@@ -48,14 +48,18 @@ uv run python -m backend.cli.entry
 
 ### Testing before a pull request
 
-This matches what **required** GitHub Actions jobs run (Linux and Windows full unit gates):
+**Required** GitHub Actions jobs on Linux and Windows run the full **unit** corpus only. Match that locally before you open a PR:
 
 ```bash
 uv sync --group dev --group test --group runtime
 PYTHONPATH=. uv run pytest backend/tests/unit
 ```
 
-Optional: same command with `uv run pytest backend/tests/unit -q` for quieter output. The default `pytest` invocation (per [`pytest.ini`](pytest.ini)) discovers `backend/tests/unit` only; tests marked `heavy`, `integration`, or `benchmark` are not selected by default and are covered on a [separate CI schedule](docs/CI.md#heavy--integration--benchmark-tier).
+Optional: `uv run pytest backend/tests/unit -q` for quieter output.
+
+A bare `pytest` or `PYTHONPATH=. uv run pytest` from the repository root discovers all of **`backend/tests`** (unit, integration, e2e, stress, and so on) per [`pytest.ini`](pytest.ini). That run is much slower and may need extra services; use it when your change spans those tiers or before a large release.
+
+The scheduled **Heavy / Integration Tests** job runs a marker-filtered slice (`pytest backend/tests -m "heavy or integration or benchmark"`). See [docs/CI.md](docs/CI.md#heavy--integration--benchmark-tier).
 
 If your change touches the CLI, REPL, or orchestration hot paths, also run the [CLI regression workflow](.github/workflows/e2e-tests.yml) locally when possible (it may also run on PRs when files under `backend/`, `launch/`, etc. change).
 

@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 # CI tiers (see docs/CI.md):
-# - gates-on-linux / gates-on-windows: full backend/tests/unit (matches pytest.ini testpaths).
+# - gates-on-linux / gates-on-windows: full backend/tests/unit (fast PR gates; narrower than pytest.ini testpaths).
 # - heavy-tests: pytest markers heavy | integration | benchmark (schedule, main, manual).
 jobs:
   gates-on-linux:

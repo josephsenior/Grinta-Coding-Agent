@@ -50,7 +50,7 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for the LLM model.
 
     Attributes:
-        model: The model to use (e.g., openai/gpt-4o, anthropic/claude-3-5-sonnet).
+        model: The model to use (e.g., openai/gpt-4o, anthropic/claude-sonnet-4-6).
         api_key: The API key to use.
         base_url: The base URL for the API.
         api_version: The version of the API.
@@ -273,8 +273,8 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             model=...
             num_retries = 5
             [llm.claude]
-            model="claude-3-5-sonnet"
-        results in num_retries APPLIED to claude-3-5-sonnet.
+            model="claude-sonnet-4-6"
+        results in num_retries APPLIED to claude-sonnet-4-6.
 
         Returns:
             dict[str, LLMConfig]: A mapping where the key "llm" corresponds to the default configuration

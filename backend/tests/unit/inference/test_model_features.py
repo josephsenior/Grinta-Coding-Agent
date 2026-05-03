@@ -30,8 +30,8 @@ class TestNormalizeModelName:
             ('GPT-4o', 'gpt-4o'),
             ('  gpt-4  ', 'gpt-4'),
             ('openai/gpt-4o-mini', 'gpt-4o-mini'),
-            ('anthropic/claude-3.5-sonnet', 'claude-3.5-sonnet'),
-            ('google/gemini-2.0-flash', 'gemini-2.0-flash'),
+            ('anthropic/claude-sonnet-4-6', 'claude-sonnet-4-6'),
+            ('google/gemini-2.5-flash', 'gemini-2.5-flash'),
             # Multiple slashes — keep after last /
             ('org/team/model-v2', 'model-v2'),
             # Ollama-style :tag stripped
@@ -77,7 +77,7 @@ class TestModelMatches:
         assert model_matches('openai/gpt-4o-mini', ['gpt-4o*']) is True
 
     def test_multiple_patterns_first_match_wins(self):
-        assert model_matches('claude-3.5-sonnet-20241022', ['gpt*', 'claude*']) is True
+        assert model_matches('claude-sonnet-4-6', ['gpt*', 'claude*']) is True
 
     def test_no_patterns_returns_false(self):
         assert model_matches('gpt-4o', []) is False
@@ -123,9 +123,9 @@ class TestPatternSanity:
     @pytest.mark.parametrize(
         'model',
         [
-            'claude-3-5-sonnet-20241022',
+            'claude-sonnet-4-6',
             'gpt-4o-2024-11-20',
-            'google/gemini-2.0-flash',
+            'google/gemini-2.5-flash',
             'grok-3',
         ],
     )
@@ -134,7 +134,7 @@ class TestPatternSanity:
 
     @pytest.mark.parametrize(
         'model',
-        ['o3-mini', 'o1-preview', 'gemini-2.5-pro', 'deepseek-chat'],
+        ['gpt-5.5', 'gemini-3.1-pro-preview', 'gemini-2.5-pro', 'deepseek-chat'],
     )
     def test_reasoning_effort_models(self, model):
         assert model_matches(model, REASONING_EFFORT_PATTERNS)
@@ -142,10 +142,10 @@ class TestPatternSanity:
     @pytest.mark.parametrize(
         'model',
         [
-            'claude-3.5-sonnet-20241022',
-            'claude-3-haiku-20240307',
-            'google/gemini-2.0-flash',
-            'gemini-2.5-pro',
+            'claude-sonnet-4-6',
+            'claude-haiku-4-5-20251001',
+            'google/gemini-2.5-flash',
+            'gemini-3-flash',
         ],
     )
     def test_prompt_cache_models(self, model):
@@ -153,14 +153,14 @@ class TestPatternSanity:
 
     @pytest.mark.parametrize(
         'model',
-        ['o1-preview', 'deepseek-reasoner'],
+        ['o1-preview', 'xai/grok-4', 'deepseek-reasoner'],
     )
     def test_stop_words_disabled_models(self, model):
         assert model_matches(model, SUPPORTS_STOP_WORDS_FALSE_PATTERNS)
 
     @pytest.mark.parametrize(
         'model',
-        ['gpt-4o', 'claude-3.5-sonnet-20241022', 'google/gemini-2.0-flash'],
+        ['gpt-4o', 'claude-sonnet-4-6', 'google/gemini-2.5-flash'],
     )
     def test_response_schema_models(self, model):
         assert model_matches(model, RESPONSE_SCHEMA_PATTERNS)

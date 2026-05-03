@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **CI:** `py-tests` required jobs on Linux and Windows now run the full
-  `backend/tests/unit` corpus (aligned with `pytest.ini`), not a fixed
-  nine-file slice. [docs/CI.md](docs/CI.md) documents the tiers.
+- **CI:** `py-tests` required jobs on Linux and Windows run the full
+  `backend/tests/unit` corpus (fast PR gates), not a fixed nine-file slice.
+  [docs/CI.md](docs/CI.md) documents the tiers.
+- **Testing:** [`pytest.ini`](pytest.ini) `testpaths` defaults to
+  `backend/tests` (full tree for a bare `pytest`); use `pytest backend/tests/unit`
+  to match the required gates locally.
 - **Docs:** [CONTRIBUTING.md](CONTRIBUTING.md) testing instructions match CI;
   added [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md),
   [docs/REGRESSION_TESTS.md](docs/REGRESSION_TESTS.md); user-facing autonomy

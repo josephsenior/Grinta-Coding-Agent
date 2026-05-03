@@ -1,19 +1,54 @@
 {
   "models": {
-    "gpt-5-nano": {
+    "gpt-5.5": {
       "provider": "openai",
       "aliases": [
-        "openai/gpt-5-nano"
+        "openai/gpt-5.5"
+      ],
+      "max_input_tokens": 400000,
+      "max_output_tokens": 128000,
+      "input_price_per_m": 1.25,
+      "output_price_per_m": 10.0,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_response_schema": true,
+      "supports_vision": true,
+      "supports_reasoning_effort": true,
+      "use_max_completion_tokens": true
+    },
+    "gpt-5.4-mini": {
+      "provider": "openai",
+      "aliases": [
+        "openai/gpt-5.4-mini"
+      ],
+      "max_input_tokens": 256000,
+      "max_output_tokens": 64000,
+      "input_price_per_m": 0.3,
+      "output_price_per_m": 1.2,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_vision": true,
+      "supports_reasoning_effort": true,
+      "use_max_completion_tokens": true
+    },
+    "gpt-5.4-nano": {
+      "provider": "openai",
+      "aliases": [
+        "openai/gpt-5.4-nano"
       ],
       "max_input_tokens": 128000,
       "max_output_tokens": 32768,
-      "verified": false,
+      "input_price_per_m": 0.15,
+      "output_price_per_m": 0.6,
+      "verified": true,
       "featured": false,
       "supports_function_calling": true,
       "supports_parallel_tool_calls": true,
-      "strip_temperature": true,
-      "strip_top_p": true,
-      "strip_penalties": true,
+      "supports_vision": true,
       "use_max_completion_tokens": true
     },
     "gpt-5.3-codex-spark": {
@@ -33,10 +68,49 @@
       "supports_response_schema": true,
       "supports_vision": true
     },
+    "gpt-5.1": {
+      "provider": "openai",
+      "aliases": [
+        "openai/gpt-5.1",
+        "gpt-5.1-2025-11-13"
+      ],
+      "max_input_tokens": 400000,
+      "max_output_tokens": 128000,
+      "input_price_per_m": 1.25,
+      "output_price_per_m": 10.0,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_response_schema": true,
+      "supports_vision": true,
+      "supports_reasoning_effort": true,
+      "use_max_completion_tokens": true
+    },
+    "gpt-5.1-codex": {
+      "provider": "openai",
+      "aliases": [
+        "openai/gpt-5.1-codex",
+        "gpt-5.1-codex"
+      ],
+      "max_input_tokens": 400000,
+      "max_output_tokens": 128000,
+      "input_price_per_m": 1.25,
+      "output_price_per_m": 10.0,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_response_schema": true,
+      "supports_vision": true,
+      "supports_reasoning_effort": true,
+      "use_max_completion_tokens": true
+    },
     "gpt-5.2": {
       "provider": "openai",
       "aliases": [
-        "openai/gpt-5.2"
+        "openai/gpt-5.2",
+        "gpt-5.2-2025-12-11"
       ],
       "max_input_tokens": 256000,
       "max_output_tokens": 64000,
@@ -46,7 +120,9 @@
       "featured": true,
       "supports_function_calling": true,
       "supports_parallel_tool_calls": true,
-      "supports_vision": true
+      "supports_vision": true,
+      "supports_reasoning_effort": true,
+      "use_max_completion_tokens": true
     },
     "gpt-5": {
       "provider": "openai",
@@ -58,11 +134,13 @@
       "input_price_per_m": 3.0,
       "output_price_per_m": 12.0,
       "verified": true,
-      "featured": true,
+      "featured": false,
       "supports_function_calling": true,
       "supports_parallel_tool_calls": true,
       "supports_response_schema": true,
-      "supports_vision": true
+      "supports_vision": true,
+      "supports_reasoning_effort": true,
+      "use_max_completion_tokens": true
     },
     "gpt-4.5": {
       "provider": "openai",
@@ -87,7 +165,7 @@
         "gpt-4o-2024-08-06"
       ],
       "max_input_tokens": 128000,
-      "max_output_tokens": 4096,
+      "max_output_tokens": 16384,
       "input_price_per_m": 2.5,
       "output_price_per_m": 10.0,
       "verified": true,
@@ -103,7 +181,7 @@
         "openai/gpt-4o-mini"
       ],
       "max_input_tokens": 128000,
-      "max_output_tokens": 4096,
+      "max_output_tokens": 16384,
       "input_price_per_m": 0.15,
       "output_price_per_m": 0.6,
       "verified": true,
@@ -120,10 +198,11 @@
         "gpt-4.1-2025-04-14"
       ],
       "max_input_tokens": 128000,
-      "max_output_tokens": 4096,
+      "max_output_tokens": 32768,
       "input_price_per_m": 2.0,
       "output_price_per_m": 8.0,
       "verified": true,
+      "featured": false,
       "supports_function_calling": true,
       "supports_parallel_tool_calls": true,
       "supports_vision": true
@@ -134,9 +213,10 @@
         "openai/gpt-4.1-mini"
       ],
       "max_input_tokens": 128000,
-      "max_output_tokens": 4096,
+      "max_output_tokens": 32768,
       "input_price_per_m": 0.4,
       "output_price_per_m": 1.6,
+      "verified": true,
       "supports_function_calling": true,
       "supports_parallel_tool_calls": true,
       "supports_vision": true
@@ -147,123 +227,108 @@
         "openai/gpt-4.1-nano"
       ],
       "max_input_tokens": 128000,
-      "max_output_tokens": 4096,
+      "max_output_tokens": 32768,
       "input_price_per_m": 0.1,
       "output_price_per_m": 0.4,
+      "verified": false,
       "supports_function_calling": true,
       "supports_parallel_tool_calls": true
     },
     "gpt-4-turbo": {
       "provider": "openai",
+      "aliases": [
+        "openai/gpt-4-turbo"
+      ],
       "max_input_tokens": 128000,
       "max_output_tokens": 4096,
       "input_price_per_m": 10.0,
       "output_price_per_m": 30.0,
+      "verified": true,
       "supports_function_calling": true,
       "supports_parallel_tool_calls": true,
       "supports_response_schema": true,
       "supports_vision": true
     },
-    "o1-mini": {
+    "kimi-k2.5": {
       "provider": "openai",
       "aliases": [
-        "openai/o1-mini"
+        "openai/kimi-k2.5",
+        "moonshotai/kimi-k2.5"
       ],
-      "max_input_tokens": 200000,
-      "max_output_tokens": 100000,
-      "input_price_per_m": 1.1,
-      "output_price_per_m": 4.4,
-      "verified": true,
-      "featured": true,
+      "max_input_tokens": 256000,
+      "max_output_tokens": 8192,
+      "input_price_per_m": 0.6,
+      "output_price_per_m": 2.4,
+      "verified": false,
+      "featured": false,
       "supports_function_calling": true,
-      "supports_reasoning_effort": true,
-      "supports_response_schema": true
+      "supports_parallel_tool_calls": true,
+      "supports_vision": true
     },
-    "o1": {
-      "provider": "openai",
-      "aliases": [
-        "openai/o1"
-      ],
-      "max_input_tokens": 200000,
-      "max_output_tokens": 100000,
-      "input_price_per_m": 15.0,
-      "output_price_per_m": 60.0,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_reasoning_effort": true,
-      "supports_response_schema": true
-    },
-    "o3": {
-      "provider": "openai",
-      "aliases": [
-        "openai/o3"
-      ],
-      "max_input_tokens": 200000,
-      "max_output_tokens": 100000,
-      "input_price_per_m": 10.0,
-      "output_price_per_m": 40.0,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_reasoning_effort": true
-    },
-    "o3-mini": {
-      "provider": "openai",
-      "aliases": [
-        "openai/o3-mini"
-      ],
-      "max_input_tokens": 200000,
-      "max_output_tokens": 100000,
-      "input_price_per_m": 1.1,
-      "output_price_per_m": 4.4,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_reasoning_effort": true
-    },
-    "o4-mini": {
-      "provider": "openai",
-      "aliases": [
-        "openai/o4-mini"
-      ],
-      "max_input_tokens": 200000,
-      "max_output_tokens": 100000,
-      "input_price_per_m": 1.1,
-      "output_price_per_m": 4.4,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_reasoning_effort": true
-    },
-    "codex-mini-latest": {
-      "provider": "openai",
-      "max_input_tokens": 200000,
-      "max_output_tokens": 100000,
-      "input_price_per_m": 1.5,
-      "output_price_per_m": 6.0,
-      "verified": true
-    },
-    "claude-4.6-opus": {
+    "claude-opus-4-7": {
       "provider": "anthropic",
       "aliases": [
-        "anthropic/claude-4-opus-latest",
-        "claude-4.6-opus"
+        "anthropic/claude-opus-4-7",
+        "claude-opus-4-7-latest"
       ],
-      "max_input_tokens": 500000,
+      "max_input_tokens": 1000000,
       "max_output_tokens": 128000,
       "input_price_per_m": 15.0,
       "output_price_per_m": 75.0,
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_prompt_cache": true,
       "supports_vision": true,
       "strip_reasoning_effort": true
     },
-    "claude-4.5-sonnet": {
+    "claude-opus-4-6": {
       "provider": "anthropic",
       "aliases": [
-        "anthropic/claude-4-sonnet",
-        "claude-4.5-sonnet"
+        "anthropic/claude-opus-4-6",
+        "claude-opus-4-6"
+      ],
+      "max_input_tokens": 1000000,
+      "max_output_tokens": 128000,
+      "input_price_per_m": 15.0,
+      "output_price_per_m": 75.0,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_prompt_cache": true,
+      "supports_vision": true,
+      "strip_reasoning_effort": true
+    },
+    "claude-sonnet-4-6": {
+      "provider": "anthropic",
+      "aliases": [
+        "anthropic/claude-sonnet-4-6",
+        "claude-sonnet-4-6",
+        "anthropic/claude-sonnet-4-20250514",
+        "claude-sonnet-4-20250514"
+      ],
+      "max_input_tokens": 1000000,
+      "max_output_tokens": 64000,
+      "input_price_per_m": 3.0,
+      "output_price_per_m": 15.0,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_prompt_cache": true,
+      "supports_vision": true,
+      "strip_reasoning_effort": true
+    },
+    "claude-sonnet-4-5-20250929": {
+      "provider": "anthropic",
+      "aliases": [
+        "anthropic/claude-sonnet-4-5-20250929",
+        "anthropic/claude-sonnet-4-5-latest",
+        "anthropic/claude-4.5-sonnet",
+        "claude-4.5-sonnet",
+        "claude-sonnet-4-5"
       ],
       "max_input_tokens": 256000,
       "max_output_tokens": 64000,
@@ -272,116 +337,94 @@
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_prompt_cache": true,
       "supports_vision": true,
       "strip_reasoning_effort": true
     },
-    "claude-4-sonnet": {
+    "claude-opus-4-5-20251101": {
       "provider": "anthropic",
       "aliases": [
-        "anthropic/claude-4-sonnet",
-        "claude-4-sonnet-latest"
-      ],
-      "max_input_tokens": 200000,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 3.0,
-      "output_price_per_m": 15.0,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_prompt_cache": true,
-      "supports_vision": true
-    },
-    "claude-sonnet-4-20250514": {
-      "provider": "anthropic",
-      "aliases": [
-        "anthropic/claude-sonnet-4-20250514",
-        "claude-sonnet-4"
-      ],
-      "max_input_tokens": 200000,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 3.0,
-      "output_price_per_m": 15.0,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_prompt_cache": true,
-      "supports_vision": true
-    },
-    "claude-opus-4-20250514": {
-      "provider": "anthropic",
-      "aliases": [
-        "claude-opus-4"
+        "anthropic/claude-opus-4-5-20251101",
+        "anthropic/claude-opus-4-5-latest",
+        "claude-opus-4-5"
       ],
       "max_input_tokens": 200000,
       "max_output_tokens": 64000,
       "input_price_per_m": 15.0,
       "output_price_per_m": 75.0,
       "verified": true,
+      "featured": false,
       "supports_function_calling": true,
-      "supports_prompt_cache": true,
-      "supports_vision": true
-    },
-    "claude-opus-4-1-20250805": {
-      "provider": "anthropic",
-      "aliases": [
-        "claude-opus-4-1",
-        "claude-opus-4.1"
-      ],
-      "max_input_tokens": 200000,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 15.0,
-      "output_price_per_m": 75.0,
-      "verified": true,
-      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_prompt_cache": true,
       "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "thinking_mode": "disabled",
-      "strip_top_p": true
+      "strip_reasoning_effort": true
     },
-    "gemini-pro-latest": {
-      "provider": "google",
+    "claude-haiku-4-5-20251001": {
+      "provider": "anthropic",
       "aliases": [
-        "google/gemini-pro-latest",
-        "gemini-pro"
+        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-haiku-4-5-latest",
+        "claude-haiku-4-5"
       ],
-      "max_input_tokens": 32768,
+      "max_input_tokens": 200000,
       "max_output_tokens": 8192,
-      "input_price_per_m": 0.5,
-      "output_price_per_m": 1.5,
+      "input_price_per_m": 1.0,
+      "output_price_per_m": 5.0,
       "verified": true,
-      "featured": true,
+      "featured": false,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_prompt_cache": true,
       "supports_vision": true
     },
-    "gemini-3-deep-think": {
+    "gemini-3.1-pro-preview": {
       "provider": "google",
       "aliases": [
-        "google/gemini-3-deep-think"
+        "google/gemini-3.1-pro-preview"
       ],
-      "max_input_tokens": 2000000,
-      "max_output_tokens": 128000,
+      "max_input_tokens": 1000000,
+      "max_output_tokens": 65536,
       "input_price_per_m": 2.0,
       "output_price_per_m": 8.0,
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_reasoning_effort": true,
       "supports_vision": true
     },
     "gemini-3-flash": {
       "provider": "google",
       "aliases": [
-        "google/gemini-3-flash"
+        "google/gemini-3-flash",
+        "google/gemini-3-flash-preview",
+        "gemini-3-flash-preview"
       ],
       "max_input_tokens": 1000000,
-      "max_output_tokens": 16384,
+      "max_output_tokens": 65536,
       "input_price_per_m": 0.1,
       "output_price_per_m": 0.4,
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_vision": true
+    },
+    "gemini-3.1-flash-preview": {
+      "provider": "google",
+      "aliases": [
+        "google/gemini-3.1-flash-preview"
+      ],
+      "max_input_tokens": 1000000,
+      "max_output_tokens": 65536,
+      "input_price_per_m": 0.1,
+      "output_price_per_m": 0.4,
+      "verified": false,
+      "featured": false,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_vision": true
     },
     "gemini-3.1-flash-lite-preview": {
@@ -396,20 +439,23 @@
       "verified": false,
       "featured": false,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_vision": true
     },
     "gemini-2.5-pro": {
       "provider": "google",
       "aliases": [
-        "google/gemini-2.5-pro"
+        "google/gemini-2.5-pro",
+        "google/gemini-2.5-pro-preview-06-05"
       ],
       "max_input_tokens": 1000000,
-      "max_output_tokens": 8192,
+      "max_output_tokens": 65536,
       "input_price_per_m": 1.25,
       "output_price_per_m": 10.0,
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_reasoning_effort": true,
       "supports_vision": true,
       "thinking_mode": "budget:128",
@@ -419,68 +465,48 @@
     "gemini-2.5-flash": {
       "provider": "google",
       "aliases": [
-        "google/gemini-2.5-flash"
+        "google/gemini-2.5-flash",
+        "google/gemini-2.5-flash-preview-05-20"
+      ],
+      "max_input_tokens": 1000000,
+      "max_output_tokens": 65536,
+      "input_price_per_m": 0.15,
+      "output_price_per_m": 0.6,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_reasoning_effort": true,
+      "supports_vision": true
+    },
+    "gemini-2.5-flash-lite": {
+      "provider": "google",
+      "aliases": [
+        "google/gemini-2.5-flash-lite"
+      ],
+      "max_input_tokens": 1000000,
+      "max_output_tokens": 8192,
+      "input_price_per_m": 0.1,
+      "output_price_per_m": 0.4,
+      "verified": true,
+      "featured": false,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_vision": true
+    },
+    "gemini-2.5-flash-image": {
+      "provider": "google",
+      "aliases": [
+        "google/gemini-2.5-flash-image"
       ],
       "max_input_tokens": 1000000,
       "max_output_tokens": 8192,
       "input_price_per_m": 0.15,
       "output_price_per_m": 0.6,
       "verified": true,
-      "featured": true,
+      "featured": false,
       "supports_function_calling": true,
-      "supports_vision": true
-    },
-    "gemini-2.5-pro-preview-06-05": {
-      "provider": "google",
-      "aliases": [
-        "google/gemini-2.5-pro"
-      ],
-      "max_input_tokens": 1000000,
-      "max_output_tokens": 8192,
-      "input_price_per_m": 1.25,
-      "output_price_per_m": 10.0,
-      "supports_function_calling": true,
-      "supports_reasoning_effort": true,
-      "supports_vision": true
-    },
-    "gemini-2.5-flash-preview-05-20": {
-      "provider": "google",
-      "aliases": [
-        "google/gemini-2.5-flash"
-      ],
-      "max_input_tokens": 1000000,
-      "max_output_tokens": 8192,
-      "input_price_per_m": 0.15,
-      "output_price_per_m": 0.6,
-      "supports_function_calling": true,
-      "supports_reasoning_effort": true,
-      "supports_vision": true
-    },
-    "gemini-2.0-flash": {
-      "provider": "google",
-      "aliases": [
-        "google/gemini-2.0-flash-exp"
-      ],
-      "max_input_tokens": 1000000,
-      "max_output_tokens": 8192,
-      "input_price_per_m": 0.1,
-      "output_price_per_m": 0.4,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_vision": true
-    },
-    "gemini-2.0-flash-thinking-exp": {
-      "provider": "google",
-      "aliases": [
-        "google/gemini-2.0-flash-thinking-exp"
-      ],
-      "max_input_tokens": 1000000,
-      "max_output_tokens": 8192,
-      "input_price_per_m": 0.1,
-      "output_price_per_m": 0.4,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_reasoning_effort": true,
+      "supports_parallel_tool_calls": true,
       "supports_vision": true
     },
     "grok-4.1-fast": {
@@ -488,13 +514,15 @@
       "aliases": [
         "xai/grok-4.1-fast"
       ],
-      "max_input_tokens": 128000,
-      "max_output_tokens": 4096,
+      "max_input_tokens": 2000000,
+      "max_output_tokens": 65536,
       "input_price_per_m": 0.5,
       "output_price_per_m": 1.0,
       "verified": true,
       "featured": true,
-      "supports_function_calling": true
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_vision": true
     },
     "grok-4.1": {
       "provider": "xai",
@@ -508,6 +536,7 @@
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_vision": true
     },
     "grok-4-fast": {
@@ -515,11 +544,14 @@
       "aliases": [
         "xai/grok-4-fast"
       ],
-      "max_input_tokens": 128000,
-      "max_output_tokens": 4096,
+      "max_input_tokens": 2000000,
+      "max_output_tokens": 65536,
       "input_price_per_m": 0.5,
       "output_price_per_m": 1.0,
-      "verified": true
+      "verified": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_vision": true
     },
     "grok-4": {
       "provider": "xai",
@@ -533,6 +565,7 @@
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_vision": true
     },
     "grok-3": {
@@ -544,7 +577,9 @@
       "max_output_tokens": 4096,
       "input_price_per_m": 3.0,
       "output_price_per_m": 15.0,
+      "verified": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_vision": true
     },
     "grok-3-mini": {
@@ -556,67 +591,119 @@
       "max_output_tokens": 4096,
       "input_price_per_m": 0.3,
       "output_price_per_m": 0.5,
-      "supports_function_calling": true
+      "verified": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true
     },
     "deepseek-chat": {
       "provider": "deepseek",
+      "aliases": [
+        "deepseek/deepseek-chat"
+      ],
       "max_input_tokens": 128000,
-      "max_output_tokens": 32768,
+      "max_output_tokens": 8192,
       "input_price_per_m": 0.27,
       "output_price_per_m": 1.1,
+      "verified": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_reasoning_effort": true
     },
     "deepseek-reasoner": {
       "provider": "deepseek",
+      "aliases": [
+        "deepseek/deepseek-reasoner"
+      ],
       "max_input_tokens": 128000,
-      "max_output_tokens": 32768,
+      "max_output_tokens": 8192,
       "input_price_per_m": 0.55,
       "output_price_per_m": 2.19,
+      "verified": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_reasoning_effort": true
     },
     "mistral-large-latest": {
       "provider": "mistral",
+      "aliases": [
+        "mistral/mistral-large-latest"
+      ],
       "max_input_tokens": 128000,
-      "max_output_tokens": 4096,
+      "max_output_tokens": 8192,
       "input_price_per_m": 2.0,
-      "output_price_per_m": 6.0
+      "output_price_per_m": 6.0,
+      "verified": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true
     },
     "codestral-latest": {
       "provider": "mistral",
+      "aliases": [
+        "mistral/codestral-latest"
+      ],
       "max_input_tokens": 256000,
       "max_output_tokens": 8192,
       "input_price_per_m": 0.3,
-      "output_price_per_m": 0.9
-    },
-    "devstral-small-2505": {
-      "provider": "mistral",
-      "max_input_tokens": 128000,
-      "max_output_tokens": 8192,
-      "input_price_per_m": 0.25,
-      "output_price_per_m": 0.75,
-      "verified": true
+      "output_price_per_m": 0.9,
+      "verified": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true
     },
     "devstral-small-2507": {
       "provider": "mistral",
+      "aliases": [
+        "mistral/devstral-small-2507"
+      ],
       "max_input_tokens": 128000,
       "max_output_tokens": 8192,
       "input_price_per_m": 0.25,
       "output_price_per_m": 0.75,
-      "verified": true
+      "verified": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true
     },
     "devstral-medium-2507": {
       "provider": "mistral",
+      "aliases": [
+        "mistral/devstral-medium-2507"
+      ],
       "max_input_tokens": 128000,
       "max_output_tokens": 8192,
       "input_price_per_m": 1.0,
       "output_price_per_m": 3.0,
-      "verified": true
+      "verified": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true
     }
   },
   "tier_pricing": {
+    "gpt-5.5": {
+      "input": 1.25,
+      "output": 10.0
+    },
+    "gpt-5.4-mini": {
+      "input": 0.3,
+      "output": 1.2
+    },
+    "gpt-5.4-nano": {
+      "input": 0.15,
+      "output": 0.6
+    },
     "gpt-5.3": {
       "input": 5.0,
       "output": 20.0
+    },
+    "gpt-5.1-codex": {
+      "input": 1.25,
+      "output": 10.0
+    },
+    "gpt-5.1": {
+      "input": 1.25,
+      "output": 10.0
+    },
+    "gpt-5.2": {
+      "input": 4.0,
+      "output": 16.0
     },
     "gpt-5": {
       "input": 3.0,
@@ -638,33 +725,41 @@
       "input": 10.0,
       "output": 30.0
     },
-    "gpt-3.5": {
-      "input": 0.5,
-      "output": 1.5
+    "kimi-k2": {
+      "input": 0.6,
+      "output": 2.4
     },
-    "o3-mini": {
-      "input": 1.1,
-      "output": 4.4
-    },
-    "o4-mini": {
-      "input": 1.1,
-      "output": 4.4
-    },
-    "claude-4.6": {
+    "claude-opus-4-7": {
       "input": 15.0,
       "output": 75.0
     },
-    "claude-4.5": {
+    "claude-opus-4-6": {
+      "input": 15.0,
+      "output": 75.0
+    },
+    "claude-opus-4-5": {
+      "input": 15.0,
+      "output": 75.0
+    },
+    "claude-sonnet-4-6": {
       "input": 3.0,
       "output": 15.0
     },
-    "claude-sonnet-4": {
+    "claude-sonnet-4-5": {
       "input": 3.0,
       "output": 15.0
     },
-    "gemini-3": {
+    "claude-haiku-4-5": {
+      "input": 1.0,
+      "output": 5.0
+    },
+    "gemini-3.1": {
       "input": 2.0,
       "output": 8.0
+    },
+    "gemini-3-flash": {
+      "input": 0.1,
+      "output": 0.4
     },
     "gemini-2.5-pro": {
       "input": 1.25,
@@ -674,7 +769,7 @@
       "input": 0.15,
       "output": 0.6
     },
-    "gemini-2.0-flash": {
+    "gemini-2.5-flash-lite": {
       "input": 0.1,
       "output": 0.4
     },
@@ -705,6 +800,10 @@
     "codestral": {
       "input": 0.3,
       "output": 0.9
+    },
+    "devstral": {
+      "input": 0.25,
+      "output": 0.75
     }
   }
 }

@@ -1,14 +1,14 @@
 # Continuous integration
 
-This document describes what runs in GitHub Actions and how it relates to local `pytest` defaults ([`pytest.ini`](../pytest.ini)).
+This document describes what runs in GitHub Actions and how it relates to local `pytest` ([`pytest.ini`](../pytest.ini)). Required PR gates run the **unit** tree only; a bare `pytest` from the repo root follows `pytest.ini` and discovers the full **`backend/tests`** tree (slower, may need services).
 
 ## Required checks on pull requests
 
 | Workflow | Job | What runs |
 |----------|-----|-----------|
-| **Run Python Tests** | `gates-on-linux` | Full unit corpus: `pytest backend/tests/unit` (same discovery as local `pytest` with default `testpaths`). |
-| **Run Python Tests** | `gates-on-windows` | Same full unit corpus on `windows-latest`. |
-| **Run Python Tests** | `gates-on-macos` | Same full unit corpus on `macos-latest` — **advisory only** (`continue-on-error: true`) until the matrix is promoted to required. |
+| **Run Python Tests** | `gates-on-linux` | Full unit corpus: `pytest backend/tests/unit` (required PR gates; narrower than a bare local `pytest`, which uses `testpaths = backend/tests` in [`pytest.ini`](../pytest.ini)). |
+| **Run Python Tests** | `gates-on-windows` | Same unit corpus as `gates-on-linux` on `windows-latest`. |
+| **Run Python Tests** | `gates-on-macos` | Same unit corpus as `gates-on-linux` on `macos-latest` — **advisory only** (`continue-on-error: true`) until the matrix is promoted to required. |
 | **Lint** | pre-commit, mypy, version check | See [`.github/workflows/lint.yml`](../.github/workflows/lint.yml). |
 | **Dependency Review** | `dependency-review` | Blocks high-severity dependency risk on pull requests. |
 | **CodeQL** | `analyze` | Static security analysis for Python on PRs and main. |
@@ -24,9 +24,9 @@ The **Heavy / Integration Tests** job in `py-tests.yml` runs only when:
 - manually dispatched, or
 - the push is to `main`.
 
-It executes: `pytest -m "heavy or integration or benchmark"`.
+It executes: `pytest backend/tests -m "heavy or integration or benchmark"`.
 
-Markers are defined in `pytest.ini`. Default local `pytest` does **not** include those unless you opt in.
+Markers are defined in `pytest.ini`. That job is marker-filtered over the full tree. A bare local `pytest` (no path arguments) still collects all of `backend/tests` per `testpaths`; narrow with `pytest backend/tests/unit` or add `-m` when you want a smaller slice.
 
 ## What to run before opening a PR
 

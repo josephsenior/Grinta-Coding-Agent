@@ -35,7 +35,13 @@ Most application code lives under `backend/`. The supported interactive surface 
 
 ## Running Tests
 
-From the project root:
+From the project root, `uv run pytest` (no path) discovers all of `backend/tests` per the repo [`pytest.ini`](../pytest.ini). To match the required PR gates (unit only):
+
+```bash
+uv run pytest backend/tests/unit
+```
+
+To run the full tree explicitly:
 
 ```bash
 uv run pytest backend/tests

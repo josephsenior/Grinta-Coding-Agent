@@ -148,6 +148,12 @@ Grinta executes on local host permissions.
 uv run pytest backend/tests/unit/ --tb=short -q
 ```
 
+That matches the **required** PR gates (`backend/tests/unit` only). A bare `pytest` or `uv run pytest` from the repository root follows [`pytest.ini`](../pytest.ini) and collects all of **`backend/tests`** (integration, e2e, stress, and so on)—expect a long run and possible extra services.
+
+```bash
+PYTHONPATH=. uv run pytest --tb=short -q
+```
+
 ### Targeted checks
 
 ```bash

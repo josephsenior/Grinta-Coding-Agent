@@ -123,8 +123,8 @@ class TestLlmSupportsToolChoice:
             'gpt-4-turbo',
             'claude-opus-4',
             'claude-4-sonnet',
-            'o3-mini',
-            'o4-mini',
+            'gpt-5.2',
+            'gpt-4.1-mini',
         ],
     )
     def test_supported_models(self, model):

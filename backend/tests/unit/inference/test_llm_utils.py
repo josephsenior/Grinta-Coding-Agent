@@ -85,7 +85,7 @@ class TestCheckTools:
     def test_anthropic_model_unchanged(self):
         """Test Anthropic models don't trigger cleaning."""
         tools = [{'function': {'parameters': {'properties': {'x': {'default': 'y'}}}}}]
-        config = LLMConfig(model='claude-3-5-sonnet-20241022', api_key='test')
+        config = LLMConfig(model='claude-sonnet-4-6', api_key='test')
         result = check_tools(tools, config)
         assert result is tools
 

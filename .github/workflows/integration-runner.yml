@@ -107,7 +107,7 @@ jobs:
 
       - name: Configure settings.json for testing with Haiku
         env:
-          LLM_MODEL: "litellm_proxy/claude-3-5-haiku-20241022"
+          LLM_MODEL: "litellm_proxy/anthropic/claude-haiku-4-5-20251001"
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           MAX_ITERATIONS: 10

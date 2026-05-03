@@ -59,7 +59,7 @@ from backend.core.config.llm_config import LLMConfig
 
 # Create LLM instance
 config = LLMConfig(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     api_key="sk-ant-...",
     temperature=0.0,
     max_output_tokens=8000
@@ -211,7 +211,7 @@ if features.supports_reasoning_effort:
 | Provider | Models | API Key Env Var | Key Prefix |
 |----------|--------|-----------------|------------|
 | Anthropic | Claude 3.5, 4, 4.5 | `ANTHROPIC_API_KEY` | `sk-ant-` |
-| OpenAI | GPT-4, GPT-5, o3, o4-mini | `OPENAI_API_KEY` | `sk-` |
+| OpenAI | GPT-4.x, GPT-5.x | `OPENAI_API_KEY` | `sk-` |
 | OpenRouter | 200+ models (meta-provider) | `OPENROUTER_API_KEY` | `sk-or-` |
 | xAI | Grok 4, Grok 4 Fast | `XAI_API_KEY` | - |
 | Google | Gemini 2.5 Pro, Flash | `GEMINI_API_KEY` | `AIza` |
@@ -290,7 +290,7 @@ llm = LLM(model="gpt-4")  # → https://api.openai.com/v1
 
 ```toml
 [llm]
-model = "claude-sonnet-4-20250514"
+model = "claude-sonnet-4-6"
 api_key = "sk-ant-..."
 temperature = 0.0
 max_output_tokens = 8000
@@ -315,7 +315,7 @@ max_message_chars = 30000  # Truncate long messages
 
 ```bash
 # Model selection
-LLM_MODEL=claude-sonnet-4-20250514
+LLM_MODEL=claude-sonnet-4-6
 
 # API keys (cloud providers)
 ANTHROPIC_API_KEY=sk-ant-...
@@ -426,7 +426,7 @@ output_cost_per_token = 0.003
 ```python
 # Enable caching
 config = LLMConfig(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     caching_prompt=True  # Enable caching
 )
 
@@ -581,7 +581,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 curl http://localhost:3000/api/options/models
 
 # Check model name format:
-# Correct: "claude-sonnet-4-20250514"
+# Correct: "claude-sonnet-4-6"
 # Correct: "openrouter/anthropic/claude-3.5-sonnet"
 # Wrong: "claude-sonnet-4" (missing date)
 ```
@@ -643,7 +643,7 @@ ollama pull qwen2.5-coder
 
 - `claude-sonnet-4-5-20250929` - Best for coding
 - `gpt-5-2025-08-07` - Frontier model
-- `o3-mini` - Best reasoning
+- `gpt-5.5` - Flagship reasoning + tools
 
 **For cost:**
 
@@ -655,7 +655,7 @@ ollama pull qwen2.5-coder
 
 ```toml
 [llm]
-model = "claude-sonnet-4-20250514"
+model = "claude-sonnet-4-6"
 caching_prompt = true  # 35-50% cost savings
 ```
 
