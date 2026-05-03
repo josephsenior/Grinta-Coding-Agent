@@ -21,7 +21,7 @@ On workspace-modifying tasks, call `recall(key="lessons")` once. Skip for pure Q
 
 <EXECUTION_DISCIPLINE>
 Loop: reason clearly → use tools → advance.
-**Re-read policy:** Do not re-read a file you just wrote in the same turn.
+**Re-read policy:** Do not re-read a file you just wrote in the same turn **except** when grounding **tests or public API contracts** against that same file (see rule 8 in `<CRITICAL_TOOL_EXECUTION_RULES>` in `system_partial_04_critical.md`).
 **Priorities:** SECURITY > CORRECTNESS > EFFICIENCY > SIMPLICITY.
 **Batching:** {batch_commands}
 **Tool-call batching mode:** {tool_call_batching_mode}
