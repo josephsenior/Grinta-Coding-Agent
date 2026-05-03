@@ -76,6 +76,55 @@ def _explore_hint(_config: Any = None) -> str:
     )
 
 
+def _repo_discovery_contract(
+    *,
+    is_windows: bool,
+    windows_with_bash: bool,
+    shell_is_powershell: bool,
+) -> str:
+    """One line: prefer ladder tools for repo intelligence; shell details live in SHELL_IDENTITY."""
+    if not is_windows:
+        return (
+            'Repo/source intelligence: follow `<TOOL_ROUTING_LADDER>` and use '
+            '`text_editor`/`read_file`—avoid improvised `find`/`grep`/`cat` tree walks; '
+            '`<SHELL_IDENTITY>` governs allowed shell usage.'
+        )
+    if windows_with_bash:
+        return (
+            'Repo/source intelligence: follow `<TOOL_ROUTING_LADDER>` and editors first; '
+            'terminal is Git Bash under `<SHELL_IDENTITY>`.'
+        )
+    if shell_is_powershell:
+        return (
+            'Repo/source intelligence: follow `<TOOL_ROUTING_LADDER>` and editors first; '
+            'do not use Unix-only shell habits in PowerShell—see `<SHELL_IDENTITY>`.'
+        )
+    return (
+        'Repo/source intelligence: follow `<TOOL_ROUTING_LADDER>` first; '
+        'see `<SHELL_IDENTITY>` for shell-specific rules.'
+    )
+
+
+def _path_uncertainty_hint(
+    explore: str,
+    *,
+    is_windows: bool,
+    windows_with_bash: bool,
+    shell_is_powershell: bool,
+) -> str:
+    """Short ERROR_RECOVERY path line; defers anti-pattern lists to SHELL_IDENTITY."""
+    if not is_windows:
+        return (
+            f'When paths are uncertain: use {explore}; boundaries in '
+            '`<TOOL_ROUTING_LADDER>` + `<SHELL_IDENTITY>`.'
+        )
+    if windows_with_bash:
+        return f'When paths are uncertain: use {explore}; Git Bash rules in `<SHELL_IDENTITY>`.'
+    if shell_is_powershell:
+        return f'When paths are uncertain: use {explore}; PowerShell rules in `<SHELL_IDENTITY>`.'
+    return f'When paths are uncertain: use {explore}; see `<SHELL_IDENTITY>`.'
+
+
 def _routing_tool_batching_paragraph(function_calling_mode: str | None) -> str:
     mode = (function_calling_mode or 'unknown').strip().lower()
     if mode == 'native':
@@ -157,6 +206,9 @@ def _render_routing(
     is_windows: bool,
     config: Any = None,
     function_calling_mode: str | None = None,
+    *,
+    windows_with_bash: bool = False,
+    shell_is_powershell: bool = False,
 ) -> str:
     explore = _explore_hint(config)
     lsp_available = _lsp_available(config)
@@ -164,15 +216,25 @@ def _render_routing(
     working_memory_on = getattr(config, 'enable_working_memory', True)
     condensation_on = getattr(config, 'enable_condensation_request', False)
     tracker_on = getattr(config, 'enable_task_tracker_tool', False)
-    batch_cmds = _choose(
-        is_windows,
-        f'Use **PowerShell** only for environment actions (install, build, test, git, processes). '
-        f'For repo layout and file content, use **{explore}** '
-        'and **`text_editor` (`read_file`)**—not `Get-Content`/`Select-String` pipelines for source trees.',
-        f'Use **bash** only for environment actions (install, build, test, git, processes). '
-        f'For repo layout and file content, use **{explore}** '
-        'and **`text_editor` (`read_file`)**—not `ls && cat && grep` chains for project files.',
+    if not is_windows:
+        env_line = (
+            'Use **bash** for environment actions (install, build, test, git, processes). '
+        )
+    elif windows_with_bash:
+        env_line = (
+            'Use **bash** (Git Bash on Windows) for environment actions '
+            '(install, build, test, git, processes). '
+        )
+    else:
+        env_line = (
+            'Use **PowerShell** for environment actions (install, build, test, git, processes). '
+        )
+    discovery = _repo_discovery_contract(
+        is_windows=is_windows,
+        windows_with_bash=windows_with_bash,
+        shell_is_powershell=shell_is_powershell,
     )
+    batch_cmds = env_line + discovery
     lsp_routing = (
         '- **Known file + symbol position, precise definition/references/hover** → `lsp`'
         if lsp_available
@@ -393,7 +455,12 @@ def _render_security(cli_mode: bool = True) -> str:
 
 
 def _render_autonomy(
-    render_partial: Callable[..., str], config: Any, is_windows: bool
+    render_partial: Callable[..., str],
+    config: Any,
+    *,
+    is_windows: bool,
+    windows_with_bash: bool,
+    shell_is_powershell: bool,
 ) -> str:
     checkpoints = getattr(config, 'enable_checkpoints', False)
     lsp_available = _lsp_available(config)
@@ -419,10 +486,12 @@ def _render_autonomy(
         f'{cp_line}\n</AUTONOMY>'
     )
 
-    path_hint = _choose(
-        is_windows,
-        f'run {_explore_hint(config)}, or list with `Get-ChildItem` only if no tool fits',
-        f'run {_explore_hint(config)}—avoid blind `cat` of guessed paths',
+    explore = _explore_hint(config)
+    path_hint = _path_uncertainty_hint(
+        explore,
+        is_windows=is_windows,
+        windows_with_bash=windows_with_bash,
+        shell_is_powershell=shell_is_powershell,
     )
     lsp_fallback = (
         '- `search_code` returns nothing → try `lsp`'
@@ -468,20 +537,26 @@ def _render_autonomy(
 
 def _render_tool_reference(
     render_partial: Callable[..., str],
-    is_windows: bool,
     config: Any = None,
+    *,
+    is_windows: bool,
+    windows_with_bash: bool,
+    shell_is_powershell: bool,
 ) -> str:
     explore = _explore_hint(config)
-    confirm_cmd = _choose(
-        is_windows,
-        f'If unsure where a file lives, use {explore} before opening it—not only `Get-ChildItem`.',
-        f'If unsure where a file lives, use {explore} before opening it—not only `ls`.',
-    )
-    proc_find = _choose(
-        is_windows,
-        "Find: `Get-Process | Where-Object { $_.ProcessName -like '*name*' }`; kill: `Stop-Process -Id <PID>`.",
-        'Never `pkill -f` broadly — `ps`/`grep` then `kill <PID>`.',
-    )
+    confirm_cmd = _path_uncertainty_hint(
+        explore,
+        is_windows=is_windows,
+        windows_with_bash=windows_with_bash,
+        shell_is_powershell=shell_is_powershell,
+    ) + ' Prefer editors over shell directory guessing.'
+    if not is_windows or windows_with_bash:
+        proc_find = 'Never `pkill -f` broadly — `ps`/`grep` then `kill <PID>`.'
+    else:
+        proc_find = (
+            "Find: `Get-Process | Where-Object { $_.ProcessName -like '*name*' }`; "
+            'kill: `Stop-Process -Id <PID>`.'
+        )
     checkpoints = getattr(config, 'enable_checkpoints', False)
     checkpoint_rollback_hint = (
         '; use **checkpoint** for coarse rollback' if checkpoints else ''
