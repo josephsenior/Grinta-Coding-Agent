@@ -9,6 +9,9 @@ from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.execution.base import Runtime
 from backend.orchestration import SessionOrchestrator
+from backend.orchestration.runtime_late_error_guard import (
+    should_skip_agent_error_transition_for_runtime_callback,
+)
 from backend.utils.async_utils import run_or_schedule
 
 
@@ -32,25 +35,28 @@ def _handle_error_status(
         except Exception:
             logger.debug('Failed to record memory error boundary', exc_info=True)
         # Schedule safely across threads without requiring a running loop
-        try:
-            run_or_schedule(controller.set_agent_state_to(AgentState.ERROR))
-        except Exception:
-            logger.warning(
-                'Failed to schedule ERROR state transition via run_or_schedule',
-                exc_info=True,
-            )
+        if should_skip_agent_error_transition_for_runtime_callback(controller):
+            pass
+        else:
             try:
-                from backend.utils.async_utils import create_tracked_task
-
-                create_tracked_task(
-                    controller.set_agent_state_to(AgentState.ERROR),
-                    name='error-state-fallback',
-                )
+                run_or_schedule(controller.set_agent_state_to(AgentState.ERROR))
             except Exception:
-                logger.error(
-                    'All attempts to transition agent to ERROR state failed',
+                logger.warning(
+                    'Failed to schedule ERROR state transition via run_or_schedule',
                     exc_info=True,
                 )
+                try:
+                    from backend.utils.async_utils import create_tracked_task
+
+                    create_tracked_task(
+                        controller.set_agent_state_to(AgentState.ERROR),
+                        name='error-state-fallback',
+                    )
+                except Exception:
+                    logger.error(
+                        'All attempts to transition agent to ERROR state failed',
+                        exc_info=True,
+                    )
 
 
 def _create_status_callback(

@@ -4,6 +4,9 @@ from typing import TYPE_CHECKING
 
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
+from backend.orchestration.runtime_late_error_guard import (
+    TERMINALS_NO_LATE_RUNTIME_ERROR_PROMOTION,
+)
 from backend.ledger import EventSource
 from backend.ledger.action import ActionConfirmationStatus
 from backend.ledger.observation import AgentStateChangedObservation
@@ -145,6 +148,18 @@ class StateTransitionService:
         )
 
         if new_state == old_state:
+            return
+
+        # Late runtime callbacks may race after stop/finish; do not promote to ERROR.
+        if (
+            new_state == AgentState.ERROR
+            and old_state in TERMINALS_NO_LATE_RUNTIME_ERROR_PROMOTION
+        ):
+            logger.warning(
+                'Ignoring agent ERROR transition from %s (late runtime tail); '
+                'see last_error / logs for diagnostics.',
+                old_state,
+            )
             return
 
         # ── Transition validation ──────────────────────────────────────
