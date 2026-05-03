@@ -1464,6 +1464,54 @@ async def test_cancel_agent_stops_task() -> None:
 
 
 @pytest.mark.asyncio
+async def test_ensure_controller_loop_reconnects_after_hard_kill() -> None:
+    """After interrupt/hard_kill, next turn must await runtime.connect()."""
+    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    runtime = MagicMock()
+    runtime.runtime_initialized = False
+    connect = AsyncMock()
+    runtime.connect = connect
+
+    controller = MagicMock()
+    controller.get_agent_state.return_value = AgentState.RUNNING
+
+    async def run_agent_until_done(*_a: object, **_k: object) -> None:
+        await asyncio.sleep(0)
+
+    await repl._ensure_controller_loop(
+        controller=controller,
+        agent_task=None,
+        create_controller=MagicMock(),
+        create_status_callback=MagicMock(return_value=None),
+        run_agent_until_done=run_agent_until_done,
+        agent=MagicMock(),
+        runtime=runtime,
+        config=_make_config(),
+        conversation_stats=MagicMock(),
+        memory=MagicMock(),
+        end_states=[AgentState.FINISHED],
+    )
+    connect.assert_awaited_once()
+
+    connect.reset_mock()
+    runtime.runtime_initialized = True
+    await repl._ensure_controller_loop(
+        controller=controller,
+        agent_task=None,
+        create_controller=MagicMock(),
+        create_status_callback=MagicMock(return_value=None),
+        run_agent_until_done=run_agent_until_done,
+        agent=MagicMock(),
+        runtime=runtime,
+        config=_make_config(),
+        conversation_stats=MagicMock(),
+        memory=MagicMock(),
+        end_states=[AgentState.FINISHED],
+    )
+    connect.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_repl_run_saves_controller_state_on_exit() -> None:
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
     controller = MagicMock()

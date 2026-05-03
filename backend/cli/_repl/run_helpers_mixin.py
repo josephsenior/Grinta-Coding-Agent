@@ -545,6 +545,28 @@ class RunHelpersMixin:
             with contextlib.suppress(Exception):
                 close()
 
+    async def _ensure_runtime_connected(self, runtime: Any) -> None:
+        """Restore execution backend after ``hard_kill`` (e.g. Ctrl+C during a run).
+
+        Interrupt handling tears down the in-process executor; the next user turn
+        must await :meth:`~backend.execution.base.Runtime.connect` again or tools
+        raise :class:`~backend.core.errors.AgentRuntimeDisconnectedError`.
+        """
+        if runtime is None:
+            return
+        if not hasattr(runtime, 'runtime_initialized'):
+            return
+        try:
+            if runtime.runtime_initialized:
+                return
+        except Exception:
+            logger.debug('runtime_initialized check failed', exc_info=True)
+            return
+        connect_fn = getattr(runtime, 'connect', None)
+        if not callable(connect_fn):
+            return
+        await connect_fn()
+
     async def _ensure_controller_loop(
         self,
         *,
@@ -560,6 +582,8 @@ class RunHelpersMixin:
         memory: Any,
         end_states: list[AgentState],
     ) -> tuple[Any, asyncio.Task[Any] | None]:
+        await self._ensure_runtime_connected(runtime)
+
         if controller is None:
             controller, _ = create_controller(
                 agent, runtime, config, conversation_stats
