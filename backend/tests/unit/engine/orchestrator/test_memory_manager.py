@@ -433,7 +433,7 @@ class TestBuildMessages:
         llm_config = MagicMock()
         llm_config.max_message_chars = None
         llm_config.vision_is_active = False
-        llm_config.model = 'claude-4-sonnet'
+        llm_config.model = 'claude-sonnet-4-6'
         llm_config.caching_prompt = True
 
         m.build_messages([], MagicMock(), llm_config)
@@ -453,7 +453,7 @@ class TestBuildMessages:
         llm_config = MagicMock()
         llm_config.max_message_chars = None
         llm_config.vision_is_active = False
-        llm_config.model = 'anthropic/claude-4-sonnet'
+        llm_config.model = 'anthropic/claude-sonnet-4-6'
         llm_config.caching_prompt = True
 
         m.build_messages([], MagicMock(), llm_config)
@@ -492,7 +492,7 @@ class TestBuildMessages:
         llm_config = MagicMock()
         llm_config.max_message_chars = None
         llm_config.vision_is_active = False
-        llm_config.model = 'claude-4-sonnet'
+        llm_config.model = 'claude-sonnet-4-6'
         llm_config.caching_prompt = False
 
         m.build_messages([], MagicMock(), llm_config)
