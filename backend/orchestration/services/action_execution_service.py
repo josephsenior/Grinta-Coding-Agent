@@ -74,52 +74,52 @@ if TYPE_CHECKING:
 # single malformed LLM emission; the ``_convert_tool_calls`` safety net in
 # ``backend/context/action_processors.py`` repairs on the next build.
 _MALFORMED_JSON_MARKERS: tuple[str, ...] = (
-    'invalid \\escape',
-    'invalid escape',
-    'expecting property name',
-    'expecting value',
-    'unterminated string',
-    'control character',
-    'json parse error',
-    'invalid json',
+    "invalid \\escape",
+    "invalid escape",
+    "expecting property name",
+    "expecting value",
+    "unterminated string",
+    "control character",
+    "json parse error",
+    "invalid json",
 )
 
-_VERIFICATION_REQUIRED_KEY = '__step_guard_verification_required'
+_VERIFICATION_REQUIRED_KEY = "__step_guard_verification_required"
 _GROUNDING_MCP_TOOL_NAMES = frozenset(
     {
-        'copilot_getnotebooksummary',
-        'execution_subagent',
-        'fetch_webpage',
-        'file_search',
-        'get_changed_files',
-        'get_errors',
-        'get_terminal_output',
-        'github_repo',
-        'github_text_search',
-        'grep_search',
-        'read_file',
-        'read_notebook_cell_output',
-        'run_in_terminal',
-        'run_task',
-        'semantic_search',
-        'view_image',
-        'vscode_listcodeusages',
+        "copilot_getnotebooksummary",
+        "execution_subagent",
+        "fetch_webpage",
+        "file_search",
+        "get_changed_files",
+        "get_errors",
+        "get_terminal_output",
+        "github_repo",
+        "github_text_search",
+        "grep_search",
+        "read_file",
+        "read_notebook_cell_output",
+        "run_in_terminal",
+        "run_task",
+        "semantic_search",
+        "view_image",
+        "vscode_listcodeusages",
     }
 )
 _MUTATING_MCP_TOOL_NAMES = frozenset(
     {
-        'apply_patch',
-        'create_directory',
-        'create_file',
-        'create_new_jupyter_notebook',
-        'create_new_workspace',
-        'edit_notebook_file',
-        'memory.create',
-        'memory.delete',
-        'memory.insert',
-        'memory.rename',
-        'memory.str_replace',
-        'vscode_renamesymbol',
+        "apply_patch",
+        "create_directory",
+        "create_file",
+        "create_new_jupyter_notebook",
+        "create_new_workspace",
+        "edit_notebook_file",
+        "memory.create",
+        "memory.delete",
+        "memory.insert",
+        "memory.rename",
+        "memory.str_replace",
+        "vscode_renamesymbol",
     }
 )
 
@@ -137,21 +137,21 @@ def _resolve_operation_pipeline(
     from backend.orchestration.tool_pipeline import ToolInvocationPipeline
 
     def _is_pipeline_like(value: object) -> bool:
-        return callable(getattr(value, 'create_context', None))
+        return callable(getattr(value, "create_context", None))
 
-    raw_context_dict = getattr(context, '__dict__', None)
+    raw_context_dict = getattr(context, "__dict__", None)
     context_dict = raw_context_dict if isinstance(raw_context_dict, dict) else {}
-    pipeline = context_dict.get('operation_pipeline')
+    pipeline = context_dict.get("operation_pipeline")
     if _is_pipeline_like(pipeline):
         return cast(ToolInvocationPipeline, pipeline)
     if pipeline is None and not isinstance(context, Mock):
-        candidate = getattr(context, 'operation_pipeline', None)
+        candidate = getattr(context, "operation_pipeline", None)
         if _is_pipeline_like(candidate):
             return cast(ToolInvocationPipeline, candidate)
-    pipeline = context_dict.get('tool_pipeline')
+    pipeline = context_dict.get("tool_pipeline")
     if _is_pipeline_like(pipeline):
         return cast(ToolInvocationPipeline, pipeline)
-    candidate = getattr(context, 'tool_pipeline', None)
+    candidate = getattr(context, "tool_pipeline", None)
     if _is_pipeline_like(candidate):
         return cast(ToolInvocationPipeline, candidate)
     return None
@@ -167,9 +167,9 @@ def _resolve_llm_step_timeout_seconds(agent: object) -> float | None:
     """
     from backend.core.llm_step_timeout import llm_step_timeout_seconds_from_env
 
-    cfg = getattr(agent, 'config', None)
+    cfg = getattr(agent, "config", None)
     if cfg is not None:
-        v = getattr(cfg, 'llm_step_timeout_seconds', None)
+        v = getattr(cfg, "llm_step_timeout_seconds", None)
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             f = float(v)
             return None if f <= 0 else f
@@ -195,25 +195,35 @@ class ActionExecutionService:
         event_stream = self._context.event_stream
         if event_stream is None:
             logger.warning(
-                'ActionExecutionService could not publish %s because event_stream is unavailable',
+                "ActionExecutionService could not publish %s because event_stream is unavailable",
                 type(event).__name__,
             )
             return
+
+        # Agent-generated functional errors MUST NOT render in UI but MUST reach LLM context
+        # (e.g. LLM generated empty response without tool calls). Setting is_internal=True hides it from CLI/UI.
+        from backend.ledger.observation.error import ErrorObservation
+
+        if isinstance(event, ErrorObservation) and not getattr(
+            event, "notify_ui_only", False
+        ):
+            event.is_internal = True
+
         event_stream.add_event(event, EventSource.AGENT)
 
     @staticmethod
     def _agent_name(agent: object) -> str:
-        return str(getattr(agent, 'name', agent.__class__.__name__))
+        return str(getattr(agent, "name", agent.__class__.__name__))
 
     @staticmethod
     def _agent_model_name(agent: object) -> object | None:
-        llm = getattr(agent, 'llm', None)
-        llm_config = getattr(llm, 'config', None) if llm is not None else None
-        return getattr(llm_config, 'model', None)
+        llm = getattr(agent, "llm", None)
+        llm_config = getattr(llm, "config", None) if llm is not None else None
+        return getattr(llm_config, "model", None)
 
     def _should_use_confirmation_replay(self, controller: object) -> bool:
         confirmation = self._context.confirmation_service
-        replay_mgr = getattr(controller, '_replay_manager', None)
+        replay_mgr = getattr(controller, "_replay_manager", None)
         return (
             confirmation is not None
             and replay_mgr is not None
@@ -227,7 +237,7 @@ class ActionExecutionService:
         # sync ``Engine.step`` shim (which previously fell back to an
         # isolated event loop and broke cross-loop primitives in ``astep``).
         aget_next_action = (
-            getattr(confirmation, 'aget_next_action', None)
+            getattr(confirmation, "aget_next_action", None)
             if confirmation is not None
             else None
         )
@@ -238,15 +248,15 @@ class ActionExecutionService:
             # Mocks (or stale subclasses) may return a plain value.
             return cast(Action | None, result)
         get_next_action = (
-            getattr(confirmation, 'get_next_action', None)
+            getattr(confirmation, "get_next_action", None)
             if confirmation is not None
             else None
         )
         if callable(get_next_action):
             return cast(Callable[[], Action], get_next_action)()
         logger.error(
-            'ActionExecutionService.get_next_action: confirmation replay '
-            'was requested but ConfirmationService.get_next_action is unavailable'
+            "ActionExecutionService.get_next_action: confirmation replay "
+            "was requested but ConfirmationService.get_next_action is unavailable"
         )
         return None
 
@@ -254,19 +264,19 @@ class ActionExecutionService:
         agent = cast(object | None, self._context.agent)
         if agent is None:
             logger.error(
-                'ActionExecutionService.get_next_action: context agent is unavailable'
+                "ActionExecutionService.get_next_action: context agent is unavailable"
             )
             return None
 
-        astep = getattr(agent, 'astep', None)
+        astep = getattr(agent, "astep", None)
         if callable(astep) and inspect.iscoroutinefunction(astep):
             async_step = cast(Callable[[object], Awaitable[Action]], astep)
             return await self._run_async_step(agent, async_step, attempt)
 
-        step = getattr(agent, 'step', None)
+        step = getattr(agent, "step", None)
         if not callable(step):
             logger.error(
-                'ActionExecutionService.get_next_action: agent=%s has no callable step()',
+                "ActionExecutionService.get_next_action: agent=%s has no callable step()",
                 self._agent_name(agent),
             )
             return None
@@ -279,8 +289,8 @@ class ActionExecutionService:
         attempt: int,
     ) -> Action:
         logger.info(
-            'ActionExecutionService.get_next_action: invoking astep '
-            'for agent=%s (attempt=%d)',
+            "ActionExecutionService.get_next_action: invoking astep "
+            "for agent=%s (attempt=%d)",
             self._agent_name(agent),
             attempt,
         )
@@ -308,25 +318,25 @@ class ActionExecutionService:
             except _asyncio.TimeoutError as exc:
                 if _timeout_attempt == 0:
                     logger.warning(
-                        'ActionExecutionService.get_next_action: '
-                        'astep timed out after %s seconds, retrying once',
+                        "ActionExecutionService.get_next_action: "
+                        "astep timed out after %s seconds, retrying once",
                         step_timeout,
                     )
                     continue
                 model_name = self._agent_model_name(agent)
                 logger.error(
-                    'ActionExecutionService.get_next_action: astep timed out '
-                    'after %s seconds for model=%s (after retry)',
+                    "ActionExecutionService.get_next_action: astep timed out "
+                    "after %s seconds for model=%s (after retry)",
                     step_timeout,
                     model_name,
                 )
                 raise Timeout(
-                    f'LLM step timed out after {step_timeout} seconds',
+                    f"LLM step timed out after {step_timeout} seconds",
                     model=model_name,  # type: ignore[arg-type]
                 ) from exc
 
         if result is None:
-            raise RuntimeError('unreachable async-step timeout state')
+            raise RuntimeError("unreachable async-step timeout state")
         return result
 
     async def _acquire_next_action(self, attempt: int) -> tuple[Action | None, bool]:
@@ -338,16 +348,16 @@ class ActionExecutionService:
 
     def _log_missing_action(self, attempt: int) -> None:
         logger.error(
-            'ActionExecutionService.get_next_action: agent produced no action object '
-            'on attempt=%d',
+            "ActionExecutionService.get_next_action: agent produced no action object "
+            "on attempt=%d",
             attempt,
         )
 
     def _log_obtained_action(self, action: Action) -> None:
         agent = self._context.agent
         logger.info(
-            'ActionExecutionService.get_next_action: obtained action=%s from agent=%s',
-            getattr(action, 'action', type(action).__name__),
+            "ActionExecutionService.get_next_action: obtained action=%s from agent=%s",
+            getattr(action, "action", type(action).__name__),
             self._agent_name(agent),
         )
 
@@ -377,7 +387,7 @@ class ActionExecutionService:
         last_error_signature: str,
         identical_error_count: int,
     ) -> tuple[str, int]:
-        error_signature = f'{type(exc).__name__}:{str(exc).strip()}'
+        error_signature = f"{type(exc).__name__}:{str(exc).strip()}"
         if error_signature == last_error_signature:
             return error_signature, identical_error_count + 1
         return error_signature, 1
@@ -389,22 +399,22 @@ class ActionExecutionService:
             (FunctionCallValidationError, CommonFunctionCallValidationError),
         ):
             return (
-                f'Tool validation failed: {exc}\n'
-                'Please correct the tool arguments and try again.'
+                f"Tool validation failed: {exc}\n"
+                "Please correct the tool arguments and try again."
             )
         if isinstance(
             exc,
             (FunctionCallNotExistsError, CommonFunctionCallNotExistsError),
         ):
             return (
-                f'Tool not found: {exc}\n'
-                'Please use an existing tool from the provided list.'
+                f"Tool not found: {exc}\n"
+                "Please use an existing tool from the provided list."
             )
         if isinstance(exc, LLMNoActionError):
             return (
-                'You returned an empty response with no tool calls. '
-                'You MUST either use a tool (e.g. read a file, run a command) '
-                'or send a message to the user to continue.'
+                "You returned an empty response with no tool calls. "
+                "You MUST either use a tool (e.g. read a file, run a command) "
+                "or send a message to the user to continue."
             )
         return str(exc)
 
@@ -426,11 +436,11 @@ class ActionExecutionService:
         exc: Exception,
         error_signature: str,
     ) -> None:
-        cb_service = getattr(controller, 'circuit_breaker_service', None)
+        cb_service = getattr(controller, "circuit_breaker_service", None)
         if cb_service is None:
             return
         error_lower = error_signature.lower()
-        if 'text_editor' in error_lower or '[text_editor' in error_lower:
+        if "text_editor" in error_lower or "[text_editor" in error_lower:
             bucket = classify_text_editor_error_bucket(str(exc))
             cb_service.record_error(exc, tool_name=bucket)
 
@@ -440,8 +450,8 @@ class ActionExecutionService:
         max_identical_retries: int,
     ) -> int:
         if (
-            '[APPLY_PATCH_CLASS:malformed_patch]' in error_signature
-            or '[APPLY_PATCH_CLASS:context_mismatch]' in error_signature
+            "[APPLY_PATCH_CLASS:malformed_patch]" in error_signature
+            or "[APPLY_PATCH_CLASS:context_mismatch]" in error_signature
         ):
             return self._APPLY_PATCH_MAX_RETRIES
         return max_identical_retries
@@ -491,7 +501,7 @@ class ActionExecutionService:
         )
         if identical_error_count > effective_max_retries:
             logger.error(
-                'get_next_action blocked repeated identical recoverable error after %d attempts: %s',
+                "get_next_action blocked repeated identical recoverable error after %d attempts: %s",
                 identical_error_count,
                 error_signature,
             )
@@ -503,7 +513,7 @@ class ActionExecutionService:
             return True, error_logged, error_signature, identical_error_count
 
         logger.error(
-            'get_next_action exhausted %d repair attempts; transitioning to ERROR state',
+            "get_next_action exhausted %d repair attempts; transitioning to ERROR state",
             max_repair_attempts,
         )
         await self._set_controller_error_if_running(controller)
@@ -515,7 +525,7 @@ class ActionExecutionService:
         max_identical_retries = self._MAX_IDENTICAL_RETRIES
 
         error_logged = False
-        last_error_signature = ''
+        last_error_signature = ""
         identical_error_count = 0
         for attempt in range(max_repair_attempts + 1):
             try:
@@ -568,18 +578,18 @@ class ActionExecutionService:
     async def _handle_consecutive_null_action(self, action: Action) -> Action | None:
         # Sentinel NullActions (bootstrap init, orphaned-observation pairing) are
         # legitimate no-ops and must never contribute to the consecutive-null counter.
-        if getattr(action, 'reason', '') == NullActionReason.SENTINEL:
+        if getattr(action, "reason", "") == NullActionReason.SENTINEL:
             return action
 
         self._consecutive_null_actions += 1
         logger.warning(
-            'ActionExecutionService.get_next_action: consecutive NullAction %d/%d '
-            'from agent=%s',
+            "ActionExecutionService.get_next_action: consecutive NullAction %d/%d "
+            "from agent=%s",
             self._consecutive_null_actions,
             self._MAX_CONSECUTIVE_NULL_ACTIONS,
             getattr(
                 self._context.agent,
-                'name',
+                "name",
                 self._context.agent.__class__.__name__,
             ),
         )
@@ -595,36 +605,36 @@ class ActionExecutionService:
             # The model is confused but not fatally stuck — give it one more
             # turn with an explicit instruction rather than pausing immediately.
             logger.warning(
-                'Null-action loop: recovery round %d/%d — injecting directive',
+                "Null-action loop: recovery round %d/%d — injecting directive",
                 self._null_recovery_rounds,
                 self._MAX_NULL_RECOVERY_ROUNDS,
             )
             self._publish_agent_event(
                 ErrorObservation(
                     content=(
-                        'You have returned no executable action for several consecutive steps.\n\n'
-                        'You MUST emit a concrete tool call right now. Do not describe what you '
-                        'would do — actually do it. Pick the single most important next step '
-                        '(e.g. run a command, read a file, write code) and execute it immediately.'
+                        "You have returned no executable action for several consecutive steps.\n\n"
+                        "You MUST emit a concrete tool call right now. Do not describe what you "
+                        "would do — actually do it. Pick the single most important next step "
+                        "(e.g. run a command, read a file, write code) and execute it immediately."
                     ),
-                    error_id='NULL_ACTION_LOOP_RECOVERY',
+                    error_id="NULL_ACTION_LOOP_RECOVERY",
                 )
             )
             return action  # let the loop continue
 
         # All recovery rounds exhausted — pause for user input.
         logger.error(
-            'Null-action loop: all %d recovery rounds exhausted, pausing',
+            "Null-action loop: all %d recovery rounds exhausted, pausing",
             self._MAX_NULL_RECOVERY_ROUNDS,
         )
         self._null_recovery_rounds = 0
         self._publish_agent_event(
             ErrorObservation(
                 content=(
-                    'The model returned no executable action for multiple consecutive '
-                    'steps. Pausing to avoid a no-progress loop that burns model calls.'
+                    "The model returned no executable action for multiple consecutive "
+                    "steps. Pausing to avoid a no-progress loop that burns model calls."
                 ),
-                error_id='NULL_ACTION_LOOP',
+                error_id="NULL_ACTION_LOOP",
             )
         )
 
@@ -646,10 +656,10 @@ class ActionExecutionService:
         self._null_recovery_rounds = 0
 
     def _get_verification_requirement(self) -> dict[str, object] | None:
-        state = getattr(self._context, 'state', None)
+        state = getattr(self._context, "state", None)
         if state is None:
             return None
-        extra_value = getattr(state, 'extra_data', None)
+        extra_value = getattr(state, "extra_data", None)
         if not isinstance(extra_value, dict):
             return None
         extra = cast(dict[str, object], extra_value)
@@ -659,60 +669,60 @@ class ActionExecutionService:
         return None
 
     def _clear_verification_requirement(self) -> None:
-        state = getattr(self._context, 'state', None)
+        state = getattr(self._context, "state", None)
         if state is None:
             return
-        extra_value = getattr(state, 'extra_data', None)
+        extra_value = getattr(state, "extra_data", None)
         if not isinstance(extra_value, dict):
             state.extra_data = {}
             extra = cast(dict[str, object], state.extra_data)
         else:
             extra = cast(dict[str, object], extra_value)
         extra[_VERIFICATION_REQUIRED_KEY] = None
-        if hasattr(state, 'set_extra'):
+        if hasattr(state, "set_extra"):
             state.set_extra(
                 _VERIFICATION_REQUIRED_KEY,
                 None,
-                source='ActionExecutionService',
+                source="ActionExecutionService",
             )
 
     def _set_verification_requirement(self, requirement: dict[str, object]) -> None:
-        state = getattr(self._context, 'state', None)
+        state = getattr(self._context, "state", None)
         if state is None:
             return
-        extra_value = getattr(state, 'extra_data', None)
+        extra_value = getattr(state, "extra_data", None)
         if not isinstance(extra_value, dict):
             state.extra_data = {}
             extra = cast(dict[str, object], state.extra_data)
         else:
             extra = cast(dict[str, object], extra_value)
         extra[_VERIFICATION_REQUIRED_KEY] = requirement
-        if hasattr(state, 'set_extra'):
+        if hasattr(state, "set_extra"):
             state.set_extra(
                 _VERIFICATION_REQUIRED_KEY,
                 requirement,
-                source='ActionExecutionService',
+                source="ActionExecutionService",
             )
 
     @staticmethod
     def _normalize_mcp_tool_name(action: MCPAction) -> str:
-        name = str(getattr(action, 'name', '') or '').strip().lower()
-        arguments_value = getattr(action, 'arguments', None)
+        name = str(getattr(action, "name", "") or "").strip().lower()
+        arguments_value = getattr(action, "arguments", None)
         arguments = (
             cast(dict[str, object], arguments_value)
             if isinstance(arguments_value, dict)
             else {}
         )
 
-        if name in {'call_mcp_tool', 'execute_mcp_tool'}:
-            inner = arguments.get('tool_name') or arguments.get('name')
+        if name in {"call_mcp_tool", "execute_mcp_tool"}:
+            inner = arguments.get("tool_name") or arguments.get("name")
             if isinstance(inner, str) and inner.strip():
                 name = inner.strip().lower()
 
-        if name == 'memory':
-            command = arguments.get('command')
+        if name == "memory":
+            command = arguments.get("command")
             if isinstance(command, str) and command.strip():
-                return f'memory.{command.strip().lower()}'
+                return f"memory.{command.strip().lower()}"
 
         return name
 
@@ -722,8 +732,8 @@ class ActionExecutionService:
         if isinstance(action, (RecallAction, TerminalReadAction, TerminalRunAction)):
             return True
         if isinstance(action, FileEditAction):
-            command = str(getattr(action, 'command', '') or '').strip().lower()
-            return command == 'read_file'
+            command = str(getattr(action, "command", "") or "").strip().lower()
+            return command == "read_file"
         if isinstance(action, MCPAction):
             return self._normalize_mcp_tool_name(action) in _GROUNDING_MCP_TOOL_NAMES
         return False
@@ -732,8 +742,8 @@ class ActionExecutionService:
         if isinstance(action, (FileWriteAction, PlaybookFinishAction)):
             return True
         if isinstance(action, FileEditAction):
-            command = str(getattr(action, 'command', '') or '').strip().lower()
-            return command != 'read_file'
+            command = str(getattr(action, "command", "") or "").strip().lower()
+            return command != "read_file"
         if isinstance(action, MCPAction):
             return self._normalize_mcp_tool_name(action) in _MUTATING_MCP_TOOL_NAMES
         return False
@@ -741,33 +751,33 @@ class ActionExecutionService:
     def _format_verification_required_content(
         self, requirement: dict[str, object]
     ) -> str:
-        raw_paths_value = requirement.get('paths')
+        raw_paths_value = requirement.get("paths")
         raw_paths: list[object] = (
             raw_paths_value if isinstance(raw_paths_value, list) else []
         )
-        paths = ', '.join(
+        paths = ", ".join(
             str(path_value) for path_value in raw_paths if str(path_value).strip()
         )
         failure = str(
-            requirement.get('observed_failure')
-            or 'Recent failing feedback still contradicts the last edit attempt.'
+            requirement.get("observed_failure")
+            or "Recent failing feedback still contradicts the last edit attempt."
         ).strip()
         lines = [
-            'VERIFICATION REQUIRED BEFORE CONTINUING',
-            '',
-            'Recent edits were followed by failing feedback, so blind retries are blocked for one grounding step.',
+            "VERIFICATION REQUIRED BEFORE CONTINUING",
+            "",
+            "Recent edits were followed by failing feedback, so blind retries are blocked for one grounding step.",
         ]
         if paths:
-            lines.append(f'Files to reconcile: {paths}')
+            lines.append(f"Files to reconcile: {paths}")
         if failure:
-            lines.append(f'Latest failing feedback: {failure}')
+            lines.append(f"Latest failing feedback: {failure}")
         lines.extend(
             [
-                'Allowed next moves: read the affected file, inspect terminal output, or rerun a focused check.',
-                'After one fresh grounding action, edits and finish are allowed again.',
+                "Allowed next moves: read the affected file, inspect terminal output, or rerun a focused check.",
+                "After one fresh grounding action, edits and finish are allowed again.",
             ]
         )
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def _proactive_churn_check(self, action: Action) -> dict[str, object] | None:
         """Proactively scan history for edit+failure churn even before stuck detection fires.
@@ -777,10 +787,10 @@ class ActionExecutionService:
         """
         if not self._action_blocked_by_verification_requirement(action):
             return None
-        state = getattr(self._context, 'state', None)
+        state = getattr(self._context, "state", None)
         if state is None:
             return None
-        history = getattr(state, 'history', [])
+        history = getattr(state, "history", [])
         if not history:
             return None
         try:
@@ -823,7 +833,7 @@ class ActionExecutionService:
 
         _cause = (
             action
-            if getattr(action, 'id', _Event.INVALID_ID) != _Event.INVALID_ID
+            if getattr(action, "id", _Event.INVALID_ID) != _Event.INVALID_ID
             else None
         )
         from backend.orchestration.services.guard_bus import VERIFICATION, GuardBus
@@ -831,11 +841,11 @@ class ActionExecutionService:
         GuardBus.emit(
             self._context,
             VERIFICATION,
-            'VERIFICATION_REQUIRED',
+            "VERIFICATION_REQUIRED",
             self._format_verification_required_content(requirement),
-            'VERIFICATION REQUIRED: before more edits or finish, get one fresh file read, terminal read, or focused command result from the actual workspace state.',
+            "VERIFICATION REQUIRED: before more edits or finish, get one fresh file read, terminal read, or focused command result from the actual workspace state.",
             cause=_cause,
-            cause_context='ActionExecutionService.verification_gate',
+            cause_context="ActionExecutionService.verification_gate",
         )
         return True
 
@@ -847,7 +857,7 @@ class ActionExecutionService:
             action = await get_plugin_registry().dispatch_action_pre(action)
         except Exception as exc:
             logger.warning(
-                'ActionExecutionService action_pre hook failed for %s: %s',
+                "ActionExecutionService action_pre hook failed for %s: %s",
                 type(action).__name__,
                 exc,
                 exc_info=True,
@@ -883,8 +893,8 @@ class ActionExecutionService:
         if not is_context_window_error(error_str, exc):
             raise exc
         agent = cast(object | None, self._context.agent)
-        agent_config = getattr(agent, 'config', None) if agent is not None else None
-        if not getattr(agent_config, 'enable_history_truncation', False):
+        agent_config = getattr(agent, "config", None) if agent is not None else None
+        if not getattr(agent_config, "enable_history_truncation", False):
             raise LLMContextWindowExceedError from exc
         self._publish_agent_event(CondensationRequestAction())
         return None
@@ -901,20 +911,20 @@ class ActionExecutionService:
         arguments on the next build).
         """
         logger.warning(
-            'BadRequestError with JSON-parse wording detected; treating as '
-            'recoverable: %s',
+            "BadRequestError with JSON-parse wording detected; treating as "
+            "recoverable: %s",
             exc,
         )
         from backend.ledger.action import AgentThinkAction
 
         think = AgentThinkAction(
             thought=(
-                '[API_REJECTED_MALFORMED_ARGS] Your previous tool call '
-                'contained invalid JSON escape sequences and was rejected '
-                'by the API. Emit the same call again with strict JSON: use '
+                "[API_REJECTED_MALFORMED_ARGS] Your previous tool call "
+                "contained invalid JSON escape sequences and was rejected "
+                "by the API. Emit the same call again with strict JSON: use "
                 'a single backslash for newlines inside strings (not "\\\\n"), '
                 'escape embedded double quotes as \\", and avoid raw control '
-                'characters in string values.'
+                "characters in string values."
             )
         )
         think.source = EventSource.AGENT
