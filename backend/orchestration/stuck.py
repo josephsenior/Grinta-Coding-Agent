@@ -152,6 +152,19 @@ class StuckDetector:
             and self._is_stuck_action_observation_pattern(filtered_history)
         ):
             return True
+            
+        if self._is_stuck_think_only_loop(filtered_history):
+            return True
+            
+        if self._is_stuck_token_repetition(filtered_history):
+            return True
+            
+        if self._is_stuck_cost_acceleration(filtered_history):
+            return True
+            
+        if self._is_stuck_readonly_inspection_loop(filtered_history):
+            return True
+
         return bool(
             len(filtered_history) >= DEFAULT_STUCK_CONDENSATION_LOOP_MIN
             and self._is_stuck_context_window_error(filtered_history)
@@ -191,9 +204,12 @@ class StuckDetector:
             return False
 
         last_actions, last_observations = self._collect_recent_events(filtered_history)
-        return self._check_basic_stuck_patterns(
+        if self._check_basic_stuck_patterns(
             last_actions, last_observations, filtered_history
-        )
+        ):
+            return True
+
+        return self._check_advanced_stuck_patterns(filtered_history)
 
     def _is_stuck_action_observation_pattern(
         self, filtered_history: list[Event]

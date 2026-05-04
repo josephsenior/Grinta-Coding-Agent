@@ -304,7 +304,6 @@ class ToolResultValidator(ToolInvocationMiddleware):
             if exit_code != -2:
                 return None
             # The process was detached — build actionable guidance.
-            getattr(metadata, 'timeout_kind', 'idle_detach')
             still_running = getattr(metadata, 'command_still_running', True)
             if not still_running:
                 return None  # Hard-killed; no background session to poll.
