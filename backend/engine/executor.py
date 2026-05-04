@@ -907,8 +907,12 @@ class OrchestratorExecutor:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            from backend.inference.exceptions import LLMError
+            from backend.inference.exceptions import LLMError, RateLimitError
 
+            # Explicitly catch RateLimitError to prevent it from being wrapped or swallowed
+            if isinstance(exc, RateLimitError):
+                logger.debug('OrchestratorExecutor.async_execute: bubbling up RateLimitError natively')
+                raise
             if isinstance(exc, LLMError):
                 raise
             error_message = str(exc)
