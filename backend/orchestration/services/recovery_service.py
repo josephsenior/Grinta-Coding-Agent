@@ -356,11 +356,32 @@ class RecoveryService:
 
         await self._continue_after_survivable_error(controller, exc)
 
-    def _apply_timeout_planning_routing(self, controller, exc: Exception) -> None:
-        """Route timeout recoveries based on recent MCP validation failures."""
-        if not isinstance(exc, Timeout):
-            return
+    @staticmethod
+    def _event_is_background_detach_warning(event) -> bool:
+        content = getattr(event, 'content', '')
+        if not isinstance(content, str):
+            return False
+        return '[BACKGROUND_DETACH]' in content
 
+    @staticmethod
+    def _inject_background_detach_planning_directive(state) -> None:
+        directive = (
+            'Your previous command was detached to the background because it '
+            'exceeded the idle-output timeout. It is STILL RUNNING. '
+            'Before taking any other action or writing new commands, you MUST '
+            'call `terminal_read` with the session ID provided in the previous '
+            'observation to check its progress.'
+        )
+        state.set_planning_directive(
+            directive,
+            source='RecoveryService.background_detach_recovery',
+        )
+        logger.warning(
+            'Injected planning directive after LLMNoActionError due to recent background detach'
+        )
+
+    def _apply_timeout_planning_routing(self, controller, exc: Exception) -> None:
+        """Route timeout recoveries based on recent MCP validation failures or background detaches."""
         state = getattr(controller, 'state', None)
         if state is None or not hasattr(state, 'set_planning_directive'):
             return
@@ -369,10 +390,20 @@ class RecoveryService:
             return
 
         recent = self._recent_history_slice(state)
-        if any(
+
+        # 1. MCP Validation Timeout Recovery
+        if isinstance(exc, Timeout) and any(
             self._event_is_mcp_validation_failure(event) for event in reversed(recent)
         ):
             self._inject_timeout_planning_directive(state)
+            return
+
+        # 2. Background Detach + Empty Response Recovery
+        if isinstance(exc, LLMNoActionError) and any(
+            self._event_is_background_detach_warning(event) for event in reversed(recent)
+        ):
+            self._inject_background_detach_planning_directive(state)
+            return
 
     def _inject_task_reconciliation_directive(self, controller, exc: Exception) -> None:
         """Inject a directive requiring task_tracker reconciliation when ``doing`` steps exist.
