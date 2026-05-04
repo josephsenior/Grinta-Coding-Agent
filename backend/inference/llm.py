@@ -399,6 +399,21 @@ class LLM(RetryMixin, DebugMixin):
                 'No LLM model is configured. Set llm_model in settings.json or LLM_MODEL in the environment.',
                 model=None,
             )
+            
+        # Early-exit validation: Check if the model name is known to the catalog
+        # or has an explicit provider prefix. This prevents hard 404s later.
+        resolver = _get_provider_resolver()
+        try:
+            # resolve_provider raises ValueError if the model is unknown and has no prefix
+            resolver.resolve_provider(self.config.model)
+        except ValueError as exc:
+            from backend.inference.exceptions import NotFoundError
+            raise NotFoundError(
+                f"Model '{self.config.model}' is not registered in the catalog and lacks a provider prefix. "
+                "Please configure a valid model (e.g. 'openai/gpt-4o' or a known catalog entry).",
+                model=self.config.model,
+            ) from exc
+
         self.service_id = service_id
         self.metrics: Metrics = (
             metrics if metrics is not None else Metrics(model_name=self.config.model)

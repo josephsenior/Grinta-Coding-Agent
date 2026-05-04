@@ -685,7 +685,10 @@ class Orchestrator(Agent):
         if not message_text.strip():
             raise LLMNoActionError(
                 'LLM returned no tool calls and no content. '
-                'The model must emit at least one tool call per step.'
+                'You must emit at least one tool call per step. '
+                'Review the most recent observation in your context — if a command '
+                'was detached to the background or truncated, you must follow the '
+                'instructions provided in that observation to continue.'
             )
 
         logger.warning(

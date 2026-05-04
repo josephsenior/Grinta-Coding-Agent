@@ -400,6 +400,12 @@ class ActionExecutionService:
                 f'Tool not found: {exc}\n'
                 'Please use an existing tool from the provided list.'
             )
+        if isinstance(exc, LLMNoActionError):
+            return (
+                'You returned an empty response with no tool calls. '
+                'You MUST either use a tool (e.g. read a file, run a command) '
+                'or send a message to the user to continue.'
+            )
         return str(exc)
 
     def _publish_repair_error_observation(

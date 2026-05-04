@@ -282,6 +282,60 @@ class ToolResultValidator(ToolInvocationMiddleware):
 
         self.add_rule('wrong_shell', check_wrong_shell, severity='warning')
 
+        # 6. Background-detached process detection
+        # When a command exceeds the idle-output timeout, the runtime detaches
+        # it to a background session (exit_code=-2).  The LLM receives partial
+        # output with an ambiguous suffix.  Without explicit guidance, models
+        # often return empty completions ("no tool calls"), triggering recovery
+        # loops.  This rule injects a clear, actionable directive so the model
+        # knows it MUST poll the background session to continue.
+        def check_background_detach(
+            ctx: ToolInvocationContext, obs: Observation,
+        ) -> str | None:
+            from backend.ledger.observation.commands import CmdOutputObservation
+
+            if not isinstance(obs, CmdOutputObservation):
+                return None
+            metadata = getattr(obs, 'metadata', None)
+            if metadata is None:
+                return None
+            exit_code = getattr(metadata, 'exit_code', None)
+            if exit_code != -2:
+                return None
+            # The process was detached — build actionable guidance.
+            timeout_kind = getattr(metadata, 'timeout_kind', 'idle_detach')
+            still_running = getattr(metadata, 'command_still_running', True)
+            if not still_running:
+                return None  # Hard-killed; no background session to poll.
+            # Extract the background session ID from the suffix if present.
+            suffix = getattr(metadata, 'suffix', '') or ''
+            bg_session = ''
+            if 'session_id="' in suffix:
+                try:
+                    bg_session = suffix.split('session_id="')[1].split('"')[0]
+                except (IndexError, ValueError):
+                    pass
+            if bg_session:
+                return (
+                    f'[BACKGROUND_DETACH] The command exceeded the idle-output '
+                    f'timeout and was detached to background session "{bg_session}". '
+                    f'The process is STILL RUNNING. You MUST call '
+                    f'terminal_read(session_id="{bg_session}") to check its '
+                    f'progress before taking any other action. Do NOT assume '
+                    f'the command failed — it is running in the background.'
+                )
+            return (
+                '[BACKGROUND_DETACH] The command exceeded the idle-output '
+                'timeout and was detached to a background session. '
+                'The process is STILL RUNNING. You MUST use terminal_read '
+                'with the session ID shown in the output to check its '
+                'progress before taking any other action.'
+            )
+
+        self.add_rule(
+            'background_detach', check_background_detach, severity='warning',
+        )
+
     @staticmethod
     def _annotate_observation(
         observation: Observation, result: ValidationResult
