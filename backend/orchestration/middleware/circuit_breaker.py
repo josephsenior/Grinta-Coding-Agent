@@ -68,6 +68,9 @@ def _append_tool_fallback_hint(observation: Observation, tool_name: str) -> None
     if hint is None:
         return
     base_content = observation.content or ''
+    # Prevent recursive fallback triggers by avoiding duplicate hints in context
+    if hint.strip() in base_content:
+        return
     observation.content = base_content + hint
 
 
