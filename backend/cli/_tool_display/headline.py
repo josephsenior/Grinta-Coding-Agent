@@ -33,6 +33,7 @@ _TEXT_EDITOR_VERBS = {
     'create_file': 'Created',
     'insert_text': 'Inserted',
     'undo_last_edit': 'Reverted',
+    'edit': 'Edited',
 }
 
 _TERMINAL_MANAGER_VERBS = {
@@ -118,7 +119,7 @@ def _stats_text_editor(args: dict[str, Any]) -> str | None:
         end = args.get('view_range_end')
         if start is not None and end is not None:
             return f'lines {start}–{end}'
-    if cmd == 'replace_text' and path_hint:
+    if cmd == 'edit' and path_hint:
         return path_hint
     return None
 

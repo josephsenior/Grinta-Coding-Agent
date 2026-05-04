@@ -302,11 +302,11 @@ def _render_system_capabilities(
         multi_edit_line = (
             '- **Atomic multi-file edits**: AVAILABLE via `symbol_editor` `command=multi_edit`. '
             'Pass a list of `{path, new_content}` items; all files commit together or all roll back. '
-            'Use this instead of sequential `replace_text` calls when the changes must succeed as a unit.'
+            'Use this instead of sequential `text_editor` edits when the changes must succeed as a unit.'
         )
     else:
         multi_edit_line = (
-            '- **Atomic multi-file edits**: not exposed in this build — use `text_editor` `replace_text` '
+            '- **Atomic multi-file edits**: not exposed in this build — use `text_editor` `edit_mode=range` '
             'sequentially'
             + (
                 ' and take a `checkpoint` before the batch for coarse rollback.'

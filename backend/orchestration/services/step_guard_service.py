@@ -61,7 +61,6 @@ class StepGuardService:
 
     _WARNING_TRIP_COUNTS_KEY = '__step_guard_warning_trip_counts'
     _REPLAN_REQUIRED_KEY = '__step_guard_replan_required'
-    _VERIFICATION_REQUIRED_KEY = '__step_guard_verification_required'
     _STUCK_COOLDOWN_KEY = '__step_guard_stuck_cooldown'
 
     def __init__(self, context: OrchestrationContext) -> None:
@@ -168,19 +167,7 @@ class StepGuardService:
                 self._REPLAN_REQUIRED_KEY, bool(value), source='StepGuardService'
             )
 
-    def _set_verification_requirement(
-        self, controller: 'SessionOrchestrator', requirement: dict[str, Any] | None
-    ) -> None:
-        state: 'State | None' = getattr(controller, 'state', None)
-        if state is None:
-            return
-        state.extra_data[self._VERIFICATION_REQUIRED_KEY] = requirement
-        if hasattr(state, 'set_extra'):
-            state.set_extra(
-                self._VERIFICATION_REQUIRED_KEY,
-                requirement,
-                source='StepGuardService',
-            )
+
 
     async def _check_circuit_breaker(
         self, controller: 'SessionOrchestrator'
@@ -359,12 +346,9 @@ class StepGuardService:
         _clear_agent_queued_actions(controller, reason='stuck_loop_recovery')
 
         created_files = self._collect_created_files(history)
-        msg, planning, verification_requirement = self._build_stuck_recovery_message(
+        msg, planning = self._build_stuck_recovery_message(
             created_files, history
         )
-
-        if verification_requirement is not None:
-            self._set_verification_requirement(controller, verification_requirement)
 
         GuardBus.emit(
             controller,
@@ -390,22 +374,14 @@ class StepGuardService:
         self,
         created_files: set[str],
         history: list[Any],
-    ) -> tuple[str, str, dict[str, Any] | None]:
+    ) -> tuple[str, str]:
         """Build a generic stuck recovery message without task-text heuristics."""
-        verification_requirement = self._build_verification_requirement(history)
         recent_errors = self._recent_error_contents(history)
         text_editor_message = self._text_editor_recovery_message(
-            recent_errors,
-            verification_requirement,
+            recent_errors
         )
         if text_editor_message is not None:
             return text_editor_message
-
-        verification_message = self._verification_recovery_message(
-            verification_requirement
-        )
-        if verification_message is not None:
-            return verification_message
 
         created_files_message = self._created_files_recovery_message(created_files)
         if created_files_message is not None:
@@ -419,14 +395,7 @@ class StepGuardService:
             '3. Execute one specific unfinished step.\n'
             'YOUR VERY NEXT ACTION MUST BE a real progress-making action.',
             'STUCK RECOVERY: verify state, then make one concrete next-step action.',
-            None,
         )
-
-    def _build_verification_requirement(
-        self, history: list[Any]
-    ) -> dict[str, Any] | None:
-        """Detect stale-state churn after a recent file mutation plus failing feedback."""
-        return StepGuardService._build_verification_requirement_from_history(history)
 
     @staticmethod
     def _recent_error_contents(history: list[Any]) -> list[str]:
@@ -438,9 +407,8 @@ class StepGuardService:
 
     @staticmethod
     def _text_editor_recovery_message(
-        recent_errors: list[str],
-        verification_requirement: dict[str, Any] | None,
-    ) -> tuple[str, str, dict[str, Any] | None] | None:
+        recent_errors: list[str]
+    ) -> tuple[str, str] | None:
         text_editor_hits = sum(
             1
             for content in recent_errors
@@ -459,40 +427,12 @@ class StepGuardService:
             '3. If it fails again, switch to a different edit strategy instead of retrying text_editor.\n'
             'Do NOT emit another near-identical text_editor call without new file evidence.',
             'STUCK RECOVERY: read_file refresh, then one text_editor retry max, then switch strategy.',
-            verification_requirement,
-        )
-
-    @staticmethod
-    def _verification_recovery_message(
-        verification_requirement: dict[str, Any] | None,
-    ) -> tuple[str, str, dict[str, Any] | None] | None:
-        if verification_requirement is None:
-            return None
-        path_list: list[Any] = list(verification_requirement.get('paths') or [])
-        files_text = ', '.join(str(path) for path in path_list if str(path).strip())
-        failure_text = str(
-            verification_requirement.get('observed_failure')
-            or 'Recent failing feedback still contradicts the last edit attempt.'
-        ).strip()
-        if not files_text:
-            files_text = 'recently touched files'
-        return (
-            'STUCK LOOP DETECTED — recent file changes were followed by failing feedback.\n'
-            f'Files to reconcile: {files_text}.\n'
-            f'Latest failing feedback: {failure_text}\n'
-            'MANDATORY NEXT ACTIONS:\n'
-            '1. Read the actual file contents or rerun the focused failing check.\n'
-            '2. Compare the fresh output to your last assumption.\n'
-            '3. Only then emit another edit or finish action.\n'
-            'Do NOT emit another write/edit or finish action until you have one fresh grounding result.',
-            'STUCK RECOVERY: reconcile actual file/check state before any more edits or finish.',
-            verification_requirement,
         )
 
     @staticmethod
     def _created_files_recovery_message(
         created_files: set[str],
-    ) -> tuple[str, str, dict[str, Any] | None] | None:
+    ) -> tuple[str, str] | None:
         if not created_files:
             return None
         created_str = ', '.join(sorted(created_files))
@@ -503,178 +443,4 @@ class StepGuardService:
             'YOUR VERY NEXT ACTION MUST BE: perform one concrete unfinished task step, '
             'or verify the current state before changing course.',
             'STUCK RECOVERY: stop repeating, verify current state, then do the next unfinished step.',
-            None,
         )
-
-    @staticmethod
-    def _mutation_marker_from_event(event: Any) -> tuple[bool, str | None]:
-        if isinstance(event, FileEditAction):
-            command = str(getattr(event, 'command', '') or '').strip().lower()
-            if command == 'read_file':
-                return False, None
-            path = getattr(event, 'path', '') or ''
-            return True, StepGuardService._normalize_path(path) if path else None
-
-        if isinstance(
-            event, (FileWriteAction, FileEditObservation, FileWriteObservation)
-        ):
-            path = getattr(event, 'path', '') or ''
-            return True, StepGuardService._normalize_path(path) if path else None
-
-        return False, None
-
-    @staticmethod
-    def _collect_recent_mutations(recent_history: list[Any]) -> tuple[int, list[str]]:
-        last_mutation_index = -1
-        mutated_paths: list[str] = []
-        for idx, event in enumerate(recent_history):
-            is_mutation, path = StepGuardService._mutation_marker_from_event(event)
-            if not is_mutation:
-                continue
-            last_mutation_index = idx
-            if path:
-                mutated_paths.append(path)
-        return last_mutation_index, mutated_paths
-
-    @staticmethod
-    def _failure_feedback_from_error_observation(event: Any) -> str | None:
-        if not isinstance(event, ErrorObservation):
-            return None
-        ignored_error_ids = {
-            'CIRCUIT_BREAKER_TRIPPED',
-            'CIRCUIT_BREAKER_WARNING',
-            'NULL_ACTION_LOOP',
-            'STUCK_LOOP_RECOVERY',
-            'VERIFICATION_REQUIRED',
-        }
-        error_id = str(getattr(event, 'error_id', '') or '').strip().upper()
-        if error_id in ignored_error_ids:
-            return None
-        return (getattr(event, 'content', '') or '').splitlines()[0].strip() or None
-
-    @staticmethod
-    def _failure_feedback_from_cmd_output(event: Any) -> str | None:
-        if not isinstance(event, CmdOutputObservation):
-            return None
-        exit_code = getattr(event, 'exit_code', None)
-        if exit_code in (None, 0, -1):
-            return None
-        first_line = (getattr(event, 'content', '') or '').splitlines()[0].strip()
-        if first_line:
-            return first_line
-        command = str(getattr(event, 'command', '') or '').strip()
-        return f'{command or "Command"} failed with exit code {exit_code}'
-
-    @staticmethod
-    def _failure_feedback_from_event(event: Any) -> str | None:
-        for extractor in (
-            StepGuardService._failure_feedback_from_error_observation,
-            StepGuardService._failure_feedback_from_cmd_output,
-        ):
-            if failure_line := extractor(event):
-                return failure_line
-        return None
-
-    @staticmethod
-    def _is_infrastructure_feedback(feedback_line: str) -> bool:
-        normalized = feedback_line.strip().lower()
-        if not normalized:
-            return False
-        infra_markers = (
-            'default shell session not initialized',
-            'default shell session not initialized (recreation failed)',
-            'runtime not initialized',
-        )
-        return any(marker in normalized for marker in infra_markers)
-
-    @staticmethod
-    def _collect_failing_feedback(
-        recent_history: list[Any],
-        last_mutation_index: int,
-    ) -> tuple[list[str], int]:
-        failing_feedback: list[str] = []
-        last_failure_index = -1
-        for rel_idx, event in enumerate(recent_history[last_mutation_index + 1 :]):
-            failure_line = StepGuardService._failure_feedback_from_event(event)
-            if not failure_line:
-                continue
-            if StepGuardService._is_infrastructure_feedback(failure_line):
-                continue
-            abs_idx = last_mutation_index + 1 + rel_idx
-            failing_feedback.append(failure_line)
-            last_failure_index = abs_idx
-        return failing_feedback, last_failure_index
-
-    @staticmethod
-    def _is_grounding_followup_action(event: Any) -> bool:
-        if isinstance(
-            event,
-            (
-                FileReadAction,
-                CmdRunAction,
-                LspQueryAction,
-                RecallAction,
-                TerminalReadAction,
-                TerminalRunAction,
-            ),
-        ):
-            return True
-        if not isinstance(event, FileEditAction):
-            return False
-        command = str(getattr(event, 'command', '') or '').strip().lower()
-        return command == 'read_file'
-
-    @staticmethod
-    def _has_post_failure_grounding_action(
-        recent_history: list[Any],
-        last_failure_index: int,
-    ) -> bool:
-        if last_failure_index < 0:
-            return False
-        return any(
-            StepGuardService._is_grounding_followup_action(event)
-            for event in recent_history[last_failure_index + 1 :]
-        )
-
-    @staticmethod
-    def _truncate_failure_text(text: str, limit: int = 180) -> str:
-        if len(text) <= limit:
-            return text
-        return text[: limit - 1].rstrip() + '…'
-
-    @staticmethod
-    def _build_verification_requirement_from_history(
-        history: list[Any],
-    ) -> dict[str, Any] | None:
-        """Static entry point so ActionExecutionService can call it without an instance."""
-        recent_history = list(history[-18:])
-        last_mutation_index, mutated_paths = StepGuardService._collect_recent_mutations(
-            recent_history
-        )
-
-        if last_mutation_index < 0:
-            return None
-
-        failing_feedback, last_failure_index = (
-            StepGuardService._collect_failing_feedback(
-                recent_history,
-                last_mutation_index,
-            )
-        )
-
-        if not mutated_paths or not failing_feedback:
-            return None
-
-        if StepGuardService._has_post_failure_grounding_action(
-            recent_history,
-            last_failure_index,
-        ):
-            return None
-
-        latest_failure = StepGuardService._truncate_failure_text(failing_feedback[-1])
-
-        return {
-            'reason': 'recent_file_mutation_plus_failure',
-            'paths': sorted({path for path in mutated_paths if path})[:6],
-            'observed_failure': latest_failure,
-        }

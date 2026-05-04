@@ -102,8 +102,6 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
 
     def _simulate_edit(self, old_content: str, action) -> str | None:
         """Simulate the edit on old content based on action command."""
-        if action.command == 'replace_text' and action.old_str:
-            return old_content.replace(action.old_str, action.new_str or '', 1)
         if action.command == 'create_file':
             return action.file_text or ''
         if action.command == 'insert_text' and action.insert_line is not None:

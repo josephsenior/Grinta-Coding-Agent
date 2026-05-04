@@ -198,7 +198,6 @@ class FileStateTracker:
 _READ_BEFORE_EDIT_COMMANDS: frozenset[str] = frozenset(
     {
         'apply_patch',
-        'replace_text',
         'insert_text',
         'edit',
         'str_replace',
@@ -209,7 +208,6 @@ _READ_BEFORE_EDIT_COMMANDS: frozenset[str] = frozenset(
 
 _MUTATING_EDIT_COMMANDS: frozenset[str] = frozenset(
     {
-        'replace_text',
         'insert_text',
         'edit',
         'write',
