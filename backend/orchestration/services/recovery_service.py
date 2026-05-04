@@ -11,6 +11,7 @@ from backend.core.errors import (
     AgentRuntimeError,
     LLMContextWindowExceedError,
     LLMNoResponseError,
+    LLMNoActionError,
 )
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
