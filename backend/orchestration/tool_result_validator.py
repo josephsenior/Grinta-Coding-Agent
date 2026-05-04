@@ -290,7 +290,8 @@ class ToolResultValidator(ToolInvocationMiddleware):
         # loops.  This rule injects a clear, actionable directive so the model
         # knows it MUST poll the background session to continue.
         def check_background_detach(
-            ctx: ToolInvocationContext, obs: Observation,
+            ctx: ToolInvocationContext,
+            obs: Observation,
         ) -> str | None:
             from backend.ledger.observation.commands import CmdOutputObservation
 
@@ -303,7 +304,7 @@ class ToolResultValidator(ToolInvocationMiddleware):
             if exit_code != -2:
                 return None
             # The process was detached — build actionable guidance.
-            timeout_kind = getattr(metadata, 'timeout_kind', 'idle_detach')
+            getattr(metadata, 'timeout_kind', 'idle_detach')
             still_running = getattr(metadata, 'command_still_running', True)
             if not still_running:
                 return None  # Hard-killed; no background session to poll.
@@ -333,7 +334,9 @@ class ToolResultValidator(ToolInvocationMiddleware):
             )
 
         self.add_rule(
-            'background_detach', check_background_detach, severity='warning',
+            'background_detach',
+            check_background_detach,
+            severity='warning',
         )
 
     @staticmethod
