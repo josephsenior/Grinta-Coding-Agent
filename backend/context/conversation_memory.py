@@ -47,6 +47,7 @@ from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.error import ErrorObservation
 from backend.ledger.observation.observation import Observation
 from backend.ledger.observation.reject import UserRejectObservation
+from backend.ledger.observation.status import StatusObservation
 from backend.utils.prompt import PromptManager
 
 _MAX_SYSTEM_CONTEXT_SUMMARY_CHARS = 2000
@@ -735,6 +736,9 @@ class ContextMemory:
 
         """
         # Handle special cases first
+        if is_instance_of(obs, StatusObservation):
+            return []
+
         if is_instance_of(obs, RecallObservation):
             return self._process_recall_observation(
                 cast(RecallObservation, obs), current_index, events or []
