@@ -71,10 +71,9 @@ class FileEditAction(Action):
 
     Attributes:
         path (str): The path to the file being edited.
-        command (str): The editing command to be performed (read_file, create_file, replace_text [internal substring replace], insert_text, undo_last_edit, write).
+        command (str): The editing command to be performed (read_file, create_file, insert_text, undo_last_edit, write).
         file_text (str): The content of the file to be created (used with 'create_file').
-        old_str (str): The string to be replaced (substring replace).
-        new_str (str): The replacement text (substring replace and insert_text).
+        new_str (str): The replacement text (used with 'insert_text' or range edits).
         insert_line (int): The line number after which to insert new_str (used with 'insert_text').
         content (str): Optional raw content payload kept for legacy compatibility.
         start (int): Optional starting line for legacy payloads. Default is 1.
@@ -93,9 +92,7 @@ class FileEditAction(Action):
     path: str = ''
     command: str = ''
     file_text: str | None = None
-    old_str: str | None = None
     new_str: str | None = None
-    normalize_ws: bool | None = None
     insert_line: int | None = None
     view_range: list[int] | None = None
     content: str = ''
@@ -135,11 +132,6 @@ class FileEditAction(Action):
             ret += f'Command: {self.command}\n'
             if self.command == 'create_file':
                 ret += f'Created File with Text:\n```\n{self.file_text}\n```\n'
-            elif self.command == 'replace_text':
-                ret += f'Old String: ```\n{self.old_str}\n```\n'
-                ret += f'New String: ```\n{self.new_str}\n```\n'
-                if self.normalize_ws is not None:
-                    ret += f'Normalize WS: {self.normalize_ws}\n'
             elif self.command == 'insert_text':
                 ret += f'Insert Line: {self.insert_line}\n'
                 ret += f'New String: ```\n{self.new_str}\n```\n'

@@ -84,7 +84,6 @@ _MALFORMED_JSON_MARKERS: tuple[str, ...] = (
     "invalid json",
 )
 
-_VERIFICATION_REQUIRED_KEY = "__step_guard_verification_required"
 _GROUNDING_MCP_TOOL_NAMES = frozenset(
     {
         "copilot_getnotebooksummary",
@@ -655,199 +654,7 @@ class ActionExecutionService:
     def _reset_null_recovery_rounds(self) -> None:
         self._null_recovery_rounds = 0
 
-    def _get_verification_requirement(self) -> dict[str, object] | None:
-        state = getattr(self._context, "state", None)
-        if state is None:
-            return None
-        extra_value = getattr(state, "extra_data", None)
-        if not isinstance(extra_value, dict):
-            return None
-        extra = cast(dict[str, object], extra_value)
-        requirement = extra.get(_VERIFICATION_REQUIRED_KEY)
-        if isinstance(requirement, dict) and requirement:
-            return cast(dict[str, object], requirement)
-        return None
 
-    def _clear_verification_requirement(self) -> None:
-        state = getattr(self._context, "state", None)
-        if state is None:
-            return
-        extra_value = getattr(state, "extra_data", None)
-        if not isinstance(extra_value, dict):
-            state.extra_data = {}
-            extra = cast(dict[str, object], state.extra_data)
-        else:
-            extra = cast(dict[str, object], extra_value)
-        extra[_VERIFICATION_REQUIRED_KEY] = None
-        if hasattr(state, "set_extra"):
-            state.set_extra(
-                _VERIFICATION_REQUIRED_KEY,
-                None,
-                source="ActionExecutionService",
-            )
-
-    def _set_verification_requirement(self, requirement: dict[str, object]) -> None:
-        state = getattr(self._context, "state", None)
-        if state is None:
-            return
-        extra_value = getattr(state, "extra_data", None)
-        if not isinstance(extra_value, dict):
-            state.extra_data = {}
-            extra = cast(dict[str, object], state.extra_data)
-        else:
-            extra = cast(dict[str, object], extra_value)
-        extra[_VERIFICATION_REQUIRED_KEY] = requirement
-        if hasattr(state, "set_extra"):
-            state.set_extra(
-                _VERIFICATION_REQUIRED_KEY,
-                requirement,
-                source="ActionExecutionService",
-            )
-
-    @staticmethod
-    def _normalize_mcp_tool_name(action: MCPAction) -> str:
-        name = str(getattr(action, "name", "") or "").strip().lower()
-        arguments_value = getattr(action, "arguments", None)
-        arguments = (
-            cast(dict[str, object], arguments_value)
-            if isinstance(arguments_value, dict)
-            else {}
-        )
-
-        if name in {"call_mcp_tool", "execute_mcp_tool"}:
-            inner = arguments.get("tool_name") or arguments.get("name")
-            if isinstance(inner, str) and inner.strip():
-                name = inner.strip().lower()
-
-        if name == "memory":
-            command = arguments.get("command")
-            if isinstance(command, str) and command.strip():
-                return f"memory.{command.strip().lower()}"
-
-        return name
-
-    def _action_satisfies_verification_requirement(self, action: Action) -> bool:
-        if isinstance(action, (CmdRunAction, FileReadAction, LspQueryAction)):
-            return True
-        if isinstance(action, (RecallAction, TerminalReadAction, TerminalRunAction)):
-            return True
-        if isinstance(action, FileEditAction):
-            command = str(getattr(action, "command", "") or "").strip().lower()
-            return command == "read_file"
-        if isinstance(action, MCPAction):
-            return self._normalize_mcp_tool_name(action) in _GROUNDING_MCP_TOOL_NAMES
-        return False
-
-    def _action_blocked_by_verification_requirement(self, action: Action) -> bool:
-        if isinstance(action, (FileWriteAction, PlaybookFinishAction)):
-            return True
-        if isinstance(action, FileEditAction):
-            command = str(getattr(action, "command", "") or "").strip().lower()
-            return command != "read_file"
-        if isinstance(action, MCPAction):
-            return self._normalize_mcp_tool_name(action) in _MUTATING_MCP_TOOL_NAMES
-        return False
-
-    def _format_verification_required_content(
-        self, requirement: dict[str, object]
-    ) -> str:
-        raw_paths_value = requirement.get("paths")
-        raw_paths: list[object] = (
-            raw_paths_value if isinstance(raw_paths_value, list) else []
-        )
-        paths = ", ".join(
-            str(path_value) for path_value in raw_paths if str(path_value).strip()
-        )
-        failure = str(
-            requirement.get("observed_failure")
-            or "Recent failing feedback still contradicts the last edit attempt."
-        ).strip()
-        lines = [
-            "VERIFICATION REQUIRED BEFORE CONTINUING",
-            "",
-            "Recent edits were followed by failing feedback, so blind retries are blocked for one grounding step.",
-        ]
-        if paths:
-            lines.append(f"Files to reconcile: {paths}")
-        if failure:
-            lines.append(f"Latest failing feedback: {failure}")
-        lines.extend(
-            [
-                "Allowed next moves: read the affected file, inspect terminal output, or rerun a focused check.",
-                "After one fresh grounding action, edits and finish are allowed again.",
-            ]
-        )
-        return "\n".join(lines)
-
-    def _proactive_churn_check(self, action: Action) -> dict[str, object] | None:
-        """Proactively scan history for edit+failure churn even before stuck detection fires.
-
-        Returns a verification requirement dict if the pattern is detected,
-        otherwise None.  Only called when no gate is already set.
-        """
-        if not self._action_blocked_by_verification_requirement(action):
-            return None
-        state = getattr(self._context, "state", None)
-        if state is None:
-            return None
-        history = getattr(state, "history", [])
-        if not history:
-            return None
-        try:
-            from backend.orchestration.services.step_guard_service import (
-                StepGuardService,
-            )
-
-            step_guard_service_cls = cast(Any, StepGuardService)
-            requirement = (
-                step_guard_service_cls._build_verification_requirement_from_history(
-                    history
-                )
-            )
-            if isinstance(requirement, dict):
-                return cast(dict[str, object], requirement)
-            return None
-        except Exception:
-            return None
-
-    def _enforce_verification_requirement(self, action: Action) -> bool:
-        requirement = self._get_verification_requirement()
-        if requirement is None:
-            # Proactive path: check history even when stuck detection hasn't fired yet.
-            requirement = self._proactive_churn_check(action)
-            if requirement is not None:
-                # Persist so the gate stays set until a grounding action clears it.
-                self._set_verification_requirement(requirement)
-
-        if requirement is None:
-            return False
-
-        if self._action_satisfies_verification_requirement(action):
-            self._clear_verification_requirement()
-            return False
-
-        if not self._action_blocked_by_verification_requirement(action):
-            return False
-
-        from backend.ledger.event import Event as _Event
-
-        _cause = (
-            action
-            if getattr(action, "id", _Event.INVALID_ID) != _Event.INVALID_ID
-            else None
-        )
-        from backend.orchestration.services.guard_bus import VERIFICATION, GuardBus
-
-        GuardBus.emit(
-            self._context,
-            VERIFICATION,
-            "VERIFICATION_REQUIRED",
-            self._format_verification_required_content(requirement),
-            "VERIFICATION REQUIRED: before more edits or finish, get one fresh file read, terminal read, or focused command result from the actual workspace state.",
-            cause=_cause,
-            cause_context="ActionExecutionService.verification_gate",
-        )
-        return True
 
     async def execute_action(self, action: Action) -> None:
         # Plugin hook: action_pre
@@ -862,9 +669,6 @@ class ActionExecutionService:
                 exc,
                 exc_info=True,
             )
-
-        if self._enforce_verification_requirement(action):
-            return
 
         ctx: ToolInvocationContext | None = None
         pipeline = _resolve_operation_pipeline(self._context)

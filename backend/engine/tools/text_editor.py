@@ -12,16 +12,15 @@ from backend.inference.tool_names import TEXT_EDITOR_TOOL_NAME
 _DETAILED_TEXT_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
 * `read_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
 * `create_file`: create or fully overwrite a file with the given content. Requires `file_text` — full-file body. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call.
-* `replace_text`: **the primary way to edit an existing file**. Requires `old_str` (exact substring to find — must be unique in the file) and `new_str` (replacement text). Uses tolerant whitespace + quote normalization so small formatting differences do not block the match. To delete a block set `new_str` to an empty string.
 * `insert_text`: insert `new_str` after `insert_line`.
 * `undo_last_edit`: revert the last successful edit/write to this file in the current session (bounded history). Prefer checkpoint/rollback for large reversions.
-* `edit_mode`: safer non-code editing primitives — prefer these over giant free-form replaces for documents:
+* `edit_mode`: deterministic non-code editing primitives:
+  - `range`: line-range replacement. Provide `start_line`, `end_line`, and `new_str` to replace a specific block. THIS IS THE PREFERRED WAY to edit files if not using `symbol_editor`.
   - `format`: parser-based mutation for json/yaml/toml/markdown/html/xml.
   - `section`: anchor-bounded section edit.
-  - `range`: line-range replacement with optional `expected_hash` (slice) or `expected_file_hash` (whole file as read).
-  - `patch`: unified diff hunk apply with strict context — for strict apply or review, not the default editing style.
+  - `patch`: unified diff hunk apply with strict context.
 
-Default mental model: **`replace_text`** for code edits on existing files; **minimal valid `file_text` on create**, then **`replace_text`** or **`insert_text`** to extend. For atomic multi-file batches (all-or-nothing across many files), use `symbol_editor` `command=multi_edit`.
+Default mental model: **`symbol_editor`** for most code edits (AST-based or line-based); **minimal valid `file_text` on create**, then **`edit_mode=range`** or **`insert_text`** to extend. Avoid brittle string replacement.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
 
@@ -38,8 +37,8 @@ If the tool reports `Syntax validation failed` with a hint about literal escape 
 """
 _SHORT_TEXT_EDITOR_DESCRIPTION = (
     'File reading, creation, and editing tool. '
-    'Commands: read_file, create_file, replace_text, insert_text, undo_last_edit. '
-    'replace_text: edit existing file using old_str→new_str (unique substring). '
+    'Commands: read_file, create_file, insert_text, undo_last_edit. '
+    'Use edit_mode=range or symbol_editor for deterministic edits. '
     'Supports edit_mode=format|section|range|patch. '
     'Use project-relative paths.\n'
 )
@@ -67,25 +66,16 @@ def create_text_editor_tool(
         description=description,
         properties={
             'command': get_command_param(
-                'The commands to run: `read_file`, `create_file`, `replace_text`, `insert_text`, `undo_last_edit`. '
-                'Use `replace_text` to edit existing files (requires `old_str` and `new_str`).',
+                'The commands to run: `read_file`, `create_file`, `insert_text`, `undo_last_edit`, `edit`. '
+                'Use `command=edit` with `edit_mode=range` or `symbol_editor` to edit existing files.',
                 [
                     'read_file',
                     'create_file',
-                    'replace_text',
                     'insert_text',
                     'undo_last_edit',
+                    'edit',
                 ],
             ),
-            'old_str': {
-                'description': (
-                    'Required for `replace_text`. The exact substring to find and replace. '
-                    'Must be unique within the file. Whitespace and quote normalization is '
-                    'applied automatically so minor formatting differences are tolerated. '
-                    'JSON string — escape newlines as \\n, embedded double quotes as \\".'
-                ),
-                'type': 'string',
-            },
             'path': get_path_param(
                 'Path to file or directory, relative to the project root (e.g. `README.md`, '
                 '`src/main.py`) or an absolute path under that root.'
@@ -100,9 +90,8 @@ def create_text_editor_tool(
             },
             'new_str': {
                 'description': (
-                    'Required for `replace_text` (the replacement text; use empty string to delete). '
-                    'Required for `insert_text` (text to insert). JSON string — '
-                    'escape newlines as \\n, embedded quotes as \\".'
+                    'Replacement text for `edit_mode=range` or `insert_text`. '
+                    'JSON string — escape newlines as \\n, embedded quotes as \\".'
                 ),
                 'type': 'string',
             },
