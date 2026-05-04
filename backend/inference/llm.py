@@ -52,19 +52,19 @@ def _safe_exception_text(exc: Exception) -> str:
     try:
         return str(exc)
     except Exception:
-        return f'{type(exc).__name__} (unprintable exception)'
+        return f"{type(exc).__name__} (unprintable exception)"
 
 
 def _map_api_status_error(exc: Exception, model: str, provider: str) -> Exception:
     """Map APIStatusError by status code."""
-    status = getattr(exc, 'status_code', None)
+    status = getattr(exc, "status_code", None)
     if status in (401, 403):
         from backend.inference.direct_clients_openai_ops import (
             simplify_openai_unauthorized_message,
         )
 
         msg = _safe_exception_text(exc)
-        if provider == 'openai' and isinstance(status, int):
+        if provider == "openai" and isinstance(status, int):
             msg = simplify_openai_unauthorized_message(exc, status)
         return AuthenticationError(
             msg,
@@ -119,16 +119,16 @@ def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
             return AuthenticationError(
                 simplify_openai_unauthorized_message(exc, status_early),
                 model=model,
-                llm_provider='openai',
+                llm_provider="openai",
                 status_code=status_early,
             )
 
         simple_map: list[tuple[type, type, str]] = [
-            (_oai.AuthenticationError, AuthenticationError, 'openai'),
-            (_oai.RateLimitError, RateLimitError, 'openai'),
-            (_oai.APITimeoutError, Timeout, 'openai'),
-            (_oai.APIConnectionError, APIConnectionError, 'openai'),
-            (_oai.InternalServerError, InternalServerError, 'openai'),
+            (_oai.AuthenticationError, AuthenticationError, "openai"),
+            (_oai.RateLimitError, RateLimitError, "openai"),
+            (_oai.APITimeoutError, Timeout, "openai"),
+            (_oai.APIConnectionError, APIConnectionError, "openai"),
+            (_oai.InternalServerError, InternalServerError, "openai"),
         ]
         for sdk_cls, our_cls, prov in simple_map:
             if isinstance(exc, sdk_cls):
@@ -140,9 +140,9 @@ def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
                 return mapped
 
         if isinstance(exc, _oai.BadRequestError):
-            return _map_bad_request_with_context_check(exc, model, 'openai')
+            return _map_bad_request_with_context_check(exc, model, "openai")
         if isinstance(exc, _oai.APIStatusError):
-            return _map_api_status_error(exc, model, 'openai')
+            return _map_api_status_error(exc, model, "openai")
     except ImportError:
         pass
     return None
@@ -156,11 +156,11 @@ def _map_anthropic_exception(exc: Exception, model: str) -> Exception | None:
         from backend.inference.rate_limit_parser import enrich_rate_limit_exception
 
         simple_map: list[tuple[type, type, str]] = [
-            (_anth.AuthenticationError, AuthenticationError, 'anthropic'),
-            (_anth.RateLimitError, RateLimitError, 'anthropic'),
-            (_anth.APITimeoutError, Timeout, 'anthropic'),
-            (_anth.APIConnectionError, APIConnectionError, 'anthropic'),
-            (_anth.InternalServerError, InternalServerError, 'anthropic'),
+            (_anth.AuthenticationError, AuthenticationError, "anthropic"),
+            (_anth.RateLimitError, RateLimitError, "anthropic"),
+            (_anth.APITimeoutError, Timeout, "anthropic"),
+            (_anth.APIConnectionError, APIConnectionError, "anthropic"),
+            (_anth.InternalServerError, InternalServerError, "anthropic"),
         ]
         for sdk_cls, our_cls, prov in simple_map:
             if isinstance(exc, sdk_cls):
@@ -172,9 +172,9 @@ def _map_anthropic_exception(exc: Exception, model: str) -> Exception | None:
                 return mapped
 
         if isinstance(exc, _anth.BadRequestError):
-            return _map_bad_request_with_context_check(exc, model, 'anthropic')
+            return _map_bad_request_with_context_check(exc, model, "anthropic")
         if isinstance(exc, _anth.APIStatusError):
-            return _map_api_status_error(exc, model, 'anthropic')
+            return _map_api_status_error(exc, model, "anthropic")
     except ImportError:
         pass
     return None
@@ -184,21 +184,21 @@ def _try_google_exception_mapping(
     exc: Exception, model: str, exc_name: str, exc_str: str
 ) -> Exception | None:
     """Map Google/Generative AI exceptions. Returns None if not applicable."""
-    if 'google' not in exc_name and 'generativeai' not in exc_name:
+    if "google" not in exc_name and "generativeai" not in exc_name:
         return None
     if is_context_window_error(exc_str, exc):
         return ContextWindowExceededError(
-            _safe_exception_text(exc), model=model, llm_provider='google'
+            _safe_exception_text(exc), model=model, llm_provider="google"
         )
-    if 'quota' in exc_str or 'rate' in exc_str:
+    if "quota" in exc_str or "rate" in exc_str:
         from backend.inference.rate_limit_parser import enrich_rate_limit_exception
 
         mapped = RateLimitError(
-            _safe_exception_text(exc), model=model, llm_provider='google'
+            _safe_exception_text(exc), model=model, llm_provider="google"
         )
         enrich_rate_limit_exception(exc, mapped)
         return mapped
-    return APIError(_safe_exception_text(exc), model=model, llm_provider='google')
+    return APIError(_safe_exception_text(exc), model=model, llm_provider="google")
 
 
 def _try_heuristic_exception_mapping(
@@ -206,9 +206,9 @@ def _try_heuristic_exception_mapping(
 ) -> Exception | None:
     """Map by heuristic string checks. Returns None if no match."""
     if (
-        'content_filter' in exc_str
-        or 'content policy' in exc_str
-        or 'safety' in exc_str
+        "content_filter" in exc_str
+        or "content policy" in exc_str
+        or "safety" in exc_str
     ):
         return ContentPolicyViolationError(_safe_exception_text(exc), model=model)
     if is_context_window_error(exc_str, exc):
@@ -251,7 +251,7 @@ def _map_provider_exception(exc: Exception, model: str) -> Exception:
     return APIError(_safe_exception_text(exc), model=model)
 
 
-__all__ = ['LLM', '_map_provider_exception']
+__all__ = ["LLM", "_map_provider_exception"]
 
 LLM_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     APIConnectionError,
@@ -270,20 +270,20 @@ LLM_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
 # stream is aborted and an APIConnectionError is raised so the existing
 # backoff/retry machinery kicks in exactly as for a proper network failure.
 _INBAND_DISCONNECT_PHRASES: tuple[str, ...] = (
-    '网络中断',  # Lightning AI / DeepSeek: "network disconnected"
-    '请重新连接',  # Lightning AI: "please reconnect"
-    '网络连接中断',  # variant
+    "网络中断",  # Lightning AI / DeepSeek: "network disconnected"
+    "请重新连接",  # Lightning AI: "please reconnect"
+    "网络连接中断",  # variant
     # Common mojibake variants observed in proxies/tests where UTF-8 Chinese
     # text is decoded with a Western codepage before reaching the SDK stream.
-    'ç½‘ç»œä¸­æ–­',
-    'è¯·é‡æ–°è¿žæŽ¥',
-    'network disconnected, please reconnect',
-    'connection was reset',
-    'upstream connect error',
-    'upstream request timeout',
-    'bad gateway',
-    'gateway timeout',
-    'service temporarily unavailable',
+    "ç½‘ç»œä¸­æ–­",
+    "è¯·é‡æ–°è¿žæŽ¥",
+    "network disconnected, please reconnect",
+    "connection was reset",
+    "upstream connect error",
+    "upstream request timeout",
+    "bad gateway",
+    "gateway timeout",
+    "service temporarily unavailable",
 )
 
 # We only inspect the first _INBAND_PREFIX_LIMIT chars so we never buffer
@@ -304,7 +304,7 @@ def _apply_base_url_discovery(config: Any, resolver: Any) -> None:
     if not config.base_url:
         discovered = resolver.resolve_base_url(config.model)
         if discovered:
-            logger.info('Auto-discovered base_url for %s: %s', config.model, discovered)
+            logger.info("Auto-discovered base_url for %s: %s", config.model, discovered)
             config.base_url = discovered
 
 
@@ -312,8 +312,8 @@ def _is_local_model(config: Any, resolver: Any) -> bool:
     """Check if model is local (no API key required)."""
     if resolver.is_local_model(config.model):
         return True
-    base = config.base_url or ''
-    return any(h in base for h in ('localhost', '127.0.0.1', '0.0.0.0'))
+    base = config.base_url or ""
+    return any(h in base for h in ("localhost", "127.0.0.1", "0.0.0.0"))
 
 
 def _validate_api_key_or_local(
@@ -322,10 +322,10 @@ def _validate_api_key_or_local(
     """Raise AuthenticationError if API key missing and model is not local."""
     if api_key_value or _is_local_model(config, resolver):
         return
-    logger.error('No API key available for model: %s', config.model)
+    logger.error("No API key available for model: %s", config.model)
     raise AuthenticationError(
         f"No API key provided for model '{config.model}'. "
-        'Please set it in Settings -> Models -> API Keys.',
+        "Please set it in Settings -> Models -> API Keys.",
         model=config.model,
     )
 
@@ -343,9 +343,9 @@ def _resolve_function_calling_config(
         )
     except (KeyError, ValueError) as exc:
         logger.warning(
-            'Could not detect function-calling support for model %s: %s  '
-            '— defaulting to disabled. If this model supports tools, '
-            'set native_tool_calling=true in the LLM config.',
+            "Could not detect function-calling support for model %s: %s  "
+            "— defaulting to disabled. If this model supports tools, "
+            "set native_tool_calling=true in the LLM config.",
             model,
             exc,
         )
@@ -358,9 +358,9 @@ def _load_cached_features(model: str) -> ModelFeatures:
         return get_features(model)
     except (KeyError, ValueError) as exc:
         logger.warning(
-            'Model feature lookup failed for %s: %s  '
-            '— using empty defaults. Token limits, vision, and '
-            'other capabilities may be inaccurate.',
+            "Model feature lookup failed for %s: %s  "
+            "— using empty defaults. Token limits, vision, and "
+            "other capabilities may be inaccurate.",
             model,
             exc,
         )
@@ -396,10 +396,10 @@ class LLM(RetryMixin, DebugMixin):
         self.config: LLMConfig = copy.deepcopy(config)
         if not self.config.model or not str(self.config.model).strip():
             raise AuthenticationError(
-                'No LLM model is configured. Set llm_model in settings.json or LLM_MODEL in the environment.',
+                "No LLM model is configured. Set llm_model in settings.json or LLM_MODEL in the environment.",
                 model=None,
             )
-            
+
         # Early-exit validation: Check if the model name is known to the catalog
         # or has an explicit provider prefix. This prevents hard 404s later.
         resolver = _get_provider_resolver()
@@ -408,6 +408,7 @@ class LLM(RetryMixin, DebugMixin):
             resolver.resolve_provider(self.config.model)
         except ValueError as exc:
             from backend.inference.exceptions import NotFoundError
+
             raise NotFoundError(
                 f"Model '{self.config.model}' is not registered in the catalog and lacks a provider prefix. "
                 "Please configure a valid model (e.g. 'openai/gpt-4o' or a known catalog entry).",
@@ -429,7 +430,7 @@ class LLM(RetryMixin, DebugMixin):
 
         self.client = get_direct_client(
             model=self.config.model,
-            api_key=api_key_value or 'not-needed',
+            api_key=api_key_value or "not-needed",
             base_url=self.config.base_url,
             timeout=self.config.timeout,
         )
@@ -452,7 +453,7 @@ class LLM(RetryMixin, DebugMixin):
         Uses native model_features.
         """
         try:
-            model = (self.config.model or '').strip()
+            model = (self.config.model or "").strip()
             if not model:
                 return
             features = get_features(model)
@@ -462,8 +463,8 @@ class LLM(RetryMixin, DebugMixin):
                 self.config.max_output_tokens = features.max_output_tokens
         except (KeyError, ValueError, AttributeError) as exc:
             logger.warning(
-                'Could not initialize token limits for model %s: %s  '
-                '— max_input_tokens and max_output_tokens may be None.',
+                "Could not initialize token limits for model %s: %s  "
+                "— max_input_tokens and max_output_tokens may be None.",
                 self.config.model,
                 exc,
             )
@@ -490,20 +491,20 @@ class LLM(RetryMixin, DebugMixin):
         Model-specific parameter overrides are driven by catalog.json
         via ``apply_model_param_overrides()``.
         """
-        is_stream = kwargs.pop('is_stream', False)
+        is_stream = kwargs.pop("is_stream", False)
 
         for param in (
-            'drop_params',
-            'force_timeout',
-            'metadata',
-            'api_base',
-            'caching',
+            "drop_params",
+            "force_timeout",
+            "metadata",
+            "api_base",
+            "caching",
         ):
             kwargs.pop(param, None)
 
         call_kwargs = {
-            'model': self.config.model,
-            'temperature': self.config.temperature,
+            "model": self.config.model,
+            "temperature": self.config.temperature,
             **kwargs,
         }
 
@@ -511,21 +512,21 @@ class LLM(RetryMixin, DebugMixin):
         # `null` values differently than omitted parameters. In particular,
         # sending `max_tokens: null` can result in empty completions.
         if self.config.max_output_tokens is not None:
-            call_kwargs['max_tokens'] = self.config.max_output_tokens
+            call_kwargs["max_tokens"] = self.config.max_output_tokens
         if self.config.top_p is not None:
-            call_kwargs['top_p'] = self.config.top_p
+            call_kwargs["top_p"] = self.config.top_p
         if self.config.top_k is not None:
-            call_kwargs['top_k'] = self.config.top_k
-        timeout = getattr(self.config, 'timeout', None)
+            call_kwargs["top_k"] = self.config.top_k
+        timeout = getattr(self.config, "timeout", None)
         if timeout is not None:
-            call_kwargs['timeout'] = float(timeout)
+            call_kwargs["timeout"] = float(timeout)
 
         from backend.inference.catalog_loader import (
             apply_model_param_overrides,
             sanitize_call_kwargs_for_provider,
         )
 
-        model = (self.config.model or '').strip() or 'unknown'
+        model = (self.config.model or "").strip() or "unknown"
 
         call_kwargs = apply_model_param_overrides(
             model,
@@ -535,7 +536,7 @@ class LLM(RetryMixin, DebugMixin):
         )
 
         if self.config.seed is not None:
-            call_kwargs['seed'] = self.config.seed
+            call_kwargs["seed"] = self.config.seed
 
         call_kwargs = sanitize_call_kwargs_for_provider(model, call_kwargs)
 
@@ -554,9 +555,9 @@ class LLM(RetryMixin, DebugMixin):
             return
 
         usage = response.usage
-        prompt_tokens = usage.get('prompt_tokens', 0)
-        completion_tokens = usage.get('completion_tokens', 0)
-        usage_estimated = bool(usage.get('is_estimated', False))
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
+        usage_estimated = bool(usage.get("is_estimated", False))
 
         cost = self.client.get_completion_cost(
             prompt_tokens=prompt_tokens,
@@ -566,20 +567,20 @@ class LLM(RetryMixin, DebugMixin):
         self.metrics.add_cost(cost)
 
         # Extract cache tokens from provider-specific nested structures
-        cache_read = usage.get('cache_read_tokens', 0)
-        cache_write = usage.get('cache_write_tokens', 0)
+        cache_read = usage.get("cache_read_tokens", 0)
+        cache_write = usage.get("cache_write_tokens", 0)
 
-        if not cache_read and 'prompt_tokens_details' in usage:
-            details: Any = usage['prompt_tokens_details']
-            if hasattr(details, 'cached_tokens'):
+        if not cache_read and "prompt_tokens_details" in usage:
+            details: Any = usage["prompt_tokens_details"]
+            if hasattr(details, "cached_tokens"):
                 cache_read = details.cached_tokens
             elif isinstance(details, dict):
-                cache_read = details.get('cached_tokens', 0)
+                cache_read = details.get("cached_tokens", 0)
 
-        if not cache_write and 'model_extra' in usage:
-            extra: Any = usage['model_extra']
+        if not cache_write and "model_extra" in usage:
+            extra: Any = usage["model_extra"]
             if isinstance(extra, dict):
-                cache_write = extra.get('cache_creation_input_tokens', 0)
+                cache_write = extra.get("cache_creation_input_tokens", 0)
 
         self.metrics.add_token_usage(
             prompt_tokens=prompt_tokens,
@@ -608,14 +609,14 @@ class LLM(RetryMixin, DebugMixin):
                 return None
 
         # Model catalog limits (preferred)
-        max_in = _as_int(getattr(self.features, 'max_input_tokens', None))
-        max_out = _as_int(getattr(self.features, 'max_output_tokens', None))
+        max_in = _as_int(getattr(self.features, "max_input_tokens", None))
+        max_out = _as_int(getattr(self.features, "max_output_tokens", None))
 
         # Config limits (fallback)
         if max_in is None:
-            max_in = _as_int(getattr(self.config, 'max_input_tokens', None))
+            max_in = _as_int(getattr(self.config, "max_input_tokens", None))
         if max_out is None:
-            max_out = _as_int(getattr(self.config, 'max_output_tokens', None))
+            max_out = _as_int(getattr(self.config, "max_output_tokens", None))
 
         if max_in is not None and max_out is not None:
             return max_in + max_out
@@ -650,7 +651,7 @@ class LLM(RetryMixin, DebugMixin):
                 return response
             except Exception as e:
                 # Map provider SDK exceptions to our unified hierarchy
-                mapped = _map_provider_exception(e, (self.config.model or '').strip())
+                mapped = _map_provider_exception(e, (self.config.model or "").strip())
                 if mapped is not e:
                     raise mapped from e
                 raise
@@ -667,7 +668,7 @@ class LLM(RetryMixin, DebugMixin):
 
             messages = await get_plugin_registry().dispatch_llm_pre(messages)
         except Exception as e:
-            logger.warning('Error in LLM pre-plugin dispatch: %s', e)
+            logger.warning("Error in LLM pre-plugin dispatch: %s", e)
 
         # Merge default kwargs
         call_kwargs = self._get_call_kwargs(is_stream=False, **kwargs)
@@ -684,7 +685,7 @@ class LLM(RetryMixin, DebugMixin):
             start_time = time.time()
             # Check for cancellation before start
             if await self._check_cancelled():
-                raise LLMNoResponseError('Request cancelled before start')
+                raise LLMNoResponseError("Request cancelled before start")
 
             self.log_prompt(messages)
             response = await self.client.acompletion(messages=messages, **kwargs)
@@ -697,7 +698,7 @@ class LLM(RetryMixin, DebugMixin):
 
                 response = await get_plugin_registry().dispatch_llm_post(response)
             except Exception as e:
-                logger.warning('Error in LLM post-plugin dispatch: %s', e)
+                logger.warning("Error in LLM post-plugin dispatch: %s", e)
 
             return response
 
@@ -705,9 +706,9 @@ class LLM(RetryMixin, DebugMixin):
 
     def _get_astream_retry_params(self) -> tuple[int, float, float]:
         """Return (max_attempts, retry_min_wait, retry_max_wait)."""
-        max_a = getattr(self.config, 'num_retries', None) or 3
-        min_w = getattr(self.config, 'retry_min_wait', None) or 1
-        max_w = getattr(self.config, 'retry_max_wait', None) or 10
+        max_a = getattr(self.config, "num_retries", None) or 3
+        min_w = getattr(self.config, "retry_min_wait", None) or 1
+        max_w = getattr(self.config, "retry_max_wait", None) or 10
         return max_a, min_w, max_w
 
     def _should_retry_astream(
@@ -749,18 +750,18 @@ class LLM(RetryMixin, DebugMixin):
 
         for attempt in range(1, max_attempts + 1):
             yielded_any = False
-            _inband_prefix: list[
-                str
-            ] = []  # accumulate leading content for disconnect probe
+            _inband_prefix: list[str] = (
+                []
+            )  # accumulate leading content for disconnect probe
             try:
                 self.log_prompt(messages)
                 stream_iter = self.client.astream(messages=messages, **call_kwargs)
                 async for chunk in stream_iter:  # type: ignore[attr-defined]
                     if await self._check_cancelled():
-                        logger.debug('LLM stream cancelled by user.')
+                        logger.debug("LLM stream cancelled by user.")
                         return
-                    if chunk.get('choices') and chunk['choices'][0].get('delta'):
-                        content = chunk['choices'][0]['delta'].get('content', '')
+                    if chunk.get("choices") and chunk["choices"][0].get("delta"):
+                        content = chunk["choices"][0]["delta"].get("content", "")
                         if content:
                             self.log_response(content)
                             # Before the first real yield, accumulate a small
@@ -768,17 +769,17 @@ class LLM(RetryMixin, DebugMixin):
                             # messages injected by provider proxies.
                             if not yielded_any:
                                 _inband_prefix.append(content)
-                                prefix = ''.join(_inband_prefix)
+                                prefix = "".join(_inband_prefix)
                                 if len(prefix) <= _INBAND_PREFIX_LIMIT:
                                     lower = prefix.lower()
                                     logger.debug(
-                                        'LLM in-band disconnect prefix probe',
+                                        "LLM in-band disconnect prefix probe",
                                         extra={
-                                            'msg_type': 'LLM_INBAND_PROBE',
-                                            'prefix_preview': prefix[:120],
-                                            'prefix_repr': repr(prefix[:120]),
-                                            'lower_preview': lower[:120],
-                                            'matched_phrases': [
+                                            "msg_type": "LLM_INBAND_PROBE",
+                                            "prefix_preview": prefix[:120],
+                                            "prefix_repr": repr(prefix[:120]),
+                                            "lower_preview": lower[:120],
+                                            "matched_phrases": [
                                                 p
                                                 for p in _INBAND_DISCONNECT_PHRASES
                                                 if p in lower
@@ -789,8 +790,8 @@ class LLM(RetryMixin, DebugMixin):
                                         p in lower for p in _INBAND_DISCONNECT_PHRASES
                                     ):
                                         raise APIConnectionError(
-                                            f'Provider sent in-band disconnect message: {prefix.strip()!r}',
-                                            model=(self.config.model or '').strip(),
+                                            f"Provider sent in-band disconnect message: {prefix.strip()!r}",
+                                            model=(self.config.model or "").strip(),
                                         )
                     yield chunk
                     yielded_any = True
@@ -802,16 +803,16 @@ class LLM(RetryMixin, DebugMixin):
                 if not self._should_retry_astream(
                     is_retryable, is_last, yielded_any, exc=e
                 ):
-                    logger.error('LLM astream error: %s', e)
+                    logger.error("LLM astream error: %s", e)
                     mapped = _map_provider_exception(
-                        e, (self.config.model or '').strip()
+                        e, (self.config.model or "").strip()
                     )
                     if mapped is not e:
                         raise mapped from e
                     raise
                 wait = min(retry_max, retry_min * (2 ** (attempt - 1)))
                 logger.warning(
-                    'LLM astream transient error (attempt %d/%d): %s — retrying in %.1fs',
+                    "LLM astream transient error (attempt %d/%d): %s — retrying in %.1fs",
                     attempt,
                     max_attempts,
                     e,
@@ -822,7 +823,7 @@ class LLM(RetryMixin, DebugMixin):
     async def _check_cancelled(self) -> bool:
         """Check if the request has been cancelled."""
         if (
-            hasattr(self.config, 'on_cancel_requested_fn')
+            hasattr(self.config, "on_cancel_requested_fn")
             and self.config.on_cancel_requested_fn is not None
         ):
             return await self.config.on_cancel_requested_fn()
@@ -834,8 +835,8 @@ class LLM(RetryMixin, DebugMixin):
         """Extract and normalize messages from args and kwargs."""
         if args:
             messages_kwarg = args[0]
-        elif 'messages' in kwargs:
-            messages_kwarg = kwargs.pop('messages')
+        elif "messages" in kwargs:
+            messages_kwarg = kwargs.pop("messages")
         else:
             messages_kwarg = []
 
@@ -867,7 +868,7 @@ class LLM(RetryMixin, DebugMixin):
     def get_token_count(self, messages: list[dict] | list[Message]) -> int:
         """Estimate token count."""
         try:
-            model = (self.config.model or '').strip()
+            model = (self.config.model or "").strip()
             return get_token_count(
                 messages,
                 model=model,
@@ -875,7 +876,7 @@ class LLM(RetryMixin, DebugMixin):
             )
         except Exception as e:
             logger.error(
-                'Error getting token count for\n model %s\n%s', self.config.model, e
+                "Error getting token count for\n model %s\n%s", self.config.model, e
             )
             # Conservative fallback: ~4 chars per token is a safe heuristic.
             # Returning 0 here would cause downstream code to believe the
@@ -894,7 +895,7 @@ class LLM(RetryMixin, DebugMixin):
         return [model_dump_with_options(m) for m in messages]
 
     def __str__(self) -> str:
-        return f'LLM(model={self.config.model})'
+        return f"LLM(model={self.config.model})"
 
     def __repr__(self) -> str:
         return str(self)

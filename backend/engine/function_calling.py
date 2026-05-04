@@ -442,6 +442,11 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
     other_kwargs = {
         k: v for k, v in normalized_args.items() if k not in ['command', 'path']
     }
+    
+    # "normalize_ws — the new default for general code edits" (Book of Grinta : 34)
+    # Make whitespace-tolerant matching the automatic API default to reduce model cognitive load.
+    if command == 'replace_text' and 'normalize_ws' not in other_kwargs:
+        other_kwargs['normalize_ws'] = True
 
     _apply_confidence_preview_override(other_kwargs, path)
 
