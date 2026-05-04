@@ -288,13 +288,28 @@ class ToolResultValidator(ToolInvocationMiddleware):
     ) -> None:
         """Append validation information to the observation content.
 
-        Keeps the annotation compact to reduce token overhead.
+        Keeps the annotation compact to reduce token overhead. Truncates original
+        content for error observations to prevent context bloat.
         """
+        from backend.ledger.observation import ErrorObservation
+        from backend.ledger.serialization.event import truncate_content
+
         content = getattr(observation, 'content', None)
         if not isinstance(content, str):
             return
 
+        # Context safeguard: truncate original content for errors or massive results
+        # before adding annotations. Error observations are truncated more
+        # aggressively since they usually contain noisy tracebacks.
+        max_original = 3000
+        if isinstance(observation, ErrorObservation):
+            max_original = 1000
+
+        if len(content) > max_original:
+            content = truncate_content(content, max_original, strategy='tail_heavy')
+
         if not (result.warnings or result.errors or result.blocked):
+            observation.content = content
             return
 
         # Keep message size bounded

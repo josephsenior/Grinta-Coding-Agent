@@ -7,6 +7,7 @@ import json
 from typing import TYPE_CHECKING
 
 from backend.core.errors import (
+    AgentRuntimeDisconnectedError,
     AgentRuntimeError,
     LLMContextWindowExceedError,
     LLMNoResponseError,
@@ -42,6 +43,9 @@ _HARD_STOP_EXCEPTIONS = (
     ContextWindowExceededError,
     LLMContextWindowExceedError,
     NotFoundError,
+    # Persistent runtime disconnects require a full session restart/re-init
+    # and should not be treated as survivable tool errors.
+    AgentRuntimeDisconnectedError,
 )
 
 # Errors that need a rate-limit back-off before retrying. These also use the
@@ -438,6 +442,8 @@ class RecoveryService:
             err_id = 'LLM_TIMEOUT'
         elif isinstance(exc, LLMContextWindowExceedError | ContextWindowExceededError):
             err_id = 'LLM_CONTEXT_WINDOW_EXCEEDED'
+        elif isinstance(exc, AgentRuntimeDisconnectedError):
+            err_id = 'AGENT_RUNTIME_DISCONNECTED'
         elif isinstance(exc, AgentRuntimeError):
             err_id = 'AGENT_RUNTIME_ERROR'
 
@@ -447,7 +453,13 @@ class RecoveryService:
             text = f'{type(exc).__name__}: {exc}'
 
         # Hard stops need user action; survivable errors get guidance for the model.
-        if isinstance(exc, _HARD_STOP_EXCEPTIONS):
+        if isinstance(exc, AgentRuntimeDisconnectedError):
+            guidance = (
+                'The agent runtime has disconnected or failed to initialize. '
+                'This is a persistent state that requires a session reset or '
+                'infrastructure check. CONTROL IS RETURNED TO USER.'
+            )
+        elif isinstance(exc, _HARD_STOP_EXCEPTIONS):
             guidance = (
                 'This error requires user intervention (check credentials, model name, '
                 'or context window). Wait for the user to fix the configuration.'
