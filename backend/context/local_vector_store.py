@@ -155,14 +155,18 @@ class ChromaDBBackend(VectorBackend):
         with self._model_lock:
             if self._model is not None:
                 return
-            logger.info("Loading FastEmbed ONNX embedding model '%s'…", self._model_name)
+            logger.info(
+                "Loading FastEmbed ONNX embedding model '%s'…", self._model_name
+            )
             from chromadb.utils import embedding_functions
 
             with (
                 contextlib.redirect_stderr(io.StringIO()),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
-                self._model = embedding_functions.FastEmbedEmbeddingFunction(model_name=self._model_name)
+                self._model = embedding_functions.FastEmbedEmbeddingFunction(
+                    model_name=self._model_name
+                )
             logger.info('Embedding model ready (%s)', self._model_name)
 
     def warm_model_in_background(self) -> None:
@@ -224,18 +228,20 @@ class ChromaDBBackend(VectorBackend):
             chunks = []
             chunk_metadatas = []
             chunk_ids = []
-            
+
             for i in range(0, len(text), chunk_size - overlap):
                 chunk = text[i : i + chunk_size]
-                if len(chunk) < 100 and chunks: # Skip tiny trailing chunks
+                if len(chunk) < 100 and chunks:  # Skip tiny trailing chunks
                     continue
                 chunks.append(chunk)
-                chunk_metadatas.append({**doc_metadata, 'is_child': True, 'parent_id': step_id})
-                chunk_ids.append(f"{step_id}_child_{len(chunks)}")
-                
+                chunk_metadatas.append(
+                    {**doc_metadata, 'is_child': True, 'parent_id': step_id}
+                )
+                chunk_ids.append(f'{step_id}_child_{len(chunks)}')
+
                 if i + chunk_size >= len(text):
                     break
-            
+
             if chunks:
                 self.collection.add(
                     ids=chunk_ids,
@@ -251,7 +257,7 @@ class ChromaDBBackend(VectorBackend):
             return []
 
         _ = self.model
-        
+
         # Search specifically for child chunks to get precise semantic matches
         search_filter = {'is_child': True}
         if filter_metadata:
@@ -260,7 +266,9 @@ class ChromaDBBackend(VectorBackend):
 
         results = self.collection.query(
             query_texts=[query],
-            n_results=min(k * 3, self.collection.count()), # Fetch more to find unique parents
+            n_results=min(
+                k * 3, self.collection.count()
+            ),  # Fetch more to find unique parents
             where=search_filter,
             include=['documents', 'metadatas', 'distances'],
         )
@@ -282,13 +290,13 @@ class ChromaDBBackend(VectorBackend):
 
         # Map child matches back to their unique parents
         parent_ids = []
-        scores = {} # parent_id -> best_score
-        
+        scores = {}  # parent_id -> best_score
+
         for i, meta in enumerate(results['metadatas'][0]):
             pid = meta.get('parent_id') or results['ids'][0][i]
             dist = results['distances'][0][i]
             score = 1.0 - dist
-            
+
             if pid not in scores:
                 parent_ids.append(pid)
                 scores[pid] = score
@@ -303,13 +311,15 @@ class ChromaDBBackend(VectorBackend):
 
         final_results = []
         for i, pid in enumerate(parent_results['ids']):
-            final_results.append({
-                'step_id': pid,
-                'score': scores.get(pid, 0.0),
-                'excerpt': parent_results['documents'][i],
-                **parent_results['metadatas'][i],
-            })
-            
+            final_results.append(
+                {
+                    'step_id': pid,
+                    'score': scores.get(pid, 0.0),
+                    'excerpt': parent_results['documents'][i],
+                    **parent_results['metadatas'][i],
+                }
+            )
+
         # Sort by score since .get() doesn't preserve order or provide distances
         final_results.sort(key=lambda x: x['score'], reverse=True)
         return final_results[:k]
