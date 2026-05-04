@@ -195,58 +195,124 @@ class ChromaDBBackend(VectorBackend):
         content_text: str,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        """Insert a new document embedding into the local ChromaDB collection."""
+        """Insert a new document with parent-child chunking into ChromaDB."""
         text = self._prepare_text(rationale, content_text)
-        # Ensure EF is loaded; ChromaDB will call it server-side on the document.
+        # Ensure EF is loaded
         _ = self.model
 
         doc_metadata = {
             'step_id': step_id,
             'role': role,
             'timestamp': time.time(),
+            'is_child': False,
             **(metadata or {}),
         }
         if artifact_hash:
             doc_metadata['artifact_hash'] = artifact_hash
 
+        # 1. Add the parent document (full context)
         self.collection.add(
             ids=[step_id],
             documents=[text[:2000]],
             metadatas=[doc_metadata],
         )
 
+        # 2. Add child chunks if the text is long enough to benefit
+        if len(text) > 600:
+            chunk_size = 400
+            overlap = 100
+            chunks = []
+            chunk_metadatas = []
+            chunk_ids = []
+            
+            for i in range(0, len(text), chunk_size - overlap):
+                chunk = text[i : i + chunk_size]
+                if len(chunk) < 100 and chunks: # Skip tiny trailing chunks
+                    continue
+                chunks.append(chunk)
+                chunk_metadatas.append({**doc_metadata, 'is_child': True, 'parent_id': step_id})
+                chunk_ids.append(f"{step_id}_child_{len(chunks)}")
+                
+                if i + chunk_size >= len(text):
+                    break
+            
+            if chunks:
+                self.collection.add(
+                    ids=chunk_ids,
+                    documents=chunks,
+                    metadatas=chunk_metadatas,
+                )
+
     def search(
         self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
-        """Search the collection for the most similar documents to the query."""
+        """Search child chunks and return their parent documents for context."""
         if self.collection.count() == 0:
             return []
 
-        _ = self.model  # ensure EF loaded for query embedding
+        _ = self.model
+        
+        # Search specifically for child chunks to get precise semantic matches
+        search_filter = {'is_child': True}
+        if filter_metadata:
+            # Combine filters if they don't conflict
+            search_filter.update(filter_metadata)
+
         results = self.collection.query(
             query_texts=[query],
-            n_results=min(k, self.collection.count()),
-            where=filter_metadata,
+            n_results=min(k * 3, self.collection.count()), # Fetch more to find unique parents
+            where=search_filter,
             include=['documents', 'metadatas', 'distances'],
         )
 
-        if (
-            not results['ids']
-            or not results['documents']
-            or not results['metadatas']
-            or not results['distances']
-        ):
+        if not results['ids'] or not results['ids'][0]:
+            # Fallback: search parents if no children found (e.g. old data or small docs)
+            parent_filter = {'is_child': False}
+            if filter_metadata:
+                parent_filter.update(filter_metadata)
+            results = self.collection.query(
+                query_texts=[query],
+                n_results=min(k, self.collection.count()),
+                where=parent_filter,
+                include=['documents', 'metadatas', 'distances'],
+            )
+
+        if not results['ids'] or not results['ids'][0]:
             return []
 
-        return [
-            {
-                'step_id': results['ids'][0][i],
-                'score': 1.0 - results['distances'][0][i],
-                'excerpt': results['documents'][0][i],
-                **results['metadatas'][0][i],
-            }
-            for i in range(len(results['ids'][0]))
-        ]
+        # Map child matches back to their unique parents
+        parent_ids = []
+        scores = {} # parent_id -> best_score
+        
+        for i, meta in enumerate(results['metadatas'][0]):
+            pid = meta.get('parent_id') or results['ids'][0][i]
+            dist = results['distances'][0][i]
+            score = 1.0 - dist
+            
+            if pid not in scores:
+                parent_ids.append(pid)
+                scores[pid] = score
+            else:
+                scores[pid] = max(scores[pid], score)
+
+        # Retrieve the full parent documents
+        parent_results = self.collection.get(
+            ids=parent_ids[:k],
+            include=['documents', 'metadatas'],
+        )
+
+        final_results = []
+        for i, pid in enumerate(parent_results['ids']):
+            final_results.append({
+                'step_id': pid,
+                'score': scores.get(pid, 0.0),
+                'excerpt': parent_results['documents'][i],
+                **parent_results['metadatas'][i],
+            })
+            
+        # Sort by score since .get() doesn't preserve order or provide distances
+        final_results.sort(key=lambda x: x['score'], reverse=True)
+        return final_results[:k]
 
     async def async_add(
         self,

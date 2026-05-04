@@ -154,6 +154,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         self._suppress_pending_unmatched_error_on_reset: bool = False
 
         # Initialize core state via lifecycle service
+        self._initialize_operation_pipeline()
         self.services.lifecycle.initialize_core_attributes(
             config.sid,
             config.event_stream,
@@ -186,8 +187,12 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             config.budget_per_task_delta,
         )
         self.services.autonomy.initialize(config.agent)
-        self._initialize_operation_pipeline()
         self.services.retry.initialize()
+
+        # C-P1-1: snapshot post-init state so users can rewind to a "fresh
+        # session" baseline. Now that the pipeline is initialized, the
+        # rollback middleware will correctly capture the checkpoint.
+        self._create_phase_boundary_checkpoint('init_to_active')
 
     def _initialize_operation_pipeline(self) -> None:
         """Build the default tool pipeline directly on the controller."""
