@@ -693,7 +693,12 @@ class GeminiClient(DirectLLMClient):
         # Add timeout to prevent infinite hanging when the API is overloaded
         from google.genai.types import HttpOptions
 
-        http_options = HttpOptions(timeout=_gemini_timeout_ms(timeout))
+        # Force the SDK onto its httpx async path so it does not instantiate
+        # the aiohttp session subclass that emits a DeprecationWarning.
+        http_options = HttpOptions(
+            timeout=_gemini_timeout_ms(timeout),
+            async_client_args={'transport': httpx.AsyncHTTPTransport()},
+        )
         self.client = genai.Client(api_key=api_key, http_options=http_options)
 
     def _resolve_gemini_model_name(self, model_name: str | None) -> str:
