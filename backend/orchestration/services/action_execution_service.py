@@ -201,13 +201,13 @@ class ActionExecutionService:
             return
 
         # Agent-generated functional errors MUST NOT render in UI but MUST reach LLM context
-        # (e.g. LLM generated empty response without tool calls). Setting is_internal=True hides it from CLI/UI.
+        # (e.g. LLM generated empty response without tool calls). Setting agent_only=True hides it from CLI/UI.
         from backend.ledger.observation.error import ErrorObservation
 
         if isinstance(event, ErrorObservation) and not getattr(
             event, "notify_ui_only", False
         ):
-            event.is_internal = True
+            event.agent_only = True
 
         event_stream.add_event(event, EventSource.AGENT)
 
