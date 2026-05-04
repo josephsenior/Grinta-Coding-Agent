@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from backend.inference.direct_clients import (
@@ -180,7 +181,12 @@ class TestSharedHttpClients:
         ):
             GeminiClient('gemini-2.5-pro', 'key', timeout=7)
 
-        http_options.assert_called_once_with(timeout=7000)
+        http_options.assert_called_once()
+        call_kwargs = http_options.call_args.kwargs
+        assert call_kwargs['timeout'] == 7000
+        assert isinstance(
+            call_kwargs['async_client_args']['transport'], httpx.AsyncBaseTransport
+        )
 
 
 # ---------------------------------------------------------------------------
