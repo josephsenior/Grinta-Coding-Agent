@@ -123,6 +123,10 @@ class RecoveryService:
         self._context = context
 
     def _record_circuit_breaker_error(self, controller, exc: Exception) -> None:
+        from backend.inference.exceptions import RateLimitError, APIConnectionError, Timeout
+        if isinstance(exc, (RateLimitError, APIConnectionError, Timeout)):
+            return
+            
         try:
             controller.circuit_breaker_service.record_error(exc)
         except Exception:
@@ -232,6 +236,27 @@ class RecoveryService:
     async def _handle_queued_retry_exception(self, controller, exc: Exception) -> bool:
         if not isinstance(exc, _QUEUED_RETRY_EXCEPTIONS):
             return False
+
+        from backend.inference.exceptions import RateLimitError, RateLimitKind
+        
+        if isinstance(exc, RateLimitError):
+            if getattr(exc, "kind", None) == RateLimitKind.RPD:
+                logger.warning("Daily quota (RPD) exhausted. Aborting queued retry.")
+                await self._set_awaiting_user_input_if_allowed(controller)
+                return True
+            
+            retry_after = getattr(exc, "retry_after", None)
+            if retry_after is not None:
+                from backend.core.retry_queue import get_retry_queue
+                queue = get_retry_queue()
+                max_delay = getattr(queue, "max_delay", 30.0) if queue else 30.0
+                if retry_after > max_delay:
+                    logger.warning(
+                        "Rate limit retry_after (%.1fs) exceeds max delay (%.1fs). Aborting queued retry.", 
+                        retry_after, max_delay
+                    )
+                    await self._set_awaiting_user_input_if_allowed(controller)
+                    return True
 
         if not _recovery_may_set_state(controller, AgentState.RATE_LIMITED):
             logger.info(
