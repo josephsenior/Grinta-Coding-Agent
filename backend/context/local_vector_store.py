@@ -67,8 +67,8 @@ class ChromaDBBackend(VectorBackend):
     """
 
     backend_name = 'ChromaDB (Local)'
-    # ChromaDB ships a quantised ONNX MiniLM-L6 (~80 MB) as its default EF.
-    _DEFAULT_EMBEDDING_MODEL = 'all-MiniLM-L6-v2 (chromadb-onnx)'
+    # Use FastEmbed BAAI/bge-small-en-v1.5 which is ONNX-based and fast
+    _DEFAULT_EMBEDDING_MODEL = 'BAAI/bge-small-en-v1.5'
 
     def __init__(  # noqa: D417
         self,
@@ -155,16 +155,14 @@ class ChromaDBBackend(VectorBackend):
         with self._model_lock:
             if self._model is not None:
                 return
-            logger.info("Loading bundled ONNX embedding model '%s'…", self._model_name)
+            logger.info("Loading FastEmbed ONNX embedding model '%s'…", self._model_name)
             from chromadb.utils import embedding_functions
 
             with (
                 contextlib.redirect_stderr(io.StringIO()),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
-                # Default EF lazily downloads + caches the ONNX MiniLM weights
-                # under ~/.cache/chroma/onnx_models/ on first use.
-                self._model = embedding_functions.DefaultEmbeddingFunction()
+                self._model = embedding_functions.FastEmbedEmbeddingFunction(model_name=self._model_name)
             logger.info('Embedding model ready (%s)', self._model_name)
 
     def warm_model_in_background(self) -> None:

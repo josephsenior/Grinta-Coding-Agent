@@ -93,7 +93,7 @@ class EnhancedVectorStore:
         collection_name: str = 'APP_memory',
         backend_type: str | None = None,
         enable_cache: bool = True,
-        enable_reranking: bool = False,  # noqa: ARG002 — kept for backward compat
+        enable_reranking: bool = True,
         cache_size: int = 10000,
         cache_ttl: int = 3600,
         warm_embeddings_in_background: bool = True,
@@ -122,8 +122,20 @@ class EnhancedVectorStore:
             QueryCache(max_size=cache_size, ttl=cache_ttl) if enable_cache else None
         )
 
-        # Re-ranker permanently disabled (removed in 0.56).
-        self.reranker: Any = None
+        self.enable_reranking = enable_reranking
+        if self.enable_reranking:
+            try:
+                from flashrank import Ranker
+                import os
+                cache_dir = _LOCAL_VECTOR_STORE._default_memory_persist_directory('flashrank')
+                os.makedirs(cache_dir, exist_ok=True)
+                # tinybert is very fast and lightweight
+                self.reranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2", cache_dir=str(cache_dir))
+            except ImportError:
+                logger.warning("flashrank not installed, falling back to no reranking")
+                self.reranker = None
+        else:
+            self.reranker = None
 
         # Configuration
         self.config: dict[str, bool | int | float] = {
@@ -203,11 +215,47 @@ class EnhancedVectorStore:
 
     def _finalize_hybrid_results(
         self,
-        query: str,  # noqa: ARG002 — retained for API compatibility
+        query: str,
         k: int,
         candidates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        return candidates[:k]
+        if not self.reranker or not candidates:
+            return candidates[:k]
+            
+        try:
+            from flashrank import RerankRequest
+            passages = [
+                {
+                    "id": c.get("step_id", str(i)),
+                    "text": c.get("excerpt", ""),
+                }
+                for i, c in enumerate(candidates)
+            ]
+            
+            rerank_request = RerankRequest(query=query, passages=passages)
+            results = self.reranker.rerank(rerank_request)
+            
+            # Map back to original candidate dicts
+            candidates_by_id = {c.get("step_id"): c for c in candidates}
+            reranked_candidates = []
+            for r in results:
+                original = candidates_by_id.get(r.get("id"))
+                if original:
+                    new_candidate = dict(original)
+                    new_candidate["score"] = r.get("score", new_candidate["score"])
+                    reranked_candidates.append(new_candidate)
+            
+            # If some candidates were dropped by the reranker (shouldn't happen), append them
+            returned_ids = {r.get("id") for r in results}
+            for c in candidates:
+                if c.get("step_id") not in returned_ids:
+                    reranked_candidates.append(c)
+            
+            return reranked_candidates[:k]
+            
+        except Exception as e:
+            logger.warning("FlashRank reranking failed, falling back to original order: %s", e)
+            return candidates[:k]
 
     def _try_cached_search(
         self,

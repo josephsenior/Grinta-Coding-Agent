@@ -80,6 +80,8 @@ optional-dependencies.documents = [
 ]
 optional-dependencies.rag = [
   "chromadb>=1.4,<2",
+  "fastembed>=0.2,<1",
+  "flashrank>=0.2,<1",
 ]
 urls = { Repository = "https://github.com/josephsenior/Grinta-Coding-Agent", Issues = "https://github.com/josephsenior/Grinta-Coding-Agent/issues", Documentation = "https://github.com/josephsenior/Grinta-Coding-Agent/tree/main/docs" }
 
