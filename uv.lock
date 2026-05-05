@@ -1289,7 +1289,7 @@ requires-dist = [
     { name = "python-pptx", marker = "extra == 'documents'", specifier = ">=1,<2" },
     { name = "pywinpty", marker = "sys_platform == 'win32'", specifier = ">=2,<3" },
     { name = "rapidfuzz", specifier = ">=3.9,<4" },
-    { name = "rich", specifier = ">=14,<15" },
+    { name = "rich", specifier = ">=14,<16" },
     { name = "ripgrep", specifier = "==14.1" },
     { name = "starlette", specifier = ">=0.49.1,<0.50" },
     { name = "tenacity", specifier = ">=8.5,<10" },
