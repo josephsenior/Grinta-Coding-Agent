@@ -109,6 +109,15 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
             insert_idx = max(0, min(action.insert_line, len(lines)))
             lines.insert(insert_idx, (action.new_str or '') + '\n')
             return ''.join(lines)
+        if action.command == 'edit' and getattr(action, 'edit_mode', None) == 'range':
+            start = getattr(action, 'start_line', None)
+            end = getattr(action, 'end_line', None)
+            if start is not None and end is not None:
+                lines = old_content.splitlines(keepends=True)
+                start_idx = max(0, start - 1)
+                end_idx = min(len(lines), end)
+                new_lines = (action.new_str or '').splitlines(keepends=True)
+                return ''.join(lines[:start_idx] + new_lines + lines[end_idx:])
         return None  # view or unknown — nothing to diff
 
     async def _diff_for_write(self, ctx: ToolInvocationContext, action) -> None:

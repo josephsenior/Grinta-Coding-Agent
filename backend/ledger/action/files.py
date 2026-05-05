@@ -71,13 +71,10 @@ class FileEditAction(Action):
 
     Attributes:
         path (str): The path to the file being edited.
-        command (str): The editing command to be performed (read_file, create_file, insert_text, undo_last_edit, write).
+        command (str): The editing command to be performed (read_file, create_file, insert_text, undo_last_edit, edit).
         file_text (str): The content of the file to be created (used with 'create_file').
         new_str (str): The replacement text (used with 'insert_text' or range edits).
         insert_line (int): The line number after which to insert new_str (used with 'insert_text').
-        content (str): Optional raw content payload kept for legacy compatibility.
-        start (int): Optional starting line for legacy payloads. Default is 1.
-        end (int): Optional ending line for legacy payloads. Default is -1 (end of file).
         thought (str): The reasoning behind the edit action.
         action (str): The type of action being performed (always ActionType.EDIT).
         runnable (bool): Indicates if the action can be executed (always True).
@@ -95,9 +92,6 @@ class FileEditAction(Action):
     new_str: str | None = None
     insert_line: int | None = None
     view_range: list[int] | None = None
-    content: str = ''
-    start: int = 1
-    end: int = -1
     thought: str = ''
     action: ClassVar[str] = ActionType.EDIT
     runnable: ClassVar[bool] = True
@@ -125,16 +119,15 @@ class FileEditAction(Action):
         ret = '**FileEditAction**\n'
         ret += f'Path: [{self.path}]\n'
         ret += f'Thought: {self.thought}\n'
-        if not self.command and self.content:
-            ret += f'Range: [L{self.start}:L{self.end}]\n'
-            ret += f'Content:\n```\n{self.content}\n```\n'
-        else:
-            ret += f'Command: {self.command}\n'
-            if self.command == 'create_file':
-                ret += f'Created File with Text:\n```\n{self.file_text}\n```\n'
-            elif self.command == 'insert_text':
-                ret += f'Insert Line: {self.insert_line}\n'
-                ret += f'New String: ```\n{self.new_str}\n```\n'
-            elif self.command == 'undo_last_edit':
-                ret += 'Undo Edit\n'
+        ret += f'Command: {self.command}\n'
+        if self.command == 'create_file':
+            ret += f'Created File with Text:\n```\n{self.file_text}\n```\n'
+        elif self.command == 'insert_text':
+            ret += f'Insert Line: {self.insert_line}\n'
+            ret += f'New String: ```\n{self.new_str}\n```\n'
+        elif self.command == 'edit' and self.edit_mode == 'range':
+            ret += f'Range: [L{self.start_line}:L{self.end_line}]\n'
+            ret += f'New String: ```\n{self.new_str}\n```\n'
+        elif self.command == 'undo_last_edit':
+            ret += 'Undo Edit\n'
         return ret

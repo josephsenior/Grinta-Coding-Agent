@@ -44,7 +44,7 @@ class TestActionRequiresConfirmation:
 
     def test_file_edit_requires_confirmation(self):
         svc = SafetyService(_make_context())
-        action = FileEditAction(path='/tmp/x.py', content='x')
+        action = FileEditAction(path='/tmp/x.py', new_str='x')
         assert svc.action_requires_confirmation(action) is True
 
     def test_file_read_requires_confirmation(self):

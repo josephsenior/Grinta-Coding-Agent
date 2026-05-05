@@ -369,17 +369,18 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
         self._run(pipeline.run_observe(ctx, obs))
         self.assertIn('<SYNTAX_CHECK_FAILED>', obs.content)
 
-    def test_file_edit_replace_text_uses_content_fallback(self):
-        """FileEditAction replace_text — uses content attr as file content."""
+    def test_file_edit_range_syntax_check(self):
+        """FileEditAction range edit — verifies syntax check fires."""
         from backend.ledger.action.files import FileEditAction
         from backend.ledger.observation import FileEditObservation
 
         action = FileEditAction(
             path='/workspace/app.py',
-            command='replace_text',
-            old_str='old',
-            new_str='new',
-            content='def hello():\n    return 42\n',
+            command='edit',
+            edit_mode='range',
+            start_line=1,
+            end_line=1,
+            new_str='def hello():\n    return 42\n',
         )
         obs = FileEditObservation(content='Replacement done', path='/workspace/app.py')
         pipeline, ctx = self._make_pipeline_and_ctx(action)

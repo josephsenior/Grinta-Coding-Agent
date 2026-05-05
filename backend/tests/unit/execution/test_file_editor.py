@@ -195,13 +195,15 @@ class TestFileEditorEdit:
         p.write_text(content)
         return p
 
-    def test_str_replace(self):
+    def test_range_edit(self):
         self._write('code.py', 'x = 1\ny = 2\nz = 3\n')
         result = self.editor(
             command='edit',
             path='code.py',
-            old_str='y = 2',
-            new_str='y = 42',
+            edit_mode='range',
+            start_line=2,
+            end_line=2,
+            new_str='y = 42\n',
         )
         assert result.error is None
         content = (Path(self.tmpdir) / 'code.py').read_text()
@@ -212,8 +214,10 @@ class TestFileEditorEdit:
         result = self.editor(
             command='edit',
             path='code.py',
-            old_str='x = 1',
-            new_str='x = 99',
+            edit_mode='range',
+            start_line=1,
+            end_line=1,
+            new_str='x = 99\n',
             dry_run=True,
         )
         assert result.error is None
@@ -232,54 +236,15 @@ class TestFileEditorEdit:
         content = (Path(self.tmpdir) / 'insert.py').read_text()
         assert 'inserted' in content
 
-    def test_replace_auto_whitespace_tolerant(self):
-        self._write('code.py', 'if True:\n\tvalue = 1\n')
+    def test_edit_requires_mode(self):
+        self._write('code.py', 'x = 1\n')
         result = self.editor(
             command='edit',
             path='code.py',
-            old_str='if True:\n    value = 1\n',
-            new_str='if True:\n    value = 2\n',
-            match_mode='normalize_ws',
-        )
-        assert result.error is None
-        content = (Path(self.tmpdir) / 'code.py').read_text()
-        assert 'value = 2' in content
-
-    def test_replace_requires_unique_match(self):
-        self._write('dup.py', 'x = 1\ny = 2\nx = 1\n')
-        result = self.editor(
-            command='edit',
-            path='dup.py',
-            old_str='x = 1',
             new_str='x = 9',
         )
+        # Should fail because no mode (like range) is provided and old_str is gone
         assert result.error is not None
-        assert 'Must be unique' in result.error
-
-    def test_replace_fuzzy_safe_single_line_success(self):
-        self._write('fuzzy.ts', 'first\nvalue = fooo\nlast\n')
-        result = self.editor(
-            command='edit',
-            path='fuzzy.ts',
-            old_str='value = foo',
-            new_str='value = bar',
-            match_mode='fuzzy_safe',
-        )
-        assert result.error is None
-        content = (Path(self.tmpdir) / 'fuzzy.ts').read_text()
-        assert 'value = bar' in content
-
-    def test_replace_fuzzy_safe_ambiguity_is_rejected(self):
-        self._write('ambiguous-fuzzy.ts', 'value = fooo\nvalue = fooo\n')
-        result = self.editor(
-            command='edit',
-            path='ambiguous-fuzzy.ts',
-            old_str='value = fo0o',
-            new_str='value = bar',
-            match_mode='fuzzy_safe',
-        )
-        assert result.error is not None
-        assert 'ambiguous' in result.error.lower()
 
     def test_unknown_command(self):
         result = self.editor(command='delete', path='x.txt')

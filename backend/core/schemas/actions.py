@@ -87,20 +87,10 @@ class FileEditActionSchema(ActionSchemaV1):
     file_text: str | None = Field(
         default=None, description='File content for create command'
     )
-    old_str: str | None = Field(
-        default=None,
-        description='String to replace (file-editor substring replace opcode)',
-    )
     new_str: str | None = Field(default=None, description='Replacement string')
     insert_line: int | None = Field(
         default=None, ge=1, description='Line number for insert command'
     )
-    content: str | None = Field(
-        default=None,
-        description='Optional raw content payload retained for legacy compatibility',
-    )
-    start: int = Field(default=1, ge=1, description='Starting line number (1-indexed)')
-    end: int = Field(default=-1, description='Ending line number (-1 for end of file)')
     impl_source: str | None = Field(
         default=None,
         description='Implementation source (currently FILE_EDITOR when set)',

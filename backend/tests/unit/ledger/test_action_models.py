@@ -258,16 +258,13 @@ class TestFileEditAction(unittest.TestCase):
     def test_default_impl_source(self):
         self.assertEqual(FileEditAction().impl_source, FileEditSource.FILE_EDITOR)
 
-    def test_repr_content_payload(self):
+    def test_repr_insert_text(self):
         f = FileEditAction(
-            path='x.py',
-            content='new code',
-            thought='refactor',
+            path='w.py', command='insert_text', insert_line=5, new_str='line'
         )
         r = repr(f)
-        self.assertIn('FileEditAction', r)
-        self.assertIn('x.py', r)
-        self.assertIn('new code', r)
+        self.assertIn('Insert Line: 5', r)
+        self.assertIn('line', r)
 
     def test_repr_file_editor_create(self):
         f = FileEditAction(path='y.py', command='create_file', file_text='hello')
@@ -275,20 +272,15 @@ class TestFileEditAction(unittest.TestCase):
         self.assertIn('Command: create_file', r)
         self.assertIn('hello', r)
 
-    def test_repr_replace_text(self):
+    def test_repr_edit_range(self):
         f = FileEditAction(
-            path='z.py', command='replace_text', old_str='a', new_str='b'
+            path='z.py', command='edit', edit_mode='range', start_line=10, end_line=12, new_str='updated code'
         )
         r = repr(f)
-        self.assertIn('Old String', r)
-        self.assertIn('New String', r)
+        self.assertIn('Range: [L10:L12]', r)
+        self.assertIn('updated code', r)
 
-    def test_repr_insert_text(self):
-        f = FileEditAction(
-            path='w.py', command='insert_text', insert_line=5, new_str='line'
-        )
-        r = repr(f)
-        self.assertIn('Insert Line: 5', r)
+
 
     def test_repr_undo(self):
         f = FileEditAction(path='u.py', command='undo_last_edit')

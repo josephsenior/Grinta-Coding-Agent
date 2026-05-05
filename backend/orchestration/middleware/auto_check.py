@@ -94,7 +94,7 @@ def _extract_syntax_check_payload(action: object) -> tuple[str, bytes | None] | 
     from backend.ledger.action import FileEditAction, FileWriteAction
 
     if isinstance(action, FileEditAction):
-        raw = action.file_text or action.content
+        raw = action.new_str or action.file_text
         return action.path, raw.encode('utf-8') if raw else None
     if isinstance(action, FileWriteAction):
         raw = action.content

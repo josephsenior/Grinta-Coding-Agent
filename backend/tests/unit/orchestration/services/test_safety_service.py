@@ -52,7 +52,7 @@ class TestSafetyService(unittest.IsolatedAsyncioTestCase):
 
     def test_action_requires_confirmation_file_edit(self):
         """Test action_requires_confirmation for FileEditAction."""
-        action = FileEditAction(path='/test', content='test')
+        action = FileEditAction(path='/test', new_str='test')
 
         result = self.service.action_requires_confirmation(action)
 

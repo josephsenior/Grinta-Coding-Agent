@@ -69,7 +69,7 @@ COMMANDS:
 
 NOTE:
 - Prefer this tool for structure-aware code edits.
-- For non-code files, string-match edits (old_str→new_str), or document-oriented edits (format/section/range/patch), use `text_editor`.
+- For non-code files, range-based edits, or document-oriented edits (format/section/patch), use `text_editor`.
 
 FEATURES:
 - Language-agnostic: Works with ALL languages via Tree-sitter
