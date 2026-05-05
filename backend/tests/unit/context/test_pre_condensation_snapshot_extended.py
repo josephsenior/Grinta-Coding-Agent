@@ -60,7 +60,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
                 exit_code=0,
             ),
             FileEditAction(
-                path='test.py', command='replace_text', new_str='new'
+                path='test.py', command='edit', new_str='new'
             ),
             ErrorObservation(content='Match not found'),
             CmdRunAction(command='pytest'),
@@ -122,7 +122,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         """Diff/code mentioning 'error' must not mark the approach as FAILED."""
         events = [
             FileEditAction(
-                path='app.py', command='replace_text', new_str='b'
+                path='app.py', command='edit', new_str='b'
             ),
             FileEditObservation(
                 content='+def handle_error():\n    pass\n',

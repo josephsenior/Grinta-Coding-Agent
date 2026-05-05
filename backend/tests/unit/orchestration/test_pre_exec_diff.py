@@ -5,7 +5,7 @@ Tests cover:
 - execute() method dispatch for different action types
 - _diff_for_edit with various FileEditAction commands
 - _diff_for_write for FileWriteAction
-- _simulate_edit for replace_text, create_file, insert_text commands
+- _simulate_edit for edit, create_file, insert_text commands
 - _resolve_path helper
 - _read_file helper with size limits
 """
@@ -127,8 +127,8 @@ class TestDiffForEdit:
         assert 'pre_exec_diff' not in ctx.metadata
 
     @pytest.mark.asyncio
-    async def test_diff_for_edit_with_replace_text(self):
-        """Should generate diff for replace_text command."""
+    async def test_diff_for_edit_with_edit_command(self):
+        """Should generate diff for edit command."""
         middleware = PreExecDiffMiddleware()
         action = FileEditAction(
             path='test.txt',

@@ -264,7 +264,7 @@ class TestExecuteFileEditor:
         result_mock.new_content = 'new'
         editor = MagicMock(return_value=result_mock)
 
-        output, (old, new) = execute_file_editor(editor, 'replace_text', '/test.py')
+        output, (old, new) = execute_file_editor(editor, 'edit', '/test.py')
         assert output == 'File edited successfully'
         assert old == 'old'
         assert new == 'new'
@@ -275,7 +275,7 @@ class TestExecuteFileEditor:
         result_mock.output = ''
         editor = MagicMock(return_value=result_mock)
 
-        output, (old, new) = execute_file_editor(editor, 'replace_text', '/test.py')
+        output, (old, new) = execute_file_editor(editor, 'edit', '/test.py')
         assert 'ERROR' in output
         assert old is None and new is None
 

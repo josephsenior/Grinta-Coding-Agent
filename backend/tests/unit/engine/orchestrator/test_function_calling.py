@@ -518,14 +518,14 @@ class TestValidateStructureEditorArgs:
         assert isinstance(result, FileReadAction)
         assert result.path == 'x.py'
 
-    def test_replace_text_not_valid_for_symbol_editor(self):
-        """replace_text is NOT a symbol_editor command — use text_editor instead."""
+    def test_edit_not_valid_for_symbol_editor(self):
+        """edit is NOT a symbol_editor command — use text_editor instead."""
         from backend.engine.function_calling import _handle_symbol_editor_tool
 
         with pytest.raises(FunctionCallValidationError, match='Unknown command'):
             _handle_symbol_editor_tool(
                 {
-                    'command': 'replace_text',
+                    'command': 'edit',
                     'path': 'x.py',
                     'old_str': 'old',
                     'new_str': 'new',
