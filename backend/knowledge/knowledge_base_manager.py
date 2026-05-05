@@ -6,9 +6,12 @@ import asyncio
 import hashlib
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any
 
 from backend.context.vector_store import EnhancedVectorStore
+from backend.knowledge.query_expansion import QueryExpander
+from backend.knowledge.smart_chunking import SmartChunker
 from backend.persistence.data_models.knowledge_base import (
     DocumentChunk,
     KnowledgeBaseCollection,
@@ -35,6 +38,8 @@ class KnowledgeBaseManager:
         self.user_id = user_id
         self.store = get_knowledge_base_store()
         self._vector_stores: dict[str, EnhancedVectorStore] = {}
+        self._chunker = SmartChunker()
+        self._query_expander = QueryExpander(expand=True, use_patterns=True)
 
     def _get_vector_store(self, collection_id: str) -> EnhancedVectorStore:
         """Get or create a vector store for a collection."""
@@ -270,10 +275,19 @@ class KnowledgeBaseManager:
     ) -> list[DocumentChunk]:
         """Split content into chunks for vector storage.
 
-        Uses AST-aware chunking for supported code files (via tree-sitter)
-        and falls back to a sliding window for plain text / unsupported
-        languages.
+        Uses AST-aware chunking for supported code files (via tree-sitter),
+        smart chunking for markdown/JSON/YAML, and falls back to sliding
+        window for plain text.
         """
+        file_type = self._chunker.get_file_type(filename)
+
+        if file_type == 'markdown':
+            return self._chunker.chunk_markdown(content, document_id, metadata)
+        if file_type == 'json':
+            return self._chunker.chunk_json(content, document_id, metadata)
+        if file_type == 'yaml':
+            return self._chunker.chunk_yaml(content, document_id, metadata)
+
         if filename:
             ast_chunks = self._try_ast_chunk(content, document_id, metadata, filename)
             if ast_chunks is not None:
@@ -564,17 +578,20 @@ class KnowledgeBaseManager:
         collection_ids: list[str] | None = None,
         top_k: int = 5,
         relevance_threshold: float = 0.7,
+        expand_query: bool = True,
     ) -> list[KnowledgeBaseSearchResult]:
         """Search across knowledge base collections.
 
         Searches all specified collections in parallel, then merges and
-        sorts results by relevance.
+        sorts results by relevance. Uses query expansion with synonyms
+        to improve recall.
 
         Args:
             query: The search query
             collection_ids: List of collection IDs to search (or None for all)
             top_k: Number of results to return
             relevance_threshold: Minimum relevance score (0-1)
+            expand_query: Whether to expand query with synonyms
 
         Returns:
             List of search results, sorted by relevance
@@ -594,15 +611,20 @@ class KnowledgeBaseManager:
         if not accessible:
             return []
 
+        # Expand query with synonyms for better recall
+        expanded_queries = [query]
+        if expand_query:
+            expanded_queries = self._query_expander.expand_query(query)
+
         # Search all accessible collections in parallel
         all_results: list[KnowledgeBaseSearchResult] = []
 
-        def _search_collection(cid: str) -> list[KnowledgeBaseSearchResult]:
+        def _search_collection(cid: str, search_query: str) -> list[KnowledgeBaseSearchResult]:
             vector_store = self._get_vector_store(cid)
             results: list[KnowledgeBaseSearchResult] = []
             try:
                 raw_results = vector_store.search(
-                    query=query,
+                    query=search_query,
                     k=top_k,
                     filter_metadata={'collection_id': cid},
                 )
@@ -625,12 +647,26 @@ class KnowledgeBaseManager:
                 logger.error('Error searching collection %s: %s', cid, e)
             return results
 
-        with ThreadPoolExecutor(max_workers=min(len(accessible), 8)) as pool:
-            futures = {
-                pool.submit(_search_collection, cid): cid for cid in accessible
-            }
+        with ThreadPoolExecutor(max_workers=min(len(accessible) * len(expanded_queries), 16)) as pool:
+            futures = {}
+            for cid in accessible:
+                for eq in expanded_queries:
+                    futures[pool.submit(_search_collection, cid, eq)] = (cid, eq)
+
+            seen_chunks: dict[str, KnowledgeBaseSearchResult] = {}
             for future in as_completed(futures):
-                all_results.extend(future.result())
+                cid, eq = futures[future]
+                try:
+                    results = future.result()
+                    for r in results:
+                        chunk_idx = r.metadata.get('chunk_index', 0) if r.metadata else 0
+                        chunk_key = f"{r.document_id}:{chunk_idx}"
+                        if chunk_key not in seen_chunks or r.relevance_score > seen_chunks[chunk_key].relevance_score:
+                            seen_chunks[chunk_key] = r
+                except Exception as e:
+                    logger.error('Error searching collection %s with query %s: %s', cid, eq, e)
+
+            all_results = list(seen_chunks.values())
 
         # Sort by relevance and return top results
         all_results.sort(key=lambda r: r.relevance_score, reverse=True)
@@ -642,6 +678,7 @@ class KnowledgeBaseManager:
         collection_ids: list[str] | None = None,
         top_k: int = 5,
         relevance_threshold: float = 0.7,
+        expand_query: bool = True,
     ) -> list[KnowledgeBaseSearchResult]:
         """Async wrapper for search, offloading blocking work to a thread."""
         return await asyncio.to_thread(
@@ -650,6 +687,7 @@ class KnowledgeBaseManager:
             collection_ids,
             top_k,
             relevance_threshold,
+            expand_query,
         )
 
     def get_stats(self) -> dict[str, Any]:
