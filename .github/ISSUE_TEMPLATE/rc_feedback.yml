@@ -92,7 +92,7 @@ body:
     id: model
     attributes:
       label: Model/provider used
-      description: Example: openai/gpt-4o-mini, anthropic/..., ollama/...
+      description: 'Example: openai/gpt-4o-mini, anthropic/..., ollama/...'
       placeholder: "openai/gpt-4o-mini"
 
   - type: textarea

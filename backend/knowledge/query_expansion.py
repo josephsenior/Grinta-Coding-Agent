@@ -21,7 +21,7 @@ class QueryExpander:
         'database': {'db', 'storage', 'data', 'query'},
         'auth': {'authentication', 'authorization', 'login', 'security'},
         'install': {'setup', 'init', 'configure', 'deploy'},
-        'build': {'compile', 'compile', 'package', 'bundle'},
+        'build': {'compile', 'package', 'bundle'},
         'run': {'execute', 'start', 'launch', 'invoke'},
         'debug': {'troubleshoot', 'diagnose', 'fix', 'inspect'},
         'refactor': {'restructure', 'reorganize', 'cleanup', 'improve'},
@@ -94,7 +94,9 @@ class QueryExpander:
 
         return boosts
 
-    def contextualize(self, query: str, context: dict[str, Any] | None = None) -> list[str]:
+    def contextualize(
+        self, query: str, context: dict[str, Any] | None = None
+    ) -> list[str]:
         """Generate contextual query variations."""
         queries = self.expand_query(query)
 

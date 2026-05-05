@@ -14,8 +14,8 @@ from backend.core.constants import (
     MCP_PENDING_ACTION_TIMEOUT_FLOOR,
     TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR,
 )
-from backend.core.timeout_policy import effective_cmd_run_pending_timeout_seconds
 from backend.core.logger import app_logger as logger
+from backend.core.timeout_policy import effective_cmd_run_pending_timeout_seconds
 from backend.ledger import EventSource
 from backend.ledger.action import Action
 from backend.ledger.observation import ErrorObservation

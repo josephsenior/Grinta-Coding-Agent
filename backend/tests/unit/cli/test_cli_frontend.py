@@ -2395,7 +2395,9 @@ def test_error_guidance_connection_refused() -> None:
 
 
 @pytest.mark.asyncio
-async def test_wait_for_state_change_returns_immediately_when_events_are_pending() -> None:
+async def test_wait_for_state_change_returns_immediately_when_events_are_pending() -> (
+    None
+):
     renderer = CLIEventRenderer(
         _make_console(), HUDBar(), ReasoningDisplay(), loop=asyncio.get_running_loop()
     )

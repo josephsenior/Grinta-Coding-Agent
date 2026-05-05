@@ -225,7 +225,7 @@ class ChromaDBBackend(VectorBackend):
         if len(text) > 600:
             chunk_size = 400
             overlap = 100
-            chunks = []
+            chunks: list[str] = []
             chunk_metadatas = []
             chunk_ids = []
 
@@ -300,12 +300,18 @@ class ChromaDBBackend(VectorBackend):
 
                 for i in range(0, len(text), chunk_size - overlap):
                     chunk = text[i : i + chunk_size]
-                    if len(chunk) < 100 and child_ids and child_ids[-1].startswith(f'{step_id}_child_'):
+                    if (
+                        len(chunk) < 100
+                        and child_ids
+                        and child_ids[-1].startswith(f'{step_id}_child_')
+                    ):
                         continue
                     child_count += 1
                     child_ids.append(f'{step_id}_child_{child_count}')
                     child_docs.append(chunk)
-                    child_metas.append({**doc_metadata, 'is_child': True, 'parent_id': step_id})
+                    child_metas.append(
+                        {**doc_metadata, 'is_child': True, 'parent_id': step_id}
+                    )
 
                     if i + chunk_size >= len(text):
                         break
@@ -316,7 +322,9 @@ class ChromaDBBackend(VectorBackend):
 
         # Single batch insert for all children
         if child_ids:
-            self.collection.add(ids=child_ids, documents=child_docs, metadatas=child_metas)
+            self.collection.add(
+                ids=child_ids, documents=child_docs, metadatas=child_metas
+            )
 
     def search(
         self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None
@@ -689,16 +697,16 @@ class SQLiteBM25Backend(VectorBackend):
         if not ids_to_delete:
             return 0
 
-        conn.executemany('DELETE FROM docs WHERE rowid = ?', [(rid,) for rid in ids_to_delete])
+        conn.executemany(
+            'DELETE FROM docs WHERE rowid = ?', [(rid,) for rid in ids_to_delete]
+        )
         conn.commit()
         return len(ids_to_delete)
 
     def delete_by_ids(self, ids: list[str]) -> int:
         conn = self._get_conn()
         cursor = conn.cursor()
-        cursor.executemany(
-            'DELETE FROM docs WHERE step_id = ?', [(i,) for i in ids]
-        )
+        cursor.executemany('DELETE FROM docs WHERE step_id = ?', [(i,) for i in ids])
         conn.commit()
         return cursor.rowcount
 

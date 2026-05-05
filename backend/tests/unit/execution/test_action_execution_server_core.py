@@ -44,7 +44,9 @@ def test_resolve_workspace_path_rejects_traversal(tmp_path: Path) -> None:
 
     # Absolute path outside workspace should be rejected
     with pytest.raises(ValueError, match='outside the workspace root'):
-        aes.resolve_workspace_path(str(outside / 'evil.txt'), str(nested), str(workspace))
+        aes.resolve_workspace_path(
+            str(outside / 'evil.txt'), str(nested), str(workspace)
+        )
 
     # Relative path that escapes workspace should be rejected
     with pytest.raises(ValueError, match='outside the workspace root'):

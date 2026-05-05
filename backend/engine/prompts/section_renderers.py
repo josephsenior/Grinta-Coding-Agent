@@ -128,16 +128,10 @@ def _path_uncertainty_hint(
 def _routing_tool_batching_paragraph(function_calling_mode: str | None) -> str:
     mode = (function_calling_mode or 'unknown').strip().lower()
     if mode == 'native':
-        return (
-            'You may batch independent code search/reads in one turn if it improves latency. Dependent edits/runs must be sequential.'
-        )
+        return 'You may batch independent code search/reads in one turn if it improves latency. Dependent edits/runs must be sequential.'
     if mode == 'string':
-        return (
-            'Fallback string-parsing mode is active. Only emit one tool call per message.'
-        )
-    return (
-        'Use single tool-calls unless multi-call is clearly supported.'
-    )
+        return 'Fallback string-parsing mode is active. Only emit one tool call per message.'
+    return 'Use single tool-calls unless multi-call is clearly supported.'
 
 
 def _routing_memory_tool_placeholders(
@@ -217,18 +211,14 @@ def _render_routing(
     condensation_on = getattr(config, 'enable_condensation_request', False)
     tracker_on = getattr(config, 'enable_task_tracker_tool', False)
     if not is_windows:
-        env_line = (
-            'Use **bash** for environment actions (install, build, test, git, processes). '
-        )
+        env_line = 'Use **bash** for environment actions (install, build, test, git, processes). '
     elif windows_with_bash:
         env_line = (
             'Use **bash** (Git Bash on Windows) for environment actions '
             '(install, build, test, git, processes). '
         )
     else:
-        env_line = (
-            'Use **PowerShell** for environment actions (install, build, test, git, processes). '
-        )
+        env_line = 'Use **PowerShell** for environment actions (install, build, test, git, processes). '
     discovery = _repo_discovery_contract(
         is_windows=is_windows,
         windows_with_bash=windows_with_bash,
@@ -360,7 +350,7 @@ def _render_system_capabilities(
 
 
 def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
-    """Return ``(lsp_line, dap_line)`` summarizing detected runtimes.
+    r"""Return ``(lsp_line, dap_line)`` summarizing detected runtimes.
 
     When ``enable_lsp_query`` / ``enable_debugger`` is false, returns ``''`` for that
     line so the capability block omits the tool entirely (no \"DISABLED\" bullet).
@@ -544,12 +534,15 @@ def _render_tool_reference(
     shell_is_powershell: bool,
 ) -> str:
     explore = _explore_hint(config)
-    confirm_cmd = _path_uncertainty_hint(
-        explore,
-        is_windows=is_windows,
-        windows_with_bash=windows_with_bash,
-        shell_is_powershell=shell_is_powershell,
-    ) + ' Prefer editors over shell directory guessing.'
+    confirm_cmd = (
+        _path_uncertainty_hint(
+            explore,
+            is_windows=is_windows,
+            windows_with_bash=windows_with_bash,
+            shell_is_powershell=shell_is_powershell,
+        )
+        + ' Prefer editors over shell directory guessing.'
+    )
     if not is_windows or windows_with_bash:
         proc_find = 'Never `pkill -f` broadly — `ps`/`grep` then `kill <PID>`.'
     else:

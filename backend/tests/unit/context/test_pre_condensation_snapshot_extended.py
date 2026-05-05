@@ -59,9 +59,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
                 command='pip install flask',
                 exit_code=0,
             ),
-            FileEditAction(
-                path='test.py', command='edit', new_str='new'
-            ),
+            FileEditAction(path='test.py', command='edit', new_str='new'),
             ErrorObservation(content='Match not found'),
             CmdRunAction(command='pytest'),
             CmdOutputObservation(
@@ -121,9 +119,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
     def test_file_edit_observation_benign_error_word_is_success(self):
         """Diff/code mentioning 'error' must not mark the approach as FAILED."""
         events = [
-            FileEditAction(
-                path='app.py', command='edit', new_str='b'
-            ),
+            FileEditAction(path='app.py', command='edit', new_str='b'),
             FileEditObservation(
                 content='+def handle_error():\n    pass\n',
                 path='app.py',

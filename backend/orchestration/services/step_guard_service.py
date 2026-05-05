@@ -9,17 +9,10 @@ from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import (
-    CmdRunAction,
     FileEditAction,
-    FileReadAction,
     FileWriteAction,
-    LspQueryAction,
-    RecallAction,
-    TerminalReadAction,
-    TerminalRunAction,
 )
-from backend.ledger.observation import CmdOutputObservation, ErrorObservation
-from backend.ledger.observation.files import FileEditObservation, FileWriteObservation
+from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation_cause import attach_observation_cause
 from backend.orchestration.services.guard_bus import (
     CIRCUIT_WARNING,
@@ -166,8 +159,6 @@ class StepGuardService:
             state.set_extra(
                 self._REPLAN_REQUIRED_KEY, bool(value), source='StepGuardService'
             )
-
-
 
     async def _check_circuit_breaker(
         self, controller: 'SessionOrchestrator'
@@ -346,9 +337,7 @@ class StepGuardService:
         _clear_agent_queued_actions(controller, reason='stuck_loop_recovery')
 
         created_files = self._collect_created_files(history)
-        msg, planning = self._build_stuck_recovery_message(
-            created_files, history
-        )
+        msg, planning = self._build_stuck_recovery_message(created_files, history)
 
         GuardBus.emit(
             controller,
@@ -377,9 +366,7 @@ class StepGuardService:
     ) -> tuple[str, str]:
         """Build a generic stuck recovery message without task-text heuristics."""
         recent_errors = self._recent_error_contents(history)
-        text_editor_message = self._text_editor_recovery_message(
-            recent_errors
-        )
+        text_editor_message = self._text_editor_recovery_message(recent_errors)
         if text_editor_message is not None:
             return text_editor_message
 
@@ -407,7 +394,7 @@ class StepGuardService:
 
     @staticmethod
     def _text_editor_recovery_message(
-        recent_errors: list[str]
+        recent_errors: list[str],
     ) -> tuple[str, str] | None:
         text_editor_hits = sum(
             1

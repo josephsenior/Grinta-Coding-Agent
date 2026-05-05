@@ -463,9 +463,7 @@ def _collect_system_prompt_sections(
             (
                 'system_partial_05_examples',
                 _render_examples(
-                    tracker_on=bool(
-                        getattr(config, 'enable_task_tracker_tool', False)
-                    ),
+                    tracker_on=bool(getattr(config, 'enable_task_tracker_tool', False)),
                     enable_think=effective_enable_think,
                     meta_cognition_on=bool(
                         getattr(config, 'enable_meta_cognition', False)

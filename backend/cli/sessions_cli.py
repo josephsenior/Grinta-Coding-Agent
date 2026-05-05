@@ -82,7 +82,11 @@ def cmd_list(console: Console, limit: int = 50, search: str | None = None) -> in
     for i, (sid, meta, count, _path) in enumerate(rows, 1):
         table.add_row(*_format_session_row(i, sid, meta, count))
     console.print(table)
-    search_hint = ' | [bold]grinta sessions list --search <term>[/bold] to filter' if search else ''
+    search_hint = (
+        ' | [bold]grinta sessions list --search <term>[/bold] to filter'
+        if search
+        else ''
+    )
     console.print(
         f'[{CLR_META}]Shell: [bold]grinta sessions show <N|id>[/bold] for details, '
         '[bold]grinta sessions export <N|id> <path>[/bold] to save one.'
@@ -102,7 +106,8 @@ def _filter_sessions_fuzzy(
         # Fallback to simple substring matching
         search_lower = search_term.lower()
         return [
-            r for r in rows
+            r
+            for r in rows
             if search_lower in str(r[1].get('title', '') or '').lower()
             or search_lower in str(r[1].get('name', '') or '').lower()
             or search_lower in str(r[1].get('llm_model', '') or '').lower()
@@ -143,7 +148,9 @@ def _build_session_table(console: Console) -> Table:
     table.add_column('#', style=STYLE_DIM, no_wrap=True)
     table.add_column('ID', max_width=id_max, overflow='fold', no_wrap=False)
     table.add_column('Title', max_width=title_max, overflow='fold')
-    table.add_column('Model', style=STYLE_DIM, max_width=max(10, tw // 12), overflow='fold')
+    table.add_column(
+        'Model', style=STYLE_DIM, max_width=max(10, tw // 12), overflow='fold'
+    )
     table.add_column('Events', justify='right', no_wrap=True)
     table.add_column('Cost', justify='right', no_wrap=True)
     table.add_column('Updated', style=STYLE_DIM, max_width=22, overflow='fold')

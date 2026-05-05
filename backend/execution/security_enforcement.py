@@ -417,7 +417,7 @@ class SecurityEnforcementMixin:
             # ``DAPDebugManager.handle`` (and ``DEBUGGER_DISPATCH``) never runs.
             # The debugger tool is a vetted, typed action — use declared risk with
             # a LOW default when the agent omitted it.
-            effective = (
+            effective: ActionSecurityRisk = (
                 ActionSecurityRisk.LOW
                 if declared == ActionSecurityRisk.UNKNOWN
                 else declared

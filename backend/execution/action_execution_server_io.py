@@ -603,12 +603,16 @@ class RuntimeExecutorIOAndTerminalMixin:
         if isinstance(session, BaseShellSession):
             return session, None
         if session is not None:
-            return None, ErrorObservation('Default shell session is not a foreground shell')
+            return None, ErrorObservation(
+                'Default shell session is not a foreground shell'
+            )
 
         try:
             recreated = self.session_manager.create_session(session_id='default')
         except Exception as exc:
-            logger.error('Failed to recreate default shell session: %s', exc, exc_info=True)
+            logger.error(
+                'Failed to recreate default shell session: %s', exc, exc_info=True
+            )
             return (
                 None,
                 ErrorObservation(
@@ -616,7 +620,9 @@ class RuntimeExecutorIOAndTerminalMixin:
                 ),
             )
         if not isinstance(recreated, BaseShellSession):
-            return None, ErrorObservation('Default shell session is not a foreground shell')
+            return None, ErrorObservation(
+                'Default shell session is not a foreground shell'
+            )
         logger.warning('Recreated missing default shell session')
         return recreated, None
 

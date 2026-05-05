@@ -864,32 +864,34 @@ class GeminiClient(DirectLLMClient):
             )
         if exc.code == 429 or 'quota' in error_str or 'rate limit' in error_str:
             import re
-            
+
             from backend.inference.exceptions import RateLimitKind
-            
+
             # Default to TPM since streaming 429s from Gemini are often token quotas
             kind = RateLimitKind.TPM
             retry_after = None
-            
+
             # Look for "Please retry in 17.235s" or "'retryDelay': '17s'"
-            delay_match = re.search(r'(?:retry in |retryDelay[\'\":\s]*)([0-9.]+)', error_str, re.IGNORECASE)
+            delay_match = re.search(
+                r'(?:retry in |retryDelay[\'\":\s]*)([0-9.]+)', error_str, re.IGNORECASE
+            )
             if delay_match:
                 try:
                     retry_after = float(delay_match.group(1))
                 except (ValueError, TypeError):
                     pass
-                    
+
             if 'rpm' in error_str or 'requests per minute' in error_str:
                 kind = RateLimitKind.RPM
             elif 'rpd' in error_str or 'requests per day' in error_str:
                 kind = RateLimitKind.RPD
 
             return RateLimitError(
-                str(exc), 
-                llm_provider='google', 
+                str(exc),
+                llm_provider='google',
                 model=self.model_name,
                 kind=kind,
-                retry_after=retry_after
+                retry_after=retry_after,
             )
         if (
             exc.code == 401

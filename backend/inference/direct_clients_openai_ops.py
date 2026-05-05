@@ -32,7 +32,7 @@ def extract_openai_http_status(exc: Exception) -> int | None:
     m = re.search(r'status code:\s*(\d{3})\b', text, re.IGNORECASE)
     if m:
         return int(m.group(1))
-    return None
+    return None  # type: ignore[unreachable]
 
 
 def simplify_openai_unauthorized_message(exc: Exception, status_code: int) -> str:

@@ -59,12 +59,11 @@ def _is_trivial_command(command: str) -> bool:
         return False
     head = command.strip()
     # Strip leading env-var assignments such as ``DEBUG=1 ls``.
-    while True:
-        m = re.match(r'^[A-Za-z_][A-Za-z0-9_]*=\S*\s+', head)
-        if not m:
-            break
+    m = re.match(r'^[A-Za-z_][A-Za-z0-9_]*=\S*\s+', head)
+    while m:
         head = head[m.end() :]
-    return bool(_TRIVIAL_CMD_PATTERN.match(head))
+        m = re.match(r'^[A-Za-z_][A-Za-z0-9_]*=\S*\s+', head)
+    return bool(_TRIVIAL_CMD_PATTERN.match(head))  # type: ignore[unreachable]
 
 
 class RollbackMiddleware(ToolInvocationMiddleware):

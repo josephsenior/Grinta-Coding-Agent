@@ -158,7 +158,7 @@ def create_debugger_tool() -> dict[str, Any]:
                         'type': 'number',
                         'description': (
                             'Optional timeout in seconds for this debugger operation. '
-                            "For action=start, this is the total wall-clock budget for the "
+                            'For action=start, this is the total wall-clock budget for the '
                             'whole startup (initialize + launch + breakpoints), not a '
                             'per-request limit.'
                         ),

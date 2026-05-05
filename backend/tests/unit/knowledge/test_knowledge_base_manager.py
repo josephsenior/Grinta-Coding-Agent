@@ -697,9 +697,7 @@ class TestAdditionalCoveragePaths:
             mime_type='text/plain',
         )
 
-        result = manager._add_chunks_to_vector_store(
-            'col123', [chunk], doc, 'test.txt'
-        )
+        result = manager._add_chunks_to_vector_store('col123', [chunk], doc, 'test.txt')
         assert result == 1
 
     @patch('backend.knowledge.knowledge_base_manager.get_knowledge_base_store')

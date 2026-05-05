@@ -18,7 +18,14 @@ import contextlib
 import logging
 import os
 import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from backend.cli._typing import SessionLifecycleHost
+
+    _SessionLifecycleBase = SessionLifecycleHost
+else:
+    _SessionLifecycleBase = object
 
 from backend.cli._typing import SessionLifecycleHost
 from backend.cli.confirmation import build_confirmation_action, render_confirmation
@@ -28,8 +35,18 @@ from backend.core.enums import AgentState, EventSource
 logger = logging.getLogger(__name__)
 
 
-class SessionLifecycleMixin:
+class SessionLifecycleMixin(_SessionLifecycleBase):
     """Mixin providing agent-wait, interrupt, resume and confirmation flows."""
+
+    _controller: Any
+    _memory: Any
+    _acquire_result: Any
+    _event_stream: Any
+    _runtime: Any
+    _renderer: Any
+    _console: Any
+    _hud: Any
+    _reasoning: Any
 
     # -- wait for agent to be idle -----------------------------------------
 

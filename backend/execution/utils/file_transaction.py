@@ -294,10 +294,9 @@ class FileTransaction:
 
 
 # Example usage in agent code:
-"""
-async with FileTransaction(runtime) as txn:
-    await txn.write_file("/workspace/Component.tsx", tsx_content)
-    await txn.write_file("/workspace/Component.test.tsx", test_content)
-    await txn.write_file("/workspace/Component.css", css_content)
-    # If any write fails, all 3 files are rolled back
-"""
+#
+# async with FileTransaction(runtime) as txn:
+#     await txn.write_file("/workspace/Component.tsx", tsx_content)
+#     await txn.write_file("/workspace/Component.test.tsx", test_content)
+#     await txn.write_file("/workspace/Component.css", css_content)
+#     # If any write fails, all 3 files are rolled back

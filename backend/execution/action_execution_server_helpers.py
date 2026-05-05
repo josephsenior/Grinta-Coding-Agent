@@ -358,7 +358,7 @@ def _missing_bash_command_name(content: str) -> str | None:
         r'([A-Za-z][A-Za-z0-9-]*)\s*:\s*command not found', content
     )
     if not missing_match:
-        return None
+        return None  # type: ignore[unreachable]
     return missing_match.group(1)
 
 

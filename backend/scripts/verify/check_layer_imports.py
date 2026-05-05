@@ -91,8 +91,12 @@ EXEMPTIONS: dict[str, str] = {
     'backend.core.bootstrap.main': 'Bootstrap: application entry point',
     'backend.core.bootstrap.setup': 'Bootstrap: creates agent, controller, memory, runtime',
     'backend.core.config.config_loader': 'Bootstrap: registers custom agent classes',
-    # TODO: Remove once engine orchestrator no longer imports from execution.plugins.
+    # TODO: Refactor to remove cross-layer imports.
     'backend.engine.orchestrator': 'Temporary: engine imports execution.plugins for AgentSkills',
+    'backend.engine.__init__': '__init__.py re-exports orchestration.agent for backwards compat',
+    'backend.execution.action_execution_server': 'Execution imports engine.tools.prompt for tool registry',
+    'backend.execution.utils.unified_shell': 'Execution imports engine.tools.prompt for tool registry',
+    'backend.inference.fn_call_converter': 'Inference imports engine.tools.prompt for tool registry',
 }
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]  # backend/

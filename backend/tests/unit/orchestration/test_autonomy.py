@@ -277,7 +277,9 @@ class TestHighRiskDetection:
         config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = FileEditAction(path='/tmp/test.txt', start_line=1, end_line=1, new_str='new')
+        action = FileEditAction(
+            path='/tmp/test.txt', start_line=1, end_line=1, new_str='new'
+        )
         assert controller._is_high_risk_action(action) is False
 
     def test_file_read_not_high_risk(self):

@@ -64,6 +64,7 @@ def splash_anim_disabled() -> bool:
     """Skip splash ``Live`` animation (``GRINTA_NO_SPLASH_ANIM=1``)."""
     return _env_truthy('GRINTA_NO_SPLASH_ANIM')
 
+
 # ── Backgrounds ────────────────────────────────────────────────────────────────
 HUD_BG = 'grey15'  # HUD footer background
 

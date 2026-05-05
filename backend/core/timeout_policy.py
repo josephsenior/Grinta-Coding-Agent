@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.core.constants import CMD_PENDING_ACTION_TIMEOUT_FLOOR, TOOL_BRIDGE_TIMEOUT_BUFFER
+from backend.core.constants import (
+    CMD_PENDING_ACTION_TIMEOUT_FLOOR,
+    TOOL_BRIDGE_TIMEOUT_BUFFER,
+)
 
 
 def cmd_run_timeout_candidates(base: float, action: Any) -> list[float]:

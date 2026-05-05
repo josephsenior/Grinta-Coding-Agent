@@ -133,9 +133,7 @@ class TestProviderResolver(TestCase):
     def test_resolve_base_url_cloud_providers(self):
         """Test resolve_base_url returns None for cloud providers."""
         self.assertIsNone(self.resolver.resolve_base_url('gpt-4o'))
-        self.assertIsNone(
-            self.resolver.resolve_base_url('anthropic/claude-sonnet-4-6')
-        )
+        self.assertIsNone(self.resolver.resolve_base_url('anthropic/claude-sonnet-4-6'))
         self.assertIsNone(self.resolver.resolve_base_url('google/gemini-2.5-flash'))
 
     def test_resolve_base_url_lightning_provider(self):

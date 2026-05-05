@@ -138,6 +138,7 @@ _GLOBAL_UNDO_HISTORY: dict[str, deque[str | None]] = defaultdict(
     lambda: deque(maxlen=32)
 )
 
+
 class FileEditor(FileEditorEditOpsMixin):
     """Production-grade low-level file editor.
 
@@ -525,9 +526,7 @@ class FileEditor(FileEditorEditOpsMixin):
                     )
 
             # Extract params
-            file_text_val, new_str_val = self._extract_edit_params(
-                file_text, new_str
-            )
+            file_text_val, new_str_val = self._extract_edit_params(file_text, new_str)
 
             # Apply edit logic
             new_content = self._apply_edit_logic(

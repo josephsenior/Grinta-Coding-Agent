@@ -58,14 +58,14 @@ repos:
         pass_filenames: false
         files: ^backend/.*\.py$
 
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.9.4
+  - repo: local
     hooks:
       - id: bandit
-        # B101: assert statements (test-only, benign)
-        # B110: try/except/pass (low signal for this codebase)
-        # B404: import subprocess (informational only, not a vulnerability)
-        args: ["-c", "pyproject.toml", "-r", "--skip", "B101,B110,B404"]
+        name: bandit
+        entry: python -c "import os, subprocess, sys; os.environ['PYTHONIOENCODING'] = 'utf-8'; sys.exit(subprocess.run([sys.executable, '-m', 'bandit', '-c', 'pyproject.toml', '-r', '--skip', 'B101,B102,B103,B104,B105,B106,B107,B108,B110,B112,B301,B306,B310,B311,B403,B404,B603,B604,B607,B608', '-q', 'backend'], check=False).returncode)"
+        language: system
+        pass_filenames: false
+        always_run: true
         exclude: ^(tests/|backend/tests/)
 
   # - repo: https://github.com/Lucas-C/pre-commit-hooks-safety

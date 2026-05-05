@@ -652,9 +652,7 @@ def _base_config(**overrides: object) -> SimpleNamespace:
         autonomy_level=overrides.get('autonomy_level', 'balanced'),
         enable_checkpoints=bool(overrides.get('enable_checkpoints', False)),
         enable_lsp_query=bool(overrides.get('enable_lsp_query', False)),
-        enable_task_tracker_tool=bool(
-            overrides.get('enable_task_tracker_tool', False)
-        ),
+        enable_task_tracker_tool=bool(overrides.get('enable_task_tracker_tool', False)),
         enable_permissions=False,
         enable_meta_cognition=bool(overrides.get('enable_meta_cognition', False)),
         enable_think=bool(overrides.get('enable_think', False)),

@@ -11,7 +11,7 @@ from typing import Any
 
 
 def parse_content_length_json_messages(raw: str) -> list[dict[str, Any]]:
-    """Extract JSON objects from a complete stdout/stderr buffer.
+    r"""Extract JSON objects from a complete stdout/stderr buffer.
 
     Scans for ``Content-Length: N`` headers followed by ``\\r\\n\\r\\n`` and a
     body of *N* bytes, then ``json.loads`` each body. Malformed chunks are

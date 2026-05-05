@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import queue
 import shutil
@@ -15,9 +16,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import logging
-
 from backend.core.logger import app_logger as logger
+from backend.ledger.action.debugger import DebuggerAction
+from backend.ledger.observation import ErrorObservation
+from backend.ledger.observation.debugger import DebuggerObservation
+from backend.utils.language_tool_aliases import normalize_debug_adapter_name
 
 _LOGRECORD_EXTRA_FORBIDDEN: frozenset[str] | None = None
 
@@ -73,12 +76,6 @@ def _dap_log(
     logger.log(effective, f'[{msg_type}] {message}', extra=extra)
 
 
-from backend.utils.language_tool_aliases import normalize_debug_adapter_name
-from backend.ledger.action.debugger import DebuggerAction
-from backend.ledger.observation import ErrorObservation
-from backend.ledger.observation.debugger import DebuggerObservation
-
-
 class DAPError(RuntimeError):
     """Raised when DAP communication fails."""
 
@@ -86,7 +83,9 @@ class DAPError(RuntimeError):
 class DAPStartPhaseError(DAPError):
     """Debugger start failed during a specific startup phase."""
 
-    def __init__(self, phase: str, detail: str, *, timeout: float | None = None) -> None:
+    def __init__(
+        self, phase: str, detail: str, *, timeout: float | None = None
+    ) -> None:
         self.phase = phase
         self.timeout = timeout
         timeout_msg = f' after {timeout:.1f}s' if timeout and timeout > 0 else ''
@@ -612,9 +611,7 @@ class DAPDebugSession:
             wall_budget_seconds=wall_budget,
             launch_request=self.request,
             program=target,
-            adapter_argv0=(
-                self.adapter_command[0] if self.adapter_command else None
-            ),
+            adapter_argv0=(self.adapter_command[0] if self.adapter_command else None),
             adapter_id=self.adapter_id,
             cwd=self.client.cwd,
         )
@@ -644,9 +641,7 @@ class DAPDebugSession:
                     'initialize', self._initialize_arguments(), timeout=time_left()
                 )
             except DAPError as exc:
-                raise DAPStartPhaseError(
-                    phase, str(exc), timeout=wall_budget
-                ) from exc
+                raise DAPStartPhaseError(phase, str(exc), timeout=wall_budget) from exc
             _dap_log(
                 logging.INFO,
                 'DAP initialize acknowledged',
@@ -692,9 +687,7 @@ class DAPDebugSession:
             try:
                 self.client.request('configurationDone', {}, timeout=time_left())
             except DAPError as exc:
-                raise DAPStartPhaseError(
-                    phase, str(exc), timeout=wall_budget
-                ) from exc
+                raise DAPStartPhaseError(phase, str(exc), timeout=wall_budget) from exc
             _dap_log(
                 logging.INFO,
                 'configurationDone acknowledged',
@@ -712,7 +705,9 @@ class DAPDebugSession:
                         self.start_request_seq, timeout=min(1.0, time_left())
                     )
                 except DAPError:
-                    logger.debug('DAP start response was not available yet', exc_info=True)
+                    logger.debug(
+                        'DAP start response was not available yet', exc_info=True
+                    )
             event = self._wait_for_pause_or_exit(timeout=min(0.5, time_left()))
             elapsed_total = time.monotonic() - session_started
             _dap_log(
@@ -748,7 +743,9 @@ class DAPDebugSession:
             try:
                 self.client.close()
             except Exception:
-                logger.debug('DAP client close after start-phase failure', exc_info=True)
+                logger.debug(
+                    'DAP client close after start-phase failure', exc_info=True
+                )
             raise
         except Exception as exc:
             _dap_log(

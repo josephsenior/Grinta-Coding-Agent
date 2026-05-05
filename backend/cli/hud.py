@@ -106,8 +106,8 @@ class HUDBar:
                 if len(candidate) <= max_len:
                     return candidate
         # Fallback: ellipsis + tail keeps the leaf directory visible.
-        tail = max_len - 1
-        return '…' + path[-tail:]
+        tail_len = max_len - 1
+        return '…' + path[-tail_len:]
 
     @staticmethod
     def describe_model(model: str | None) -> tuple[str, str]:

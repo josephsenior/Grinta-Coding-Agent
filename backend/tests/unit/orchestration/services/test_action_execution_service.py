@@ -22,11 +22,9 @@ from backend.inference.exceptions import (
 from backend.ledger import EventSource
 from backend.ledger.action import (
     Action,
-    FileEditAction,
-    MCPAction,
     NullAction,
 )
-from backend.ledger.action.agent import CondensationRequestAction, PlaybookFinishAction
+from backend.ledger.action.agent import CondensationRequestAction
 from backend.orchestration.services.action_execution_service import (
     ActionExecutionService,
 )

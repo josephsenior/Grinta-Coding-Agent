@@ -117,7 +117,12 @@ def build_parser(*, include_subcommands: bool = True) -> argparse.ArgumentParser
 
     p_list = sessions_sub.add_parser('list', help='List past sessions')
     p_list.add_argument('--limit', type=_positive_int, default=50)
-    p_list.add_argument('--search', '-s', dest='search', help='Filter sessions by fuzzy search on title/model')
+    p_list.add_argument(
+        '--search',
+        '-s',
+        dest='search',
+        help='Filter sessions by fuzzy search on title/model',
+    )
 
     p_show = sessions_sub.add_parser('show', help='Show one session')
     p_show.add_argument('target', help='Session index (1-based) or id prefix')
@@ -205,7 +210,9 @@ def _run_sessions(args: argparse.Namespace) -> int:
     console = Console(no_color=no_color_enabled())
     sub = args.sessions_cmd
     if sub == 'list':
-        return sessions_cli.cmd_list(console, limit=args.limit, search=getattr(args, 'search', None))
+        return sessions_cli.cmd_list(
+            console, limit=args.limit, search=getattr(args, 'search', None)
+        )
     if sub == 'show':
         return sessions_cli.cmd_show(console, args.target)
     if sub == 'export':

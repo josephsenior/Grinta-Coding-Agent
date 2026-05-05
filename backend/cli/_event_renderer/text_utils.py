@@ -71,7 +71,7 @@ def normalize_reasoning_text(text: str) -> tuple[str | None, str | None]:
 
     match = INTERNAL_THINK_TAG_RE.match(stripped)
     if not match:
-        return None, stripped
+        return None, stripped  # type: ignore[unreachable]
 
     tag = match.group('tag')
     label = INTERNAL_THINK_LABELS.get(
@@ -85,7 +85,7 @@ def normalize_reasoning_text(text: str) -> tuple[str | None, str | None]:
 def _section_match_to_compact(compact: str) -> str:
     section_match = VISIBLE_INTERNAL_SECTION_RE.match(compact)
     if not section_match:
-        return compact
+        return compact  # type: ignore[unreachable]
     section_name = section_match.group(1).strip().capitalize()
     remainder = (section_match.group(2) or '').strip()
     return f'{section_name}: {remainder}' if remainder else f'{section_name}:'
@@ -136,7 +136,7 @@ def sanitize_visible_transcript_text(text: str) -> str:
 def _should_skip_visible_line(compact: str, had_task_tracking_block: bool) -> bool:
     if VISIBLE_SUPPRESSED_LINE_RE.match(compact):
         return True
-    if not had_task_tracking_block:
+    if not had_task_tracking_block:  # type: ignore[unreachable]
         return False
     lower_compact = compact.lower()
     return any(

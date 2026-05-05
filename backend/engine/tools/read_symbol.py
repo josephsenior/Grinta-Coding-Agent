@@ -19,6 +19,9 @@ from typing import TYPE_CHECKING, Any
 from backend.engine.tools.common import create_tool_definition
 
 if TYPE_CHECKING:
+    from backend.engine.contracts import ChatCompletionToolParam
+
+if TYPE_CHECKING:
     from backend.ledger.action import AgentThinkAction
 
 
@@ -37,7 +40,7 @@ hover, or references, use `lsp`.
 """.strip()
 
 
-def create_read_symbol_definition_tool() -> dict[str, Any]:
+def create_read_symbol_definition_tool() -> ChatCompletionToolParam:
     """Create the read_symbol_definition tool definition."""
     return create_tool_definition(
         name=READ_SYMBOL_DEFINITION_TOOL_NAME,

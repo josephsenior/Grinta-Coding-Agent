@@ -21,7 +21,9 @@ from typing import Any
 
 import pytest
 
-from backend.engine.prompts.prompt_builder import _provider_parallel_tool_calls_supported
+from backend.engine.prompts.prompt_builder import (
+    _provider_parallel_tool_calls_supported,
+)
 from backend.engine.prompts.section_renderers import _render_system_capabilities
 from backend.inference.catalog_loader import (
     apply_model_param_overrides,
@@ -73,7 +75,11 @@ def _base_kwargs() -> dict[str, Any]:
         pytest.param('vllm/Qwen/Qwen2.5-7B-Instruct', False, id='vllm_keeps'),
         pytest.param('lm_studio/local-model', False, id='lm_studio_keeps'),
         pytest.param('nvidia/meta/llama-3.1-8b-instruct', False, id='nvidia_keeps'),
-        pytest.param('together/meta-llama/Llama-3.3-70B-Instruct-Turbo', False, id='together_keeps'),
+        pytest.param(
+            'together/meta-llama/Llama-3.3-70B-Instruct-Turbo',
+            False,
+            id='together_keeps',
+        ),
         pytest.param('kimi-k2.5', False, id='unknown_model_keeps'),
     ],
 )

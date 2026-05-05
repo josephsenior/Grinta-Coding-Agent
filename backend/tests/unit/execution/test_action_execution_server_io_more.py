@@ -67,7 +67,9 @@ async def test_run_action_strips_ansi_and_tolerates_message_setter_error(
 
 
 @pytest.mark.asyncio
-async def test_run_foreground_recreates_default_session_when_missing(mock_executor) -> None:
+async def test_run_foreground_recreates_default_session_when_missing(
+    mock_executor,
+) -> None:
     recreated = MagicMock(spec=BaseShellSession)
     recreated.execute.return_value = CmdOutputObservation(
         content='C:/ws',

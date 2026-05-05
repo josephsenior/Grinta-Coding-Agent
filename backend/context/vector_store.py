@@ -55,7 +55,7 @@ class QueryCache:
         logger.debug('Cache MISS for query: %s', query[:50])
         return None
 
-    def set(self, query: str, results: list[dict[str, Any]]) -> None:
+    def store(self, query: str, results: list[dict[str, Any]]) -> None:
         """Cache query results."""
         cache_key = self._hash_query(query)
         self.cache[cache_key] = (time.time(), results)
@@ -162,10 +162,15 @@ class EnhancedVectorStore:
                 import os
 
                 from flashrank import Ranker
-                cache_dir = _LOCAL_VECTOR_STORE._default_memory_persist_directory('flashrank')
+
+                cache_dir = _LOCAL_VECTOR_STORE._default_memory_persist_directory(
+                    'flashrank'
+                )
                 os.makedirs(cache_dir, exist_ok=True)
                 # tinybert is very fast and lightweight
-                self.reranker = Ranker(model_name='ms-marco-TinyBERT-L-2-v2', cache_dir=str(cache_dir))
+                self.reranker = Ranker(
+                    model_name='ms-marco-TinyBERT-L-2-v2', cache_dir=str(cache_dir)
+                )
             except ImportError:
                 logger.warning('flashrank not installed, falling back to no reranking')
                 self.reranker = None
@@ -254,7 +259,12 @@ class EnhancedVectorStore:
         """Async batch add to avoid blocking the event loop."""
         await asyncio.to_thread(
             self.add_batch,
-            step_ids, roles, artifact_hashes, rationales, content_texts, metadatas,
+            step_ids,
+            roles,
+            artifact_hashes,
+            rationales,
+            content_texts,
+            metadatas,
         )
 
     def _effective_initial_k(self, k: int) -> int:
@@ -291,6 +301,7 @@ class EnhancedVectorStore:
 
         try:
             from flashrank import RerankRequest
+
             passages = [
                 {
                     'id': c.get('step_id', str(i)),
@@ -321,7 +332,9 @@ class EnhancedVectorStore:
             return reranked_candidates[:k]
 
         except Exception as e:
-            logger.warning('FlashRank reranking failed, falling back to original order: %s', e)
+            logger.warning(
+                'FlashRank reranking failed, falling back to original order: %s', e
+            )
             return candidates[:k]
 
     def _try_cached_search(
@@ -367,7 +380,9 @@ class EnhancedVectorStore:
                         lexical_candidates = result
                 except Exception:
                     # If one backend fails, fall back to the other
-                    logger.warning('One backend failed during parallel search', exc_info=True)
+                    logger.warning(
+                        'One backend failed during parallel search', exc_info=True
+                    )
                     if future is sem_future:
                         semantic_candidates = []
                     else:
@@ -421,7 +436,7 @@ class EnhancedVectorStore:
 
         # Cache the results
         if self.cache:
-            self.cache.set(query, results)
+            self.cache.store(query, results)
 
         elapsed_ms = (time.time() - start_time) * 1000
         logger.debug(

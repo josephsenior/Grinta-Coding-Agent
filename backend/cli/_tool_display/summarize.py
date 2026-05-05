@@ -144,7 +144,7 @@ def _streaming_hint_terminal_manager(partial_json: str) -> str:
     """Best-effort label while ``terminal_manager`` JSON is still streaming."""
     m_act = re.search(r'"action"\s*:\s*"(open|input|read)"', partial_json)
     if not m_act:
-        return ''
+        return ''  # type: ignore[unreachable]
     op = m_act.group(1)
     if op == 'open':
         m_cmd = re.search(
@@ -153,14 +153,14 @@ def _streaming_hint_terminal_manager(partial_json: str) -> str:
         if m_cmd:
             raw_c = m_cmd.group(1).replace('\\n', '\n').replace('\\"', '"')
             return f'open · {_trunc(raw_c, 90)}'
-        return 'open'
+        return 'open'  # type: ignore[unreachable]
     if op == 'input':
         return _stream_hint_input(partial_json)
     if op == 'read':
         m_sid = re.search(r'"session_id"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)
         if m_sid:
             return f'read · {_trunc(m_sid.group(1), 40)}'
-        return 'read'
+        return 'read'  # type: ignore[unreachable]
     return ''
 
 
@@ -174,7 +174,7 @@ def _stream_hint_input(partial_json: str) -> str:
         parts.append(_trunc(sid, 22))
     if m_ctrl:
         parts.append(f'ctrl {m_ctrl.group(1)[:24]}')
-    elif m_inp:
+    elif m_inp:  # type: ignore[unreachable]
         raw = m_inp.group(1).replace('\\n', '\n').replace('\\"', '"')
         parts.append(_trunc(raw, 55))
     return ' · '.join(parts)
@@ -462,7 +462,7 @@ def _extract_streaming_hints(partial_json: str) -> list[str]:
     for pat, _kind in _STREAMING_HINT_PATTERNS:
         m = re.search(pat, partial_json, re.DOTALL)
         if not m:
-            continue
+            continue  # type: ignore[unreachable]
         raw = m.group(1).replace('\\n', '\n').replace('\\"', '"')
         piece = _trunc(raw, 90)
         if piece and piece not in hints:

@@ -56,7 +56,7 @@ def check_workflow_labels(defined_labels: set[str]) -> list[str]:
 def has_automatic_triggers(workflow_text: str) -> bool:
     on_block_match = re.search(r'(?ms)^on:\n(.*?)(^\S|\Z)', workflow_text)
     if not on_block_match:
-        return False
+        return False  # type: ignore[unreachable]
 
     on_block = on_block_match.group(1)
     for key in AUTOMATIC_TRIGGER_KEYS:

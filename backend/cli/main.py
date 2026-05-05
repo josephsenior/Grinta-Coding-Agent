@@ -563,7 +563,7 @@ def main(
         }
         if minimal:
             async_kwargs['minimal'] = minimal
-        asyncio.run(_async_main(**async_kwargs))
+        asyncio.run(_async_main(**async_kwargs))  # type: ignore[arg-type]
     except KeyboardInterrupt:
         # Top-level Ctrl+C — exit cleanly without traceback.
         print()  # newline after ^C

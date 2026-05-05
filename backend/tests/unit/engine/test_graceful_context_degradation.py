@@ -47,6 +47,11 @@ def _make_error_obs(msg: str = 'error') -> ErrorObservation:
     return obs
 
 
+def _run(coro):
+    """Run an async coroutine with a fresh event loop."""
+    return asyncio.run(coro)
+
+
 # ---------------------------------------------------------------------------
 # CmdOutputObservation shrinking
 # ---------------------------------------------------------------------------
@@ -58,9 +63,7 @@ class TestCmdOutputShrinking:
         obs = _make_large_cmd_obs(3000)
         state = _make_state([obs])
 
-        asyncio.get_event_loop().run_until_complete(
-            orch._attempt_graceful_context_degradation(state)
-        )
+        _run(orch._attempt_graceful_context_degradation(state))
 
         # Content must be shorter than the original.
         assert len(obs.content) < 3000
@@ -70,9 +73,7 @@ class TestCmdOutputShrinking:
         obs = _make_large_cmd_obs(3000)
         state = _make_state([obs])
 
-        asyncio.get_event_loop().run_until_complete(
-            orch._attempt_graceful_context_degradation(state)
-        )
+        _run(orch._attempt_graceful_context_degradation(state))
 
         assert 'graceful-degradation truncated' in obs.content
 
@@ -85,9 +86,7 @@ class TestCmdOutputShrinking:
         obs.content = head_marker + padding + tail_marker
 
         state = _make_state([obs])
-        asyncio.get_event_loop().run_until_complete(
-            orch._attempt_graceful_context_degradation(state)
-        )
+        _run(orch._attempt_graceful_context_degradation(state))
 
         assert head_marker in obs.content
         assert tail_marker in obs.content
@@ -99,9 +98,7 @@ class TestCmdOutputShrinking:
         original = obs.content
         state = _make_state([obs])
 
-        asyncio.get_event_loop().run_until_complete(
-            orch._attempt_graceful_context_degradation(state)
-        )
+        _run(orch._attempt_graceful_context_degradation(state))
 
         assert obs.content == original
 
@@ -111,9 +108,7 @@ class TestCmdOutputShrinking:
         obs = _make_large_cmd_obs(100)  # too small to trigger
         state = _make_state([obs])
 
-        result = asyncio.get_event_loop().run_until_complete(
-            orch._attempt_graceful_context_degradation(state)
-        )
+        result = _run(orch._attempt_graceful_context_degradation(state))
 
         assert result is None
 
@@ -129,9 +124,7 @@ class TestErrorObservationThinning:
         errors = [_make_error_obs(f'error {i}') for i in range(8)]
         state = _make_state(errors)
 
-        asyncio.get_event_loop().run_until_complete(
-            orch._attempt_graceful_context_degradation(state)
-        )
+        _run(orch._attempt_graceful_context_degradation(state))
 
         # The first 3 (indices 0-2) should have been replaced by a sentinel.
         for i in range(3):
@@ -142,9 +135,7 @@ class TestErrorObservationThinning:
         errors = [_make_error_obs(f'important_error_{i}') for i in range(8)]
         state = _make_state(errors)
 
-        asyncio.get_event_loop().run_until_complete(
-            orch._attempt_graceful_context_degradation(state)
-        )
+        _run(orch._attempt_graceful_context_degradation(state))
 
         # The last 5 (indices 3-7) must keep their original content.
         for i in range(3, 8):
@@ -156,9 +147,7 @@ class TestErrorObservationThinning:
         originals = [e.content for e in errors]
         state = _make_state(errors)
 
-        asyncio.get_event_loop().run_until_complete(
-            orch._attempt_graceful_context_degradation(state)
-        )
+        _run(orch._attempt_graceful_context_degradation(state))
 
         for orig, obs in zip(originals, errors, strict=False):
             assert obs.content == orig
@@ -169,9 +158,7 @@ class TestErrorObservationThinning:
         errors = [_make_error_obs(f'e{i}') for i in range(10)]
         state = _make_state(errors)
 
-        asyncio.get_event_loop().run_until_complete(
-            orch._attempt_graceful_context_degradation(state)
-        )
+        _run(orch._attempt_graceful_context_degradation(state))
 
         assert len(state.history) == 10
 
@@ -187,9 +174,7 @@ class TestDegenerateState:
         state = MagicMock()
         state.history = None
 
-        result = asyncio.get_event_loop().run_until_complete(
-            orch._attempt_graceful_context_degradation(state)
-        )
+        result = _run(orch._attempt_graceful_context_degradation(state))
 
         assert result is None
 
@@ -197,8 +182,6 @@ class TestDegenerateState:
         orch = _make_orchestrator()
         state = _make_state([])
 
-        result = asyncio.get_event_loop().run_until_complete(
-            orch._attempt_graceful_context_degradation(state)
-        )
+        result = _run(orch._attempt_graceful_context_degradation(state))
 
         assert result is None

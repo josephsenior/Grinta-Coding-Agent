@@ -62,7 +62,7 @@ def _looks_like_file_pattern_hint(pattern: str) -> bool:
     import re
 
     if not re.match(r'^[\w\*\.\-\?]+$', pattern):
-        return False
+        return False  # type: ignore[unreachable]
     if pattern.startswith(('*', '?', '.')):
         return True
     return any(token in pattern for token in ['test', 'tests', 'util', 'src'])

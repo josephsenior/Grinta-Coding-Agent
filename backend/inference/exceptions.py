@@ -151,7 +151,6 @@ class RateLimitError(LLMError):
         llm_provider: str | None = None,
         model: str | None = None,
         status_code: int | None = None,
-        *args: object,
         kind: 'RateLimitKind | None' = None,
         retry_after: float | None = None,
         **kwargs: object,
@@ -161,7 +160,6 @@ class RateLimitError(LLMError):
             llm_provider=llm_provider,
             model=model,
             status_code=status_code,
-            *args,
             **kwargs,
         )
         self.kind: RateLimitKind = kind or RateLimitKind.UNKNOWN

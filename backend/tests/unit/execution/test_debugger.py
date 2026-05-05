@@ -173,7 +173,9 @@ def test_manager_maps_pwa_node_adapter_to_js_recipe(monkeypatch, tmp_path) -> No
     assert instances[0].kwargs['adapter_id'] == 'javascript'
 
 
-def test_manager_start_error_includes_startup_phase_metadata(monkeypatch, tmp_path) -> None:
+def test_manager_start_error_includes_startup_phase_metadata(
+    monkeypatch, tmp_path
+) -> None:
     class FakeSession:
         def __init__(self, session_id: str, **kwargs: Any) -> None:
             self.session_id = session_id
@@ -217,9 +219,6 @@ def test_is_debugger_action_string_tool_id_and_instance_attr() -> None:
 
 def test_is_debugger_action_name_fallback_for_duplicate_module_load() -> None:
     """Last resort: distinct class objects both named ``DebuggerAction``."""
-
-    from backend.core.schemas import ActionType
-
     ns: dict[str, Any] = {}
     exec(
         'from backend.core.schemas import ActionType\n'

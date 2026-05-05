@@ -16,8 +16,6 @@ from typing import (
     runtime_checkable,
 )
 
-_MAX_CHECKPOINT_CACHE_SIZE = 16
-
 from backend.core.constants import (
     DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
     DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
@@ -78,6 +76,8 @@ class ModelResponse(Protocol):
 # these two tag conventions.
 _INLINE_OPEN_THINK_RE = re.compile(r'<(redacted_thinking|think)>', re.IGNORECASE)
 _INLINE_CLOSE_THINK_RE = re.compile(r'</(redacted_thinking|think)>', re.IGNORECASE)
+
+_MAX_CHECKPOINT_CACHE_SIZE = 16
 
 
 @dataclass(slots=True)
@@ -374,7 +374,7 @@ class OrchestratorExecutor:
                     state.in_inline_think_block = False
                     remaining = remaining[close_match.end() :]
                     continue
-                await self._emit_stream_thinking_piece(state, remaining, event_stream)
+                await self._emit_stream_thinking_piece(state, remaining, event_stream)  # type: ignore[unreachable]
                 return
 
             open_match = _INLINE_OPEN_THINK_RE.search(remaining)
@@ -385,7 +385,7 @@ class OrchestratorExecutor:
                 state.in_inline_think_block = True
                 remaining = remaining[open_match.end() :]
                 continue
-            await self._emit_stream_text_piece(state, remaining, event_stream)
+            await self._emit_stream_text_piece(state, remaining, event_stream)  # type: ignore[unreachable]
             return
 
     async def _ingest_stream_tool_call_chunk(
@@ -914,7 +914,9 @@ class OrchestratorExecutor:
 
             # Explicitly catch RateLimitError to prevent it from being wrapped or swallowed
             if isinstance(exc, RateLimitError):
-                logger.debug('OrchestratorExecutor.async_execute: bubbling up RateLimitError natively')
+                logger.debug(
+                    'OrchestratorExecutor.async_execute: bubbling up RateLimitError natively'
+                )
                 raise
             if isinstance(exc, LLMError):
                 raise
@@ -988,8 +990,8 @@ class OrchestratorExecutor:
                 logger.error(
                     'Discarded uncommitted streaming checkpoint for %s and blocked next LLM call: %s',
                     session_key,
-                inspection.reason,
-            )
+                    inspection.reason,
+                )
         self._checkpoint_cache[session_key] = checkpoint
         self._checkpoint_cache.move_to_end(session_key)
         while len(self._checkpoint_cache) > _MAX_CHECKPOINT_CACHE_SIZE:
@@ -998,7 +1000,9 @@ class OrchestratorExecutor:
                 evicted_ckpt.discard()
             except Exception:
                 pass
-            logger.debug('Evicted streaming checkpoint for %s (cache full)', evicted_key)
+            logger.debug(
+                'Evicted streaming checkpoint for %s (cache full)', evicted_key
+            )
         return checkpoint
 
     def _checkpoint_recovery_policy(self) -> tuple[float, bool]:
