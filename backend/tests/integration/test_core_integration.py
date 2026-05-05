@@ -428,7 +428,7 @@ class TestLongSessionCompactionInvariants:
 
         file_edit = FileEditAction(
             path='src/main.py',
-            command='replace_text',
+            command='edit',
             new_str='new',
         )
         file_edit.id = 2

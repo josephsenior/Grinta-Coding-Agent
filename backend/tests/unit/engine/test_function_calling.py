@@ -203,10 +203,10 @@ class TestHandleTextEditorTool:
         assert isinstance(action, FileReadAction)
         assert action.view_range == [10, 20]
 
-    def test_replace_text_command_is_accepted(self):
+    def test_edit_command_is_accepted(self):
         action = _handle_text_editor_tool(
             {
-                'command': 'replace_text',
+                'command': 'edit',
                 'path': '/workspace/app.py',
                 'old_str': 'x = 1',
                 'new_str': 'x = 2',
@@ -214,7 +214,7 @@ class TestHandleTextEditorTool:
             }
         )
         assert isinstance(action, FileEditAction)
-        assert action.command == 'replace_text'
+        assert action.command == 'edit'
 
     def test_create_returns_file_edit(self):
         action = _handle_text_editor_tool(
