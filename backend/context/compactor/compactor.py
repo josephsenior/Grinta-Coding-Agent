@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 COMPACTOR_METADATA_KEY = 'compactor_meta'
-"""Key identifying where metadata is stored in a ``State`` object's ``extra_data`` field."""
+# Key identifying where metadata is stored in a ``State`` object's ``extra_data`` field.
 
 # Maximum number of condensation metadata batches to retain.
 # Older batches become irrelevant once their events are pruned.
@@ -48,7 +48,7 @@ def get_compaction_metadata(state: State) -> list[dict[str, Any]]:
 
 
 COMPACTOR_REGISTRY: dict[type[CompactorConfig], type[Compactor]] = {}
-"""Registry of compactor configurations to their corresponding compactor classes."""
+# Registry of compactor configurations to their corresponding compactor classes.
 
 
 class Compaction(BaseModel):

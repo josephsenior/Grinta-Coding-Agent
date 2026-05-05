@@ -616,7 +616,8 @@ def _build_help_table_fallback(search_term: str | None = None) -> Table:
         filtered_sections = {}
         for section, specs in by_section.items():
             matched = [
-                spec for spec in specs
+                spec
+                for spec in specs
                 if search_lower in spec.name.lower()
                 or search_lower in spec.description.lower()
             ]
@@ -1080,7 +1081,9 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
     def _prompt_placeholder(self) -> Any:
         from prompt_toolkit.formatted_text import FormattedText
 
-        return FormattedText([('class:placeholder', 'Describe the task, or type /help')])
+        return FormattedText(
+            [('class:placeholder', 'Describe the task, or type /help')]
+        )
 
     def _prompt_state_label(self) -> str:
         state = self._current_prompt_state()

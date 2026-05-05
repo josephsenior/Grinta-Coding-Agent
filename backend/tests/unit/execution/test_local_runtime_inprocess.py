@@ -4,15 +4,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.execution.drivers.local.local_runtime_inprocess import (
-    LocalRuntimeInProcess,
-)
 from backend.core.constants import (
     CMD_PENDING_ACTION_TIMEOUT_FLOOR,
     TOOL_BRIDGE_TIMEOUT_BUFFER,
-    TOOL_BRIDGE_TIMEOUT_DEBUGGER,
 )
 from backend.core.errors import AgentRuntimeDisconnectedError
+from backend.execution.drivers.local.local_runtime_inprocess import (
+    LocalRuntimeInProcess,
+)
+from backend.ledger.action import CmdRunAction
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.debugger import DebuggerAction
@@ -21,7 +21,6 @@ from backend.ledger.action.terminal import (
     TerminalReadAction,
     TerminalRunAction,
 )
-from backend.ledger.action import CmdRunAction
 from backend.ledger.observation import ErrorObservation, NullObservation
 from backend.ledger.observation.code_nav import LspQueryObservation
 from backend.ledger.observation.commands import CmdOutputObservation
@@ -188,7 +187,9 @@ def test_cmd_run_bridge_timeout_aligns_with_default_cmd_floor() -> None:
     ) as call_sync:
         result = runtime.run(action)
     assert result is obs
-    expected = float(CMD_PENDING_ACTION_TIMEOUT_FLOOR) + float(TOOL_BRIDGE_TIMEOUT_BUFFER)
+    expected = float(CMD_PENDING_ACTION_TIMEOUT_FLOOR) + float(
+        TOOL_BRIDGE_TIMEOUT_BUFFER
+    )
     assert float(call_sync.call_args.args[1]) == pytest.approx(expected)
 
 

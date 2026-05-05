@@ -51,7 +51,12 @@ class TestFileEditorCoverageGaps:
             self.editor, '_read_file', side_effect=Exception('Read fail')
         ):
             result = self.editor(
-                command='edit', path='test.txt', edit_mode='range', start_line=1, end_line=1, new_str='d'
+                command='edit',
+                path='test.txt',
+                edit_mode='range',
+                start_line=1,
+                end_line=1,
+                new_str='d',
             )
             assert result.error is not None
             assert 'Error editing file: Read fail' in result.error
@@ -122,8 +127,6 @@ class TestFileEditorCoverageGaps:
             # Hit lines 568-572
             self.editor._rollback_transaction(backup)
             # No crash!
-
-
 
     def test_unicode_decode_fallback(self) -> None:
         """Covers line 440-449 (UnicodeDecodeError fallback)."""

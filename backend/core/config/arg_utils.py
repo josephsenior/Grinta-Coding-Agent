@@ -122,13 +122,17 @@ def get_cli_parser() -> argparse.ArgumentParser:
         title='commands',
         metavar='COMMAND',
     )
-    subparsers.add_parser('serve', help='Legacy serve subcommand (optional HTTP tooling)')
+    subparsers.add_parser(
+        'serve', help='Legacy serve subcommand (optional HTTP tooling)'
+    )
 
     subparsers.add_parser(
         'health', help='Run production health checks for critical dependencies'
     )
 
-    init_parser = subparsers.add_parser('init', help='Initialize a new Grinta workspace')
+    init_parser = subparsers.add_parser(
+        'init', help='Initialize a new Grinta workspace'
+    )
     init_parser.add_argument(
         'project_name',
         nargs='?',

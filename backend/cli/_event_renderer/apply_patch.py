@@ -72,7 +72,11 @@ def extract_apply_patch_delta(content: str) -> tuple[int | None, int | None]:
     match = APPLY_PATCH_STATS_RE.search(content or '')
     if match:
         return int(match.group(1)), int(match.group(2))
+    return _count_patch_lines(content)  # type: ignore[unreachable]
 
+
+def _count_patch_lines(content: str | None) -> tuple[int | None, int | None]:
+    """Count added/removed lines from raw unified diff content."""
     added = 0
     removed = 0
     saw_patch_lines = False

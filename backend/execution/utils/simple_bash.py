@@ -87,13 +87,12 @@ class SimpleBashSession(BaseShellSession):
             if code == -2:
                 # Process was detached to a background session.
                 # action_execution_server will pick up _bg_process and register it.
+                from backend.execution.utils.shell_utils import (
+                    apply_cmd_output_timeout_metadata,
+                )
                 from backend.ledger.observation.commands import (
                     CmdOutputMetadata,
                     CmdOutputObservation,
-                )
-
-                from backend.execution.utils.shell_utils import (
-                    apply_cmd_output_timeout_metadata,
                 )
 
                 metadata = CmdOutputMetadata(exit_code=-2, working_dir=self._cwd)

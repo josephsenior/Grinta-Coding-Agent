@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
+from backend.execution.debugger import DAPDebugManager
 from backend.ledger.action import (
     CmdRunAction,
     DebuggerAction,
@@ -89,3 +90,16 @@ class RuntimeExecutorProtocol(Protocol):
     async def terminal_read(self, action: TerminalReadAction) -> Observation: ...
 
     async def browser_tool(self, action: Any) -> Observation: ...
+
+    # -- debugging --------------------------------------------------------
+
+    @property
+    def debug_manager(self) -> DAPDebugManager:
+        """Access the DAP debug manager for interactive debugger sessions."""
+        ...
+
+    # -- browser integration ----------------------------------------------
+
+    def set_browser_structured_extract(self, fn: Any | None) -> None:
+        """Register async callback used by ``browser extract``."""
+        ...

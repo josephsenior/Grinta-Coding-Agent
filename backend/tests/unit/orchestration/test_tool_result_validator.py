@@ -1,5 +1,3 @@
-from typing import Any, cast
-
 """Unit tests for backend.orchestration.tool_result_validator module.
 
 Tests cover:
@@ -11,6 +9,7 @@ Tests cover:
 - Built-in validation rules (truncated, error, empty)
 """
 
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest

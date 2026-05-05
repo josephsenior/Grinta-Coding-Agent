@@ -25,9 +25,6 @@ def _preload_pydantic_root_model() -> None:
 _sanitize_sys_path()
 
 
-import importlib  # noqa: E402
-import os  # noqa: E402
-import sys  # noqa: E402
 import pathlib  # noqa: E402
 from collections.abc import Iterator  # noqa: E402
 

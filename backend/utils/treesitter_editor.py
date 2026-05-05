@@ -66,8 +66,6 @@ try:  # pragma: no cover - exercised in integration tests
 except ImportError:  # pragma: no cover - handled in __init__
     TREE_SITTER_AVAILABLE = False
 
-from backend.core.logger import app_logger as logger  # noqa: E402
-
 
 @dataclass
 class SymbolLocation:
@@ -544,7 +542,7 @@ class TreeSitterEditor:
                 success=False,
                 message=f"Function '{function_name}' not found in {file_path}",
             )
-        
+
         logger.debug(f"Found node for '{function_name}' (type: {func_node.type})")
 
         # Extract function body node (language-specific)
@@ -703,13 +701,19 @@ class TreeSitterEditor:
             parts = function_name.split('.')
             if len(parts) == 2:
                 class_name, method_name = parts
-                logger.debug(f"Qualified name detected: class='{class_name}', method='{method_name}'")
-                class_node = self._find_class_node(tree, file_bytes, class_name, language)
+                logger.debug(
+                    f"Qualified name detected: class='{class_name}', method='{method_name}'"
+                )
+                class_node = self._find_class_node(
+                    tree, file_bytes, class_name, language
+                )
                 if class_node:
                     return self._find_method_node_in_class(
                         class_node, file_bytes, method_name, language
                     )
-                logger.debug(f"Class '{class_name}' not found; falling back to direct lookup for '{function_name}'")
+                logger.debug(
+                    f"Class '{class_name}' not found; falling back to direct lookup for '{function_name}'"
+                )
 
         # Language-specific node types for functions
         function_types = {
@@ -748,7 +752,9 @@ class TreeSitterEditor:
         target_types = class_types.get(
             language, ['class_declaration', 'class_definition']
         )
-        return self._find_node_by_name(tree.root_node, file_bytes, class_name, target_types)
+        return self._find_node_by_name(
+            tree.root_node, file_bytes, class_name, target_types
+        )
 
     def _find_method_node_in_class(
         self, class_node: NodeType, file_bytes: bytes, method_name: str, language: str
@@ -766,7 +772,9 @@ class TreeSitterEditor:
         target_types = method_types.get(
             language, ['method_definition', 'method_declaration']
         )
-        return self._find_node_by_name(class_node, file_bytes, method_name, target_types)
+        return self._find_node_by_name(
+            class_node, file_bytes, method_name, target_types
+        )
 
     def _find_node_by_name(
         self, node: NodeType, file_bytes: bytes, target_name: str, node_types: list[str]

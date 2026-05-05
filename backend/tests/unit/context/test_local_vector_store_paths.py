@@ -16,7 +16,8 @@ def test_chromadb_backend_defaults_to_project_storage_memory_chroma(tmp_path) ->
     fake_client.get_collection.side_effect = Exception('missing')
     fake_client.create_collection.return_value = fake_collection
     fake_ef_module = types.SimpleNamespace(
-        DefaultEmbeddingFunction=MagicMock(return_value=MagicMock())
+        DefaultEmbeddingFunction=MagicMock(return_value=MagicMock()),
+        FastEmbedEmbeddingFunction=MagicMock(return_value=MagicMock()),
     )
 
     fake_chromadb = types.ModuleType('chromadb')

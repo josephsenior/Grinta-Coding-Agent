@@ -135,7 +135,7 @@ def _render_tab_bar(active: int) -> Text:
             bar.append(f' {label}', style=CLR_META)
             bar.append('  ', style='')
         if i != len(tabs) - 1:
-            bar.append('   ', style=STYLE_EMPTY)
+            bar.append('   ', style='')
     return bar
 
 

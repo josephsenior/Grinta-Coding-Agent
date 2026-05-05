@@ -142,9 +142,10 @@ class RetryMixin:
         )
 
         class _StopWhenBudgetExhausted(stop_base):
-            """Stop after ``num_retries`` attempts unless the latest failure
-            carries a server-supplied ``retry_after`` hint, in which case
-            allow up to ``num_retries + bonus`` attempts before giving up.
+            """Stop after ``num_retries`` attempts.
+
+            Unless the latest failure carries a server-supplied ``retry_after`` hint,
+            in which case allow up to ``num_retries + bonus`` attempts before giving up.
 
             Rationale: when the provider tells us *exactly* how long to wait
             we should be patient (the wait is bounded). When the failure is

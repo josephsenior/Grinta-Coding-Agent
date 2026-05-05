@@ -6,7 +6,6 @@ import asyncio
 import hashlib
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 from typing import Any
 
 from backend.context.vector_store import EnhancedVectorStore
@@ -81,13 +80,15 @@ class KnowledgeBaseManager:
             artifact_hashes.append(document.content_hash)
             rationales.append(f'Document: {filename}')
             content_texts.append(chunk.content)
-            metadatas.append({
-                'document_id': document.id,
-                'collection_id': collection_id,
-                'filename': filename,
-                'chunk_index': chunk.chunk_index,
-                **(chunk.metadata or {}),
-            })
+            metadatas.append(
+                {
+                    'document_id': document.id,
+                    'collection_id': collection_id,
+                    'filename': filename,
+                    'chunk_index': chunk.chunk_index,
+                    **(chunk.metadata or {}),
+                }
+            )
 
         try:
             vector_store.add_batch(
@@ -619,7 +620,9 @@ class KnowledgeBaseManager:
         # Search all accessible collections in parallel
         all_results: list[KnowledgeBaseSearchResult] = []
 
-        def _search_collection(cid: str, search_query: str) -> list[KnowledgeBaseSearchResult]:
+        def _search_collection(
+            cid: str, search_query: str
+        ) -> list[KnowledgeBaseSearchResult]:
             vector_store = self._get_vector_store(cid)
             results: list[KnowledgeBaseSearchResult] = []
             try:
@@ -647,7 +650,9 @@ class KnowledgeBaseManager:
                 logger.error('Error searching collection %s: %s', cid, e)
             return results
 
-        with ThreadPoolExecutor(max_workers=min(len(accessible) * len(expanded_queries), 16)) as pool:
+        with ThreadPoolExecutor(
+            max_workers=min(len(accessible) * len(expanded_queries), 16)
+        ) as pool:
             futures = {}
             for cid in accessible:
                 for eq in expanded_queries:
@@ -659,12 +664,20 @@ class KnowledgeBaseManager:
                 try:
                     results = future.result()
                     for r in results:
-                        chunk_idx = r.metadata.get('chunk_index', 0) if r.metadata else 0
-                        chunk_key = f"{r.document_id}:{chunk_idx}"
-                        if chunk_key not in seen_chunks or r.relevance_score > seen_chunks[chunk_key].relevance_score:
+                        chunk_idx = (
+                            r.metadata.get('chunk_index', 0) if r.metadata else 0
+                        )
+                        chunk_key = f'{r.document_id}:{chunk_idx}'
+                        if (
+                            chunk_key not in seen_chunks
+                            or r.relevance_score
+                            > seen_chunks[chunk_key].relevance_score
+                        ):
                             seen_chunks[chunk_key] = r
                 except Exception as e:
-                    logger.error('Error searching collection %s with query %s: %s', cid, eq, e)
+                    logger.error(
+                        'Error searching collection %s with query %s: %s', cid, eq, e
+                    )
 
             all_results = list(seen_chunks.values())
 

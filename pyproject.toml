@@ -205,6 +205,7 @@ lint.per-file-ignores."backend/tests/**" = [
   "E402",
   "F841",
 ]
+lint.per-file-ignores."packaging/vulture_whitelist.py" = [ "F821" ]
 lint.flake8-bugbear.extend-immutable-calls = [ "Depends", "fastapi.Depends", "fastapi.params.Depends" ]
 lint.flake8-quotes.docstring-quotes = "double"
 lint.flake8-quotes.inline-quotes = "single"

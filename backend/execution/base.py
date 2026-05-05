@@ -44,10 +44,10 @@ from backend.ledger.action import (
     AgentThinkAction,
     CmdRunAction,
     FileEditAction,
-    is_debugger_action,
     FileReadAction,
     FileWriteAction,
     TaskTrackingAction,
+    is_debugger_action,
 )
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.observation import (
@@ -430,7 +430,7 @@ class Runtime(
         if isinstance(cfg, AppConfig):
             return bool(cfg.get_agent_config(cfg.default_agent).enable_debugger)
         # Tests may pass a slim stub; default permissive when unspecified.
-        return bool(getattr(cfg, 'enable_debugger', True))
+        return bool(getattr(cfg, 'enable_debugger', True))  # type: ignore[unreachable]
 
     def set_runtime_status(
         self, runtime_status: RuntimeStatus, msg: str = '', level: str = 'info'

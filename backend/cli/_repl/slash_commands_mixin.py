@@ -577,7 +577,7 @@ class SlashCommandsMixin:
         host = cast(SlashCommandsHost, self)
         parsed_diff = _parse_diff_args_from_host(host, parsed)
         if not isinstance(parsed_diff, tuple) or len(parsed_diff) != 2:
-            return True
+            return True  # type: ignore[unreachable]
         mode, paths = parsed_diff
         cwd = _command_project_root_from_host(host)
         git_args = self._build_diff_git_args(mode, paths)
@@ -786,6 +786,7 @@ class SlashCommandsMixin:
                 from io import StringIO
 
                 from rich.console import Console
+
                 sio = StringIO()
                 table_console = Console(file=sio, force_terminal=True, width=100)
                 table_console.print(table)

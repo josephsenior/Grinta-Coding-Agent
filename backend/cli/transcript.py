@@ -39,11 +39,11 @@ from backend.cli.theme import (
     CLR_WARN_BODY,
     CLR_WARN_ICON,
     MARK_WARN,
+    STYLE_DIM,
+    STYLE_EMPTY,
     mark_err,
     mark_info,
     mark_ok,
-    STYLE_DIM,
-    STYLE_EMPTY,
 )
 
 # Stripped from user-visible transcripts (still present on stored observations for the LLM).

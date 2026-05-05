@@ -13,7 +13,9 @@ from backend.core import json_compat as json_compat
 
 def _file_editor_module():
     from backend.execution.utils import file_editor as fe
+
     return fe
+
 
 def _tool_result(**kwargs):
     return _file_editor_module().ToolResult(**kwargs)

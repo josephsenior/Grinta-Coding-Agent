@@ -27,7 +27,7 @@ class TestQueryCacheInit:
 class TestQueryCacheGetSet:
     def test_set_and_get(self):
         cache = QueryCache()
-        cache.set('hello', [{'id': 1}])
+        cache.store('hello', [{'id': 1}])
         result = cache.get('hello')
         assert result == [{'id': 1}]
         assert cache.hits == 1
@@ -41,7 +41,7 @@ class TestQueryCacheGetSet:
 
     def test_get_expired(self):
         cache = QueryCache(ttl=0)  # Immediately expires
-        cache.set('q', [{'id': 1}])
+        cache.store('q', [{'id': 1}])
         # Force expiration by sleeping a tiny bit
         time.sleep(0.01)
         result = cache.get('q')
@@ -50,27 +50,27 @@ class TestQueryCacheGetSet:
 
     def test_overwrite_existing(self):
         cache = QueryCache()
-        cache.set('q', [{'id': 1}])
-        cache.set('q', [{'id': 2}])
+        cache.store('q', [{'id': 1}])
+        cache.store('q', [{'id': 2}])
         result = cache.get('q')
         assert result == [{'id': 2}]
 
     def test_lru_eviction(self):
         cache = QueryCache(max_size=2)
-        cache.set('a', [{'v': 1}])
-        cache.set('b', [{'v': 2}])
-        cache.set('c', [{'v': 3}])  # Should evict "a"
+        cache.store('a', [{'v': 1}])
+        cache.store('b', [{'v': 2}])
+        cache.store('c', [{'v': 3}])  # Should evict "a"
         assert cache.get('a') is None
         assert cache.get('b') is not None
         assert cache.get('c') is not None
 
     def test_lru_moves_to_end(self):
         cache = QueryCache(max_size=2)
-        cache.set('a', [{'v': 1}])
-        cache.set('b', [{'v': 2}])
+        cache.store('a', [{'v': 1}])
+        cache.store('b', [{'v': 2}])
         # Access "a" to move it to end
         cache.get('a')
-        cache.set('c', [{'v': 3}])  # Should evict "b" (least recently used)
+        cache.store('c', [{'v': 3}])  # Should evict "b" (least recently used)
         assert cache.get('a') is not None
         assert cache.get('b') is None
 
@@ -86,7 +86,7 @@ class TestQueryCacheStats:
 
     def test_stats_with_data(self):
         cache = QueryCache()
-        cache.set('x', [])
+        cache.store('x', [])
         cache.get('x')  # hit
         cache.get('y')  # miss
         stats = cache.stats()

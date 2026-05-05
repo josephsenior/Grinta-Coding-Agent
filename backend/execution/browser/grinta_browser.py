@@ -1065,7 +1065,6 @@ class GrintaNativeBrowser:
     async def _execute_go_back(self, cmd: str, params: dict[str, Any]) -> Observation:
         from browser_use.browser.events import GoBackEvent
 
-        del params
         browser = await self._ensure_session()
         await self._dispatch_bus_event(browser, GoBackEvent())
         base = 'Navigated back in history.'

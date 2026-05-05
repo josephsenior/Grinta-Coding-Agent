@@ -99,7 +99,7 @@ def _parse_orphan_param_token(text: str, start: int) -> int | None:
     """Parse one leaked ConPTY-ish token like ``[17;29;0;1;40;1_``."""
     if match := _ORPHAN_PARAM_TOKEN_RE.match(text, start):
         return match.end()
-    if _ORPHAN_PARAM_PREFIX_RE.fullmatch(text[start:]):
+    if _ORPHAN_PARAM_PREFIX_RE.fullmatch(text[start:]):  # type: ignore[unreachable]
         return -1
     return None
 

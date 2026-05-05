@@ -117,12 +117,10 @@ class TestValidateStatusCallbacks:
         controller = MagicMock()
         controller.status_callback = lambda *args: None
 
-        with patch(
-            'backend.core.bootstrap.agent_control_loop.logger.warning'
-        ) as warning:
+        with patch('backend.core.bootstrap.agent_control_loop.logger.debug') as debug:
             _validate_status_callbacks(runtime, controller)
 
-        assert warning.call_count == 2
+        assert debug.call_count == 2
 
 
 class TestSetStatusCallbacks:

@@ -42,13 +42,12 @@ make reliability-gate
 
 1. **FileEditAction arguments** - The action class accepts `new_str` or `file_text`, NOT `content` or `old_str`. Tests using old arguments will fail.
 
-2. **text_editor command names** - Valid commands are: `read_file`, `create_file`, `insert_text`, `undo_last_edit`, `edit`. NOT `replace_text`.
+2. **text_editor command names** - Valid commands are: `read_file`, `create_file`, `insert_text`, `undo_last_edit`. NOT `edit`, `replace_text`.
 
 3. **Test directory** - Use `backend/tests/unit` not just `backend/tests`. The pytest.ini default discovery includes unit+integration+e2e+stress which may be slow.
 
 4. **Pre-existing test failures** - Some tests fail due to:
-   - test_tool_display_modules.py::test_text_editor_replace_with_path (invalid command - now fixed)
-   - test_local_vector_store_paths.py::test_chromadb_backend_defaults_to_project_storage_memory_chroma (FastEmbed env issue)
+   - `test_local_vector_store.py` - FastEmbed ONNX model loading issue (requires `[rag]` extra, skip if missing)
 
 5. **browser-use dependencies** - Pinned aiohttp==3.13.3, limits ability to fix some vulnerabilities in optional deps.
 
@@ -60,7 +59,7 @@ make reliability-gate
 - Key test paths to verify fixes:
   - `backend/tests/unit/cli/` - CLI tests
   - `backend/tests/unit/knowledge/` - Knowledge base tests
-  - `backend/tests/unit/context/` - Context tests  
+  - `backend/tests/unit/context/` - Context tests
   - `backend/tests/integration/` - Integration tests
 - Some tests need Docker or external services (marked with `@pytest.mark.integration`)
 

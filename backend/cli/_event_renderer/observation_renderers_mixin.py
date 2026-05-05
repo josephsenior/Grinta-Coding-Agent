@@ -10,7 +10,14 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from backend.cli._typing import ObservationRenderersHost
+
+    _ObservationRenderersBase = ObservationRenderersHost
+else:
+    _ObservationRenderersBase = object
 
 from rich import box
 from rich.padding import Padding
@@ -145,8 +152,13 @@ def _cmd_stdout_syntax_extras(content: str) -> list[Any] | None:
     ]
 
 
-class ObservationRenderersMixin:
+class ObservationRenderersMixin(_ObservationRenderersBase):
     """Per-observation ``_render_*_observation`` renderers + dispatch."""
+
+    _pending_shell_command: str | None
+    _pending_shell_action: tuple[str, str] | None
+    _pending_shell_title: str | None
+    _pending_shell_is_internal: bool
 
     # Dispatch table for :meth:`_handle_observation` — maps observation class
     # to the method that knows how to render it.
@@ -351,7 +363,10 @@ class ObservationRenderersMixin:
         use_notice = _use_recoverable_notice_style(error_content)
         if use_notice:
             last_notice_content = getattr(self, '_last_notice_error_content', None)
-            if isinstance(last_notice_content, str) and last_notice_content == error_content:
+            if (
+                isinstance(last_notice_content, str)
+                and last_notice_content == error_content
+            ):
                 return
             setattr(self, '_last_notice_error_content', error_content)
         else:

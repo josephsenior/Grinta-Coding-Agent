@@ -1,15 +1,15 @@
 """Centralized undo history for file modifications across execution environments."""
 
-from collections import deque
-from typing import DefaultDict
+from collections import defaultdict, deque
 
 _UNDO_MAX_PER_FILE = 32
+
 
 class UndoHistoryManager:
     """Manages cross-tool file undo history."""
 
     def __init__(self) -> None:
-        self._history: DefaultDict[str, deque[str | None]] = DefaultDict(
+        self._history: defaultdict[str, deque[str | None]] = defaultdict(
             lambda: deque(maxlen=_UNDO_MAX_PER_FILE)
         )
 

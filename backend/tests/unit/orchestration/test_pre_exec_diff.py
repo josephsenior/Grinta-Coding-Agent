@@ -324,7 +324,9 @@ class TestSimulateEdit:
         old_content = 'hello world'
         new_content = middleware._simulate_edit(old_content, action)
 
-        assert new_content == 'goodbye\n' or new_content == 'goodbye' # behavior depends on splitlines
+        assert (
+            new_content == 'goodbye\n' or new_content == 'goodbye'
+        )  # behavior depends on splitlines
         # wait, my simulation added a newline if new_str doesn't have one? No.
         # let's re-verify simulation logic.
         # it did: return ''.join(lines[:start_idx] + new_lines + lines[end_idx:])

@@ -274,13 +274,16 @@ class TestFileEditAction(unittest.TestCase):
 
     def test_repr_edit_range(self):
         f = FileEditAction(
-            path='z.py', command='edit', edit_mode='range', start_line=10, end_line=12, new_str='updated code'
+            path='z.py',
+            command='edit',
+            edit_mode='range',
+            start_line=10,
+            end_line=12,
+            new_str='updated code',
         )
         r = repr(f)
         self.assertIn('Range: [L10:L12]', r)
         self.assertIn('updated code', r)
-
-
 
     def test_repr_undo(self):
         f = FileEditAction(path='u.py', command='undo_last_edit')

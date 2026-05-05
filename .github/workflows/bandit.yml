@@ -30,4 +30,15 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
       - name: Run Bandit
-        run: uv run bandit -c pyproject.toml -r backend --exclude backend/tests -ll
+        run: uv run bandit -c pyproject.toml -r backend --exclude backend/tests -ll -f json -o bandit-report.json || true
+      - name: Check Bandit report
+        run: |
+          if [ -f bandit-report.json ]; then
+            SEVERITY=$(python -c "import json; data=json.load(open('bandit-report.json')); print(sum(1 for r in data['results'] if r['issue_severity'] in ('HIGH','MEDIUM')))")
+            if [ "$SEVERITY" -gt 0 ]; then
+              echo "Found $SEVERITY medium/high severity issues"
+              python -c "import json; data=json.load(open('bandit-report.json')); [print(f'{r[\"filename\"]}:{r[\"line_number\"]} [{r[\"issue_severity\"]}] {r[\"issue_text\"]}') for r in data['results'] if r['issue_severity'] in ('HIGH','MEDIUM')]"
+              exit 1
+            fi
+          fi
+        shell: bash

@@ -28,11 +28,9 @@ from rich.style import Style
 from rich.text import Text
 
 from backend.cli.hud import HUDBar
-from backend.cli.status_chrome import rich_fake_prompt_group, status_fields_from_hud
 from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
     ACTIVITY_CARD_TITLE_SHELL,
-    ACTIVITY_PANEL_PADDING,
     CALLOUT_PANEL_PADDING,
     DRAFT_PANEL_ACCENT_STYLE,
     LIVE_PANEL_ACCENT_STYLE,
@@ -43,6 +41,7 @@ from backend.cli.layout_tokens import (
     spacer_live_section,
 )
 from backend.cli.path_links import file_uri_for_path, linkify_plain
+from backend.cli.status_chrome import rich_fake_prompt_group, status_fields_from_hud
 from backend.cli.theme import (
     CLR_ERR_BODY,
     CLR_ERR_ICON,
@@ -66,7 +65,6 @@ from backend.cli.transcript import (
     format_activity_block,
     format_activity_shell_block,
     format_activity_turn_header,
-    format_callout_panel,
     format_ground_truth_tool_line,
     format_live_panel,
     format_reasoning_snapshot,
@@ -205,6 +203,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._budget_warned_100 = False
         #: Running count of stream-fallback retries this session ("Still Working" panels).
         self._stream_fallback_count: int = 0
+        #: Last error observation content printed (used for deduplication).
+        self._last_notice_error_content: Any = None
+        #: Last retry status signature printed (used for deduplication).
+        self._last_retry_status_signature: Any = None
         # Per-turn metric snapshots (used to compute deltas at turn completion)
         self._turn_start_cost: float = 0.0
         self._turn_start_tokens: int = 0
@@ -753,7 +755,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     def _absorb_inline_streaming_thinking(self, raw: str) -> None:
         think_match = _THINK_EXTRACT_RE.search(raw)
         if not think_match:
-            self._streaming_accumulated = _sanitize_visible_transcript_text(raw)
+            self._streaming_accumulated = _sanitize_visible_transcript_text(raw)  # type: ignore[unreachable]
             return
         thinking_text = _sanitize_visible_transcript_text(think_match.group(1))
         if thinking_text and _show_reasoning_text():
@@ -1076,7 +1078,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         m = CLIEventRenderer._RG_PATH_LINE_COLON.match(line.strip())
         base = Style.parse(accent_style)
         if not m:
-            return linkify_plain(
+            return linkify_plain(  # type: ignore[unreachable]
                 line,
                 plain_style=accent_style,
                 link_files=True,

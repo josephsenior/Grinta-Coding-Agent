@@ -519,7 +519,7 @@ class TestValidateStructureEditorArgs:
         assert result.path == 'x.py'
 
     def test_edit_not_valid_for_symbol_editor(self):
-        """edit is NOT a symbol_editor command — use text_editor instead."""
+        """Edit is NOT a symbol_editor command — use text_editor instead."""
         from backend.engine.function_calling import _handle_symbol_editor_tool
 
         with pytest.raises(FunctionCallValidationError, match='Unknown command'):
@@ -588,25 +588,25 @@ class TestEditSymbolsBatch:
         assert '20' in py.read_text(encoding='utf-8')
 
     def test_edit_symbols_restores_on_failure(self, tmp_path):
+        from backend.core.errors import ToolExecutionError
         from backend.engine.function_calling import _handle_symbol_editor_tool
 
         original = 'def a():\n    return 1\n\ndef b():\n    return 2\n'
         py = tmp_path / 'm.py'
         py.write_text(original, encoding='utf-8')
-        result = _handle_symbol_editor_tool(
-            {
-                'command': 'edit_symbols',
-                'path': str(py),
-                'edits': [
-                    {'symbol_name': 'a', 'new_body': '    return 99'},
-                    {'symbol_name': 'nope_not_a_symbol', 'new_body': '    pass'},
-                ],
-                'security_risk': 'LOW',
-            }
-        )
-        from backend.ledger.action import MessageAction
-
-        assert isinstance(result, MessageAction)
+        with pytest.raises(ToolExecutionError, match='nope_not_a_symbol'):
+            _handle_symbol_editor_tool(
+                {
+                    'command': 'edit_symbols',
+                    'path': str(py),
+                    'edits': [
+                        {'symbol_name': 'a', 'new_body': '    return 99'},
+                        {'symbol_name': 'nope_not_a_symbol', 'new_body': '    pass'},
+                    ],
+                    'security_risk': 'LOW',
+                }
+            )
+        # File must be restored to original after failure
         assert py.read_text(encoding='utf-8') == original
 
     def test_edit_symbols_rejects_duplicate_symbols(self, tmp_path):
@@ -649,13 +649,14 @@ class TestHandleEditFunctionCommand:
         )
         assert isinstance(result, FileReadAction)
 
-    def test_failure_returns_message_action(self):
+    def test_failure_raises_tool_execution_error(self):
+        from backend.core.errors import ToolExecutionError
+
         editor = self._make_editor(success=False, message='parse error')
-        result = _handle_edit_symbol_body_command(
-            editor, 'foo.py', {'symbol_name': 'my_fn', 'new_body': 'return 1'}
-        )
-        assert isinstance(result, MessageAction)
-        assert 'parse error' in result.content
+        with pytest.raises(ToolExecutionError, match='parse error'):
+            _handle_edit_symbol_body_command(
+                editor, 'foo.py', {'symbol_name': 'my_fn', 'new_body': 'return 1'}
+            )
 
     def test_missing_symbol_name_raises(self):
         with pytest.raises(FunctionCallValidationError, match='symbol_name'):
@@ -693,15 +694,15 @@ class TestHandleRenameSymbolCommand:
         )
         assert isinstance(result, FileReadAction)
 
-    def test_failure_returns_message_action(self):
+    def test_failure_raises_tool_execution_error(self):
+        from backend.core.errors import ToolExecutionError
         from backend.engine.function_calling import _handle_rename_symbol_command
 
         editor = self._make_editor(success=False, message='not found')
-        result = _handle_rename_symbol_command(
-            editor, 'f.py', {'old_name': 'foo', 'new_name': 'bar'}
-        )
-        assert isinstance(result, MessageAction)
-        assert 'not found' in result.content
+        with pytest.raises(ToolExecutionError, match='not found'):
+            _handle_rename_symbol_command(
+                editor, 'f.py', {'old_name': 'foo', 'new_name': 'bar'}
+            )
 
     def test_missing_old_name_raises(self):
         from backend.engine.function_calling import _handle_rename_symbol_command
@@ -722,7 +723,7 @@ class TestHandleRenameSymbolCommand:
 
 
 class TestHandleFindSymbolCommand:
-    def test_found_symbol_returns_message_with_info(self):
+    def test_found_symbol_returns_file_read_action(self):
         from backend.engine.function_calling import _handle_find_symbol_command
 
         editor = MagicMock()
@@ -733,17 +734,17 @@ class TestHandleFindSymbolCommand:
         sym.parent_name = 'MyClass'
         editor.find_symbol.return_value = sym
         result = _handle_find_symbol_command(editor, 'f.py', {'symbol_name': 'my_fn'})
-        assert isinstance(result, MessageAction)
-        assert 'my_fn' in result.content
+        assert isinstance(result, FileReadAction)
+        assert 'my_fn' in result.thought
 
-    def test_not_found_returns_not_found_message(self):
+    def test_not_found_raises_tool_execution_error(self):
+        from backend.core.errors import ToolExecutionError
         from backend.engine.function_calling import _handle_find_symbol_command
 
         editor = MagicMock()
         editor.find_symbol.return_value = None
-        result = _handle_find_symbol_command(editor, 'f.py', {'symbol_name': 'ghost'})
-        assert isinstance(result, MessageAction)
-        assert 'not found' in result.content.lower()
+        with pytest.raises(ToolExecutionError, match='not found'):
+            _handle_find_symbol_command(editor, 'f.py', {'symbol_name': 'ghost'})
 
     def test_missing_symbol_name_raises(self):
         from backend.engine.function_calling import _handle_find_symbol_command
@@ -762,7 +763,7 @@ class TestHandleFindSymbolCommand:
         sym.parent_name = None
         editor.find_symbol.return_value = sym
         result = _handle_find_symbol_command(editor, 'f.py', {'symbol_name': 'Klass'})
-        assert 'Parent' not in cast(Any, result).content
+        assert 'Parent' not in result.thought
 
 
 # ---------------------------------------------------------------------------

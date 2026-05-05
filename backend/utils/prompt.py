@@ -57,7 +57,7 @@ class _UninitializedPromptManager:
 
 
 UNINITIALIZED_PROMPT_MANAGER = _UninitializedPromptManager()
-"""Module-level sentinel instance — import this instead of duplicating the class."""
+# Module-level sentinel instance — import this instead of duplicating the class.
 
 
 class PromptManager:

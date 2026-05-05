@@ -622,9 +622,9 @@ class StructureEditor:
                         name = file_bytes[
                             name_node.start_byte : name_node.end_byte
                         ].decode('utf-8')
-                        
+
                         full_name = f'{parent_name}.{name}' if parent_name else name
-                        
+
                         if not symbol_type or symbol_type == 'function':
                             symbols.append(full_name)
 
@@ -637,7 +637,7 @@ class StructureEditor:
                         ].decode('utf-8')
                         if not symbol_type or symbol_type == 'class':
                             symbols.append(name)
-                        
+
                         # Recurse into class members with parent_name
                         for child in node.children:
                             extract_symbols(child, parent_name=name)

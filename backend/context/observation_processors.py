@@ -308,7 +308,7 @@ def _handle_browser_screenshot_observation(
         cap = f'{cap}\n[{obs.inject_skipped_reason}]'
     cap = truncate_content(cap, max_message_chars, strategy='balanced')
     tag = '[BROWSER_SCREENSHOT]'
-    if vision_is_active and getattr(obs, 'image_b64', ''):
+    if vision_is_active and getattr(obs, 'image_b64', ''):  # type: ignore[arg-type]
         data_url = f'data:{obs.image_mime};base64,{obs.image_b64}'
         return Message(
             role='user',

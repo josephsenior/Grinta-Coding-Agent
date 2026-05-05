@@ -13,8 +13,12 @@ def test_blackboard_persists_under_app_dir(tmp_path, monkeypatch) -> None:
         lambda project_root=None: tmp_path,
     )
 
-    board = Blackboard()
-    asyncio.run(board.set('schema', 'ok'))
+    async def _test():
+        board = Blackboard()
+        await board.set('schema', 'ok')
+        await board.flush()
+
+    asyncio.run(_test())
 
     blackboard_file = tmp_path / 'blackboard.json'
     assert blackboard_file.exists()

@@ -224,7 +224,9 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(call_kwargs['initial_delay'], 10.0)
 
     @patch('backend.orchestration.services.retry_service.get_retry_queue')
-    async def test_schedule_retry_increments_attempt_monotonically(self, mock_get_queue):
+    async def test_schedule_retry_increments_attempt_monotonically(
+        self, mock_get_queue
+    ):
         """Subsequent retry scheduling should not reset attempt to 1."""
         from backend.inference.exceptions import RateLimitError
         from backend.ledger.observation import StatusObservation
@@ -261,7 +263,9 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         self.assertIn('2/5', event.content)
 
     @patch('backend.orchestration.services.retry_service.get_retry_queue')
-    async def test_schedule_retry_returns_false_after_max_attempts(self, mock_get_queue):
+    async def test_schedule_retry_returns_false_after_max_attempts(
+        self, mock_get_queue
+    ):
         """After max retries are exhausted, no new retry task is scheduled."""
         from backend.inference.exceptions import Timeout
 

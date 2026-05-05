@@ -152,16 +152,16 @@ class StuckDetector:
             and self._is_stuck_action_observation_pattern(filtered_history)
         ):
             return True
-            
+
         if self._is_stuck_think_only_loop(filtered_history):
             return True
-            
+
         if self._is_stuck_token_repetition(filtered_history):
             return True
-            
+
         if self._is_stuck_cost_acceleration(filtered_history):
             return True
-            
+
         if self._is_stuck_readonly_inspection_loop(filtered_history):
             return True
 

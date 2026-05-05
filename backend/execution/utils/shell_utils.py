@@ -10,7 +10,9 @@ if TYPE_CHECKING:
     pass
 
 
-def apply_cmd_output_timeout_metadata(metadata: CmdOutputMetadata, exit_code: int) -> None:
+def apply_cmd_output_timeout_metadata(
+    metadata: CmdOutputMetadata, exit_code: int
+) -> None:
     """Set structured timeout fields for subprocess-backed shells (idle detach / hard kill)."""
     if exit_code == -2:
         metadata.timeout_kind = 'idle_detach'

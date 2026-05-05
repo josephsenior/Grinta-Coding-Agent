@@ -165,7 +165,7 @@ class ContextMemoryManager:
             delete_snapshot()
             return CondensedHistory(condensation_result.events, None)
 
-        action = condensation_result.action
+        action = condensation_result.action  # type: ignore[attr-defined]
         if self._is_noop_condensation_action(
             action
         ) and not self._has_unhandled_condensation_request(state):

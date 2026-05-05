@@ -73,7 +73,7 @@ def _has_failure_marker(line: str) -> bool:
 def _is_actionable_failure_line(line: str) -> bool:
     if not _has_failure_marker(line):
         return False
-    return bool(re.search(r'^FAILED\s+\S+', line) or re.search(r'^--- FAIL:', line))
+    return bool(re.search(r'^FAILED\s+\S+', line) or re.search(r'^--- FAIL:', line))  # type: ignore[unreachable]
 
 
 def _collect_summary_and_failure_lines(

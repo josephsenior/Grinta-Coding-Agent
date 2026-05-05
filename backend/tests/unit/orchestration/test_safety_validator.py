@@ -1,7 +1,6 @@
-from typing import Any, cast
-
 """Tests for backend.orchestration.safety_validator module."""
 
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

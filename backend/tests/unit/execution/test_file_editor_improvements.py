@@ -1,9 +1,6 @@
 import hashlib
 
-from backend.execution.utils.file_editor import FileEditor, ToolResult, normalize_quotes
-
-
-
+from backend.execution.utils.file_editor import FileEditor
 
 
 def test_edit_mode_range_with_hash_guard(tmp_path):
@@ -106,9 +103,6 @@ def test_expected_file_hash_guard_accepts_matching_content(tmp_path):
     )
     assert result.error is None
     assert target.read_text(encoding='utf-8') == 'beta\n'
-
-
-
 
 
 def test_crlf_preserved_on_write(tmp_path):

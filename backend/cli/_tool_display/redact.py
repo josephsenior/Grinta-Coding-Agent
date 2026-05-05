@@ -117,7 +117,7 @@ def _locate_tool_call_json_start(text: str, rest_start: int) -> int | None:
     lstripped = rest.lstrip()
     ws = len(rest) - len(lstripped)
     if not re.match(r'^([A-Za-z0-9_]+)\(', lstripped):
-        return None
+        return None  # type: ignore[unreachable]
     open_paren_in_rest = lstripped.find('(')
     args_begin = rest_start + ws + open_paren_in_rest + 1
     tail = text[args_begin:].lstrip()
@@ -160,7 +160,7 @@ def redact_streamed_tool_call_markers(text: str) -> str:
         lstripped = rest.lstrip()
         m = re.match(r'^([A-Za-z0-9_]+)\(', lstripped)
         if not m:
-            out.append(text[j:rest_start])
+            out.append(text[j:rest_start])  # type: ignore[unreachable]
             i = rest_start
             continue
         span = _scan_tool_call_marker(text, j)
@@ -192,7 +192,7 @@ def extract_tool_calls_from_text_markers(text: str) -> list[dict[str, Any]]:
         lstripped = rest.lstrip()
         m = re.match(r'^([A-Za-z0-9_]+)\(', lstripped)
         if not m:
-            i = rest_start
+            i = rest_start  # type: ignore[unreachable]
             continue
         fn_name = m.group(1)
         span = _scan_tool_call_marker(text, j)

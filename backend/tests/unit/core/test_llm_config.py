@@ -278,9 +278,7 @@ class TestBaseURLCleaning:
         """Test custom_llm_provider forbidden for some providers."""
         with suppress_llm_env_export():
             # Anthropic forbids custom_llm_provider
-            cfg = LLMConfig(
-                model='claude-sonnet-4-6', custom_llm_provider='anthropic'
-            )
+            cfg = LLMConfig(model='claude-sonnet-4-6', custom_llm_provider='anthropic')
         # Should still create config (just logs warning)
         assert cfg.model == 'claude-sonnet-4-6'
 

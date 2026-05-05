@@ -510,7 +510,10 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             # was killed while this step was waiting for the LLM, a DisconnectedError
             # is expected. Swallow it to avoid noisy error popups for the user.
             from backend.core.errors import AgentRuntimeDisconnectedError
-            if self.get_agent_state() == AgentState.STOPPED and isinstance(e, AgentRuntimeDisconnectedError):
+
+            if self.get_agent_state() == AgentState.STOPPED and isinstance(
+                e, AgentRuntimeDisconnectedError
+            ):
                 logger.info('Ignoring runtime disconnection error after agent stop.')
                 return
 

@@ -6,8 +6,6 @@ import unittest
 from unittest.mock import MagicMock
 
 from backend.ledger import EventSource
-from backend.ledger.action import FileEditAction
-from backend.ledger.observation import CmdOutputObservation
 from backend.ledger.observation.error import ErrorObservation
 from backend.orchestration.services.step_guard_service import StepGuardService
 

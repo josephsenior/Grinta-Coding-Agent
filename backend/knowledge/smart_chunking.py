@@ -38,7 +38,25 @@ class SmartChunker:
         if not filename:
             return 'text'
         ext = Path(filename).suffix.lower()
-        code_exts = {'.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.go', '.rs', '.cpp', '.c', '.h', '.cs', '.rb', '.php', '.swift', '.kt', '.scala'}
+        code_exts = {
+            '.py',
+            '.js',
+            '.ts',
+            '.jsx',
+            '.tsx',
+            '.java',
+            '.go',
+            '.rs',
+            '.cpp',
+            '.c',
+            '.h',
+            '.cs',
+            '.rb',
+            '.php',
+            '.swift',
+            '.kt',
+            '.scala',
+        }
         md_exts = {'.md', '.markdown', '.rst', '.txt'}
         json_exts = {'.json', '.jsonc'}
         yaml_exts = {'.yaml', '.yml', '.toml'}
@@ -60,7 +78,9 @@ class SmartChunker:
         overlap = self.CHUNK_OVERLAPS.get(ftype, self.default_overlap)
         return size, overlap
 
-    def chunk_markdown(self, content: str, document_id: str, metadata: dict[str, Any] | None) -> list[DocumentChunk]:
+    def chunk_markdown(
+        self, content: str, document_id: str, metadata: dict[str, Any] | None
+    ) -> list[DocumentChunk]:
         """Chunk markdown by headers and logical sections."""
         chunks: list[DocumentChunk] = []
         lines = content.split('\n')
@@ -77,13 +97,18 @@ class SmartChunker:
                 if current_size > 0:
                     chunk_text = '\n'.join(current_section).strip()
                     if chunk_text:
-                        chunks.append(DocumentChunk(
-                            id=f'{document_id}_chunk_{chunk_index}',
-                            document_id=document_id,
-                            chunk_index=chunk_index,
-                            content=chunk_text,
-                            metadata={**(metadata or {}), '_section_type': 'markdown_header'},
-                        ))
+                        chunks.append(
+                            DocumentChunk(
+                                id=f'{document_id}_chunk_{chunk_index}',
+                                document_id=document_id,
+                                chunk_index=chunk_index,
+                                content=chunk_text,
+                                metadata={
+                                    **(metadata or {}),
+                                    '_section_type': 'markdown_header',
+                                },
+                            )
+                        )
                         chunk_index += 1
                 current_section = [line]
                 current_size = len(line)
@@ -91,17 +116,24 @@ class SmartChunker:
                 if current_size + len(line) + 1 > max_size and current_section:
                     chunk_text = '\n'.join(current_section).strip()
                     if chunk_text:
-                        chunks.append(DocumentChunk(
-                            id=f'{document_id}_chunk_{chunk_index}',
-                            document_id=document_id,
-                            chunk_index=chunk_index,
-                            content=chunk_text,
-                            metadata={**(metadata or {}), '_section_type': 'markdown_body'},
-                        ))
+                        chunks.append(
+                            DocumentChunk(
+                                id=f'{document_id}_chunk_{chunk_index}',
+                                document_id=document_id,
+                                chunk_index=chunk_index,
+                                content=chunk_text,
+                                metadata={
+                                    **(metadata or {}),
+                                    '_section_type': 'markdown_body',
+                                },
+                            )
+                        )
                         chunk_index += 1
-                        overlap_lines = current_section[-overlap // 50:]
+                        overlap_lines = current_section[-overlap // 50 :]
                         current_section = overlap_lines + [line]
-                        current_size = sum(len(l) + 1 for l in current_section)
+                        current_size = sum(
+                            len(line_item) + 1 for line_item in current_section
+                        )
                 else:
                     current_section.append(line)
                     current_size += len(line) + 1
@@ -109,17 +141,21 @@ class SmartChunker:
         if current_section:
             chunk_text = '\n'.join(current_section).strip()
             if chunk_text:
-                chunks.append(DocumentChunk(
-                    id=f'{document_id}_chunk_{chunk_index}',
-                    document_id=document_id,
-                    chunk_index=chunk_index,
-                    content=chunk_text,
-                    metadata={**(metadata or {}), '_section_type': 'markdown_body'},
-                ))
+                chunks.append(
+                    DocumentChunk(
+                        id=f'{document_id}_chunk_{chunk_index}',
+                        document_id=document_id,
+                        chunk_index=chunk_index,
+                        content=chunk_text,
+                        metadata={**(metadata or {}), '_section_type': 'markdown_body'},
+                    )
+                )
 
         return chunks
 
-    def chunk_json(self, content: str, document_id: str, metadata: dict[str, Any] | None) -> list[DocumentChunk]:
+    def chunk_json(
+        self, content: str, document_id: str, metadata: dict[str, Any] | None
+    ) -> list[DocumentChunk]:
         """Chunk JSON by top-level keys and array items."""
         chunks: list[DocumentChunk] = []
         chunk_index = 0
@@ -135,13 +171,19 @@ class SmartChunker:
             result = []
             serialized = json.dumps(value, indent=2)
             if len(serialized) <= max_size:
-                result.append(DocumentChunk(
-                    id=f'{document_id}_chunk_{chunk_index}',
-                    document_id=document_id,
-                    chunk_index=chunk_index,
-                    content=f'# {key}\n\n{serialized}',
-                    metadata={**(metadata or {}), '_json_path': f'{path}.{key}', '_section_type': 'json_object'},
-                ))
+                result.append(
+                    DocumentChunk(
+                        id=f'{document_id}_chunk_{chunk_index}',
+                        document_id=document_id,
+                        chunk_index=chunk_index,
+                        content=f'# {key}\n\n{serialized}',
+                        metadata={
+                            **(metadata or {}),
+                            '_json_path': f'{path}.{key}',
+                            '_section_type': 'json_object',
+                        },
+                    )
+                )
                 chunk_index += 1
             elif isinstance(value, dict):
                 for k, v in value.items():
@@ -160,7 +202,9 @@ class SmartChunker:
 
         return chunks
 
-    def chunk_yaml(self, content: str, document_id: str, metadata: dict[str, Any] | None) -> list[DocumentChunk]:
+    def chunk_yaml(
+        self, content: str, document_id: str, metadata: dict[str, Any] | None
+    ) -> list[DocumentChunk]:
         """Chunk YAML by top-level keys and list items."""
         chunks: list[DocumentChunk] = []
         chunk_index = 0
@@ -168,23 +212,27 @@ class SmartChunker:
         lines = content.split('\n')
         current_doc: list[str] = []
         current_size = 0
-        doc_start = 0
 
         for i, line in enumerate(lines):
             is_document_start = bool(re.match(r'^---\s*$', line))
-            is_list_item = bool(re.match(r'^-\s+', line))
-            is_key_value = bool(re.match(r'^[\w\-]+:\s', line))
+            bool(re.match(r'^-\s+', line))
+            bool(re.match(r'^[\w\-]+:\s', line))
 
             if is_document_start and current_doc:
                 chunk_text = '\n'.join(current_doc).strip()
                 if chunk_text:
-                    chunks.append(DocumentChunk(
-                        id=f'{document_id}_chunk_{chunk_index}',
-                        document_id=document_id,
-                        chunk_index=chunk_index,
-                        content=chunk_text,
-                        metadata={**(metadata or {}), '_section_type': 'yaml_document'},
-                    ))
+                    chunks.append(
+                        DocumentChunk(
+                            id=f'{document_id}_chunk_{chunk_index}',
+                            document_id=document_id,
+                            chunk_index=chunk_index,
+                            content=chunk_text,
+                            metadata={
+                                **(metadata or {}),
+                                '_section_type': 'yaml_document',
+                            },
+                        )
+                    )
                     chunk_index += 1
                 current_doc = []
                 current_size = 0
@@ -192,13 +240,15 @@ class SmartChunker:
             if current_size + len(line) + 1 > max_size and current_doc:
                 chunk_text = '\n'.join(current_doc).strip()
                 if chunk_text:
-                    chunks.append(DocumentChunk(
-                        id=f'{document_id}_chunk_{chunk_index}',
-                        document_id=document_id,
-                        chunk_index=chunk_index,
-                        content=chunk_text,
-                        metadata={**(metadata or {}), '_section_type': 'yaml_body'},
-                    ))
+                    chunks.append(
+                        DocumentChunk(
+                            id=f'{document_id}_chunk_{chunk_index}',
+                            document_id=document_id,
+                            chunk_index=chunk_index,
+                            content=chunk_text,
+                            metadata={**(metadata or {}), '_section_type': 'yaml_body'},
+                        )
+                    )
                     chunk_index += 1
                 current_doc = []
                 current_size = 0
@@ -209,17 +259,25 @@ class SmartChunker:
         if current_doc:
             chunk_text = '\n'.join(current_doc).strip()
             if chunk_text:
-                chunks.append(DocumentChunk(
-                    id=f'{document_id}_chunk_{chunk_index}',
-                    document_id=document_id,
-                    chunk_index=chunk_index,
-                    content=chunk_text,
-                    metadata={**(metadata or {}), '_section_type': 'yaml_body'},
-                ))
+                chunks.append(
+                    DocumentChunk(
+                        id=f'{document_id}_chunk_{chunk_index}',
+                        document_id=document_id,
+                        chunk_index=chunk_index,
+                        content=chunk_text,
+                        metadata={**(metadata or {}), '_section_type': 'yaml_body'},
+                    )
+                )
 
-        return chunks if chunks else self.chunk_text_fallback(content, document_id, metadata)
+        return (
+            chunks
+            if chunks
+            else self.chunk_text_fallback(content, document_id, metadata)
+        )
 
-    def chunk_text_fallback(self, content: str, document_id: str, metadata: dict[str, Any] | None) -> list[DocumentChunk]:
+    def chunk_text_fallback(
+        self, content: str, document_id: str, metadata: dict[str, Any] | None
+    ) -> list[DocumentChunk]:
         """Basic sliding window for text files."""
         chunks: list[DocumentChunk] = []
         max_size, overlap = self.get_chunk_params('.txt')
@@ -229,13 +287,15 @@ class SmartChunker:
         while start < len(content):
             end = start + max_size
             chunk_text = content[start:end]
-            chunks.append(DocumentChunk(
-                id=f'{document_id}_chunk_{chunk_index}',
-                document_id=document_id,
-                chunk_index=chunk_index,
-                content=chunk_text.strip(),
-                metadata={**(metadata or {}), '_section_type': 'text'},
-            ))
+            chunks.append(
+                DocumentChunk(
+                    id=f'{document_id}_chunk_{chunk_index}',
+                    document_id=document_id,
+                    chunk_index=chunk_index,
+                    content=chunk_text.strip(),
+                    metadata={**(metadata or {}), '_section_type': 'text'},
+                )
+            )
             chunk_index += 1
             start = end - overlap if end < len(content) else len(content)
 

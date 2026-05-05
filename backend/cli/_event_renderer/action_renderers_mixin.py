@@ -9,7 +9,14 @@ that class via multiple inheritance.
 from __future__ import annotations
 
 import re
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from backend.cli._typing import ActionRenderersHost
+
+    _ActionRenderersBase = ActionRenderersHost
+else:
+    _ActionRenderersBase = object
 
 from rich.console import Group
 from rich.padding import Padding
@@ -97,8 +104,15 @@ from backend.ledger.action import (
 )
 
 
-class ActionRenderersMixin:
+class ActionRenderersMixin(_ActionRenderersBase):
     """Per-action ``_render_*_action`` renderers + dispatch."""
+
+    _pending_shell_command: str | None
+    _pending_shell_action: tuple[str, str] | None
+    _pending_shell_title: str | None
+    _pending_shell_is_internal: bool
+    _pending_finish_text: str | None
+    _last_terminal_input_sent: str
 
     # Dispatch table for :meth:`_handle_agent_action` — maps action class to
     # the method that knows how to render it.  Looked up via ``isinstance``
@@ -434,7 +448,7 @@ class ActionRenderersMixin:
             detail: str | Text = linkify_plain(raw_url, link_files=True, link_urls=True)
             reasoning_detail = raw_url
         else:
-            detail = 'interactive session'
+            detail = 'interactive session'  # type: ignore[unreachable]
             reasoning_detail = detail
         self._print_activity('Opened', detail, None, title=ACTIVITY_CARD_TITLE_BROWSER)
         thought = getattr(action, 'thought', '') or ''

@@ -95,9 +95,7 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
         model_display = f'{provider}/{model}'
 
     ctx = HUDBar._format_tokens(hud.context_tokens)
-    lim_tok = (
-        HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
-    )
+    lim_tok = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
     if hud.context_tokens == 0 and hud.context_limit == 0:
         token_display_compact = '0t'
     elif hud.context_limit == 0:
@@ -107,9 +105,7 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
     if getattr(hud, 'token_usage_estimated', False):
         token_display_compact += '~'
 
-    mcp_short = (
-        '?' if hud.mcp_servers is None else str(min(int(hud.mcp_servers), 99))
-    )
+    mcp_short = '?' if hud.mcp_servers is None else str(min(int(hud.mcp_servers), 99))
     skills_short = str(min(int(bundled_skill_count), 99))
 
     return StatusFields(
