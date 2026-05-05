@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import time
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,6 +15,8 @@ from typing import (
     Protocol,
     runtime_checkable,
 )
+
+_MAX_CHECKPOINT_CACHE_SIZE = 16
 
 from backend.core.constants import (
     DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
@@ -147,7 +150,7 @@ class OrchestratorExecutor:
             os.environ.get('APP_DATA_DIR', os.path.expanduser('~/.app')),
             'streaming_checkpoints',
         )
-        self._checkpoint_cache: dict[str, StreamingCheckpoint] = {}
+        self._checkpoint_cache: OrderedDict[str, StreamingCheckpoint] = OrderedDict()
         self._recovery_blocked_reasons: dict[str, str] = {}
 
     # ------------------------------------------------------------------ #
@@ -948,6 +951,7 @@ class OrchestratorExecutor:
         session_key = self._checkpoint_session_key(event_stream)
         checkpoint = self._checkpoint_cache.get(session_key)
         if checkpoint is not None:
+            self._checkpoint_cache.move_to_end(session_key)
             return checkpoint
 
         if event_stream is None:
@@ -984,9 +988,17 @@ class OrchestratorExecutor:
                 logger.error(
                     'Discarded uncommitted streaming checkpoint for %s and blocked next LLM call: %s',
                     session_key,
-                    inspection.reason,
-                )
+                inspection.reason,
+            )
         self._checkpoint_cache[session_key] = checkpoint
+        self._checkpoint_cache.move_to_end(session_key)
+        while len(self._checkpoint_cache) > _MAX_CHECKPOINT_CACHE_SIZE:
+            evicted_key, evicted_ckpt = self._checkpoint_cache.popitem(last=False)
+            try:
+                evicted_ckpt.discard()
+            except Exception:
+                pass
+            logger.debug('Evicted streaming checkpoint for %s (cache full)', evicted_key)
         return checkpoint
 
     def _checkpoint_recovery_policy(self) -> tuple[float, bool]:

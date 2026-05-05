@@ -23,11 +23,32 @@ def test_resolve_workspace_path_relative_and_absolute(tmp_path: Path) -> None:
     absolute = tmp_path / 'abs.txt'
     absolute.write_text('x', encoding='utf-8')
 
-    rel = aes.resolve_workspace_path('../x.txt', str(nested), str(workspace))
-    abs_out = aes.resolve_workspace_path(str(absolute), str(nested), str(workspace))
+    # Relative paths resolve against working_dir (nested)
+    rel = aes.resolve_workspace_path('x.txt', str(nested), str(workspace))
+    assert rel == (nested / 'x.txt').resolve()
 
-    assert rel == (workspace / 'x.txt').resolve()
-    assert abs_out == absolute.resolve()
+    # Absolute paths that are within workspace are allowed
+    abs_within = workspace / 'root_file.txt'
+    abs_within.write_text('y', encoding='utf-8')
+    abs_out = aes.resolve_workspace_path(str(abs_within), str(nested), str(workspace))
+    assert abs_out == abs_within.resolve()
+
+
+def test_resolve_workspace_path_rejects_traversal(tmp_path: Path) -> None:
+    workspace = tmp_path / 'ws'
+    workspace.mkdir(parents=True)
+    nested = workspace / 'sub'
+    nested.mkdir(parents=True)
+    outside = tmp_path / 'outside'
+    outside.mkdir(parents=True)
+
+    # Absolute path outside workspace should be rejected
+    with pytest.raises(ValueError, match='outside the workspace root'):
+        aes.resolve_workspace_path(str(outside / 'evil.txt'), str(nested), str(workspace))
+
+    # Relative path that escapes workspace should be rejected
+    with pytest.raises(ValueError, match='outside the workspace root'):
+        aes.resolve_workspace_path('../../outside.txt', str(nested), str(workspace))
 
 
 def test_try_compile_user_regex_valid_and_invalid() -> None:

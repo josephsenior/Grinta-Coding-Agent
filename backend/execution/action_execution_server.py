@@ -59,12 +59,20 @@ from backend.utils.regex_limits import try_compile_user_regex as _try_compile_us
 
 
 def resolve_workspace_path(path: str, working_dir: str, workspace_root: str) -> Path:
-    """Resolve a workspace-relative path against *working_dir* (session cwd)."""
+    """Resolve a workspace-relative path against *working_dir* and validate it stays within *workspace_root*."""
     base = Path(working_dir).resolve()
     candidate = Path(path)
-    return (
+    resolved = (
         candidate.resolve() if candidate.is_absolute() else (base / candidate).resolve()
     )
+    root = Path(workspace_root).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        raise ValueError(
+            f"Path '{path}' resolves to '{resolved}', which is outside the workspace root '{root}'"
+        )
+    return resolved
 
 
 _ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*m')
