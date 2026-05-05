@@ -758,9 +758,11 @@ async def test_renderer_timeout_error_with_autonomous_retry_uses_recovery_copy()
         )
     )
     output = _console_output(console)
-    assert 'Autonomous recovery' in output
-    assert 'Automatic retry is running. No action needed.' in output
-    assert 'Confirm your network' not in output
+    # Autonomous recovery panel removed per user request (ugly UI)
+    assert 'Autonomous recovery' not in output
+    assert 'Automatic retry is running. No action needed.' not in output
+    # Should show generic timeout error guidance instead
+    assert 'Request timed out' in output
 
 
 @pytest.mark.asyncio
@@ -782,10 +784,13 @@ async def test_renderer_rate_limit_queue_error_uses_notice_not_red_error() -> No
         )
     )
     output = _console_output(console)
-    assert 'Autonomous recovery' in output
-    assert 'Autonomous recovery is in progress' in output
+    # Autonomous recovery panel removed per user request (ugly UI)
+    assert 'Autonomous recovery' not in output
+    assert 'Autonomous recovery is in progress' not in output
     assert hud.state.ledger_status != 'Error'
     assert 'What you can try' not in output
+    # Should show rate limit guidance instead
+    assert 'Rate or quota limit' in output
 
 
 @pytest.mark.asyncio
