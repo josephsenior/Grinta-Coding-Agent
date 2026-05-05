@@ -161,6 +161,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         )
 
         # Setup workspace
+        self.project_root = project_root
         self._temp_workspace: str | None = project_root
         self._owns_workspace = project_root is None
         self.status_callback = status_callback
