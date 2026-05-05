@@ -87,9 +87,9 @@ def _validate_status_callbacks(
 ) -> None:
     """Validate that status callbacks are not already set."""
     if getattr(runtime, 'status_callback', None):
-        logger.warning('Runtime status_callback already set; overriding in run loop')
+        logger.debug('Runtime status_callback already set; overriding in run loop')
     if getattr(controller, 'status_callback', None):
-        logger.warning('Controller status_callback already set; overriding in run loop')
+        logger.debug('Controller status_callback already set; overriding in run loop')
 
 
 def _set_status_callbacks(

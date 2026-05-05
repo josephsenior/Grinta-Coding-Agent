@@ -463,6 +463,35 @@ class TestEditFunction:
         result = editor.edit_function(str(f), 'func', 'body')
         assert result.success is False
 
+    def test_edit_method_dot_notation(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
+        """Test edit_function with qualified name (Class.method)."""
+        result = editor.edit_function(
+            py_file, 'Calculator.multiply', '        return x * y * 1'
+        )
+        assert result.success is True
+        content = open(py_file, encoding='utf-8').read()
+        assert 'return x * y * 1' in content
+
+    def test_edit_symbols_batch_dot_notation(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
+        """Test multiple edits with qualified names."""
+        # Note: edit_symbols implementation is in function_calling.py,
+        # but here we test the underlying edit_function being called multiple times.
+        res1 = editor.edit_function(
+            py_file, 'Calculator.multiply', '        return "mult"'
+        )
+        res2 = editor.edit_function(
+            py_file, 'Calculator.divide', '        return "div"'
+        )
+        assert res1.success is True
+        assert res2.success is True
+        content = open(py_file, encoding='utf-8').read()
+        assert '"mult"' in content
+        assert '"div"' in content
+
 
 # ---------------------------------------------------------------------------
 # rename_symbol
