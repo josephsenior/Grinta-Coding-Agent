@@ -62,7 +62,7 @@ repos:
     hooks:
       - id: bandit
         name: bandit
-        entry: python -c "import os, subprocess, sys; os.environ['PYTHONIOENCODING'] = 'utf-8'; sys.exit(subprocess.run([sys.executable, '-m', 'bandit', '-c', 'pyproject.toml', '-r', '--skip', 'B101,B102,B103,B104,B105,B106,B107,B108,B110,B112,B301,B306,B310,B311,B403,B404,B603,B604,B607,B608', '-q', 'backend'], check=False).returncode)"
+        entry: python -c "import os, subprocess, sys; os.environ['PYTHONIOENCODING'] = 'utf-8'; sys.exit(subprocess.run([sys.executable, '-m', 'bandit', '-c', 'pyproject.toml', '-r', '-q', 'backend'], check=False).returncode)"
         language: system
         pass_filenames: false
         always_run: true

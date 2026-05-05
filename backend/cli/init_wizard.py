@@ -78,8 +78,8 @@ def _http_ok(url: str) -> bool:
     if not (url.startswith('http://') or url.startswith('https://')):
         return False
     try:
-        req = urllib.request.Request(url)  # noqa: S310 (scheme guarded above)
-        with urllib.request.urlopen(req, timeout=0.5):  # noqa: S310
+        req = urllib.request.Request(url)  # nosec B310 (scheme guarded above)
+        with urllib.request.urlopen(req, timeout=0.5):  # nosec B310
             return True
     except Exception:
         return False

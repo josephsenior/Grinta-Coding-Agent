@@ -50,6 +50,9 @@ from backend.cli._event_renderer.error_panel import (
     build_llm_stream_fallback_panel as _build_llm_stream_fallback_panel,
 )
 from backend.cli._event_renderer.error_panel import (
+    build_retry_panel as _build_retry_panel,
+)
+from backend.cli._event_renderer.error_panel import (
     use_recoverable_notice_style as _use_recoverable_notice_style,
 )
 from backend.cli._event_renderer.text_utils import (
@@ -487,6 +490,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         retry_after = extras.get('retry_after')
         if not retry_after:
             retry_after = extras.get('delay_seconds')
+        eta = None
         try:
             if retry_after is not None:
                 eta = float(retry_after)
@@ -496,6 +500,15 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             pass
         suffix = f' [{" · ".join(suffix_parts)}]' if suffix_parts else ''
         self._hud.update_agent_state(f'{prefix} {attempt}/{max_attempts}{suffix}')
+        # Show a visual retry notification panel (only on first attempt to avoid spam)
+        if attempt == 1:
+            host = cast(ObservationRenderersHost, self)
+            retry_panel = _build_retry_panel(
+                attempt, max_attempts, prefix=prefix, kind=kind, eta=eta
+            )
+            if hasattr(host, '_append_history'):
+                host._append_history(retry_panel)
+        # TODO: Enable after fixing test compatibility
 
     @staticmethod
     def _coerce_positive_int(value: Any, *, default: int, floor: int = 1) -> int:

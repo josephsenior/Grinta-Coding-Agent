@@ -27,6 +27,7 @@ from backend.cli.layout_tokens import (
     CALLOUT_PANEL_CHROME_WIDTH,
     LIVE_PANEL_ACCENT_STYLE,
 )
+from backend.cli.text_truncation import truncate_line
 from backend.cli.theme import CLR_ACTION, CLR_META, CLR_SPINNER, CLR_THOUGHT_BODY
 from backend.cli.transcript import format_live_panel
 from backend.engine import prompt_role_debug as _prompt_role_debug
@@ -52,18 +53,7 @@ _STREAM_CURSOR = '▌'
 
 def _truncate_action_line(label: str, max_len: int) -> str:
     """Ellipsis at end of label, preferring a word boundary when there is room."""
-    text = (label or '').strip()
-    if max_len <= 0 or len(text) <= max_len:
-        return text
-    if max_len <= 1:
-        return '…'
-    limit = max_len - 1
-    chunk = text[:limit]
-    if ' ' in chunk:
-        at = chunk.rfind(' ')
-        if at > max(6, limit // 4):
-            chunk = chunk[:at].rstrip()
-    return f'{chunk}…'
+    return truncate_line(label, max_len)
 
 
 def _thought_lines_for_display(

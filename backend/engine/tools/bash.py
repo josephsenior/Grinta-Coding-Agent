@@ -81,7 +81,7 @@ def create_cmd_run_tool(use_short_description: bool = False):
 
     description = (
         _SHORT_BASH_DESCRIPTION if use_short_description else _DETAILED_BASH_DESCRIPTION
-    ).format(shell=shell)
+    ).format(shell=shell)  # nosec B604 (formatting tool description, not executing)
 
     # Explicit identity note for Windows + Git Bash / PowerShell to prevent shell confusion
     if uses_powershell_terminal():
