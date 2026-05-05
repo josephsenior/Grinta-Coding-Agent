@@ -123,11 +123,11 @@ class TestToolActivityStatsHint(unittest.TestCase):
         self.assertIsNotNone(hint)
         self.assertIn('10', hint)  # type: ignore[arg-type]
 
-    def test_text_editor_replace_with_path(self) -> None:
+    def test_text_editor_edit_with_path(self) -> None:
         hint = tool_activity_stats_hint(
             'text_editor',
             {
-                'command': 'replace_text',
+                'command': 'edit',
                 'path': 'myfile.py',
             },
         )
