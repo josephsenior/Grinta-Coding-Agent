@@ -276,12 +276,11 @@ def _make_file_edit_action(event: Event) -> dict[str, Any]:
     """Build a file_edit pending action dict from a FileEditAction event."""
     path = getattr(event, 'path', '')
     command = getattr(event, 'command', 'edit')
-    old_str = (
-        str(getattr(event, 'old_str', ''))[:80] if hasattr(event, 'old_str') else ''
-    )
+    start = getattr(event, 'start_line', None)
+    end = getattr(event, 'end_line', None)
     detail = f'{command} on {path}'
-    if old_str:
-        detail += f' (old_str: {old_str!r}...)'
+    if start is not None and end is not None:
+        detail += f' [L{start}:L{end}]'
     return {'type': 'file_edit', 'detail': detail}
 
 

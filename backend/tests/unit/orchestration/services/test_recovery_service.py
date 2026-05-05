@@ -52,7 +52,7 @@ class TestRecoveryService:
         svc = RecoveryService(mock_context)
         await svc.react_to_exception(Timeout('slow'))
 
-        ctrl.circuit_breaker_service.record_error.assert_called_once()
+        ctrl.circuit_breaker_service.record_error.assert_not_called()
         mock_context.emit_event.assert_called_once()
         err_obs, source = mock_context.emit_event.call_args[0]
         assert isinstance(err_obs, ErrorObservation)

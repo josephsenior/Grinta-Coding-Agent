@@ -7,16 +7,18 @@ from pathlib import Path
 from backend.execution.utils.file_editor import FileEditor
 
 
-def test_file_editor_replace_text_command(tmp_path: Path) -> None:
+def test_file_editor_edit_range_command(tmp_path: Path) -> None:
     editor = FileEditor(workspace_root=str(tmp_path))
     p = tmp_path / 'sample.txt'
     p.write_text('hello old world\n', encoding='utf-8')
 
     result = editor(
-        command='replace_text',
+        command='edit',
         path='sample.txt',
-        old_str='old',
-        new_str='new',
+        edit_mode='range',
+        start_line=1,
+        end_line=1,
+        new_str='hello new world\n',
     )
 
     assert result.error is None
@@ -52,17 +54,19 @@ def test_file_editor_undo_last_edit_empty_history(tmp_path: Path) -> None:
     assert 'no undo history' in result.error.lower()
 
 
-def test_file_editor_undo_after_replace_text(tmp_path: Path) -> None:
+def test_file_editor_undo_after_edit_range(tmp_path: Path) -> None:
     editor = FileEditor(workspace_root=str(tmp_path))
     p = tmp_path / 'sample.txt'
     p.write_text('hello old world\n', encoding='utf-8')
 
     assert (
         editor(
-            command='replace_text',
+            command='edit',
             path='sample.txt',
-            old_str='old',
-            new_str='new',
+            edit_mode='range',
+            start_line=1,
+            end_line=1,
+            new_str='hello new world\n',
         ).error
         is None
     )

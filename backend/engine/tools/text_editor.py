@@ -104,10 +104,6 @@ def create_text_editor_tool(
                 'items': {'type': 'integer'},
                 'type': 'array',
             },
-            'normalize_ws': {
-                'description': 'If true, ignore whitespace differences when finding `old_str`. Defaults to True.',
-                'type': 'boolean',
-            },
             'security_risk': get_security_risk_param(),
             'preview': {
                 'description': 'If true, dry-run the edit without modifying the file.',

@@ -58,9 +58,11 @@ class TestExecuteMethod:
         middleware = PreExecDiffMiddleware()
         action = FileEditAction(
             path='test.txt',
-            old_str='old',
+            start_line=1,
+            end_line=1,
             new_str='new',
-            command='replace_text',
+            command='edit',
+            edit_mode='range',
         )
 
         controller = MagicMock()
@@ -103,9 +105,11 @@ class TestDiffForEdit:
         middleware = PreExecDiffMiddleware()
         action = FileEditAction(
             path='/nonexistent/file.txt',
-            old_str='old',
+            start_line=1,
+            end_line=1,
             new_str='new',
-            command='replace_text',
+            command='edit',
+            edit_mode='range',
         )
 
         controller = MagicMock()
@@ -128,9 +132,11 @@ class TestDiffForEdit:
         middleware = PreExecDiffMiddleware()
         action = FileEditAction(
             path='test.txt',
-            old_str='old content',
+            start_line=1,
+            end_line=1,
             new_str='new content',
-            command='replace_text',
+            command='edit',
+            edit_mode='range',
         )
 
         controller = MagicMock()
@@ -167,9 +173,11 @@ class TestDiffForEdit:
         middleware = PreExecDiffMiddleware()
         action = FileEditAction(
             path='test.txt',
-            old_str='old',
+            start_line=1,
+            end_line=1,
             new_str='new',
-            command='replace_text',
+            command='edit',
+            edit_mode='range',
         )
 
         controller = MagicMock()
@@ -303,31 +311,28 @@ class TestDiffForWrite:
 class TestSimulateEdit:
     """Test _simulate_edit method."""
 
-    def test_simulate_edit_replace_text(self):
-        """Should simulate replace_text command."""
+    def test_simulate_edit_range(self):
+        """Should simulate edit range command."""
         middleware = PreExecDiffMiddleware()
         action = MagicMock()
-        action.command = 'replace_text'
-        action.old_str = 'hello'
+        action.command = 'edit'
+        action.edit_mode = 'range'
+        action.start_line = 1
+        action.end_line = 1
         action.new_str = 'goodbye'
 
         old_content = 'hello world'
         new_content = middleware._simulate_edit(old_content, action)
 
-        assert new_content == 'goodbye world'
-
-    def test_simulate_edit_replace_text_once_only(self):
-        """replace_text should replace only first occurrence."""
-        middleware = PreExecDiffMiddleware()
-        action = MagicMock()
-        action.command = 'replace_text'
-        action.old_str = 'cat'
-        action.new_str = 'dog'
-
-        old_content = 'cat cat cat'
-        new_content = middleware._simulate_edit(old_content, action)
-
-        assert new_content == 'dog cat cat'
+        assert new_content == 'goodbye\n' or new_content == 'goodbye' # behavior depends on splitlines
+        # wait, my simulation added a newline if new_str doesn't have one? No.
+        # let's re-verify simulation logic.
+        # it did: return ''.join(lines[:start_idx] + new_lines + lines[end_idx:])
+        # if old_content is 'hello world', lines is ['hello world']
+        # start_idx = 0, end_idx = 1
+        # new_lines is ['goodbye']
+        # result is 'goodbye'
+        assert new_content == 'goodbye'
 
     def test_simulate_edit_create_file(self):
         """Should simulate create_file command."""

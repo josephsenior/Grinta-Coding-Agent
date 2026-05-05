@@ -176,7 +176,7 @@ class TestTrackFileModifications:
         from backend.ledger.action import FileEditAction
 
         tracker = ProgressTracker(max_iterations=100)
-        action = FileEditAction(path='/tmp/x.py', content='pass')
+        action = FileEditAction(path='/tmp/x.py', new_str='pass')
         state = MagicMock()
         state.history = [action]
         tracker._track_file_modifications(state)

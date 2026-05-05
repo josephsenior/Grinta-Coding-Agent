@@ -31,7 +31,7 @@ class TestNormalizePath(unittest.TestCase):
 
 class TestRecoveryMessage(unittest.TestCase):
     def test_build_message_with_created_files_is_generic(self):
-        msg, planning, _vr = StepGuardService(
+        msg, planning = StepGuardService(
             MagicMock()
         )._build_stuck_recovery_message({'src/app/page.tsx', 'src/app/layout.tsx'}, [])
         self.assertIn('Files already touched in this session', msg)
@@ -39,7 +39,7 @@ class TestRecoveryMessage(unittest.TestCase):
         self.assertIn('verify current state', planning)
 
     def test_build_message_without_created_files_is_generic(self):
-        msg, planning, _vr = StepGuardService(
+        msg, planning = StepGuardService(
             MagicMock()
         )._build_stuck_recovery_message(set(), [])
         self.assertIn('Stop repeating', msg)
@@ -55,8 +55,8 @@ class TestInjectReplanDirective(unittest.TestCase):
         self.service = StepGuardService(self.context)
         self.controller.state = MagicMock()
         self.controller.state.history = [
-            FileWriteAction(path='/workspace/src/app/page.tsx'),
-            FileEditAction(path='src/app/layout.tsx'),
+            FileWriteAction(path='/workspace/src/app/page.tsx', content='test'),
+            FileEditAction(path='src/app/layout.tsx', new_str='test'),
         ]
         self.controller.state.set_planning_directive = MagicMock()
 

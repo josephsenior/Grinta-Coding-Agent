@@ -3,19 +3,7 @@ import hashlib
 from backend.execution.utils.file_editor import FileEditor, ToolResult, normalize_quotes
 
 
-def test_ws_tolerant_replace_failure_message_improved():
-    fe = FileEditor()
-    # Content with two simple functions
-    content = 'def a():\n    return 1\n\ndef b():\n    return 2\n'
 
-    # old_str not present; multi-line pattern
-    old_str = 'def c():\n    return 3\n'
-
-    res = fe._apply_str_replace(content, old_str, 'REPLACED')
-    assert isinstance(res, ToolResult)
-    assert res.error is not None and res.error.strip() != ''
-    # Ensure we don't return the vague legacy internal-failure message
-    assert 'Whitespace-based matching failed internally.' not in (res.error or '')
 
 
 def test_edit_mode_range_with_hash_guard(tmp_path):
@@ -90,8 +78,10 @@ def test_expected_file_hash_guard_rejects_stale_content(tmp_path):
     result = editor(
         command='edit',
         path='x.py',
-        old_str='alpha',
-        new_str='beta',
+        edit_mode='range',
+        start_line=1,
+        end_line=1,
+        new_str='beta\n',
         expected_file_hash=wrong_hash,
     )
     assert result.error is not None
@@ -108,41 +98,17 @@ def test_expected_file_hash_guard_accepts_matching_content(tmp_path):
     result = editor(
         command='edit',
         path='x.py',
-        old_str='alpha',
-        new_str='beta',
+        edit_mode='range',
+        start_line=1,
+        end_line=1,
+        new_str='beta\n',
         expected_file_hash=digest,
     )
     assert result.error is None
     assert target.read_text(encoding='utf-8') == 'beta\n'
 
 
-def test_normalize_quotes_matches_claude_index_slice(tmp_path):
-    """Curly quotes in file + straight in needle resolve via normalizeQuotes + slice."""
-    target = tmp_path / 't.txt'
-    target.write_bytes('x = \u201cok\u201d\n'.encode('utf-8'))
-    editor = FileEditor(workspace_root=str(tmp_path))
-    actual = editor._find_actual_substring_for_replace(
-        target.read_text(encoding='utf-8'), 'x = "ok"'
-    )
-    assert actual == 'x = \u201cok\u201d'
-    assert normalize_quotes(actual) == normalize_quotes('x = "ok"')
 
-
-def test_straight_quotes_match_curly_quotes_in_file(tmp_path):
-    target = tmp_path / 'q.txt'
-    # Typographic double quotes in source (non-code file avoids Python syntax validation)
-    target.write_bytes('msg = \u201chello\u201d\n'.encode('utf-8'))
-    editor = FileEditor(workspace_root=str(tmp_path))
-    result = editor(
-        command='edit',
-        path='q.txt',
-        old_str='msg = "hello"',
-        new_str='msg = "bye"',
-    )
-    assert result.error is None
-    out = target.read_text(encoding='utf-8')
-    assert '\u201c' in out or '\u201d' in out
-    assert 'bye' in out
 
 
 def test_crlf_preserved_on_write(tmp_path):
@@ -152,8 +118,10 @@ def test_crlf_preserved_on_write(tmp_path):
     result = editor(
         command='edit',
         path='lines.txt',
-        old_str='one',
-        new_str='ONE',
+        edit_mode='range',
+        start_line=1,
+        end_line=1,
+        new_str='ONE\r\n',
     )
     assert result.error is None
     raw = target.read_bytes()

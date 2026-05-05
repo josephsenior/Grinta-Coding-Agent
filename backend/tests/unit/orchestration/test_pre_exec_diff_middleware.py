@@ -67,21 +67,15 @@ class TestSimulateEdit:
     def setup_method(self):
         self.mw = PreExecDiffMiddleware()
 
-    def test_replace_text(self):
+    def test_simulate_edit_range(self):
         action = MagicMock()
-        action.command = 'replace_text'
-        action.old_str = 'old'
+        action.command = 'edit'
+        action.edit_mode = 'range'
+        action.start_line = 1
+        action.end_line = 1
         action.new_str = 'new'
         result = self.mw._simulate_edit('line with old text', action)
-        assert result == 'line with new text'
-
-    def test_replace_text_first_occurrence_only(self):
-        action = MagicMock()
-        action.command = 'replace_text'
-        action.old_str = 'a'
-        action.new_str = 'b'
-        result = self.mw._simulate_edit('a a a', action)
-        assert result == 'b a a'
+        assert result == 'new'
 
     def test_create_file_command(self):
         action = MagicMock()
@@ -121,8 +115,10 @@ class TestExecuteEdit:
         action = MagicMock()
         action.__class__.__name__ = 'FileEditAction'
         action.path = str(test_file)
-        action.command = 'replace_text'
-        action.old_str = 'line2'
+        action.command = 'edit'
+        action.edit_mode = 'range'
+        action.start_line = 2
+        action.end_line = 2
         action.new_str = 'modified_line2'
 
         ctx = _make_ctx(action=action)
@@ -169,8 +165,10 @@ class TestMetadataPropagation:
 
         action = MagicMock()
         action.path = str(test_file)
-        action.command = 'replace_text'
-        action.old_str = 'old'
+        action.command = 'edit'
+        action.edit_mode = 'range'
+        action.start_line = 1
+        action.end_line = 1
         action.new_str = 'new'
 
         _make_ctx(action=action)
@@ -180,5 +178,5 @@ class TestMetadataPropagation:
         old_content = PreExecDiffMiddleware._read_file(str(test_file))
         assert old_content is not None
         new_content = mw._simulate_edit(old_content, action)
-        assert new_content == 'new content'
+        assert new_content == 'new'
         assert old_content != new_content

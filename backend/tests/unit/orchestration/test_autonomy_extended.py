@@ -100,7 +100,7 @@ class TestShouldRequestConfirmation:
 
     def test_balanced_file_edit_not_high_risk(self):
         ctrl = self._make('balanced')
-        action = FileEditAction(path='/tmp/test.py', content='pass')
+        action = FileEditAction(path='/tmp/test.py', new_str='pass')
         assert ctrl.should_request_confirmation(action) is False
 
     def test_balanced_file_write_not_high_risk(self):

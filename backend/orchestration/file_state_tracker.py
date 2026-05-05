@@ -350,7 +350,7 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                     '[FILE_STATE_GUARD] File has not been read yet in this '
                     f'session: {target_path}. Read it first (use read_file or '
                     'grep to locate the exact text) before editing, otherwise '
-                    'your old_str / anchor context will likely not match.',
+                    'your range / anchor context will likely not match.',
                     agent_only=True,
                 )
 

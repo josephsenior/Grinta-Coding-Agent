@@ -17,46 +17,16 @@ from backend.execution.utils.file_editor_edit_ops import (
     apply_section_edit as _apply_section_edit_impl,
 )
 from backend.execution.utils.file_editor_edit_ops import (
-    apply_str_replace as _apply_str_replace_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
     apply_unified_patch as _apply_unified_patch_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    build_no_match_error as _build_no_match_error_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    closest_match_candidates as _closest_match_candidates_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    find_actual_substring_for_replace as _find_actual_substring_for_replace_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    find_actual_substring_regex as _find_actual_substring_regex_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    flex_quote_pattern as _flex_quote_pattern_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    fuzzy_safe_replace as _fuzzy_safe_replace_impl,
 )
 from backend.execution.utils.file_editor_edit_ops import (
     line_ending_for_content as _line_ending_for_content_impl,
 )
 from backend.execution.utils.file_editor_edit_ops import (
-    map_normalized_offset_to_original as _map_normalized_offset_to_original_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
     mutate_structured_data as _mutate_structured_data_impl,
 )
 from backend.execution.utils.file_editor_edit_ops import (
-    normalize_whitespace_for_match as _normalize_whitespace_for_match_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
     parse_structured_content as _parse_structured_content_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    preserve_quote_style_in_new_string as _preserve_quote_style_in_new_string_impl,
 )
 from backend.execution.utils.file_editor_edit_ops import (
     replace_range_guarded as _replace_range_guarded_impl,
@@ -76,46 +46,23 @@ from backend.execution.utils.file_editor_edit_ops import (
 from backend.execution.utils.file_editor_edit_ops import (
     structured_path_tokens as _structured_path_tokens_impl,
 )
-from backend.execution.utils.file_editor_edit_ops import (
-    ws_tolerant_replace as _ws_tolerant_replace_impl,
-)
 
 
 class FileEditorEditOpsMixin:
     def _extract_edit_params(
         self,
         file_text: str | Sentinel | None,
-        old_str: str | Sentinel | None,
         new_str: str | Sentinel | None,
-    ) -> tuple[str | None, str | None, str | None]:
+    ) -> tuple[str | None, str | None]:
         file_text_val = (
             str(file_text)
             if not is_missing(file_text) and file_text is not None
             else None
         )
-        old_str_val = (
-            str(old_str) if not is_missing(old_str) and old_str is not None else None
-        )
         new_str_val = (
             str(new_str) if not is_missing(new_str) and new_str is not None else None
         )
-        return file_text_val, old_str_val, new_str_val
-
-    @staticmethod
-    def _normalize_whitespace_for_match(text: str) -> str:
-        return _normalize_whitespace_for_match_impl(text)
-
-    def _ws_tolerant_replace(
-        self,
-        file_content: str,
-        old_str: str,
-        new_str: str,
-    ) -> Any:
-        return _ws_tolerant_replace_impl(self, file_content, old_str, new_str)
-
-    @staticmethod
-    def _map_normalized_offset_to_original(original: str, norm_offset: int) -> int:
-        return _map_normalized_offset_to_original_impl(original, norm_offset)
+        return file_text_val, new_str_val
 
     @staticmethod
     def _line_ending_for_content(content: str) -> str:
@@ -216,51 +163,6 @@ class FileEditorEditOpsMixin:
             pass
         return msg
 
-    def _closest_match_candidates(
-        self,
-        file_content: str,
-        old_str: str,
-        *,
-        limit: int = 3,
-    ) -> list[tuple[float, int, str]]:
-        return _closest_match_candidates_impl(self, file_content, old_str, limit=limit)
-
-    def _build_no_match_error(self, file_content: str, old_str: str, mode: str) -> str:
-        return _build_no_match_error_impl(self, file_content, old_str, mode)
-
-    def _fuzzy_safe_replace(
-        self,
-        file_content: str,
-        old_str: str,
-        new_str: str,
-    ) -> Any:
-        return _fuzzy_safe_replace_impl(self, file_content, old_str, new_str)
-
-    @staticmethod
-    def _flex_quote_pattern(needle: str) -> str:
-        return _flex_quote_pattern_impl(needle)
-
-    def _find_actual_substring_regex(self, haystack: str, needle: str) -> str | None:
-        return _find_actual_substring_regex_impl(self, haystack, needle)
-
-    def _find_actual_substring_for_replace(
-        self, haystack: str, needle: str
-    ) -> str | None:
-        return _find_actual_substring_for_replace_impl(self, haystack, needle)
-
-    @staticmethod
-    def _preserve_quote_style_in_new_string(actual_old: str, new_str: str) -> str:
-        return _preserve_quote_style_in_new_string_impl(actual_old, new_str)
-
-    def _apply_str_replace(
-        self,
-        old_content: str,
-        old_str: str,
-        new_str: str,
-        file_path: Path | None = None,
-    ) -> Any:
-        return _apply_str_replace_impl(self, old_content, old_str, new_str, file_path)
-
     def _resolve_edit_content(
         self,
         file_text_val: str | None,
@@ -272,7 +174,6 @@ class FileEditorEditOpsMixin:
         self,
         old_content_str: str,
         file_text_val: str | None,
-        old_str_val: str | None,
         new_str_val: str | None,
         insert_line: int | None,
         start_line: int | None,
@@ -296,7 +197,6 @@ class FileEditorEditOpsMixin:
             self,
             old_content_str,
             file_text_val,
-            old_str_val,
             new_str_val,
             insert_line,
             start_line,

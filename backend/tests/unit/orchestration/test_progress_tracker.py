@@ -116,9 +116,9 @@ class TestProgressTracker:
         state = MagicMock()
         state.iteration_flag.current_value = 3
         state.history = [
-            FileEditAction(path='test.py', content="print('hello')"),
-            FileEditAction(path='main.py', content='import os'),
-            FileEditAction(path='test.py', content="print('world')"),  # Duplicate
+            FileEditAction(path='test.py', new_str="print('hello')"),
+            FileEditAction(path='main.py', new_str='import os'),
+            FileEditAction(path='test.py', new_str="print('world')"),  # Duplicate
         ]
 
         tracker.update(state)
@@ -228,8 +228,8 @@ class TestProgressTracker:
         state = MagicMock()
         state.iteration_flag.current_value = 50
         state.history = [
-            FileEditAction(path='test1.py', content='code'),
-            FileEditAction(path='test2.py', content='code'),
+            FileEditAction(path='test1.py', new_str='code'),
+            FileEditAction(path='test2.py', new_str='code'),
             CmdRunAction(command='pytest'),
             CmdOutputObservation(content='passed', command='pytest', exit_code=0),
         ]
@@ -240,7 +240,7 @@ class TestProgressTracker:
         # Add more progress markers
         state.history.extend(
             [
-                FileEditAction(path='test3.py', content='code'),
+                FileEditAction(path='test3.py', new_str='code'),
                 CmdOutputObservation(content='passed', command='pytest', exit_code=0),
             ]
         )
@@ -322,7 +322,7 @@ class TestProgressTracker:
         state = MagicMock()
         state.iteration_flag.current_value = 50
         state.history = [
-            FileEditAction(path='test.py', content='code'),
+            FileEditAction(path='test.py', new_str='code'),
         ]
 
         metrics = tracker.update(state)

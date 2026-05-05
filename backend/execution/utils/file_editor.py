@@ -221,7 +221,6 @@ class FileEditor(FileEditorEditOpsMixin):
         path: str,
         file_text: str | Sentinel | None = MISSING,
         view_range: list[int] | None = None,
-        old_str: str | Sentinel | None = MISSING,
         new_str: str | Sentinel | None = MISSING,
         insert_line: int | None = None,
         start_line: int | None = None,
@@ -250,7 +249,6 @@ class FileEditor(FileEditorEditOpsMixin):
             path: File path (relative to workspace_root or absolute)
             file_text: Optional file content for write/edit operations (use MISSING if not provided)
             view_range: Optional [start_line, end_line] for view command (1-indexed)
-            old_str: Optional string to replace (for edit operations, use MISSING if not provided)
             new_str: Optional replacement string (for edit operations, use MISSING if not provided)
             insert_line: Optional line number to insert at (1-indexed)
             start_line: Optional start line number for range edit (1-indexed)
@@ -294,7 +292,6 @@ class FileEditor(FileEditorEditOpsMixin):
                 return self._handle_edit(
                     file_path,
                     file_text,
-                    old_str,
                     new_str,
                     insert_line,
                     start_line,
@@ -488,7 +485,6 @@ class FileEditor(FileEditorEditOpsMixin):
         self,
         file_path: Path,
         file_text: str | Sentinel | None,
-        old_str: str | Sentinel | None,
         new_str: str | Sentinel | None,
         insert_line: int | None,
         start_line: int | None,
@@ -529,15 +525,14 @@ class FileEditor(FileEditorEditOpsMixin):
                     )
 
             # Extract params
-            file_text_val, old_str_val, new_str_val = self._extract_edit_params(
-                file_text, old_str, new_str
+            file_text_val, new_str_val = self._extract_edit_params(
+                file_text, new_str
             )
 
             # Apply edit logic
             new_content = self._apply_edit_logic(
                 old_content_str,
                 file_text_val,
-                old_str_val,
                 new_str_val,
                 insert_line,
                 start_line,
