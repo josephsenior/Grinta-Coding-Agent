@@ -195,7 +195,23 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         self._create_phase_boundary_checkpoint('init_to_active')
 
     def _initialize_operation_pipeline(self) -> None:
-        """Build the default tool pipeline directly on the controller."""
+        """Build the default tool pipeline directly on the controller.
+
+        Middleware are ordered by responsibility. Pipeline runs execute() then observe():
+        1. SafetyValidatorMiddleware - blocks dangerous actions (file deletions outside workspace, etc.)
+        2. BlackboardMiddleware - shares state between concurrent tool invocations
+        3. CircuitBreakerMiddleware - prevents repeated tool failures from blocking progress
+        4. ProgressPolicyMiddleware - enforces progress checks (e.g., max iterations)
+        5. CostQuotaMiddleware - tracks and limits LLM spend
+        6. ContextWindowMiddleware - prevents context window overflow
+        7. RollbackMiddleware - creates checkpoints before risky operations for recovery
+        8. DestructiveCommandMiddleware - high-priority checkpoints before shell destructive ops
+        9. PreExecDiffMiddleware - computes diff before action executes for user preview
+        10. AutoCheckMiddleware - runs auto-checks after tool execution
+        11. FileStateMiddleware - tracks file modifications for state management
+        12. LoggingMiddleware, TelemetryMiddleware - observability (always last in execute)
+        13. ToolResultValidator - validates results after all observe() hooks complete
+        """
         from backend.orchestration.file_state_tracker import FileStateMiddleware
         from backend.orchestration.middleware.destructive_command import (
             DestructiveCommandMiddleware,

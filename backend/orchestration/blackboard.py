@@ -43,6 +43,24 @@ class Blackboard:
         self._data: dict[str, str] = {}
         self._load()
         self._lock = asyncio.Lock()
+        self._dirty = False
+        self._flush_task: asyncio.Task[None] | None = None
+
+    async def _flush_loop(self) -> None:
+        """Debounced flush: wait for a quiet period then write once."""
+        try:
+            while self._dirty:
+                self._dirty = False
+                await asyncio.sleep(0.1)
+            self._save()
+        finally:
+            self._flush_task = None
+
+    def _schedule_flush(self) -> None:
+        """Mark data dirty and schedule a debounced flush."""
+        self._dirty = True
+        if self._flush_task is None or self._flush_task.done():
+            self._flush_task = asyncio.create_task(self._flush_loop())
 
     async def get(self, key: str | None = None) -> dict[str, str] | str:
         """Get one key's value, or all keys when key is None or 'all'."""
@@ -57,12 +75,24 @@ class Blackboard:
             return
         async with self._lock:
             self._data[key] = value
-            self._save()
+            self._schedule_flush()
 
     async def keys(self) -> list[str]:
         """Return all keys."""
         async with self._lock:
             return list(self._data.keys())
+
+    async def flush(self) -> None:
+        """Force an immediate flush of pending writes."""
+        async with self._lock:
+            if self._flush_task and not self._flush_task.done():
+                self._flush_task.cancel()
+                try:
+                    await self._flush_task
+                except asyncio.CancelledError:
+                    pass
+            self._save()
+            self._dirty = False
 
     def snapshot(self) -> dict[str, str]:
         """Synchronous snapshot for observation text (no lock; best-effort)."""

@@ -25,45 +25,13 @@ def _preload_pydantic_root_model() -> None:
 _sanitize_sys_path()
 
 
-import asyncio  # noqa: E402
-import inspect  # noqa: E402
+import importlib  # noqa: E402
+import os  # noqa: E402
+import sys  # noqa: E402
 import pathlib  # noqa: E402
 from collections.abc import Iterator  # noqa: E402
 
 import pytest  # noqa: E402
-
-
-@pytest.fixture
-def event_loop():
-    """Provide a fresh event loop for async tests without requiring pytest-asyncio."""
-    loop = asyncio.new_event_loop()
-    try:
-        yield loop
-    finally:
-        if not loop.is_closed():
-            loop.close()
-
-
-def pytest_pyfunc_call(pyfuncitem):
-    """Execute coroutine tests by driving them with an event loop."""
-    if inspect.iscoroutinefunction(pyfuncitem.obj):
-        loop = pyfuncitem.funcargs.get('event_loop')  # type: ignore[attr-defined]
-        owns_loop = False
-        if loop is None:
-            loop = asyncio.new_event_loop()
-            owns_loop = True
-
-        try:
-            asyncio.set_event_loop(loop)
-            fixture_names = getattr(pyfuncitem, '_fixtureinfo').argnames
-            test_kwargs = {name: pyfuncitem.funcargs[name] for name in fixture_names}
-            loop.run_until_complete(pyfuncitem.obj(**test_kwargs))
-        finally:
-            asyncio.set_event_loop(None)
-            if owns_loop and not loop.is_closed():
-                loop.close()
-        return True
-    return None
 
 
 def _has_pkg(name: str) -> bool:
@@ -229,8 +197,6 @@ def use_repo_root_cwd(tmp_path, monkeypatch):
 # Removed runtime test helpers that relied on stale non-local runtime logic.
 
 __all__ = [
-    'event_loop',
-    'pytest_pyfunc_call',
     'require_pkg',
     'use_repo_root_cwd',
 ]

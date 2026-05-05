@@ -61,7 +61,16 @@ class ToolInvocationMiddleware:
 
 
 class ToolInvocationPipeline:
-    """Runs middleware stages (execute → observe) for tool calls."""
+    """Runs middleware stages (execute → observe) for tool calls.
+
+    Each middleware can implement:
+    - execute(ctx): Runs before the tool action executes. Can block the action.
+    - observe(ctx, observation): Runs after the tool executes with its result.
+
+    The pipeline iterates through middlewares in order. If any execute() call blocks
+    the action, subsequent middlewares are skipped. The observe() stage always runs
+    if there's an observation, even if execute was blocked (for logging/audit).
+    """
 
     def __init__(
         self,

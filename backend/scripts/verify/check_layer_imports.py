@@ -30,6 +30,9 @@ from pathlib import Path
 
 # ── Rule definitions ──────────────────────────────────────────────────────────
 # Each rule is  (source_dir, forbidden_prefix, justification)
+# Layer ordering (higher layers may import from lower layers, never the reverse):
+#     orchestration → engine → inference → core / context / ledger / utils / telemetry
+#     execution → core / utils (but NOT orchestration or engine)
 RULES: list[tuple[str, str, str]] = [
     (
         'backend/events',
@@ -38,6 +41,47 @@ RULES: list[tuple[str, str, str]] = [
     ),
     ('backend/core', 'backend.engine', 'core must not depend on engines layer'),
     ('backend/core', 'backend.context', 'core must not depend on memory layer'),
+    (
+        'backend/engine',
+        'backend.orchestration',
+        'engine must not depend on orchestration layer',
+    ),
+    (
+        'backend/execution',
+        'backend.orchestration',
+        'execution must not depend on orchestration layer',
+    ),
+    (
+        'backend/execution',
+        'backend.engine',
+        'execution must not depend on engine layer',
+    ),
+    ('backend/core', 'backend.execution', 'core must not depend on execution layer'),
+    (
+        'backend/context',
+        'backend.orchestration',
+        'context must not depend on orchestration layer',
+    ),
+    (
+        'backend/ledger',
+        'backend.orchestration',
+        'ledger must not depend on orchestration layer',
+    ),
+    (
+        'backend/ledger',
+        'backend.engine',
+        'ledger must not depend on engine layer',
+    ),
+    (
+        'backend/inference',
+        'backend.orchestration',
+        'inference must not depend on orchestration layer',
+    ),
+    (
+        'backend/inference',
+        'backend.engine',
+        'inference must not depend on engine layer',
+    ),
 ]
 
 # Known exemptions (module path → reason).  Keep this list SMALL.
@@ -47,6 +91,8 @@ EXEMPTIONS: dict[str, str] = {
     'backend.core.bootstrap.main': 'Bootstrap: application entry point',
     'backend.core.bootstrap.setup': 'Bootstrap: creates agent, controller, memory, runtime',
     'backend.core.config.config_loader': 'Bootstrap: registers custom agent classes',
+    # TODO: Remove once engine orchestrator no longer imports from execution.plugins.
+    'backend.engine.orchestrator': 'Temporary: engine imports execution.plugins for AgentSkills',
 }
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]  # backend/
