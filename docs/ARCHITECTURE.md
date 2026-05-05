@@ -64,35 +64,82 @@ backend/
 The orchestrator delegates to focused services under `backend/orchestration/services/`.
 Current service modules include:
 
-- `action_execution_service.py`
-- `action_service.py`
-- `autonomy_service.py`
-- `circuit_breaker_service.py`
-- `confirmation_service.py`
-- `event_router_service.py`
-- `exception_handler_service.py`
-- `guard_bus.py`
-- `iteration_guard_service.py`
-- `iteration_service.py`
-- `lifecycle_service.py`
-- `observation_service.py`
-- `orchestration_context.py`
-- `pending_action_service.py`
-- `recovery_service.py`
-- `retry_service.py`
-- `safety_service.py`
-- `state_transition_service.py`
-- `step_decision_service.py`
-- `step_guard_service.py`
-- `step_prerequisite_service.py`
-- `stuck_detection_service.py`
-- `task_validation_service.py`
+- `action_execution_service.py` - Executes agent actions via the runtime
+- `action_service.py` - Action lifecycle management
+- `autonomy_service.py` - Controls agent autonomy and delegation
+- `circuit_breaker_service.py` - Prevents cascading failures
+- `confirmation_service.py` - Handles user confirmation flows
+- `event_router_service.py` - Routes events to appropriate handlers
+- `exception_handler_service.py` - Centralized exception handling
+- `guard_bus.py` - Pub/sub guard rail for system events
+- `iteration_guard_service.py` - Prevents infinite loops
+- `iteration_service.py` - Manages iteration counting and limits
+- `lifecycle_service.py` - Manages agent lifecycle transitions
+- `observation_service.py` - Processes observations from actions
+- `pending_action_service.py` - Tracks in-flight actions
+- `recovery_service.py` - Error recovery and retry logic
+- `retry_service.py` - Handles retry policies
+- `safety_service.py` - Validates actions against safety policies
+- `state_transition_service.py` - Manages valid state transitions
+- `step_decision_service.py` - Decides whether to continue or finish
+- `step_guard_service.py` - Pre-step validation checks
+- `step_prerequisite_service.py` - Ensures prerequisites are met
+- `stuck_detection_service.py` - Detects stuck agents
+- `task_validation_service.py` - Validates task completion
 
 Design intent:
 
 - split control-plane concerns into testable units
 - classify errors into recoverable vs terminal paths
 - prevent false completion with explicit task validation
+
+### Middleware Pipeline
+
+The orchestrator uses a middleware pipeline (defined in `session_orchestrator.py` lines 218-235) for cross-cutting concerns:
+
+```python
+middlewares = [
+    SafetyValidatorMiddleware(self),      # Validate action safety
+    BlackboardMiddleware(self),         # Track action context
+    CircuitBreakerMiddleware(self),     # Prevent cascading failures  
+    ProgressPolicyMiddleware(),            # Progress indicators
+    CostQuotaMiddleware(self),          # Budget tracking
+    ContextWindowMiddleware(self),       # Context window management
+    RollbackMiddleware(),               # State rollback support
+    DestructiveCommandMiddleware(),      # Block dangerous commands
+    PreExecDiffMiddleware(),             # Generate diffs before edits
+    AutoCheckMiddleware(),               # Post-execution validation
+    LoggingMiddleware(self),            # Request/response logging
+    TelemetryMiddleware(self),          # Metrics collection
+    ToolResultValidator(),             # Validate tool outputs
+]
+```
+
+Middleware execution order matters - safety checks run first, telemetry runs last.
+
+### Key Flows
+
+#### Step Execution Flow
+1. `orchestrator.step()` called
+2. Acquires `self._step_lock` (asyncio.Lock)
+3. Calls `services.pending_action.set(action)`
+4. Middleware pipeline processes action
+5. Action executed via `services.action_execution`
+6. Observation processed by `services.observation`
+7. State updated via `state_tracker`
+8. Releases lock, updates metrics
+
+#### Error Recovery Flow
+1. Exception occurs during step
+2. `services.recovery.react_to_exception(e)` called
+3. Error classified as recoverable or terminal
+4. Recoverable: retry with backoff via `services.retry`
+5. Terminal: emit error observation, transition to CLOSING
+
+#### Lifecycle Transitions
+- INITIALIZING → ACTIVE: After service initialization
+- ACTIVE → CLOSING: On agent finish or error
+- CLOSING → CLOSED: After cleanup and checkpoint
 
 ## Execution Layer
 
