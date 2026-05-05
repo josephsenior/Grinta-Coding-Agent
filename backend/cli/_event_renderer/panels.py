@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -47,7 +48,16 @@ class ErrorGuidance:
 
     summary: str
     steps: tuple[str, ...]
+    error_code: str = ''
     omit_summary_in_recovery: bool = False
+
+
+@dataclass(frozen=True)
+class _GuidanceRule:
+    """A single rule in the guidance dispatch table."""
+
+    matches: Callable[[str], bool]
+    guidance: ErrorGuidance
 
 
 @dataclass

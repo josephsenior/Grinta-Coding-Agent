@@ -69,13 +69,13 @@ def splash_anim_disabled() -> bool:
 HUD_BG = 'grey15'  # HUD footer background
 
 # ── Separators & borders ───────────────────────────────────────────────────────
-CLR_SEP = '#4a6b82'  # · bullet separator and lightweight dividers
+CLR_SEP = '#7da4c4'  # · bullet separator and lightweight dividers (WCAG AA compliant)
 CLR_CARD_BORDER = '#5a7f95'  # rounded card / panel border (blue-gray)
 
 # ── HUD display text ──────────────────────────────────────────────────────────
 CLR_HUD_MODEL = 'bold #dbe7f3'  # model name (bright)
 CLR_HUD_DETAIL = '#b4c4d5'  # tokens, cost, calls (secondary)
-CLR_META = '#6d8596'  # subdued metadata, timers, helper text
+CLR_META = '#8da5b6'  # subdued metadata, timers, helper text (WCAG AA compliant)
 CLR_MUTED_TEXT = '#94a3b8'  # long-form secondary labels / values
 CLR_BRAND = 'bold #7dd3fc'  # GRINTA wordmark / active spinner hue
 CLR_BRAND_HUE = '#7dd3fc'  # brand cyan without bold modifier
@@ -120,7 +120,7 @@ CLR_CARD_TITLE = 'bold #a0b9cc'  # panel title text (gray-blue)
 # ── Activity row text ─────────────────────────────────────────────────────────
 CLR_VERB = 'bold #94a3b8'  # action verb (muted but distinct)
 CLR_DETAIL = 'default'  # action detail (normal foreground)
-CLR_SECONDARY = '#6d8596'  # secondary row (neutral)
+CLR_SECONDARY = '#8da5b6'  # secondary row (neutral, WCAG AA compliant)
 CLR_SECONDARY_OK = 'dim green'  # secondary row (success)
 CLR_SECONDARY_ERR = 'dim red'  # secondary row (error)
 

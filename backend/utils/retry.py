@@ -114,7 +114,7 @@ def calculate_backoff(attempt: int, config: RetryConfig) -> float:
     # Apply jitter if enabled
     if config.jitter:
         jitter_min, jitter_max = config.jitter_range
-        jitter = random.uniform(jitter_min, jitter_max)
+        jitter = random.uniform(jitter_min, jitter_max)  # nosec B311 (retry jitter, not cryptographic)
         delay = delay * (1 + jitter)
 
     return delay

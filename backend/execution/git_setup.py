@@ -96,7 +96,7 @@ class GitSetupMixin:
             )
         dir_name = selected_repository.split('/')[-1].lower()
         random_str = ''.join(
-            random.choices(string.ascii_lowercase + string.digits, k=8)
+            random.choices(string.ascii_lowercase + string.digits, k=8)  # nosec B311 (branch name suffix, not cryptographic)
         )
         workspace_branch = f'app-workspace-{random_str}'
         clone_command = f'git clone {remote_repo_url} {dir_name}'

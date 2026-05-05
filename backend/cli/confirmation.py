@@ -11,6 +11,7 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
 
+from backend.cli.text_truncation import shorten_middle, shorten_path
 from backend.cli.theme import (
     CLR_BRAND,
     CLR_CARD_BORDER,
@@ -33,15 +34,6 @@ from backend.ledger.action import (
     FileEditAction,
     FileWriteAction,
 )
-
-
-def _shorten_middle(text: str, max_len: int = 88) -> str:
-    """Keep long commands readable by preserving the start and the tail."""
-    if not text or len(text) <= max_len:
-        return text
-    head_len = max(20, max_len // 2 - 2)
-    tail_len = max(20, max_len - head_len - 1)
-    return f'{text[:head_len]}…{text[-tail_len:]}'
 
 
 @dataclass(frozen=True)
@@ -77,28 +69,20 @@ def _risk_label(action: Action) -> tuple[str, str]:
 
 def _action_label(action: Action) -> str:
     if isinstance(action, CmdRunAction):
-        return f'shell: {_shorten_middle(action.command)}'
+        return f'shell: {shorten_middle(action.command)}'
     if isinstance(action, FileEditAction):
-        return f'edit: {_shorten_path(action.path or "—")}'
+        return f'edit: {shorten_path(action.path or "—")}'
     if isinstance(action, FileWriteAction):
-        return f'write: {_shorten_path(action.path or "—")}'
+        return f'write: {shorten_path(action.path or "—")}'
     return type(action).__name__
 
 
 def _file_label(action: Action) -> str:
     if isinstance(action, (FileEditAction, FileWriteAction)):
-        return _shorten_path(action.path or '—')
+        return shorten_path(action.path or '—')
     if isinstance(action, CmdRunAction):
         return '—'
     return '—'
-
-
-def _shorten_path(path: str, max_len: int = 48) -> str:
-    """Keep path readable in the table; favour the leaf folder + filename."""
-    if not path or len(path) <= max_len:
-        return path
-    tail = path[-(max_len - 1) :]
-    return '…' + tail
 
 
 def _confirmation_frame_style(risk_text: str) -> str:
