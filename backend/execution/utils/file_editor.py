@@ -134,14 +134,16 @@ class ToolError(Exception):
         self.message = message
 
 
+_GLOBAL_UNDO_HISTORY: dict[str, deque[str | None]] = defaultdict(
+    lambda: deque(maxlen=32)
+)
+
 class FileEditor(FileEditorEditOpsMixin):
     """Production-grade low-level file editor.
 
     Provides basic file operations (view, edit, write) with proper
     error handling and validation. Used by runtime for file I/O operations.
     """
-
-    _UNDO_MAX_PER_FILE = 32
 
     def __init__(self, workspace_root: str | None = None) -> None:
         """Initialize the file editor.
@@ -155,9 +157,7 @@ class FileEditor(FileEditorEditOpsMixin):
         self._transaction_stack: list[dict[str, str | None]] = []
         # Per-file undo: before each mutating write we append the previous snapshot
         # (None means the file did not exist). Bounded FIFO via deque maxlen.
-        self._undo_history: dict[str, deque[str | None]] = defaultdict(
-            lambda: deque(maxlen=self._UNDO_MAX_PER_FILE)
-        )
+        self._undo_history = _GLOBAL_UNDO_HISTORY
         # Last read encoding/newline per path (for CRLF/BOM round-trip on write)
         self._file_io_meta: dict[str, _FileReadMeta] = {}
         # Path validator for security
