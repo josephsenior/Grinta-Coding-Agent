@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, cast
 
 from rich.console import Console
+from rich.table import Table
 
 from backend.cli._repl.run_helpers_mixin import RunHelpersMixin
 from backend.cli._repl.session_lifecycle_mixin import SessionLifecycleMixin
@@ -536,6 +537,105 @@ def _build_help_markdown(command_name: str | None = None) -> str:
     return '\n'.join(lines)
 
 
+def _build_help_table(search_term: str | None = None) -> Table:
+    """Build a Rich table of slash commands, optionally filtered by search term."""
+    try:
+        from rapidfuzz import fuzz
+    except ImportError:
+        return _build_help_table_fallback(search_term)
+
+    from collections import defaultdict
+
+    from backend.cli.theme import CLR_CARD_BORDER, CLR_CARD_TITLE, STYLE_DIM
+
+    table = Table(
+        title='Slash Commands',
+        title_style=CLR_CARD_TITLE,
+        border_style=CLR_CARD_BORDER,
+        box=None,
+        padding=(0, 1),
+    )
+    table.add_column('Command', style='bold cyan', no_wrap=True)
+    table.add_column('Description', style=STYLE_DIM)
+
+    by_section: dict[str, list[SlashCommandSpec]] = defaultdict(list)
+    for spec in _SLASH_COMMANDS:
+        by_section[spec.help_section].append(spec)
+
+    if search_term:
+        search_lower = search_term.lower()
+        filtered_sections: dict[str, list[SlashCommandSpec]] = {}
+        for section, specs in by_section.items():
+            matched = []
+            for spec in specs:
+                score = max(
+                    fuzz.partial_ratio(search_lower, spec.name.lower()),
+                    fuzz.partial_ratio(search_lower, spec.description.lower()),
+                    fuzz.partial_ratio(search_lower, spec.usage.lower()),
+                )
+                if score > 60:
+                    matched.append(spec)
+            if matched:
+                filtered_sections[section] = matched
+        by_section = filtered_sections
+
+    for section_key, title in _HELP_SECTIONS_ORDER:
+        specs = by_section.get(section_key)
+        if not specs:
+            continue
+        table.add_row('', '')
+        table.add_row(f'[bold]{title}[/bold]', '')
+        for spec in specs:
+            table.add_row(spec.usage, spec.description)
+
+    return table
+
+
+def _build_help_table_fallback(search_term: str | None = None) -> Table:
+    """Fallback help table without fuzzy matching."""
+    from collections import defaultdict
+
+    from backend.cli.theme import CLR_CARD_BORDER, CLR_CARD_TITLE, STYLE_DIM
+
+    table = Table(
+        title='Slash Commands',
+        title_style=CLR_CARD_TITLE,
+        border_style=CLR_CARD_BORDER,
+        box=None,
+        padding=(0, 1),
+    )
+    table.add_column('Command', style='bold cyan', no_wrap=True)
+    table.add_column('Description', style=STYLE_DIM)
+
+    by_section: dict[str, list[SlashCommandSpec]] = defaultdict(list)
+    for spec in _SLASH_COMMANDS:
+        by_section[spec.help_section].append(spec)
+
+    if search_term:
+        search_lower = search_term.lower()
+        filtered_sections = {}
+        for section, specs in by_section.items():
+            matched = [
+                spec for spec in specs
+                if search_lower in spec.name.lower()
+                or search_lower in spec.description.lower()
+            ]
+            if matched:
+                filtered_sections[section] = matched
+        by_section = filtered_sections
+
+    for section_key, title in _HELP_SECTIONS_ORDER:
+        specs = by_section.get(section_key)
+        if not specs:
+            continue
+        table.add_row('', '')
+        table.add_row(f'[bold]{title}[/bold]', '')
+        for spec in specs:
+            table.add_row(spec.usage, spec.description)
+
+    return table
+
+
 def _closest_command_names(command: str, *, limit: int = 2) -> list[str]:
     """Suggest the closest matching slash commands for typos."""
     matches = get_close_matches(command, _COMMAND_NAMES, n=limit, cutoff=0.5)
@@ -811,6 +911,9 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         self._config = config
         self._console = console
         self._hud = HUDBar()
+        # Enable minimal mode if flag was passed
+        if getattr(config, '_minimal_mode', False):
+            self._hud.set_minimal_mode(True)
         self._reasoning = ReasoningDisplay()
         self._renderer: Any | None = None
         self._event_stream: EventStream | None = None

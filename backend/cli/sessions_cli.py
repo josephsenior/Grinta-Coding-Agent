@@ -55,27 +55,76 @@ def _entries() -> list[tuple[str, dict[str, Any], int, Path]]:
     return out
 
 
-def cmd_list(console: Console, limit: int = 50) -> int:
+def cmd_list(console: Console, limit: int = 50, search: str | None = None) -> int:
     if limit < 1:
         console.print(f'[{CLR_STATUS_ERR}]--limit must be 1 or greater.[/]')
         return 2
+
     rows = _entries()[:limit]
+
+    # Apply fuzzy search if search term provided
+    if search:
+        rows = _filter_sessions_fuzzy(rows, search)
+
     if not rows:
-        console.print(
-            f'[{CLR_META}]No sessions yet. Start a conversation with '
-            '[bold]grinta[/bold], then use this view to resume or export it.[/]'
-        )
+        if search:
+            console.print(
+                f'[{CLR_META}]No sessions matching "[bold]{search}[/bold]". '
+                'Try a different search term.[/]'
+            )
+        else:
+            console.print(
+                f'[{CLR_META}]No sessions yet. Start a conversation with '
+                '[bold]grinta[/bold], then use this view to resume or export it.[/]'
+            )
         return 0
     table = _build_session_table(console)
     for i, (sid, meta, count, _path) in enumerate(rows, 1):
         table.add_row(*_format_session_row(i, sid, meta, count))
     console.print(table)
+    search_hint = ' | [bold]grinta sessions list --search <term>[/bold] to filter' if search else ''
     console.print(
         f'[{CLR_META}]Shell: [bold]grinta sessions show <N|id>[/bold] for details, '
-        '[bold]grinta sessions export <N|id> <path>[/bold] to save one. '
-        'REPL: [bold]/sessions[/bold], [bold]/resume <id>[/bold].[/]'
+        '[bold]grinta sessions export <N|id> <path>[/bold] to save one.'
+        f'{search_hint}[/]'
     )
     return 0
+
+
+def _filter_sessions_fuzzy(
+    rows: list[tuple[str, dict[str, Any], int, Path]],
+    search_term: str,
+) -> list[tuple[str, dict[str, Any], int, Path]]:
+    """Filter sessions using fuzzy matching on title and model."""
+    try:
+        from rapidfuzz import fuzz
+    except ImportError:
+        # Fallback to simple substring matching
+        search_lower = search_term.lower()
+        return [
+            r for r in rows
+            if search_lower in str(r[1].get('title', '') or '').lower()
+            or search_lower in str(r[1].get('name', '') or '').lower()
+            or search_lower in str(r[1].get('llm_model', '') or '').lower()
+        ]
+
+    search_lower = search_term.lower()
+    scored: list[tuple[int, tuple[str, dict[str, Any], int, Path]]] = []
+
+    for row in rows:
+        sid, meta, count, path = row
+        title = str(meta.get('title') or meta.get('name') or '').lower()
+        model = str(meta.get('llm_model') or '').lower()
+
+        title_score = fuzz.partial_ratio(search_lower, title)
+        model_score = fuzz.partial_ratio(search_lower, model)
+        max_score = max(title_score, model_score)
+
+        if max_score > 50:
+            scored.append((100 - max_score, row))  # Negate for ascending sort
+
+    scored.sort()
+    return [r for _, r in scored]
 
 
 def _build_session_table(console: Console) -> Table:

@@ -619,7 +619,9 @@ class TestCmdHelp:
         result = r._cmd_help(_parse('/help'))
         assert result is True
         assert r._renderer is not None
-        assert len(r._renderer.markdown_blocks) > 0
+        # New table-based help uses messages as fallback; also check markdown_blocks
+        has_content = len(r._renderer.markdown_blocks) > 0 or len(r._renderer.messages) > 0
+        assert has_content
 
     def test_help_with_command(self) -> None:
         r = _repl()

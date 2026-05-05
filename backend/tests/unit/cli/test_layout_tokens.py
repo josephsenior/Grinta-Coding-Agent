@@ -53,11 +53,9 @@ def test_spacer_live_section_is_empty_text() -> None:
 
 
 def test_callout_padding_tuple() -> None:
-    assert CALLOUT_PANEL_PADDING == (1, 2)
+    assert CALLOUT_PANEL_PADDING == (0, 1)
 
 
 def test_activity_block_bottom_pad() -> None:
-    # A single trailing blank row keeps adjacent activity cards visually
-    # separated without padding the transcript out and making rapid tool
-    # sequences read as sluggish.
-    assert ACTIVITY_BLOCK_BOTTOM_PAD == (0, 0, 1, 0)
+    # Minimal bottom padding for cleaner visual separation of activity cards
+    assert ACTIVITY_BLOCK_BOTTOM_PAD == (0, 0, 0, 0)

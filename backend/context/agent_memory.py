@@ -405,35 +405,48 @@ class Memory:
         )
 
     def _on_playbook_recall(self, event: RecallAction) -> RecallObservation | None:
-        """When a playbook action triggers playbooks, create a RecallObservation with structured data."""
-        playbook_knowledge = self._find_playbook_knowledge(event.query)
+        """When a playbook action triggers playbooks, create a RecallObservation with structured data.
 
-        # Also search Knowledge Base
-        kb_results = []
-        try:
-            # Check if KB search is enabled and should be performed
-            kb_enabled = True
-            kb_threshold = 0.7
-            kb_top_k = 5
-            kb_collections = None
+        Runs playbook matching and KB search in parallel to minimize recall latency.
+        """
+        playbook_knowledge: list[PlaybookKnowledge] = []
+        kb_results: list[Any] = []
 
-            # Use settings if available
-            if hasattr(self, '_kb_settings') and self._kb_settings:
+        def _find_playbooks() -> list[PlaybookKnowledge]:
+            return self._find_playbook_knowledge(event.query)
+
+        def _search_kb() -> list[Any]:
+            if not (hasattr(self, '_kb_settings') and self._kb_settings):
+                kb_enabled = True
+                kb_threshold = 0.7
+                kb_top_k = 5
+                kb_collections = None
+            else:
                 kb_enabled = self._kb_settings.auto_search
                 kb_threshold = self._kb_settings.relevance_threshold
                 kb_top_k = self._kb_settings.search_top_k
                 kb_collections = self._kb_settings.active_collection_ids
 
             if kb_enabled and self._kb_manager is not None:
-                # We use a relatively high threshold by default for auto-search
-                kb_results = self._kb_manager.search(
+                return self._kb_manager.search(
                     query=event.query,
                     relevance_threshold=kb_threshold,
                     top_k=kb_top_k,
                     collection_ids=kb_collections,
                 )
-        except Exception as e:
-            logger.error('Error searching knowledge base during recall: %s', e)
+            return []
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            playbook_future = pool.submit(_find_playbooks)
+            kb_future = pool.submit(_search_kb)
+            try:
+                playbook_knowledge = playbook_future.result()
+            except Exception as e:
+                logger.error('Error finding playbook knowledge: %s', e)
+            try:
+                kb_results = kb_future.result()
+            except Exception as e:
+                logger.error('Error searching knowledge base during recall: %s', e)
 
         if playbook_knowledge or kb_results:
             return RecallObservation(

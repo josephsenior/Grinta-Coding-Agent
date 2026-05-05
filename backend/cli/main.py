@@ -37,6 +37,7 @@ warnings.filterwarnings(
 
 def _create_console(*args: Any, **kwargs: Any) -> Any:
     from rich.console import Console as RichConsole
+
     from backend.cli.theme import no_color_enabled
 
     kwargs.setdefault('no_color', no_color_enabled())
@@ -391,6 +392,7 @@ async def _async_main(
     model: str | None = None,
     project: str | None = None,
     show_splash: bool = True,
+    minimal: bool = False,
 ) -> None:
     resolved_project = (
         str(Path(project).resolve()) if project else str(Path.cwd().resolve())
@@ -412,6 +414,7 @@ async def _async_main(
     try:
         # -- load config -------------------------------------------------------
         config = load_app_config()
+        config._minimal_mode = minimal  # Store for REPL to pick up
 
         # -- apply CLI overrides (non-persistent) ------------------------------
         _apply_cli_overrides(
@@ -526,6 +529,7 @@ def main(
     project: str | None = None,
     cleanup_storage: bool = False,
     no_splash: bool = False,
+    minimal: bool = False,
 ) -> None:
     """Synchronous entry point for the ``grinta`` console_script."""
     # Grinta repo ``.env`` first (and optional explicit project), before backend
@@ -552,9 +556,14 @@ def main(
         run_storage_cleanup_command(project)
         return
     try:
-        asyncio.run(
-            _async_main(model=model, project=project, show_splash=not no_splash)
-        )
+        async_kwargs = {
+            'model': model,
+            'project': project,
+            'show_splash': not no_splash,
+        }
+        if minimal:
+            async_kwargs['minimal'] = minimal
+        asyncio.run(_async_main(**async_kwargs))
     except KeyboardInterrupt:
         # Top-level Ctrl+C — exit cleanly without traceback.
         print()  # newline after ^C

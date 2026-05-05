@@ -13,9 +13,11 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import importlib
+import itertools
 import logging
 import time
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 _LOCAL_VECTOR_STORE = importlib.import_module('backend.context.local_vector_store')
@@ -61,6 +63,38 @@ class QueryCache:
         # Evict oldest if over max size
         if len(self.cache) > self.max_size:
             self.cache.popitem(last=False)
+
+    def invalidate_by_step_ids(self, step_ids: set[str]) -> int:
+        """Remove cache entries whose results contain any of the given step_ids.
+
+        Returns the number of entries evicted.
+        """
+        evicted = 0
+        keys_to_remove: list[str] = []
+        for key, (_, results) in self.cache.items():
+            if any(r.get('step_id') in step_ids for r in results):
+                keys_to_remove.append(key)
+        for key in keys_to_remove:
+            del self.cache[key]
+            evicted += 1
+        return evicted
+
+    def invalidate_by_metadata(self, filter_metadata: dict[str, Any]) -> int:
+        """Remove cache entries whose results contain documents matching all filter criteria.
+
+        Returns the number of entries evicted.
+        """
+        evicted = 0
+        keys_to_remove: list[str] = []
+        for key, (_, results) in self.cache.items():
+            for r in results:
+                if all(r.get(k) == v for k, v in filter_metadata.items()):
+                    keys_to_remove.append(key)
+                    break
+        for key in keys_to_remove:
+            del self.cache[key]
+            evicted += 1
+        return evicted
 
     def stats(self) -> dict[str, Any]:
         """Get cache statistics."""
@@ -125,14 +159,15 @@ class EnhancedVectorStore:
         self.enable_reranking = enable_reranking
         if self.enable_reranking:
             try:
-                from flashrank import Ranker
                 import os
+
+                from flashrank import Ranker
                 cache_dir = _LOCAL_VECTOR_STORE._default_memory_persist_directory('flashrank')
                 os.makedirs(cache_dir, exist_ok=True)
                 # tinybert is very fast and lightweight
-                self.reranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2", cache_dir=str(cache_dir))
+                self.reranker = Ranker(model_name='ms-marco-TinyBERT-L-2-v2', cache_dir=str(cache_dir))
             except ImportError:
-                logger.warning("flashrank not installed, falling back to no reranking")
+                logger.warning('flashrank not installed, falling back to no reranking')
                 self.reranker = None
         else:
             self.reranker = None
@@ -165,12 +200,29 @@ class EnhancedVectorStore:
         content_text: str,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        """Add a document to the vector store."""
+        """Add a document to both backends."""
         self.backend.add(
             step_id, role, artifact_hash, rationale, content_text, metadata
         )
         self.bm25_backend.add(
             step_id, role, artifact_hash, rationale, content_text, metadata
+        )
+
+    def add_batch(
+        self,
+        step_ids: list[str],
+        roles: list[str],
+        artifact_hashes: list[str | None],
+        rationales: list[str | None],
+        content_texts: list[str],
+        metadatas: list[dict[str, Any] | None] | None = None,
+    ) -> None:
+        """Add multiple documents to both backends in a single batch call."""
+        self.backend.add_batch(
+            step_ids, roles, artifact_hashes, rationales, content_texts, metadatas
+        )
+        self.bm25_backend.add_batch(
+            step_ids, roles, artifact_hashes, rationales, content_texts, metadatas
         )
 
     async def async_add(
@@ -190,6 +242,21 @@ class EnhancedVectorStore:
             self.add, step_id, role, artifact_hash, rationale, content_text, metadata
         )
 
+    async def async_add_batch(
+        self,
+        step_ids: list[str],
+        roles: list[str],
+        artifact_hashes: list[str | None],
+        rationales: list[str | None],
+        content_texts: list[str],
+        metadatas: list[dict[str, Any] | None] | None = None,
+    ) -> None:
+        """Async batch add to avoid blocking the event loop."""
+        await asyncio.to_thread(
+            self.add_batch,
+            step_ids, roles, artifact_hashes, rationales, content_texts, metadatas,
+        )
+
     def _effective_initial_k(self, k: int) -> int:
         initial_k_raw = self.config.get('initial_k', 20)
         if isinstance(initial_k_raw, bool):
@@ -205,7 +272,7 @@ class EnhancedVectorStore:
     ) -> list[dict[str, Any]]:
         seen_ids: set[str] = set()
         candidates: list[dict[str, Any]] = []
-        for doc in semantic_candidates + lexical_candidates:
+        for doc in itertools.chain(semantic_candidates, lexical_candidates):
             step_id = doc['step_id']
             if step_id in seen_ids:
                 continue
@@ -221,40 +288,40 @@ class EnhancedVectorStore:
     ) -> list[dict[str, Any]]:
         if not self.reranker or not candidates:
             return candidates[:k]
-            
+
         try:
             from flashrank import RerankRequest
             passages = [
                 {
-                    "id": c.get("step_id", str(i)),
-                    "text": c.get("excerpt", ""),
+                    'id': c.get('step_id', str(i)),
+                    'text': c.get('excerpt', ''),
                 }
                 for i, c in enumerate(candidates)
             ]
-            
+
             rerank_request = RerankRequest(query=query, passages=passages)
             results = self.reranker.rerank(rerank_request)
-            
+
             # Map back to original candidate dicts
-            candidates_by_id = {c.get("step_id"): c for c in candidates}
+            candidates_by_id = {c.get('step_id'): c for c in candidates}
             reranked_candidates = []
             for r in results:
-                original = candidates_by_id.get(r.get("id"))
+                original = candidates_by_id.get(r.get('id'))
                 if original:
                     new_candidate = dict(original)
-                    new_candidate["score"] = r.get("score", new_candidate["score"])
+                    new_candidate['score'] = r.get('score', new_candidate['score'])
                     reranked_candidates.append(new_candidate)
-            
+
             # If some candidates were dropped by the reranker (shouldn't happen), append them
-            returned_ids = {r.get("id") for r in results}
+            returned_ids = {r.get('id') for r in results}
             for c in candidates:
-                if c.get("step_id") not in returned_ids:
+                if c.get('step_id') not in returned_ids:
                     reranked_candidates.append(c)
-            
+
             return reranked_candidates[:k]
-            
+
         except Exception as e:
-            logger.warning("FlashRank reranking failed, falling back to original order: %s", e)
+            logger.warning('FlashRank reranking failed, falling back to original order: %s', e)
             return candidates[:k]
 
     def _try_cached_search(
@@ -274,6 +341,40 @@ class EnhancedVectorStore:
         logger.debug('Cache hit! Returned in %.1fms', elapsed_ms)
         return filtered_results
 
+    def _search_backends_in_parallel(
+        self, query: str, initial_k: int, filter_metadata: dict[str, Any] | None
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Run semantic and BM25 searches concurrently and return both result sets."""
+        semantic_candidates: list[dict[str, Any]] = []
+        lexical_candidates: list[dict[str, Any]] = []
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            sem_future = pool.submit(
+                self.backend.search, query, k=initial_k, filter_metadata=filter_metadata
+            )
+            lex_future = pool.submit(
+                self.bm25_backend.search,
+                query,
+                k=initial_k,
+                filter_metadata=filter_metadata,
+            )
+            for future in as_completed([sem_future, lex_future]):
+                try:
+                    result = future.result()
+                    if future is sem_future:
+                        semantic_candidates = result
+                    else:
+                        lexical_candidates = result
+                except Exception:
+                    # If one backend fails, fall back to the other
+                    logger.warning('One backend failed during parallel search', exc_info=True)
+                    if future is sem_future:
+                        semantic_candidates = []
+                    else:
+                        lexical_candidates = []
+
+        return semantic_candidates, lexical_candidates
+
     def search(
         self,
         query: str,
@@ -284,7 +385,7 @@ class EnhancedVectorStore:
 
         Process:
         1. Check cache (if enabled)
-        2. Vector search with higher k (20 vs 5)
+        2. Vector search with higher k (20 vs 5) — both backends run in parallel
         3. Re-rank with cross-encoder (if enabled)
         4. Return top k results
         5. Cache for future queries
@@ -305,11 +406,8 @@ class EnhancedVectorStore:
             return cached
 
         initial_k = self._effective_initial_k(k)
-        semantic_candidates = self.backend.search(
-            query, k=initial_k, filter_metadata=filter_metadata
-        )
-        lexical_candidates = self.bm25_backend.search(
-            query, k=initial_k, filter_metadata=filter_metadata
+        semantic_candidates, lexical_candidates = self._search_backends_in_parallel(
+            query, initial_k, filter_metadata
         )
 
         candidates = self._dedupe_candidates_by_step_id(
@@ -348,35 +446,65 @@ class EnhancedVectorStore:
         """
         return await asyncio.to_thread(self.search, query, k, filter_metadata)
 
+    def _delete_backends_in_parallel(
+        self,
+        delete_fn_semantic: Any,
+        delete_fn_lexical: Any,
+        *args: Any,
+    ) -> int:
+        """Run delete operations on both backends concurrently."""
+        c1: int = 0
+        c2: int = 0
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f1 = pool.submit(delete_fn_semantic, *args)
+            f2 = pool.submit(delete_fn_lexical, *args)
+            try:
+                c1 = f1.result()
+            except Exception:
+                logger.warning('Semantic backend delete failed', exc_info=True)
+            try:
+                c2 = f2.result()
+            except Exception:
+                logger.warning('BM25 backend delete failed', exc_info=True)
+        return max(c1, c2)
+
     def delete_by_metadata(self, filter_metadata: dict[str, Any]) -> int:
         """Delete documents matching metadata filters.
 
-        Also clears relevant cache entries to prevent stale results.
+        Also selectively invalidates cache entries that reference deleted documents.
         """
-        c1 = self.backend.delete_by_metadata(filter_metadata)
-        c2 = self.bm25_backend.delete_by_metadata(filter_metadata)
-        deleted_count = max(c1, c2)
+        deleted_count = self._delete_backends_in_parallel(
+            self.backend.delete_by_metadata,
+            self.bm25_backend.delete_by_metadata,
+            filter_metadata,
+        )
 
-        # Clear cache since results may have changed
+        # Selectively invalidate cache entries matching the deleted metadata
         if self.cache:
-            self.cache.cache.clear()
-            logger.debug('Cleared cache after deletion')
+            evicted = self.cache.invalidate_by_metadata(filter_metadata)
+            logger.debug(
+                'Invalidated %s cache entries after metadata-based deletion', evicted
+            )
 
         return deleted_count
 
     def delete_by_ids(self, ids: list[str]) -> int:
         """Delete documents by their IDs.
 
-        Also clears relevant cache entries to prevent stale results.
+        Also selectively invalidates cache entries that reference deleted documents.
         """
-        c1 = self.backend.delete_by_ids(ids)
-        c2 = self.bm25_backend.delete_by_ids(ids)
-        deleted_count = max(c1, c2)
+        deleted_count = self._delete_backends_in_parallel(
+            self.backend.delete_by_ids,
+            self.bm25_backend.delete_by_ids,
+            ids,
+        )
 
-        # Clear cache since results may have changed
+        # Selectively invalidate cache entries referencing deleted step_ids
         if self.cache:
-            self.cache.cache.clear()
-            logger.debug('Cleared cache after deletion')
+            evicted = self.cache.invalidate_by_step_ids(set(ids))
+            logger.debug(
+                'Invalidated %s cache entries after ID-based deletion', evicted
+            )
 
         return deleted_count
 
