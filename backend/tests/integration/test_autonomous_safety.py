@@ -288,7 +288,11 @@ class TestSemanticStuckDetection:
             history.append(
                 CmdRunAction(command=f'cat file{i % 3}.txt')
             )  # Only 3 unique files
-            history.append(MagicMock(exit_code=1, content='No such file or directory'))
+            # Use proper CmdRunAction with exit_code instead of MagicMock
+            error_action = CmdRunAction(command=f'cat nonexistent{i % 3}.txt')
+            error_action.exit_code = 1
+            error_action.output = 'No such file or directory'
+            history.append(error_action)
 
         state.history = history
         detector = StuckDetector(state)
