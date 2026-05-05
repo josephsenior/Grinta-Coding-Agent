@@ -694,6 +694,22 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                     'Install tmux for better command management: sudo apt install tmux'
                 )
 
+    def additional_agent_instructions(self) -> str:
+        """Provide runtime-specific instructions about the local environment and paths."""
+        workspace_root = self.workspace_root.absolute()
+        project_root = (
+            Path(self.project_root).absolute() if self.project_root else workspace_root
+        )
+
+        return (
+            '### Local Environment Context\n'
+            f'- **Workspace Root (Absolute)**: {workspace_root}\n'
+            f'- **Project Root (Absolute)**: {project_root}\n'
+            f'- **Platform**: Windows\n'
+            'Always use absolute paths when referencing files in the project tree to avoid ambiguity '
+            'between nested source directories (e.g. `src/` vs `flask/src/`).'
+        )
+
     def _sanitize_config(self) -> None:
         """Sanitize configuration and ensure compatibility."""
         security_cfg = getattr(self.config, 'security', None)

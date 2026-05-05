@@ -168,12 +168,11 @@ def evaluate_editor_only_shell_block(
 
 
 _BLOCK_MSG = (
-    'Shell file creation/overwrites are disabled for project work. '
-    'Use the editor tools instead: '
-    '`text_editor` (create_file, insert_text, edit_mode) or '
-    '`symbol_editor` (create_file, replace_range, …). '
-    'Do not use Set-Content, Out-File, tee, or `>` / `>>` to write source or '
-    'document files. Redirection to `.log` / `.tmp` or a temp path is still allowed. '
-    'If you really need shell writes (e.g. scaffolding scripts), set the '
-    'environment variable GRINTA_ALLOW_SHELL_WRITES=1.'
+    'SECURITY POLICY: Shell-based file writes to project source files are restricted to prevent '
+    'accidental corruption and bypass of validation. Please use the dedicated editor tools instead:\n'
+    '- `text_editor` (create_file, insert_text, edit_mode) for creating or editing source files.\n'
+    '- `symbol_editor` (create_file, replace_range, …) for structured code modifications.\n'
+    'Direct shell commands like `Set-Content`, `Out-File`, `tee`, or `>` / `>>` are only allowed for '
+    '`.log` / `.tmp` files or files in temporary directories. If you absolutely require shell-level '
+    'writes for non-source files, set the environment variable `GRINTA_ALLOW_SHELL_WRITES=1`.'
 )
