@@ -251,7 +251,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         """
         mw = getattr(self, '_rollback_middleware', None)
         if mw is None:
-            logger.warning(
+            logger.info(
                 'Phase-boundary checkpoint at %s skipped: no RollbackMiddleware '
                 'is registered. Rollback to this transition will not be possible.',
                 label,
@@ -263,7 +263,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             ctx = ToolInvocationContext(controller=self, action=None, state=None)  # type: ignore[arg-type]
             manager = mw._get_manager(ctx)  # type: ignore[attr-defined]
             if manager is None:
-                logger.warning(
+                logger.info(
                     'Phase-boundary checkpoint at %s skipped: RollbackManager '
                     'unavailable. Rollback to this transition will not be possible.',
                     label,
@@ -612,6 +612,25 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         # 3. Ensure any pending actions are cleared or marked as cancelled?
         self._pending_action = None
 
+    async def _ensure_runtime_connected(self) -> None:
+        """Restore execution backend if disconnected (e.g. after hard_kill/interrupt)."""
+        runtime = getattr(self, 'runtime', None)
+        if runtime is None:
+            return
+
+        # Check if already initialized to avoid redundant connect calls.
+        if hasattr(runtime, 'runtime_initialized'):
+            try:
+                if runtime.runtime_initialized:
+                    return
+            except Exception:
+                logger.debug('runtime_initialized check failed', exc_info=True)
+
+        connect_fn = getattr(runtime, 'connect', None)
+        if callable(connect_fn):
+            logger.info('Restoring runtime connection...')
+            await connect_fn()
+
     async def set_agent_state_to(self, new_state: AgentState) -> None:
         """Delegate to the state transition service for consistency."""
         await self.services.state.set_agent_state(new_state)
@@ -684,6 +703,8 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
 
     async def _step_inner(self) -> None:
         """Inner step logic, guarded by _step_lock."""
+        await self._ensure_runtime_connected()
+
         if not self.step_prerequisites.can_step():
             return
 

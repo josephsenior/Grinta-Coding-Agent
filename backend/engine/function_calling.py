@@ -706,13 +706,19 @@ def _handle_edit_symbol_body_command(
             "edit_symbol_body requires 'symbol_name' and 'new_body' arguments"
         )
 
+    logger.info(f"Executing edit_symbol_body: symbol='{symbol_name}' in {path}")
     result = editor.edit_function(path, symbol_name, new_body)
 
     if result.success:
+        logger.info(f"✓ edit_symbol_body succeeded for '{symbol_name}'")
         return FileReadAction(
             path=path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
-    return MessageAction(content=f'❌ Edit failed: {result.message}')
+    
+    error_msg = f"Edit failed for '{symbol_name}': {result.message}"
+    logger.warning(f"❌ {error_msg}")
+    from backend.core.errors import ToolExecutionError
+    raise ToolExecutionError(error_msg)
 
 
 def _normalized_edit_symbols_tuple(
@@ -799,10 +805,13 @@ def _run_edit_symbols_sequence(
     normalized: list[tuple[str, str]],
     backup: str | None,
 ) -> Action:
+    logger.info(f"Executing edit_symbols batch: {len(normalized)} replacements in {path}")
     messages: list[str] = []
     for idx, (fn, nb) in enumerate(normalized):
+        logger.debug(f"Batch step {idx + 1}/{len(normalized)}: symbol='{fn}'")
         result = editor.edit_function(path, fn, nb)
         if result.success:
+            logger.debug(f"✓ Step {idx + 1} succeeded ('{fn}')")
             messages.append(result.message)
             continue
         if backup is not None:
@@ -816,9 +825,10 @@ def _run_edit_symbols_sequence(
                         f'Could not restore file: {restore_err}'
                     )
                 )
-        return MessageAction(
-            content=_edit_symbols_failure_content(idx, fn, result.message, backup)
-        )
+        error_msg = _edit_symbols_failure_content(idx, fn, result.message, backup)
+        logger.warning(error_msg)
+        from backend.core.errors import ToolExecutionError
+        raise ToolExecutionError(error_msg)
 
     summary = (
         f'✓ edit_symbols applied {len(normalized)} replacement(s) in {path}:\n'
@@ -862,7 +872,11 @@ def _handle_rename_symbol_command(
         return FileReadAction(
             path=path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
-    return MessageAction(content=f'❌ Rename failed: {result.message}')
+    
+    error_msg = f"Rename failed: {result.message}"
+    logger.warning(f"❌ {error_msg}")
+    from backend.core.errors import ToolExecutionError
+    raise ToolExecutionError(error_msg)
 
 
 def _handle_find_symbol_command(
@@ -884,8 +898,19 @@ def _handle_find_symbol_command(
         )
         if result.parent_name:
             message += f'\n  Parent: {result.parent_name}'
-        return MessageAction(content=message)
-    return MessageAction(content=f"❌ Symbol '{symbol_name}' not found in {path}")
+        
+        return FileReadAction(
+            path=path,
+            start=result.line_start,
+            end=result.line_end,
+            impl_source=FileReadSource.DEFAULT,
+            thought=message
+        )
+    
+    error_msg = f"Symbol '{symbol_name}' not found in {path}"
+    logger.warning(f"❌ {error_msg}")
+    from backend.core.errors import ToolExecutionError
+    raise ToolExecutionError(error_msg)
 
 
 def _handle_replace_range_command(
@@ -1169,7 +1194,10 @@ def _dispatch_structure_editor_commands(
     except FunctionCallValidationError:
         raise
     except Exception as e:
-        return MessageAction(content=f'❌ Structure Editor error: {str(e)}')
+        error_msg = f"Structure Editor error: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        from backend.core.errors import ToolExecutionError
+        raise ToolExecutionError(error_msg) from e
 
 
 def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:

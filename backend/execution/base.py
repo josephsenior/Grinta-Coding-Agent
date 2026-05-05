@@ -338,6 +338,7 @@ class Runtime(
 
         If called for instance by error handling, it could prevent recovery.
         """
+        self._runtime_initialized = False
         if not self._should_cleanup_processes():
             return
         try:
@@ -607,7 +608,7 @@ class Runtime(
         """Handle action execution with timeout, error handling, and observation processing."""
         action_type = type(event).__name__
         action_id = getattr(event, 'id', '?')
-        logger.info(
+        logger.debug(
             '[runtime %s] _handle_action START %s (id=%s)',
             self.sid,
             action_type,
@@ -621,7 +622,7 @@ class Runtime(
 
         try:
             observation = await self._execute_action(event)
-            logger.info(
+            logger.debug(
                 '[runtime %s] _handle_action GOT observation %s for %s (id=%s)',
                 self.sid,
                 type(observation).__name__,

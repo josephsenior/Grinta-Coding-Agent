@@ -603,11 +603,12 @@ class StructureEditor:
 
             symbols: list[str] = []
 
-            def extract_symbols(node: Any):
+            def extract_symbols(node: Any, parent_name: str | None = None):
                 """Recursively extract function and class symbols from AST node.
 
                 Args:
                     node: Tree-sitter AST node to extract symbols from
+                    parent_name: Name of the parent class (for methods)
 
                 """
                 # Functions
@@ -621,8 +622,11 @@ class StructureEditor:
                         name = file_bytes[
                             name_node.start_byte : name_node.end_byte
                         ].decode('utf-8')
+                        
+                        full_name = f'{parent_name}.{name}' if parent_name else name
+                        
                         if not symbol_type or symbol_type == 'function':
-                            symbols.append(name)
+                            symbols.append(full_name)
 
                 # Classes
                 elif node.type in ['class_definition', 'class_declaration']:
@@ -633,10 +637,15 @@ class StructureEditor:
                         ].decode('utf-8')
                         if not symbol_type or symbol_type == 'class':
                             symbols.append(name)
+                        
+                        # Recurse into class members with parent_name
+                        for child in node.children:
+                            extract_symbols(child, parent_name=name)
+                        return
 
-                # Recurse
+                # Default recursion
                 for child in node.children:
-                    extract_symbols(child)
+                    extract_symbols(child, parent_name=parent_name)
 
             extract_symbols(root)
             return symbols

@@ -403,10 +403,10 @@ class EventStream(EventStore):
 
         """
         if subscriber_id not in self._subscribers:
-            logger.warning('Subscriber not found during unsubscribe: %s', subscriber_id)
+            logger.debug('Subscriber not found during unsubscribe: %s', subscriber_id)
             return
         if callback_id not in self._subscribers[subscriber_id]:
-            logger.warning('Callback not found during unsubscribe: %s', callback_id)
+            logger.debug('Callback not found during unsubscribe: %s', callback_id)
             return
         self._clean_up_subscriber(subscriber_id, callback_id)
 

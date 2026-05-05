@@ -365,7 +365,7 @@ class EventStore(EventStoreABC):
         try:
             return int(filename.split('/')[-1].split('.')[0])
         except ValueError:
-            logger.warning('get id from filename (%s) failed.', filename)
+            logger.debug('get id from filename (%s) failed.', filename)
             return -1
 
 

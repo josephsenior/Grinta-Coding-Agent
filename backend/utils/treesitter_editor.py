@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 else:  # pragma: no cover - runtime import with graceful fallback
     LanguageType = ParserType = NodeType = TreeType = Any
 
+from backend.core.logger import app_logger as logger
+
 TREE_SITTER_AVAILABLE = False
 _RuntimeLanguage: Any | None = None
 _RuntimeParser: Any | None = None
@@ -534,12 +536,16 @@ class TreeSitterEditor:
         original_code = file_bytes.decode('utf-8')
 
         # Find the function node
+        logger.info(f"Looking for symbol '{function_name}' in {file_path}")
         func_node = self._find_function_node(tree, file_bytes, function_name, language)
         if not func_node:
+            logger.warning(f"Symbol '{function_name}' not found in {file_path}")
             return EditResult(
                 success=False,
                 message=f"Function '{function_name}' not found in {file_path}",
             )
+        
+        logger.debug(f"Found node for '{function_name}' (type: {func_node.type})")
 
         # Extract function body node (language-specific)
         body_node = self._get_function_body_node(func_node, language)
@@ -692,6 +698,19 @@ class TreeSitterEditor:
         """Find function node (language-agnostic using Tree-sitter queries)."""
         root = tree.root_node
 
+        # Handle dot notation for methods (e.g., MyClass.my_method)
+        if '.' in function_name:
+            parts = function_name.split('.')
+            if len(parts) == 2:
+                class_name, method_name = parts
+                logger.debug(f"Qualified name detected: class='{class_name}', method='{method_name}'")
+                class_node = self._find_class_node(tree, file_bytes, class_name, language)
+                if class_node:
+                    return self._find_method_node_in_class(
+                        class_node, file_bytes, method_name, language
+                    )
+                logger.debug(f"Class '{class_name}' not found; falling back to direct lookup for '{function_name}'")
+
         # Language-specific node types for functions
         function_types = {
             'python': ['function_definition'],
@@ -712,6 +731,42 @@ class TreeSitterEditor:
 
         # Recursive search
         return self._find_node_by_name(root, file_bytes, function_name, target_types)
+
+    def _find_class_node(
+        self, tree: TreeType, file_bytes: bytes, class_name: str, language: str
+    ) -> NodeType | None:
+        """Find a class node by name."""
+        class_types = {
+            'python': ['class_definition'],
+            'javascript': ['class_declaration', 'class_definition'],
+            'typescript': ['class_declaration', 'class_definition'],
+            'java': ['class_declaration'],
+            'cpp': ['class_specifier'],
+            'ruby': ['class'],
+            'php': ['class_declaration'],
+        }
+        target_types = class_types.get(
+            language, ['class_declaration', 'class_definition']
+        )
+        return self._find_node_by_name(tree.root_node, file_bytes, class_name, target_types)
+
+    def _find_method_node_in_class(
+        self, class_node: NodeType, file_bytes: bytes, method_name: str, language: str
+    ) -> NodeType | None:
+        """Find a method node within a class node."""
+        method_types = {
+            'python': ['function_definition'],
+            'javascript': ['method_definition'],
+            'typescript': ['method_definition'],
+            'java': ['method_declaration'],
+            'cpp': ['function_definition'],
+            'ruby': ['method'],
+            'php': ['method_declaration'],
+        }
+        target_types = method_types.get(
+            language, ['method_definition', 'method_declaration']
+        )
+        return self._find_node_by_name(class_node, file_bytes, method_name, target_types)
 
     def _find_node_by_name(
         self, node: NodeType, file_bytes: bytes, target_name: str, node_types: list[str]
