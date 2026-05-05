@@ -45,7 +45,7 @@ dependencies = [
   "python-dotenv>=1.1.1,<2",
   "python-frontmatter>=1.1,<2",
   "python-json-logger>=3.2.1,<4",
-  "python-multipart>=0.0.20,<1",
+  "python-multipart>=0.0.26,<1",
   "pywinpty>=2,<3; sys_platform=='win32'",
   "rapidfuzz>=3.9,<4",
   "rich>=14,<16",
