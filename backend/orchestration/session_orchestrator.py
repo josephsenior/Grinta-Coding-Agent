@@ -490,6 +490,14 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         try:
             await self._step()
         except Exception as e:
+            # P1-STAB: If the agent was stopped (e.g. via interrupt/ctrl+c) and the runtime
+            # was killed while this step was waiting for the LLM, a DisconnectedError
+            # is expected. Swallow it to avoid noisy error popups for the user.
+            from backend.core.errors import AgentRuntimeDisconnectedError
+            if self.get_agent_state() == AgentState.STOPPED and isinstance(e, AgentRuntimeDisconnectedError):
+                logger.info('Ignoring runtime disconnection error after agent stop.')
+                return
+
             # CancelledError (BaseException) propagates; only handle Exception
             await self.exception_handler.handle_step_exception(e)
 
@@ -730,6 +738,10 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             )
             self.services.retry.reset_retry_metrics()
 
+        if self.get_agent_state() != AgentState.RUNNING:
+            logger.info('Agent is no longer running, skipping action execution.')
+            return
+
         await self.action_execution.execute_action(action)
         await self._handle_post_execution()
 
@@ -750,6 +762,9 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                 while self._can_drain_pending():
                     action = await self.action_execution.get_next_action()
                     if action is None:
+                        break
+                    if self.get_agent_state() != AgentState.RUNNING:
+                        logger.info('Agent is no longer running, stopping drain.')
                         break
                     await self.action_execution.execute_action(action)
                     # Yield so _on_event tasks update state.history before the next
