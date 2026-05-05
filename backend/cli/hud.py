@@ -33,6 +33,8 @@ class HUDState:
     token_usage_estimated: bool = False
     #: Resolved project/workspace root (absolute path) for CLI status display.
     workspace_path: str = ''
+    #: Minimal mode strips borders and reduces information for cleaner display.
+    minimal_mode: bool = False
 
 
 class HUDBar:
@@ -41,6 +43,7 @@ class HUDBar:
     def __init__(self) -> None:
         self.state = HUDState()
         self._bundled_skill_count = HUDBar.count_bundled_playbook_skills()
+        self._minimal_mode = False
 
     @property
     def bundled_skill_count(self) -> int:
@@ -158,12 +161,47 @@ class HUDBar:
         """Deprecated alias for :meth:`_format_bar` — one bar at all widths."""
         return self._format_bar()
 
+    def set_minimal_mode(self, enabled: bool) -> None:
+        """Enable or disable minimal mode for cleaner display."""
+        self._minimal_mode = enabled
+        self.state.minimal_mode = enabled
+
+    @property
+    def is_minimal_mode(self) -> bool:
+        """Check if minimal mode is enabled."""
+        return self._minimal_mode
+
     def _format_bar(self) -> Text:
-        """One dense status line: model, tokens, cost, MCP, skills, ledger icon."""
-        from backend.cli.status_chrome import rich_compact_hud_line, status_fields_from_hud
+        """One dense status line: model, tokens, cost, MCP, skills, ledger icon.
+
+        In minimal mode, returns an even simpler line with less decoration.
+        """
+        from backend.cli.status_chrome import (
+            rich_compact_hud_line,
+            status_fields_from_hud,
+        )
 
         fields = status_fields_from_hud(self.state, self._bundled_skill_count)
-        return rich_compact_hud_line(fields)
+        return rich_compact_hud_line(fields, minimal=self._minimal_mode)
+
+    def _format_bar_minimal(self) -> Text:
+        """Ultra-minimal HUD: just model, tokens, cost, state."""
+        from backend.cli.status_chrome import status_fields_from_hud
+
+        fields = status_fields_from_hud(self.state, self._bundled_skill_count)
+
+        parts = []
+        if fields.model_display and fields.model_display != '(not set)/(not set)':
+            parts.append(fields.model_display)
+
+        parts.append(f'{fields.token_display_compact}t')
+
+        if fields.cost_usd > 0:
+            parts.append(f'${fields.cost_usd:.2f}')
+
+        parts.append(fields.agent_state_label)
+
+        return Text(' | '.join(parts), style='#b4c4d5')
 
     def _ledger_icon(self) -> str:
         """Single-char ledger glyph (tests and callers that inspect HUD state)."""

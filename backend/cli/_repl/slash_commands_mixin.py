@@ -755,17 +755,41 @@ class SlashCommandsMixin:
         return True
 
     def _cmd_help(self, parsed) -> bool:
-        from backend.cli.repl import _build_help_markdown
+        from backend.cli.repl import _build_help_markdown, _build_help_table
 
         if len(parsed.args) > 1:
             self._warn(f'Usage: {self._usage(parsed.name)}')
             return True
-        help_text = _build_help_markdown(parsed.args[0] if parsed.args else None)
+
+        search_term = None
+        if parsed.args and parsed.args[0] not in ('--search', '-s'):
+            # Specific command requested
+            help_text = _build_help_markdown(parsed.args[0])
+            if self._renderer is not None:
+                self._renderer.add_markdown_block(
+                    'Help',
+                    help_text,
+                )
+            return True
+
+        # Check for search flag
+        if parsed.args and parsed.args[0] in ('--search', '-s'):
+            search_term = parsed.args[1] if len(parsed.args) > 1 else None
+
+        # Show interactive table (if renderer supports add_renderable)
+        table = _build_help_table(search_term)
         if self._renderer is not None:
-            self._renderer.add_markdown_block(
-                'Help',
-                help_text,
-            )
+            if hasattr(self._renderer, 'add_renderable'):
+                self._renderer.add_renderable(table)
+            else:
+                # Fallback: convert table to string and show as markdown
+                from io import StringIO
+
+                from rich.console import Console
+                sio = StringIO()
+                table_console = Console(file=sio, force_terminal=True, width=100)
+                table_console.print(table)
+                self._renderer.add_system_message(sio.getvalue().strip(), title='help')
         return True
 
     def _cmd_model(self, parsed) -> bool:

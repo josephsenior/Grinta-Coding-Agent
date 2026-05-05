@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from backend.context.vector_store import EnhancedVectorStore
@@ -45,39 +46,6 @@ class KnowledgeBaseManager:
             )
         return self._vector_stores[collection_id]
 
-    def _add_chunk_to_vector_store(
-        self,
-        vector_store: EnhancedVectorStore,
-        chunk: DocumentChunk,
-        document: KnowledgeBaseDocument,
-        collection_id: str,
-        filename: str,
-    ) -> bool:
-        """Add a single chunk to vector store.
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            vector_store.add(
-                step_id=chunk.id,
-                role='document',
-                artifact_hash=document.content_hash,
-                rationale=f'Document: {filename}',
-                content_text=chunk.content,
-                metadata={
-                    'document_id': document.id,
-                    'collection_id': collection_id,
-                    'filename': filename,
-                    'chunk_index': chunk.chunk_index,
-                    **(chunk.metadata or {}),
-                },
-            )
-            return True
-        except Exception as e:
-            logger.error('Failed to add chunk %s to vector store: %s', chunk.id, e)
-            return False
-
     def _add_chunks_to_vector_store(
         self,
         collection_id: str,
@@ -85,50 +53,57 @@ class KnowledgeBaseManager:
         document: KnowledgeBaseDocument,
         filename: str,
     ) -> int:
-        """Add chunks to vector store with error handling.
+        """Add chunks to vector store using a single batch call.
 
         Returns:
             Number of chunks successfully added
         """
         vector_store = self._get_vector_store(collection_id)
-        chunks_added = 0
-        failed_chunks = []
+
+        if not chunks:
+            return 0
+
+        step_ids: list[str] = []
+        roles: list[str] = []
+        artifact_hashes: list[str | None] = []
+        rationales: list[str | None] = []
+        content_texts: list[str] = []
+        metadatas: list[dict[str, Any] | None] = []
+
+        for chunk in chunks:
+            step_ids.append(chunk.id)
+            roles.append('document')
+            artifact_hashes.append(document.content_hash)
+            rationales.append(f'Document: {filename}')
+            content_texts.append(chunk.content)
+            metadatas.append({
+                'document_id': document.id,
+                'collection_id': collection_id,
+                'filename': filename,
+                'chunk_index': chunk.chunk_index,
+                **(chunk.metadata or {}),
+            })
 
         try:
-            for chunk in chunks:
-                if self._add_chunk_to_vector_store(
-                    vector_store, chunk, document, collection_id, filename
-                ):
-                    chunks_added += 1
-                else:
-                    failed_chunks.append(chunk.id)
-
-            if chunks_added < len(chunks):
-                logger.warning(
-                    'Only %s/%s chunks added to vector store. Failed chunks: %s',
-                    chunks_added,
-                    len(chunks),
-                    failed_chunks,
-                )
-
-            if chunks_added == 0:
-                logger.error(
-                    'Failed to add any chunks to vector store for document %s. '
-                    'Document exists but is not searchable.',
-                    document.id,
-                )
-            else:
-                logger.info(
-                    "Added document '%s' to collection %s (%s/%s chunks)",
-                    filename,
-                    collection_id,
-                    chunks_added,
-                    len(chunks),
-                )
+            vector_store.add_batch(
+                step_ids, roles, artifact_hashes, rationales, content_texts, metadatas
+            )
+            logger.info(
+                "Added document '%s' to collection %s (%s/%s chunks)",
+                filename,
+                collection_id,
+                len(chunks),
+                len(chunks),
+            )
+            return len(chunks)
         except Exception as e:
-            logger.error('Failed to add document chunks to vector store: %s', e)
-
-        return chunks_added
+            logger.error(
+                'Failed to add %s chunks to vector store for document %s: %s',
+                len(chunks),
+                document.id,
+                e,
+            )
+            return 0
 
     # Collection operations
 
@@ -170,9 +145,6 @@ class KnowledgeBaseManager:
         collection = self.get_collection(collection_id)
         if not collection:
             return False
-
-        # Get all documents in the collection before deletion
-        self.list_documents(collection_id)
 
         # Delete from vector store first (before removing from store)
         try:
@@ -595,10 +567,13 @@ class KnowledgeBaseManager:
     ) -> list[KnowledgeBaseSearchResult]:
         """Search across knowledge base collections.
 
+        Searches all specified collections in parallel, then merges and
+        sorts results by relevance.
+
         Args:
             query: The search query
             collection_ids: List of collection IDs to search (or None for all)
-            top_k: Number of results to return per collection
+            top_k: Number of results to return
             relevance_threshold: Minimum relevance score (0-1)
 
         Returns:
@@ -609,47 +584,56 @@ class KnowledgeBaseManager:
             collections = self.list_collections()
             collection_ids = [c.id for c in collections]
 
-        all_results = []
-
+        # Filter to accessible collections
+        accessible = []
         for collection_id in collection_ids:
-            # Verify access
             collection = self.get_collection(collection_id)
-            if not collection:
-                continue
+            if collection:
+                accessible.append(collection_id)
 
-            # Search in vector store
-            vector_store = self._get_vector_store(collection_id)
+        if not accessible:
+            return []
+
+        # Search all accessible collections in parallel
+        all_results: list[KnowledgeBaseSearchResult] = []
+
+        def _search_collection(cid: str) -> list[KnowledgeBaseSearchResult]:
+            vector_store = self._get_vector_store(cid)
+            results: list[KnowledgeBaseSearchResult] = []
             try:
                 raw_results = vector_store.search(
                     query=query,
                     k=top_k,
-                    filter_metadata={'collection_id': collection_id},
+                    filter_metadata={'collection_id': cid},
                 )
-
-                # Convert to search results
                 for result in raw_results:
                     score = result.get('score', 0.0)
                     if score < relevance_threshold:
                         continue
-
-                    search_result = KnowledgeBaseSearchResult(
-                        document_id=result.get('metadata', {}).get('document_id', ''),
-                        collection_id=collection_id,
-                        filename=result.get('metadata', {}).get('filename', ''),
-                        chunk_content=result.get('content', ''),
-                        relevance_score=score,
-                        metadata=result.get('metadata', {}),
+                    meta = result.get('metadata', {})
+                    results.append(
+                        KnowledgeBaseSearchResult(
+                            document_id=meta.get('document_id', ''),
+                            collection_id=cid,
+                            filename=meta.get('filename', ''),
+                            chunk_content=result.get('content', ''),
+                            relevance_score=score,
+                            metadata=meta,
+                        )
                     )
-                    all_results.append(search_result)
-
             except Exception as e:
-                logger.error('Error searching collection %s: %s', collection_id, e)
-                continue
+                logger.error('Error searching collection %s: %s', cid, e)
+            return results
 
-        # Sort by relevance
+        with ThreadPoolExecutor(max_workers=min(len(accessible), 8)) as pool:
+            futures = {
+                pool.submit(_search_collection, cid): cid for cid in accessible
+            }
+            for future in as_completed(futures):
+                all_results.extend(future.result())
+
+        # Sort by relevance and return top results
         all_results.sort(key=lambda r: r.relevance_score, reverse=True)
-
-        # Return top results
         return all_results[:top_k]
 
     async def async_search(

@@ -89,7 +89,7 @@ class TestActionLabel:
         assert len(label) <= 100
 
     def test_file_edit(self) -> None:
-        action = FileEditAction(path='/some/file.py', content='code')
+        action = FileEditAction(path='/some/file.py', command='edit', new_str='code')
         label = _action_label(action)
         assert label.startswith('edit:')
         assert '/some/file.py' in label
@@ -113,7 +113,7 @@ class TestActionLabel:
 
 class TestFileLabel:
     def test_file_edit(self) -> None:
-        action = FileEditAction(path='/foo/bar.py', content='x')
+        action = FileEditAction(path='/foo/bar.py', command='edit', new_str='x')
         assert _file_label(action) == '/foo/bar.py'
 
     def test_file_write(self) -> None:
@@ -198,7 +198,7 @@ class TestRenderConfirmation:
 
     def test_file_edit_action(self) -> None:
         console = _quiet_console()
-        action = FileEditAction(path='/etc/hosts', content='x')
+        action = FileEditAction(path='/etc/hosts', command='edit', new_str='x')
         action.security_risk = ActionSecurityRisk.MEDIUM
         with patch('rich.prompt.Prompt.ask', return_value='n'):
             result = render_confirmation(console, action)

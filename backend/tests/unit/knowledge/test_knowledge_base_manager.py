@@ -697,20 +697,20 @@ class TestAdditionalCoveragePaths:
             mime_type='text/plain',
         )
 
-        result = manager._add_chunk_to_vector_store(
-            mock_vector_store, chunk, doc, 'col123', 'test.txt'
+        result = manager._add_chunks_to_vector_store(
+            'col123', [chunk], doc, 'test.txt'
         )
-        assert result is True
+        assert result == 1
 
     @patch('backend.knowledge.knowledge_base_manager.get_knowledge_base_store')
     @patch('backend.knowledge.knowledge_base_manager.EnhancedVectorStore')
     def test_add_chunk_to_vector_store_error(
         self, mock_vector_store_cls, mock_get_store
     ):
-        """Test _add_chunk_to_vector_store error case."""
+        """Test _add_chunks_to_vector_store error case."""
         mock_get_store.return_value = MagicMock()
         mock_vector_store = MagicMock()
-        mock_vector_store.add.side_effect = RuntimeError('Error')
+        mock_vector_store.add_batch.side_effect = RuntimeError('Error')
         mock_vector_store_cls.return_value = mock_vector_store
 
         manager = KnowledgeBaseManager(user_id='user123')
@@ -723,20 +723,17 @@ class TestAdditionalCoveragePaths:
             mime_type='text/plain',
         )
 
-        result = manager._add_chunk_to_vector_store(
-            mock_vector_store, chunk, doc, 'col123', 'test.txt'
-        )
-        assert result is False
+        result = manager._add_chunks_to_vector_store('col123', [chunk], doc, 'test.txt')
+        assert result == 0
 
     @patch('backend.knowledge.knowledge_base_manager.get_knowledge_base_store')
     @patch('backend.knowledge.knowledge_base_manager.EnhancedVectorStore')
-    def test_add_chunks_partial_failure(self, mock_vector_store_cls, mock_get_store):
-        """Test _add_chunks_to_vector_store with some failures."""
+    def test_add_chunks_batch_success(self, mock_vector_store_cls, mock_get_store):
+        """Test _add_chunks_to_vector_store with batch add success."""
         mock_store = MagicMock()
         mock_get_store.return_value = mock_store
 
         mock_vector_store = MagicMock()
-        mock_vector_store.add.side_effect = [None, RuntimeError('Error'), None]
         mock_vector_store_cls.return_value = mock_vector_store
 
         manager = KnowledgeBaseManager(user_id='user123')
@@ -753,17 +750,18 @@ class TestAdditionalCoveragePaths:
         )
 
         count = manager._add_chunks_to_vector_store('col123', chunks, doc, 'test.txt')
-        assert count == 2
+        assert count == 3
+        mock_vector_store.add_batch.assert_called_once()
 
     @patch('backend.knowledge.knowledge_base_manager.get_knowledge_base_store')
     @patch('backend.knowledge.knowledge_base_manager.EnhancedVectorStore')
     def test_add_chunks_all_fail(self, mock_vector_store_cls, mock_get_store):
-        """Test _add_chunks_to_vector_store when all fail."""
+        """Test _add_chunks_to_vector_store when batch add fails."""
         mock_store = MagicMock()
         mock_get_store.return_value = mock_store
 
         mock_vector_store = MagicMock()
-        mock_vector_store.add.side_effect = RuntimeError('Error')
+        mock_vector_store.add_batch.side_effect = RuntimeError('Error')
         mock_vector_store_cls.return_value = mock_vector_store
 
         manager = KnowledgeBaseManager(user_id='user123')

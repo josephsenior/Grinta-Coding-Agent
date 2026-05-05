@@ -185,13 +185,36 @@ def ledger_fake_prompt_style(ledger_status: str) -> str:
     return CLR_STATUS_OK + ' bold'
 
 
-def rich_compact_hud_line(fields: StatusFields) -> Text:
-    """Single-line Rich HUD: autonomy word, model, tokens, cost, calls, MCP, skills, icon."""
+def rich_compact_hud_line(fields: StatusFields, minimal: bool = False) -> Text:
+    """Single-line Rich HUD: autonomy word, model, tokens, cost, calls, MCP, skills, icon.
+
+    Args:
+        fields: StatusFields from HUD
+        minimal: If True, strip decorations and show only essential info
+    """
+    if minimal:
+        # Minimal mode: just model, tokens, cost, state
+        parts: list[tuple[str, str]] = []
+        if fields.model_display and fields.model_display != '(not set)/(not set)':
+            parts.append((fields.model_display, CLR_HUD_MODEL))
+            parts.append((' · ', CLR_SEP))
+        parts.append((fields.token_display_compact, CLR_HUD_DETAIL))
+        parts.append((' · ', CLR_SEP))
+        if fields.cost_usd > 0:
+            parts.append((f'${fields.cost_usd:.2f}', CLR_HUD_DETAIL))
+            parts.append((' · ', CLR_SEP))
+        parts.append((fields.agent_state_label, CLR_STATUS_OK))
+        txt = Text()
+        for content, style in parts:
+            txt.append(content, style=style)
+        return txt
+
+    # Full mode - all the information
     auto_lbl, auto_style = autonomy_word_label(fields.autonomy_level)
     group_sep = ('  │  ', CLR_SEP)
     item_sep = (' · ', CLR_SEP)
 
-    parts: list[tuple[str, str]] = [
+    parts = [
         (' ', ''),
         (auto_lbl, auto_style),
         (' ', ''),

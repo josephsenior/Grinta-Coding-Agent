@@ -249,10 +249,84 @@ class ChromaDBBackend(VectorBackend):
                     metadatas=chunk_metadatas,
                 )
 
+    def add_batch(
+        self,
+        step_ids: list[str],
+        roles: list[str],
+        artifact_hashes: list[str | None],
+        rationales: list[str | None],
+        content_texts: list[str],
+        metadatas: list[dict[str, Any] | None] | None = None,
+    ) -> None:
+        """Batch insert documents with parent-child chunking into ChromaDB.
+
+        Uses a single collection.add() call for all parents and another for
+        all children, drastically reducing embedding+I/O round trips.
+        """
+        if not step_ids:
+            return
+        # Ensure embedding model is loaded
+        _ = self.model
+
+        all_ids: list[str] = []
+        all_docs: list[str] = []
+        all_metas: list[dict[str, Any]] = []
+
+        child_ids: list[str] = []
+        child_docs: list[str] = []
+        child_metas: list[dict[str, Any]] = []
+
+        for idx, step_id in enumerate(step_ids):
+            text = self._prepare_text(rationales[idx], content_texts[idx])
+            doc_metadata: dict[str, Any] = {
+                'step_id': step_id,
+                'role': roles[idx],
+                'timestamp': time.time(),
+                'is_child': False,
+                **(metadatas[idx] or {}),
+            }
+            if artifact_hashes[idx]:
+                doc_metadata['artifact_hash'] = artifact_hashes[idx]
+
+            all_ids.append(step_id)
+            all_docs.append(text[:2000])
+            all_metas.append(doc_metadata)
+
+            # Generate child chunks
+            if len(text) > 600:
+                chunk_size = 400
+                overlap = 100
+                child_count = 0
+
+                for i in range(0, len(text), chunk_size - overlap):
+                    chunk = text[i : i + chunk_size]
+                    if len(chunk) < 100 and child_ids and child_ids[-1].startswith(f'{step_id}_child_'):
+                        continue
+                    child_count += 1
+                    child_ids.append(f'{step_id}_child_{child_count}')
+                    child_docs.append(chunk)
+                    child_metas.append({**doc_metadata, 'is_child': True, 'parent_id': step_id})
+
+                    if i + chunk_size >= len(text):
+                        break
+
+        # Single batch insert for all parents
+        if all_ids:
+            self.collection.add(ids=all_ids, documents=all_docs, metadatas=all_metas)
+
+        # Single batch insert for all children
+        if child_ids:
+            self.collection.add(ids=child_ids, documents=child_docs, metadatas=child_metas)
+
     def search(
         self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
-        """Search child chunks and return their parent documents for context."""
+        """Search child chunks and return their parent documents for context.
+
+        Uses a single query() call that includes documents, then resolves
+        parent texts from the same result set when possible, falling back
+        to a .get() only for parents whose text was not already returned.
+        """
         if self.collection.count() == 0:
             return []
 
@@ -261,14 +335,12 @@ class ChromaDBBackend(VectorBackend):
         # Search specifically for child chunks to get precise semantic matches
         search_filter = {'is_child': True}
         if filter_metadata:
-            # Combine filters if they don't conflict
             search_filter.update(filter_metadata)
 
+        n_results = min(k * 3, self.collection.count())
         results = self.collection.query(
             query_texts=[query],
-            n_results=min(
-                k * 3, self.collection.count()
-            ),  # Fetch more to find unique parents
+            n_results=n_results,
             where=search_filter,
             include=['documents', 'metadatas', 'distances'],
         )
@@ -288,9 +360,11 @@ class ChromaDBBackend(VectorBackend):
         if not results['ids'] or not results['ids'][0]:
             return []
 
-        # Map child matches back to their unique parents
-        parent_ids = []
-        scores = {}  # parent_id -> best_score
+        # Map child matches back to their unique parents, keeping best score and document text
+        parent_ids: list[str] = []
+        scores: dict[str, float] = {}
+        parent_texts: dict[str, str] = {}
+        parent_metas: dict[str, dict[str, Any]] = {}
 
         for i, meta in enumerate(results['metadatas'][0]):
             pid = meta.get('parent_id') or results['ids'][0][i]
@@ -300,23 +374,39 @@ class ChromaDBBackend(VectorBackend):
             if pid not in scores:
                 parent_ids.append(pid)
                 scores[pid] = score
+                # For parent-path fallback results, the document IS the parent text
+                if meta.get('is_child') is False:
+                    parent_texts[pid] = results['documents'][0][i]
+                    parent_metas[pid] = meta
+                else:
+                    # Capture parent_id metadata from the child match
+                    parent_metas[pid] = {
+                        k: v for k, v in meta.items() if k != 'parent_id'
+                    }
+                    parent_metas[pid].pop('is_child', None)
             else:
                 scores[pid] = max(scores[pid], score)
 
-        # Retrieve the full parent documents
-        parent_results = self.collection.get(
-            ids=parent_ids[:k],
-            include=['documents', 'metadatas'],
-        )
+        # Determine which parents still need their text fetched
+        needed_ids = [pid for pid in parent_ids[:k] if pid not in parent_texts]
+
+        if needed_ids:
+            parent_results = self.collection.get(
+                ids=needed_ids,
+                include=['documents', 'metadatas'],
+            )
+            for i, pid in enumerate(parent_results['ids']):
+                parent_texts[pid] = parent_results['documents'][i]
+                parent_metas[pid] = parent_results['metadatas'][i]
 
         final_results = []
-        for i, pid in enumerate(parent_results['ids']):
+        for pid in parent_ids[:k]:
             final_results.append(
                 {
                     'step_id': pid,
                     'score': scores.get(pid, 0.0),
-                    'excerpt': parent_results['documents'][i],
-                    **parent_results['metadatas'][i],
+                    'excerpt': parent_texts.get(pid, ''),
+                    **parent_metas.get(pid, {}),
                 }
             )
 
@@ -403,18 +493,39 @@ class SQLiteBM25Backend(VectorBackend):
             persist_directory = _default_memory_persist_directory('sqlite')
         persist_directory.mkdir(parents=True, exist_ok=True)
         self.db_path = persist_directory / f'{collection_name}_fts.db'
+        self._local = threading.local()
         self._init_db()
 
+    def _get_conn(self) -> sqlite3.Connection:
+        """Return a per-thread persistent SQLite connection."""
+        if not hasattr(self._local, 'conn') or self._local.conn is None:
+            conn = sqlite3.connect(self.db_path)
+            conn.execute('PRAGMA journal_mode=WAL')
+            conn.execute('PRAGMA synchronous=NORMAL')
+            self._local.conn = conn
+        return self._local.conn
+
+    def _close_conn(self) -> None:
+        """Close the per-thread connection if open."""
+        conn = getattr(self._local, 'conn', None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            self._local.conn = None
+
     def _init_db(self) -> None:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE VIRTUAL TABLE IF NOT EXISTS docs USING fts5(
-                    step_id UNINDEXED,
-                    role UNINDEXED,
-                    content,
-                    metadata UNINDEXED
-                )
-            """)
+        conn = self._get_conn()
+        conn.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS docs USING fts5(
+                step_id UNINDEXED,
+                role UNINDEXED,
+                content,
+                metadata UNINDEXED
+            )
+        """)
+        conn.commit()
 
     def add(
         self,
@@ -436,12 +547,50 @@ class SQLiteBM25Backend(VectorBackend):
         if artifact_hash:
             doc_metadata['artifact_hash'] = artifact_hash
 
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute('DELETE FROM docs WHERE step_id = ?', (step_id,))
-            conn.execute(
-                'INSERT INTO docs (step_id, role, content, metadata) VALUES (?, ?, ?, ?)',
-                (step_id, role, text[:2000], json.dumps(doc_metadata)),
-            )
+        conn = self._get_conn()
+        conn.execute(
+            'INSERT OR REPLACE INTO docs (step_id, role, content, metadata) VALUES (?, ?, ?, ?)',
+            (step_id, role, text[:2000], json.dumps(doc_metadata)),
+        )
+        conn.commit()
+
+    def add_batch(
+        self,
+        step_ids: list[str],
+        roles: list[str],
+        artifact_hashes: list[str | None],
+        rationales: list[str | None],
+        content_texts: list[str],
+        metadatas: list[dict[str, Any] | None] | None = None,
+    ) -> None:
+        """Batch insert documents using a single transaction.
+
+        Uses INSERT OR REPLACE for upsert semantics in one round trip.
+        """
+        if not step_ids:
+            return
+        if metadatas is None:
+            metadatas = [None] * len(step_ids)
+
+        conn = self._get_conn()
+        rows = []
+        for idx, step_id in enumerate(step_ids):
+            text = self._prepare_text(rationales[idx], content_texts[idx])
+            doc_metadata = {
+                'step_id': step_id,
+                'role': roles[idx],
+                'timestamp': time.time(),
+                **(metadatas[idx] or {}),
+            }
+            if artifact_hashes[idx]:
+                doc_metadata['artifact_hash'] = artifact_hashes[idx]
+            rows.append((step_id, roles[idx], text[:2000], json.dumps(doc_metadata)))
+
+        conn.executemany(
+            'INSERT OR REPLACE INTO docs (step_id, role, content, metadata) VALUES (?, ?, ?, ?)',
+            rows,
+        )
+        conn.commit()
 
     @staticmethod
     def _metadata_matches_filter(
@@ -492,51 +641,71 @@ class SQLiteBM25Backend(VectorBackend):
         match_query = ' OR '.join(words)
 
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    SELECT step_id, content, metadata, bm25(docs) as score
-                    FROM docs
-                    WHERE docs MATCH ?
-                    ORDER BY score ASC
-                    LIMIT ?
-                    """,
-                    (match_query, k * 2),
-                )
+            conn = self._get_conn()
+            cursor = conn.execute(
+                """
+                SELECT step_id, content, metadata, bm25(docs) as score
+                FROM docs
+                WHERE docs MATCH ?
+                ORDER BY score ASC
+                LIMIT ?
+                """,
+                (match_query, k * 2),
+            )
 
-                results: list[dict[str, Any]] = []
-                for step_id, content, meta_json, score in cursor:
-                    if self._append_fts_row(
-                        results,
-                        step_id=step_id,
-                        content=content,
-                        meta_json=meta_json,
-                        score=score,
-                        filter_metadata=filter_metadata,
-                        k=k,
-                    ):
-                        break
+            results: list[dict[str, Any]] = []
+            for step_id, content, meta_json, score in cursor:
+                if self._append_fts_row(
+                    results,
+                    step_id=step_id,
+                    content=content,
+                    meta_json=meta_json,
+                    score=score,
+                    filter_metadata=filter_metadata,
+                    k=k,
+                ):
+                    break
 
-                return results
+            return results
         except sqlite3.OperationalError as e:
             logger.warning("SQLite FTS search failed for query '%s': %s", query, e)
             return []
 
     def delete_by_metadata(self, filter_metadata: dict[str, Any]) -> int:
-        return 0
+        """Delete documents whose stored metadata matches all filter criteria."""
+        if not filter_metadata:
+            return 0
+
+        conn = self._get_conn()
+        # Fetch all rows and filter by metadata JSON (FTS5 doesn't index arbitrary
+        # JSON fields, so we must scan and match in Python).
+        cursor = conn.execute('SELECT rowid, metadata FROM docs')
+        ids_to_delete: list[int] = []
+        for rowid, meta_json in cursor:
+            meta = self._load_row_metadata(meta_json)
+            if self._metadata_matches_filter(meta, filter_metadata):
+                ids_to_delete.append(rowid)
+
+        if not ids_to_delete:
+            return 0
+
+        conn.executemany('DELETE FROM docs WHERE rowid = ?', [(rid,) for rid in ids_to_delete])
+        conn.commit()
+        return len(ids_to_delete)
 
     def delete_by_ids(self, ids: list[str]) -> int:
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.executemany(
-                'DELETE FROM docs WHERE step_id = ?', [(i,) for i in ids]
-            )
-            return cursor.rowcount
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        cursor.executemany(
+            'DELETE FROM docs WHERE step_id = ?', [(i,) for i in ids]
+        )
+        conn.commit()
+        return cursor.rowcount
 
     def stats(self) -> dict[str, Any]:
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute('SELECT count(*) FROM docs')
-            count = cursor.fetchone()[0]
+        conn = self._get_conn()
+        cursor = conn.execute('SELECT count(*) FROM docs')
+        count = cursor.fetchone()[0]
         return {
             'backend': 'SQLite FTS5 (BM25)',
             'num_documents': count,

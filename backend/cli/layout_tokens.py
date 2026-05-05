@@ -24,15 +24,15 @@ TRANSCRIPT_LEFT_INSET = 5
 TRANSCRIPT_RIGHT_INSET = 5
 
 # Inner padding for rounded callout-style panels (vertical, horizontal).
-CALLOUT_PANEL_PADDING = (1, 2)
+CALLOUT_PANEL_PADDING = (0, 1)
 
 # Inner padding for activity tool cards (tight horizontal rhythm).
-ACTIVITY_PANEL_PADDING = (1, 1)
+ACTIVITY_PANEL_PADDING = (0, 1)
 
 # Space below each activity block (tool rows) for scanability. A single blank
 # row keeps adjacent cards visually separated without making rapid tool
 # sequences feel sluggish or "loose".
-ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 1, 0)
+ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 0, 0)
 
 # Horizontal chrome added by ``format_callout_panel`` and rounded activity
 # panels: 2 border characters + ``CALLOUT_PANEL_PADDING`` horizontal cells on
