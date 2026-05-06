@@ -64,6 +64,9 @@ from backend.cli._event_renderer.text_utils import (
 from backend.cli._event_renderer.text_utils import (
     strip_pty_echo as _strip_pty_echo,
 )
+from backend.cli._tool_display.preview import (
+    file_read_syntax_highlight as _file_read_syntax_highlight,
+)
 from backend.cli._typing import ObservationRenderersHost
 from backend.cli.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
 from backend.cli.theme import (
@@ -558,19 +561,30 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
     def _render_file_read_observation(self, obs: FileReadObservation) -> None:
         self._stop_reasoning()
         content = getattr(obs, 'content', '') or ''
+        file_path = getattr(obs, 'path', None)
         n_lines = len(content.splitlines()) if content else 0
         pending = cast(Any, self._take_pending_activity_card('file_read'))
         result_message = self._file_read_result_message(content, n_lines)
+
+        # Try to add syntax highlighting
+        extra_lines = None
+        if n_lines > 0:
+            extra_lines = _file_read_syntax_highlight(content, file_path)
+
         if pending is not None:
             self._render_pending_activity_card(
                 pending,
                 result_message=result_message,
                 result_kind='neutral',
+                extra_lines=extra_lines,
             )
         elif n_lines:
             self._append_history(
                 format_activity_result_secondary(result_message, kind='neutral')
             )
+            if extra_lines:
+                for line in extra_lines:
+                    self._append_history(line)
 
     @staticmethod
     def _file_read_result_message(content: str, n_lines: int) -> str:
