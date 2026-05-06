@@ -699,6 +699,7 @@ def _handle_edit_symbol_body_command(
     """Handle edit_symbol_body command."""
     symbol_name = cast(str | None, arguments.get('symbol_name'))
     new_body = cast(str | None, arguments.get('new_body'))
+    line_number = cast(int | None, arguments.get('line_number'))
 
     if not symbol_name or not new_body:
         raise FunctionCallValidationError(
@@ -706,7 +707,16 @@ def _handle_edit_symbol_body_command(
         )
 
     logger.info(f"Executing edit_symbol_body: symbol='{symbol_name}' in {path}")
-    result = editor.edit_function(path, symbol_name, new_body)
+
+    from backend.utils.treesitter_editor import AmbiguousSymbolError
+
+    try:
+        result = editor.edit_function(path, symbol_name, new_body, line_number=line_number)
+    except AmbiguousSymbolError as e:
+        error_msg = f"Ambiguous symbol '{symbol_name}': {e}"
+        logger.warning(f'❌ {error_msg}')
+        from backend.core.errors import ToolExecutionError
+        raise ToolExecutionError(error_msg)
 
     if result.success:
         logger.info(f"✓ edit_symbol_body succeeded for '{symbol_name}'")

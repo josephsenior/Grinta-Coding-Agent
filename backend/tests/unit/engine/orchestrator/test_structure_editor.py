@@ -7,6 +7,7 @@ import textwrap
 
 import pytest
 
+from backend.core.file_history import global_undo_manager
 from backend.engine.tools.structure_editor import (
     EditorConfig,
     StructureEditor,
@@ -118,8 +119,9 @@ class TestInit:
         assert editor.refactor is not None
         assert editor.errors is not None
 
-    def test_undo_history_empty(self, editor):
-        assert editor._undo_history == {}
+    def test_undo_history_empty(self, editor, tmp_path):
+        test_file = str(tmp_path / "test.py")
+        assert not global_undo_manager.has_history(test_file)
 
 
 # ---------------------------------------------------------------------------
@@ -264,8 +266,7 @@ class TestUndoLastEdit:
     def test_undo_write_error(self, editor, tmp_path):
         f = tmp_path / 'canundo.py'
         f.write_text('x = 1\n')
-        # Manually push some history
-        editor._undo_history[str(f)] = [('h', 'original = True\n')]
+        global_undo_manager.push(str(f), 'original = True\n', "symbol_editor")
         result = editor.undo_last_edit(str(f))
         assert result.success is True
 
@@ -362,7 +363,7 @@ class TestReplaceCodeRange:
         f = tmp_path / 'undo_test.py'
         f.write_text('x = 1\ny = 2\nz = 3\n')
         editor.replace_code_range(str(f), 1, 1, 'x = 99')
-        assert str(f) in editor._undo_history
+        assert global_undo_manager.has_history(str(f))
 
 
 # ---------------------------------------------------------------------------
