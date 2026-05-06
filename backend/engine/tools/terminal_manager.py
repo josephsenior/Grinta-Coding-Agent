@@ -181,7 +181,10 @@ def handle_terminal_manager_tool(arguments: dict) -> Any:
         control_val = arguments.get('control')
         rows, cols = _opt_int(arguments.get('rows')), _opt_int(arguments.get('cols'))
         if not session_id:
-            raise ValueError("Terminal 'input' action requires 'session_id'")
+            raise ValueError(
+                "Terminal 'input' action requires 'session_id'. "
+                "Call action='open' first to start a terminal session and obtain a session_id."
+            )
         if (
             not str(input_val).strip()
             and not (control_val and str(control_val).strip())
@@ -213,7 +216,10 @@ def handle_terminal_manager_tool(arguments: dict) -> Any:
     elif action == 'read':
         session_id = arguments.get('session_id')
         if not session_id:
-            raise ValueError("Terminal 'read' action requires 'session_id'")
+            raise ValueError(
+                "Terminal 'read' action requires 'session_id'. "
+                "Call action='open' first to start a terminal session and obtain a session_id."
+            )
         mode = str(arguments.get('mode', 'delta') or 'delta').lower()
         if mode not in {'delta', 'snapshot'}:
             raise ValueError(
