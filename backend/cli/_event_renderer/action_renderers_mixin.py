@@ -490,8 +490,25 @@ class ActionRenderersMixin(_ActionRenderersBase):
                 else ('rd' if count % 10 == 3 and count % 11 != 3 else 'th')
             )
         )
+
+        # Get details about what's being condensed
+        pruned_count = 0
+        if action.pruned_event_ids:
+            pruned_count = len(action.pruned_event_ids)
+        elif action.pruned_events_start_id and action.pruned_events_end_id:
+            pruned_count = (
+                action.pruned_events_end_id - action.pruned_events_start_id + 1
+            )
+
         self._ensure_reasoning()
-        self._reasoning.update_action(f'Compressing context ({count}{suffix})…')
+        detail = f'{pruned_count} events' if pruned_count else ''
+        if detail:
+            self._reasoning.update_action(
+                f'Compressing context ({count}{suffix}) - {detail}…'
+            )
+        else:
+            self._reasoning.update_action(f'Compressing context ({count}{suffix})…')
+
         host = getattr(self, '_host', None)
         if host is not None:
             host._hud.update_condensation_count(count)
