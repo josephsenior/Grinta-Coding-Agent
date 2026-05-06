@@ -39,10 +39,13 @@ patterns, LaTeX).
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Markup / data files where literal ``\n`` / ``\"`` / ``\t`` pairs are NEVER
 # legal source text. For these we always repair on sight (no ratio check) —
@@ -301,6 +304,11 @@ def repair_literal_escapes(
 
     if repaired == content:
         return RepairReport(content, False, 0, 'no_residue')
+
+    path_str = str(path) if path else 'unknown'
+    logger.debug(
+        "Escape repair applied to %s: %d replacements", path_str, count
+    )
     return RepairReport(repaired, True, count, 'repaired')
 
 
