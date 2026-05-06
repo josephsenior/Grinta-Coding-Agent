@@ -133,4 +133,4 @@ def test_block_message_mentions_env_var(monkeypatch: pytest.MonkeyPatch) -> None
         workspace_root='/workspace',
     )
     assert msg is not None
-    assert 'security.allow_shell_file_writes' in msg
+    assert 'GRINTA_ALLOW_SHELL_WRITES' in msg

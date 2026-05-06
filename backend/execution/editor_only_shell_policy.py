@@ -177,5 +177,6 @@ _BLOCK_MSG = (
     '- `symbol_editor` (create_file, replace_range, …) for structured code modifications.\n'
     'Direct shell commands like `Set-Content`, `Out-File`, `tee`, or `>` / `>>` are only allowed for '
     '`.log` / `.tmp` files or files in temporary directories. To allow shell-level writes, set '
-    '`security.allow_shell_file_writes = true` in your `pyproject.toml` `[tool.grinta]` section.'
+    '`require_editor_for_shell_file_writes = false` in SecurityConfig or set env var '
+    '`GRINTA_ALLOW_SHELL_WRITES=1`.'
 )
