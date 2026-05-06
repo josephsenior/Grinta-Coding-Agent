@@ -35,6 +35,8 @@ class HUDState:
     workspace_path: str = ''
     #: Minimal mode strips borders and reduces information for cleaner display.
     minimal_mode: bool = False
+    #: Number of context condensations that have occurred in this session.
+    condensation_count: int = 0
 
 
 class HUDBar:
@@ -243,6 +245,10 @@ class HUDBar:
     def update_autonomy(self, level: str) -> None:
         """Update the autonomy level shown in the branded row."""
         self.state.autonomy_level = level
+
+    def update_condensation_count(self, count: int) -> None:
+        """Update the context condensation count displayed in HUD."""
+        self.state.condensation_count = max(0, count)
 
     def update_workspace(self, root: str | Path | None) -> None:
         """Set resolved workspace path for footer / Live HUD (empty if unknown)."""

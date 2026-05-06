@@ -479,9 +479,22 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self.refresh()
 
     def _render_condensation_action(self, action: CondensationAction) -> None:
-        del action
+        count = getattr(self, '_condensation_count', 0) + 1
+        self._condensation_count = count
+        suffix = (
+            'st'
+            if count % 10 == 1 and count % 11 != 1
+            else (
+                'nd'
+                if count % 10 == 2 and count % 11 != 2
+                else ('rd' if count % 10 == 3 and count % 11 != 3 else 'th')
+            )
+        )
         self._ensure_reasoning()
-        self._reasoning.update_action('Compressing context…')
+        self._reasoning.update_action(f'Compressing context ({count}{suffix})…')
+        host = getattr(self, '_host', None)
+        if host is not None:
+            host._hud.update_condensation_count(count)
         self.refresh()
 
     def _render_terminal_run_action(self, action: TerminalRunAction) -> None:

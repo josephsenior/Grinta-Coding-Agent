@@ -283,8 +283,9 @@ def _render_system_capabilities(
         provider_line = ''
     else:
         parallel_line = (
-            '- **Parallel tool scheduling**: DISABLED in this run.\n'
-            '  - Only emit one tool call at a time; batching is not supported.'
+            '- **Parallel tool calls**: NOT SUPPORTED by this model/run. '
+            'Emit exactly ONE tool call per assistant turn. '
+            'Batching multiple tool calls will cause errors.'
         )
         provider_line = ''
 

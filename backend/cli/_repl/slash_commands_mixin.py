@@ -498,9 +498,9 @@ class SlashCommandsMixin:
 
         condensation_count: int | str = 'n/a'
         if controller is not None:
-            state_obj = getattr(controller, 'state', None)
-            if state_obj is not None:
-                condensation_count = getattr(state_obj, 'condensation_count', 'n/a')
+            monitor = getattr(controller, 'memory_pressure', None)
+            if monitor is not None:
+                condensation_count = monitor._condensation_count
         lines.append(f'  condensation_events: {condensation_count}')
 
         hud = self._hud.state

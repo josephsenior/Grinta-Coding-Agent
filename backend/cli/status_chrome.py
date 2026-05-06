@@ -84,6 +84,8 @@ class StatusFields:
     agent_state_label: str
     autonomy_level: str
     workspace_path: str
+    #: Number of context condensations in this session.
+    condensation_count: int = 0
 
 
 def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
@@ -121,6 +123,7 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
         agent_state_label=str(hud.agent_state_label or 'Ready').strip(),
         autonomy_level=str(hud.autonomy_level or 'balanced').strip().lower(),
         workspace_path=str(getattr(hud, 'workspace_path', '') or '').strip(),
+        condensation_count=int(getattr(hud, 'condensation_count', 0) or 0),
     )
 
 
@@ -225,9 +228,16 @@ def rich_compact_hud_line(fields: StatusFields, minimal: bool = False) -> Text:
         (f'MCP: {fields.mcp_short}', CLR_HUD_DETAIL),
         item_sep,
         (f'Skills: {fields.skills_short}', CLR_HUD_DETAIL),
-        group_sep,
-        (ledger_icon(fields.ledger_status), ledger_rich_style(fields.ledger_status)),
     ]
+
+    if fields.condensation_count > 0:
+        parts.append(group_sep)
+        parts.append((f'💧 {fields.condensation_count}x', CLR_HUD_DETAIL))
+
+    parts.append(group_sep)
+    parts.append(
+        (ledger_icon(fields.ledger_status), ledger_rich_style(fields.ledger_status))
+    )
     txt = Text()
     for content, style in parts:
         txt.append(content, style=style)
@@ -270,9 +280,15 @@ def rich_fake_prompt_metrics_row(fields: StatusFields) -> Text:
         (f'MCP: {fields.mcp_short}', CLR_HUD_DETAIL),
         sep,
         (f'Skills: {fields.skills_short}', CLR_HUD_DETAIL),
-        sep,
-        (fields.ledger_status, ledger_style),
     ]
+    if fields.condensation_count > 0:
+        primary_parts.append(sep)
+        primary_parts.append(
+            (f'Condensed: {fields.condensation_count}x', CLR_HUD_DETAIL)
+        )
+
+    primary_parts.append(sep)
+    primary_parts.append((fields.ledger_status, ledger_style))
     row = Text()
     for content, style in primary_parts:
         row.append(content, style=style)
