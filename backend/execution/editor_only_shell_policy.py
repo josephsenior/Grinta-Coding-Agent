@@ -130,9 +130,10 @@ def evaluate_editor_only_shell_block(
 
     Precedence:
 
-    1. ``GRINTA_ALLOW_SHELL_WRITES=1`` env var → always allow.
-    2. ``security_config.require_editor_for_shell_file_writes=False`` → allow.
-    3. Otherwise run the pattern checks and block Set-Content/Out-File/
+    1. ``security_config.allow_shell_file_writes=True`` → always allow.
+    2. ``GRINTA_ALLOW_SHELL_WRITES=1`` env var → always allow (backward compat).
+    3. ``security_config.require_editor_for_shell_file_writes=False`` → allow.
+    4. Otherwise run the pattern checks and block Set-Content/Out-File/
        redirection/tee/dd when they target non-log files.
 
     workspace_root and cwd are reserved for future path-precision checks
@@ -140,6 +141,8 @@ def evaluate_editor_only_shell_block(
     """
     _ = Path(workspace_root)
     _ = cwd
+    if getattr(security_config, 'allow_shell_file_writes', False):
+        return None
     if _env_allow_shell_writes():
         return None
     if not getattr(security_config, 'require_editor_for_shell_file_writes', True):
@@ -173,6 +176,6 @@ _BLOCK_MSG = (
     '- `text_editor` (create_file, insert_text, edit_mode) for creating or editing source files.\n'
     '- `symbol_editor` (create_file, replace_range, …) for structured code modifications.\n'
     'Direct shell commands like `Set-Content`, `Out-File`, `tee`, or `>` / `>>` are only allowed for '
-    '`.log` / `.tmp` files or files in temporary directories. If you absolutely require shell-level '
-    'writes for non-source files, set the environment variable `GRINTA_ALLOW_SHELL_WRITES=1`.'
+    '`.log` / `.tmp` files or files in temporary directories. To allow shell-level writes, set '
+    '`security.allow_shell_file_writes = true` in your `pyproject.toml` `[tool.grinta]` section.'
 )

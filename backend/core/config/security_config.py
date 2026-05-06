@@ -122,6 +122,14 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             'scripts to generate files.'
         ),
     )
+    allow_shell_file_writes: bool = Field(
+        default=False,
+        description=(
+            'Override to allow shell file writes regardless of require_editor_for_shell_file_writes. '
+            'Convenience flag that bypasses the editor-only policy. Set True to allow shell '
+            'commands to write files directly.'
+        ),
+    )
     model_config = ConfigDict(extra='ignore')
 
     @classmethod
