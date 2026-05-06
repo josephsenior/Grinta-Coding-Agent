@@ -1023,15 +1023,6 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             return
         plain_summary = self._summarize_plain_match_lines(s)
         if plain_summary is not None:
-            lines = [ln for ln in s.splitlines() if ln.strip()]
-            if len(lines) <= 24:
-                for ln in lines:
-                    self._append_history(
-                        self._linkify_ripgrep_line(
-                            ln.strip(), accent_style=LIVE_PANEL_ACCENT_STYLE
-                        )
-                    )
-                return
             self._append_history(Text(plain_summary, style=LIVE_PANEL_ACCENT_STYLE))
             return
         self._append_history(Padding(Markdown(display_content), (0, 0, 1, 0)))

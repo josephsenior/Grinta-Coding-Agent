@@ -35,7 +35,7 @@ class TestToolHeadline(unittest.TestCase):
 class TestFriendlyVerbForTool(unittest.TestCase):
     def test_text_editor_read(self) -> None:
         v = friendly_verb_for_tool('text_editor', {'command': 'read_file'})
-        self.assertEqual(v, 'Viewed')
+        self.assertEqual(v, 'Read')
 
     def test_text_editor_create(self) -> None:
         v = friendly_verb_for_tool('text_editor', {'command': 'create_file'})

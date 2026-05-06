@@ -43,7 +43,7 @@ ACTIVITY_PANEL_CHROME_WIDTH = 2 + 2 * ACTIVITY_PANEL_PADDING[1]
 
 # Shared palette for the transcript chrome. Centralizing these keeps live panels,
 # activity cards, and decision callouts visually consistent during long sessions.
-ACTIVITY_SECTION_TITLE = 'Activity'
+ACTIVITY_SECTION_TITLE = ''
 ACTIVITY_CARD_BORDER_STYLE = CLR_CARD_BORDER
 ACTIVITY_CARD_TITLE_STYLE = CLR_CARD_TITLE
 LIVE_PANEL_ACCENT_STYLE = CLR_THINKING_BORDER
