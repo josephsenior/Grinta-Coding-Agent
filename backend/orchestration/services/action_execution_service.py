@@ -401,9 +401,9 @@ class ActionExecutionService:
             )
         if isinstance(exc, LLMNoActionError):
             return (
-                'You returned an empty response with no tool calls. '
-                'You MUST either use a tool (e.g. read a file, run a command) '
-                'or send a message to the user to continue.'
+                'No tool call detected - the response contains text but no tool call.\n\n'
+                'Use tool calls: text_editor to edit files, terminal_manager to run commands, '
+                'think to reason, or send a message to the user.'
             )
         return str(exc)
 
@@ -598,15 +598,16 @@ class ActionExecutionService:
                 self._null_recovery_rounds,
                 self._MAX_NULL_RECOVERY_ROUNDS,
             )
+            # Make recovery message visible to user (notify_ui_only) so they see why agent is retrying
             self._publish_agent_event(
                 ErrorObservation(
                     content=(
-                        'You have returned no executable action for several consecutive steps.\n\n'
-                        'You MUST emit a concrete tool call right now. Do not describe what you '
-                        'would do — actually do it. Pick the single most important next step '
-                        '(e.g. run a command, read a file, write code) and execute it immediately.'
+                        'No tool call detected — retrying with explicit instruction.\n\n'
+                        'You MUST use a tool: text_editor, terminal_manager, think, or similar.\n'
+                        'Pick the single most important next step and execute it now.'
                     ),
                     error_id='NULL_ACTION_LOOP_RECOVERY',
+                    notify_ui_only=True,
                 )
             )
             return action  # let the loop continue
@@ -617,13 +618,16 @@ class ActionExecutionService:
             self._MAX_NULL_RECOVERY_ROUNDS,
         )
         self._null_recovery_rounds = 0
+        # Make final pause message visible to user
         self._publish_agent_event(
             ErrorObservation(
                 content=(
-                    'The model returned no executable action for multiple consecutive '
-                    'steps. Pausing to avoid a no-progress loop that burns model calls.'
+                    'Agent returned no tool calls for multiple steps.\n'
+                    'Pausing to avoid wasted API calls.\n'
+                    'Provide clearer instructions or ask the agent to retry.'
                 ),
                 error_id='NULL_ACTION_LOOP',
+                notify_ui_only=True,
             )
         )
 

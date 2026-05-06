@@ -203,8 +203,8 @@ class TestHandleTextEditorTool:
         assert isinstance(action, FileReadAction)
         assert action.view_range == [10, 20]
 
-    def test_edit_command_is_rejected(self):
-        with pytest.raises(FunctionCallValidationError, match="Unknown command 'edit'"):
+    def test_edit_command_without_edit_mode_is_rejected(self):
+        with pytest.raises(FunctionCallValidationError, match="edit_mode"):
             _handle_text_editor_tool(
                 {
                     'command': 'edit',

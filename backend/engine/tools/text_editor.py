@@ -11,7 +11,7 @@ from backend.inference.tool_names import TEXT_EDITOR_TOOL_NAME
 
 _DETAILED_TEXT_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
 * `read_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
-* `create_file`: create or fully overwrite a file with the given content. Requires `file_text` — full-file body. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call.
+* `create_file`: create a new file or fully overwrite an existing file with the given content. Requires `file_text` — full-file body. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call. Use this command for both new files and updating existing files.
 * `insert_text`: insert `new_str` after `insert_line`.
 * `undo_last_edit`: revert the last successful edit/write to this file in the current session (bounded history). Prefer checkpoint/rollback for large reversions.
 * `edit_mode`: deterministic non-code editing primitives:
@@ -38,6 +38,7 @@ If the tool reports `Syntax validation failed` with a hint about literal escape 
 _SHORT_TEXT_EDITOR_DESCRIPTION = (
     'File reading, creation, and editing tool. '
     'Commands: read_file, create_file, insert_text, undo_last_edit. '
+    'create_file creates new files OR overwrites existing files. '
     'Use edit_mode=range or symbol_editor for deterministic edits. '
     'Supports edit_mode=format|section|range|patch. '
     'Use project-relative paths.\n'

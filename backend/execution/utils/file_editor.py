@@ -636,17 +636,8 @@ class FileEditor(FileEditorEditOpsMixin):
         dry_run: bool,
     ) -> ToolResult | None:
         """Early exits before validation / disk write."""
-        if is_create and file_existed:
-            # ``create_file`` on an already-existing file always returns
-            # silent success WITHOUT overwriting.  Agents should use
-            # ``str_replace`` to edit existing files.  Returning
-            # old==new lets the stuck-detector recognise repeated
-            # no-change create attempts and nudge the model forward.
-            return ToolResult(
-                output='File created successfully',
-                old_content=old_content,
-                new_content=old_content,
-            )
+        # create_file now overwrites existing files (was changed from silent-success behavior).
+        # The 'write' command is the explicit overwrite option.
         if dry_run:
             return ToolResult(
                 output='Preview generated (no changes applied)',

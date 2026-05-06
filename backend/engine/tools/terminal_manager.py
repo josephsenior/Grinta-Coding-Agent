@@ -17,22 +17,13 @@ def create_terminal_manager_tool() -> dict[str, Any]:
             'name': TERMINAL_MANAGER_TOOL_NAME,
             'description': (
                 'Interactive PTY terminal (same session across open → read → input). '
-                'action=open runs ``command`` once (a newline is appended server-side—'
-                'the shell executes it immediately on PowerShell and bash). Then use '
-                'action=read (prefer mode=delta; reuse next_offset from the last result, '
-                'or omit offset on read to continue from the server cursor) before sending '
-                'more input. For a second command in the same session, use action=input '
-                'with the next line (e.g. ``dir`` or ``ls``), not repeated blank Enter/control '
-                'unless you are diagnosing a hung prompt. Do not spam identical control/input '
-                'when reads show no new bytes. On Windows the shell is often PowerShell—use '
-                'PowerShell cmdlets, not Unix-only tools, unless you know the session is bash. '
-                'TIMING: open and input poll the PTY internally for the first byte of '
-                'output (early-exit on arrival, capped by GRINTA_PTY_OPEN_READ_TIMEOUT_SECONDS '
-                '/ GRINTA_PTY_INPUT_READ_TIMEOUT_SECONDS env vars). An empty result with '
-                'has_new_output=false is normal for slow commands — wait and call action=read '
-                'again instead of resending input. Use action=open with is_background=true '
-                'on the underlying execute_bash for log tails or servers; do not park them '
-                'inside this tool.'
+                'action=open starts a session and runs the first command. '
+                'action=read fetches output (use mode=delta, remember next_offset). '
+                'action=input sends subsequent commands to the SAME session. '
+                'Do NOT call action=open again for new commands — that creates a new session. '
+                'On Windows the shell is usually PowerShell. '
+                'IMPORTANT: If action=read returns empty output, wait 1-2 seconds and retry — '
+                'slow commands take time to produce output. Do NOT resend the command.'
             ),
             'parameters': {
                 'type': 'object',
