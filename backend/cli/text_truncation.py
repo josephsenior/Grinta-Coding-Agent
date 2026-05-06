@@ -48,7 +48,7 @@ def shorten_path(path: str, max_len: int = 48) -> str:
     """
     if not path or len(path) <= max_len:
         return path
-    tail = path[-(max_len - 1):]
+    tail = path[-(max_len - 1) :]
     return '…' + tail
 
 

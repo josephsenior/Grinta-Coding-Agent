@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.cli._event_renderer.error_categories._matchers import _any, _and, _has
+from backend.cli._event_renderer.error_categories._matchers import _and, _any, _has
 from backend.cli._event_renderer.panels import ErrorGuidance, _GuidanceRule
 
 TIMEOUT_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (

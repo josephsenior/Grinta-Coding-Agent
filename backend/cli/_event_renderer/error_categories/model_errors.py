@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from backend.cli._event_renderer.error_categories._matchers import _any, _context_size_match, _has
+from backend.cli._event_renderer.error_categories._matchers import (
+    _any,
+    _context_size_match,
+    _has,
+)
 from backend.cli._event_renderer.panels import ErrorGuidance, _GuidanceRule
 
 MODEL_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (

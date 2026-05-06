@@ -120,7 +120,7 @@ class TestInit:
         assert editor.errors is not None
 
     def test_undo_history_empty(self, editor, tmp_path):
-        test_file = str(tmp_path / "test.py")
+        test_file = str(tmp_path / 'test.py')
         assert not global_undo_manager.has_history(test_file)
 
 
@@ -266,7 +266,7 @@ class TestUndoLastEdit:
     def test_undo_write_error(self, editor, tmp_path):
         f = tmp_path / 'canundo.py'
         f.write_text('x = 1\n')
-        global_undo_manager.push(str(f), 'original = True\n', "symbol_editor")
+        global_undo_manager.push(str(f), 'original = True\n', 'symbol_editor')
         result = editor.undo_last_edit(str(f))
         assert result.success is True
 

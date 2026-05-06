@@ -12,7 +12,7 @@ class UndoSnapshot:
     """A snapshot of file content with metadata."""
 
     content: str | None  # None means file didn't exist
-    editor: Literal["text_editor", "symbol_editor"]
+    editor: Literal['text_editor', 'symbol_editor']
     timestamp: float
 
 
@@ -25,12 +25,17 @@ class UndoHistoryManager:
         )
 
     def push(
-        self, path: str, snapshot: str | None, editor: Literal["text_editor", "symbol_editor"]
+        self,
+        path: str,
+        snapshot: str | None,
+        editor: Literal['text_editor', 'symbol_editor'],
     ) -> None:
         """Record a file snapshot before modification."""
         import time
 
-        self._history[path].append(UndoSnapshot(content=snapshot, editor=editor, timestamp=time.time()))
+        self._history[path].append(
+            UndoSnapshot(content=snapshot, editor=editor, timestamp=time.time())
+        )
 
     def pop(self, path: str) -> str | None:
         """Pop the last snapshot for a path, raising IndexError if empty."""

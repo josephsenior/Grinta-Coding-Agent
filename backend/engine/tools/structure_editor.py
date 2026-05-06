@@ -247,7 +247,11 @@ class StructureEditor:
         return EditResult(success=True, message='\n'.join(output))
 
     def edit_function(
-        self, path: str, function_name: str, new_body: str, line_number: int | None = None
+        self,
+        path: str,
+        function_name: str,
+        new_body: str,
+        line_number: int | None = None,
     ) -> EditResult:
         """Edit a function by name (works for ANY language).
 
@@ -454,7 +458,7 @@ class StructureEditor:
                 if os.path.exists(path):
                     with open(path, encoding='utf-8') as f:
                         old_content = f.read()
-                global_undo_manager.push(path, old_content, "symbol_editor")
+                global_undo_manager.push(path, old_content, 'symbol_editor')
             except Exception as e:
                 logger.warning('Failed to save undo history: %s', e)
 

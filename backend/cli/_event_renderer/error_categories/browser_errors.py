@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.cli._event_renderer.error_categories._matchers import _any, _and
+from backend.cli._event_renderer.error_categories._matchers import _any
 from backend.cli._event_renderer.panels import ErrorGuidance, _GuidanceRule
 
 BROWSER_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (

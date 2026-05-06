@@ -306,9 +306,7 @@ def repair_literal_escapes(
         return RepairReport(content, False, 0, 'no_residue')
 
     path_str = str(path) if path else 'unknown'
-    logger.debug(
-        "Escape repair applied to %s: %d replacements", path_str, count
-    )
+    logger.debug('Escape repair applied to %s: %d replacements', path_str, count)
     return RepairReport(repaired, True, count, 'repaired')
 
 
