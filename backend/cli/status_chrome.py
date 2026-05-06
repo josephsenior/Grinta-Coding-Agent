@@ -191,18 +191,18 @@ def ledger_fake_prompt_style(ledger_status: str) -> str:
 
 def _token_progress_bar(pct: int, width: int = 8) -> str:
     """Generate a token usage progress bar.
-    
+
     Args:
         pct: Percentage (0-100)
         width: Number of bar characters
-        
+
     Returns:
         Progress bar string like '#####-- 65%'
     """
     if pct <= 0:
         return f'[{"-" * width}] 0%'
     if pct >= 100:
-        return f'[{pct}%]' # Show 100% without bar to save space
+        return f'[{pct}%]'  # Show 100% without bar to save space
     filled = pct * width // 100
     empty = width - filled
     return f'[{"=" * filled}{"-" * empty}] {pct}%'
