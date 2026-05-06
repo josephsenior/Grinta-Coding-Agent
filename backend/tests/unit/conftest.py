@@ -22,6 +22,12 @@ _OS_CAP_FIELDS = (
 
 
 @pytest.fixture(autouse=True)
+def _clear_env_before_test(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clear GRINTA_ALLOW_SHELL_WRITES before each test to ensure deterministic behavior."""
+    monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _restore_os_capabilities_after_test() -> None:
     """Reset :data:`OS_CAPS` after each test (``override_os_capabilities`` is in-process)."""
     yield

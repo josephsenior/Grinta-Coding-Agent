@@ -528,7 +528,13 @@ class TreeSitterEditor:
                 except AmbiguousSymbolError:
                     if line_number:
                         return self._find_method_in_class_by_line(
-                            tree, file_bytes, parts[0], parts[1], file_path, language, line_number
+                            tree,
+                            file_bytes,
+                            parts[0],
+                            parts[1],
+                            file_path,
+                            language,
+                            line_number,
                         )
                     raise
 
@@ -607,7 +613,12 @@ class TreeSitterEditor:
                     f"AST contains errors, attempting text-based fallback for '{function_name}'"
                 )
                 return self._edit_function_text_fallback(
-                    file_path, function_name, new_body, original_code, language, validate
+                    file_path,
+                    function_name,
+                    new_body,
+                    original_code,
+                    language,
+                    validate,
                 )
             logger.warning(f"Symbol '{function_name}' not found in {file_path}")
             return EditResult(
@@ -1037,7 +1048,9 @@ class TreeSitterEditor:
             ]
 
         # Find ALL matching nodes (not just first) to detect ambiguity
-        all_nodes = self._find_all_nodes_by_name(root, file_bytes, symbol_name, node_types)
+        all_nodes = self._find_all_nodes_by_name(
+            root, file_bytes, symbol_name, node_types
+        )
         if not all_nodes:
             return None
 
@@ -1272,7 +1285,11 @@ class TreeSitterEditor:
             lines = original_code[body_start:].split('\n')
             body_end = body_start
             for i, line in enumerate(lines[1:], start=1):
-                if line.strip() and not line.startswith(indent) and not line.startswith(' ' * (len(indent) + 1)):
+                if (
+                    line.strip()
+                    and not line.startswith(indent)
+                    and not line.startswith(' ' * (len(indent) + 1))
+                ):
                     body_end = body_start + sum(len(l) + 1 for l in lines[:i])
                     break
 
@@ -1285,7 +1302,7 @@ class TreeSitterEditor:
                 if not is_valid:
                     return EditResult(
                         success=False,
-                        message=f"Text fallback produced invalid syntax: {error_msg}",
+                        message=f'Text fallback produced invalid syntax: {error_msg}',
                         original_code=original_code,
                     )
 
@@ -1302,10 +1319,10 @@ class TreeSitterEditor:
                 original_code=original_code,
             )
         except Exception as e:
-            logger.error(f"Text fallback failed: {e}")
+            logger.error(f'Text fallback failed: {e}')
             return EditResult(
                 success=False,
-                message=f"Text fallback error: {e}",
+                message=f'Text fallback error: {e}',
                 original_code=original_code,
             )
 

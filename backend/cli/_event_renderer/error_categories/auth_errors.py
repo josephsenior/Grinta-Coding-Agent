@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from backend.cli._event_renderer.error_categories._matchers import _any, _has, _no_api_key_match
+from backend.cli._event_renderer.error_categories._matchers import (
+    _any,
+    _no_api_key_match,
+)
 from backend.cli._event_renderer.panels import ErrorGuidance, _GuidanceRule
 
 AUTH_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (

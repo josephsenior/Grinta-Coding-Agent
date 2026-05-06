@@ -90,7 +90,18 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ),
     ),
     _GuidanceRule(
-        _any('503', '502', '504', 'service unavailable', 'temporarily unavailable', 'bad gateway', 'gateway timeout', 'overloaded', 'over capacity', 'capacity error'),
+        _any(
+            '503',
+            '502',
+            '504',
+            'service unavailable',
+            'temporarily unavailable',
+            'bad gateway',
+            'gateway timeout',
+            'overloaded',
+            'over capacity',
+            'capacity error',
+        ),
         ErrorGuidance(
             summary='The provider endpoint is temporarily overloaded or unavailable.',
             steps=(

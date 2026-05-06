@@ -506,7 +506,9 @@ class RunHelpersMixin:
                     renderer.start_live()
                     await renderer.add_user_message(str(msg_content))
                 else:
-                    renderer.add_system_message('Condensing context\u2026', title='grinta')
+                    renderer.add_system_message(
+                        'Condensing context\u2026', title='grinta'
+                    )
                     renderer.start_live()
                 return initial_action
         self._last_user_message = text

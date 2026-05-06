@@ -29,20 +29,20 @@ class TestFileEditorRecreate(unittest.TestCase):
         self.assertTrue(path.exists())
 
     def test_recreate_existing_file_silent_success(self):
-        """Re-creating an existing file returns silent success."""
+        """Re-creating an existing file now overwrites (changed from silent-success)."""
         path = Path(self.tmpdir) / 'existing.py'
         path.write_text('original content', encoding='utf-8')
 
         result = self.editor._handle_write(path, 'new content', is_create=True)
 
-        # Should succeed silently
+        # Should succeed
         self.assertIn('created', result.output.lower())
         self.assertIsNone(result.error)
-        # old_content == new_content signals re-creation to stuck detector
-        self.assertEqual(result.old_content, result.new_content)
+        # old_content != new_content (file was overwritten)
         self.assertEqual(result.old_content, 'original content')
-        # File should NOT be overwritten
-        self.assertEqual(path.read_text(encoding='utf-8'), 'original content')
+        self.assertEqual(result.new_content, 'new content')
+        # File SHOULD be overwritten (new behavior)
+        self.assertEqual(path.read_text(encoding='utf-8'), 'new content')
 
     def test_write_existing_file_overwrites(self):
         """Normal write (not create) to existing file overwrites content."""
@@ -57,16 +57,17 @@ class TestFileEditorRecreate(unittest.TestCase):
         self.assertEqual(path.read_text(encoding='utf-8'), 'new')
 
     def test_recreate_sets_old_equals_new(self):
-        """Re-creation sets old_content == new_content for stuck detection."""
+        """Re-creation now overwrites, so old != new."""
         path = Path(self.tmpdir) / 'component.tsx'
         original = 'export default function Page() { return <div/>; }'
         path.write_text(original, encoding='utf-8')
 
         result = self.editor._handle_write(path, 'different content', is_create=True)
 
-        # Key invariant: old == new so stuck detector sees "no_change"
+        # old != new (file was overwritten)
         self.assertIsNotNone(result.old_content)
-        self.assertEqual(result.old_content, result.new_content)
+        self.assertEqual(result.old_content, original)
+        self.assertEqual(result.new_content, 'different content')
 
 
 if __name__ == '__main__':

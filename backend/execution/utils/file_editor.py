@@ -109,7 +109,9 @@ def _attempt_escape_repair_at_disk_write(content: str, file_path: Path) -> str:
 
 def _normalize_newlines_for_metadata(content: str, meta: _FileReadMeta) -> str:
     if meta.newline == 'crlf':
-        return content.replace('\r\n', '\n').replace('\n', '\r\n')
+        content = content.replace('\r\n', '\n')
+        content = content.replace('\r', '')
+        return content.replace('\n', '\r\n')
     return content
 
 
@@ -855,12 +857,17 @@ class FileEditor(FileEditorEditOpsMixin):
         return ''.join(result_lines)
 
     def _replace_range(
-        self, content: str, new_text: str, start_line: int, end_line: int,
+        self,
+        content: str,
+        new_text: str,
+        start_line: int,
+        end_line: int,
         expected_hash: str | None = None,
     ) -> str | ToolResult:
         """Replace a range of lines with new text."""
         # Check expected_hash (content hash) if provided
         import hashlib
+
         content_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
         if expected_hash and content_hash != expected_hash:
             return ToolResult(
@@ -918,8 +925,11 @@ class FileEditor(FileEditorEditOpsMixin):
         end_idx = min(end_idx, len(lines))
 
         # Detect original file newline style and normalize new_text to match
+        # First normalize all newlines to \n, then convert to target style
         original_newline = '\r\n' if '\r\n' in content else '\n'
-        new_text_normalized = new_text.replace('\r\n', original_newline).replace('\n', original_newline).replace('\r', original_newline)
+        new_text_normalized = new_text.replace('\r\n', '\n').replace('\r', '\n')
+        if original_newline == '\r\n':
+            new_text_normalized = new_text_normalized.replace('\n', '\r\n')
         new_lines_to_insert = new_text_normalized.splitlines(keepends=True)
 
         result_lines = lines[:start_idx] + new_lines_to_insert + lines[end_idx:]

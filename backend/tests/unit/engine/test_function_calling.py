@@ -204,7 +204,7 @@ class TestHandleTextEditorTool:
         assert action.view_range == [10, 20]
 
     def test_edit_command_without_edit_mode_is_rejected(self):
-        with pytest.raises(FunctionCallValidationError, match="edit_mode"):
+        with pytest.raises(FunctionCallValidationError, match='edit_mode'):
             _handle_text_editor_tool(
                 {
                     'command': 'edit',

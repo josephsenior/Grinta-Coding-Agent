@@ -183,8 +183,8 @@ def test_resolve_workspace_path_relative_to_working_dir(tmp_path: Path) -> None:
     rel = resolve_workspace_path('sub/file.txt', str(nested), str(workspace))
     assert rel == (nested / 'sub/file.txt').resolve()
 
-    direct = resolve_workspace_path(str(abs_file), str(nested), str(workspace))
-    assert direct == abs_file.resolve()
+    with pytest.raises(ValueError, match='outside the workspace root'):
+        resolve_workspace_path(str(abs_file), str(nested), str(workspace))
 
 
 @pytest.mark.integration

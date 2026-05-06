@@ -53,7 +53,9 @@ ALL_GUIDANCE_RULES: tuple = (
 NOTICE_TITLE_RULES: tuple = (
     (lambda lower: 'verification required' in lower, 'Need fresh evidence'),
     (
-        lambda lower: any(s in lower for s in ('no executable action', 'no-progress loop')),
+        lambda lower: any(
+            s in lower for s in ('no executable action', 'no-progress loop')
+        ),
         'Paused safely',
     ),
     (lambda lower: 'intermediate control tool' in lower, 'Continuing work'),
@@ -61,20 +63,43 @@ NOTICE_TITLE_RULES: tuple = (
     (
         lambda lower: any(
             s in lower
-            for s in ('rate limit', 'provider limit', 'too many requests', '429', 'quota', 'billing')
+            for s in (
+                'rate limit',
+                'provider limit',
+                'too many requests',
+                '429',
+                'quota',
+                'billing',
+            )
         ),
         'Rate or quota limit',
     ),
     (
         lambda lower: any(
-            s in lower for s in ('connection', 'unreachable', 'connect error', 'dns', 'ssl', 'certificate')
+            s in lower
+            for s in (
+                'connection',
+                'unreachable',
+                'connect error',
+                'dns',
+                'ssl',
+                'certificate',
+            )
         ),
         'Connection issue',
     ),
     (lambda lower: 'debugger start failed during' in lower, 'Debugger startup issue'),
-    (lambda lower: 'default shell session not initialized' in lower, 'Shell session issue'),
+    (
+        lambda lower: 'default shell session not initialized' in lower,
+        'Shell session issue',
+    ),
     (lambda lower: 'stuck loop' in lower, 'Stuck pattern'),
-    (lambda lower: any(s in lower for s in ('timeout', 'timed out', 'did not answer')), 'Request timed out'),
+    (
+        lambda lower: any(
+            s in lower for s in ('timeout', 'timed out', 'did not answer')
+        ),
+        'Request timed out',
+    ),
 )
 
 
