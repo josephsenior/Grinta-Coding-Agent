@@ -11,6 +11,8 @@ Edit the user path directly; no shadow copies; remove temp files when done.
 
 <CODE_QUALITY>
 Minimal diff unless asked. Keep imports at top.
+**Structural Integrity:** No circular dependencies; clean abstraction boundaries.
+**Defensive Programming:** Graceful failure; thorough error handling.
 </CODE_QUALITY>
 
 <PROCESS_MANAGEMENT>
