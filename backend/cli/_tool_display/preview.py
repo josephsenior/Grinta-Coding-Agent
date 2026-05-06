@@ -56,6 +56,18 @@ _VERBOSE_MCP_JSON = os.environ.get(
     'yes',
 }
 
+# File read syntax highlighting
+# ---------------------------------------------------------------------------
+_GRINTA_FILE_READ_SYNTAX = os.environ.get(
+    'GRINTA_FILE_READ_SYNTAX', ''
+).strip().lower() in {
+    '1',
+    'true',
+    'yes',
+}
+
+_FILE_READ_MAX_LINES_FOR_SYNTAX = 500
+
 
 def _mcp_try_json_blob(blob: str) -> Any | None:
     s = blob.strip()
@@ -299,9 +311,151 @@ def mcp_result_syntax_extras(
     ]
 
 
-# ---------------------------------------------------------------------------
-# Try-format-message-as-tool-json
-# ---------------------------------------------------------------------------
+def file_read_syntax_highlight(
+    content: str,
+    file_path: str | None = None,
+    max_lines: int = _FILE_READ_MAX_LINES_FOR_SYNTAX,
+) -> list[Any] | None:
+    """Rich Syntax for file read content — opt-in via ``GRINTA_FILE_READ_SYNTAX``.
+
+    Args:
+        content: The file content to syntax highlight
+        file_path: Optional file path for language detection
+        max_lines: Maximum lines to show with syntax (default 500)
+
+    Returns:
+        List with Rich Syntax object, or None if disabled/not applicable
+    """
+    if not _GRINTA_FILE_READ_SYNTAX:
+        return None
+    s = (content or '').strip()
+    if not s:
+        return None
+    lines = s.split('\n')
+    if len(lines) > max_lines:
+        return None
+
+    # Infer language from file extension or content
+    lexer = None
+    if file_path:
+        ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
+        lexer = _EXT_TO_LEXER.get(ext)
+
+    # Try to detect from content
+    if not lexer:
+        lexer = _guess_lexer_from_content(s)
+
+    if not lexer:
+        return None
+
+    body = s
+    if len(s) > 20_000:
+        body = s[:20_000] + '\n… (truncated)'
+
+    return [
+        Syntax(
+            body,
+            lexer,
+            word_wrap=True,
+            theme='monokai',
+            line_numbers=True,
+            padding=(1, 1),
+        )
+    ]
+
+
+# Lexer mapping for common file extensions
+_EXT_TO_LEXER: dict[str, str] = {
+    'py': 'python',
+    'js': 'javascript',
+    'ts': 'typescript',
+    'jsx': 'javascript',
+    'tsx': 'typescript',
+    'rb': 'ruby',
+    'go': 'go',
+    'rs': 'rust',
+    'java': 'java',
+    'c': 'c',
+    'cpp': 'cpp',
+    'h': 'c',
+    'hpp': 'cpp',
+    'cs': 'csharp',
+    'php': 'php',
+    'swift': 'swift',
+    'kt': 'kotlin',
+    'scala': 'scala',
+    'sh': 'bash',
+    'bash': 'bash',
+    'zsh': 'bash',
+    'fish': 'bash',
+    'ps1': 'powershell',
+    'psm1': 'powershell',
+    'yaml': 'yaml',
+    'yml': 'yaml',
+    'json': 'json',
+    'toml': 'toml',
+    'xml': 'xml',
+    'html': 'html',
+    'css': 'css',
+    'scss': 'scss',
+    'less': 'less',
+    'sql': 'sql',
+    'md': 'markdown',
+    'markdown': 'markdown',
+    'r': 'r',
+    'lua': 'lua',
+    'pl': 'perl',
+    'ex': 'elixir',
+    'exs': 'elixir',
+    'erl': 'erlang',
+    'hs': 'haskell',
+    'clj': 'clojure',
+    'jl': 'julia',
+    'vim': 'vim',
+    'ini': 'ini',
+    'cfg': 'ini',
+    'conf': 'ini',
+}
+
+
+def _guess_lexer_from_content(content: str) -> str | None:
+    """Simple heuristic to guess lexer from file content."""
+    # Check for shebang
+    lines = content.split('\n')[:3]
+    for line in lines:
+        if line.startswith('#!'):
+            if 'python' in line:
+                return 'python'
+            if 'node' in line:
+                return 'javascript'
+            if 'bash' in line or 'sh' in line:
+                return 'bash'
+            if 'ruby' in line:
+                return 'ruby'
+            if 'perl' in line:
+                return 'perl'
+            if 'php' in line:
+                return 'php'
+
+    # Check for common patterns
+    if 'import ' in content and 'from ' in content:
+        return 'python'
+    if 'function ' in content and '{' in content:
+        return 'javascript'
+    if 'def ' in content and ':' in content:
+        return 'python'
+    if 'package ' in content and 'func ' in content:
+        return 'go'
+    if 'fn main' in content:
+        return 'rust'
+    if 'public class' in content:
+        return 'java'
+    if '<html' in content or '<div' in content:
+        return 'html'
+    if '{' in content and ':' in content:
+        return 'json'
+
+    return None
 
 
 def _coerce_tool_args(arguments: Any) -> dict[str, Any]:
