@@ -10,6 +10,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from backend.core.file_history import global_undo_manager
 from backend.core.logger import app_logger as logger
 from backend.engine.tools.atomic_refactor import (
     AtomicRefactor,
@@ -86,10 +87,6 @@ class StructureEditor:
         self.whitespace = WhitespaceHandler()
         self.refactor = AtomicRefactor()
         self.errors = SmartErrorHandler()
-
-        self._undo_history: dict[
-            str, list[tuple[str, str]]
-        ] = {}  # path -> [(hash, content)]
 
         logger.info('🚀 Ultimate Editor initialized')
         logger.info(
@@ -202,12 +199,19 @@ class StructureEditor:
         Returns:
             EditResult
         """
-        if path not in self._undo_history or not self._undo_history[path]:
+        if not global_undo_manager.has_history(path):
             return EditResult(success=False, message=f'No undo history for {path}')
 
-        _, previous_content = self._undo_history[path].pop()
+        previous_content = global_undo_manager.pop(path)
 
         try:
+            if previous_content is None:
+                if os.path.exists(path):
+                    os.remove(path)
+                return EditResult(
+                    success=True,
+                    message=f'Undid last edit to {path} (file removed)',
+                )
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(previous_content)
 
@@ -242,13 +246,16 @@ class StructureEditor:
 
         return EditResult(success=True, message='\n'.join(output))
 
-    def edit_function(self, path: str, function_name: str, new_body: str) -> EditResult:
+    def edit_function(
+        self, path: str, function_name: str, new_body: str, line_number: int | None = None
+    ) -> EditResult:
         """Edit a function by name (works for ANY language).
 
         Args:
             path: Path to the file
             function_name: Name of the function to edit
             new_body: New function body
+            line_number: Optional line number to disambiguate when multiple matches exist
 
         Returns:
             EditResult with success status
@@ -269,7 +276,11 @@ class StructureEditor:
 
         # Perform edit
         result = self.universal.edit_function(
-            path, function_name, new_body, validate=self.config.validate_syntax
+            path,
+            function_name,
+            new_body,
+            validate=self.config.validate_syntax,
+            line_number=line_number,
         )
 
         # Clean whitespace if successful and requested
@@ -437,18 +448,13 @@ class StructureEditor:
 
     def _write_and_clean_file(self, path: str, content: str) -> None:
         """Write content to file and optionally clean whitespace."""
-        # Save to undo history before writing
         if self.config.backup_enabled:
             try:
+                old_content = None
                 if os.path.exists(path):
                     with open(path, encoding='utf-8') as f:
                         old_content = f.read()
-                    if path not in self._undo_history:
-                        self._undo_history[path] = []
-                    self._undo_history[path].append(('hash', old_content))
-                    # Keep history limited
-                    if len(self._undo_history[path]) > 10:
-                        self._undo_history[path].pop(0)
+                global_undo_manager.push(path, old_content, "symbol_editor")
             except Exception as e:
                 logger.warning('Failed to save undo history: %s', e)
 

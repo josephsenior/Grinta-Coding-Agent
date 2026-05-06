@@ -193,6 +193,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._live: Live | None = None
         self._streaming_accumulated = ''
         self._streaming_final = False
+        self._stream_wrap_width: int | None = None
         self._current_state: AgentState | None = None
         self._state_event = asyncio.Event()
         self._subscribed = False
@@ -1311,20 +1312,23 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     def _clear_streaming_preview(self) -> None:
         self._streaming_accumulated = ''
         self._streaming_final = False
+        self._stream_wrap_width = None
         self.refresh()
 
     @staticmethod
     def _tail_preview_text(
-        content: str, *, max_width: int | None, max_lines: int
+        content: str,
+        *,
+        max_width: int | None,
+        max_lines: int,
+        wrap_width: int | None = None,
     ) -> str:
-        """Return a bottom-follow viewport of *content* constrained by wrapped lines."""
+        """Return a bottom-follow viewport of *content' constrained by wrapped lines."""
         if max_lines <= 0 or not content:
             return content
 
-        # Account for panel padding / gutters so wrapping approximates terminal
-        # width. 10 = 2 border chars + 4 padding chars (left+right) + 4-char
-        # safety margin to leave room for Rich's trailing space on ANSI rows.
-        wrap_width = max(20, (max_width or 120) - 10)
+        if wrap_width is None:
+            wrap_width = max(20, (max_width or 120) - 10)
         wrapped: list[str] = []
         for raw in content.splitlines() or ['']:
             if not raw:
@@ -1355,10 +1359,13 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         full = self._streaming_accumulated or ''
         clipped = full
         if max_lines is not None:
+            if self._stream_wrap_width is None and max_width is not None:
+                self._stream_wrap_width = max(20, max_width - 10)
             clipped = self._tail_preview_text(
                 full,
                 max_width=max_width,
                 max_lines=max_lines,
+                wrap_width=self._stream_wrap_width,
             )
 
         body: list[Any] = [Markdown(clipped)]
