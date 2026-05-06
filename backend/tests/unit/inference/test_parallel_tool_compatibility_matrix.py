@@ -189,7 +189,7 @@ def test_system_capabilities_parallel_scheduling_line_matrix(
     if expect_enabled_substring:
         assert 'ENABLED for read-only batches' in text
     else:
-        assert 'DISABLED in this run' in text
+        assert 'NOT SUPPORTED' in text
 
 
 def test_system_capabilities_parallel_native_all_on_renders_enabled() -> None:
