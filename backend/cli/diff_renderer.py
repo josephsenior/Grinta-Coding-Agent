@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from rich import box
@@ -74,6 +75,12 @@ class DiffPanel:
         # New file creation — no diff, just show creation note
         if not prev_exist:
             self._append_new_file_delta(parts)
+            yield self._build_panel(parts)
+            return
+
+        # GRINTA_SHOW_DIFF=0: hide full diff output
+        if os.environ.get('GRINTA_SHOW_DIFF', '1') == '0':
+            parts.append(format_activity_result_secondary('updated', kind='ok'))
             yield self._build_panel(parts)
             return
 

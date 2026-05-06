@@ -29,7 +29,7 @@ def tool_headline(tool_name: str, *, use_icons: bool = True) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 _TEXT_EDITOR_VERBS = {
-    'read_file': 'Viewed',
+    'read_file': 'Read',
     'create_file': 'Created',
     'insert_text': 'Inserted',
     'undo_last_edit': 'Reverted',

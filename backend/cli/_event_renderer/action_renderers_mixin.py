@@ -355,14 +355,11 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
     def _render_file_write_action(self, action: FileWriteAction) -> None:
         self._flush_pending_tool_cards()
-        content = getattr(action, 'content', '') or ''
-        n_lines = len(content.splitlines()) if content else 0
         self._buffer_pending_activity(
             title=ACTIVITY_CARD_TITLE_FILES,
             verb='Created',
             detail=action.path,
             kind='file_write',
-            payload={'line_count': n_lines},
         )
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(
@@ -394,12 +391,12 @@ class ActionRenderersMixin(_ActionRenderersBase):
             detail = path
         self._buffer_pending_activity(
             title=ACTIVITY_CARD_TITLE_FILES,
-            verb='Viewed',
+            verb='Read',
             detail=detail,
             kind='file_read',
         )
         thought = getattr(action, 'thought', '') or ''
-        _sync_reasoning_after_tool_line(self._reasoning, f'Viewed {path}', thought)
+        _sync_reasoning_after_tool_line(self._reasoning, f'Read {path}', thought)
         self.refresh()
 
     def _render_mcp_action(self, action: MCPAction) -> None:

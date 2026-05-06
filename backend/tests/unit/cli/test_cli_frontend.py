@@ -164,7 +164,7 @@ async def test_event_renderer_repeats_identical_file_read_rows() -> None:
     renderer._process_event_data(r2)
     renderer._process_event_data(FileReadObservation(content='a\nb', path='pkg/a.py'))
     assert _transcript_needle_count(console, 'pkg/a.py') == 2
-    assert _transcript_needle_count(console, 'Viewed') == 2
+    assert _transcript_needle_count(console, 'Read') == 2
 
 
 @pytest.mark.asyncio

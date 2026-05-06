@@ -91,10 +91,10 @@ def test_strip_tool_result_validation_unclosed_tag() -> None:
 
 def test_format_activity_block_includes_secondary_when_set() -> None:
     g = format_activity_block(
-        'Viewed', 'src/a.py', secondary='12 lines', secondary_kind='neutral'
+        'Read', 'src/a.py', secondary='12 lines', secondary_kind='neutral'
     )
     plain = ''.join(getattr(seg, 'plain', str(seg)) for seg in g.renderables)
-    assert 'Viewed' in plain
+    assert 'Read' in plain
     assert 'src/a.py' in plain
     assert '12 lines' in plain
 
@@ -102,13 +102,11 @@ def test_format_activity_block_includes_secondary_when_set() -> None:
 def test_format_activity_turn_header_plain() -> None:
     import io
 
-    from rich.console import Console
-
     r = format_activity_turn_header()
     assert isinstance(r, Text)
     buf = io.StringIO()
     Console(file=buf, width=80, force_terminal=False, color_system=None).print(r)
-    assert 'Activity' in buf.getvalue()
+    assert buf.getvalue().strip() == ''
 
 
 def test_format_callout_panel_uses_layout_padding() -> None:
