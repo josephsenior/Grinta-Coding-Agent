@@ -855,10 +855,26 @@ class FileEditor(FileEditorEditOpsMixin):
         return ''.join(result_lines)
 
     def _replace_range(
-        self, content: str, new_text: str, start_line: int, end_line: int
+        self, content: str, new_text: str, start_line: int, end_line: int,
+        expected_hash: str | None = None,
     ) -> str | ToolResult:
         """Replace a range of lines with new text."""
+        # Check expected_hash (content hash) if provided
+        import hashlib
+        content_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
+        if expected_hash and content_hash != expected_hash:
+            return ToolResult(
+                output='',
+                error=(
+                    'FILE_UNEXPECTEDLY_MODIFIED: file changed since it was read. '
+                    'Re-read the file and retry the edit.'
+                ),
+                old_content=content,
+                new_content=content,
+            )
+
         lines = content.splitlines(keepends=True)
+
         # Handle empty file case
         if not lines:
             if start_line == 1:
@@ -874,6 +890,14 @@ class FileEditor(FileEditorEditOpsMixin):
             return ToolResult(
                 output='',
                 error=f'Start line must be >= 1 (got {start_line})',
+                new_content=content,
+            )
+
+        # Validate end_line > start_line
+        if end_line < start_line:
+            return ToolResult(
+                output='',
+                error=f'end_line must be >= start_line (got start={start_line}, end={end_line})',
                 new_content=content,
             )
 
@@ -893,13 +917,10 @@ class FileEditor(FileEditorEditOpsMixin):
         # Allow end_line to exceed file length (truncate/replace until end)
         end_idx = min(end_idx, len(lines))
 
-        # Prepare replacement
-        new_lines_to_insert = new_text.splitlines(keepends=True)
-        # If input text doesn't end with newline but we are inserting blocks, usually we want consistency
-        # But 'lines' have keepends=True.
-        # If new_text is "foo" and we replace a line "bar\n", we get "foo".
-        # If there are subsequent lines, they will be attached: "foobaz\n" if next line is "baz\n".
-        # This is expected behavior for raw string replacement.
+        # Detect original file newline style and normalize new_text to match
+        original_newline = '\r\n' if '\r\n' in content else '\n'
+        new_text_normalized = new_text.replace('\r\n', original_newline).replace('\n', original_newline).replace('\r', original_newline)
+        new_lines_to_insert = new_text_normalized.splitlines(keepends=True)
 
         result_lines = lines[:start_idx] + new_lines_to_insert + lines[end_idx:]
         return ''.join(result_lines)
