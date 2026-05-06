@@ -531,12 +531,13 @@ def missing_terminal_session_error(
         )
     else:
         suggestion = (
-            'No active terminal sessions exist right now. '
-            'Call terminal_manager with action=open first, then reuse that session_id.'
+            'No active terminal sessions exist. '
+            'Call terminal_manager with action=open and a command first.'
         )
     return ErrorObservation(
-        f"Terminal session '{session_id}' does not exist for action={operation}. "
-        f'Do not invent IDs like terminal_session_0. {suggestion}'
+        f"Terminal session '{session_id}' does not exist (expired or never opened).\n\n"
+        f'Do not invent session IDs. {suggestion}\n\n'
+        'Workflow: action=open → action=read → action=input (not action=open again)'
     )
 
 

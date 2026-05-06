@@ -431,12 +431,27 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
         'create_file',
         'insert_text',
         'undo_last_edit',
+        'edit',
     }
     if command not in valid_commands:
         raise FunctionCallValidationError(
             f"Unknown command '{command}' for text_editor tool. "
             f'Valid commands: {sorted(valid_commands)}'
         )
+    # Handle 'edit' command - requires edit_mode parameter
+    if command == 'edit':
+        edit_mode = normalized_args.get('edit_mode')
+        if not edit_mode:
+            raise FunctionCallValidationError(
+                "text_editor command 'edit' requires 'edit_mode' parameter. "
+                "Valid edit_mode values: 'format', 'section', 'range', 'patch'. "
+                "Example: {'command': 'edit', 'edit_mode': 'range', 'start_line': 1, 'end_line': 10, 'new_str': '...'}"
+            )
+        valid_edit_modes = {'format', 'section', 'range', 'patch'}
+        if edit_mode not in valid_edit_modes:
+            raise FunctionCallValidationError(
+                f"Unknown edit_mode '{edit_mode}'. Valid edit_mode values: {sorted(valid_edit_modes)}"
+            )
     path = str(normalized_args.get('path', path))
     other_kwargs = {
         k: v for k, v in normalized_args.items() if k not in ['command', 'path']
@@ -711,11 +726,14 @@ def _handle_edit_symbol_body_command(
     from backend.utils.treesitter_editor import AmbiguousSymbolError
 
     try:
-        result = editor.edit_function(path, symbol_name, new_body, line_number=line_number)
+        result = editor.edit_function(
+            path, symbol_name, new_body, line_number=line_number
+        )
     except AmbiguousSymbolError as e:
         error_msg = f"Ambiguous symbol '{symbol_name}': {e}"
         logger.warning(f'❌ {error_msg}')
         from backend.core.errors import ToolExecutionError
+
         raise ToolExecutionError(error_msg)
 
     if result.success:

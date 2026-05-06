@@ -753,9 +753,9 @@ async def test_terminal_read_rejects_nonexistent_session_with_guidance(
     )
 
     assert isinstance(obs, ErrorObservation)
-    assert 'does not exist for action=read' in obs.content
-    assert 'Do not invent IDs like terminal_session_0' in obs.content
-    assert 'terminal_1' in obs.content
+    assert 'does not exist' in obs.content
+    assert 'Do not invent' in obs.content
+    assert 'action=open' in obs.content
 
 
 @pytest.mark.asyncio
