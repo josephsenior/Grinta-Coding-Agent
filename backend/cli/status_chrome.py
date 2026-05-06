@@ -86,6 +86,8 @@ class StatusFields:
     workspace_path: str
     #: Number of context condensations in this session.
     condensation_count: int = 0
+    #: Token usage percentage (0-100).
+    token_usage_pct: int = 0
 
 
 def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
@@ -124,6 +126,9 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
         autonomy_level=str(hud.autonomy_level or 'balanced').strip().lower(),
         workspace_path=str(getattr(hud, 'workspace_path', '') or '').strip(),
         condensation_count=int(getattr(hud, 'condensation_count', 0) or 0),
+        token_usage_pct=0
+        if hud.context_limit == 0
+        else min(100, max(0, hud.context_tokens * 100 // hud.context_limit)),
     )
 
 
@@ -184,6 +189,25 @@ def ledger_fake_prompt_style(ledger_status: str) -> str:
     return CLR_STATUS_OK + ' bold'
 
 
+def _token_progress_bar(pct: int, width: int = 8) -> str:
+    """Generate a token usage progress bar.
+    
+    Args:
+        pct: Percentage (0-100)
+        width: Number of bar characters
+        
+    Returns:
+        Progress bar string like '#####-- 65%'
+    """
+    if pct <= 0:
+        return f'[{"-" * width}] 0%'
+    if pct >= 100:
+        return f'[{pct}%]' # Show 100% without bar to save space
+    filled = pct * width // 100
+    empty = width - filled
+    return f'[{"=" * filled}{"-" * empty}] {pct}%'
+
+
 def rich_compact_hud_line(fields: StatusFields, minimal: bool = False) -> Text:
     """Single-line Rich HUD: autonomy word, model, tokens, cost, calls, MCP, skills, icon.
 
@@ -197,7 +221,12 @@ def rich_compact_hud_line(fields: StatusFields, minimal: bool = False) -> Text:
         if fields.model_display and fields.model_display != '(not set)/(not set)':
             parts.append((fields.model_display, CLR_HUD_MODEL))
             parts.append((' · ', CLR_SEP))
-        parts.append((fields.token_display_compact, CLR_HUD_DETAIL))
+        parts.append(
+            (
+                f'{_token_progress_bar(fields.token_usage_pct, width=5)} {fields.token_display_compact}',
+                CLR_HUD_DETAIL,
+            )
+        )
         parts.append((' · ', CLR_SEP))
         if fields.cost_usd > 0:
             parts.append((f'${fields.cost_usd:.2f}', CLR_HUD_DETAIL))
@@ -219,7 +248,10 @@ def rich_compact_hud_line(fields: StatusFields, minimal: bool = False) -> Text:
         (' ', ''),
         (fields.model_display, CLR_HUD_MODEL),
         item_sep,
-        (fields.token_display_compact, CLR_HUD_DETAIL),
+        (
+            f'{_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
+            CLR_HUD_DETAIL,
+        ),
         group_sep,
         (f'Cost: ${fields.cost_usd:.3f}', CLR_HUD_DETAIL),
         item_sep,
@@ -271,7 +303,10 @@ def rich_fake_prompt_metrics_row(fields: StatusFields) -> Text:
     primary_parts: list[tuple[str, str]] = [
         (fields.model_display, CLR_HUD_MODEL),
         sep,
-        (f'Tokens: {fields.token_display_compact}', CLR_HUD_DETAIL),
+        (
+            f'Tokens: {_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
+            CLR_HUD_DETAIL,
+        ),
         sep,
         (f'Cost: ${fields.cost_usd:.3f}', CLR_HUD_DETAIL),
         sep,
@@ -408,7 +443,10 @@ def pt_stats_row2_fragments(
             ('class:prompt.sep', ' '),
             ('class:prompt.model', fields.model),
             ('class:prompt.sep', sep),
-            ('class:prompt.value', f'Tokens: {fields.token_display_compact}'),
+            (
+                'class:prompt.value',
+                f'Tokens: {_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
+            ),
             ('class:prompt.sep', sep),
             ('class:prompt.value', f'Cost: ${fields.cost_usd:.3f}'),
         ]
