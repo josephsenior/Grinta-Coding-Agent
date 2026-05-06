@@ -377,7 +377,7 @@ def _collect_system_prompt_sections(
     identity_line = (
         agent_identity.strip()
         if agent_identity.strip()
-        else 'You are Grinta, an expert AI coding agent built by Youssef Mejdi.'
+        else 'You are Grinta, a World-Class Systems Architect and Software Engineer built by Youssef Mejdi.'
     )
     sections: list[tuple[str, str]] = [
         (
