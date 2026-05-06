@@ -331,18 +331,6 @@ class ContextMemory:
             f'Unknown event type without text content: {type(event).__name__}'
         )
 
-    def _track_user_message_as_anchor(self, event: MessageAction) -> bool:
-        """Track user message as requirement anchor if substantive. Returns True if handled."""
-        user_text = (event.content or '').strip()
-        if len(user_text) < 24:
-            return False
-        self._add_anchor_if_new(
-            content=user_text[:600],
-            category='requirement',
-            importance=0.95,
-        )
-        return True
-
     def _track_error_as_anchor(self, event: Any) -> bool:
         """Track error observation as anchor if substantive. Returns True if handled."""
         if not isinstance(event, ErrorObservation):
@@ -373,17 +361,15 @@ class ContextMemory:
         """Automatically capture durable context signals from events.
 
         Tracks:
-        - user requirements/goals from user messages
         - critical errors as anchors
         - explicit agent planning/decision language as decisions
         """
         try:
-            if isinstance(event, MessageAction) and event.source == EventSource.USER:
-                if self._track_user_message_as_anchor(event):
-                    return
-
             if self._track_error_as_anchor(event):
                 return
+
+            if isinstance(event, MessageAction) and event.source == EventSource.USER:
+                pass  # User messages handled elsewhere
 
             self._track_agent_think_as_decision(event)
         except Exception:
