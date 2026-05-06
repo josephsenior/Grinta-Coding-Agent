@@ -464,6 +464,7 @@ class Orchestrator(Agent):
             CommonFunctionCallNotExistsError,
             FunctionCallConversionError,
             LLMMalformedActionError,
+            ValueError,
         ) as e:
             return self._astep_handle_recoverable_tool_call_shape_error(e)
 

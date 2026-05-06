@@ -52,6 +52,7 @@ def is_recoverable_tool_call_error(exc: Exception) -> bool:
             CommonFunctionCallValidationError,
             CommonFunctionCallNotExistsError,
             TruncatedToolArgumentsError,
+            ValueError,
         ),
     )
 
