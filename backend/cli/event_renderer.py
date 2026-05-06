@@ -289,13 +289,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             console=self._console,
             auto_refresh=False,
             transient=True,  # erases on stop — we print final output ourselves
-            # ``visible`` causes Rich to re-print overflow content on every
-            # refresh when the Live body is taller than the terminal, which
-            # makes streaming panels (Draft reply, Thinking) render dozens of
-            # duplicate copies per turn. ``crop`` redraws in place; panels
-            # that could exceed height (streaming preview, reasoning thoughts)
-            # are responsible for clamping themselves to ``options.max_height``.
-            vertical_overflow='crop',
+            # Use 'visible' so content scrolls naturally when it exceeds
+            # terminal height. The user sees the latest output (bottom) as it streams.
+            # Throttle refreshes to ~20fps to avoid excessive redraws.
+            vertical_overflow='visible',
         )
         live.start()
         self._live = live
