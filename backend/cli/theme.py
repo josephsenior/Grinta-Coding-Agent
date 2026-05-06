@@ -155,9 +155,10 @@ CLR_ACTION = 'bold #dbe7f3'  # current action label text
 CLR_THINKING_BORDER = '#587487'  # reasoning / live panel border accent
 # Live Rich block only (MINIMAL panel frame) — softer than transcript cards.
 CLR_LIVE_PANEL_BORDER = '#2a3a4a'
-# Live Thinking + flushed reasoning snapshot: readable blue-gray, roman (no
-# italic) so it stays distinct from the main reply without looking washed out.
-CLR_THOUGHT_BODY = '#b4c9dc'
+# Live Thinking + flushed reasoning snapshot: dim blue-gray so agent
+# responses stand out more. Intentionally muted (low luminance) to
+# de-emphasize internal monologue vs. visible output.
+CLR_THOUGHT_BODY = '#6b8299'
 CLR_REASONING_SNAP = CLR_THOUGHT_BODY  # legacy alias; keep in sync
 CLR_DRAFT_BORDER = '#6b8ea4'  # draft reply preview border accent
 CLR_DECISION_BORDER = '#c4a35a'  # approval / question / options accent
