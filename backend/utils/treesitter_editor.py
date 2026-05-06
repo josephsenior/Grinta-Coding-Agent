@@ -526,16 +526,6 @@ class TreeSitterEditor:
                         tree, file_bytes, parts[0], parts[1], file_path, language
                     )
                 except AmbiguousSymbolError:
-                    if line_number:
-                        return self._find_method_in_class_by_line(
-                            tree,
-                            file_bytes,
-                            parts[0],
-                            parts[1],
-                            file_path,
-                            language,
-                            line_number,
-                        )
                     raise
 
         # Search for symbol
@@ -1257,7 +1247,7 @@ class TreeSitterEditor:
 
         match = regex.search(original_code)
         if not match:
-            return EditResult(
+            return EditResult(  # type: ignore[unreachable]
                 success=False,
                 message=f"Function '{function_name}' not found in {file_path} (text fallback failed)",
             )
@@ -1290,7 +1280,9 @@ class TreeSitterEditor:
                     and not line.startswith(indent)
                     and not line.startswith(' ' * (len(indent) + 1))
                 ):
-                    body_end = body_start + sum(len(l) + 1 for l in lines[:i])
+                    body_end = body_start + sum(
+                        len(line_obj) + 1 for line_obj in lines[:i]
+                    )
                     break
 
         # Replace the body
@@ -1298,7 +1290,9 @@ class TreeSitterEditor:
             new_code = original_code[:body_start] + new_body + original_code[body_end:]
 
             if validate:
-                is_valid, error_msg = self._validate_syntax(new_code, language)
+                is_valid, error_msg = self.validate_syntax(
+                    new_code, file_path, language
+                )
                 if not is_valid:
                     return EditResult(
                         success=False,
