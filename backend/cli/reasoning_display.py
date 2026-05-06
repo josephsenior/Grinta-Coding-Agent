@@ -261,7 +261,7 @@ class ReasoningDisplay:
         meta_right: str,
         max_width: int | None,
     ) -> str:
-        action_label = self._current_action or 'Thinking'
+        action_label = self._current_action or 'Thinking:'
         # Reserve room for the right-side meta + separators when trimming.
         reserved = len(meta_right) + 6 if meta_right else 4
         if max_width and len(action_label) > max(24, max_width - reserved):
