@@ -231,6 +231,9 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
             except (asyncio.CancelledError, Exception):
                 pass
 
+        # Clear stale _next_action to prevent swallowing user messages after interrupt
+        self._next_action = None
+
         # Hard kill underlying shells/processes
         with contextlib.suppress(Exception):
             from backend.execution.action_execution_server import (

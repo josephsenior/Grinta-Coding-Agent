@@ -492,16 +492,23 @@ class RunHelpersMixin:
         renderer: Any,
     ) -> Any:
         if self._next_action is not None:
-            initial_action = self._next_action
-            self._next_action = None
-            msg_content = getattr(initial_action, 'content', None)
-            if msg_content is not None:
-                renderer.start_live()
-                await renderer.add_user_message(str(msg_content))
+            next_content = getattr(self._next_action, 'content', None)
+            if next_content is not None and text.strip() != str(next_content).strip():
+                logger.warning(
+                    'Discarding stale _next_action in favor of new user message'
+                )
+                self._next_action = None
             else:
-                renderer.add_system_message('Condensing context\u2026', title='grinta')
-                renderer.start_live()
-            return initial_action
+                initial_action = self._next_action
+                self._next_action = None
+                msg_content = getattr(initial_action, 'content', None)
+                if msg_content is not None:
+                    renderer.start_live()
+                    await renderer.add_user_message(str(msg_content))
+                else:
+                    renderer.add_system_message('Condensing context\u2026', title='grinta')
+                    renderer.start_live()
+                return initial_action
         self._last_user_message = text
         renderer.start_live()
         await renderer.add_user_message(text)
