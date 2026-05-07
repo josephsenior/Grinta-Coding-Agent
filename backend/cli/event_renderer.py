@@ -610,11 +610,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         body_items = self._frame_live_sections(live_sections, reasoning_section)
         if live_sections:
             body_items.append(spacer_live_section())
-        # Render a fake prompt bar at the bottom so the input area, stats, and
-        # HUD remain visually present while the agent works.
-        body_items.append(
-            self._render_fake_prompt(options.max_width or self._console.width)
-        )
+        # Fake prompt disabled - keeping UI clean with only main chat + HUD
+        # body_items.append(
+        #     self._render_fake_prompt(options.max_width or self._console.width)
+        # )
         yield Group(*body_items)
 
     def _collect_live_sections(self) -> list[Any]:
