@@ -410,6 +410,7 @@ class RetryService:
         from backend.ledger.observation import AgentThinkObservation
 
         controller = self.controller
+        self.reset_retry_metrics()
         controller.event_stream.add_event(
             AgentThinkObservation(
                 content='All automatic retries exhausted. Returning to prompt.'
