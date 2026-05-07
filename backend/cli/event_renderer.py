@@ -460,7 +460,8 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         )
         framed = frame_transcript_body(panel)
         spacer = frame_transcript_body(Text(''))
-        group = Group(spacer, framed, spacer)
+        extra_spacer = frame_transcript_body(Text(''))
+        group = Group(spacer, framed, spacer, extra_spacer)
 
         if self._live is not None:
             # Same path as committed transcript lines during a turn: print into

@@ -316,8 +316,9 @@ class ReasoningDisplay:
         if wrapped_rows and self._streaming:
             wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
 
-        for row in wrapped_rows:
-            rows.append(Text(row, style=CLR_THOUGHT_BODY))
+        for idx, row in enumerate(wrapped_rows):
+            prefix = 'Thinking: ' if idx == 0 else '           '
+            rows.append(Text(prefix + row, style=CLR_THOUGHT_BODY))
 
         if clipped:
             rows.append(Text('… showing latest thoughts', style=CLR_META))
