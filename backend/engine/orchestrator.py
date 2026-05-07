@@ -692,11 +692,16 @@ class Orchestrator(Agent):
                 'instructions provided in that observation to continue.'
             )
 
+        # Extract reasoning content from response if available
+        reasoning = ''
+        if message is not None:
+            reasoning = getattr(message, 'reasoning_content', '') or ''
+
         logger.warning(
             'LLM returned text-only response with no tool calls — continuing loop. '
             'Model should use explicit tool calls instead of plain text output.'
         )
-        fallback = MessageAction(content=message_text, wait_for_response=False)
+        fallback = MessageAction(content=message_text, thought=reasoning, wait_for_response=False)
         fallback.source = EventSource.AGENT
         return fallback
 
