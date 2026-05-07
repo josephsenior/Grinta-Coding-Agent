@@ -567,16 +567,11 @@ def _render_critical(
     render_partial: Callable[..., str],
     terminal_command_tool: str,
     *,
-    enable_think: bool,
     terminal_manager_available: bool,
     meta_cognition_on: bool,
 ) -> str:
     """Render last-mile critical execution rules with dynamic terminal tool naming."""
-    think_execution_rule = (
-        '**`think` does not execute** — after reasoning, you must still call tools.'
-        if enable_think
-        else '**Reasoning alone does not execute** — after reasoning, you must still call tools.'
-    )
+    think_execution_rule = '**Reasoning alone does not execute** — after reasoning, you must still call tools.'
     if terminal_manager_available:
         terminal_manager_rule = (
             '**Interactive terminal state diagram**: `open` (spawns process and returns session id) -> `read` -> `input` -> `read`.\n'
@@ -602,20 +597,15 @@ def _render_examples(
     render_partial: Callable[..., str],
     *,
     tracker_on: bool,
-    enable_think: bool,
     meta_cognition_on: bool,
     lsp_available: bool,
     checkpoints_on: bool,
 ) -> str:
     """Render the worked-examples partial with capability-aware tool references."""
-    if tracker_on and enable_think:
-        planning_hint = 'draft the plan with `task_tracker` (or `think`)'
-    elif tracker_on:
+    if tracker_on:
         planning_hint = 'draft the plan with `task_tracker`'
-    elif enable_think:
-        planning_hint = 'draft the plan with `think`'
     else:
-        planning_hint = 'draft a short plan in your working notes before editing'
+        planning_hint = 'plan by thinking step-by-step in your head'
 
     destructive_confirmation_step = (
         'Use `communicate_with_user` to confirm scope and target.'
@@ -784,7 +774,6 @@ def _mcp_tail_render_kwargs(
     config: Any,
 ) -> str:
     meta_cognition = getattr(config, 'enable_meta_cognition', False)
-    enable_think = bool(getattr(config, 'enable_think', False))
     communicate_tool_section = (
         '<COMMUNICATE_TOOL>\n'
         'Use `communicate_with_user` for clarification, uncertainty, risky-action options, or escalation after 3 failed attempts on a sub-task. On escalation, include a brief post-mortem and one specific question. Do not ask mid-task questions in plain text; use this tool so the turn ends cleanly and waits for user input.\n'
@@ -797,13 +786,6 @@ def _mcp_tail_render_kwargs(
         uncertainty_state_1_discover_line = '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**; use tools like `search_code`, editor `view_*`, or `lsp`. Do NOT ask first.'
     else:
         uncertainty_state_1_discover_line = '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**, not shell repo search/read. Do NOT ask first.'
-    thinking_tool_section = (
-        '<THINKING_TOOL>\n'
-        'Use `think` for multi-step planning, complex debugging, or architecture trade-offs. It records reasoning only; it does not execute actions.\n'
-        '</THINKING_TOOL>'
-        if enable_think
-        else ''
-    )
     return render_partial(
         'system_partial_03_tail.md',
         communicate_tool_section=communicate_tool_section,
@@ -823,7 +805,6 @@ def _mcp_tail_render_kwargs(
             if meta_cognition
             else '**Needs user input** (user preference, external credential, business policy) → ask the user directly in natural language.'
         ),
-        thinking_tool_section=thinking_tool_section,
     )
 
 

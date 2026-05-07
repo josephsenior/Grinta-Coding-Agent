@@ -19,7 +19,6 @@ from backend.engine.function_calling import (
     _handle_summarize_context_tool,
     _handle_task_tracker_tool,
     _handle_text_editor_tool,
-    _handle_think_tool,
     _process_single_tool_call,
     combine_thought,
     set_security_risk,
@@ -271,22 +270,6 @@ class TestHandleStrReplaceEditorTool:
 
 
 # ---------------------------------------------------------------------------
-# _handle_think_tool
-# ---------------------------------------------------------------------------
-
-
-class TestHandleThinkTool:
-    def test_creates_think_action(self):
-        action = _handle_think_tool({'thought': 'I should check the logs'})
-        assert isinstance(action, AgentThinkAction)
-        assert action.thought == 'I should check the logs'
-
-    def test_missing_thought_raises(self):
-        with pytest.raises(FunctionCallValidationError, match='thought'):
-            _handle_think_tool({})
-
-
-# ---------------------------------------------------------------------------
 # _handle_summarize_context_tool
 # ---------------------------------------------------------------------------
 
@@ -460,14 +443,6 @@ class TestProcessSingleToolCall:
         tc = self._make_tool_call(tool_name)
         action = _process_single_tool_call(tc, {'message': 'done'})
         assert isinstance(action, PlaybookFinishAction)
-
-    def test_dispatches_think(self):
-        from backend.engine.tools.think import create_think_tool
-
-        tool_name = create_think_tool()['function']['name']
-        tc = self._make_tool_call(tool_name)
-        action = _process_single_tool_call(tc, {'thought': 'thinking'})
-        assert isinstance(action, AgentThinkAction)
 
     def test_dispatches_mcp_tool(self):
         tc = self._make_tool_call('some_mcp_tool', mcp_names=['some_mcp_tool'])

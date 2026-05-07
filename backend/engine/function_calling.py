@@ -38,7 +38,6 @@ from backend.engine.tools import (
     create_summarize_context_tool,
     create_symbol_editor_tool,
     create_text_editor_tool,
-    create_think_tool,
 )
 from backend.engine.tools.analyze_project_structure import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
@@ -481,13 +480,6 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
     )
     set_security_risk(action, arguments)
     return action
-
-
-def _handle_think_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
-    """Handle ThinkTool tool call."""
-    tool_name = cast(str, create_think_tool().get('function', {}).get('name', ''))
-    thought = require_tool_argument(arguments, 'thought', tool_name)
-    return AgentThinkAction(thought=thought)
 
 
 def _handle_summarize_context_tool(
@@ -1346,9 +1338,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         cast(
             str, create_symbol_editor_tool().get('function', {}).get('name', '')
         ): _handle_symbol_editor_tool,
-        cast(
-            str, create_think_tool().get('function', {}).get('name', '')
-        ): _handle_think_tool,
         cast(
             str, create_summarize_context_tool().get('function', {}).get('name', '')
         ): _handle_summarize_context_tool,

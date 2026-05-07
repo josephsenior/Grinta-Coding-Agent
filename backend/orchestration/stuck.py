@@ -15,7 +15,6 @@ from backend.core.constants import (
     DEFAULT_STUCK_SEMANTIC_FAILURE_RATE,
     DEFAULT_STUCK_SEMANTIC_MIN_EVENTS,
     DEFAULT_STUCK_SEMANTIC_WINDOW,
-    DEFAULT_STUCK_THINK_LOOP_DEPTH,
     DEFAULT_STUCK_TOKEN_REPETITION_MIN_CHARS,
 )
 from backend.core.logger import app_logger as logger
@@ -596,13 +595,13 @@ class StuckDetector:
             if isinstance(e, Action) and not isinstance(e, NullAction)
         ]
 
-        if len(recent_actions) < DEFAULT_STUCK_THINK_LOOP_DEPTH:
+        if len(recent_actions) < 10:
             return False
 
         # Check if the last N actions are ALL AgentThinkAction
         if all(
             isinstance(a, AgentThinkAction)
-            for a in recent_actions[-DEFAULT_STUCK_THINK_LOOP_DEPTH:]
+            for a in recent_actions[-10:]
         ):
             logger.warning(
                 'Think-only loop detected: last 6+ actions are all AgentThinkAction '

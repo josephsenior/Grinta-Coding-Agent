@@ -112,7 +112,7 @@ class OrchestratorPlanner:
         self._add_terminal_and_special_tools(tools)
 
     def _add_basic_tools(self, tools: list) -> None:
-        """Add cmd, think, finish, summarize_context, memory tools."""
+        """Add cmd, finish, summarize_context, memory tools."""
         from backend.engine.tools.bash import create_cmd_run_tool
         from backend.engine.tools.condensation_request import (
             create_summarize_context_tool,
@@ -122,11 +122,8 @@ class OrchestratorPlanner:
             create_memory_manager_tool,
         )
         from backend.engine.tools.note import create_note_tool, create_recall_tool
-        from backend.engine.tools.think import create_think_tool
 
         tools.append(create_cmd_run_tool())
-        if getattr(self._config, 'enable_think', True):
-            tools.append(create_think_tool())
         if getattr(self._config, 'enable_finish', True):
             tools.append(create_finish_tool())
         if getattr(self._config, 'enable_condensation_request', False):

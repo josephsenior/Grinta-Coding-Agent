@@ -100,15 +100,6 @@ class TestFeatureFlagToolPresence:
         missing = sorted(names - set(dispatch.keys()))
         assert missing == [], f'Tools with no dispatch handler: {missing}'
 
-    def test_think_enabled(self):
-        names = _build_toolset(enable_think=True)
-        assert 'think' in names
-        self._assert_dispatch_covered(names)
-
-    def test_think_disabled(self):
-        names = _build_toolset(enable_think=False)
-        assert 'think' not in names
-
     def test_finish_enabled(self):
         names = _build_toolset(enable_finish=True)
         assert 'finish' in names
