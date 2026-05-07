@@ -270,7 +270,7 @@ def _build_splash_lines() -> list[Any]:
 
 
 def show_grinta_splash(console: Any | None = None) -> None:
-    """Render the GRINTA boot splash (text only, no logo)."""
+    """Render the GRINTA boot splash (text only, no ASCII logo)."""
     from rich.align import Align
     from rich.box import ROUNDED
     from rich.console import Group
@@ -357,7 +357,7 @@ async def _async_main(
     *,
     model: str | None = None,
     project: str | None = None,
-    show_splash: bool = False,
+    show_splash: bool = True,
     minimal: bool = False,
 ) -> None:
     resolved_project = (
@@ -525,7 +525,7 @@ def main(
         async_kwargs = {
             'model': model,
             'project': project,
-            'show_splash': False,  # disabled - UI is clean now
+            'show_splash': not no_splash,
         }
         if minimal:
             async_kwargs['minimal'] = minimal
