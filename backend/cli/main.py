@@ -559,7 +559,7 @@ def main(
         async_kwargs = {
             'model': model,
             'project': project,
-            'show_splash': not no_splash,
+            'show_splash': False,  # disabled - UI is clean now
         }
         if minimal:
             async_kwargs['minimal'] = minimal
