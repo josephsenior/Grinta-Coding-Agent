@@ -1264,7 +1264,7 @@ def test_grinta_main_parses_project_flag(tmp_path: Path) -> None:
                 main()
 
     mock_async_main.assert_called_once_with(
-        model=None, project=str(tmp_path.resolve()), show_splash=False
+        model=None, project=str(tmp_path.resolve()), show_splash=True
     )
     mock_asyncio_run.assert_called_once()
 
