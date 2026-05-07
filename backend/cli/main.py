@@ -266,7 +266,7 @@ def _build_splash_lines() -> list[Any]:
 
 
 def show_grinta_splash(console: Any | None = None) -> None:
-    """Render the GRINTA boot splash (text only, no ASCII logo)."""
+    """Render the GRINTA boot splash with ASCII text and tagline."""
     from rich.align import Align
     from rich.box import ROUNDED
     from rich.console import Group
@@ -283,6 +283,10 @@ def show_grinta_splash(console: Any | None = None) -> None:
         'Describe a task · /help · /settings · /sessions · '
         'grinta sessions list · /quit to leave'
     )
+
+    ascii_lines = _build_splash_lines()
+    for line in ascii_lines:
+        console.print(line)
 
     def _frame(hint: bool = False) -> Any:
         panel = Panel(
