@@ -270,7 +270,7 @@ def _build_splash_lines() -> list[Any]:
 
 
 def show_grinta_splash(console: Any | None = None) -> None:
-    """Render the GRINTA boot splash."""
+    """Render the GRINTA boot splash (text only, no logo)."""
     from rich.align import Align
     from rich.box import ROUNDED
     from rich.console import Group
@@ -278,7 +278,6 @@ def show_grinta_splash(console: Any | None = None) -> None:
     from rich.text import Text
 
     console = console or Console()
-    _figlet_lines = _build_splash_lines()
     from backend.cli.theme import STYLE_DIM, STYLE_ITALIC_DIM
 
     _D = STYLE_DIM
@@ -289,54 +288,21 @@ def show_grinta_splash(console: Any | None = None) -> None:
         'grinta sessions list · /quit to leave'
     )
 
-    def _body(visible: int, *, tagline: bool = False) -> Group:
-        figlet = Text()
-        for i, text_obj in enumerate(_figlet_lines):
-            if i > 0:
-                figlet.append('\n')
-            if i < visible:
-                figlet.append(text_obj)
-            else:
-                figlet.append(' ' * len(text_obj))
-        parts: list = [Align.center(figlet), Text('')]
-        if tagline:
-            parts.append(Text(_TAGLINE, style=STYLE_ITALIC_DIM, justify='center'))
-        else:
-            parts.append(Text(''))
-        return Group(*parts)
-
-    def _frame(visible: int, *, tagline: bool = False, hint: bool = False) -> Any:
+    def _frame(hint: bool = False) -> Any:
         panel = Panel(
-            _body(visible, tagline=tagline),
+            Text(_TAGLINE, style=STYLE_ITALIC_DIM, justify='center'),
             title='[bold dim] >_ [/]',
             border_style=_D,
             box=ROUNDED,
             padding=(1, 4),
         )
-        rows: list = [Text(''), Align.center(panel), Text('')]
+        rows = [Text(''), Align.center(panel), Text('')]
         if hint:
             rows.append(Align.center(Text(_HINT, style=STYLE_DIM)))
             rows.append(Text(''))
         return Group(*rows)
 
-    from backend.cli.theme import splash_anim_disabled
-
-    if not console.is_terminal or splash_anim_disabled():
-        console.print(_frame(len(_figlet_lines), tagline=True, hint=True))
-        return
-
-    from rich.live import Live
-
-    with Live(
-        _frame(0), console=console, refresh_per_second=30, transient=False
-    ) as live:
-        for i in range(1, len(_figlet_lines) + 1):
-            live.update(_frame(i))
-            time.sleep(0.08)
-        live.update(_frame(len(_figlet_lines), tagline=True))
-        time.sleep(0.1)
-        live.update(_frame(len(_figlet_lines), tagline=True, hint=True))
-        time.sleep(0.2)
+    console.print(_frame(hint=True))
 
 
 def _setup_logging() -> None:
@@ -453,7 +419,8 @@ def _build_async_console(show_splash: bool) -> Console:
     except OSError:
         term_cols = 120
     console = Console(width=term_cols - 2)
-    # Splash disabled - logo no longer shown by default
+    if show_splash and not _env_truthy('GRINTA_NO_SPLASH'):
+        show_grinta_splash(console)
     return console
 
 
