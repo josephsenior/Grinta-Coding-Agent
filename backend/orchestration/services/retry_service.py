@@ -112,7 +112,7 @@ class RetryService:
         header) we honor that hint verbatim — clipped by the queue's
         ``max_delay`` so a single bad header cannot stall the worker.
         """
-        from backend.inference.exceptions import RateLimitError
+        from backend.inference.exceptions import RateLimitError, ServiceUnavailableError
 
         delay = queue.base_delay
         if isinstance(exc, RateLimitError):
@@ -120,6 +120,8 @@ class RetryService:
             if retry_after and retry_after > 0:
                 return min(float(retry_after), queue.max_delay)
             delay = max(delay, queue.base_delay * 2)
+        elif isinstance(exc, ServiceUnavailableError):
+            delay = max(delay, queue.base_delay * 3)
         circuit_breaker = getattr(
             self.controller.circuit_breaker_service, 'circuit_breaker', None
         )

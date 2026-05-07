@@ -116,9 +116,8 @@ class TestRecoveryService:
         )
 
         err_obs = mock_context.emit_event.call_args[0][0]
-        assert 'provider limit reached' in err_obs.content
+        assert 'Rate limit' in err_obs.content
         assert 'https://example.com/pricing' not in err_obs.content
-        assert 'Waiting before retrying - no action needed.' in err_obs.content
         assert err_obs.notify_ui_only is True
 
     @pytest.mark.asyncio

@@ -518,7 +518,9 @@ class RecoveryService:
             err_id = 'AGENT_RUNTIME_ERROR'
 
         if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
-            text = f'{type(exc).__name__}: provider limit reached.'
+            rate_kind = getattr(exc, 'kind', None)
+            retry_after = getattr(exc, 'retry_after', None)
+            text = _format_rate_limit_text(exc, rate_kind, retry_after)
         else:
             text = f'{type(exc).__name__}: {exc}'
 
@@ -535,7 +537,9 @@ class RecoveryService:
                 'or context window). Wait for the user to fix the configuration.'
             )
         elif isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
-            guidance = 'Waiting before retrying - no action needed.'
+            rate_kind = getattr(exc, 'kind', None)
+            retry_after = getattr(exc, 'retry_after', None)
+            guidance = _format_rate_limit_guidance(rate_kind, retry_after)
         elif isinstance(exc, Timeout):
             guidance = (
                 'The provider timed out on this step. Automatic backoff and retry '
@@ -553,3 +557,48 @@ class RecoveryService:
                 'Review what went wrong, choose a different approach or tool, and continue.'
             )
         return f'{text}\n\n{guidance}', err_id, notify_ui_only
+
+
+def _format_rate_limit_text(exc: Exception, rate_kind, retry_after) -> str:
+    """Format rate limit error text with specific kind info."""
+    import re
+
+    from backend.inference.exceptions import RateLimitKind
+
+    kind_value = getattr(rate_kind, 'value', str(rate_kind)) if rate_kind else None
+    base_text = str(exc) if exc.args else 'Rate limit exceeded'
+    base_text = re.sub(r'https?://\S+', '[link]', base_text)
+
+    if kind_value == RateLimitKind.RPD.value:
+        return f'⚠️ Daily quota exhausted. Your free-tier limit has been reached for today.'
+    elif kind_value == RateLimitKind.RPM.value:
+        return f'⚠️ Too many requests per minute (RPM limit).'
+    elif kind_value == RateLimitKind.TPM.value:
+        return f'⚠️ Too many tokens used per minute (TPM limit).'
+    else:
+        return f'⚠️ Rate limit ({base_text})'
+
+
+def _format_rate_limit_guidance(rate_kind, retry_after) -> str:
+    """Format actionable guidance for rate limit errors."""
+    from backend.inference.exceptions import RateLimitKind
+
+    kind_value = getattr(rate_kind, 'value', str(rate_kind)) if rate_kind else None
+
+    if kind_value == RateLimitKind.RPD.value:
+        return (
+            '🎯 Next steps: '
+            '1) Wait until midnight UTC for quota to reset, OR '
+            '2) Add credits at https://openrouter.ai/credits to unlock 1000 requests/day, OR '
+            '3) Switch to a different model in /settings.'
+        )
+    elif kind_value == RateLimitKind.RPM.value:
+        if retry_after:
+            return f'Waiting {retry_after:.0f}s before automatic retry...'
+        return 'Waiting ~1 minute before retrying (per-minute limit).'
+    elif kind_value == RateLimitKind.TPM.value:
+        if retry_after:
+            return f'Waiting {retry_after:.0f}s for token quota to refresh...'
+        return 'Waiting for token quota to refresh...'
+    else:
+        return 'Will retry automatically. If this persists, check your provider dashboard.'
