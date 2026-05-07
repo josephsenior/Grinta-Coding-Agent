@@ -391,7 +391,7 @@ async def _async_main(
     *,
     model: str | None = None,
     project: str | None = None,
-    show_splash: bool = True,
+    show_splash: bool = False,
     minimal: bool = False,
 ) -> None:
     resolved_project = (
