@@ -266,7 +266,7 @@ def _build_splash_lines() -> list[Any]:
 
 
 def show_grinta_splash(console: Any | None = None) -> None:
-    """Render the GRINTA boot splash with ASCII text and tagline."""
+    """Render the GRINTA boot splash with ASCII text inside panel."""
     from rich.align import Align
     from rich.box import ROUNDED
     from rich.console import Group
@@ -285,24 +285,31 @@ def show_grinta_splash(console: Any | None = None) -> None:
     )
 
     ascii_lines = _build_splash_lines()
-    for line in ascii_lines:
-        console.print(line)
+    figlet_text = Text()
+    for i, line in enumerate(ascii_lines):
+        if i > 0:
+            figlet_text.append('\n')
+        figlet_text.append(line)
 
-    def _frame(hint: bool = False) -> Any:
-        panel = Panel(
+    def _frame() -> Any:
+        content = Group(
+            figlet_text,
+            Text(''),
             Text(_TAGLINE, style=STYLE_ITALIC_DIM, justify='center'),
+        )
+        panel = Panel(
+            content,
             title='[bold dim] >_ [/]',
             border_style=_D,
             box=ROUNDED,
             padding=(1, 4),
         )
         rows = [Text(''), Align.center(panel), Text('')]
-        if hint:
-            rows.append(Align.center(Text(_HINT, style=STYLE_DIM)))
-            rows.append(Text(''))
+        rows.append(Align.center(Text(_HINT, style=STYLE_DIM)))
+        rows.append(Text(''))
         return Group(*rows)
 
-    console.print(_frame(hint=True))
+    console.print(_frame())
 
 
 def _setup_logging() -> None:
