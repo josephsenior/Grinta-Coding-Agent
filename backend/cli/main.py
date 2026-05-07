@@ -453,8 +453,7 @@ def _build_async_console(show_splash: bool) -> Console:
     except OSError:
         term_cols = 120
     console = Console(width=term_cols - 2)
-    if show_splash and not _env_truthy('GRINTA_NO_SPLASH'):
-        show_grinta_splash(console)
+    # Splash disabled - logo no longer shown by default
     return console
 
 
