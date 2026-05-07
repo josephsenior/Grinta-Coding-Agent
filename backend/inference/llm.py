@@ -403,9 +403,10 @@ class LLM(RetryMixin, DebugMixin):
         # Early-exit validation: Check if the model name is known to the catalog
         # or has an explicit provider prefix. This prevents hard 404s later.
         resolver = _get_provider_resolver()
+        config_provider = getattr(self.config, 'custom_llm_provider', None)
         try:
             # resolve_provider raises ValueError if the model is unknown and has no prefix
-            resolver.resolve_provider(self.config.model)
+            resolver.resolve_provider(self.config.model, config_provider=config_provider)
         except ValueError as exc:
             from backend.inference.exceptions import NotFoundError
 

@@ -91,10 +91,16 @@ class DiffPanel:
             yield self._build_panel(parts)
             return
 
-        # Fallback: visualize_diff or plain content
+        # Fallback: visualize_diff or embedded diff
         diff_str = self._extract_visualize_diff()
         if diff_str:
             parts.append(Text(diff_str[:3000]))
+            yield self._build_panel(parts)
+            return
+
+        embedded = self._extract_embedded_diff()
+        if embedded:
+            parts.append(Text(embedded[:3000]))
             yield self._build_panel(parts)
             return
 
@@ -134,6 +140,18 @@ class DiffPanel:
             return obs.visualize_diff(n_context_lines=3)
         except Exception:
             return None
+
+    def _extract_embedded_diff(self) -> str | None:
+        """Extract diff embedded in content string (via [EDIT_DIFF] marker)."""
+        obs = self._obs
+        content = getattr(obs, 'content', None)
+        if not content:
+            return None
+        marker = '[EDIT_DIFF]'
+        idx = content.find(marker)
+        if idx == -1:
+            return None
+        return content[idx + len(marker):].lstrip('\n')
 
     def _append_groups_diff(
         self,

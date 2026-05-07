@@ -100,14 +100,15 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
 
     ctx = HUDBar._format_tokens(hud.context_tokens)
     lim_tok = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
+    is_estimated = getattr(hud, 'token_usage_estimated', False)
     if hud.context_tokens == 0 and hud.context_limit == 0:
         token_display_compact = '0t'
     elif hud.context_limit == 0:
         token_display_compact = f'{ctx}t'
     else:
         token_display_compact = f'{ctx}/{lim_tok}' if lim_tok else f'{ctx}t'
-    if getattr(hud, 'token_usage_estimated', False):
-        token_display_compact += '~'
+    if is_estimated:
+        token_display_compact += '~'  # ~ indicates estimated (not exact count)
 
     mcp_short = '?' if hud.mcp_servers is None else str(min(int(hud.mcp_servers), 99))
     skills_short = str(min(int(bundled_skill_count), 99))
