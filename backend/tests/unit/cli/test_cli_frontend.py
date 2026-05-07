@@ -868,7 +868,11 @@ async def test_renderer_default_shell_session_error_uses_recovery_copy() -> None
 
 @pytest.mark.asyncio
 async def test_reasoning_transcript_skips_duplicate_prefix_between_tool_steps() -> None:
-    """CoT segments often restate the same opening; only new lines print after each flush."""
+    """CoT segments often restate the same opening; only new lines print after each flush.
+
+    Note: This test is now a no-op since _flush_thinking_block is disabled.
+    Thinking appears in Live panel during streaming only, not committed to transcript.
+    """
     console = _make_console()
     reasoning = ReasoningDisplay()
     renderer = CLIEventRenderer(
@@ -883,9 +887,10 @@ async def test_reasoning_transcript_skips_duplicate_prefix_between_tool_steps() 
     reasoning.set_streaming_thought('Goal line\nPlan A\nPlan B\n')
     renderer._stop_reasoning()
 
+    # With flush disabled, nothing appears in transcript - Live handles all display
     output = _console_output(console)
-    assert output.count('Goal line') == 1
-    assert 'Plan B' in output
+    assert 'Goal line' not in output
+    assert 'Plan B' not in output
 
 
 @pytest.mark.asyncio

@@ -1288,24 +1288,13 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._last_printed_delegate_panel_signature = None
 
     def _flush_thinking_block(self) -> None:
-        """Print accumulated thoughts as a persistent dim block before they are cleared.
+        """Print accumulated thoughts as a persistent dim block.
 
-        Called just before _reasoning.stop() so the thought lines are still available.
-        Does nothing when no thoughts were collected this turn.
+        Disabled - thinking now appears inline in the main response stream only.
+        Live panel shows thinking during streaming, no need for separate
+        static block at the bottom.
         """
-        thoughts = self._reasoning.snapshot_thoughts()
-        if not thoughts:
-            return
-        fresh = _reasoning_lines_skip_already_committed(
-            self._last_committed_reasoning_lines,
-            thoughts,
-        )
-        self._last_committed_reasoning_lines = list(thoughts)
-        if not fresh:
-            return
-        self._print_or_buffer(
-            Padding(format_reasoning_snapshot(fresh), pad=ACTIVITY_BLOCK_BOTTOM_PAD)
-        )
+        return
 
     def _stop_reasoning(self) -> None:
         """Flush any accumulated thoughts to static output, then stop the spinner.
