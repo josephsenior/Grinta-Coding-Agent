@@ -511,7 +511,6 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             )
             if hasattr(host, '_append_history'):
                 host._append_history(retry_panel)
-        # TODO: Enable after fixing test compatibility
 
     @staticmethod
     def _coerce_positive_int(value: Any, *, default: int, floor: int = 1) -> int:

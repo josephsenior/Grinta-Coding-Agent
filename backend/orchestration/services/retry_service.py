@@ -105,13 +105,15 @@ class RetryService:
             ),
         )
 
-    def _compute_initial_delay(self, exc: Exception, queue: RetryQueue) -> float:
-        """Compute initial retry delay, accounting for RateLimitError and circuit breaker.
+    def _compute_initial_delay(self, exc: Exception, queue: RetryQueue, attempt: int = 0) -> float:
+        """Compute initial retry delay with exponential backoff + jitter.
 
         When the provider supplied a ``Retry-After`` (or equivalent reset
         header) we honor that hint verbatim — clipped by the queue's
         ``max_delay`` so a single bad header cannot stall the worker.
         """
+        import random as _random
+
         from backend.inference.exceptions import RateLimitError, ServiceUnavailableError
 
         delay = queue.base_delay
@@ -119,15 +121,19 @@ class RetryService:
             retry_after = getattr(exc, 'retry_after', None)
             if retry_after and retry_after > 0:
                 return min(float(retry_after), queue.max_delay)
-            delay = max(delay, queue.base_delay * 2)
+            # Exponential backoff for rate limits: base * 2^attempt
+            delay = queue.base_delay * (2 ** attempt)
         elif isinstance(exc, ServiceUnavailableError):
-            delay = max(delay, queue.base_delay * 3)
-        circuit_breaker = getattr(
-            self.controller.circuit_breaker_service, 'circuit_breaker', None
-        )
-        if circuit_breaker:
-            consecutive = max(1, getattr(circuit_breaker, 'consecutive_errors', 1))
-            delay = min(queue.max_delay, delay * consecutive)
+            delay = queue.base_delay * (2 ** attempt)
+        else:
+            delay = queue.base_delay * (2 ** attempt)
+
+        # Add jitter (50% to 150% of calculated delay)
+        jitter = _random.uniform(0.5, 1.5)
+        delay = delay * jitter
+
+        # Apply max delay cap
+        delay = min(delay, queue.max_delay)
         return delay
 
     @staticmethod
