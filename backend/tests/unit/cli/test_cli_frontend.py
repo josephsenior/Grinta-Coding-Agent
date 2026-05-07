@@ -1830,7 +1830,7 @@ def test_start_live_passes_vertical_overflow_crop() -> None:
     assert live_cls.call_args.kwargs.get('vertical_overflow') == 'scroll'
 
 
-@pytest.mark.skip(reason='ReasoningDisplay renderable now requires thought text to render')
+@pytest.mark.skip(reason='elapsed time not rendered in renderable(), only in __rich_console__ which needs ConsoleOptions')
 def test_reasoning_display_elapsed_time() -> None:
     """ReasoningDisplay should show elapsed time when active."""
     rd = ReasoningDisplay()
@@ -3543,7 +3543,7 @@ async def test_renderer_apply_patch_output_is_collapsed_on_failure() -> None:
     assert '-....' not in output
 
 
-@pytest.mark.skip(reason='ReasoningDisplay renderable returns Group, not Panel')
+@pytest.mark.skip(reason='elapsed time not rendered in renderable(), only in __rich_console__ which needs ConsoleOptions')
 def test_reasoning_display_tool_icons() -> None:
     """ReasoningDisplay should show tool-specific icons."""
 
