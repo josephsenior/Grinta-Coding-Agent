@@ -203,11 +203,6 @@ DEFAULT_AGENT_AUTO_LINT_ENABLED = True
 DEFAULT_AGENT_CONFIRM_ACTIONS = False
 DEFAULT_AGENT_AUTO_RETRY_ON_ERROR = True
 DEFAULT_AGENT_AUTONOMY_LEVEL = 'balanced'
-# Frontier models (Claude 3.5/4, GPT-5, Gemini 2.5/3) reason natively; the explicit
-# `think` tool duplicates that reasoning into an externally-visible tool call that
-# burns context without improving accuracy. Off by default; flip to True only for
-# legacy models without native reasoning, or for traceability during evals.
-DEFAULT_AGENT_THINK_ENABLED = False
 # DAP / interactive debugger: off by default; enable per agent when stable for your release.
 DEFAULT_AGENT_DEBUGGER_ENABLED = False
 DEFAULT_AGENT_FINISH_ENABLED = True
@@ -309,8 +304,6 @@ DEFAULT_STUCK_COST_ACCEL_TOKENS_PER_5_STEPS = 50000
 DEFAULT_STUCK_CONTEXT_HIGH_THRESHOLD = 100000
 # Continued growth needed alongside high-context to actually trip.
 DEFAULT_STUCK_CONTEXT_HIGH_GROWTH = 1000
-# N consecutive AgentThinkActions with no real tool use trips think-only.
-DEFAULT_STUCK_THINK_LOOP_DEPTH = 10
 # Read-only inspection loop: extreme cases only (true degenerate poll loop).
 # Stuck-detection recovery: how much one progress signal decrements the
 # counter (game-able if too high; ignored if too low).

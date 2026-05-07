@@ -205,14 +205,12 @@ def _render_tool_reference(
 def _render_critical(
     terminal_command_tool: str,
     *,
-    enable_think: bool,
     terminal_manager_available: bool,
     meta_cognition_on: bool,
 ) -> str:
     return _render_critical_impl(
         _render_partial,
         terminal_command_tool,
-        enable_think=enable_think,
         terminal_manager_available=terminal_manager_available,
         meta_cognition_on=meta_cognition_on,
     )
@@ -221,7 +219,6 @@ def _render_critical(
 def _render_examples(
     *,
     tracker_on: bool,
-    enable_think: bool,
     meta_cognition_on: bool,
     lsp_available: bool,
     checkpoints_on: bool,
@@ -229,7 +226,6 @@ def _render_examples(
     return _render_examples_impl(
         _render_partial,
         tracker_on=tracker_on,
-        enable_think=enable_think,
         meta_cognition_on=meta_cognition_on,
         lsp_available=lsp_available,
         checkpoints_on=checkpoints_on,
@@ -450,12 +446,6 @@ def _collect_system_prompt_sections(
         )
     )
 
-    # ``think`` is opt-in via config, but if the model has inherent reasoning
-    # (o1/o3/r1/grok-4/gemini-thinking) we suppress the scaffolding regardless.
-    effective_enable_think = (
-        bool(getattr(config, 'enable_think', False)) and not has_inherent_reasoning
-    )
-
     # Worked-examples partial — capability-adapted: omit on small/local models
     # where prompt budget is tight, and where examples can crowd out tool docs.
     if not is_small_model:
@@ -464,7 +454,6 @@ def _collect_system_prompt_sections(
                 'system_partial_05_examples',
                 _render_examples(
                     tracker_on=bool(getattr(config, 'enable_task_tracker_tool', False)),
-                    enable_think=effective_enable_think,
                     meta_cognition_on=bool(
                         getattr(config, 'enable_meta_cognition', False)
                     ),
@@ -479,7 +468,6 @@ def _collect_system_prompt_sections(
             'system_partial_04_critical',
             _render_critical(
                 resolved_terminal_tool,
-                enable_think=effective_enable_think,
                 terminal_manager_available=bool(
                     getattr(config, 'enable_terminal', True)
                 ),

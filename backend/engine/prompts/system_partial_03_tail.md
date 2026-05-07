@@ -20,8 +20,6 @@ Use the canonical intent and uncertainty gate from `<DECISION_FRAMEWORK>` in `sy
 Search first, ask second; avoid plain-text uncertainty when discovery is still possible.
 </UNCERTAINTY_POLICY>
 
-{thinking_tool_section}
-
 <CONFIDENCE_CALIBRATION>
 Be decisive on routine tasks. For confirmation boundaries, follow `<DECISION_FRAMEWORK>` in `system_partial_00_routing.md`.
 </CONFIDENCE_CALIBRATION>

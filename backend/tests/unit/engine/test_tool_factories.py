@@ -1,4 +1,4 @@
-"""Tests for orchestrator tool factory functions — finish, think, task_tracker, condensation_request."""
+"""Tests for orchestrator tool factory functions — finish, task_tracker, condensation_request."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from backend.engine.tools.condensation_request import (
 )
 from backend.engine.tools.finish import create_finish_tool
 from backend.engine.tools.task_tracker import create_task_tracker_tool
-from backend.engine.tools.think import create_think_tool
 from backend.inference.tool_names import FINISH_TOOL_NAME, TASK_TRACKER_TOOL_NAME
 
 
@@ -29,22 +28,6 @@ class TestCreateFinishTool:
     def test_description_nonempty(self):
         tool = create_finish_tool()
         assert len(tool['function']['description']) > 10
-
-
-class TestCreateThinkTool:
-    def test_type(self):
-        tool = create_think_tool()
-        assert tool['type'] == 'function'
-
-    def test_name(self):
-        tool = create_think_tool()
-        assert tool['function']['name'] == 'think'
-
-    def test_has_thought_param(self):
-        tool = create_think_tool()
-        params = tool['function']['parameters']
-        assert 'thought' in params['properties']
-        assert 'thought' in params['required']
 
 
 class TestCreateTaskTrackerTool:

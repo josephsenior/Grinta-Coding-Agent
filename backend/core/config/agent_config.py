@@ -62,7 +62,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_STUCK_DETECTION_ENABLED,
     DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS,
     DEFAULT_AGENT_TASK_TRACKER_TOOL_ENABLED,
-    DEFAULT_AGENT_THINK_ENABLED,
     DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
     DEFAULT_AGENT_WARNING_FIRST_TRIP_ENABLED,
     DEFAULT_AGENT_WARNING_FIRST_TRIP_LIMIT,
@@ -155,12 +154,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
 
     # Core tool toggles
-    enable_think: bool = Field(
-        default=DEFAULT_AGENT_THINK_ENABLED,
-        description=(
-            'Expose the think tool for explicit reasoning steps (optional; models may reason in prose).'
-        ),
-    )
     enable_finish: bool = Field(
         default=DEFAULT_AGENT_FINISH_ENABLED,
         description=(
