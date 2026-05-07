@@ -185,11 +185,26 @@ class ActionRenderersMixin(_ActionRenderersBase):
         # so Live panel doesn't linger.
         if bool(getattr(action, 'suppress_cli', False)):
             self._stop_reasoning()
-        # Prepend thinking to message content (inline in main response)
+        # Get thought from action field, or extract from content if not present
         thought = (getattr(action, 'thought', None) or '').strip()
         content = (action.content or '').strip()
-        if thought:
+        
+        # If no dedicated thought field, try to extract thinking from content
+        if not thought and content:
+            # Look for thinking patterns at start of content
+            lines = content.split('\n', 3)
+            if len(lines) >= 2:
+                first_line = lines[0].strip().lower()
+                thinking_indicators = ['i should', "i'll", 'let me', 'the user is', 'i need to', 'analyzing']
+                if any(first_line.startswith(ind) for ind in thinking_indicators):
+                    # First line looks like thinking, extract it
+                    thought = lines[0].strip()
+                    content = '\n'.join(lines[1:]).strip()
+        
+        if thought and content:
             display_content = f"Thinking: {thought}\n\n{content}"
+        elif thought:
+            display_content = f"Thinking: {thought}"
         else:
             display_content = content
         display_content = _sanitize_visible_transcript_text(display_content)
