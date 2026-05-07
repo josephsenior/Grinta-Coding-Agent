@@ -160,6 +160,9 @@ class RecoveryService:
 
     async def _set_awaiting_user_input_if_allowed(self, controller) -> None:
         if _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
+            retry_service = getattr(controller, 'retry_service', None)
+            if retry_service and hasattr(retry_service, 'reset_retry_metrics'):
+                retry_service.reset_retry_metrics()
             await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
 
     async def _handle_hard_stop_exception(self, controller, exc: Exception) -> bool:
