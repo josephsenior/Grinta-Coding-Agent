@@ -242,9 +242,14 @@ class RecoveryService:
         if not isinstance(exc, _QUEUED_RETRY_EXCEPTIONS):
             return False
 
-        from backend.inference.exceptions import RateLimitError
+        from backend.inference.exceptions import RateLimitError, RateLimitKind
 
         if isinstance(exc, RateLimitError):
+            if getattr(exc, 'kind', None) == RateLimitKind.RPD:
+                logger.warning('Daily quota exhausted.')
+                await self._set_awaiting_user_input_if_allowed(controller)
+                return True
+
             retry_after = getattr(exc, 'retry_after', None)
             if retry_after is not None:
                 from backend.core.retry_queue import get_retry_queue
