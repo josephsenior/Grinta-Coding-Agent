@@ -31,5 +31,5 @@ Before the **second** substantive milestone in one task (e.g. moving from core i
 **Multi-file creation:** list paths first, create minimal stubs, then edit.
 **Research-then-implement chain:** act with tool calls immediately after gathering info. DO NOT stop to explain.
 {task_sync_instruction}
-**Execution verification:** See `<CRITICAL_TOOL_EXECUTION_RULES>` in `system_partial_04_critical.md` for mandatory verification before finish.
+**Execution verification:** See `<CRITICAL_TOOL_EXECUTION_RULES>` in `system_partial_04_critical.md`.
 </WORK_HABITS>
