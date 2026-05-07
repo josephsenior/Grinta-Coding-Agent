@@ -256,10 +256,6 @@ def _build_splash_lines() -> list[Any]:
     width = max(logo_width, text_width)
 
     lines: list[Any] = []
-    for ln in _GRINTA_LOGO_LINES:
-        t = Text.from_markup(ln.strip())
-        pad = max(0, width - len(t))
-        lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
     for ln in raw:
         from backend.cli.theme import CLR_SPLASH_FIGLET
 
