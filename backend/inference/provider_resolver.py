@@ -25,12 +25,15 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     # (see get_direct_client) with this OpenAI-compatible root. If the key or
     # path is wrong, the host may return HTML — see format_html_api_error_response.
     'lightning': 'https://lightning.ai/api/v1',
+    # DigitalOcean AI Platform (OpenAI-compatible)
+    'digitalocean': 'https://api.digitalocean.com/v1',
 }
 
 KNOWN_PROVIDER_PREFIXES: set[str] = {
     'anthropic',
     'deepinfra',
     'deepseek',
+    'digitalocean',
     'fireworks',
     'google',
     'groq',
