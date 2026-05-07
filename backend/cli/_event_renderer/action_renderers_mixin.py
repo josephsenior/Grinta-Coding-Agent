@@ -185,14 +185,18 @@ class ActionRenderersMixin(_ActionRenderersBase):
         # so Live panel doesn't linger.
         if bool(getattr(action, 'suppress_cli', False)):
             self._stop_reasoning()
-        # Clear accumulated thoughts so they don't appear in separate panel
-        # after message response - they should only appear inline
-        host._reasoning._thought_lines.clear()
-        self._clear_streaming_preview()
-        display_content = _sanitize_visible_transcript_text(action.content or '')
+        # Prepend thinking to message content (inline in main response)
+        thought = (getattr(action, 'thought', None) or '').strip()
+        content = (action.content or '').strip()
+        if thought:
+            display_content = f"Thinking: {thought}\n\n{content}"
+        else:
+            display_content = content
+        display_content = _sanitize_visible_transcript_text(display_content)
         if not display_content:
             self.refresh()
             return
+        self._clear_streaming_preview()
         attachments = self._message_action_attachments(action)
         self._append_assistant_message(display_content, attachments=attachments)
 
