@@ -207,7 +207,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         #: Last error observation content printed (used for deduplication).
         self._last_notice_error_content: Any = None
         #: Last retry status signature printed (used for deduplication).
-        self._last_retry_status_signature: Any = None
+        self._last_retry_status_signature: Any | None = None
+        #: Last console dimensions (for resize detection).
+        self._last_console_size: tuple[int, int] = (console.width, console.height)
         # Per-turn metric snapshots (used to compute deltas at turn completion)
         self._turn_start_cost: float = 0.0
         self._turn_start_tokens: int = 0
@@ -290,10 +292,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             console=self._console,
             auto_refresh=False,
             transient=True,  # erases on stop — we print final output ourselves
-            # Use 'visible' so content scrolls naturally when it exceeds
-            # terminal height. The user sees the latest output (bottom) as it streams.
-            # Throttle refreshes to ~20fps to avoid excessive redraws.
-            vertical_overflow='visible',
+            # Use 'scroll' for better viewport management when content exceeds
+            # terminal height. This prevents the visual mess where old content
+            # overlaps with new.
+            vertical_overflow='scroll',
         )
         live.start()
         self._live = live
@@ -343,14 +345,22 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
         When *force* is False the call is throttled so rapid-fire streaming
         tokens do not saturate the terminal with redraws.
+
+        However, when content exceeds terminal height and needs scrolling,
+        we skip throttle to ensure the viewport updates properly.
         """
         if self._live is None:
             return
         now = time.monotonic()
-        if not force and (now - self._last_refresh_time) < self._REFRESH_MIN_INTERVAL:
+        has_streaming_content = bool(self._streaming_accumulated)
+        if not force and not has_streaming_content and (now - self._last_refresh_time) < self._REFRESH_MIN_INTERVAL:
             return
         self._last_refresh_time = now
-        self._live.update(self, refresh=True)
+        current_size = (self._console.width, self._console.height)
+        if current_size != self._last_console_size:
+            self._last_console_size = current_size
+            force = True
+        self._live.update(self, refresh=force)
 
     async def handle_event(self, event: Any) -> None:
         self._process_event_data(event)
@@ -366,17 +376,22 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         if live is None:
             yield
             return
+        was_active = True
         try:
             live.stop()
         except Exception:
             logger.debug('Live.stop() failed during suspend', exc_info=True)
+            was_active = False
+        self._live = None
         try:
             yield
         finally:
-            try:
-                live.start()
-            except Exception:
-                logger.debug('Live.start() failed during resume', exc_info=True)
+            if was_active and self._live is None:
+                try:
+                    live.start()
+                    self._live = live
+                except Exception:
+                    logger.debug('Live.start() failed during resume', exc_info=True)
             self.refresh()
 
     def begin_turn(self) -> None:

@@ -25,8 +25,8 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     # (see get_direct_client) with this OpenAI-compatible root. If the key or
     # path is wrong, the host may return HTML — see format_html_api_error_response.
     'lightning': 'https://lightning.ai/api/v1',
-    # DigitalOcean AI Platform (OpenAI-compatible)
-    'digitalocean': 'https://api.digitalocean.com/v1',
+    # DigitalOcean AI Platform (Serverless Inference endpoint)
+    'digitalocean': 'https://inference.do-ai.run/v1',
 }
 
 KNOWN_PROVIDER_PREFIXES: set[str] = {
@@ -158,11 +158,12 @@ class ProviderResolver:
         self._discovery_cache_ttl = 300  # 5 minutes
         self._last_discovery = 0.0
 
-    def resolve_provider(self, model_name: str) -> str:
+    def resolve_provider(self, model_name: str, config_provider: str | None = None) -> str:
         """Determine the provider for a given model.
 
         Args:
             model_name: Model name (e.g., "gpt-4o", "claude-opus-4", "llama3")
+            config_provider: Provider from llm_provider in settings.json (fallback)
 
         Returns:
             Provider name (e.g., "openai", "anthropic", "ollama")
@@ -187,10 +188,18 @@ class ProviderResolver:
                 )
             return entry.provider
 
+        # NEW: Fall back to config_provider from settings.json if provided and valid
+        if config_provider and config_provider.lower() in KNOWN_PROVIDER_PREFIXES:
+            return config_provider.lower()
+
+        # Check if config_provider base_url would work
+        if config_provider and config_provider.lower() in _PROVIDER_DEFAULT_URLS:
+            return config_provider.lower()
+
         raise ValueError(
             'Provider is ambiguous for model '
-            f"'{model_name}'. Use an explicit provider prefix like 'openai/{model_name}' "
-            'or configure llm_provider alongside llm_model.'
+            f"'{model_name}'. Use an explicit provider prefix like "
+            f"'openai/{model_name}' or configure llm_provider in settings.json."
         )
 
     def is_local_model(self, model_name: str) -> bool:

@@ -1822,7 +1822,7 @@ def test_start_live_passes_vertical_overflow_crop() -> None:
         finally:
             loop.close()
     assert live_cls.call_args is not None
-    assert live_cls.call_args.kwargs.get('vertical_overflow') == 'visible'
+    assert live_cls.call_args.kwargs.get('vertical_overflow') == 'scroll'
 
 
 def test_reasoning_display_elapsed_time() -> None:
