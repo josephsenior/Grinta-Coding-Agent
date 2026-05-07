@@ -38,9 +38,6 @@ from backend.cli._event_renderer.text_utils import (
     sanitize_visible_transcript_text as _sanitize_visible_transcript_text,
 )
 from backend.cli._event_renderer.text_utils import (
-    show_reasoning_text as _show_reasoning_text,
-)
-from backend.cli._event_renderer.text_utils import (
     sync_reasoning_after_tool_line as _sync_reasoning_after_tool_line,
 )
 from backend.cli._typing import ActionRenderersHost
@@ -188,16 +185,6 @@ class ActionRenderersMixin(_ActionRenderersBase):
         # so Live panel doesn't linger.
         if bool(getattr(action, 'suppress_cli', False)):
             self._stop_reasoning()
-            self._clear_streaming_preview()
-            self.refresh()
-            return
-        cot = (getattr(action, 'thought', None) or '').strip()
-        if cot and _show_reasoning_text():
-            cleaned_cot = _sanitize_visible_transcript_text(cot)
-            if cleaned_cot:
-                self._ensure_reasoning()
-                host._reasoning.update_thought(cleaned_cot)
-        self._stop_reasoning()
         self._clear_streaming_preview()
         display_content = _sanitize_visible_transcript_text(action.content or '')
         if not display_content:
