@@ -19,17 +19,12 @@ import time
 from typing import Any
 
 from rich.console import Console, ConsoleOptions, Group, RenderResult
-from rich.spinner import Spinner
-from rich.table import Table
 from rich.text import Text
 
 from backend.cli.layout_tokens import (
     CALLOUT_PANEL_CHROME_WIDTH,
-    LIVE_PANEL_ACCENT_STYLE,
 )
-from backend.cli.text_truncation import truncate_line
-from backend.cli.theme import CLR_ACTION, CLR_META, CLR_SPINNER, CLR_THOUGHT_BODY
-from backend.cli.transcript import format_live_panel
+from backend.cli.theme import CLR_META, CLR_THOUGHT_BODY
 from backend.engine import prompt_role_debug as _prompt_role_debug
 
 # Thought lines are rendered without an extra manual prefix so they align with
@@ -49,11 +44,6 @@ _PANEL_CHROME_WIDTH = CALLOUT_PANEL_CHROME_WIDTH
 # Rich spinner in the header already conveys "thinking" — this cursor conveys
 # "tokens are still flowing for this specific thought".
 _STREAM_CURSOR = '▌'
-
-
-def _truncate_action_line(label: str, max_len: int) -> str:
-    """Ellipsis at end of label, preferring a word boundary when there is room."""
-    return truncate_line(label, max_len)
 
 
 def _thought_lines_for_display(
@@ -182,9 +172,6 @@ class ReasoningDisplay:
         if new != self._current_action:
             _prompt_role_debug.log_reasoning_transition('reasoning.update_action', new)
             self._current_action = new
-            # Per-step wall clock: the header timer should reflect the *current* sub-step
-            # (e.g. browser CDP), not time since the first spinner in this agent turn.
-            self._start_time = time.monotonic()
             # Action changes end any prior streaming run — the model is
             # committing to a next step, not still generating text.
             self._streaming = False
@@ -227,10 +214,7 @@ class ReasoningDisplay:
         max_width: int | None = None,
         max_lines: int | None = None,
     ) -> Any:
-        meta_right = self._format_meta_right()
-        action_label = self._format_action_label(meta_right, max_width)
-
-        rows: list[Any] = [self._build_header_row(action_label, meta_right)]
+        rows: list[Any] = []
 
         # Thought bodies stream in the live panel when present. Callers may pass
         # ``max_lines`` to clamp height (e.g. tests); the main agent Live layout
@@ -238,55 +222,11 @@ class ReasoningDisplay:
         if self.live_panel_shows_thought_rows():
             self._append_thought_rows(rows, max_width, max_lines)
 
-        return format_live_panel(
-            'Thinking',
-            Group(*rows),
-            accent_style=LIVE_PANEL_ACCENT_STYLE,
-            padding=(0, 0),
-        )
+        if not rows:
+            return Group()
 
-    def _format_meta_right(self) -> str:
-        elapsed_bits: list[str] = []
-        secs = self.elapsed_seconds
-        if secs is not None:
-            m, s = divmod(secs, 60)
-            elapsed_bits.append(f'{m}m {s}s' if m > 0 else f'{s}s')
-        turn_cost = max(0.0, self._current_cost - self._cost_at_start)
-        if turn_cost > 0.0:
-            elapsed_bits.append(f'+${turn_cost:.4f}')
-        return ' · '.join(elapsed_bits) if elapsed_bits else ''
+        return Group(*rows)
 
-    def _format_action_label(
-        self,
-        meta_right: str,
-        max_width: int | None,
-    ) -> str:
-        action_label = self._current_action or 'Thinking:'
-        # Reserve room for the right-side meta + separators when trimming.
-        reserved = len(meta_right) + 6 if meta_right else 4
-        if max_width and len(action_label) > max(24, max_width - reserved):
-            action_label = _truncate_action_line(
-                action_label, max(12, max_width - reserved)
-            )
-        return action_label
-
-    @staticmethod
-    def _build_header_row(action_label: str, meta_right: str) -> Any:
-        header = Table.grid(expand=True, padding=(0, 0))
-        header.add_column(width=2, no_wrap=True)
-        header.add_column(ratio=1)
-        header.add_column(justify='right', no_wrap=True)
-        # Render "Thinking:" in blue (CLR_ACTION) for visibility
-        if action_label == 'Thinking:':
-            label = Text('Thinking:', style=CLR_ACTION)
-        else:
-            label = Text(action_label, style=CLR_ACTION)
-        header.add_row(
-            Spinner('dots', style=f'bold {CLR_SPINNER}'),
-            label,
-            Text(meta_right, style=CLR_META) if meta_right else Text(''),
-        )
-        return header
 
     def _append_thought_rows(
         self,

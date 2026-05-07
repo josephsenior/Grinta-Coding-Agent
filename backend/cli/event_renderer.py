@@ -34,7 +34,6 @@ from backend.cli.layout_tokens import (
     CALLOUT_PANEL_PADDING,
     DRAFT_PANEL_ACCENT_STYLE,
     LIVE_PANEL_ACCENT_STYLE,
-    TRANSCRIPT_RIGHT_INSET,
     frame_live_body,
     frame_transcript_body,
     gap_below_live_section,
@@ -607,7 +606,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             stream_max_lines,
             options.max_width,
         )
-        body_items = self._frame_live_sections(live_sections, reasoning_section)
+        body_items = self._frame_live_sections(live_sections)
         if live_sections:
             body_items.append(spacer_live_section())
         # Fake prompt disabled - keeping UI clean with only main chat + HUD
@@ -665,24 +664,17 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
                 max_width=max_width,
                 max_lines=None,
             )
-            live_sections.append(reasoning_section)
+            if reasoning_section is not None:
+                live_sections.append(reasoning_section)
         return reasoning_section
 
     @staticmethod
     def _frame_live_sections(
         live_sections: list[Any],
-        reasoning_section: Any | None,
     ) -> list[Any]:
         body_items: list[Any] = []
         for index, section in enumerate(live_sections):
-            if section is reasoning_section:
-                framed = Padding(
-                    section,
-                    pad=(0, TRANSCRIPT_RIGHT_INSET, 0, 0),
-                    expand=False,
-                )
-            else:
-                framed = frame_live_body(section)
+            framed = frame_live_body(section)
             if index < len(live_sections) - 1:
                 body_items.append(gap_below_live_section(framed))
             else:
