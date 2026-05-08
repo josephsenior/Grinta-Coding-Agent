@@ -107,6 +107,24 @@ def render_confirmation(
     """
     risk_text, risk_style = _risk_label(pending_action)
     frame_style = _confirmation_frame_style(risk_text)
+    is_high_risk = risk_text == 'HIGH'
+
+    # HIGH-risk actions get a prominent warning banner before the panel.
+    if is_high_risk:
+        from rich.panel import Panel as WarningPanel
+
+        console.print()
+        console.print(
+            WarningPanel(
+                'This action can modify your system or environment.\n'
+                'Type [bold]yes[/bold] to confirm, or [bold]n[/bold] to reject.',
+                title='[bold red]⚠  REQUIRES APPROVAL[/bold red]',
+                title_align='left',
+                border_style=CLR_RISK_HIGH,
+                box=box.HEAVY,
+                padding=(1, 2),
+            )
+        )
 
     table = Table(
         show_header=True,
@@ -139,7 +157,7 @@ def render_confirmation(
             title=title,
             title_align='left',
             border_style=frame_style,
-            box=box.ROUNDED,
+            box=box.HEAVY if is_high_risk else box.ROUNDED,
             padding=(1, 2),
         )
     )
@@ -158,29 +176,51 @@ def render_confirmation(
             ),
         )
 
-    # y = approve once, n = reject, a = always allow this exact action
-    # signature for the remainder of the session. Render keys as bold accents
-    # so the user can scan their options without re-reading the sentence.
-    hint = Text('  ')
-    hint.append('[y]', style=f'bold {CLR_BRAND}')
-    hint.append('es ', style=CLR_META)
-    hint.append('[n]', style=f'bold {CLR_BRAND}')
-    hint.append('o ', style=CLR_META)
-    hint.append('[a]', style=f'bold {CLR_BRAND}')
-    hint.append('lways allow', style=CLR_META)
-    console.print(hint)
-    answer = Prompt.ask(
-        '  Approve?',
-        console=console,
-        choices=['y', 'n', 'a'],
-        default='n',
-        show_choices=False,
-        show_default=False,
-    )
-    answer = (answer or 'n').strip().lower()
-    if answer == 'a':
-        return ConfirmationDecision(approved=True, remember=True)
-    return ConfirmationDecision(approved=answer == 'y', remember=False)
+    if is_high_risk:
+        # HIGH risk requires typing "yes" in full — no single-key approval.
+        hint = Text('  ')
+        hint.append('[yes]', style=f'bold {CLR_RISK_HIGH}')
+        hint.append(' approve  ', style=CLR_META)
+        hint.append('[n]', style=f'bold {CLR_BRAND}')
+        hint.append('o  ', style=CLR_META)
+        hint.append('[a]', style=f'bold {CLR_BRAND}')
+        hint.append('lways allow', style=CLR_META)
+        console.print(hint)
+        answer = Prompt.ask(
+            '  Approve?',
+            console=console,
+            default='n',
+            show_choices=False,
+            show_default=False,
+        )
+        answer = (answer or 'n').strip().lower()
+        if answer in ('a', 'always'):
+            return ConfirmationDecision(approved=True, remember=True)
+        return ConfirmationDecision(approved=answer == 'yes', remember=False)
+    else:
+        # y = approve once, n = reject, a = always allow this exact action
+        # signature for the remainder of the session. Render keys as bold accents
+        # so the user can scan their options without re-reading the sentence.
+        hint = Text('  ')
+        hint.append('[y]', style=f'bold {CLR_BRAND}')
+        hint.append('es ', style=CLR_META)
+        hint.append('[n]', style=f'bold {CLR_BRAND}')
+        hint.append('o ', style=CLR_META)
+        hint.append('[a]', style=f'bold {CLR_BRAND}')
+        hint.append('lways allow', style=CLR_META)
+        console.print(hint)
+        answer = Prompt.ask(
+            '  Approve?',
+            console=console,
+            choices=['y', 'n', 'a'],
+            default='n',
+            show_choices=False,
+            show_default=False,
+        )
+        answer = (answer or 'n').strip().lower()
+        if answer == 'a':
+            return ConfirmationDecision(approved=True, remember=True)
+        return ConfirmationDecision(approved=answer == 'y', remember=False)
 
 
 def build_confirmation_action(approved: bool) -> ChangeAgentStateAction:

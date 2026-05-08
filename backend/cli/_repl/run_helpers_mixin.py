@@ -168,6 +168,9 @@ class RunHelpersMixin:
         from backend.core.bootstrap.main import _setup_mcp_tools
 
         try:
+            self._hud.update_agent_state('Starting')
+            self._bootstrap_status('Initializing session…', session, renderer)
+
             init_ok = await self._bootstrap_init_session(
                 renderer,
                 session,
@@ -175,6 +178,9 @@ class RunHelpersMixin:
             )
             if not init_ok:
                 return
+
+            self._bootstrap_status('Setting up runtime…', session, renderer)
+
             runtime_ok = await self._bootstrap_setup_runtime(
                 renderer,
                 session,
@@ -184,9 +190,13 @@ class RunHelpersMixin:
             if not runtime_ok:
                 return
             engine_init_done.set()
+
             agent = self._agent
             if agent is None or not agent.config.enable_mcp:
+                self._bootstrap_status('Ready.', session, renderer, kind='system')
                 return
+
+            self._bootstrap_status('Loading MCP tools…', session, renderer)
             try:
                 await _setup_mcp_tools(agent, self._runtime, self._memory)
             except Exception as exc:
@@ -195,19 +205,27 @@ class RunHelpersMixin:
                 )
                 self._hud.update_mcp_servers(0)
                 msg = f'MCP warmup failed: {exc}'
-                if session is not None:
-                    self._set_footer_system_line(msg, kind='warning')
-                else:
-                    renderer.add_system_message(msg, title='warning')
+                self._bootstrap_status(msg, session, renderer, kind='warning')
             else:
                 self._update_mcp_count_from_agent(agent)
-                if session is not None:
-                    self._set_footer_system_line('MCP tools loaded.')
-                else:
-                    renderer.add_system_message('MCP tools loaded.', title='system')
+                self._bootstrap_status('MCP tools loaded.', session, renderer)
         finally:
             chat_ready_done.set()
             engine_init_done.set()
+
+    def _bootstrap_status(
+        self,
+        text: str,
+        session: Any | None,
+        renderer: Any,
+        *,
+        kind: str = 'system',
+    ) -> None:
+        """Update bootstrap status in footer (PT) or renderer (non-PT)."""
+        if session is not None:
+            self._set_footer_system_line(text, kind=kind)
+        else:
+            renderer.add_system_message(text, title=kind)
 
     async def _bootstrap_init_session(
         self,
@@ -307,6 +325,7 @@ class RunHelpersMixin:
         renderer: Any,
     ) -> None:
         tip = '/help · /settings · /sessions'
+        self._hud.update_agent_state('Ready')
         if agent.config.enable_mcp:
             msg = f'Chat ready. MCP tools warming in background. {tip}'
         else:

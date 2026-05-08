@@ -254,7 +254,7 @@ _SLASH_COMMANDS = (
     SlashCommandSpec(
         '/help',
         'Show commands and shortcuts',
-        '/help [command]',
+        '/help [command|--all]',
         aliases=('/?',),
         help_section='system',
     ),
@@ -431,6 +431,9 @@ def _iter_command_completion_entries() -> list[tuple[str, str]]:
     return entries
 
 
+# Sections with more than this many commands are collapsed by default in `/help`.
+_HELP_SECTION_COLLAPSE_THRESHOLD = 10
+
 _HELP_SECTIONS_ORDER: tuple[tuple[str, str], ...] = (
     ('session', 'Session & history'),
     ('model', 'Model & configuration'),
@@ -531,12 +534,23 @@ def _build_help_markdown(command_name: str | None = None) -> str:
     return '\n'.join(lines)
 
 
-def _build_help_table(search_term: str | None = None) -> Table:
-    """Build a Rich table of slash commands, optionally filtered by search term."""
+def _build_help_table(
+    search_term: str | None = None, *, show_all: bool = False
+) -> Table:
+    """Build a Rich table of slash commands, optionally filtered by search term.
+
+    Parameters
+    ----------
+    search_term:
+        Fuzzy filter on command name/description.
+    show_all:
+        If True, expand all sections. If False, sections with more than
+        ``_HELP_SECTION_COLLAPSE_THRESHOLD`` commands are collapsed.
+    """
     try:
         from rapidfuzz import fuzz
     except ImportError:
-        return _build_help_table_fallback(search_term)
+        return _build_help_table_fallback(search_term, show_all=show_all)
 
     from collections import defaultdict
 
@@ -578,14 +592,28 @@ def _build_help_table(search_term: str | None = None) -> Table:
         if not specs_list:
             continue
         table.add_row('', '')
-        table.add_row(f'[bold]{title}[/bold]', '')
-        for spec in specs_list:
-            table.add_row(spec.usage, spec.description)
+        count = len(specs_list)
+        collapsed = (
+            not show_all
+            and count > _HELP_SECTION_COLLAPSE_THRESHOLD
+            and not search_term
+        )
+        if collapsed:
+            table.add_row(
+                f'[bold]{title}[/bold]  [dim]({count} commands — use /help --all to expand)[/dim]',
+                '',
+            )
+        else:
+            table.add_row(f'[bold]{title}[/bold]  [dim]({count})[/dim]', '')
+            for spec in specs_list:
+                table.add_row(spec.usage, spec.description)
 
     return table
 
 
-def _build_help_table_fallback(search_term: str | None = None) -> Table:
+def _build_help_table_fallback(
+    search_term: str | None = None, *, show_all: bool = False
+) -> Table:
     """Fallback help table without fuzzy matching."""
     from collections import defaultdict
 
@@ -624,9 +652,21 @@ def _build_help_table_fallback(search_term: str | None = None) -> Table:
         if not specs_list:
             continue
         table.add_row('', '')
-        table.add_row(f'[bold]{title}[/bold]', '')
-        for spec in specs_list:
-            table.add_row(spec.usage, spec.description)
+        count = len(specs_list)
+        collapsed = (
+            not show_all
+            and count > _HELP_SECTION_COLLAPSE_THRESHOLD
+            and not search_term
+        )
+        if collapsed:
+            table.add_row(
+                f'[bold]{title}[/bold]  [dim]({count} commands — use /help --all to expand)[/dim]',
+                '',
+            )
+        else:
+            table.add_row(f'[bold]{title}[/bold]  [dim]({count})[/dim]', '')
+            for spec in specs_list:
+                table.add_row(spec.usage, spec.description)
 
     return table
 
@@ -1172,10 +1212,16 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         return f' {controls}\n {telemetry} '
 
     def _prompt_bottom_toolbar(self) -> Any:
-        """Two-line status under the input; no filled backgrounds (terminal default)."""
+        """Context-aware status under the input; no filled backgrounds (terminal default).
+
+        - **Idle** (Ready): single compact line
+        - **Running**: full two-line display with all stats
+        - **Needs approval**: full display with prominent state badge
+        """
         width = shutil.get_terminal_size((110, 24)).columns
         self._prompt_panel_data()
         fields = status_fields_from_hud(self._hud.state, self._hud.bundled_skill_count)
+        is_idle = fields.agent_state_label.strip().lower() == 'ready'
 
         fragments: list[tuple[str, str]] = []
 
@@ -1190,6 +1236,25 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             self._append_footer_system_fragments(fragments, add)
             return fragments
 
+        if is_idle:
+            # Compact single line when idle
+            add('class:prompt.dim', 'GRINTA')
+            add('class:prompt.sep', '  ·  ')
+            add(
+                self._prompt_autonomy_style(),
+                autonomy_chrome_suffix(fields.autonomy_level),
+            )
+            add('class:prompt.sep', '  ·  ')
+            add('class:prompt.model', fields.model_display)
+            add('class:prompt.sep', '  ·  ')
+            add('class:prompt.value', fields.token_display_compact)
+            if fields.cost_usd > 0:
+                add('class:prompt.sep', '  ·  ')
+                add('class:prompt.value', f'${fields.cost_usd:.3f}')
+            self._append_footer_system_fragments(fragments, add)
+            return fragments
+
+        # Full two-line display when agent is active
         add('class:prompt.dim', '\u2500' * width)
         add('', '\n')
         fragments.extend(
