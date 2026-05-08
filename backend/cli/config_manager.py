@@ -234,16 +234,31 @@ def run_onboarding() -> AppConfig:
         raise SystemExit(1)
 
     _console.print()
+    try:
+        from backend import get_version
+        version = get_version()
+    except Exception:
+        version = ''
+    version_str = f' v{version}' if version else ''
     _console.print(
         Panel(
             Text.from_markup(
-                f'[{CLR_BRAND}]Welcome to Grinta[/]\n\n'
-                "Let's get you connected to an LLM.\n"
-                f'[{CLR_META}]Settings saved locally — never sent anywhere.[/]'
+                f'[{CLR_BRAND}]Welcome to Grinta{version_str}[/]\n\n'
+                "Let's get you connected to an LLM so you can start coding.\n\n"
+                f'[{CLR_META}]▸ Settings saved locally — never sent anywhere.\n'
+                '▸ API keys stored in [bold].env[/bold], never in code.\n'
+                f'▸ No telemetry by default.[/]'
             ),
             border_style=CLR_CARD_BORDER,
             padding=(1, 3),
         ),
+    )
+    _console.print()
+    _console.print(
+        Text.from_markup(
+            f'[{CLR_META}]Need help? [bold]grinta --help[/bold]  ·  '
+            f'[bold]docs: https://opencode.ai[/bold][/{CLR_META}]'
+        )
     )
     _console.print()
 

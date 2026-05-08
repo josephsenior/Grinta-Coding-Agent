@@ -949,6 +949,9 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         # Enable minimal mode if flag was passed
         if getattr(config, '_minimal_mode', False):
             self._hud.set_minimal_mode(True)
+        # Enable accessible mode if flag was passed
+        if getattr(config, '_accessible_mode', False):
+            self._hud.set_minimal_mode(True)
         self._reasoning = ReasoningDisplay()
         self._renderer: Any | None = None
         self._event_stream: EventStream | None = None

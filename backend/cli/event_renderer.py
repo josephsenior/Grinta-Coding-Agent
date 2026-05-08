@@ -52,6 +52,7 @@ from backend.cli.theme import (
     STYLE_BOLD_DIM,
     STYLE_DEFAULT,
     STYLE_DIM,
+    accessible_mode_enabled,
 )
 from backend.cli.tool_call_display import (
     looks_like_streaming_tool_arguments,
@@ -197,6 +198,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._budget_warned_100 = False
         #: Running count of stream-fallback retries this session ("Still Working" panels).
         self._stream_fallback_count: int = 0
+        self._accessible: bool = accessible_mode_enabled()
         #: Last error observation content printed (used for deduplication).
         self._last_notice_error_content: Any = None
         #: Last retry status signature printed (used for deduplication).
@@ -279,7 +281,13 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     # -- Live lifecycle (per agent turn) -----------------------------------
 
     def start_live(self) -> None:
-        """Create and start a Rich Live display for the current agent turn."""
+        """Create and start a Rich Live display for the current agent turn.
+
+        In accessible mode no Live display is created — output is printed
+        directly instead.
+        """
+        if self._accessible:
+            return
         if self._live is not None:
             return
         live = Live(
@@ -297,7 +305,19 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self.refresh(force=True)
 
     def stop_live(self) -> None:
-        """Stop the Rich Live display."""
+        """Stop the Rich Live display.
+
+        In accessible mode, flush output directly instead.
+        """
+        # In accessible mode, flush pending output directly.
+        if self._accessible:
+            self._flush_thinking_block()
+            self._console.print()
+            try:
+                self._console.show_cursor(True)
+            except Exception:
+                pass
+            return
         # Flush any remaining thinking before the Live panel disappears.
         self._flush_thinking_block()
         live = self._live
@@ -338,12 +358,17 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     def refresh(self, *, force: bool = False) -> None:
         """Redraw the Live display if active.
 
+        In accessible mode, flush pending events and return immediately.
+
         When *force* is False the call is throttled so rapid-fire streaming
         tokens do not saturate the terminal with redraws.
 
         However, when content exceeds terminal height and needs scrolling,
         we skip throttle to ensure the viewport updates properly.
         """
+        if self._accessible:
+            self.drain_events()
+            return
         if self._live is None:
             return
         now = time.monotonic()
@@ -371,6 +396,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     @contextmanager
     def suspend_live(self):
         """Stop/start Live around a block (fallback for non-interactive input)."""
+        if self._accessible:
+            yield
+            return
         live = self._live
         if live is None:
             yield
@@ -545,6 +573,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         )
         self._print_or_buffer(Padding(Markdown(text), (0, 0, 1, 0), expand=False))
         self._print_or_buffer(Text(''))
+
+    def add_renderable(self, renderable: Any) -> None:
+        """Buffer or print a raw Rich renderable directly."""
+        self._print_or_buffer(renderable)
 
     # -- subscription ------------------------------------------------------
 

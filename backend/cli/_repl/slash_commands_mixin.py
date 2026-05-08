@@ -602,37 +602,121 @@ class SlashCommandsMixin:
         return True
 
     def _renderer_render_diff(self, renderer: Any, diff_body: str) -> None:
-        """Render a patch diff with syntax highlighting and line numbers."""
+        """Render a patch diff with per-file foldable sections."""
+        from rich import box
+        from rich.panel import Panel
         from rich.syntax import Syntax
+        from rich.text import Text
 
-        # Parse file headers from the diff to add section markers
-        lines = diff_body.split('\n')
-        file_count = sum(
-            1 for line in lines if line.startswith('diff --git')
-        )
-        insertions = sum(
-            1 for line in lines if line.startswith('+') and line not in ('+++', '+++ b/')
-        )
-        deletions = sum(
-            1 for line in lines if line.startswith('-') and line not in ('---', '--- a/')
-        )
+        from backend.cli.theme import CLR_CARD_BORDER, CLR_CARD_TITLE
+
+        files = self._parse_diff_files(diff_body)
+
+        file_count = len(files)
+        total_added = sum(f['added'] for f in files)
+        total_removed = sum(f['removed'] for f in files)
 
         summary = f'{file_count} file{"s" if file_count != 1 else ""} changed'
-        if insertions > 0 or deletions > 0:
-            inserts = f'+{insertions}' if insertions > 0 else ''
-            deletes = f'-{deletions}' if deletions > 0 else ''
+        if total_added > 0 or total_removed > 0:
+            inserts = f'+{total_added}' if total_added > 0 else ''
+            deletes = f'-{total_removed}' if total_removed > 0 else ''
             summary += f'  ({inserts}{", " if inserts and deletes else ""}{deletes})'
 
-        syntax = Syntax(
-            diff_body,
-            lexer='diff',
-            theme='monokai',
-            word_wrap=True,
-            padding=(1, 2),
-            background_color='default',
-            line_numbers=True,
-        )
-        renderer.add_system_message(f'{summary}\n\n{syntax}', title='diff')
+        if file_count == 1:
+            syntax = Syntax(
+                diff_body,
+                lexer='diff',
+                theme='monokai',
+                word_wrap=True,
+                padding=(1, 2),
+                background_color='default',
+                line_numbers=True,
+            )
+            renderer.add_system_message(f'{summary}\n\n{syntax}', title='diff')
+            return
+
+        # Multi-file: render each file as its own panel
+        renderer.add_system_message(summary, title='diff')
+        for f in files:
+            file_diff = '\n'.join(f['lines'])
+            file_label = f['path']
+            add_str = f'+{f["added"]}' if f['added'] > 0 else ''
+            rem_str = f'-{f["removed"]}' if f['removed'] > 0 else ''
+            delta = ''
+            if add_str or rem_str:
+                delta = f'  ({add_str}{", " if add_str and rem_str else ""}{rem_str})'
+
+            syntax = Syntax(
+                file_diff,
+                lexer='diff',
+                theme='monokai',
+                word_wrap=True,
+                padding=(1, 2),
+                background_color='default',
+                line_numbers=True,
+            )
+            panel = Panel(
+                syntax,
+                title=Text(f'{file_label}{delta}', style=CLR_CARD_TITLE),
+                title_align='left',
+                border_style=CLR_CARD_BORDER,
+                box=box.ROUNDED,
+                padding=(0, 1),
+            )
+            if hasattr(renderer, 'add_renderable'):
+                renderer.add_renderable(panel)
+            else:
+                renderer.add_system_message(
+                    f'[{file_label}]{delta}[/]\n\n{file_diff}',
+                    title='diff',
+                )
+
+    @staticmethod
+    def _parse_diff_files(diff_body: str) -> list[dict]:
+        """Split a unified diff into per-file sections.
+
+        Returns a list of dicts with keys: ``path``, ``lines``, ``added``, ``removed``.
+        """
+        import re
+
+        files: list[dict] = []
+        current: list[str] = []
+        current_path = ''
+        added = 0
+        removed = 0
+
+        for line in diff_body.split('\n'):
+            if line.startswith('diff --git'):
+                if current and current_path:
+                    files.append({
+                        'path': current_path,
+                        'lines': current,
+                        'added': added,
+                        'removed': removed,
+                    })
+                current = [line]
+                current_path = ''
+                added = 0
+                removed = 0
+                m = re.match(r'diff --git a/(.*) b/.*', line)
+                if m:
+                    current_path = m.group(1)
+            else:
+                current.append(line)
+                if line.startswith('+') and not line.startswith('+++'):
+                    added += 1
+                elif line.startswith('-') and not line.startswith('---'):
+                    removed += 1
+
+        if current and current_path:
+            files.append({
+                'path': current_path,
+                'lines': current,
+                'added': added,
+                'removed': removed,
+            })
+
+        return files
 
     @staticmethod
     def _build_diff_git_args(mode: str, paths: list[str]) -> list[str]:
@@ -724,29 +808,112 @@ class SlashCommandsMixin:
         return True
 
     def _cmd_sessions(self, parsed) -> bool:
-        from backend.cli.session_manager import list_sessions
+        from backend.cli.session_manager import (
+            delete_sessions,
+            list_sessions,
+            show_session,
+        )
 
         args = list(parsed.args)
         if args and args[0].lower() == 'list':
             args.pop(0)
-        if len(args) > 1:
-            self._warn('Usage: /sessions [list] [limit]')
-            return True
+
+        search = None
+        sort_by = 'updated'
         limit = 20
-        if args:
-            try:
-                limit = int(args[0])
-            except ValueError:
-                self._warn('Usage: /sessions [list] [limit]')
-                return True
-            if limit < 1:
-                self._warn('Session limit must be 1 or greater.')
-                return True
+        preview_idx = None
+        delete_targets: list[str] = []
+
+        i = 0
+        while i < len(args):
+            a = args[i]
+            if a in ('--search', '-s') and i + 1 < len(args):
+                search = args[i + 1]
+                i += 2
+            elif a in ('--sort',) and i + 1 < len(args):
+                allowed = ('updated', 'created', 'events', 'cost', 'model')
+                if args[i + 1] in allowed:
+                    sort_by = args[i + 1]
+                else:
+                    self._warn(f"Sort must be one of: {', '.join(allowed)}")
+                    return True
+                i += 2
+            elif a in ('--delete', '-d') and i + 1 < len(args):
+                i += 1
+                while i < len(args) and not args[i].startswith('-'):
+                    delete_targets.append(args[i])
+                    i += 1
+            elif a in ('--limit', '-l') and i + 1 < len(args):
+                try:
+                    limit = int(args[i + 1])
+                except ValueError:
+                    self._warn('Limit must be a number.')
+                    return True
+                if limit < 1:
+                    self._warn('Limit must be 1 or greater.')
+                    return True
+                i += 2
+            elif a == '--preview' and i + 1 < len(args):
+                preview_idx = args[i + 1]
+                i += 2
+            else:
+                # Positional: could be a limit or a session index for preview
+                try:
+                    val = int(a)
+                    if preview_idx is None:
+                        preview_idx = a
+                    else:
+                        limit = val
+                except ValueError:
+                    self._warn(f'Unknown option: {a}')
+                    return True
+                i += 1
+
+        if delete_targets:
+            if self._renderer is not None:
+                with self._renderer.suspend_live():
+                    delete_sessions(
+                        self._console, delete_targets, config=self._config
+                    )
+            else:
+                delete_sessions(
+                    self._console, delete_targets, config=self._config
+                )
+            return True
+
+        if preview_idx is not None:
+            if self._renderer is not None:
+                with self._renderer.suspend_live():
+                    found = show_session(
+                        self._console, config=self._config, target=preview_idx
+                    )
+                    if not found:
+                        self._warn(f"No session at '{preview_idx}'")
+            else:
+                found = show_session(
+                    self._console, config=self._config, target=preview_idx
+                )
+                if not found:
+                    self._warn(f"No session at '{preview_idx}'")
+            return True
+
         if self._renderer is not None:
             with self._renderer.suspend_live():
-                list_sessions(self._console, limit=limit, config=self._config)
+                list_sessions(
+                    self._console,
+                    limit=limit,
+                    config=self._config,
+                    sort_by=sort_by,
+                    search=search,
+                )
         else:
-            list_sessions(self._console, limit=limit, config=self._config)
+            list_sessions(
+                self._console,
+                limit=limit,
+                config=self._config,
+                sort_by=sort_by,
+                search=search,
+            )
         return True
 
     def _cmd_resume(self, parsed) -> bool:

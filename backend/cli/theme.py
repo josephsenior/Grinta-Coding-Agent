@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import os
 
+_THEME_PRESET: str | None = None
+
 
 def _env_truthy(name: str) -> bool:
     raw = os.getenv(name)
@@ -30,6 +32,169 @@ def _env_truthy(name: str) -> bool:
 def no_color_enabled() -> bool:
     """Respect NO_COLOR and a Grinta-specific override."""
     return _env_truthy('NO_COLOR') or _env_truthy('GRINTA_NO_COLOR')
+
+
+def set_theme_preset(name: str) -> None:
+    """Override the active theme preset (must be called before imports)."""
+    global _THEME_PRESET
+    _THEME_PRESET = name
+
+
+def get_theme_preset() -> str:
+    """Return the active theme preset name.
+
+    Check order: explicit set → ``GRINTA_THEME`` env var → ``default``.
+    """
+    if _THEME_PRESET is not None:
+        return _THEME_PRESET
+    raw = (os.environ.get('GRINTA_THEME') or '').strip().lower()
+    if raw in _THEME_PRESETS:
+        return raw
+    return 'default'
+
+
+_THEME_PRESETS = frozenset({'default', 'dark', 'light', 'high-contrast', 'ocean', 'mono'})
+
+
+def _apply_theme_overrides() -> None:
+    """Mutate module-level color constants based on the active preset."""
+    preset = get_theme_preset()
+    if preset == 'default' or preset == 'dark':
+        return
+
+    global CLR_CARD_BORDER, CLR_META, CLR_BRAND, CLR_BRAND_HUE
+    global CLR_STATUS_OK, CLR_STATUS_WARN, CLR_STATUS_ERR
+    global CLR_HUD_MODEL, CLR_HUD_DETAIL, CLR_OK_BODY, CLR_OK_ICON
+    global CLR_ERR_BODY, CLR_ERR_ICON, CLR_WARN_BODY, CLR_WARN_ICON
+    global CLR_INFO_BODY, CLR_INFO_ICON, CLR_SEP, CLR_CARD_TITLE
+    global CLR_THINKING_BORDER, CLR_LIVE_PANEL_BORDER, CLR_THOUGHT_BODY
+    global CLR_SECTION_RULE, CLR_RISK_HIGH, CLR_RISK_MEDIUM, CLR_RISK_LOW
+    global CLR_SPLASH_FIGLET, CLR_SPLASH_LOGO_ACCENT
+    global STYLE_BOLD_DIM
+
+    if preset == 'light':
+        CLR_CARD_BORDER = '#6b8ba0'
+        CLR_META = '#5a7285'
+        CLR_BRAND = 'bold #0369a1'
+        CLR_BRAND_HUE = '#0369a1'
+        CLR_STATUS_OK = '#15803d'
+        CLR_STATUS_WARN = '#b45309'
+        CLR_STATUS_ERR = '#b91c1c'
+        CLR_HUD_MODEL = 'bold #0f172a'
+        CLR_HUD_DETAIL = '#334155'
+        CLR_OK_BODY = '#15803d'
+        CLR_OK_ICON = 'bold #166534'
+        CLR_ERR_BODY = '#b91c1c'
+        CLR_ERR_ICON = 'bold #991b1b'
+        CLR_WARN_BODY = '#b45309'
+        CLR_WARN_ICON = 'bold #92400e'
+        CLR_INFO_BODY = '#1d4ed8'
+        CLR_INFO_ICON = 'bold #1e40af'
+        CLR_SEP = '#64748b'
+        CLR_CARD_TITLE = 'bold #1e293b'
+        CLR_THINKING_BORDER = '#94a3b8'
+        CLR_LIVE_PANEL_BORDER = '#cbd5e1'
+        CLR_THOUGHT_BODY = '#64748b'
+        CLR_SECTION_RULE = '#94a3b8'
+        CLR_RISK_HIGH = 'bold #dc2626'
+        CLR_RISK_MEDIUM = '#ca8a04'
+        CLR_RISK_LOW = '#16a34a'
+        CLR_SPLASH_FIGLET = 'bold #b91c1c'
+        CLR_SPLASH_LOGO_ACCENT = '#b91c1c'
+        STYLE_BOLD_DIM = 'bold #475569'
+
+    elif preset == 'high-contrast':
+        CLR_CARD_BORDER = 'white'
+        CLR_META = 'white'
+        CLR_BRAND = 'bold white'
+        CLR_BRAND_HUE = 'white'
+        CLR_STATUS_OK = 'bold green'
+        CLR_STATUS_WARN = 'bold yellow'
+        CLR_STATUS_ERR = 'bold red'
+        CLR_HUD_MODEL = 'bold white'
+        CLR_HUD_DETAIL = 'white'
+        CLR_OK_BODY = 'green'
+        CLR_OK_ICON = 'bold green'
+        CLR_ERR_BODY = 'red'
+        CLR_ERR_ICON = 'bold red'
+        CLR_WARN_BODY = 'yellow'
+        CLR_WARN_ICON = 'bold yellow'
+        CLR_INFO_BODY = 'cyan'
+        CLR_INFO_ICON = 'bold cyan'
+        CLR_SEP = 'white'
+        CLR_CARD_TITLE = 'bold white'
+        CLR_THINKING_BORDER = 'white'
+        CLR_LIVE_PANEL_BORDER = 'bright_black'
+        CLR_THOUGHT_BODY = 'bright_black'
+        CLR_SECTION_RULE = 'white'
+        CLR_RISK_HIGH = 'bold red'
+        CLR_RISK_MEDIUM = 'bold yellow'
+        CLR_RISK_LOW = 'bold green'
+        CLR_SPLASH_FIGLET = 'bold white'
+        CLR_SPLASH_LOGO_ACCENT = 'white'
+        STYLE_BOLD_DIM = 'bold white'
+
+    elif preset == 'ocean':
+        CLR_CARD_BORDER = '#4895d6'
+        CLR_META = '#7eb8da'
+        CLR_BRAND = 'bold #00b4d8'
+        CLR_BRAND_HUE = '#00b4d8'
+        CLR_STATUS_OK = '#2dd4bf'
+        CLR_STATUS_WARN = '#fbbf24'
+        CLR_STATUS_ERR = '#fb7185'
+        CLR_HUD_MODEL = 'bold #e0f2fe'
+        CLR_HUD_DETAIL = '#bae6fd'
+        CLR_OK_BODY = '#5eead4'
+        CLR_OK_ICON = 'bold #14b8a6'
+        CLR_ERR_BODY = '#fda4af'
+        CLR_ERR_ICON = 'bold #f43f5e'
+        CLR_WARN_BODY = '#fde047'
+        CLR_WARN_ICON = 'bold #eab308'
+        CLR_INFO_BODY = '#7dd3fc'
+        CLR_INFO_ICON = 'bold #0ea5e9'
+        CLR_SEP = '#6b9fc4'
+        CLR_CARD_TITLE = 'bold #bae6fd'
+        CLR_THINKING_BORDER = '#3b82f6'
+        CLR_LIVE_PANEL_BORDER = '#1e3a5f'
+        CLR_THOUGHT_BODY = '#6096b4'
+        CLR_SECTION_RULE = '#3b82f6'
+        CLR_RISK_HIGH = 'bold #f43f5e'
+        CLR_RISK_MEDIUM = '#eab308'
+        CLR_RISK_LOW = '#22d3ee'
+        CLR_SPLASH_FIGLET = 'bold #0ea5e9'
+        CLR_SPLASH_LOGO_ACCENT = '#0ea5e9'
+        STYLE_BOLD_DIM = 'bold #7dd3fc'
+
+    elif preset == 'mono':
+        CLR_CARD_BORDER = 'bright_black'
+        CLR_META = 'bright_black'
+        CLR_BRAND = 'bold white'
+        CLR_BRAND_HUE = 'white'
+        CLR_STATUS_OK = 'green'
+        CLR_STATUS_WARN = 'yellow'
+        CLR_STATUS_ERR = 'red'
+        CLR_HUD_MODEL = 'bold white'
+        CLR_HUD_DETAIL = 'white'
+        CLR_OK_BODY = 'green'
+        CLR_OK_ICON = 'bold green'
+        CLR_ERR_BODY = 'red'
+        CLR_ERR_ICON = 'bold red'
+        CLR_WARN_BODY = 'yellow'
+        CLR_WARN_ICON = 'bold yellow'
+        CLR_INFO_BODY = 'cyan'
+        CLR_INFO_ICON = 'bold cyan'
+        CLR_SEP = 'bright_black'
+        CLR_CARD_TITLE = 'bold white'
+        CLR_THINKING_BORDER = 'bright_black'
+        CLR_LIVE_PANEL_BORDER = 'bright_black'
+        CLR_THOUGHT_BODY = 'bright_black'
+        CLR_SECTION_RULE = 'bright_black'
+        CLR_RISK_HIGH = 'bold red'
+        CLR_RISK_MEDIUM = 'bold yellow'
+        CLR_RISK_LOW = 'bold green'
+        CLR_SPLASH_FIGLET = 'bold white'
+        CLR_SPLASH_LOGO_ACCENT = 'white'
+        STYLE_BOLD_DIM = 'bold white'
 
 
 def use_ascii_cli_symbols() -> bool:
@@ -63,6 +228,18 @@ def mark_prompt() -> str:
 def splash_anim_disabled() -> bool:
     """Skip splash ``Live`` animation (``GRINTA_NO_SPLASH_ANIM=1``)."""
     return _env_truthy('GRINTA_NO_SPLASH_ANIM')
+
+
+def accessible_mode_enabled() -> bool:
+    """When true, enable high-contrast/simplified UI for accessibility.
+
+    Controlled by the ``GRINTA_ACCESSIBLE`` env var.
+
+    Accessible mode disables animations, disables color (via ``NO_COLOR``),
+    forces ASCII symbols, and uses simplified layouts suitable for screen
+    readers and low-vision users.
+    """
+    return _env_truthy('GRINTA_ACCESSIBLE')
 
 
 # ── Backgrounds ────────────────────────────────────────────────────────────────
@@ -219,6 +396,10 @@ PT_COMPLETION_META_BG = 'bg:#0a1929 #5c7fa0'
 PT_COMPLETION_META_CURRENT = 'bg:#163350 #93c5fd'
 PT_SCROLLBAR_BG = 'bg:#0d1f30'
 PT_SCROLLBAR_BUTTON = 'bg:#1e4976'
+
+
+# Apply theme preset overrides after all constants are defined.
+_apply_theme_overrides()
 
 
 def prompt_toolkit_style_dict() -> dict[str, str]:
