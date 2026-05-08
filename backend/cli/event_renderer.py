@@ -574,9 +574,25 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._print_or_buffer(Padding(Markdown(text), (0, 0, 1, 0), expand=False))
         self._print_or_buffer(Text(''))
 
-    def add_renderable(self, renderable: Any) -> None:
-        """Buffer or print a raw Rich renderable directly."""
-        self._print_or_buffer(renderable)
+    def add_renderable(self, renderable: Any, *, force_terminal: bool = False) -> None:
+        """Buffer or print a raw Rich renderable directly.
+
+        When *force_terminal* is True (e.g. for Rich tables that need proper
+        column sizing), the renderable is serialised to a temporary
+        ``force_terminal=True`` console and delivered as a system message.
+        """
+        if not force_terminal:
+            self._print_or_buffer(renderable)
+            return
+
+        from io import StringIO
+
+        from rich.console import Console
+
+        sio = StringIO()
+        tc = Console(file=sio, force_terminal=True, width=100)
+        tc.print(renderable)
+        self.add_system_message(sio.getvalue().strip(), title='help')
 
     # -- subscription ------------------------------------------------------
 

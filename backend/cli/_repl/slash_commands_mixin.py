@@ -857,16 +857,16 @@ class SlashCommandsMixin:
                 preview_idx = args[i + 1]
                 i += 2
             else:
-                # Positional: could be a limit or a session index for preview
+                # Positional: session limit (use --preview <N> for preview)
                 try:
-                    val = int(a)
-                    if preview_idx is None:
-                        preview_idx = a
-                    else:
-                        limit = val
+                    parsed_limit = int(a)
                 except ValueError:
                     self._warn(f'Unknown option: {a}')
                     return True
+                if parsed_limit < 1:
+                    self._warn('Limit must be 1 or greater.')
+                    return True
+                limit = parsed_limit
                 i += 1
 
         if delete_targets:
@@ -964,7 +964,7 @@ class SlashCommandsMixin:
         table = _build_help_table(search_term, show_all=show_all)
         if self._renderer is not None:
             if hasattr(self._renderer, 'add_renderable'):
-                self._renderer.add_renderable(table)
+                self._renderer.add_renderable(table, force_terminal=True)
             else:
                 # Fallback: convert table to string and show as markdown
                 from io import StringIO
