@@ -410,6 +410,9 @@ async def _async_main(
     project: str | None = None,
     show_splash: bool = True,
     minimal: bool = False,
+    accessible: bool = False,
+    theme: str | None = None,
+    verbose: bool = False,
 ) -> None:
     from backend.cli.repl import Repl
     from backend.core.config import load_app_config
@@ -426,13 +429,25 @@ async def _async_main(
     # Backend imports above trigger module-level logger setup — re-silence.
     _silence_all_loggers()
 
-    console = _build_async_console(show_splash)
+    _accessible_mode = accessible or _env_truthy('GRINTA_ACCESSIBLE')
+    if _accessible_mode:
+        os.environ['GRINTA_NO_COLOR'] = '1'
+        os.environ['GRINTA_ASCII'] = '1'
+        os.environ['GRINTA_NO_SPLASH_ANIM'] = '1'
+    if theme:
+        os.environ['GRINTA_THEME'] = theme
+        from backend.cli.theme import set_theme_preset
+        set_theme_preset(theme)
+    if verbose:
+        os.environ['GRINTA_VERBOSE'] = '1'
+    console = _build_async_console(show_splash and not _accessible_mode)
     initial_input = _read_piped_stdin()
 
     try:
         # -- load config -------------------------------------------------------
         config = load_app_config()
         config._minimal_mode = minimal  # Store for REPL to pick up
+        config._accessible_mode = _accessible_mode  # Store for REPL to pick up
 
         # -- apply CLI overrides (non-persistent) ------------------------------
         _apply_cli_overrides(
@@ -549,6 +564,9 @@ def main(
     cleanup_storage: bool = False,
     no_splash: bool = False,
     minimal: bool = False,
+    accessible: bool = False,
+    theme: str | None = None,
+    verbose: bool = False,
 ) -> None:
     """Synchronous entry point for the ``grinta`` console_script."""
     # Grinta repo ``.env`` first (and optional explicit project), before backend
@@ -595,6 +613,12 @@ def main(
         }
         if minimal:
             async_kwargs['minimal'] = minimal
+        if accessible:
+            async_kwargs['accessible'] = accessible
+        if theme:
+            async_kwargs['theme'] = theme
+        if verbose:
+            async_kwargs['verbose'] = verbose
 
         diag('main() calling asyncio.run')
         asyncio.run(_async_main(**async_kwargs))  # type: ignore[arg-type]

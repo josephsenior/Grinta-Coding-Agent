@@ -54,7 +54,8 @@ _EPILOG = """examples:
 
 In the REPL: /help for slash commands, /settings for model and keys.
 Environment: NO_COLOR=1 or GRINTA_NO_COLOR=1 disables color;
-GRINTA_ASCII=1 uses ASCII markers; GRINTA_NO_SPLASH_ANIM=1 skips splash animation.
+GRINTA_ASCII=1 uses ASCII markers; GRINTA_NO_SPLASH_ANIM=1 skips splash animation;
+GRINTA_ACCESSIBLE=1 enables accessible mode (high-contrast, no animations, ASCII).
 """
 
 
@@ -76,6 +77,11 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
         help='Start without the animated splash screen',
     )
     parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Verbose mode: show detailed bootstrap and status information',
+    )
+    parser.add_argument(
         '--cleanup-storage',
         action='store_true',
         help='Consolidate legacy project data into the workspace storage root and exit',
@@ -84,6 +90,17 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
         '--minimal',
         action='store_true',
         help='Minimal mode: stripped borders and reduced HUD for cleaner display',
+    )
+    parser.add_argument(
+        '--accessible',
+        action='store_true',
+        help='Accessible mode: high-contrast, no animations, ASCII symbols, simplified layout',
+    )
+    parser.add_argument(
+        '--theme',
+        choices=['default', 'dark', 'light', 'high-contrast', 'ocean', 'mono'],
+        default=None,
+        help='Color theme preset (default: dark). Overrides GRINTA_THEME env var.',
     )
     parser.add_argument(
         '--version',
@@ -249,6 +266,12 @@ def main() -> None:
     }
     if args.minimal:
         call_kwargs['minimal'] = True
+    if args.accessible:
+        call_kwargs['accessible'] = True
+    if args.theme:
+        call_kwargs['theme'] = args.theme
+    if args.verbose:
+        call_kwargs['verbose'] = True
     repl_main(**call_kwargs)
 
 
