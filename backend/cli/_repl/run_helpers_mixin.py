@@ -346,7 +346,10 @@ class RunHelpersMixin:
             self._console.print(
                 f'[{CLR_STATUS_ERR}]Prompt input failed:[/] {e}',
             )
-            return None
+            # Prompt failure (e.g. PTY disconnect on first call) should NOT
+            # terminate the session. Return '' to stay in the loop and give
+            # the user a chance to retry.
+            return ''
 
         if not self._running:
             return None

@@ -1419,15 +1419,15 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
                     )
                 except Exception:
                     logger.exception('Unhandled exception in REPL iteration')
-                    # Print directly to stderr so the user sees something
-                    # even if the renderer is in an inconsistent state.
                     import traceback
                     traceback.print_exc()
                     self._console.print(
                         f'[{CLR_STATUS_ERR}]Fatal error in REPL loop:[/] '
                         'see log or stderr for details.'
                     )
-                    break
+                    # Continue looping so user can retry rather than silently
+                    # terminating the session.
+                    continue
                 if stop is None:
                     break
                 controller, agent_task = stop
