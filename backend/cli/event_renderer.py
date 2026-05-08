@@ -287,7 +287,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             # Use 'scroll' for better viewport management when content exceeds
             # terminal height. This prevents the visual mess where old content
             # overlaps with new.
-            vertical_overflow='scroll',
+            vertical_overflow='scroll',  # type: ignore[arg-type]
         )
         live.start()
         self._live = live
@@ -597,10 +597,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         # Committed transcript lines are printed via console.print immediately
         # so Rich does not clip tall turns (Live vertical_overflow ellipsis).
         live_sections: list[Any] = self._collect_live_sections()
-        stream_max_lines = self._live_section_budgets(options)
         self._append_streaming_and_reasoning_sections(
             live_sections,
-            stream_max_lines,
+            None,
             options.max_width,
         )
         body_items = self._frame_live_sections(live_sections)
@@ -1306,6 +1305,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         tail = wrapped[-max_lines:]
         return '\n'.join(tail)
 
+    @staticmethod
     def _format_command_display(command: str, *, limit: int = 96) -> str:
         display = ' '.join(command.split())
         if not display:

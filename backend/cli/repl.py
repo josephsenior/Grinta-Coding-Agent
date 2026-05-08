@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import os
 import re
 import shutil
 import subprocess
@@ -1347,10 +1346,9 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
     async def run(self) -> None:
         """Boot the engine, subscribe to events, and loop on user input."""
-        import sys as _sys
         from backend.cli.repl_debug import debug as diag
-        diag("run() ENTER")
-        print("DIAG: run() ENTER", file=_sys.stderr, flush=True)
+
+        diag('run() ENTER')
         loop = asyncio.get_running_loop()
         agent_task: asyncio.Task | None = None
         bootstrap_task: asyncio.Task[None] | None = None
@@ -1370,7 +1368,9 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
             # -- prompt session (fast, no I/O) --------------------------------
             session = self._build_prompt_session()
-            print(f"DIAG: run() session built: session={'PT' if session is not None else 'None'}", file=_sys.stderr)
+            diag(
+                f'run() session built: session={"PT" if session is not None else "None"}'
+            )
 
             # -- renderer (no event-stream subscription yet) ------------------
             renderer = self._build_renderer(session, loop)
@@ -1383,7 +1383,9 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             # -- enter input loop ---------------------------------------------
             controller = None
             bootstrap_task = None
-            diag(f"run() bootstrap_task created, events: chat_ready={chat_ready_done.is_set()}, engine_init={engine_init_done.is_set()}")
+            diag(
+                f'run() bootstrap_task created, events: chat_ready={chat_ready_done.is_set()}, engine_init={engine_init_done.is_set()}'
+            )
             # RATE_LIMITED is intentionally omitted: the retry worker resumes the
             # agent after backoff; run_agent_until_done must keep running until a
             # true terminal state so controller.step() chains stay attached.
@@ -1413,8 +1415,10 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             iter_count = 0
             while self._running:
                 iter_count += 1
-                print(f"DIAG: run() iteration {iter_count} _running={self._running}", file=_sys.stderr)
-                diag(f"run() TOP OF LOOP iter={iter_count} _running={self._running} controller={'set' if controller else 'None'} agent_task={'done' if agent_task and agent_task.done() else 'pending' if agent_task else 'None'}")
+                diag(f'run() iteration {iter_count} _running={self._running}')
+                diag(
+                    f'run() TOP OF LOOP iter={iter_count} _running={self._running} controller={"set" if controller else "None"} agent_task={"done" if agent_task and agent_task.done() else "pending" if agent_task else "None"}'
+                )
                 try:
                     stop = await self._repl_iteration(
                         session,
@@ -1431,8 +1435,9 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
                 except BaseException:
                     logger.exception('Unhandled exception in REPL iteration')
                     import traceback
+
                     traceback.print_exc()
-                    print("DIAG: run() caught BaseException, continuing", file=_sys.stderr)
+                    diag('run() caught BaseException, continuing')
                     self._console.print(
                         f'[{CLR_STATUS_ERR}]Fatal error in REPL loop:[/] '
                         'see log or stderr for details.'
@@ -1441,21 +1446,21 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
                     # terminating the session. Do NOT suppress SystemExit/KeyboardInterrupt
                     # — those still need to bubble up.
                     import sys
+
                     if isinstance(sys.exc_info()[1], (SystemExit, KeyboardInterrupt)):
                         raise
                     continue
                 if stop is None:
-                    print(f"DIAG: run() stop is None at iter {iter_count}, BREAKING", file=_sys.stderr)
-                    diag(f"run() BREAKING at iter {iter_count}: stop is None")
+                    diag(f'run() BREAKING at iter {iter_count}: stop is None')
                     break
-                diag(f"run() iter {iter_count} stop=({type(stop[0]).__name__ if stop[0] else 'None'}, {type(stop[1]).__name__ if stop[1] else 'None'})")
+                diag(
+                    f'run() iter {iter_count} stop=({type(stop[0]).__name__ if stop[0] else "None"}, {type(stop[1]).__name__ if stop[1] else "None"})'
+                )
                 controller, agent_task = stop
         finally:
-            print("DIAG: run() FINALLY block reached", file=_sys.stderr)
-            diag(f"run() FINALLY block reached")
+            diag('run() FINALLY block reached')
             await self._finalize_repl_run(bootstrap_task, agent_task)
-            print("DIAG: run() EXIT", file=_sys.stderr)
-            diag("run() EXIT")
+            diag('run() EXIT')
 
     async def _repl_iteration(
         self,
