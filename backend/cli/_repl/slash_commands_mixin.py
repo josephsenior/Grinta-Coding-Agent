@@ -314,7 +314,6 @@ class SlashCommandsMixin:
         '/status': '_cmd_status',
         '/cost': '_cmd_cost',
         '/diff': '_cmd_diff',
-        '/think': '_cmd_think',
         '/checkpoint': '_cmd_checkpoint',
         '/copy': '_cmd_copy',
         '/sessions': '_cmd_sessions',
@@ -636,41 +635,6 @@ class SlashCommandsMixin:
             self._warn(f'Usage: {self._usage(parsed.name)}')
             return None
         return mode, paths
-
-    def _cmd_think(self, parsed) -> bool:
-        cur = bool(getattr(self._config, 'enable_think', False))
-        if len(parsed.args) > 1:
-            self._warn(f'Usage: {self._usage(parsed.name)}')
-            return True
-        new_val = self._resolve_think_value(parsed, cur)
-        if new_val is None:
-            return True
-        try:
-            self._config.enable_think = new_val  # type: ignore[attr-defined]
-        except Exception:
-            pass
-        if self._renderer is not None:
-            self._renderer.add_system_message(
-                f'`think` tool now {"ON" if new_val else "OFF"} (applies to next system-prompt build).',
-                title='think',
-            )
-        return True
-
-    def _resolve_think_value(
-        self,
-        parsed,
-        cur: bool,
-    ) -> bool | None:
-        if not parsed.args:
-            return not cur
-        target = parsed.args[0].lower()
-        if target in ('on', 'true', '1', 'yes'):
-            return True
-        if target in ('off', 'false', '0', 'no'):
-            return False
-        if self._renderer is not None:
-            self._renderer.add_system_message('Usage: /think [on|off]', title='warning')
-        return None
 
     def _cmd_checkpoint(self, parsed) -> bool:
         args = list(parsed.args)

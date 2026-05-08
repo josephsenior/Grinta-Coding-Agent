@@ -72,7 +72,6 @@ class _FakeRepl(SlashCommandsMixin):
         self._renderer: _FakeRenderer | None = _FakeRenderer()
         self._console = Console(quiet=True)
         self._config = MagicMock()
-        self._config.enable_think = False
         self._config.cli_tool_icons = True
         self._hud = _MockHud()  # type: ignore[assignment]
         self._controller: MagicMock | None = None
@@ -221,62 +220,6 @@ class TestCmdCost:
     def test_rejects_extra_args(self) -> None:
         r = _repl()
         result = r._cmd_cost(_parse('/cost extra'))
-        assert result is True
-
-
-# ---------------------------------------------------------------------------
-# _cmd_think
-# ---------------------------------------------------------------------------
-
-
-class TestCmdThink:
-    def test_toggle_on(self) -> None:
-        r = _repl()
-        r._config.enable_think = False  # type: ignore[attr-defined]
-        result = r._cmd_think(_parse('/think'))
-        assert result is True
-        assert r._renderer is not None
-        messages = [m for _, m in r._renderer.messages]
-        assert any('ON' in m for m in messages)
-
-    def test_toggle_off(self) -> None:
-        r = _repl()
-        r._config.enable_think = True  # type: ignore[attr-defined]
-        result = r._cmd_think(_parse('/think'))
-        assert result is True
-        assert r._renderer is not None
-        messages = [m for _, m in r._renderer.messages]
-        assert any('OFF' in m for m in messages)
-
-    def test_set_on_explicitly(self) -> None:
-        r = _repl()
-        r._config.enable_think = False  # type: ignore[attr-defined]
-        result = r._cmd_think(_parse('/think on'))
-        assert result is True
-        assert r._renderer is not None
-        messages = [m for _, m in r._renderer.messages]
-        assert any('ON' in m for m in messages)
-
-    def test_set_off_explicitly(self) -> None:
-        r = _repl()
-        r._config.enable_think = True  # type: ignore[attr-defined]
-        result = r._cmd_think(_parse('/think off'))
-        assert result is True
-        assert r._renderer is not None
-        messages = [m for _, m in r._renderer.messages]
-        assert any('OFF' in m for m in messages)
-
-    def test_invalid_value(self) -> None:
-        r = _repl()
-        result = r._cmd_think(_parse('/think maybe'))
-        assert result is True
-        assert r._renderer is not None
-        messages = [m for _, m in r._renderer.messages]
-        assert any('Usage' in m or '/think' in m for m in messages)
-
-    def test_too_many_args(self) -> None:
-        r = _repl()
-        result = r._cmd_think(_parse('/think on off'))
         assert result is True
 
 

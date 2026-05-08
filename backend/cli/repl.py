@@ -319,12 +319,6 @@ _SLASH_COMMANDS = (
         help_section='control',
     ),
     SlashCommandSpec(
-        '/think',
-        'Toggle the optional `think` reasoning tool',
-        '/think [on|off]',
-        help_section='control',
-    ),
-    SlashCommandSpec(
         '/checkpoint',
         'Save a manual checkpoint of the workspace',
         '/checkpoint [label]',
