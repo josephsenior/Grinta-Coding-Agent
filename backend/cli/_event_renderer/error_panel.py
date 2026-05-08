@@ -241,11 +241,21 @@ def build_error_panel(
     accent_style: str = 'red',
     force_notice: bool | None = None,
     content_width: int | None = None,
-) -> Panel:
+) -> Panel | Text:
     """Render a structured panel with recovery guidance when available."""
+    # Rate limit errors: return simple message, skip noisy panel
+    guidance = error_guidance(error_text)
+    if (
+        guidance is not None
+        and guidance.error_code
+        and guidance.error_code.startswith('ERR-RATE')
+    ):
+        return Text(
+            'Rate or quota limit reached — retrying automatically.',
+            style=f'dim {CLR_META}',
+        )
     wrap_w = error_panel_text_wrap_width(content_width)
     summary, detail = split_error_text(error_text)
-    guidance = error_guidance(error_text)
     use_notice = (
         force_notice
         if force_notice is not None

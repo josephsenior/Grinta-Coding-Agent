@@ -158,7 +158,9 @@ class ProviderResolver:
         self._discovery_cache_ttl = 300  # 5 minutes
         self._last_discovery = 0.0
 
-    def resolve_provider(self, model_name: str, config_provider: str | None = None) -> str:
+    def resolve_provider(
+        self, model_name: str, config_provider: str | None = None
+    ) -> str:
         """Determine the provider for a given model.
 
         Args:

@@ -406,7 +406,9 @@ class LLM(RetryMixin, DebugMixin):
         config_provider = getattr(self.config, 'custom_llm_provider', None)
         try:
             # resolve_provider raises ValueError if the model is unknown and has no prefix
-            resolver.resolve_provider(self.config.model, config_provider=config_provider)
+            resolver.resolve_provider(
+                self.config.model, config_provider=config_provider
+            )
         except ValueError as exc:
             from backend.inference.exceptions import NotFoundError
 

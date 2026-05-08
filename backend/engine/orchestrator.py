@@ -701,7 +701,9 @@ class Orchestrator(Agent):
             'LLM returned text-only response with no tool calls — continuing loop. '
             'Model should use explicit tool calls instead of plain text output.'
         )
-        fallback = MessageAction(content=message_text, thought=reasoning, wait_for_response=False)
+        fallback = MessageAction(
+            content=message_text, thought=reasoning, wait_for_response=False
+        )
         fallback.source = EventSource.AGENT
         return fallback
 
