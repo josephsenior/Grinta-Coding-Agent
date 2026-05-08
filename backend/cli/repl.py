@@ -1346,6 +1346,8 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
     async def run(self) -> None:
         """Boot the engine, subscribe to events, and loop on user input."""
+        import sys as _sys
+        print("DIAG: run() ENTER", file=_sys.stderr)
         loop = asyncio.get_running_loop()
         agent_task: asyncio.Task | None = None
         bootstrap_task: asyncio.Task[None] | None = None
@@ -1365,6 +1367,7 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
             # -- prompt session (fast, no I/O) --------------------------------
             session = self._build_prompt_session()
+            print(f"DIAG: run() session built: session={'PT' if session is not None else 'None'}", file=_sys.stderr)
 
             # -- renderer (no event-stream subscription yet) ------------------
             renderer = self._build_renderer(session, loop)
@@ -1403,7 +1406,10 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
                 name='grinta-engine-bootstrap',
             )
 
+            iter_count = 0
             while self._running:
+                iter_count += 1
+                print(f"DIAG: run() iteration {iter_count} _running={self._running}", file=_sys.stderr)
                 try:
                     stop = await self._repl_iteration(
                         session,
@@ -1417,22 +1423,30 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
                         run_agent_until_done,
                         end_states,
                     )
-                except Exception:
+                except BaseException:
                     logger.exception('Unhandled exception in REPL iteration')
                     import traceback
                     traceback.print_exc()
+                    print("DIAG: run() caught BaseException, continuing", file=_sys.stderr)
                     self._console.print(
                         f'[{CLR_STATUS_ERR}]Fatal error in REPL loop:[/] '
                         'see log or stderr for details.'
                     )
                     # Continue looping so user can retry rather than silently
-                    # terminating the session.
+                    # terminating the session. Do NOT suppress SystemExit/KeyboardInterrupt
+                    # — those still need to bubble up.
+                    import sys
+                    if isinstance(sys.exc_info()[1], (SystemExit, KeyboardInterrupt)):
+                        raise
                     continue
                 if stop is None:
+                    print(f"DIAG: run() stop is None at iter {iter_count}, BREAKING", file=_sys.stderr)
                     break
                 controller, agent_task = stop
         finally:
+            print("DIAG: run() FINALLY block reached", file=_sys.stderr)
             await self._finalize_repl_run(bootstrap_task, agent_task)
+            print("DIAG: run() EXIT", file=_sys.stderr)
 
     async def _repl_iteration(
         self,
@@ -1476,12 +1490,15 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
                 return controller, agent_task
             # else fall through to dispatch (compact/retry)
 
+        # Wait for engine to be fully initialized before dispatching.
+        # Without this, validate below will fail and terminate the session.
+        await engine_init_done.wait()
         await chat_ready_done.wait()
         if engine_init_exc[0] is not None:
             return controller, agent_task
 
         if not self._validate_engine_components_ready():
-            return None
+            return controller, agent_task
 
         controller, agent_task = await self._dispatch_user_turn(
             text,

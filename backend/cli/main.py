@@ -535,10 +535,29 @@ def main(
         }
         if minimal:
             async_kwargs['minimal'] = minimal
+        import sys as _sys
+        _sys.stderr.write('DIAG: main() calling asyncio.run\n')
+        _sys.stderr.flush()
         asyncio.run(_async_main(**async_kwargs))  # type: ignore[arg-type]
+        _sys.stderr.write('DIAG: main() asyncio.run returned normally\n')
+        _sys.stderr.flush()
     except KeyboardInterrupt:
         # Top-level Ctrl+C — exit cleanly without traceback.
         print()  # newline after ^C
+    except BaseException:
+        import traceback
+        import sys as _sys
+        _sys.stderr.write('DIAG: main() UNCAUGHT EXCEPTION:\n')
+        traceback.print_exc(file=_sys.stderr)
+        _sys.stderr.write('DIAG: main() Printing to console and stderr\n')
+        _sys.stderr.flush()
+        try:
+            from rich.console import Console as RichConsole
+            rc = RichConsole()
+            rc.print('[red]Fatal error:[/] see stderr for traceback')
+        except Exception:
+            pass
+        raise
 
 
 if __name__ == '__main__':
