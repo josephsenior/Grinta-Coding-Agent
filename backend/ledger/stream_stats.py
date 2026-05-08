@@ -26,6 +26,7 @@ def get_aggregated_event_stream_stats() -> dict[str, int]:
         'cache_write_failures': 0,
         'critical_events': 0,
         'critical_queue_blocked': 0,
+        'dropped_critical': 0,
         'critical_sync_persistence': 0,
         'durable_enqueue_failures': 0,
         'durable_writer_drops': 0,
@@ -51,6 +52,7 @@ def get_aggregated_event_stream_stats() -> dict[str, int]:
             totals['cache_write_failures'] += stats.get('cache_write_failures', 0)
             totals['critical_events'] += stats.get('critical_events', 0)
             totals['critical_queue_blocked'] += stats.get('critical_queue_blocked', 0)
+            totals['dropped_critical'] += stats.get('dropped_critical', 0)
             totals['critical_sync_persistence'] += stats.get(
                 'critical_sync_persistence', 0
             )
