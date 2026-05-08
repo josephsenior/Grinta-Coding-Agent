@@ -1,6 +1,7 @@
 """Tests for backend.orchestration.memory_pressure module."""
 
 import os
+import time
 from unittest.mock import MagicMock, patch
 
 from backend.orchestration.memory_pressure import MemoryPressureMonitor
@@ -278,3 +279,38 @@ class TestMemoryPressureMonitor:
         monitor = _make_monitor(warn_mb=500, crit_mb=1000)
         monitor._last_rss_mb = 1000.0
         assert monitor._level_str() == 'critical'
+
+    def test_pressure_ratio_normal(self):
+        """Below warning threshold → 0.0."""
+        monitor = _make_monitor(warn_mb=500, crit_mb=1000)
+        monitor._last_rss_mb = 200.0
+        monitor._last_check = time.monotonic()
+        assert monitor.pressure_ratio() == 0.0
+
+    def test_pressure_ratio_critical(self):
+        """At or above critical threshold → 1.0."""
+        monitor = _make_monitor(warn_mb=500, crit_mb=1000)
+        monitor._last_rss_mb = 1000.0
+        monitor._last_check = time.monotonic()
+        assert monitor.pressure_ratio() == 1.0
+
+    def test_pressure_ratio_midpoint(self):
+        """Halfway between warn and crit → 0.5."""
+        monitor = _make_monitor(warn_mb=500, crit_mb=1000)
+        monitor._last_rss_mb = 750.0
+        monitor._last_check = time.monotonic()
+        assert monitor.pressure_ratio() == 0.5
+
+    def test_pressure_ratio_clamps_over_crit(self):
+        """Above critical is still 1.0."""
+        monitor = _make_monitor(warn_mb=500, crit_mb=1000)
+        monitor._last_rss_mb = 2000.0
+        monitor._last_check = time.monotonic()
+        assert monitor.pressure_ratio() == 1.0
+
+    def test_pressure_ratio_no_psutil(self):
+        """No psutil → 0.0 (safe default)."""
+        monitor = _make_monitor(warn_mb=500, crit_mb=1000)
+        monitor._process = None
+        monitor._last_check = time.monotonic()
+        assert monitor.pressure_ratio() == 0.0

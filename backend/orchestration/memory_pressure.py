@@ -260,6 +260,21 @@ class MemoryPressureMonitor:
         except statistics.StatisticsError:
             return None
 
+    def pressure_ratio(self) -> float:
+        """Return memory pressure as 0.0 (none) to 1.0 (at/above critical).
+
+        Linear interpolation between the warning and critical thresholds.
+        Returns 0.0 when psutil is unavailable or sampling fails.
+        """
+        rss = self._sample_rss()
+        if rss is None:
+            return 0.0
+        if rss >= self._crit_mb:
+            return 1.0
+        if rss <= self._warn_mb:
+            return 0.0
+        return (rss - self._warn_mb) / (self._crit_mb - self._warn_mb)
+
     def snapshot(self) -> dict[str, Any]:
         """Return diagnostic snapshot for debug endpoints."""
         return {

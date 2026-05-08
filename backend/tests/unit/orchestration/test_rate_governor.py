@@ -462,3 +462,43 @@ class TestSnapshot:
         assert snapshot['current_backoff_s'] == 1.23
         # latency_p95_s rounded to 3 decimals
         assert isinstance(snapshot['latency_p95_s'], float)
+
+    def test_memory_pressure_factor_scales_limit(self):
+        """Factor below 1.0 should scale effective_tpm_limit proportionally."""
+        governor = LLMRateGovernor(max_tokens_per_minute=100000)
+        governor.set_memory_pressure_factor(0.5)
+        limit = governor.effective_tpm_limit()
+        assert limit == 50000
+
+    def test_memory_pressure_factor_floor_is_one(self):
+        """Even at zero factor the floor is 1 TPM so the governor never stalls."""
+        governor = LLMRateGovernor(max_tokens_per_minute=100000)
+        governor.set_memory_pressure_factor(0.0)
+        limit = governor.effective_tpm_limit()
+        assert limit == 1
+
+    def test_memory_pressure_factor_full_speed(self):
+        """Factor of 1.0 should pass through the configured limit unchanged."""
+        governor = LLMRateGovernor(max_tokens_per_minute=100000)
+        governor.set_memory_pressure_factor(1.0)
+        limit = governor.effective_tpm_limit()
+        assert limit == 100000
+
+    def test_set_memory_pressure_factor_clamps_high(self):
+        """Factor > 1.0 should be clamped to 1.0."""
+        governor = LLMRateGovernor()
+        governor.set_memory_pressure_factor(2.5)
+        assert governor._memory_pressure_factor == 1.0
+
+    def test_set_memory_pressure_factor_clamps_low(self):
+        """Factor < 0.0 should be clamped to 0.0."""
+        governor = LLMRateGovernor()
+        governor.set_memory_pressure_factor(-1.0)
+        assert governor._memory_pressure_factor == 0.0
+
+    def test_snapshot_includes_memory_pressure_factor(self):
+        """Snapshot dict should include the factor for observability."""
+        governor = LLMRateGovernor()
+        governor.set_memory_pressure_factor(0.5)
+        snap = governor.snapshot()
+        assert snap['memory_pressure_factor'] == 0.5

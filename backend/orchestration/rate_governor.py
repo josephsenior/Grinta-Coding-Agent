@@ -43,6 +43,7 @@ class LLMRateGovernor:
         # LLM latency tracking for adaptive ceiling
         self._latencies: deque[float] = deque(maxlen=20)
         self._consecutive_throttles: int = 0
+        self._memory_pressure_factor: float = 1.0
         # Observed TPM ceiling per ``(provider, model)`` derived from past 429s
         # tagged as ``RateLimitKind.TPM``. We learn the ceiling so we can
         # pre-emptively throttle below it without waiting for another 429.
@@ -97,19 +98,29 @@ class LLMRateGovernor:
                 prev,
             )
 
+    def set_memory_pressure_factor(self, factor: float) -> None:
+        """Set a memory-pressure scaling factor [0.0, 1.0].
+
+        When the system is under memory pressure this factor reduces the
+        effective TPM limit so the agent generates fewer tokens, giving
+        condensation time to catch up.  1.0 = no pressure, 0.0 = full stop.
+        """
+        self._memory_pressure_factor = max(0.0, min(1.0, factor))
+
     def effective_tpm_limit(
         self, *, provider: str | None = None, model: str | None = None
     ) -> int:
-        """Return the effective TPM limit, applying any learned per-model ceiling."""
+        """Return the effective TPM limit, applying learned per-model ceiling
+        and the memory-pressure factor."""
         configured = self.max_tokens_per_minute
-        if not provider or not model:
-            return configured
-        learned = self._observed_tpm_ceiling.get((provider.lower(), model.lower()))
-        if learned is None:
-            return configured
         if configured <= 0:
-            return learned
-        return min(configured, learned)
+            return 0
+        if not provider or not model:
+            return max(1, int(configured * self._memory_pressure_factor))
+        learned = self._observed_tpm_ceiling.get((provider.lower(), model.lower()))
+        if learned is not None:
+            configured = min(configured, learned)
+        return max(1, int(configured * self._memory_pressure_factor))
 
     async def check_and_wait(
         self,
@@ -175,6 +186,7 @@ class LLMRateGovernor:
             'window_seconds': self.history_window_seconds,
             'current_backoff_s': round(self._current_backoff, 2),
             'consecutive_throttles': self._consecutive_throttles,
+            'memory_pressure_factor': self._memory_pressure_factor,
             'latency_p95_s': round(p95, 3) if p95 else None,
             'history_size': len(self._history),
             'observed_tpm_ceilings': {
