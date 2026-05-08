@@ -149,8 +149,10 @@ class RunHelpersMixin:
         # the REPL shuts down — renderer messages may not flush in time.
         import sys
         print(f'\n[Grinta] {msg}\n', file=sys.stderr)
-        self._running = False
-        self._invalidate_prompt_session(session)
+        # Do NOT set self._running = False here.  Setting it kills the REPL
+        # loop silently — the user never sees the error in the prompt area.
+        # Instead leave _running True so the REPL stays alive and the user
+        # can read the error message and fix config or type /exit.
 
     async def _engine_bootstrap(
         self,
