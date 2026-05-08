@@ -78,6 +78,7 @@ class BackpressureManager:
             'enqueued': 0,
             'dropped_oldest': 0,
             'dropped_newest': 0,
+            'dropped_critical': 0,
             'high_watermark_hits': 0,
             'critical_events': 0,
             'critical_queue_blocked': 0,
@@ -201,11 +202,14 @@ class BackpressureManager:
             self.stats['enqueued'] += 1
             self._record_recent(self._recent_enqueued)
         except TimeoutError:
-            self.stats['dropped_newest'] += 1
+            self.stats['dropped_critical'] += 1
             self._record_recent(self._recent_drops)
             logger.error(
-                'EventStream critical event dropped after blocking %.3fs; consumer may be stalled',
+                'CRITICAL EVENT DROPPED after blocking %.3fs; consumer may be stalled '
+                '(queue_size=%s, max_queue_size=%s)',
                 self.block_timeout * 10,
+                queue.qsize(),
+                self.max_queue_size,
             )
         self.queue_size = queue.qsize()
 
@@ -229,9 +233,9 @@ class BackpressureManager:
             self.stats['enqueued'] += 1
             self._record_recent(self._recent_enqueued)
         except asyncio.QueueEmpty:
-            self.stats['dropped_newest'] += 1
-            self._record_recent(self._recent_drops)
-            logger.warning('EventStream full; dropped newest (empty on get)')
+            queue.put_nowait(event)
+            self.stats['enqueued'] += 1
+            self._record_recent(self._recent_enqueued)
         self.queue_size = queue.qsize()
 
     async def _try_block_and_put(self, event: Event, queue: asyncio.Queue[Any]) -> None:

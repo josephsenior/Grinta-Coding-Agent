@@ -122,6 +122,26 @@ class TestDropOldest:
             items.append(q.get_nowait()._id)
         assert items == [2, 3]
 
+    @pytest.mark.asyncio
+    async def test_drop_oldest_after_queue_drained_not_lost(self):
+        """Simulate race: queue was full at check-time, consumer drained it
+        before _try_drop_oldest_and_put ran. The event must still be enqueued."""
+        bp = BackpressureManager(max_queue_size=3, drop_policy='drop_oldest')
+        q: asyncio.Queue = _make_queue(maxsize=3)
+        for i in range(3):
+            await q.put(_make_event(i + 1))
+        # Drain the queue entirely (simulating consumer that ran after full() check)
+        for _ in range(3):
+            q.get_nowait()
+            q.task_done()
+        # Call the internal method — this is the race-condition fallback
+        bp._try_drop_oldest_and_put(_make_event(4), q)
+        assert bp.stats['enqueued'] == 1
+        assert bp.stats['dropped_oldest'] == 0
+        assert bp.stats['dropped_newest'] == 0
+        # The fallback put the event into the drained queue
+        assert q.qsize() == 1
+
 
 # ---------------------------------------------------------------------------
 # Drop-newest policy
@@ -177,14 +197,27 @@ class TestCriticalEvents:
     @pytest.mark.asyncio
     async def test_critical_never_dropped(self):
         bp = BackpressureManager(
-            max_queue_size=1,
+            max_queue_size=2,
             drop_policy='drop_newest',
             is_critical_event=lambda _e: True,
         )
-        q: asyncio.Queue = asyncio.Queue(maxsize=0)  # unbounded for await put
+        q: asyncio.Queue = asyncio.Queue(maxsize=2)
+        # Fill queue
         await bp.enqueue_event(_make_event(1), q)
-        assert bp.stats['critical_events'] == 1
-        assert bp.stats['enqueued'] == 1
+        await bp.enqueue_event(_make_event(2), q)
+        assert q.qsize() == 2
+        # Critical event should still get through — consumer frees a slot
+        async def consume():
+            await asyncio.sleep(0.01)
+            q.get_nowait()
+            q.task_done()
+
+        task = asyncio.create_task(consume())
+        await bp.enqueue_event(_make_event(3), q)
+        await task
+        assert bp.stats['critical_events'] == 3
+        assert bp.stats['enqueued'] == 3
+        assert bp.stats['dropped_critical'] == 0
 
     @pytest.mark.asyncio
     async def test_critical_counter(self):
