@@ -153,7 +153,7 @@ class HUDBar:
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        yield self._format_bar()
+        yield self._format_bar(term_width=options.max_width)
 
     def _format(self) -> Text:
         """Single HUD layout (alias for :meth:`_format_bar`)."""
@@ -173,8 +173,8 @@ class HUDBar:
         """Check if minimal mode is enabled."""
         return self._minimal_mode
 
-    def _format_bar(self) -> Text:
-        """One dense status line: model, tokens, cost, MCP, skills, ledger icon.
+    def _format_bar(self, *, term_width: int | None = None) -> Text:
+        """One dense status line: workspace, model, tokens, cost, MCP, skills, ledger icon.
 
         In minimal mode, returns an even simpler line with less decoration.
         """
@@ -184,7 +184,9 @@ class HUDBar:
         )
 
         fields = status_fields_from_hud(self.state, self._bundled_skill_count)
-        return rich_compact_hud_line(fields, minimal=self._minimal_mode)
+        return rich_compact_hud_line(
+            fields, minimal=self._minimal_mode, term_width=term_width
+        )
 
     def _format_bar_minimal(self) -> Text:
         """Ultra-minimal HUD: just model, tokens, cost, state."""
@@ -410,7 +412,7 @@ class HUDBar:
     def render_line(self, console: Console) -> None:
         """Print the HUD as a single bottom-of-screen line."""
         width = console.width
-        bar = self._format_bar()
+        bar = self._format_bar(term_width=width)
         pad = max(0, width - len(bar.plain) - 2)
         console.print(
             Text('  ') + bar + Text(' ' * pad),

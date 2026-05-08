@@ -209,12 +209,18 @@ def _token_progress_bar(pct: int, width: int = 8) -> str:
     return f'[{"=" * filled}{"-" * empty}] {pct}%'
 
 
-def rich_compact_hud_line(fields: StatusFields, minimal: bool = False) -> Text:
-    """Single-line Rich HUD: autonomy word, model, tokens, cost, calls, MCP, skills, icon.
+def rich_compact_hud_line(
+    fields: StatusFields,
+    minimal: bool = False,
+    *,
+    term_width: int | None = None,
+) -> Text:
+    """Single-line Rich HUD: workspace, autonomy, model, tokens, cost, calls, MCP, skills, icon.
 
     Args:
         fields: StatusFields from HUD
         minimal: If True, strip decorations and show only essential info
+        term_width: Terminal column count for path ellipsis (None → no truncation)
     """
     if minimal:
         # Minimal mode: just model, tokens, cost, state
@@ -243,8 +249,18 @@ def rich_compact_hud_line(fields: StatusFields, minimal: bool = False) -> Text:
     group_sep = ('  │  ', CLR_SEP)
     item_sep = (' · ', CLR_SEP)
 
-    parts = [
+    parts: list[tuple[str, str]] = [
         (' ', ''),
+    ]
+
+    if fields.workspace_path:
+        ws_budget = workspace_path_display_max(term_width or 80)
+        ws_display = HUDBar.ellipsize_path(fields.workspace_path, ws_budget)
+        parts.append((ws_display, CLR_HUD_DETAIL))
+        parts.append((' ', ''))
+        parts.append(group_sep)
+
+    parts.extend([
         (auto_lbl, auto_style),
         (' ', ''),
         (fields.model_display, CLR_HUD_MODEL),
@@ -261,7 +277,7 @@ def rich_compact_hud_line(fields: StatusFields, minimal: bool = False) -> Text:
         (f'MCP: {fields.mcp_short}', CLR_HUD_DETAIL),
         item_sep,
         (f'Skills: {fields.skills_short}', CLR_HUD_DETAIL),
-    ]
+    ])
 
     if fields.condensation_count > 0:
         parts.append(group_sep)
