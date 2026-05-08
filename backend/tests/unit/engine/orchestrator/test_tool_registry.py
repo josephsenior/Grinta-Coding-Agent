@@ -12,7 +12,6 @@ from backend.engine.tool_registry import validate_internal_toolset
 def _make_config(**kwargs):
     cfg = MagicMock()
     # Enable most tools by default so the toolset is representative.
-    cfg.enable_think = True
     cfg.enable_finish = True
     cfg.enable_editor = True
     cfg.enable_run_tests = True
@@ -221,7 +220,6 @@ class TestFeatureFlagToolPresence:
     def test_all_flags_off_still_has_dispatch_coverage(self):
         """Minimal toolset (most features disabled) must still be dispatch-covered."""
         names = _build_toolset(
-            enable_think=False,
             enable_finish=False,
             enable_terminal=False,
             enable_editor=False,
@@ -246,7 +244,6 @@ class TestFeatureFlagToolPresence:
             'backend.utils.runtime_detect.has_any_lsp_server', return_value=True
         ):
             names = _build_toolset(
-                enable_think=True,
                 enable_finish=True,
                 enable_terminal=True,
                 enable_editor=True,

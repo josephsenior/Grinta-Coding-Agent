@@ -175,9 +175,7 @@ class TestOrchestratorPromptManager:
             enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
-            enable_think=False,
             enable_working_memory=True,
-            enable_condensation_request=False,
         )
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=mock_config)
@@ -199,9 +197,7 @@ class TestOrchestratorPromptManager:
             enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
-            enable_think=False,
             enable_working_memory=True,
-            enable_condensation_request=False,
         )
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
@@ -220,7 +216,6 @@ class TestOrchestratorPromptManager:
             enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
-            enable_think=False,
             enable_working_memory=True,
             enable_condensation_request=False,
         )
@@ -241,7 +236,6 @@ class TestOrchestratorPromptManager:
             enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
-            enable_think=False,
             enable_working_memory=False,
             enable_condensation_request=False,
         )
@@ -266,7 +260,6 @@ class TestOrchestratorPromptManager:
             enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
-            enable_think=False,
             enable_working_memory=True,
             enable_condensation_request=False,
             enable_terminal=True,
@@ -291,7 +284,6 @@ class TestOrchestratorPromptManager:
             enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
-            enable_think=False,
             enable_working_memory=True,
             enable_condensation_request=False,
             enable_terminal=True,
@@ -318,7 +310,6 @@ class TestOrchestratorPromptManager:
             enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
-            enable_think=False,
             enable_working_memory=True,
             enable_condensation_request=False,
             enable_terminal=False,
@@ -564,7 +555,6 @@ def _make_budget_cfg(**overrides: object) -> MagicMock:
     )
     cfg.enable_permissions = False
     cfg.enable_meta_cognition = False
-    cfg.enable_think = False
     cfg.cli_mode = bool(overrides.get('cli_mode', False))
     return cfg
 
@@ -655,7 +645,6 @@ def _base_config(**overrides: object) -> SimpleNamespace:
         enable_task_tracker_tool=bool(overrides.get('enable_task_tracker_tool', False)),
         enable_permissions=False,
         enable_meta_cognition=bool(overrides.get('enable_meta_cognition', False)),
-        enable_think=bool(overrides.get('enable_think', False)),
         enable_working_memory=bool(overrides.get('enable_working_memory', True)),
         enable_condensation_request=bool(
             overrides.get('enable_condensation_request', False)
@@ -891,25 +880,6 @@ class TestBuildSystemPromptRenders:
             function_calling_mode='native',
         )
         assert 'communicate_with_user' in result
-
-    def test_think_enabled_non_reasoning_model(self) -> None:
-        result = self._assert_renders_cleanly(
-            active_llm_model='gpt-4o',
-            is_windows=False,
-            config=_base_config(enable_think=True),
-            function_calling_mode='native',
-        )
-        assert 'Reasoning alone does not execute' in result
-
-    def test_think_suppressed_on_inherent_reasoning_model(self) -> None:
-        result = self._assert_renders_cleanly(
-            active_llm_model='o3',
-            is_windows=False,
-            config=_base_config(enable_think=True),
-            function_calling_mode='native',
-        )
-        # Inherent reasoning models should NOT get the think scaffold
-        assert 'Reasoning alone does not execute' not in result
 
     def test_mcp_inline(self) -> None:
         result = self._assert_renders_cleanly(
