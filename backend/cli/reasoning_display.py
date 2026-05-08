@@ -227,7 +227,6 @@ class ReasoningDisplay:
 
         return Group(*rows)
 
-
     def _append_thought_rows(
         self,
         rows: list[Any],

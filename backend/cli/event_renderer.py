@@ -32,7 +32,6 @@ from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
     ACTIVITY_CARD_TITLE_SHELL,
     CALLOUT_PANEL_PADDING,
-    DRAFT_PANEL_ACCENT_STYLE,
     LIVE_PANEL_ACCENT_STYLE,
     frame_live_body,
     frame_transcript_body,
@@ -52,7 +51,6 @@ from backend.cli.theme import (
     STYLE_BOLD_DIM,
     STYLE_DEFAULT,
     STYLE_DIM,
-    STYLE_ITALIC_DIM,
 )
 from backend.cli.tool_call_display import (
     looks_like_streaming_tool_arguments,
@@ -65,8 +63,6 @@ from backend.cli.transcript import (
     format_activity_shell_block,
     format_activity_turn_header,
     format_ground_truth_tool_line,
-    format_live_panel,
-    format_reasoning_snapshot,
 )
 from backend.core.enums import AgentState, EventSource
 from backend.ledger import EventStreamSubscriber
@@ -123,9 +119,6 @@ from backend.cli._event_renderer.panels import (
 )
 from backend.cli._event_renderer.text_utils import (
     normalize_reasoning_text as _normalize_reasoning_text,
-)
-from backend.cli._event_renderer.text_utils import (
-    reasoning_lines_skip_already_committed as _reasoning_lines_skip_already_committed,
 )
 from backend.cli._event_renderer.text_utils import (
     sanitize_visible_transcript_text as _sanitize_visible_transcript_text,
@@ -352,7 +345,11 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             return
         now = time.monotonic()
         has_streaming_content = bool(self._streaming_accumulated)
-        if not force and not has_streaming_content and (now - self._last_refresh_time) < self._REFRESH_MIN_INTERVAL:
+        if (
+            not force
+            and not has_streaming_content
+            and (now - self._last_refresh_time) < self._REFRESH_MIN_INTERVAL
+        ):
             return
         self._last_refresh_time = now
         current_size = (self._console.width, self._console.height)
@@ -601,7 +598,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         # so Rich does not clip tall turns (Live vertical_overflow ellipsis).
         live_sections: list[Any] = self._collect_live_sections()
         stream_max_lines = self._live_section_budgets(options)
-        reasoning_section = self._append_streaming_and_reasoning_sections(
+        self._append_streaming_and_reasoning_sections(
             live_sections,
             stream_max_lines,
             options.max_width,
@@ -623,38 +620,12 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             sections.append(self._delegate_panel)
         return sections
 
-    def _live_section_budgets(self, options: ConsoleOptions) -> int | None:
-        """Max lines for the draft-reply tail preview inside Live.
-
-        Reasoning thought text is not line-capped here (``max_lines=None`` on
-        the Thinking renderable); only the draft preview uses a viewport limit.
-        """
-        if not options.max_height:
-            return None
-        available = max(12, options.max_height - 6)
-        has_draft = bool(self._streaming_accumulated)
-        has_reasoning = self._reasoning.active
-        if has_draft and has_reasoning:
-            if self._reasoning.live_panel_shows_thought_rows():
-                return max(6, min(16, available // 2))
-            return max(10, min(28, available - 5))
-        if has_draft:
-            return max(10, min(28, available))
-        return None
-
     def _append_streaming_and_reasoning_sections(
         self,
         live_sections: list[Any],
         stream_max_lines: int | None,
         max_width: int,
     ) -> Any | None:
-        if self._streaming_accumulated:
-            live_sections.append(
-                self._render_streaming_preview(
-                    max_width=max_width,
-                    max_lines=stream_max_lines,
-                )
-            )
         reasoning_section: Any | None = None
         if self._reasoning.active:
             # Do not cap thought rows in the Live strip: show the full CoT so
@@ -884,14 +855,12 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     def _after_state_awaiting_input(self, *, previous_state: Any) -> None:
         del previous_state
         self._flush_pending_tool_cards()
-        self._stop_reasoning()
         self._clear_streaming_preview()
         self.refresh()
 
     def _after_state_finished(self, *, previous_state: Any) -> None:
         del previous_state
         self._flush_pending_tool_cards()
-        self._stop_reasoning()
         self._clear_streaming_preview()
         # Render the finish summary that was buffered when PlaybookFinishAction
         # arrived — we deferred it to here so it only appears when the finish
@@ -1337,40 +1306,6 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         tail = wrapped[-max_lines:]
         return '\n'.join(tail)
 
-    def _render_streaming_preview(
-        self,
-        *,
-        max_width: int | None = None,
-        max_lines: int | None = None,
-    ) -> Any:
-        full = self._streaming_accumulated or ''
-        clipped = full
-        if max_lines is not None:
-            if self._stream_wrap_width is None and max_width is not None:
-                self._stream_wrap_width = max(20, max_width - 10)
-            clipped = self._tail_preview_text(
-                full,
-                max_width=max_width,
-                max_lines=max_lines,
-                wrap_width=self._stream_wrap_width,
-            )
-
-        body: list[Any] = [Markdown(clipped)]
-        status_bits: list[str] = []
-        if clipped != full:
-            status_bits.append('Tail preview — full reply follows when done')
-        if not self._streaming_final:
-            status_bits.append('streaming')
-        if status_bits:
-            body.append(Text(' · '.join(status_bits), style=STYLE_ITALIC_DIM))
-        return format_live_panel(
-            'Draft reply',
-            Group(*body),
-            accent_style=DRAFT_PANEL_ACCENT_STYLE,
-            padding=(0, 1),
-        )
-
-    @staticmethod
     def _format_command_display(command: str, *, limit: int = 96) -> str:
         display = ' '.join(command.split())
         if not display:

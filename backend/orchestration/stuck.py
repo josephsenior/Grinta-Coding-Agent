@@ -599,10 +599,7 @@ class StuckDetector:
             return False
 
         # Check if the last N actions are ALL AgentThinkAction
-        if all(
-            isinstance(a, AgentThinkAction)
-            for a in recent_actions[-10:]
-        ):
+        if all(isinstance(a, AgentThinkAction) for a in recent_actions[-10:]):
             logger.warning(
                 'Think-only loop detected: last 6+ actions are all AgentThinkAction '
                 'with no real tool use.'

@@ -105,7 +105,9 @@ class RetryService:
             ),
         )
 
-    def _compute_initial_delay(self, exc: Exception, queue: RetryQueue, attempt: int = 0) -> float:
+    def _compute_initial_delay(
+        self, exc: Exception, queue: RetryQueue, attempt: int = 0
+    ) -> float:
         """Compute initial retry delay with exponential backoff + jitter.
 
         When the provider supplied a ``Retry-After`` (or equivalent reset
@@ -122,11 +124,11 @@ class RetryService:
             if retry_after and retry_after > 0:
                 return min(float(retry_after), queue.max_delay)
             # Exponential backoff for rate limits: base * 2^attempt
-            delay = queue.base_delay * (2 ** attempt)
+            delay = queue.base_delay * (2**attempt)
         elif isinstance(exc, ServiceUnavailableError):
-            delay = queue.base_delay * (2 ** attempt)
+            delay = queue.base_delay * (2**attempt)
         else:
-            delay = queue.base_delay * (2 ** attempt)
+            delay = queue.base_delay * (2**attempt)
 
         # Add jitter (50% to 150% of calculated delay)
         jitter = _random.uniform(0.5, 1.5)

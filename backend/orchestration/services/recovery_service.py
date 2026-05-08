@@ -570,11 +570,13 @@ def _format_rate_limit_text(exc: Exception, rate_kind, retry_after) -> str:
     base_text = re.sub(r'https?://\S+', '[link]', base_text)
 
     if kind_value == RateLimitKind.RPD.value:
-        return f'⚠️ Daily quota exhausted. Your free-tier limit has been reached for today.'
+        return (
+            '⚠️ Daily quota exhausted. Your free-tier limit has been reached for today.'
+        )
     elif kind_value == RateLimitKind.RPM.value:
-        return f'⚠️ Too many requests per minute (RPM limit).'
+        return '⚠️ Too many requests per minute (RPM limit).'
     elif kind_value == RateLimitKind.TPM.value:
-        return f'⚠️ Too many tokens used per minute (TPM limit).'
+        return '⚠️ Too many tokens used per minute (TPM limit).'
     else:
         return f'⚠️ Rate limit ({base_text})'
 
@@ -601,4 +603,6 @@ def _format_rate_limit_guidance(rate_kind, retry_after) -> str:
             return f'Waiting {retry_after:.0f}s for token quota to refresh...'
         return 'Waiting for token quota to refresh...'
     else:
-        return 'Will retry automatically. If this persists, check your provider dashboard.'
+        return (
+            'Will retry automatically. If this persists, check your provider dashboard.'
+        )

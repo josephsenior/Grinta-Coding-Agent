@@ -361,7 +361,7 @@ def _collect_system_prompt_sections(
     """
     model_id = active_llm_model or 'unknown'
     is_small_model = _model_is_small(model_id)
-    has_inherent_reasoning = _model_has_inherent_reasoning(model_id)
+    _model_has_inherent_reasoning(model_id)
 
     resolved_terminal_tool = _resolve_terminal_command_tool(
         is_windows=is_windows,

@@ -74,6 +74,7 @@ def _transcript_needle_count(console: Console, needle: str) -> int:
 
 @pytest.mark.asyncio
 async def test_event_renderer_updates_metrics_and_streaming_preview() -> None:
+    """Metrics update still works, streaming preview removed."""
     console = _make_console()
     hud = HUDBar()
     renderer = CLIEventRenderer(
@@ -95,7 +96,6 @@ async def test_event_renderer_updates_metrics_and_streaming_preview() -> None:
 
     await renderer.handle_event(chunk)
 
-    assert renderer.streaming_preview == 'Hello'
     assert hud.state.cost_usd == 1.25
     assert hud.state.context_tokens == 15
     assert hud.state.context_limit == 1000
@@ -104,7 +104,6 @@ async def test_event_renderer_updates_metrics_and_streaming_preview() -> None:
     final_message.source = EventSource.AGENT
     await renderer.handle_event(final_message)
 
-    assert renderer.streaming_preview == ''
     # Agent reply printed to console (no Live active).
     output = _console_output(console)
     assert 'Hello' in output
@@ -471,6 +470,7 @@ def test_prompt_session_requires_tty_streams() -> None:
     with patch('backend.cli.repl._prompt_toolkit_available', return_value=True):
         assert _supports_prompt_session(interactive_stream, interactive_stream) is True
     assert _supports_prompt_session(piped_stream, interactive_stream) is False
+    assert _supports_prompt_session(interactive_stream, piped_stream) is False
     assert _supports_prompt_session(interactive_stream, piped_stream) is False
 
 
@@ -1830,7 +1830,9 @@ def test_start_live_passes_vertical_overflow_crop() -> None:
     assert live_cls.call_args.kwargs.get('vertical_overflow') == 'scroll'
 
 
-@pytest.mark.skip(reason='elapsed time not rendered in renderable(), only in __rich_console__ which needs ConsoleOptions')
+@pytest.mark.skip(
+    reason='elapsed time not rendered in renderable(), only in __rich_console__ which needs ConsoleOptions'
+)
 def test_reasoning_display_elapsed_time() -> None:
     """ReasoningDisplay should show elapsed time when active."""
     rd = ReasoningDisplay()
@@ -3543,7 +3545,9 @@ async def test_renderer_apply_patch_output_is_collapsed_on_failure() -> None:
     assert '-....' not in output
 
 
-@pytest.mark.skip(reason='elapsed time not rendered in renderable(), only in __rich_console__ which needs ConsoleOptions')
+@pytest.mark.skip(
+    reason='elapsed time not rendered in renderable(), only in __rich_console__ which needs ConsoleOptions'
+)
 def test_reasoning_display_tool_icons() -> None:
     """ReasoningDisplay should show tool-specific icons."""
 

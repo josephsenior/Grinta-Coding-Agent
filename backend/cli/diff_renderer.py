@@ -151,7 +151,7 @@ class DiffPanel:
         idx = content.find(marker)
         if idx == -1:
             return None
-        return content[idx + len(marker):].lstrip('\n')
+        return content[idx + len(marker) :].lstrip('\n')
 
     def _append_groups_diff(
         self,
