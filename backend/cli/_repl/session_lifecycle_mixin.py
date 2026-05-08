@@ -28,7 +28,11 @@ else:
     _SessionLifecycleBase = object
 
 from backend.cli._typing import SessionLifecycleHost
-from backend.cli.confirmation import build_confirmation_action, render_confirmation
+from backend.cli.confirmation import (
+    ConfirmationDecision,
+    build_confirmation_action,
+    render_confirmation,
+)
 from backend.core.config import AppConfig
 from backend.core.enums import AgentState, EventSource
 
@@ -472,7 +476,20 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
             logger.debug('get_pending_action() failed, trying fallback', exc_info=True)
             pending = getattr(controller, '_pending_action', None)
 
+        # Auto-approve LOW-risk when user chose "don't ask again" this session
+        if pending is not None and self._suppress_low_risk_confirmations:
+            from backend.core.enums import ActionSecurityRisk
+
+            risk = getattr(pending, 'security_risk', ActionSecurityRisk.UNKNOWN)
+            if risk == ActionSecurityRisk.LOW:
+                decision = ConfirmationDecision(approved=True, remember=False)
+                action = build_confirmation_action(True)
+                if self._event_stream:
+                    self._event_stream.add_event(action, EventSource.USER)
+                return
+
         remember_always = False
+        suppress_low_risk = False
         if pending is not None:
             if self._renderer is not None:
                 with self._renderer.suspend_live():
@@ -481,6 +498,7 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
                 decision = render_confirmation(self._console, pending)
             approved = decision.approved
             remember_always = decision.remember
+            suppress_low_risk = decision.suppress_low_risk
         else:
             # Fallback: generic prompt if we can't get the pending action.
             from rich.prompt import Confirm
@@ -509,6 +527,14 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
                         )
                 except Exception:
                     logger.debug('remember_always_allow failed', exc_info=True)
+
+        if suppress_low_risk and approved:
+            self._suppress_low_risk_confirmations = True
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    'LOW-risk actions will be auto-approved for the rest of this session.',
+                    title='autonomy',
+                )
 
         action = build_confirmation_action(approved)
         if self._event_stream:
