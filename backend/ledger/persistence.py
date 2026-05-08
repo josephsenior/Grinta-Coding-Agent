@@ -113,6 +113,7 @@ class EventPersistence:
         self._last_confirmed_event_id: int | None = None
         self._last_confirmed_critical_event_id: int | None = None
         self._last_persisted_at_monotonic: float | None = None
+        self._last_enqueued_event_id: int | None = None
         self._last_persist_failure_at_monotonic: float | None = None
         self._last_persistence_mode: str | None = None
 
@@ -174,6 +175,9 @@ class EventPersistence:
         if self._sqlite_store is not None:
             try:
                 self._sqlite_store.write_event(event_id, payload)
+                self._record_persist_success(
+                    event_id, is_critical=False, mode='sqlite'
+                )
                 return
             except Exception as exc:
                 logger.warning(
@@ -201,6 +205,7 @@ class EventPersistence:
                 cache_contents=cache_payload[1] if cache_payload else None,
             )
             if writer.enqueue(persisted):
+                self._last_enqueued_event_id = event_id
                 return
             self.stats['durable_enqueue_failures'] += 1
 
@@ -232,6 +237,7 @@ class EventPersistence:
             'persistence_health': health,
             'last_confirmed_event_id': self._last_confirmed_event_id,
             'last_confirmed_critical_event_id': self._last_confirmed_critical_event_id,
+            'last_enqueued_event_id': self._last_enqueued_event_id,
             'last_persistence_mode': self._last_persistence_mode,
         }
 

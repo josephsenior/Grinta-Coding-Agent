@@ -236,6 +236,47 @@ class TestProperties:
 
 
 # ---------------------------------------------------------------------------
+# Shutdown / drain timeout
+# ---------------------------------------------------------------------------
+
+
+class TestShutdown:
+    def test_stop_with_stuck_writer_does_not_hang(self):
+        """stop() with drain_timeout returns even when writer is stuck."""
+        import threading
+
+        store = _make_file_store()
+        block_writer = threading.Event()
+        store.write.side_effect = (
+            lambda fn, _: block_writer.wait()
+            if not fn.endswith('.pending')
+            else None
+        )
+        writer = DurableEventWriter(store, max_queue_size=4, put_timeout=0.05)
+        writer.start()
+        try:
+            writer.enqueue(_make_event(1))
+            time.sleep(0.1)
+            # stop with a short drain_timeout — writer is stuck
+            writer.stop(timeout=0.5, drain_timeout=0.2)
+            assert writer._thread is None
+        finally:
+            block_writer.set()
+
+    def test_stop_with_fast_writer_drains_normally(self):
+        """stop() with default params drains cleanly when writer is fast."""
+        store = _make_file_store()
+        writer = DurableEventWriter(store, max_queue_size=16)
+        writer.start()
+        writer.enqueue(_make_event(1))
+        writer.enqueue(_make_event(2))
+        writer.stop(timeout=2.0, drain_timeout=5.0)
+        assert writer._thread is None
+        assert writer.drop_count == 0
+        assert writer.error_count == 0
+
+
+# ---------------------------------------------------------------------------
 # WAL markers (.pending)
 # ---------------------------------------------------------------------------
 
