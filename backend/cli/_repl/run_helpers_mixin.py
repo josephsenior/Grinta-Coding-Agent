@@ -75,6 +75,7 @@ class RunHelpersMixin:
         _next_action: Any
         _last_user_message: str | None
         _prompt_ctrl_c_hint_shown: bool
+        _running: bool
 
         def _create_prompt_session(self) -> Any: ...
         def _set_footer_system_line(self, text: str, *, kind: str = ...) -> None: ...
@@ -148,6 +149,7 @@ class RunHelpersMixin:
         # Print directly to stderr so the user sees the error even as
         # the REPL shuts down — renderer messages may not flush in time.
         import sys
+
         print(f'\n[Grinta] {msg}\n', file=sys.stderr)
         # Do NOT set self._running = False here.  Setting it kills the REPL
         # loop silently — the user never sees the error in the prompt area.
@@ -181,6 +183,7 @@ class RunHelpersMixin:
             )
             if not runtime_ok:
                 return
+            engine_init_done.set()
             agent = self._agent
             if agent is None or not agent.config.enable_mcp:
                 return
@@ -354,6 +357,7 @@ class RunHelpersMixin:
                 f'[{CLR_STATUS_ERR}]Prompt input failed:[/] {e}',
             )
             import traceback
+
             traceback.print_exc()
             return ''
 
@@ -482,7 +486,9 @@ class RunHelpersMixin:
             end_states=end_states,
         )
 
-        logger.debug('REPL: _dispatch_user_turn: controller_loop done, dispatching event')
+        logger.debug(
+            'REPL: _dispatch_user_turn: controller_loop done, dispatching event'
+        )
         # Wrap event dispatch so any failure doesn't silently terminate the REPL.
         try:
             event_stream.add_event(initial_action, EventSource.USER)

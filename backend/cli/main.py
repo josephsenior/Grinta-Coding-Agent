@@ -366,16 +366,17 @@ async def _async_main(
     show_splash: bool = True,
     minimal: bool = False,
 ) -> None:
-    resolved_project = (
-        str(Path(project).resolve()) if project else str(Path.cwd().resolve())
-    )
-    os.environ['PROJECT_ROOT'] = resolved_project
-
     from backend.cli.repl import Repl
     from backend.core.config import load_app_config
     from backend.core.logger import configure_file_logging
     from backend.persistence.locations import get_project_local_data_root
 
+    resolved_project = (
+        str(Path(project).resolve()) if project else str(Path.cwd().resolve())
+    )
+    os.environ['PROJECT_ROOT'] = resolved_project
+    # configure_file_logging is idempotent — caller in main() may have already
+    # set it up so we can log as early as possible.
     configure_file_logging()
     # Backend imports above trigger module-level logger setup — re-silence.
     _silence_all_loggers()
@@ -527,6 +528,19 @@ def main(
 
         run_storage_cleanup_command(project)
         return
+
+    # Resolve project root early so file logging targets the right workspace
+    # directory before any diagnostic or REPL code runs.
+    resolved_project = (
+        str(Path(project).resolve()) if project else str(Path.cwd().resolve())
+    )
+    os.environ['PROJECT_ROOT'] = resolved_project
+    from backend.core.logger import configure_file_logging
+
+    configure_file_logging()
+
+    from backend.cli.repl_debug import debug as diag
+
     try:
         async_kwargs = {
             'model': model,
@@ -535,24 +549,22 @@ def main(
         }
         if minimal:
             async_kwargs['minimal'] = minimal
-        import sys as _sys
-        _sys.stderr.write('DIAG: main() calling asyncio.run\n')
-        _sys.stderr.flush()
+
+        diag('main() calling asyncio.run')
         asyncio.run(_async_main(**async_kwargs))  # type: ignore[arg-type]
-        _sys.stderr.write('DIAG: main() asyncio.run returned normally\n')
-        _sys.stderr.flush()
+        diag('main() asyncio.run returned normally')
     except KeyboardInterrupt:
         # Top-level Ctrl+C — exit cleanly without traceback.
         print()  # newline after ^C
     except BaseException:
         import traceback
-        import sys as _sys
-        _sys.stderr.write('DIAG: main() UNCAUGHT EXCEPTION:\n')
-        traceback.print_exc(file=_sys.stderr)
-        _sys.stderr.write('DIAG: main() Printing to console and stderr\n')
-        _sys.stderr.flush()
+
+        logger = logging.getLogger('app')
+        logger.debug('main() UNCAUGHT EXCEPTION', exc_info=True)
+        traceback.print_exc()
         try:
             from rich.console import Console as RichConsole
+
             rc = RichConsole()
             rc.print('[red]Fatal error:[/] see stderr for traceback')
         except Exception:

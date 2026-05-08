@@ -2079,50 +2079,7 @@ async def test_no_budget_warning_when_no_budget_set() -> None:
     assert not renderer.budget_warned_100
 
 
-@pytest.mark.asyncio
-async def test_streaming_preview_renders_streaming_panel() -> None:
-    console = _make_console()
-    hud = HUDBar()
-    renderer = CLIEventRenderer(
-        console,
-        hud,
-        ReasoningDisplay(),
-        loop=asyncio.get_running_loop(),
-    )
 
-    chunk = StreamingChunkAction(chunk='Hello', accumulated='Hello', is_final=False)
-    chunk.source = EventSource.AGENT
-
-    await renderer.handle_event(chunk)
-
-    console.print(renderer._render_streaming_preview(max_width=None, max_lines=None))
-    output = _console_output(console)
-
-    # _render_streaming_preview uses a titled panel so live draft text is visually separated.
-    assert 'Draft reply' in output
-    assert 'Hello' in output
-
-
-def test_streaming_preview_auto_scroll_shows_latest_content() -> None:
-    console = _make_console(width=80)
-    renderer = CLIEventRenderer(
-        console,
-        HUDBar(),
-        ReasoningDisplay(),
-        loop=asyncio.new_event_loop(),
-    )
-
-    renderer._streaming_accumulated = '\n'.join(
-        [f'line {idx:03d}' for idx in range(1, 61)]
-    )
-
-    console.print(renderer._render_streaming_preview(max_width=80, max_lines=10))
-    output = _console_output(console)
-
-    assert 'Draft reply' in output
-    assert 'Tail preview' in output
-    assert 'line 060' in output
-    assert 'line 001' not in output
 
 
 @pytest.mark.asyncio
@@ -3686,8 +3643,8 @@ async def test_reasoning_gets_generous_budget_when_alone() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reasoning_keeps_meaningful_budget_when_sharing_with_stream() -> None:
-    """Draft tail stays capped while reasoning receives ``max_lines=None`` (uncapped)."""
+async def test_reasoning_keeps_meaningful_budget_when_alone() -> None:
+    """Live layout passes ``max_lines=None`` into Thinking so rows are not capped."""
     console = _make_console(width=100)
     hud = HUDBar()
     renderer = CLIEventRenderer(
@@ -3695,23 +3652,14 @@ async def test_reasoning_keeps_meaningful_budget_when_sharing_with_stream() -> N
     )
     renderer._reasoning.start()
     renderer._reasoning.update_thought('thinking hard about the problem')
-    renderer._streaming_accumulated = 'draft reply paragraph ' * 30
 
-    captured: dict[str, int | None] = {
-        'reasoning': None,
-        'stream': None,
-    }
+    captured: dict[str, int | None] = {'reasoning': None}
 
     def _capture_reasoning(*, max_width, max_lines):  # type: ignore[no-redef]
         captured['reasoning'] = max_lines
         return Text('reasoning-stub')
 
-    def _capture_stream(*, max_width, max_lines):  # type: ignore[no-redef]
-        captured['stream'] = max_lines
-        return Text('stream-stub')
-
     renderer._reasoning.renderable = _capture_reasoning  # type: ignore[assignment]
-    renderer._render_streaming_preview = _capture_stream  # type: ignore[assignment]
     from rich.console import ConsoleOptions
 
     options = ConsoleOptions(
@@ -3726,7 +3674,6 @@ async def test_reasoning_keeps_meaningful_budget_when_sharing_with_stream() -> N
     list(renderer.__rich_console__(console, options))
 
     assert captured['reasoning'] is None
-    assert (captured['stream'] or 0) >= 6
 
 
 @pytest.mark.asyncio
