@@ -64,21 +64,34 @@ class DurableEventWriter:
         )
         self._thread.start()
 
-    def stop(self, timeout: float = 2.0) -> None:
+    def stop(self, timeout: float = 2.0, drain_timeout: float = 30.0) -> None:
         if not self._thread:
             return
-        try:
-            self._queue.join()
-        except Exception:
-            logger.error(
-                'DurableEventWriter: queue.join() failed during stop; pending events may be lost',
-                exc_info=True,
-            )
+
+        # Signal the writer thread to stop after its current batch.
         self._stop_flag.set()
+
+        # Wait for the queue to drain with a deadline instead of the
+        # unbounded queue.join() — a stuck store must not hang shutdown.
+        deadline = time.monotonic() + drain_timeout
+        while self._queue.unfinished_tasks > 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+        remaining = self._queue.unfinished_tasks
+        if remaining > 0:
+            logger.warning(
+                'DurableEventWriter: drain timeout after %.1fs with %d '
+                'unfinished tasks — pending events may be lost',
+                drain_timeout,
+                remaining,
+            )
+
+        # Best-effort sentinel to wake the writer thread
         try:
             self._queue.put_nowait(None)
         except queue.Full:
             pass
+
         self._thread.join(timeout=timeout)
         self._thread = None
 
