@@ -341,17 +341,22 @@ class RunHelpersMixin:
         except EOFError:
             self._console.print(f'[{STYLE_DIM}]Input closed. Exiting.[/]')
             return None
+        except asyncio.CancelledError:
+            # CancelledError inherits from BaseException, not Exception,
+            # but we handle it explicitly to prevent silent termination.
+            logger.debug('REPL: prompt input cancelled')
+            return ''
         except Exception as e:
             logger.exception('Prompt input failed')
             self._console.print(
                 f'[{CLR_STATUS_ERR}]Prompt input failed:[/] {e}',
             )
-            # Prompt failure (e.g. PTY disconnect on first call) should NOT
-            # terminate the session. Return '' to stay in the loop and give
-            # the user a chance to retry.
+            import traceback
+            traceback.print_exc()
             return ''
 
         if not self._running:
+            logger.debug('REPL: _read_repl_input: _running is False, returning None')
             return None
         return user_input
 
@@ -454,6 +459,7 @@ class RunHelpersMixin:
         conversation_stats = self._conversation_stats
         renderer = self._renderer
         assert renderer is not None
+        logger.debug('REPL: _dispatch_user_turn ENTER for text=%r', text[:80])
 
         # -- user message: start Live for agent turn
         self._set_footer_system_line('')
@@ -474,6 +480,7 @@ class RunHelpersMixin:
             end_states=end_states,
         )
 
+        logger.debug('REPL: _dispatch_user_turn: controller_loop done, dispatching event')
         # Wrap event dispatch so any failure doesn't silently terminate the REPL.
         try:
             event_stream.add_event(initial_action, EventSource.USER)
@@ -489,6 +496,7 @@ class RunHelpersMixin:
             self._invalidate_pt()
             return controller, agent_task
 
+        logger.debug('REPL: _dispatch_user_turn: calling controller.step()')
         try:
             controller.step()
         except Exception:
@@ -497,12 +505,16 @@ class RunHelpersMixin:
                 exc_info=True,
             )
 
+        logger.debug('REPL: _dispatch_user_turn: waiting for agent idle')
         try:
             await self._wait_for_agent_idle(controller, agent_task)
+            logger.debug('REPL: _dispatch_user_turn: agent idle OK')
         except asyncio.CancelledError:
+            logger.debug('REPL: _dispatch_user_turn: CancelledError')
             renderer.stop_live()
             await self._cancel_agent(agent_task)
         except KeyboardInterrupt:
+            logger.debug('REPL: _dispatch_user_turn: KeyboardInterrupt')
             renderer.stop_live()
             await self._cancel_agent(agent_task)
         except Exception:
@@ -519,6 +531,7 @@ class RunHelpersMixin:
             self._sync_terminal_after_agent_turn(session)
             self._invalidate_prompt_session(session)
             self._invalidate_pt()
+            logger.debug('REPL: _dispatch_user_turn: finally done')
         return controller, agent_task
 
     async def _prepare_initial_action(
@@ -556,12 +569,14 @@ class RunHelpersMixin:
         bootstrap_task: asyncio.Task[None] | None,
         agent_task: asyncio.Task[Any] | None,
     ) -> None:
+        logger.debug('REPL: _finalize_repl_run ENTER')
         self._pt_session = None
         await self._cancel_task_silently(bootstrap_task)
         controller = self._controller
         if controller is not None:
             with contextlib.suppress(Exception):
                 controller.save_state()
+                logger.debug('REPL: _finalize_repl_run: saved controller state')
         self._reasoning.stop()
         if self._renderer is not None:
             self._renderer.stop_live()
@@ -569,8 +584,10 @@ class RunHelpersMixin:
         if self._acquire_result is not None:
             from backend.execution import runtime_orchestrator
 
+            logger.debug('REPL: _finalize_repl_run: releasing acquire result')
             runtime_orchestrator.release(self._acquire_result)
         self._close_event_stream()
+        logger.debug('REPL: _finalize_repl_run DONE')
 
     @staticmethod
     async def _cancel_task_silently(task: asyncio.Task[Any] | None) -> None:
