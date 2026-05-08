@@ -212,5 +212,5 @@ class DiffPanel:
             word_wrap=True,
             padding=(1, 2),
             background_color='default',
-            line_numbers=False,
+            line_numbers=True,
         )

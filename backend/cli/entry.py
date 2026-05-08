@@ -71,7 +71,7 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
         help='Set project root directory',
     )
     parser.add_argument(
-        '--no-splash',
+        '--no-splash', '--quiet',
         action='store_true',
         help='Start without the animated splash screen',
     )

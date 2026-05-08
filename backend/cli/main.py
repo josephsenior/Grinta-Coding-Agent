@@ -264,8 +264,24 @@ def _build_splash_lines() -> list[Any]:
     return lines
 
 
-def show_grinta_splash(console: Any | None = None) -> None:
-    """Render the GRINTA boot splash with ASCII text inside panel."""
+def _is_returning_user() -> bool:
+    """Check if the user has run grinta before (history file exists)."""
+    from backend.cli.repl import _HISTORY_FILE
+    return _HISTORY_FILE.exists()
+
+
+def show_grinta_splash(
+    console: Any | None = None, *, compact: bool = False
+) -> None:
+    """Render the GRINTA boot splash with ASCII text inside panel.
+
+    Parameters
+    ----------
+    console:
+        Rich console to print to.
+    compact:
+        When True, show a condensed 3-line version for returning users.
+    """
     from rich.align import Align
     from rich.box import ROUNDED
     from rich.console import Group
@@ -282,6 +298,10 @@ def show_grinta_splash(console: Any | None = None) -> None:
         'Describe a task · /help · /settings · /sessions · '
         'grinta sessions list · /quit to leave'
     )
+
+    if compact:
+        _compact_splash(console)
+        return
 
     ascii_lines = _build_splash_lines()
     figlet_text = Text()
@@ -309,6 +329,31 @@ def show_grinta_splash(console: Any | None = None) -> None:
         return Group(*rows)  # type: ignore[arg-type]
 
     console.print(_frame())
+
+
+def _compact_splash(console: Any) -> None:
+    """Print a 3-line condensed splash for returning users."""
+    from rich.align import Align
+    from rich.text import Text
+
+    from backend.cli.theme import CLR_BRAND, STYLE_DIM, STYLE_ITALIC_DIM
+
+    text = Text()
+    text.append('  ⚡ ', style=CLR_BRAND)
+    text.append('GRINTA', style=f'bold {CLR_BRAND}')
+    text.append('  —  ', style=STYLE_DIM)
+    text.append('AI coding agent for the terminal.', style=STYLE_ITALIC_DIM)
+    console.print()
+    console.print(Align.center(text))
+    console.print(
+        Align.center(
+            Text(
+                'Describe a task · /help · /settings · /sessions · /quit to leave',
+                style=STYLE_DIM,
+            )
+        )
+    )
+    console.print()
 
 
 def _setup_logging() -> None:
@@ -427,7 +472,8 @@ def _build_async_console(show_splash: bool) -> Console:
         term_cols = 120
     console = Console(width=term_cols - 2)
     if show_splash and not _env_truthy('GRINTA_NO_SPLASH'):
-        show_grinta_splash(console)
+        returning = _is_returning_user()
+        show_grinta_splash(console, compact=returning)
     return console
 
 

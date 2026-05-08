@@ -379,6 +379,17 @@ class SlashCommandsMixin:
     def _cmd_exit(self, parsed) -> bool:
         del parsed
         if self._renderer is not None:
+            hud = self._hud.state
+            parts = []
+            if hud.context_tokens > 0 or hud.llm_calls > 0:
+                parts.append(f'{hud.llm_calls} LLM calls')
+                parts.append(f'{hud.context_tokens:,} tokens')
+                if hud.cost_usd > 0:
+                    parts.append(f'${hud.cost_usd:.4f}')
+                if hud.condensation_count > 0:
+                    parts.append(f'{hud.condensation_count}x condensed')
+                summary = ' · '.join(parts)
+                self._renderer.add_system_message(summary, title='session')
             self._renderer.add_system_message('Goodbye.', title='grinta')
         return False
 
@@ -584,8 +595,44 @@ class SlashCommandsMixin:
         if body is None:
             return True
         if self._renderer is not None:
-            self._renderer.add_system_message(body, title='diff')
+            if mode == '--patch' and body not in ('(no changes)', ''):
+                self._renderer_render_diff(self._renderer, body)
+            else:
+                self._renderer.add_system_message(body, title='diff')
         return True
+
+    def _renderer_render_diff(self, renderer: Any, diff_body: str) -> None:
+        """Render a patch diff with syntax highlighting and line numbers."""
+        from rich.syntax import Syntax
+
+        # Parse file headers from the diff to add section markers
+        lines = diff_body.split('\n')
+        file_count = sum(
+            1 for line in lines if line.startswith('diff --git')
+        )
+        insertions = sum(
+            1 for line in lines if line.startswith('+') and line not in ('+++', '+++ b/')
+        )
+        deletions = sum(
+            1 for line in lines if line.startswith('-') and line not in ('---', '--- a/')
+        )
+
+        summary = f'{file_count} file{"s" if file_count != 1 else ""} changed'
+        if insertions > 0 or deletions > 0:
+            inserts = f'+{insertions}' if insertions > 0 else ''
+            deletes = f'-{deletions}' if deletions > 0 else ''
+            summary += f'  ({inserts}{", " if inserts and deletes else ""}{deletes})'
+
+        syntax = Syntax(
+            diff_body,
+            lexer='diff',
+            theme='monokai',
+            word_wrap=True,
+            padding=(1, 2),
+            background_color='default',
+            line_numbers=True,
+        )
+        renderer.add_system_message(f'{summary}\n\n{syntax}', title='diff')
 
     @staticmethod
     def _build_diff_git_args(mode: str, paths: list[str]) -> list[str]:
@@ -726,22 +773,28 @@ class SlashCommandsMixin:
             return True
 
         search_term = None
-        if parsed.args and parsed.args[0] not in ('--search', '-s'):
-            # Specific command requested
-            help_text = _build_help_markdown(parsed.args[0])
-            if self._renderer is not None:
-                self._renderer.add_markdown_block(
-                    'Help',
-                    help_text,
-                )
-            return True
+        show_all = False
+
+        if parsed.args:
+            arg = parsed.args[0]
+            if arg in ('--all', '-a'):
+                show_all = True
+            elif arg not in ('--search', '-s'):
+                # Specific command requested
+                help_text = _build_help_markdown(arg)
+                if self._renderer is not None:
+                    self._renderer.add_markdown_block(
+                        'Help',
+                        help_text,
+                    )
+                return True
 
         # Check for search flag
         if parsed.args and parsed.args[0] in ('--search', '-s'):
             search_term = parsed.args[1] if len(parsed.args) > 1 else None
 
         # Show interactive table (if renderer supports add_renderable)
-        table = _build_help_table(search_term)
+        table = _build_help_table(search_term, show_all=show_all)
         if self._renderer is not None:
             if hasattr(self._renderer, 'add_renderable'):
                 self._renderer.add_renderable(table)
