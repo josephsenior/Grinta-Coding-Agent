@@ -899,7 +899,7 @@ class TestBuildSystemPromptRenders:
             config=_base_config(enable_think=True),
             function_calling_mode='native',
         )
-        assert '`think` does not execute' in result
+        assert 'Reasoning alone does not execute' in result
 
     def test_think_suppressed_on_inherent_reasoning_model(self) -> None:
         result = self._assert_renders_cleanly(
@@ -909,7 +909,7 @@ class TestBuildSystemPromptRenders:
             function_calling_mode='native',
         )
         # Inherent reasoning models should NOT get the think scaffold
-        assert '`think` does not execute' not in result
+        assert 'Reasoning alone does not execute' not in result
 
     def test_mcp_inline(self) -> None:
         result = self._assert_renders_cleanly(

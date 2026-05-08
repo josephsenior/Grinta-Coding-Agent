@@ -2079,9 +2079,6 @@ async def test_no_budget_warning_when_no_budget_set() -> None:
     assert not renderer.budget_warned_100
 
 
-
-
-
 @pytest.mark.asyncio
 async def test_renderer_shows_command_context_for_output() -> None:
     from backend.ledger.observation import CmdOutputObservation

@@ -130,8 +130,15 @@ class RetryService:
         else:
             delay = queue.base_delay * (2**attempt)
 
+        # Scale delay by circuit breaker consecutive errors so that
+        # repeated failures back off more aggressively.
+        cb_service = getattr(self.controller, 'circuit_breaker_service', None)
+        cb = getattr(cb_service, 'circuit_breaker', None) if cb_service else None
+        if cb is not None and cb.consecutive_errors > 0:
+            delay *= 1.0 + min(cb.consecutive_errors, 10) * 0.5
+
         # Add jitter (50% to 150% of calculated delay)
-        jitter = _random.uniform(0.5, 1.5)
+        jitter = _random.uniform(0.5, 1.5)  # nosec
         delay = delay * jitter
 
         # Apply max delay cap

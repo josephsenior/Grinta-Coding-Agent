@@ -159,7 +159,7 @@ def test_hard_kill_marks_runtime_uninitialized_and_drops_executor() -> None:
 
     assert runtime.runtime_initialized is False
     assert runtime._executor is None
-    executor.hard_kill.assert_awaited_once()
+    executor.hard_kill.assert_awaited_once()  # type: ignore[unreachable]
 
 
 def test_run_after_hard_kill_requires_reconnect() -> None:

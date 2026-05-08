@@ -213,7 +213,7 @@ def test_is_debugger_action_string_tool_id_and_instance_attr() -> None:
         pass
 
     inst = Shell()
-    inst.action = 'debugger'
+    inst.action = 'debugger'  # type: ignore[attr-defined]
     assert is_debugger_action(inst) is True
 
 

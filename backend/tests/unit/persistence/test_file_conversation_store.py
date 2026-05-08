@@ -12,17 +12,18 @@ from backend.persistence.conversation.file_conversation_store import (
     _sort_key,
 )
 from backend.persistence.data_models.conversation_metadata import ConversationMetadata
+from backend.persistence.files import FileStore
 
 
-class _FS:
+class _FS(FileStore):
     def __init__(self) -> None:
         self.data: dict[str, str] = {}
         self.deleted: list[str] = []
         self.listing: dict[str, list[str]] = {}
 
-    def write(self, path: str, content: str) -> None:
+    def write(self, path: str, contents: str | bytes) -> None:
         self.data[path] = (
-            content.decode('utf-8') if isinstance(content, bytes) else content
+            contents if isinstance(contents, str) else contents.decode('utf-8')
         )
 
     def read(self, path: str) -> str:

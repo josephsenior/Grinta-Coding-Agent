@@ -143,7 +143,7 @@ class ContextMemoryManager:
         turn_signals = getattr(state, 'turn_signals', None)
         prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
         if prewarmed is not None:
-            turn_signals.prewarmed_compaction = None
+            turn_signals.prewarmed_compaction = None  # type: ignore[union-attr]
             logger.info('Utilizing background pre-warmed condensation result.')
             condensation_result = prewarmed
 

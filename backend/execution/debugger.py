@@ -1177,11 +1177,11 @@ class DAPDebugManager:
         except Exception as exc:
             stderr_tail = self._stderr_tail_for(action)
             phase = getattr(exc, 'phase', None)
-            timeout = getattr(exc, 'timeout', None)
+            exc_timeout: Any | None = getattr(exc, 'timeout', None)
             phase_suffix = f'\nstartup_phase: {phase}' if phase else ''
             timeout_suffix = (
-                f'\nstartup_timeout_seconds: {float(timeout):.1f}'
-                if isinstance(timeout, (int, float)) and timeout > 0
+                f'\nstartup_timeout_seconds: {float(exc_timeout):.1f}'
+                if isinstance(exc_timeout, (int, float)) and exc_timeout > 0
                 else ''
             )
             suffix = f'\nadapter_stderr:\n{stderr_tail}' if stderr_tail else ''

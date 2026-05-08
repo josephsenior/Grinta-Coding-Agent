@@ -290,8 +290,8 @@ class TestSemanticStuckDetection:
             )  # Only 3 unique files
             # Use proper CmdRunAction with exit_code instead of MagicMock
             error_action = CmdRunAction(command=f'cat nonexistent{i % 3}.txt')
-            error_action.exit_code = 1
-            error_action.output = 'No such file or directory'
+            error_action.exit_code = 1  # type: ignore[attr-defined]
+            error_action.output = 'No such file or directory'  # type: ignore[attr-defined]
             history.append(error_action)
 
         state.history = history

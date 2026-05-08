@@ -29,7 +29,7 @@ def test_format_reflection_progress_with_turn_and_budget() -> None:
 
 def test_format_reflection_metrics_token_usage_and_cost() -> None:
     state = State(session_id='s')
-    state.metrics = SimpleNamespace(
+    state.metrics = SimpleNamespace(  # type: ignore[assignment]
         accumulated_token_usage=SimpleNamespace(prompt_tokens=50, context_window=100),
         accumulated_cost=1.23,
     )

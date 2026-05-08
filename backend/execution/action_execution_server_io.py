@@ -482,6 +482,7 @@ class RuntimeExecutorIOAndTerminalMixin:
         bash_session, shell_err = self._get_or_recreate_default_shell_session()
         if shell_err is not None:
             return shell_err
+        assert bash_session is not None
 
         self._maybe_promote_blocking_action(action)
 
@@ -1037,6 +1038,7 @@ class RuntimeExecutorIOAndTerminalMixin:
         bash_session, shell_err = self._get_or_recreate_default_shell_session()
         if shell_err is not None:
             return shell_err
+        assert bash_session is not None
 
         if os.path.isfile(action.path) and is_binary(action.path):
             return ErrorObservation('ERROR_BINARY_FILE')
@@ -1067,6 +1069,7 @@ class RuntimeExecutorIOAndTerminalMixin:
         bash_session, shell_err = self._get_or_recreate_default_shell_session()
         if shell_err is not None:
             return shell_err
+        assert bash_session is not None
 
         working_dir = bash_session.cwd
         try:
@@ -1119,6 +1122,7 @@ class RuntimeExecutorIOAndTerminalMixin:
         bash_session, shell_err = self._get_or_recreate_default_shell_session()
         if shell_err is not None:
             return shell_err
+        assert bash_session is not None
         working_dir = bash_session.cwd
         try:
             filepath = self._resolve_workspace_file_path(action.path, working_dir)

@@ -99,7 +99,7 @@ async def test_lsp_query_success_and_failure(mock_executor) -> None:
     ):
         bad = await mock_executor.lsp_query(action)
     assert isinstance(bad, ErrorObservation)
-    assert bad.tool_result['available'] is False
+    assert bad.tool_result['available'] is False  # type: ignore[index]
 
 
 @pytest.mark.asyncio

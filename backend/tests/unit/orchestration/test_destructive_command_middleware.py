@@ -16,7 +16,7 @@ def _ctx(command: str = 'echo ok') -> ToolInvocationContext:
     controller = SimpleNamespace(runtime=SimpleNamespace(workspace_dir='C:/ws'))
     state = SimpleNamespace(sid='s1')
     action = CmdRunAction(command=command)
-    return ToolInvocationContext(controller=controller, action=action, state=state)
+    return ToolInvocationContext(controller=controller, action=action, state=state)  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio

@@ -41,7 +41,7 @@ def test_get_compaction_prunes_middle_events() -> None:
     view = View(events=events)
     comp = c.get_compaction(view)
     assert isinstance(comp, Compaction)
-    assert len(comp.action.pruned_event_ids) >= 1
+    assert len(comp.action.pruned_event_ids) >= 1  # type: ignore[arg-type]
 
 
 def test_compact_returns_view_when_under_threshold() -> None:

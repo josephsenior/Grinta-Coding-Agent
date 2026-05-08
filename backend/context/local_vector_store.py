@@ -283,7 +283,7 @@ class ChromaDBBackend(VectorBackend):
                 'role': roles[idx],
                 'timestamp': time.time(),
                 'is_child': False,
-                **(metadatas[idx] or {}),
+                **(metadatas[idx] or {}),  # type: ignore[index]
             }
             if artifact_hashes[idx]:
                 doc_metadata['artifact_hash'] = artifact_hashes[idx]

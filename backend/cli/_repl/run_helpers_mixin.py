@@ -255,13 +255,13 @@ class RunHelpersMixin:
         config_ = self._config
         agent = self._agent
         llm_registry = self._llm_registry
-        session_id = getattr(self, '_bootstrap_session_id', None)
+        session_id: str | None = getattr(self, '_bootstrap_session_id', None)
         try:
             runtime_state = await asyncio.to_thread(
                 _setup_runtime_for_controller,
                 config_,
                 llm_registry,
-                session_id,
+                session_id,  # type: ignore[arg-type]
                 True,
                 agent,
                 None,  # type: ignore[arg-type]
@@ -282,7 +282,7 @@ class RunHelpersMixin:
             memory = await _setup_memory(
                 config_,
                 runtime,
-                session_id,
+                session_id,  # type: ignore[arg-type]
                 repo_directory,
                 None,
                 None,

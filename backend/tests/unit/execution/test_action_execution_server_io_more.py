@@ -149,7 +149,7 @@ async def test_read_file_editor_source_uses_aci_handler(mock_executor) -> None:
     expected = FileReadObservation(path='x.py', content='ok')
     with patch.object(mock_executor, '_handle_aci_file_read', return_value=expected):
         out = await mock_executor.read(
-            FileReadAction(path='x.py', impl_source='file_editor')
+            FileReadAction(path='x.py', impl_source='file_editor')  # type: ignore[arg-type]
         )
     assert out is expected
 

@@ -44,7 +44,7 @@ def _read_pdf_reader():
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', DeprecationWarning)
             try:
-                import PyPDF2
+                import PyPDF2  # type: ignore[import-untyped]
             except ImportError as exc:
                 raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
 
@@ -75,7 +75,7 @@ def parse_docx(file_path: str) -> None:
 
     """
     try:
-        import docx  # type: ignore[import-untyped]
+        import docx  # type: ignore[import-untyped, import-not-found]
     except ImportError as exc:
         raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
     content = docx.Document(file_path)
@@ -226,7 +226,9 @@ def parse_pptx(file_path: str) -> None:
     """
     try:
         try:
-            from pptx import Presentation  # type: ignore[import-untyped]
+            from pptx import (
+                Presentation,  # type: ignore[import-untyped, import-not-found]
+            )
         except ImportError as exc:
             raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
         pres = Presentation(file_path)

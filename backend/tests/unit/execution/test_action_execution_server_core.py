@@ -86,8 +86,8 @@ def test_get_client_returns_global_client() -> None:
 def test_get_mcp_proxy_reads_global() -> None:
     old = aes.mcp_proxy_manager
     try:
-        aes.mcp_proxy_manager = SimpleNamespace(name='proxy')
-        assert aes.get_mcp_proxy().name == 'proxy'
+        aes.mcp_proxy_manager = SimpleNamespace(name='proxy')  # type: ignore[assignment]
+        assert aes.get_mcp_proxy().name == 'proxy'  # type: ignore[union-attr]
     finally:
         aes.mcp_proxy_manager = old
 
@@ -133,7 +133,7 @@ async def test_lifespan_runs_initialize_and_shutdown_calls_client_close() -> Non
     try:
         aes.client = fake_client
         aes.mcp_proxy_manager = fake_proxy
-        aes._initialize_background = _init_background
+        aes._initialize_background = _init_background  # type: ignore[attr-defined]
 
         with (
             patch(
@@ -164,7 +164,7 @@ async def test_lifespan_cancels_pending_initialization_task_on_shutdown() -> Non
         await asyncio.sleep(5)
 
     try:
-        aes._initialize_background = _init_background
+        aes._initialize_background = _init_background  # type: ignore[attr-defined]
         with (
             patch(
                 'backend.utils.model_prewarm.ensure_models_available', return_value={}

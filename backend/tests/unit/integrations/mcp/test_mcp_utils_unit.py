@@ -124,9 +124,9 @@ def test_make_mcp_observation_propagates_category() -> None:
         category='timeout',
     )
     obs = mu._make_mcp_observation(action, payload)  # type: ignore[arg-type]
-    assert obs.tool_result['category'] == 'timeout'
-    assert obs.tool_result['ok'] is False
-    assert obs.tool_result['retryable'] is True
+    assert obs.tool_result['category'] == 'timeout'  # type: ignore[index]
+    assert obs.tool_result['ok'] is False  # type: ignore[index]
+    assert obs.tool_result['retryable'] is True  # type: ignore[index]
 
 
 def test_looks_like_mcp_validation_error() -> None:

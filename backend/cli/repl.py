@@ -580,12 +580,12 @@ def _build_help_table(search_term: str | None = None) -> Table:
         by_section = filtered_sections
 
     for section_key, title in _HELP_SECTIONS_ORDER:
-        specs = by_section.get(section_key)
-        if not specs:
+        specs_list = by_section.get(section_key)
+        if not specs_list:
             continue
         table.add_row('', '')
         table.add_row(f'[bold]{title}[/bold]', '')
-        for spec in specs:
+        for spec in specs_list:
             table.add_row(spec.usage, spec.description)
 
     return table
@@ -626,12 +626,12 @@ def _build_help_table_fallback(search_term: str | None = None) -> Table:
         by_section = filtered_sections
 
     for section_key, title in _HELP_SECTIONS_ORDER:
-        specs = by_section.get(section_key)
-        if not specs:
+        specs_list = by_section.get(section_key)
+        if not specs_list:
             continue
         table.add_row('', '')
         table.add_row(f'[bold]{title}[/bold]', '')
-        for spec in specs:
+        for spec in specs_list:
             table.add_row(spec.usage, spec.description)
 
     return table

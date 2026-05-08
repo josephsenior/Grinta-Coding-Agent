@@ -152,7 +152,7 @@ class OrchestrationContext:
         if ctx is None:
             mapping = getattr(ctrl, '_action_contexts_by_event_id', None)
             with contextlib.suppress(AttributeError, TypeError):
-                ctx = mapping.pop(aid, None)
+                ctx = mapping.pop(aid, None)  # type: ignore[union-attr]
         if ctx is not None:
             ctrl._cleanup_action_context(ctx)
 

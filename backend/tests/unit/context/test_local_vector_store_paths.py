@@ -21,11 +21,11 @@ def test_chromadb_backend_defaults_to_project_storage_memory_chroma(tmp_path) ->
     )
 
     fake_chromadb = types.ModuleType('chromadb')
-    fake_chromadb.PersistentClient = MagicMock(return_value=fake_client)
+    fake_chromadb.PersistentClient = MagicMock(return_value=fake_client)  # type: ignore[attr-defined]
     fake_chromadb_config = types.ModuleType('chromadb.config')
-    fake_chromadb_config.Settings = lambda **kwargs: kwargs
+    fake_chromadb_config.Settings = lambda **kwargs: kwargs  # type: ignore[attr-defined]
     fake_chromadb_utils = types.ModuleType('chromadb.utils')
-    fake_chromadb_utils.embedding_functions = fake_ef_module
+    fake_chromadb_utils.embedding_functions = fake_ef_module  # type: ignore[attr-defined]
 
     with (
         patch.dict(

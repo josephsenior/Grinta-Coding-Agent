@@ -94,9 +94,9 @@ class Memory:
                 logger.info(
                     'Knowledge base disabled (optional [rag] extra missing): %s', exc
                 )
-                self._kb_manager = None
+                self._kb_manager = None  # type: ignore[assignment]
         else:
-            self._kb_manager = None
+            self._kb_manager = None  # type: ignore[assignment]
 
     def on_event(self, event: Event) -> None:
         """Handle an event from the event stream."""

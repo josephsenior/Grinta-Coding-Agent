@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import typing
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -29,7 +30,7 @@ from backend.utils.lsp_client import LspClient, LspLocation, LspResult, LspSymbo
 
 
 @pytest.fixture(autouse=True)
-def _reset_mcp_bootstrap() -> None:
+def _reset_mcp_bootstrap() -> typing.Generator[None, None, None]:
     reset_mcp_bootstrap_status()
     yield
     reset_mcp_bootstrap_status()
@@ -136,10 +137,10 @@ async def test_runtime_executor_lsp_query_observation_shape(tmp_path) -> None:
         obs = await ex.lsp_query(action)
 
     assert isinstance(obs, LspQueryObservation)
-    assert obs.tool_result['command'] == 'find_definition'
-    assert obs.tool_result['file'] == str(py)
-    assert obs.tool_result['available'] is True
-    assert obs.tool_result['has_error'] is False
+    assert obs.tool_result['command'] == 'find_definition'  # type: ignore[index]
+    assert obs.tool_result['file'] == str(py)  # type: ignore[index]
+    assert obs.tool_result['available'] is True  # type: ignore[index]
+    assert obs.tool_result['has_error'] is False  # type: ignore[index]
     assert 'Found' in obs.content
 
 

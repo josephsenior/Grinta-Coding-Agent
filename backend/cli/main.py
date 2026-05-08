@@ -306,7 +306,7 @@ def show_grinta_splash(console: Any | None = None) -> None:
         rows = [Text(''), Align.center(panel), Text('')]
         rows.append(Align.center(Text(_HINT, style=STYLE_DIM)))
         rows.append(Text(''))
-        return Group(*rows)
+        return Group(*rows)  # type: ignore[arg-type]
 
     console.print(_frame())
 
