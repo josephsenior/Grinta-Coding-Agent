@@ -48,6 +48,7 @@ class _MockHudState:
     context_tokens = 1024
     llm_calls = 3
     model = 'openai/gpt-4o'
+    condensation_count = 0
 
 
 class _MockHud:
