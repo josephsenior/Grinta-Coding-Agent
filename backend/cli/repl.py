@@ -31,7 +31,7 @@ from backend.cli.status_chrome import (
     pt_stats_row2_fragments,
     status_fields_from_hud,
 )
-from backend.cli.theme import mark_prompt, prompt_toolkit_style_dict
+from backend.cli.theme import CLR_STATUS_ERR, mark_prompt, prompt_toolkit_style_dict
 from backend.core.config import (
     AppConfig,
 )
@@ -1404,18 +1404,30 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             )
 
             while self._running:
-                stop = await self._repl_iteration(
-                    session,
-                    controller,
-                    agent_task,
-                    chat_ready_done,
-                    engine_init_done,
-                    engine_init_exc,
-                    create_controller,
-                    _create_early_status_callback,
-                    run_agent_until_done,
-                    end_states,
-                )
+                try:
+                    stop = await self._repl_iteration(
+                        session,
+                        controller,
+                        agent_task,
+                        chat_ready_done,
+                        engine_init_done,
+                        engine_init_exc,
+                        create_controller,
+                        _create_early_status_callback,
+                        run_agent_until_done,
+                        end_states,
+                    )
+                except Exception:
+                    logger.exception('Unhandled exception in REPL iteration')
+                    # Print directly to stderr so the user sees something
+                    # even if the renderer is in an inconsistent state.
+                    import traceback
+                    traceback.print_exc()
+                    self._console.print(
+                        f'[{CLR_STATUS_ERR}]Fatal error in REPL loop:[/] '
+                        'see log or stderr for details.'
+                    )
+                    break
                 if stop is None:
                     break
                 controller, agent_task = stop

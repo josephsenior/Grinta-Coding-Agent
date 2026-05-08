@@ -133,16 +133,22 @@ class RunHelpersMixin:
         engine_init_exc[0] = exc
         self._set_footer_system_line('')
         exc_name = type(exc).__name__
+        msg: str
         if 'AuthenticationError' in exc_name or 'api_key' in str(exc).lower():
-            renderer.add_system_message(
+            msg = (
                 'No API key or model configured.\n'
                 'Run `grinta init` to configure a provider, '
                 'or edit `settings.json` directly.\n'
-                f'{exc}',
-                title='error',
+                f'{exc}'
             )
+            renderer.add_system_message(msg, title='error')
         else:
-            renderer.add_system_message(f'Initialization failed: {exc}', title='error')
+            msg = f'Initialization failed: {exc}'
+            renderer.add_system_message(msg, title='error')
+        # Print directly to stderr so the user sees the error even as
+        # the REPL shuts down — renderer messages may not flush in time.
+        import sys
+        print(f'\n[Grinta] {msg}\n', file=sys.stderr)
         self._running = False
         self._invalidate_prompt_session(session)
 
@@ -465,7 +471,21 @@ class RunHelpersMixin:
             end_states=end_states,
         )
 
-        event_stream.add_event(initial_action, EventSource.USER)
+        # Wrap event dispatch so any failure doesn't silently terminate the REPL.
+        try:
+            event_stream.add_event(initial_action, EventSource.USER)
+        except Exception:
+            logger.exception('Failed to add user event to event stream')
+            renderer.add_system_message(
+                'Failed to dispatch user message. Returning to prompt.',
+                title='error',
+            )
+            renderer.stop_live()
+            self._sync_terminal_after_agent_turn(session)
+            self._invalidate_prompt_session(session)
+            self._invalidate_pt()
+            return controller, agent_task
+
         try:
             controller.step()
         except Exception:
@@ -476,8 +496,20 @@ class RunHelpersMixin:
 
         try:
             await self._wait_for_agent_idle(controller, agent_task)
-        except (KeyboardInterrupt, asyncio.CancelledError):
+        except asyncio.CancelledError:
             renderer.stop_live()
+            await self._cancel_agent(agent_task)
+        except KeyboardInterrupt:
+            renderer.stop_live()
+            await self._cancel_agent(agent_task)
+        except Exception:
+            logger.exception('Unhandled exception during agent turn')
+            renderer.stop_live()
+            renderer.add_system_message(
+                'Agent run failed with an unexpected error. '
+                'Check the logs or try again.',
+                title='error',
+            )
             await self._cancel_agent(agent_task)
         finally:
             renderer.stop_live()
