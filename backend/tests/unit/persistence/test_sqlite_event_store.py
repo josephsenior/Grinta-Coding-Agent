@@ -79,6 +79,16 @@ class TestInitialization:
         assert 'events.db' in repr(store)
         assert 'db_path' in repr(store)
 
+    def test_synchronous_full(self, store_path: Path) -> None:
+        """PRAGMA synchronous is set to FULL for crash safety."""
+        store = SQLiteEventStore(store_path)
+        conn = sqlite3.connect(str(store_path))
+        cursor = conn.execute('PRAGMA synchronous')
+        value = cursor.fetchone()[0]
+        assert value == 2, f'Expected synchronous=FULL (2), got {value}'
+        conn.close()
+        store.close()
+
 
 class TestWriteOperations:
     """Test event writing functionality."""

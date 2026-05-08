@@ -8,6 +8,8 @@ from types import MethodType
 from typing import Any, cast
 from unittest.mock import MagicMock
 
+import pytest
+
 from backend.ledger.durable_writer import DurableEventWriter, PersistedEvent
 
 # ---------------------------------------------------------------------------
@@ -19,6 +21,7 @@ def _make_file_store():
     """Create a mock FileStore implementing the write protocol."""
     store = MagicMock()
     store.write = MagicMock()
+    store.delete = MagicMock()
     return store
 
 
@@ -109,12 +112,16 @@ class TestEnqueueAndFlush:
             # Wait for writer thread to process
             time.sleep(0.3)
             store.write.assert_called()
-            # First arg of first call is the filename
-            call_args = store.write.call_args_list[0]
-            assert call_args[0][0] == 'event_42.json'
-            # Second arg is JSON serialized payload
-            parsed = json.loads(call_args[0][1])
-            assert parsed['id'] == 42
+            # Find the event file write (not the .pending marker)
+            for call_args in store.write.call_args_list:
+                filename = call_args[0][0]
+                if not filename.endswith('.pending'):
+                    assert filename == 'event_42.json'
+                    parsed = json.loads(call_args[0][1])
+                    assert parsed['id'] == 42
+                    break
+            else:
+                pytest.fail('No event file write found')
         finally:
             writer.stop(timeout=2.0)
 
@@ -226,6 +233,96 @@ class TestProperties:
         store = _make_file_store()
         writer = DurableEventWriter(store)
         assert writer.error_count == 0
+
+
+# ---------------------------------------------------------------------------
+# WAL markers (.pending)
+# ---------------------------------------------------------------------------
+
+
+class TestWALMarkers:
+    def test_pending_written_before_enqueue(self):
+        """A .pending file is written before the event is enqueued."""
+        import threading
+
+        write_order: list[str] = []
+        lock = threading.Lock()
+
+        def track_write(filename: str, _content: str) -> None:
+            with lock:
+                write_order.append(filename)
+
+        store = _make_file_store()
+        store.write.side_effect = track_write
+        writer = DurableEventWriter(store, max_queue_size=10)
+        writer.start()
+        try:
+            ev = _make_event(7)
+            writer.enqueue(ev)
+            # Wait for flush to happen
+            time.sleep(0.3)
+            with lock:
+                pending_name = 'event_7.json.pending'
+                event_name = 'event_7.json'
+                pending_idx = write_order.index(pending_name)
+                event_idx = write_order.index(event_name)
+                assert pending_idx < event_idx
+        finally:
+            writer.stop(timeout=2.0)
+
+    def test_pending_deleted_after_flush(self):
+        """The .pending file is removed after the event is flushed."""
+        store = _make_file_store()
+        writer = DurableEventWriter(store, max_queue_size=10)
+        writer.start()
+        try:
+            ev = _make_event(7)
+            writer.enqueue(ev)
+            time.sleep(0.3)
+            store.delete.assert_any_call('event_7.json.pending')
+        finally:
+            writer.stop(timeout=2.0)
+
+    def test_pending_cleaned_on_queue_full(self):
+        """The .pending file is cleaned up when the event is dropped (queue full)."""
+        import threading
+        from types import MethodType
+
+        store = _make_file_store()
+        writer = DurableEventWriter(store, max_queue_size=1, put_timeout=0.05)
+
+        drain_blocker = threading.Event()
+        original_drain = DurableEventWriter._drain_batch
+
+        def patched_drain(self_inner):
+            drain_blocker.wait()
+            return original_drain(self_inner)
+
+        writer._drain_batch = MethodType(patched_drain, writer)
+        writer.start()
+        try:
+            # Writer thread is blocked in patched_drain, so queue stays full
+            writer.enqueue(_make_event(1))
+            time.sleep(0.1)
+            writer.enqueue(_make_event(2))
+            time.sleep(0.1)
+            store.delete.assert_any_call('event_2.json.pending')
+        finally:
+            drain_blocker.set()
+            writer.stop(timeout=2.0)
+
+    def test_pending_cleaned_on_permanent_error(self):
+        """The .pending file is cleaned up after all retries fail."""
+        store = _make_file_store()
+        store.write.side_effect = OSError('permanent failure')
+        writer = DurableEventWriter(store, max_queue_size=10)
+        writer.start()
+        try:
+            writer.enqueue(_make_event(9))
+            time.sleep(2.0)
+            store.delete.assert_any_call('event_9.json.pending')
+        finally:
+            writer.stop(timeout=2.0)
 
 
 # ---------------------------------------------------------------------------

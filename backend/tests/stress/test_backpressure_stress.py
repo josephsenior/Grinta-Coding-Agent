@@ -342,6 +342,7 @@ class TestCircuitBreakerUnderLoad:
 def _make_file_store():
     store = MagicMock()
     store.write = MagicMock()
+    store.delete = MagicMock()
     return store
 
 
@@ -420,20 +421,33 @@ class TestDurableWriterQueueSaturation:
 
     def test_drops_counted_when_queue_full(self):
         """When queue is tiny and store is blocked, drops should be counted."""
+        import threading
+        from types import MethodType
+
         store = _make_file_store()
-        # Block the writer so queue fills
-        store.write.side_effect = lambda *_: time.sleep(10)
-        writer = DurableEventWriter(store, max_queue_size=3, put_timeout=0.05)
+        writer = DurableEventWriter(store, max_queue_size=2, put_timeout=0.05)
+
+        # Block the writer thread so the queue fills up immediately
+        drain_blocker = threading.Event()
+        original_drain = DurableEventWriter._drain_batch
+
+        def patched_drain(self_inner):
+            drain_blocker.wait()
+            return original_drain(self_inner)
+
+        writer._drain_batch = MethodType(patched_drain, writer)
         writer.start()
         try:
-            # Enqueue several — some should drop
-            for i in range(10):
-                writer.enqueue(_make_persisted(i))
-                time.sleep(0.01)
-
+            # Fill the queue (maxsize=2)
+            assert writer.enqueue(_make_persisted(1)) is True
+            assert writer.enqueue(_make_persisted(2)) is True
+            time.sleep(0.05)
+            # Third event should be dropped — queue is full, writer blocked
+            assert writer.enqueue(_make_persisted(3)) is False
             assert writer.drop_count >= 1
         finally:
-            writer.stop(timeout=1.0)
+            drain_blocker.set()
+            writer.stop(timeout=2.0)
 
 
 class TestDurableWriterErrorResilience:

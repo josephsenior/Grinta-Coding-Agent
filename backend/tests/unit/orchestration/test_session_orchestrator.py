@@ -302,6 +302,7 @@ def test_default_operation_pipeline_order_is_stable() -> None:
 
     middlewares = ctrl.services.context.initialize_operation_pipeline.call_args.args[0]
     assert [middleware.__class__.__name__ for middleware in middlewares] == [
+        'IdempotencyMiddleware',
         'SafetyValidatorMiddleware',
         'BlackboardMiddleware',
         'CircuitBreakerMiddleware',
@@ -318,7 +319,7 @@ def test_default_operation_pipeline_order_is_stable() -> None:
         'ToolResultValidator',
     ]
     assert ctrl._rollback_middleware.__class__.__name__ == 'RollbackMiddleware'
-    assert ctrl._file_state_tracker is middlewares[10].tracker
+    assert ctrl._file_state_tracker is middlewares[11].tracker
 
 
 # ── Service aliasing ────────────────────────────────────────────────

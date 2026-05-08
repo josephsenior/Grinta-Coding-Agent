@@ -20,6 +20,7 @@ _BATCH_DRAIN_TIMEOUT = 0.02  # 20ms window to accumulate a batch
 
 class FileStore(Protocol):
     def write(self, filename: str, content: str) -> None: ...
+    def delete(self, filename: str) -> None: ...
 
 
 @dataclass(slots=True)
@@ -96,9 +97,26 @@ class DurableEventWriter:
         """Number of persistence flush errors encountered."""
         return self._errors
 
+    def _pending_path(self, filename: str) -> str:
+        return filename + '.pending'
+
     def enqueue(self, persisted_event: PersistedEvent) -> bool:
         if not self._thread or not self._thread.is_alive():
             return False
+
+        # Write WAL marker before enqueue so a crash between enqueue
+        # and flush is recoverable via EventPersistence.replay_pending_events().
+        serialized = json.dumps(persisted_event.payload)
+        pending_path = self._pending_path(persisted_event.filename)
+        try:
+            self._file_store.write(pending_path, serialized)
+        except Exception as exc:
+            logger.debug(
+                'WAL: could not write .pending marker %s: %s',
+                pending_path,
+                exc,
+            )
+
         try:
             # Block up to _put_timeout before dropping — gives the writer
             # thread a chance to drain under transient load spikes.
@@ -106,6 +124,15 @@ class DurableEventWriter:
             return True
         except queue.Full:
             self._drops += 1
+            # Clean up the WAL marker — the event is being dropped
+            try:
+                self._file_store.delete(pending_path)
+            except Exception as exc:
+                logger.debug(
+                    'WAL: could not remove .pending marker %s: %s',
+                    pending_path,
+                    exc,
+                )
             logger.warning(
                 'DurableEventWriter queue full after %.1fs; dropped event id=%s filename=%s (total drops: %d)',
                 self._put_timeout,
@@ -184,6 +211,16 @@ class DurableEventWriter:
                     _MAX_FLUSH_RETRIES,
                     exc,
                 )
+                # Clean up WAL marker — will be re-created if retried on restart
+                pending_path = self._pending_path(item.filename)
+                try:
+                    self._file_store.delete(pending_path)
+                except Exception as purge_exc:
+                    logger.debug(
+                        'WAL: could not clean up .pending after permanent failure %s: %s',
+                        pending_path,
+                        purge_exc,
+                    )
             finally:
                 self._queue.task_done()
                 if self._in_flight > 0:
@@ -217,6 +254,18 @@ class DurableEventWriter:
     def _flush_event(self, persisted_event: PersistedEvent) -> None:
         serialized = json.dumps(persisted_event.payload)
         self._file_store.write(persisted_event.filename, serialized)
+
+        # Remove WAL marker on successful flush — crash-recovery no longer needed.
+        pending_path = self._pending_path(persisted_event.filename)
+        try:
+            self._file_store.delete(pending_path)
+        except Exception as exc:
+            logger.debug(
+                'WAL: could not remove .pending marker %s: %s',
+                pending_path,
+                exc,
+            )
+
         if (
             persisted_event.cache_filename
             and persisted_event.cache_contents is not None
