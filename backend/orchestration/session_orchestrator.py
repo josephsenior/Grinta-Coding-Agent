@@ -216,6 +216,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         from backend.orchestration.middleware.destructive_command import (
             DestructiveCommandMiddleware,
         )
+        from backend.orchestration.middleware.idempotency import IdempotencyMiddleware
         from backend.orchestration.pre_exec_diff import PreExecDiffMiddleware
         from backend.orchestration.rollback_middleware import RollbackMiddleware
         from backend.orchestration.tool_pipeline import (
@@ -232,6 +233,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         from backend.orchestration.tool_result_validator import ToolResultValidator
 
         middlewares = [
+            IdempotencyMiddleware(self),
             SafetyValidatorMiddleware(self),
             BlackboardMiddleware(self),
             CircuitBreakerMiddleware(self),
