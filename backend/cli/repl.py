@@ -971,6 +971,8 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         self._pt_session: Any | None = None
         #: Shown once per REPL run when Ctrl+C is pressed at the input prompt.
         self._prompt_ctrl_c_hint_shown: bool = False
+        #: When True, LOW-risk actions are auto-approved without prompt.
+        self._suppress_low_risk_confirmations: bool = False
 
     def _invalidate_pt(self) -> None:
         sess = self._pt_session

@@ -43,10 +43,14 @@ class ConfirmationDecision:
     ``approved`` is the y/n answer. ``remember`` is True when the user
     asked to whitelist this exact action signature for the rest of the
     session (the "always allow" choice).
+
+    ``suppress_low_risk`` is True when the user chose to auto-approve
+    all remaining LOW-risk actions for this session.
     """
 
     approved: bool
     remember: bool = False
+    suppress_low_risk: bool = False
 
 
 def _risk_label(action: Action) -> tuple[str, str]:
@@ -197,30 +201,39 @@ def render_confirmation(
         if answer in ('a', 'always'):
             return ConfirmationDecision(approved=True, remember=True)
         return ConfirmationDecision(approved=answer == 'yes', remember=False)
-    else:
-        # y = approve once, n = reject, a = always allow this exact action
-        # signature for the remainder of the session. Render keys as bold accents
-        # so the user can scan their options without re-reading the sentence.
-        hint = Text('  ')
-        hint.append('[y]', style=f'bold {CLR_BRAND}')
-        hint.append('es ', style=CLR_META)
-        hint.append('[n]', style=f'bold {CLR_BRAND}')
-        hint.append('o ', style=CLR_META)
-        hint.append('[a]', style=f'bold {CLR_BRAND}')
-        hint.append('lways allow', style=CLR_META)
-        console.print(hint)
-        answer = Prompt.ask(
-            '  Approve?',
-            console=console,
-            choices=['y', 'n', 'a'],
-            default='n',
-            show_choices=False,
-            show_default=False,
-        )
-        answer = (answer or 'n').strip().lower()
-        if answer == 'a':
-            return ConfirmationDecision(approved=True, remember=True)
-        return ConfirmationDecision(approved=answer == 'y', remember=False)
+
+    is_low_risk = risk_text == 'LOW'
+    hint = Text('  ')
+    hint.append('[y]', style=f'bold {CLR_BRAND}')
+    hint.append('es ', style=CLR_META)
+    hint.append('[n]', style=f'bold {CLR_BRAND}')
+    hint.append('o ', style=CLR_META)
+    hint.append('[a]', style=f'bold {CLR_BRAND}')
+    hint.append('lways allow', style=CLR_META)
+    if is_low_risk:
+        hint.append('   ', style=CLR_META)
+        hint.append('[d]', style=f'bold {CLR_RISK_LOW}')
+        hint.append("don't ask again this session", style=CLR_META)
+    console.print(hint)
+
+    choices = ['y', 'n', 'a']
+    if is_low_risk:
+        choices.append('d')
+
+    answer = Prompt.ask(
+        '  Approve?',
+        console=console,
+        choices=choices,
+        default='n',
+        show_choices=False,
+        show_default=False,
+    )
+    answer = (answer or 'n').strip().lower()
+    if answer == 'a':
+        return ConfirmationDecision(approved=True, remember=True)
+    if answer == 'd':
+        return ConfirmationDecision(approved=True, remember=False, suppress_low_risk=True)
+    return ConfirmationDecision(approved=answer == 'y', remember=False)
 
 
 def build_confirmation_action(approved: bool) -> ChangeAgentStateAction:

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
 from rich.console import Console
 
 from backend.cli.confirmation import (
+    ConfirmationDecision,
     _action_label,
     _confirmation_frame_style,
     _file_label,
@@ -210,6 +212,75 @@ class TestRenderConfirmation:
         with patch('rich.prompt.Prompt.ask', return_value='y'):
             result = render_confirmation(console, action)
         assert result.approved is True
+
+    def test_dont_ask_again_for_low_risk(self) -> None:
+        console = _quiet_console()
+        action = CmdRunAction(command='echo hello')
+        action.security_risk = ActionSecurityRisk.LOW
+        with patch('rich.prompt.Prompt.ask', return_value='d'):
+            result = render_confirmation(console, action)
+        assert result.approved is True
+        assert result.remember is False
+        assert result.suppress_low_risk is True
+
+    def test_low_risk_approve_once(self) -> None:
+        console = _quiet_console()
+        action = CmdRunAction(command='echo hello')
+        action.security_risk = ActionSecurityRisk.LOW
+        with patch('rich.prompt.Prompt.ask', return_value='y'):
+            result = render_confirmation(console, action)
+        assert result.approved is True
+        assert result.suppress_low_risk is False
+
+    def test_low_risk_reject(self) -> None:
+        console = _quiet_console()
+        action = CmdRunAction(command='echo hello')
+        action.security_risk = ActionSecurityRisk.LOW
+        with patch('rich.prompt.Prompt.ask', return_value='n'):
+            result = render_confirmation(console, action)
+        assert result.approved is False
+        assert result.suppress_low_risk is False
+
+    def test_low_risk_always_allow(self) -> None:
+        console = _quiet_console()
+        action = CmdRunAction(command='echo hello')
+        action.security_risk = ActionSecurityRisk.LOW
+        with patch('rich.prompt.Prompt.ask', return_value='a'):
+            result = render_confirmation(console, action)
+        assert result.approved is True
+        assert result.remember is True
+        assert result.suppress_low_risk is False
+
+    def test_non_low_risk_has_no_d_choice(self) -> None:
+        """Choices for non-LOW risk should not include 'd'."""
+        console = _quiet_console()
+        action = CmdRunAction(command='sudo something')
+        action.security_risk = ActionSecurityRisk.MEDIUM
+        with patch('rich.prompt.Prompt.ask') as mock:
+            mock.return_value = 'n'
+            render_confirmation(console, action)
+        _call_choices = mock.call_args[1].get('choices', [])
+        assert 'd' not in _call_choices
+
+
+# ---------------------------------------------------------------------------
+# ConfirmationDecision
+# ---------------------------------------------------------------------------
+
+
+class TestConfirmationDecision:
+    def test_default_suppress_low_risk_is_false(self) -> None:
+        d = ConfirmationDecision(approved=True)
+        assert d.suppress_low_risk is False
+
+    def test_suppress_low_risk_true(self) -> None:
+        d = ConfirmationDecision(approved=True, suppress_low_risk=True)
+        assert d.suppress_low_risk is True
+
+    def test_frozen_dataclass(self) -> None:
+        d = ConfirmationDecision(approved=False)
+        with pytest.raises(AttributeError):
+            d.approved = True  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
