@@ -904,6 +904,11 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
 
     async def _handle_post_execution(self) -> None:
         """Handle post-execution tasks like rate limits and memory pressure."""
+        # Memory-pressure → rate-governor feedback loop
+        ratio = self.memory_pressure.pressure_ratio()
+        factor = 1.0 - (ratio * 0.75)
+        self.rate_governor.set_memory_pressure_factor(factor)
+
         # Check rate limits after action execution (which likely consumed tokens)
         if hasattr(self.state, 'metrics'):
             await self.rate_governor.check_and_wait(
