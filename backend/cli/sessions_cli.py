@@ -126,7 +126,7 @@ def _filter_sessions_fuzzy(
         max_score = max(title_score, model_score)
 
         if max_score > 50:
-            scored.append((100 - max_score, row))  # Negate for ascending sort
+            scored.append((int(100 - max_score), row))  # Negate for ascending sort
 
     scored.sort()
     return [r for _, r in scored]

@@ -8,19 +8,28 @@ import pytest
 
 from backend.inference.metrics import Metrics
 from backend.orchestration.conversation_stats import ConversationStats
+from backend.persistence.files import FileStore
 
 
-class _FileStore:
+class _FileStore(FileStore):
     def __init__(self) -> None:
         self.data: dict[str, str] = {}
 
-    def write(self, path: str, content: str) -> None:
-        self.data[path] = content
+    def write(self, path: str, contents: str | bytes) -> None:
+        self.data[path] = (
+            contents if isinstance(contents, str) else contents.decode('utf-8')
+        )
 
     def read(self, path: str) -> str:
         if path not in self.data:
             raise FileNotFoundError(path)
         return self.data[path]
+
+    def delete(self, path: str) -> None:
+        self.data.pop(path, None)
+
+    def list(self, path: str) -> list[str]:
+        return [k for k in self.data if k.startswith(path)]
 
 
 def _encode_metrics(payload: dict) -> str:
@@ -94,7 +103,7 @@ def test_register_llm_with_restored_metrics_reuses_restored_snapshot() -> None:
     stats.restored_metrics = {'svc-x': restored}
     llm = SimpleNamespace(metrics=None)
 
-    stats.register_llm(SimpleNamespace(llm=llm, service_id='svc-x'))
+    stats.register_llm(SimpleNamespace(llm=llm, service_id='svc-x'))  # type: ignore[arg-type]
 
     assert llm.metrics.accumulated_cost == pytest.approx(1.7)
     assert 'svc-x' in stats.service_to_metrics
@@ -104,16 +113,16 @@ def test_register_llm_with_restored_metrics_reuses_restored_snapshot() -> None:
 def test_register_llm_without_metrics_creates_metrics() -> None:
     stats = ConversationStats(_FileStore(), conversation_id='c6', user_id='u6')
     llm = SimpleNamespace(metrics=None)
-    stats.register_llm(SimpleNamespace(llm=llm, service_id='svc-y'))
+    stats.register_llm(SimpleNamespace(llm=llm, service_id='svc-y'))  # type: ignore[arg-type]
     assert isinstance(llm.metrics, Metrics)
     assert 'svc-y' in stats.service_to_metrics
 
 
 def test_register_llm_skips_invalid_event() -> None:
     stats = ConversationStats(_FileStore(), conversation_id='c7', user_id='u7')
-    stats.register_llm(SimpleNamespace(llm=None, service_id='svc-z'))
+    stats.register_llm(SimpleNamespace(llm=None, service_id='svc-z'))  # type: ignore[arg-type]
     stats.register_llm(
-        SimpleNamespace(llm=SimpleNamespace(metrics=None), service_id=None)
+        SimpleNamespace(llm=SimpleNamespace(metrics=None), service_id=None)  # type: ignore[arg-type]
     )
     assert stats.service_to_metrics == {}
 

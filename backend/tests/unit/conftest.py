@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import typing
+
 import pytest
 
 from backend.core import os_capabilities as _os_caps
@@ -28,7 +30,7 @@ def _clear_env_before_test(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _restore_os_capabilities_after_test() -> None:
+def _restore_os_capabilities_after_test() -> typing.Generator[None, None, None]:
     """Reset :data:`OS_CAPS` after each test (``override_os_capabilities`` is in-process)."""
     yield
     fresh = _os_caps.detect_os_capabilities()

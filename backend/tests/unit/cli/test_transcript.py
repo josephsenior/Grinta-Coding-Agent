@@ -167,8 +167,8 @@ def test_format_reasoning_snapshot_empty() -> None:
 
 def test_format_activity_validation_callout_contains_marker() -> None:
     panel = format_activity_validation_callout('Syntax Error: unexpected token')
-    assert 'Validation' in panel.renderable.plain
-    assert 'Syntax Error' in panel.renderable.plain
+    assert 'Validation' in panel.renderable.plain  # type: ignore[union-attr]
+    assert 'Syntax Error' in panel.renderable.plain  # type: ignore[union-attr]
 
 
 def test_format_reasoning_snapshot_lines() -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -36,7 +37,7 @@ def _controller() -> MagicMock:
     return c
 
 
-def _ctx(controller: MagicMock, action: object | None = None) -> ToolInvocationContext:
+def _ctx(controller: MagicMock, action: Any | None = None) -> ToolInvocationContext:
     if action is None:
         action = MagicMock(runnable=True)
     return ToolInvocationContext(
@@ -59,7 +60,7 @@ async def test_blackboard_middleware_get_set_keys_and_unknown() -> None:
     bad_action = BlackboardAction(command='nope', key='', value='')
 
     for action in (get_action, set_action, keys_action, bad_action):
-        ctx = _ctx(controller, action)
+        ctx = _ctx(controller, action)  # type: ignore[arg-type]
         await middleware.execute(ctx)
         assert ctx.blocked is True
         assert ctx.metadata.get('handled') is True
@@ -115,7 +116,7 @@ async def test_cost_quota_middleware_records_snapshot_and_annotates() -> None:
 
     await middleware.execute(ctx)
     metrics.accumulated_cost = 1.5
-    await middleware.observe(ctx, observation)
+    await middleware.observe(ctx, observation)  # type: ignore[arg-type]
 
     assert 'cost_snapshot' in ctx.metadata
     assert '<COST_FOOTPRINT>' in observation.content
@@ -131,7 +132,7 @@ async def test_cost_quota_middleware_skips_non_positive_delta() -> None:
     ctx = _ctx(controller)
     await middleware.execute(ctx)
     observation = SimpleNamespace(content='x')
-    await middleware.observe(ctx, observation)
+    await middleware.observe(ctx, observation)  # type: ignore[arg-type]
     assert observation.content == 'x'
 
 
@@ -144,8 +145,8 @@ def test_scan_command_detects_and_ignores_patterns() -> None:
 @pytest.mark.asyncio
 async def test_destructive_command_middleware_creates_checkpoint() -> None:
     controller = _controller()
-    ctx = _ctx(controller, CmdRunAction(command='git push --force origin main'))
-    ctx.state = SimpleNamespace(sid='S1')
+    ctx = _ctx(controller, CmdRunAction(command='git push --force origin main'))  # type: ignore[arg-type]
+    ctx.state = SimpleNamespace(sid='S1')  # type: ignore[assignment]
     middleware = DestructiveCommandMiddleware(workspace_path='C:/tmp', enabled=True)
     manager = MagicMock()
     manager.create_checkpoint.return_value = 'cp-1'
@@ -218,7 +219,7 @@ async def test_telemetry_middleware_execute_and_observe() -> None:
 
     ctx = _ctx(controller)
     await middleware.execute(ctx)
-    await middleware.observe(ctx, observation=SimpleNamespace(content='ok'))
+    await middleware.observe(ctx, observation=SimpleNamespace(content='ok'))  # type: ignore[arg-type]
 
     telemetry.on_execute.assert_called_once_with(ctx)
     telemetry.on_observe.assert_called_once()
