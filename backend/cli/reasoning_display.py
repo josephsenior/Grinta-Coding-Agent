@@ -1,15 +1,14 @@
 """Live reasoning panel — activity chrome while the agent works.
 
-Streaming updates the same ``_thought_lines`` buffer shown in the Rich Live
-Thinking strip; when the turn ends, :meth:`CLIEventRenderer._flush_thinking_block`
-prints those lines into the transcript with :func:`backend.cli.transcript.format_reasoning_snapshot`,
-using the same body style token as the live text (:data:`backend.cli.theme.CLR_THOUGHT_BODY`)
-so live vs committed reasoning differs only by context (panel vs plain lines), not by a separate pipeline.
+Two separate buffers:
+- ``_committed_lines`` — distinct reasoning steps from AgentThinkAction/Observation,
+  appended over the course of a turn.  Preserved for the final committed output.
+- ``_streaming_line`` — the current streaming thought from the model, replaced
+  on every streaming chunk.  Shown in the Live display only, never persisted.
 
-No duplicate Ctrl+C hint (the fake-prompt bar directly below the panel
-already shows "Agent working… ctrl+c to interrupt"), and no inline
-breadcrumb — the committed activity stream above the panel already
-tells the user what happened earlier in the turn.
+When the turn ends, :meth:`CLIEventRenderer._flush_thinking_block`
+collects ``_committed_lines`` for the transcript via
+:func:`backend.cli.transcript.format_reasoning_snapshot`.
 """
 
 from __future__ import annotations
@@ -27,13 +26,6 @@ from backend.cli.layout_tokens import (
 from backend.cli.theme import CLR_META, CLR_THOUGHT_BODY
 from backend.engine import prompt_role_debug as _prompt_role_debug
 
-# Thought lines are rendered without an extra manual prefix so they align with
-# other activity panel bodies.
-_THOUGHT_LINE_PREFIX_CHARS = 0
-# Safety cap on stored logical lines (streaming can be very chatty).
-_MAX_STORED_THOUGHT_LINES = 50_000
-
-
 # Panel chrome overhead: live ``MINIMAL`` frame + horizontal padding from
 # :func:`backend.cli.transcript.format_live_panel`. Sourced from ``layout_tokens`` so the wrap
 # width tracks the actual rendered panel and never desynchronises if the
@@ -43,7 +35,10 @@ _PANEL_CHROME_WIDTH = CALLOUT_PANEL_CHROME_WIDTH
 # Character used at the end of the latest thought while streaming is active.
 # Rich spinner in the header already conveys "thinking" — this cursor conveys
 # "tokens are still flowing for this specific thought".
-_STREAM_CURSOR = '▌'
+_STREAM_CURSOR = '\u258c'
+
+# Safety cap on stored logical lines (streaming can be very chatty).
+_MAX_STORED_THOUGHT_LINES = 50_000
 
 
 def _thought_lines_for_display(
@@ -52,9 +47,9 @@ def _thought_lines_for_display(
     *,
     stable_wrap_width: int | None = None,
 ) -> list[str]:
-    """One logical thought line → one or more panel rows (wrap when width is known).
+    """One logical thought line \u2192 one or more panel rows (wrap when width is known).
 
-    Never truncates with an ellipsis — we prefer to wrap across multiple
+    Never truncates with an ellipsis \u2014 we prefer to wrap across multiple
     rows so the user can read the full thought. When the terminal is too
     narrow to meaningfully wrap, we fall back to returning the line as-is
     (Rich will then soft-wrap the row itself).
@@ -67,7 +62,7 @@ def _thought_lines_for_display(
         return []
     if max_width is None or max_width <= _PANEL_CHROME_WIDTH + 12:
         return [stripped]
-    computed = max(12, max_width - _PANEL_CHROME_WIDTH - _THOUGHT_LINE_PREFIX_CHARS)
+    computed = max(12, max_width - _PANEL_CHROME_WIDTH)
     wrap_width = stable_wrap_width if stable_wrap_width is not None else computed
     wrapped = textwrap.wrap(
         stripped,
@@ -81,18 +76,22 @@ def _thought_lines_for_display(
 class ReasoningDisplay:
     """Renderable reasoning state used inside the main live layout.
 
+    Two buffers (see module docstring): ``_committed_lines`` for distinct
+    reasoning steps and ``_streaming_line`` for the current streaming thought.
+
     Usage::
 
         rd = ReasoningDisplay()
         rd.start()
-        rd.update_thought("Analyzing the codebase…")
+        rd.set_streaming_thought("Analyzing the codebase\u2026")
         rd.update_action("Reading file src/main.py")
         rd.stop()
     """
 
     def __init__(self) -> None:
         self._active = False
-        self._thought_lines: list[str] = []
+        self._committed_lines: list[str] = []
+        self._streaming_line: str = ''
         self._current_action: str = ''
         self._max_lines: int = _MAX_STORED_THOUGHT_LINES
         self._start_time: float | None = None
@@ -100,9 +99,9 @@ class ReasoningDisplay:
         self._current_cost: float = 0.0
         self._last_debug_stream_log: float = 0.0
         # True when ``set_streaming_thought`` has written content since the
-        # last non-streaming update — drives the trailing stream cursor.
+        # last non-streaming update \u2014 drives the trailing stream cursor.
         self._streaming: bool = False
-        # First computed wrap width while streaming — kept stable until streaming ends.
+        # First computed wrap width while streaming \u2014 kept stable until streaming ends.
         self._stream_wrap_width: int | None = None
 
     # -- lifecycle ---------------------------------------------------------
@@ -117,7 +116,8 @@ class ReasoningDisplay:
 
     def stop(self) -> None:
         self._active = False
-        self._thought_lines.clear()
+        self._committed_lines.clear()
+        self._streaming_line = ''
         self._current_action = ''
         self._start_time = None
         self._streaming = False
@@ -136,20 +136,8 @@ class ReasoningDisplay:
 
     # -- updates -----------------------------------------------------------
 
-    def update_thought(self, text: str) -> None:
-        self.start()
-        _prompt_role_debug.log_reasoning_transition('reasoning.update_thought', text)
-        for line in text.splitlines():
-            if stripped := line.strip():
-                self._thought_lines.append(stripped)
-        if len(self._thought_lines) > self._max_lines:
-            self._thought_lines = self._thought_lines[-self._max_lines :]
-        # A non-streaming thought snapshot turns the cursor off again.
-        self._streaming = False
-        self._stream_wrap_width = None
-
     def set_streaming_thought(self, text: str) -> None:
-        """Replace thought lines with new content (for cumulative streaming updates)."""
+        """Replace the current streaming thought (Live display only)."""
         self.start()
         if _prompt_role_debug.env_reasoning_astep_debug():
             now = time.monotonic()
@@ -158,13 +146,30 @@ class ReasoningDisplay:
                 _prompt_role_debug.log_reasoning_transition(
                     'reasoning.set_streaming_thought', text
                 )
-        self._thought_lines.clear()
+        self._streaming_line = text.strip()
+        self._streaming = bool(self._streaming_line)
+
+    def commit_thought(self, text: str) -> None:
+        """Append a distinct reasoning step to the committed history.
+
+        Called for AgentThinkAction / AgentThinkObservation \u2014 these represent
+        the model committing to a discrete reasoning step.  The committed
+        lines are preserved for the final assistant message.
+        """
+        self.start()
+        _prompt_role_debug.log_reasoning_transition('reasoning.commit_thought', text)
         for line in text.splitlines():
-            if stripped := line.strip():
-                self._thought_lines.append(stripped)
-        if len(self._thought_lines) > self._max_lines:
-            self._thought_lines = self._thought_lines[-self._max_lines :]
-        self._streaming = bool(self._thought_lines)
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if self._committed_lines and self._committed_lines[-1] == stripped:
+                continue  # skip consecutive duplicate
+            self._committed_lines.append(stripped)
+        if len(self._committed_lines) > self._max_lines:
+            self._committed_lines = self._committed_lines[-self._max_lines :]
+        # A committed thought ends any prior streaming run.
+        self._streaming = False
+        self._stream_wrap_width = None
 
     def update_action(self, label: str) -> None:
         self.start()
@@ -172,14 +177,14 @@ class ReasoningDisplay:
         if new != self._current_action:
             _prompt_role_debug.log_reasoning_transition('reasoning.update_action', new)
             self._current_action = new
-            # Action changes end any prior streaming run — the model is
+            # Action changes end any prior streaming run \u2014 the model is
             # committing to a next step, not still generating text.
             self._streaming = False
             self._stream_wrap_width = None
 
     def snapshot_thoughts(self) -> list[str]:
-        """Return a copy of current thought lines without clearing them."""
-        return list(self._thought_lines)
+        """Return a copy of committed thought lines without clearing them."""
+        return list(self._committed_lines)
 
     def update_cost(self, cost_usd: float) -> None:
         """Track current session cost for budget burn display."""
@@ -197,7 +202,7 @@ class ReasoningDisplay:
         supplies reasoning (streaming or snapshot lines), the strip grows to
         show the live-updating body within the renderer's line budget.
         """
-        return bool(self._thought_lines)
+        return bool(self._committed_lines or self._streaming_line)
 
     # -- rendering ---------------------------------------------------------
 
@@ -216,9 +221,6 @@ class ReasoningDisplay:
     ) -> Any:
         rows: list[Any] = []
 
-        # Thought bodies stream in the live panel when present. Callers may pass
-        # ``max_lines`` to clamp height (e.g. tests); the main agent Live layout
-        # passes ``None`` so the full CoT is shown (terminal may crop the block).
         if self.live_panel_shows_thought_rows():
             self._append_thought_rows(rows, max_width, max_lines)
 
@@ -235,29 +237,43 @@ class ReasoningDisplay:
     ) -> None:
         stable: int | None = None
         if self._streaming and max_width and max_width > _PANEL_CHROME_WIDTH + 12:
-            inner = max(
-                12, max_width - _PANEL_CHROME_WIDTH - _THOUGHT_LINE_PREFIX_CHARS
-            )
+            inner = max(12, max_width - _PANEL_CHROME_WIDTH)
             if self._stream_wrap_width is None:
                 self._stream_wrap_width = inner
             stable = self._stream_wrap_width
+
         wrapped_rows: list[str] = []
-        for line in self._thought_lines:
-            wrapped_rows.extend(
-                _thought_lines_for_display(line, max_width, stable_wrap_width=stable)
+        entry_starts: set[int] = set()
+
+        # Each committed line is its own thought entry with ``Thinking:`` on line 0.
+        for line in self._committed_lines:
+            entry_wrapped = _thought_lines_for_display(
+                line, max_width, stable_wrap_width=stable
             )
+            if entry_wrapped:
+                entry_starts.add(len(wrapped_rows))
+                wrapped_rows.extend(entry_wrapped)
+
+        # The streaming line is rendered as a separate final entry.
+        if self._streaming and self._streaming_line:
+            stream_wrapped = _thought_lines_for_display(
+                self._streaming_line, max_width, stable_wrap_width=stable
+            )
+            if stream_wrapped:
+                entry_starts.add(len(wrapped_rows))
+                wrapped_rows.extend(stream_wrapped)
 
         clipped = False
         if max_lines is not None and max_lines >= 0 and len(wrapped_rows) > max_lines:
             wrapped_rows = wrapped_rows[-max_lines:]
             clipped = True
 
-        if wrapped_rows and self._streaming:
+        if wrapped_rows and self._streaming and self._streaming_line:
             wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
 
         for idx, row in enumerate(wrapped_rows):
-            prefix = 'Thinking: ' if idx == 0 else '           '
+            prefix = 'Thinking: ' if idx in entry_starts else '           '
             rows.append(Text(prefix + row, style=CLR_THOUGHT_BODY))
 
         if clipped:
-            rows.append(Text('… showing latest thoughts', style=CLR_META))
+            rows.append(Text('\u2026 showing latest thoughts', style=CLR_META))

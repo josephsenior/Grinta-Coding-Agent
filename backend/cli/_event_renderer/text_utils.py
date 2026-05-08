@@ -43,7 +43,13 @@ def sync_reasoning_after_tool_line(
     tool_label: str,
     thought: str,
 ) -> None:
-    """Live panel: spinner + optional dim thinking text after a tool line."""
+    """Live panel: spinner + action label after a tool line.
+
+    The model's streaming thought is already visible in the Live display
+    via ``set_streaming_thought`` on every chunk.  Tool actions do NOT
+    append to the committed reasoning history — only explicit
+    ``AgentThinkAction`` / ``AgentThinkObservation`` events do.
+    """
     label = (tool_label or '').strip()
     t = (thought or '').strip()
     if not label and not t:
@@ -53,9 +59,6 @@ def sync_reasoning_after_tool_line(
     if label:
         _prompt_role_debug.log_reasoning_transition('update_action', label)
         reasoning.update_action(label)
-    if t and show_reasoning_text():
-        _prompt_role_debug.log_reasoning_transition('update_thought', t)
-        reasoning.update_thought(t)
 
 
 def normalize_reasoning_text(text: str) -> tuple[str | None, str | None]:

@@ -3105,7 +3105,7 @@ async def test_renderer_hides_working_memory_thought_payloads() -> None:
 
     assert reasoning.active
     assert 'working memory' in reasoning._current_action.lower()
-    assert reasoning._thought_lines == []
+    assert reasoning._committed_lines == []
     assert _console_output(console) == ''
 
 
@@ -3251,7 +3251,7 @@ async def test_renderer_ignores_agent_think_acknowledgement() -> None:
         AgentThinkObservation(content='Your thought has been logged.')
     )
 
-    assert reasoning._thought_lines == []
+    assert reasoning._committed_lines == []
     assert _console_output(console) == ''
 
 
@@ -3376,10 +3376,10 @@ async def test_renderer_cmd_run_shows_thought() -> None:
     action = CmdRunAction(command='npm test', thought='Checking if tests pass')
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
-    # CmdRunAction updates the reasoning panel (not console output directly)
+    # CmdRunAction only updates the action label (not committed lines)
     assert reasoning.active
     assert reasoning._current_action  # action label set in reasoning
-    assert reasoning._thought_lines  # thought was passed
+    assert reasoning._committed_lines == []  # tool thoughts are not committed
 
 
 @pytest.mark.asyncio
@@ -3522,7 +3522,7 @@ def test_reasoning_display_auto_scroll_shows_latest_lines() -> None:
     rd = ReasoningDisplay()
     rd.start()
     for i in range(1, 16):
-        rd.update_thought(f'thought {i:02d}')
+        rd.commit_thought(f'thought {i:02d}')
 
     console = _make_console(width=90)
     console.print(rd.renderable(max_width=90, max_lines=4))
@@ -3542,7 +3542,7 @@ def test_reasoning_display_has_no_redundant_ctrl_c_hint() -> None:
     """
     rd = ReasoningDisplay()
     rd.start()
-    rd.update_thought('analyzing request')
+    rd.set_streaming_thought('analyzing request')
     console = _make_console(width=90)
     console.print(rd.renderable(max_width=90))
     output = _console_output(console)
@@ -3596,7 +3596,7 @@ def test_reasoning_display_live_panel_includes_long_thought_wrapped() -> None:
     rd = ReasoningDisplay()
     rd.start()
     long_line = 'rgba(12,34,56,0.7) ' * 25
-    rd.update_thought(long_line)
+    rd.set_streaming_thought(long_line)
     console = _make_console(width=72)
     console.print(rd.renderable(max_width=72))
     output = _console_output(console)
@@ -3612,9 +3612,9 @@ async def test_reasoning_gets_generous_budget_when_alone() -> None:
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
     renderer._reasoning.start()
-    renderer._reasoning.update_thought('x ' * 80)
+    renderer._reasoning.commit_thought('x ' * 80)
     for i in range(40):
-        renderer._reasoning.update_thought(f'line {i:02d}')
+        renderer._reasoning.commit_thought(f'line {i:02d}')
 
     captured: dict[str, int | None] = {'max_lines': None}
 
@@ -3648,7 +3648,7 @@ async def test_reasoning_keeps_meaningful_budget_when_alone() -> None:
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
     renderer._reasoning.start()
-    renderer._reasoning.update_thought('thinking hard about the problem')
+    renderer._reasoning.commit_thought('thinking hard about the problem')
 
     captured: dict[str, int | None] = {'reasoning': None}
 

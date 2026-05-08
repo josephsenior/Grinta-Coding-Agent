@@ -1272,7 +1272,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         if action_label:
             self._reasoning.update_action(action_label)
         if thought and _show_reasoning_text():
-            self._reasoning.update_thought(thought)
+            self._reasoning.commit_thought(thought)
 
     def _set_task_panel(self, task_list: list[dict[str, Any]]) -> None:
         """Replace the visible task tracker panel with the latest known state."""
