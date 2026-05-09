@@ -695,7 +695,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         # Use two-column layout with sidebar on right
         if sidebar is not None:
             from rich.columns import Columns
-            yield Columns([main_content, sidebar], column_separators=True)
+            yield Columns([main_content, sidebar])
         else:
             yield main_content
 
