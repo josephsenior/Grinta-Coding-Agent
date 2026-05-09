@@ -661,7 +661,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         # prompt bar at the bottom so the input area appears to stay visible.
         # Committed transcript lines are printed via console.print immediately
         # so Rich does not clip tall turns (Live vertical_overflow ellipsis).
-        max_width = options.max_width or self._console.width
+        max_width = max(options.max_width or 0, self._console.width)
         main_width = _compute_main_width(max_width)
         sidebar_width = _compute_sidebar_width(max_width)
 
