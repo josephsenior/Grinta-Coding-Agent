@@ -359,6 +359,8 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         # not appear in the user-facing transcript.
         if getattr(obs, 'agent_only', False):
             return
+        if getattr(obs, 'notify_ui_only', False):
+            return
         self._stop_reasoning()
         self._flush_pending_tool_cards()
         self._clear_streaming_preview()
