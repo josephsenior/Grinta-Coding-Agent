@@ -692,12 +692,15 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
         main_content = Group(*body_items)
 
-        # Use two-column layout with sidebar on right
+        fake_prompt = self._render_fake_prompt(main_width)
+
         if sidebar is not None:
             from rich.columns import Columns
-            yield Columns([main_content, sidebar])
+            content_with_hud = Group(main_content, fake_prompt)
+            yield Columns([content_with_hud, sidebar])
         else:
-            yield main_content
+            content_with_hud = Group(main_content, fake_prompt)
+            yield content_with_hud
 
     def _collect_live_sections(self) -> list[Any]:
         sections: list[Any] = []
