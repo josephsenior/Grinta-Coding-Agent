@@ -119,6 +119,15 @@ from backend.cli._event_renderer.panels import (
 from backend.cli._event_renderer.panels import (
     task_panel_signature as _task_panel_signature,
 )
+from backend.cli._event_renderer.sidebar import (
+    build_sidebar as _build_sidebar,
+)
+from backend.cli._event_renderer.sidebar import (
+    compute_main_width as _compute_main_width,
+)
+from backend.cli._event_renderer.sidebar import (
+    compute_sidebar_width as _compute_sidebar_width,
+)
 from backend.cli._event_renderer.text_utils import (
     normalize_reasoning_text as _normalize_reasoning_text,
 )
@@ -328,12 +337,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
                 pass
             return
         self._live = None
-        if (
-            self._task_panel is not None
-            and self._task_panel_signature != self._last_printed_task_panel_signature
-        ):
-            self._console.print(self._task_panel)
-            self._last_printed_task_panel_signature = self._task_panel_signature
+        # Task panel is now shown in sidebar - no need to print separately
         if (
             self._delegate_panel is not None
             and self._delegate_panel_signature
@@ -657,25 +661,47 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         # prompt bar at the bottom so the input area appears to stay visible.
         # Committed transcript lines are printed via console.print immediately
         # so Rich does not clip tall turns (Live vertical_overflow ellipsis).
+        max_width = options.max_width or self._console.width
+        main_width = _compute_main_width(max_width)
+        sidebar_width = _compute_sidebar_width(max_width)
+
+        # Build task list from _task_panel_signature for sidebar
+        task_list = []
+        if self._task_panel_signature:
+            for task_id, status, desc in self._task_panel_signature:
+                task_list.append({'id': task_id, 'status': status, 'description': desc})
+
+        # Build sidebar if terminal is wide enough
+        sidebar = _build_sidebar(
+            task_list=task_list,
+            mcp_servers=None,
+            skill_count=self._hud.bundled_skill_count,
+            terminal_width=max_width,
+        )
+
+        # Collect main panel content (streaming, reasoning, delegate workers)
         live_sections: list[Any] = self._collect_live_sections()
         self._append_streaming_and_reasoning_sections(
             live_sections,
             None,
-            options.max_width,
+            main_width,
         )
         body_items = self._frame_live_sections(live_sections)
         if live_sections:
             body_items.append(spacer_live_section())
-        # Fake prompt disabled - keeping UI clean with only main chat + HUD
-        # body_items.append(
-        #     self._render_fake_prompt(options.max_width or self._console.width)
-        # )
-        yield Group(*body_items)
+
+        main_content = Group(*body_items)
+
+        # Use two-column layout with sidebar on right
+        if sidebar is not None:
+            from rich.columns import Columns
+            yield Columns([main_content, sidebar], column_separators=True)
+        else:
+            yield main_content
 
     def _collect_live_sections(self) -> list[Any]:
         sections: list[Any] = []
-        if self._task_panel is not None:
-            sections.append(self._task_panel)
+        # Task panel moved to sidebar
         if self._delegate_panel is not None:
             sections.append(self._delegate_panel)
         return sections

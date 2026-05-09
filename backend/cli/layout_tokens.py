@@ -91,3 +91,8 @@ def gap_below_live_section(renderable: Any) -> Any:
 def spacer_live_section() -> Text:
     """Single blank line between live regions when a full empty row is needed."""
     return Text('')
+
+
+# Sidebar configuration for right-side panel (Tasks, MCP, Skills)
+SIDEBAR_VISIBLE_MIN_WIDTH = 120
+SIDEBAR_WIDTH_RATIO = 0.3
