@@ -701,26 +701,11 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         self._flush_pending_tool_cards()
         # Strip PTY character-echo lines produced when the agent injects input.
         content = self._strip_pty_echo_if_pending(content)
-        if not content and not session_id and not raw.strip():
+        if not content and not raw.strip():
             return
-        n_lines = self._terminal_visible_line_count(content)
-        cap = 2000
-        truncated = len(display) > cap
         if content:
-            body = content[:cap] + '…' if truncated else content
-            self._render_terminal_panel(
-                body=body,
-                session_id=session_id,
-                n_lines=n_lines,
-                truncated=truncated,
-            )
+            self._render_terminal_panel(body=content)
             return
-        self._render_terminal_caption(
-            session_id=session_id,
-            n_lines=n_lines,
-            truncated=truncated,
-            has_new=has_new,
-        )
 
     def _strip_pty_echo_if_pending(self, content: str) -> str:
         if content and self._last_terminal_input_sent:
@@ -728,48 +713,13 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             self._last_terminal_input_sent = ''
         return content
 
-    @staticmethod
-    def _terminal_visible_line_count(content: str) -> int:
-        if not content:
-            return 0
-        return len([ln for ln in content.splitlines() if ln.strip()])
+    TERMINAL_LINE_LIMIT = 12
 
-    def _render_terminal_caption(
-        self,
-        *,
-        session_id: str,
-        n_lines: int,
-        truncated: bool,
-        has_new: bool | None,
-    ) -> None:
-        caption = _pty_output_transcript_caption(
-            session_id=session_id,
-            n_lines=n_lines,
-            truncated=truncated,
-            has_output=False,
-            has_new_output=has_new,
-        )
-        self._append_history(format_activity_result_secondary(caption, kind='neutral'))
-
-    def _render_terminal_panel(
-        self,
-        *,
-        body: str,
-        session_id: str,
-        n_lines: int,
-        truncated: bool,
-    ) -> None:
-        title_parts: list[str] = []
-        if session_id:
-            title_parts.append(session_id)
-        if n_lines:
-            title_parts.append(f'{n_lines} line{"s" if n_lines != 1 else ""}')
-        if truncated:
-            title_parts.append('truncated')
-        panel_title = Text(
-            '  ·  '.join(title_parts) if title_parts else 'output',
-            style=CLR_OUTPUT_PANEL_TITLE,
-        )
+    def _render_terminal_panel(self, *, body: str) -> None:
+        lines = body.splitlines()
+        if len(lines) > self.TERMINAL_LINE_LIMIT:
+            body = '\n'.join(lines[: self.TERMINAL_LINE_LIMIT])
+        panel_title = Text('$ ', style=CLR_OUTPUT_PANEL_TITLE)
         self._append_history(
             Padding(
                 Panel(
