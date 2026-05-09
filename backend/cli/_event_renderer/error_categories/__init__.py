@@ -64,12 +64,23 @@ NOTICE_TITLE_RULES: tuple = (
         lambda lower: any(
             s in lower
             for s in (
-                'rate limit',
-                'provider limit',
+                # Exact class names from provider SDKs / litellm
+                'ratelimiterror',
+                'serviceunavailableerror',
+                'provider limit reached',
+                # HTTP-level phrases
+                '429 too many requests',
                 'too many requests',
-                '429',
-                'quota',
-                'billing',
+                # Phrase-level only — avoids matching unrelated 'rate', 'limit', 'quota'
+                'rate limit exceeded',
+                'rate limit reached',
+                'rate limit hit',
+                'rate_limit_exceeded',
+                'quota exceeded',
+                'quota has been exceeded',
+                'insufficient_quota',
+                'billing hard limit',
+                'billing limit reached',
             )
         ),
         'Rate or quota limit',

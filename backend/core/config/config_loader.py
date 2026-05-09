@@ -35,6 +35,7 @@ from backend.core.config.env_loader import (
 )
 from backend.core.config.llm_config import LLMConfig
 from backend.core.config.model_rebuild import rebuild_config_models
+from backend.core.config.security_config import SecurityConfig
 from backend.core.constants import JWT_SECRET_FILE as JWT_SECRET
 from backend.persistence import get_file_store
 from backend.persistence.locations import get_local_data_root
@@ -351,6 +352,23 @@ def _apply_json_agent_overrides(
         _apply_json_agent_override(cfg, agent_name, filtered, json_file)
 
 
+def _apply_json_security_config(cfg: AppConfig, data: dict[str, object]) -> None:
+    security = data.get('security')
+    if not isinstance(security, dict):
+        return
+    allowed = set(SecurityConfig.model_fields)
+    filtered = {k: v for k, v in security.items() if k in allowed}
+    if not filtered:
+        return
+    try:
+        merged = {**cfg.security.model_dump(), **filtered}
+        cfg.security = SecurityConfig.model_validate(merged)
+    except Exception as exc:
+        logger.app_logger.warning(
+            'Skipping invalid security config overrides: %s', exc
+        )
+
+
 # ---------------------------------------------------------------------------
 # Config load
 # ---------------------------------------------------------------------------
@@ -377,6 +395,7 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
         _apply_json_top_level_fields(cfg, data)
         _apply_json_mcp_servers(cfg, data)
         _apply_json_agent_overrides(cfg, data, json_file)
+        _apply_json_security_config(cfg, data)
 
     finally:
         summary.emit()

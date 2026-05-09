@@ -17,11 +17,12 @@ from backend.cli.theme import (
     CLR_DECISION_BORDER,
     CLR_DRAFT_BORDER,
     CLR_THINKING_BORDER,
+    CLR_WORKER_BORDER,
 )
 
 # Symmetric horizontal inset so transcript and footer align cleanly.
-TRANSCRIPT_LEFT_INSET = 5
-TRANSCRIPT_RIGHT_INSET = 5
+TRANSCRIPT_LEFT_INSET = 4
+TRANSCRIPT_RIGHT_INSET = 4
 
 # Inner padding for rounded callout-style panels (vertical, horizontal).
 CALLOUT_PANEL_PADDING = (0, 1)
@@ -32,7 +33,7 @@ ACTIVITY_PANEL_PADDING = (0, 1)
 # Space below each activity block (tool rows) for scanability. A single blank
 # row keeps adjacent cards visually separated without making rapid tool
 # sequences feel sluggish or "loose".
-ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 0, 0)
+ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 1, 0)
 
 # Horizontal chrome added by ``format_callout_panel`` and rounded activity
 # panels: 2 border characters + ``CALLOUT_PANEL_PADDING`` horizontal cells on
@@ -52,8 +53,8 @@ DECISION_PANEL_ACCENT_STYLE = CLR_DECISION_BORDER
 
 # User-facing activity card titles (rounded panels under "Tools & commands").
 # Keep these short Title Case nouns so the transcript scans consistently.
-ACTIVITY_CARD_TITLE_FILES = 'Files'
-ACTIVITY_CARD_TITLE_TERMINAL = 'Terminal'
+ACTIVITY_CARD_TITLE_FILES = ''
+ACTIVITY_CARD_TITLE_TERMINAL = ''
 ACTIVITY_CARD_TITLE_BROWSER = 'Browser'
 ACTIVITY_CARD_TITLE_MCP = 'Connected Tool'
 ACTIVITY_CARD_TITLE_MEMORY = 'Memory'
@@ -63,6 +64,11 @@ ACTIVITY_CARD_TITLE_CHECKPOINT = 'Checkpoint'
 ACTIVITY_CARD_TITLE_SEARCH = 'Search'
 ACTIVITY_CARD_TITLE_TOOL = 'Tool'
 ACTIVITY_CARD_TITLE_SHELL = 'Shell'
+
+# Worker live-panel chrome
+WORKER_PANEL_ACCENT_STYLE = CLR_WORKER_BORDER
+WORKER_LABEL_WIDTH = 18  # fixed width for worker labels in the live table
+WORKER_TIMER_WIDTH = 8  # width for elapsed timer column
 
 
 def frame_transcript_body(renderable: Any) -> Any:

@@ -40,10 +40,37 @@ def _no_api_key_match(lower: str) -> bool:
 
 
 def _context_size_match(lower: str) -> bool:
-    """Match context window / token limit errors."""
-    return 'context' in lower and any(
-        n in lower for n in ('length', 'window', 'limit', 'too many tokens')
+    """Match context window / token limit errors.
+
+    Uses specific multi-word phrases to avoid false matches on unrelated
+    text that happens to contain 'context', 'limit', or 'token'.
+    """
+    return any(
+        s in lower
+        for s in (
+            'context length exceeded',
+            'context window exceeded',
+            'context window full',
+            'maximum context length',
+            'prompt is too long',
+            'input too large',
+            'too many tokens',
+            'too large to process',
+        )
     )
 
 
-__all__ = ['_all', '_any', '_has', '_and', '_no_api_key_match', '_context_size_match']
+def _budget_match(lower: str) -> bool:
+    """Match Grinta's own task-budget errors (not provider billing limits)."""
+    return 'budget limit reached' in lower or 'budget exceeded' in lower
+
+
+__all__ = [
+    '_all',
+    '_any',
+    '_has',
+    '_and',
+    '_no_api_key_match',
+    '_context_size_match',
+    '_budget_match',
+]

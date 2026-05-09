@@ -26,6 +26,7 @@ from backend.ledger.action import (
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import (
+    AgentThinkAction,
     ClarificationRequestAction,
     DelegateTaskAction,
     EscalateToHumanAction,
@@ -33,6 +34,8 @@ from backend.ledger.action.agent import (
     RecallAction,
     UncertaintyAction,
 )
+from backend.ledger.action.browse import BrowseInteractiveAction
+from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.message import StreamingChunkAction
 from backend.ledger.observation import (
     ErrorObservation,
@@ -65,7 +68,9 @@ def _summarize_delegate_file_action(
     event: Action | Observation,
 ) -> tuple[str, str] | None:
     if isinstance(event, FileReadAction):
-        return 'running', f'Viewed {event.path}'
+        view_range = getattr(event, 'view_range', None)
+        loc = f' L{view_range[0]}:L{view_range[1]}' if view_range and len(view_range) == 2 else ''
+        return 'running', f'Read {event.path}{loc}'
 
     if isinstance(event, FileWriteAction):
         return 'running', f'Created {event.path}'
@@ -77,7 +82,17 @@ def _summarize_delegate_file_action(
     if command == 'create_file':
         return 'running', f'Created {event.path}'
     if command == 'read_file':
-        return 'running', f'Read {event.path}'
+        region = ''
+        vr = getattr(event, 'view_range', None)
+        if vr and len(vr) == 2:
+            region = f' L{vr[0]}:L{vr[1]}'
+        return 'running', f'Read {event.path}{region}'
+    if command == 'insert_text':
+        return 'running', f'Inserted into {event.path}'
+    if command == 'write':
+        return 'running', f'Wrote {event.path}'
+    if command == 'undo_last_edit':
+        return 'running', f'Reverted {event.path}'
     return 'running', f'Edited {event.path}'
 
 
@@ -98,6 +113,69 @@ def _summarize_delegate_mcp_action(
         return None
     tool_name = getattr(event, 'name', '') or 'MCP tool'
     return 'running', f'Called {tool_name}'
+
+
+def _summarize_delegate_think_action(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    """Forward worker reasoning/thought as a progress detail."""
+    if not isinstance(event, AgentThinkAction):
+        return None
+    suppress = bool(getattr(event, 'suppress_cli', False))
+    if suppress:
+        return None
+    thought = (getattr(event, 'thought', '') or getattr(event, 'content', '') or '').strip()
+    if not thought:
+        return None
+    # Only forward first line of reasoning to keep it compact
+    first_line = thought.splitlines()[0].strip()
+    first_line = _truncate_delegate_progress(first_line, limit=80)
+    if not first_line:
+        return None
+    return 'running', first_line
+
+
+def _summarize_delegate_recall_action(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    if not isinstance(event, RecallAction):
+        return None
+    query = getattr(event, 'query', '') or ''
+    query = _truncate_delegate_progress(query, limit=60)
+    return 'running', f'Searched: {query}' if query else 'Searched context'
+
+
+def _summarize_delegate_task_tracking_action(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    if not isinstance(event, TaskTrackingAction):
+        return None
+    cmd = str(getattr(event, 'command', '') or '').strip().lower()
+    task_list = getattr(event, 'task_list', None)
+    if cmd == 'update' and isinstance(task_list, list):
+        return 'running', f'Updated {len(task_list)} task(s)'
+    return None
+
+
+def _summarize_delegate_browser_action(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    if isinstance(event, BrowserToolAction):
+        cmd = getattr(event, 'command', '') or 'browser'
+        params = getattr(event, 'params', None) or {}
+        url = params.get('url') if isinstance(params, dict) else None
+        if url:
+            return 'running', f'Browser {cmd}: {_truncate_delegate_progress(str(url), 60)}'
+        return 'running', f'Browser {cmd}'
+    if isinstance(event, BrowseInteractiveAction):
+        ba = getattr(event, 'browser_actions', '') or ''
+        import re
+        url_match = re.search(r'https?://[^\s\'")\]]+', ba)
+        if url_match:
+            url = _truncate_delegate_progress(url_match.group(0), 60)
+            return 'running', f'Browsing {url}'
+        return 'running', 'Browsing…'
+    return None
 
 
 def _summarize_delegate_finish_event(
@@ -163,6 +241,10 @@ def _summarize_delegate_worker_event(
     for summarizer in (
         _summarize_delegate_file_action,
         _summarize_delegate_command_action,
+        _summarize_delegate_think_action,
+        _summarize_delegate_recall_action,
+        _summarize_delegate_task_tracking_action,
+        _summarize_delegate_browser_action,
         _summarize_delegate_mcp_action,
         _summarize_delegate_terminal_event,
     ):

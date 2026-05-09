@@ -28,6 +28,15 @@ from backend.inference.exceptions import (
 )
 from backend.ledger import EventSource
 from backend.ledger.observation import ErrorObservation
+from backend.ledger.observation.error import (
+    ERROR_CATEGORY_AUTH,
+    ERROR_CATEGORY_CONTEXT_WINDOW,
+    ERROR_CATEGORY_MODEL_NOT_FOUND,
+    ERROR_CATEGORY_NETWORK,
+    ERROR_CATEGORY_RATE_LIMIT,
+    ERROR_CATEGORY_RUNTIME_DISCONNECTED,
+    ERROR_CATEGORY_TIMEOUT,
+)
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
@@ -149,14 +158,55 @@ class RecoveryService:
 
     def _emit_exception_observation(self, exc: Exception) -> None:
         msg, err_id, notify_ui_only = self._format_exception(exc)
+        error_category = self._error_category_for(exc)
         self._context.emit_event(
             ErrorObservation(
                 content=msg,
                 error_id=err_id,
                 notify_ui_only=notify_ui_only,
+                error_category=error_category,
             ),
             EventSource.ENVIRONMENT,
         )
+
+    @staticmethod
+    def _error_category_for(exc: Exception) -> str | None:
+        """Return a structured error category constant from the actual exception type.
+
+        This is the single authoritative place that maps exception → category.
+        The UI reads ``ErrorObservation.error_category`` directly so it never
+        needs to parse rendered error text.
+        """
+        from backend.inference.exceptions import (
+            APIConnectionError,
+            AuthenticationError,
+            ContextWindowExceededError,
+            InternalServerError,
+            NotFoundError,
+            RateLimitError,
+            ServiceUnavailableError,
+            Timeout,
+        )
+        from backend.core.errors import (
+            AgentRuntimeDisconnectedError,
+            LLMContextWindowExceedError,
+        )
+
+        if isinstance(exc, (RateLimitError, ServiceUnavailableError)):
+            return ERROR_CATEGORY_RATE_LIMIT
+        if isinstance(exc, AuthenticationError):
+            return ERROR_CATEGORY_AUTH
+        if isinstance(exc, (ContextWindowExceededError, LLMContextWindowExceedError)):
+            return ERROR_CATEGORY_CONTEXT_WINDOW
+        if isinstance(exc, Timeout):
+            return ERROR_CATEGORY_TIMEOUT
+        if isinstance(exc, (APIConnectionError, InternalServerError)):
+            return ERROR_CATEGORY_NETWORK
+        if isinstance(exc, NotFoundError):
+            return ERROR_CATEGORY_MODEL_NOT_FOUND
+        if isinstance(exc, AgentRuntimeDisconnectedError):
+            return ERROR_CATEGORY_RUNTIME_DISCONNECTED
+        return None
 
     async def _set_awaiting_user_input_if_allowed(self, controller) -> None:
         if _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
@@ -517,7 +567,15 @@ class RecoveryService:
         elif isinstance(exc, AgentRuntimeError):
             err_id = 'AGENT_RUNTIME_ERROR'
 
-        if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
+        if isinstance(exc, AuthenticationError):
+            model = getattr(exc, 'model', None) or '?'
+            provider = getattr(exc, 'llm_provider', None) or '?'
+            text = (
+                f'{exc}\n'
+                f'The LLM provider ({provider}) rejected access to model "{model}".\n'
+                f'Run /settings to update your model or API key.'
+            )
+        elif isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
             rate_kind = getattr(exc, 'kind', None)
             retry_after = getattr(exc, 'retry_after', None)
             text = _format_rate_limit_text(exc, rate_kind, retry_after)
@@ -531,6 +589,8 @@ class RecoveryService:
                 'This is a persistent state that requires a session reset or '
                 'infrastructure check. CONTROL IS RETURNED TO USER.'
             )
+        elif isinstance(exc, AuthenticationError):
+            guidance = ''
         elif isinstance(exc, _HARD_STOP_EXCEPTIONS):
             guidance = (
                 'This error requires user intervention (check credentials, model name, '
@@ -556,7 +616,9 @@ class RecoveryService:
                 'A transient error occurred on this step. The error has been recorded. '
                 'Review what went wrong, choose a different approach or tool, and continue.'
             )
-        return f'{text}\n\n{guidance}', err_id, notify_ui_only
+        if guidance:
+            text = f'{text}\n\n{guidance}'
+        return text, err_id, notify_ui_only
 
 
 def _format_rate_limit_text(exc: Exception, rate_kind, retry_after) -> str:

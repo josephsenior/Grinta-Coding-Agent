@@ -70,6 +70,8 @@ def _apply_theme_overrides() -> None:
     global CLR_THINKING_BORDER, CLR_LIVE_PANEL_BORDER, CLR_THOUGHT_BODY
     global CLR_SECTION_RULE, CLR_RISK_HIGH, CLR_RISK_MEDIUM, CLR_RISK_LOW
     global CLR_SPLASH_FIGLET, CLR_SPLASH_LOGO_ACCENT
+    global CLR_WORKER_SPINNER, CLR_WORKER_TIMER, CLR_WORKER_LABEL, CLR_WORKER_ACTION
+    global CLR_WORKER_LABEL_DONE, CLR_WORKER_LABEL_FAILED, CLR_WORKER_BORDER
     global STYLE_BOLD_DIM
 
     if preset == 'light':
@@ -295,7 +297,7 @@ STYLE_EMPTY = ''
 CLR_CARD_TITLE = 'bold #a0b9cc'  # panel title text (gray-blue)
 
 # ── Activity row text ─────────────────────────────────────────────────────────
-CLR_VERB = 'bold #94a3b8'  # action verb (muted but distinct)
+CLR_VERB = 'bold #b4c8d8'  # action verb (muted but distinct, bumped for readability)
 CLR_DETAIL = 'default'  # action detail (normal foreground)
 CLR_SECONDARY = '#8da5b6'  # secondary row (neutral, WCAG AA compliant)
 CLR_SECONDARY_OK = 'dim green'  # secondary row (success)
@@ -325,6 +327,15 @@ STYLE_DELEGATE_STARTING = 'cyan'
 STYLE_DELEGATE_RUNNING = 'yellow'
 STYLE_DELEGATE_DONE = 'green'
 STYLE_DELEGATE_FAILED = 'red'
+
+# ── Worker live-panel chrome (spinner, timer, action text) ────────────────────
+CLR_WORKER_SPINNER = '#7dd3fc'  # spinner during delegation
+CLR_WORKER_TIMER = '#8da5b6'  # worker elapsed timer
+CLR_WORKER_LABEL = 'bold #dbe7f3'  # worker name/label
+CLR_WORKER_ACTION = '#b4c4d5'  # last action / reasoning line
+CLR_WORKER_LABEL_DONE = 'bold #86efac'  # completed worker label
+CLR_WORKER_LABEL_FAILED = 'bold #fca5a5'  # failed worker label
+CLR_WORKER_BORDER = '#2a4a5a'  # worker card border (darker than main panel)
 
 # ── Reasoning / thinking chrome ────────────────────────────────────────────────
 CLR_SPINNER = '#7dd3fc'  # spinner icon
