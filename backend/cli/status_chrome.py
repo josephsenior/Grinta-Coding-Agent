@@ -7,6 +7,7 @@ idle vs agent-turn surfaces cannot drift.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from rich.console import Group
@@ -94,9 +95,9 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
     """Build fields from :class:`~backend.cli.hud.HUDState` and bundled skill count."""
     provider, model = HUDBar.describe_model(hud.model)
     if provider in _UNKNOWN_PROVIDERS:
-        model_display = model
+        model_display = f'Model: {model}'
     else:
-        model_display = f'{provider}/{model}'
+        model_display = f'Model: {provider}/{model}'
 
     ctx = HUDBar._format_tokens(hud.context_tokens)
     lim_tok = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
@@ -125,7 +126,7 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
         ledger_status=str(hud.ledger_status),
         agent_state_label=str(hud.agent_state_label or 'Ready').strip(),
         autonomy_level=str(hud.autonomy_level or 'balanced').strip().lower(),
-        workspace_path=str(getattr(hud, 'workspace_path', '') or '').strip(),
+        workspace_path=_shorten_home(str(getattr(hud, 'workspace_path', '') or '').strip()),
         condensation_count=int(getattr(hud, 'condensation_count', 0) or 0),
         token_usage_pct=0
         if hud.context_limit == 0
@@ -143,9 +144,19 @@ def autonomy_word_label(level: str) -> tuple[str, str]:
     return 'Balanced', CLR_AUTONOMY_BALANCED
 
 
+def _shorten_home(path: str) -> str:
+    """Replace the home directory prefix with ``~``."""
+    if not path:
+        return path
+    home = str(Path.home())
+    if path.lower().startswith(home.lower()):
+        return '~' + path[len(home):]
+    return path
+
+
 def autonomy_chrome_suffix(level: str) -> str:
-    """``autonomy:balanced`` style string for GRINTA row / PT."""
-    return f'autonomy:{(level or "balanced").strip().lower()}'
+    """``Autonomy: balanced`` style string for GRINTA row / PT."""
+    return f'Autonomy: {(level or "balanced").strip().lower()}'
 
 
 def ledger_icon(ledger_status: str) -> str:
