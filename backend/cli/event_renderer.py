@@ -712,17 +712,22 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         stream_max_lines: int | None,
         max_width: int,
     ) -> Any | None:
+        from rich.text import Text
+        from backend.cli.theme import CLR_THOUGHT_BODY
+
         reasoning_section: Any | None = None
         if self._reasoning.active:
-            # Do not cap thought rows in the Live strip: show the full CoT so
-            # users are not limited to a trailing viewport (tall panels may be
-            # cropped by the terminal / Rich ``vertical_overflow='crop'``).
             reasoning_section = self._reasoning.renderable(
                 max_width=max_width,
                 max_lines=None,
             )
             if reasoning_section is not None:
                 live_sections.append(reasoning_section)
+
+        if self._streaming_accumulated:
+            streaming_text = Text(self._streaming_accumulated, style=CLR_THOUGHT_BODY)
+            live_sections.append(streaming_text)
+
         return reasoning_section
 
     @staticmethod
