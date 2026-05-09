@@ -113,8 +113,9 @@ def test_launch_entry_runs_real_cli_session_via_subprocess(tmp_path: Path) -> No
     )
 
     assert result.returncode == 0, result.stderr or result.stdout
-    # New table-based help shows "Slash Commands" title
-    assert 'Slash Commands' in result.stdout or 'Input shortcuts' in result.stdout
+    # Help table — title "Slash Commands" wraps across two lines in Rich panel
+    assert 'Slash' in result.stdout
+    assert 'Commands' in result.stdout
     assert 'Quit grinta' in result.stdout
 
 
