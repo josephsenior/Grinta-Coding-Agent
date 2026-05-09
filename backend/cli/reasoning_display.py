@@ -272,8 +272,8 @@ class ReasoningDisplay:
             wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
 
         for idx, row in enumerate(wrapped_rows):
-            prefix = 'Thinking: ' if idx in entry_starts else '           '
-            rows.append(Text(prefix + row, style=CLR_THOUGHT_BODY))
+            prefix = '  '  # Cleaner indent — no "Thinking:" label crowding the line
+            rows.append(Text(f'{prefix}{row}', style=CLR_THOUGHT_BODY))
 
         if clipped:
             rows.append(Text('\u2026 showing latest thoughts', style=CLR_META))

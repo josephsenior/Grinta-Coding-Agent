@@ -53,7 +53,9 @@ def get_theme_preset() -> str:
     return 'default'
 
 
-_THEME_PRESETS = frozenset({'default', 'dark', 'light', 'high-contrast', 'ocean', 'mono'})
+_THEME_PRESETS = frozenset(
+    {'default', 'dark', 'light', 'high-contrast', 'ocean', 'mono'}
+)
 
 
 def _apply_theme_overrides() -> None:
@@ -248,27 +250,27 @@ def accessible_mode_enabled() -> bool:
 HUD_BG = 'grey15'  # HUD footer background
 
 # ── Separators & borders ───────────────────────────────────────────────────────
-CLR_SEP = '#7da4c4'  # · bullet separator and lightweight dividers (WCAG AA compliant)
-CLR_CARD_BORDER = '#5a7f95'  # rounded card / panel border (blue-gray)
+# Refined blue-grey tones — slightly warmer than before for a more premium feel.
+CLR_SEP = '#6d8fa8'  # · bullet separator and lightweight dividers
+CLR_CARD_BORDER = '#4a7a95'  # rounded card / panel border (slightly richer blue-grey)
 
 # ── HUD display text ──────────────────────────────────────────────────────────
 CLR_HUD_MODEL = 'bold #dbe7f3'  # model name (bright)
 CLR_HUD_DETAIL = '#b4c4d5'  # tokens, cost, calls (secondary)
-CLR_META = '#8da5b6'  # subdued metadata, timers, helper text (WCAG AA compliant)
-CLR_MUTED_TEXT = '#94a3b8'  # long-form secondary labels / values
-CLR_BRAND = 'bold #7dd3fc'  # GRINTA wordmark / active spinner hue
-CLR_BRAND_HUE = '#7dd3fc'  # brand cyan without bold modifier
+CLR_META = '#8da5b6'  # subdued metadata, timers, helper text
+CLR_MUTED_TEXT = '#7894a8'  # long-form secondary labels / values
+# Brand — warmer, more vibrant teal for a premium standout.
+CLR_BRAND = 'bold #2dd4bf'  # GRINTA wordmark / active spinner hue
+CLR_BRAND_HUE = '#2dd4bf'  # brand teal without bold modifier
 
 # ── Status semantic colors (HUD ledger / footer badges) ──────────────────────
-CLR_STATUS_OK = '#8fdfb1'  # Healthy / Ready (green)
-CLR_STATUS_WARN = '#fcd34d'  # Review / Paused (yellow)
-CLR_STATUS_ERR = '#fca5a5'  # Error (red-pink)
+# Brighter, more saturated for better at-a-glance recognition.
+CLR_STATUS_OK = '#34d399'  # Healthy / Ready (emerald)
+CLR_STATUS_WARN = '#fbbf24'  # Review / Paused (amber)
+CLR_STATUS_ERR = '#f87171'  # Error (coral red)
 
 # ── Result tones (paired body/icon hues for activity rows + tone panels) ─────
-# Body tones live inside panels and stay readable on dark terminals; icon
-# tones are reserved for the leading glyph or badge so the eye can pick the
-# state out at a glance without making whole sentences shout.
-CLR_OK_BODY = '#86efac'  # success body text
+CLR_OK_BODY = '#6ee7b7'  # success body text
 CLR_OK_ICON = 'bold #10b981'  # success icon / accent
 CLR_ERR_BODY = '#fca5a5'  # error body text
 CLR_ERR_ICON = 'bold #ef4444'  # error icon / accent
@@ -278,7 +280,6 @@ CLR_INFO_BODY = '#93c5fd'  # info body text
 CLR_INFO_ICON = 'bold #38bdf8'  # info icon / accent
 
 # ── Shared UI markers (keep iconography consistent) ───────────────────────────
-# One canonical set used across transcript cards and prompt affordances.
 MARK_OK = '✓'
 MARK_ERR = '✗'
 MARK_WARN = '⚠'
@@ -297,9 +298,9 @@ STYLE_EMPTY = ''
 CLR_CARD_TITLE = 'bold #a0b9cc'  # panel title text (gray-blue)
 
 # ── Activity row text ─────────────────────────────────────────────────────────
-CLR_VERB = 'bold #b4c8d8'  # action verb (muted but distinct, bumped for readability)
+CLR_VERB = 'bold #b4c8d8'  # action verb (muted but distinct)
 CLR_DETAIL = 'default'  # action detail (normal foreground)
-CLR_SECONDARY = '#8da5b6'  # secondary row (neutral, WCAG AA compliant)
+CLR_SECONDARY = '#8da5b6'  # secondary row (neutral)
 CLR_SECONDARY_OK = 'dim green'  # secondary row (success)
 CLR_SECONDARY_ERR = 'dim red'  # secondary row (error)
 
@@ -310,7 +311,7 @@ CLR_DIFF_ADD_DIM = 'dim green'  # apply_patch +N delta (secondary line)
 CLR_DIFF_REM_DIM = 'dim red'  # apply_patch -N delta
 
 # ── Inline Rich markup (prefer these over raw [red] / [green] in prose) ───────
-MSG_STYLE_SUCCESS_MARK = 'bold #8fdfb1'  # short ✓ success flashes (onboarding)
+MSG_STYLE_SUCCESS_MARK = 'bold #34d399'  # short ✓ success flashes (onboarding)
 MSG_STYLE_PROVIDER_HINT = 'cyan'  # provider name in onboarding lines
 
 # ── System message tags (panels / notices) ────────────────────────────────────
@@ -329,35 +330,31 @@ STYLE_DELEGATE_DONE = 'green'
 STYLE_DELEGATE_FAILED = 'red'
 
 # ── Worker live-panel chrome (spinner, timer, action text) ────────────────────
-CLR_WORKER_SPINNER = '#7dd3fc'  # spinner during delegation
+CLR_WORKER_SPINNER = '#2dd4bf'  # spinner during delegation (matches brand)
 CLR_WORKER_TIMER = '#8da5b6'  # worker elapsed timer
 CLR_WORKER_LABEL = 'bold #dbe7f3'  # worker name/label
 CLR_WORKER_ACTION = '#b4c4d5'  # last action / reasoning line
-CLR_WORKER_LABEL_DONE = 'bold #86efac'  # completed worker label
+CLR_WORKER_LABEL_DONE = 'bold #6ee7b7'  # completed worker label
 CLR_WORKER_LABEL_FAILED = 'bold #fca5a5'  # failed worker label
 CLR_WORKER_BORDER = '#2a4a5a'  # worker card border (darker than main panel)
 
 # ── Reasoning / thinking chrome ────────────────────────────────────────────────
-CLR_SPINNER = '#7dd3fc'  # spinner icon
+CLR_SPINNER = '#2dd4bf'  # spinner icon (matches brand)
 CLR_ACTION = 'bold #dbe7f3'  # current action label text
-CLR_THINKING_BORDER = '#587487'  # reasoning / live panel border accent
-# Live Rich block only (MINIMAL panel frame) — softer than transcript cards.
-CLR_LIVE_PANEL_BORDER = '#2a3a4a'
-# Live Thinking + flushed reasoning snapshot: very dim light-gray so agent
-# responses stand out more. Using neutral gray (not blue) to avoid
-# visual confusion with action labels and status elements.
-# Significantly muted (low luminance) to de-emphasize internal
-# monologue vs. visible output.
-CLR_THOUGHT_BODY = '#5a6777'
+CLR_THINKING_BORDER = '#4a7a95'  # reasoning / live panel border accent (warmer)
+CLR_LIVE_PANEL_BORDER = '#1e3a4f'  # Live Rich block only — slightly deeper
+CLR_THOUGHT_BODY = (
+    '#5a7a8a'  # Live Thinking + flushed reasoning snapshot (warmer grey-blue)
+)
 CLR_REASONING_SNAP = CLR_THOUGHT_BODY  # legacy alias; keep in sync
-CLR_DRAFT_BORDER = '#6b8ea4'  # draft reply preview border accent
-CLR_DECISION_BORDER = '#c4a35a'  # approval / question / options accent
-CLR_USER_BORDER = 'dim cyan'  # user message panel border
-CLR_STATE_RUNNING = '#93c5fd bold'  # running / active state badge
-CLR_AUTONOMY_BALANCED = '#8bd8ff'  # balanced autonomy tag
-CLR_AUTONOMY_FULL = '#f1bf63 bold'  # full autonomy tag
+CLR_DRAFT_BORDER = '#5a8ea4'  # draft reply preview border accent (teal tint)
+CLR_DECISION_BORDER = '#c4a35a'  # approval / question / options accent (amber)
+CLR_USER_BORDER = 'dim #2dd4bf'  # user message panel border (brand-aligned dim)
+CLR_STATE_RUNNING = '#2dd4bf bold'  # running / active state badge (brand color)
+CLR_AUTONOMY_BALANCED = '#5eead4'  # balanced autonomy tag
+CLR_AUTONOMY_FULL = '#fbbf24 bold'  # full autonomy tag (amber)
 CLR_AUTONOMY_CONSERVATIVE = (
-    '#f0a3ff bold'  # conservative autonomy (confirm every action)
+    '#c084fc bold'  # conservative autonomy (confirm every action) — purple
 )
 
 # ── Section divider ────────────────────────────────────────────────────────────
@@ -370,12 +367,9 @@ CLR_RISK_LOW = 'green'
 CLR_RISK_ASK = 'yellow'
 
 # ── Decision callouts (questions, options, escalations) ──────────────────────
-# Question text and option labels live inside DECISION-bordered panels, so
-# the body tones must harmonise with that amber accent rather than drift to
-# raw ``yellow`` (which read as warnings) or stark white.
 CLR_QUESTION_TEXT = '#e6c674'  # question / escalation prose body
 CLR_OPTION_TEXT = '#e2e8f0'  # neutral option label body
-CLR_OPTION_RECOMMENDED = '#f1bf63'  # recommended option marker
+CLR_OPTION_RECOMMENDED = '#fbbf24'  # recommended option marker
 
 # ── Secondary panels (terminal output, recovery notice) ──────────────────────
 CLR_OUTPUT_PANEL_BORDER = '#1e3a4a'  # nested terminal output panel
@@ -383,30 +377,30 @@ CLR_OUTPUT_PANEL_TITLE = 'dim #9ca3af'  # nested panel title (session id, lines)
 
 # ── Reasoning / activity rule chrome ─────────────────────────────────────────
 CLR_REASONING_COMMITTED = CLR_THOUGHT_BODY  # transcript snapshot (same as live body)
-CLR_TURN_RULE = 'dim #6d8596'  # "Activity" rule above first tool row
+CLR_TURN_RULE = 'dim #5a7a8a'  # "Activity" rule above first tool row
 CLR_RECOVERY_HINT = 'cyan'  # "Next steps" headline body in recovery notice
 CLR_RECOVERY_HINT_DIM = 'dim cyan'  # recovery body / numbered steps
 
 # ── Splash branding ──────────────────────────────────────────────────────────
-CLR_SPLASH_LOGO_ACCENT = 'red'  # logo block art (intentional brand mark)
-CLR_SPLASH_FIGLET = 'bold red'  # large GRINTA wordmark on the splash
+CLR_SPLASH_LOGO_ACCENT = '#2dd4bf'  # logo block art (brand teal)
+CLR_SPLASH_FIGLET = 'bold #2dd4bf'  # large GRINTA wordmark on the splash (was red)
 
 # ── prompt_toolkit (``Style.from_dict``) — keep in sync with Rich tokens above ---
 PT_DEFAULT_FG = '#e6eef7'
 PT_PLACEHOLDER_DIM = '#5d7286'
 PT_FOOTER_BADGE_BRACKET = '#0e7490'
-PT_FOOTER_BADGE_CORE = 'bold #22d3ee'
+PT_FOOTER_BADGE_CORE = 'bold #2dd4bf'
 PT_FOOTER_KICKER = 'bold #a5f3fc'
 PT_FOOTER_WARN_BRACKET = '#a16207'
-PT_FOOTER_WARN_CORE = 'bold #facc15'
+PT_FOOTER_WARN_CORE = 'bold #fbbf24'
 PT_FOOTER_WARN_KICKER = 'bold #fde68a'
 PT_FOOTER_WARN_SEP = '#92400e'
-PT_COMPLETION_MENU_BG = 'bg:#0d1f30 #b8c7d8'
-PT_COMPLETION_MENU_CURRENT = 'bg:#1e4976 bold #ffffff'
-PT_COMPLETION_META_BG = 'bg:#0a1929 #5c7fa0'
-PT_COMPLETION_META_CURRENT = 'bg:#163350 #93c5fd'
-PT_SCROLLBAR_BG = 'bg:#0d1f30'
-PT_SCROLLBAR_BUTTON = 'bg:#1e4976'
+PT_COMPLETION_MENU_BG = 'bg:#0a1a2a #b8c7d8'
+PT_COMPLETION_MENU_CURRENT = 'bg:#0d3d5c bold #ffffff'
+PT_COMPLETION_META_BG = 'bg:#061520 #5c7fa0'
+PT_COMPLETION_META_CURRENT = 'bg:#0a2a4a #2dd4bf'
+PT_SCROLLBAR_BG = 'bg:#0a1a2a'
+PT_SCROLLBAR_BUTTON = 'bg:#0d3d5c'
 
 
 # Apply theme preset overrides after all constants are defined.
