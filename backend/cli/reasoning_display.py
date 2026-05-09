@@ -23,7 +23,7 @@ from rich.text import Text
 from backend.cli.layout_tokens import (
     CALLOUT_PANEL_CHROME_WIDTH,
 )
-from backend.cli.theme import CLR_META, CLR_THOUGHT_BODY
+from backend.cli.theme import CLR_AUTONOMY_BALANCED, CLR_META, CLR_THOUGHT_BODY
 from backend.engine import prompt_role_debug as _prompt_role_debug
 
 # Panel chrome overhead: live ``MINIMAL`` frame + horizontal padding from
@@ -271,8 +271,13 @@ class ReasoningDisplay:
         if wrapped_rows and self._streaming and self._streaming_line:
             wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
 
+        sorted_starts = sorted(entry_starts)
+        entry_idx = 0
         for idx, row in enumerate(wrapped_rows):
-            prefix = '  '  # Cleaner indent — no "Thinking:" label crowding the line
+            if entry_idx < len(sorted_starts) and idx == sorted_starts[entry_idx]:
+                rows.append(Text('Thinking:', style=f'bold {CLR_AUTONOMY_BALANCED}'))
+                entry_idx += 1
+            prefix = '  '
             rows.append(Text(f'{prefix}{row}', style=CLR_THOUGHT_BODY))
 
         if clipped:
