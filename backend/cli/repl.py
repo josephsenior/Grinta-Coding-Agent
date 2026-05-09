@@ -25,11 +25,13 @@ from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.status_chrome import (
     STATUS_CHROME_COMPACT_WIDTH,
+    _token_progress_bar,
     autonomy_chrome_suffix,
     pt_compact_line_plain,
     pt_stats_row1_fragments,
     pt_stats_row2_fragments,
     status_fields_from_hud,
+    workspace_path_display_max,
 )
 from backend.cli.theme import CLR_STATUS_ERR, mark_prompt, prompt_toolkit_style_dict
 from backend.core.config import (
@@ -1243,7 +1245,12 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
         if is_idle:
             # Compact single line when idle
-            add('class:prompt.dim', 'GRINTA')
+            if fields.workspace_path:
+                ws_budget = workspace_path_display_max(width)
+                ws_display = HUDBar.ellipsize_path(fields.workspace_path, ws_budget)
+                add('class:prompt.value', ws_display)
+                add('class:prompt.sep', '  ·  ')
+            add('class:prompt.value', fields.agent_state_label)
             add('class:prompt.sep', '  ·  ')
             add(
                 self._prompt_autonomy_style(),
@@ -1252,7 +1259,14 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             add('class:prompt.sep', '  ·  ')
             add('class:prompt.model', fields.model_display)
             add('class:prompt.sep', '  ·  ')
-            add('class:prompt.value', fields.token_display_compact)
+            has_limit = '/' in fields.token_display_compact
+            if has_limit:
+                add(
+                    'class:prompt.value',
+                    f'{_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
+                )
+            else:
+                add('class:prompt.value', fields.token_display_compact)
             if fields.cost_usd > 0:
                 add('class:prompt.sep', '  ·  ')
                 add('class:prompt.value', f'${fields.cost_usd:.3f}')

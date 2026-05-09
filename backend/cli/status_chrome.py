@@ -474,7 +474,9 @@ def pt_stats_row2_fragments(
             ('class:prompt.sep', sep),
             (
                 'class:prompt.value',
-                f'Tokens: {_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
+                f'Tokens: {_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}'
+                if '/' in fields.token_display_compact
+                else f'Tokens: {fields.token_display_compact}',
             ),
             ('class:prompt.sep', sep),
             ('class:prompt.value', f'Cost: ${fields.cost_usd:.3f}'),
