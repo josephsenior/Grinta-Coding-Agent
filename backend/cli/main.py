@@ -332,23 +332,27 @@ def show_grinta_splash(
 
 
 def _compact_splash(console: Any) -> None:
-    """Print a 3-line condensed splash for returning users."""
+    """Print a cleaner compact splash for returning users."""
     from rich.align import Align
     from rich.text import Text
 
-    from backend.cli.theme import CLR_BRAND, STYLE_DIM, STYLE_ITALIC_DIM
+    from backend.cli.theme import CLR_BRAND, CLR_HUD_MODEL, STYLE_DIM
 
-    text = Text()
-    text.append('  ⚡ ', style=CLR_BRAND)
-    text.append('GRINTA', style=f'bold {CLR_BRAND}')
-    text.append('  —  ', style=STYLE_DIM)
-    text.append('AI coding agent for the terminal.', style=STYLE_ITALIC_DIM)
     console.print()
-    console.print(Align.center(text))
+    console.print(
+        Align.center(Text('GRINTA', style=CLR_BRAND))
+    )
+    console.print()
+    console.print(
+        Align.center(
+            Text('AI coding agent for the terminal.', style=CLR_HUD_MODEL)
+        )
+    )
+    console.print()
     console.print(
         Align.center(
             Text(
-                'Describe a task · /help · /settings · /sessions · /quit to leave',
+                'Describe a task  ·  /help  ·  /sessions  ·  /quit',
                 style=STYLE_DIM,
             )
         )
