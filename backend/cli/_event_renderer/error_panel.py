@@ -50,7 +50,6 @@ from backend.cli.theme import (
 )
 from backend.ledger.observation.error import (
     ERROR_CATEGORY_AUTH,
-    ERROR_CATEGORY_CONTEXT_WINDOW,
     ERROR_CATEGORY_MODEL_NOT_FOUND,
     ERROR_CATEGORY_NETWORK,
     ERROR_CATEGORY_RATE_LIMIT,
@@ -59,19 +58,22 @@ from backend.ledger.observation.error import (
 )
 
 # Categories that should be rendered as calm notices rather than red errors.
-_NOTICE_CATEGORIES: frozenset[str] = frozenset({
-    ERROR_CATEGORY_RATE_LIMIT,
-    ERROR_CATEGORY_TIMEOUT,
-    ERROR_CATEGORY_NETWORK,
-})
+_NOTICE_CATEGORIES: frozenset[str] = frozenset(
+    {
+        ERROR_CATEGORY_RATE_LIMIT,
+        ERROR_CATEGORY_TIMEOUT,
+        ERROR_CATEGORY_NETWORK,
+    }
+)
 
 # Categories that are hard failures — always red, never a notice.
-_CRITICAL_CATEGORIES: frozenset[str] = frozenset({
-    ERROR_CATEGORY_AUTH,
-    ERROR_CATEGORY_MODEL_NOT_FOUND,
-    ERROR_CATEGORY_RUNTIME_DISCONNECTED,
-})
-
+_CRITICAL_CATEGORIES: frozenset[str] = frozenset(
+    {
+        ERROR_CATEGORY_AUTH,
+        ERROR_CATEGORY_MODEL_NOT_FOUND,
+        ERROR_CATEGORY_RUNTIME_DISCONNECTED,
+    }
+)
 
 
 @dataclass(frozen=True)

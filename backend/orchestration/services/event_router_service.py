@@ -69,7 +69,11 @@ def _summarize_delegate_file_action(
 ) -> tuple[str, str] | None:
     if isinstance(event, FileReadAction):
         view_range = getattr(event, 'view_range', None)
-        loc = f' L{view_range[0]}:L{view_range[1]}' if view_range and len(view_range) == 2 else ''
+        loc = (
+            f' L{view_range[0]}:L{view_range[1]}'
+            if view_range and len(view_range) == 2
+            else ''
+        )
         return 'running', f'Read {event.path}{loc}'
 
     if isinstance(event, FileWriteAction):
@@ -124,7 +128,9 @@ def _summarize_delegate_think_action(
     suppress = bool(getattr(event, 'suppress_cli', False))
     if suppress:
         return None
-    thought = (getattr(event, 'thought', '') or getattr(event, 'content', '') or '').strip()
+    thought = (
+        getattr(event, 'thought', '') or getattr(event, 'content', '') or ''
+    ).strip()
     if not thought:
         return None
     # Only forward first line of reasoning to keep it compact
@@ -165,11 +171,15 @@ def _summarize_delegate_browser_action(
         params = getattr(event, 'params', None) or {}
         url = params.get('url') if isinstance(params, dict) else None
         if url:
-            return 'running', f'Browser {cmd}: {_truncate_delegate_progress(str(url), 60)}'
+            return (
+                'running',
+                f'Browser {cmd}: {_truncate_delegate_progress(str(url), 60)}',
+            )
         return 'running', f'Browser {cmd}'
     if isinstance(event, BrowseInteractiveAction):
         ba = getattr(event, 'browser_actions', '') or ''
         import re
+
         url_match = re.search(r'https?://[^\s\'")\]]+', ba)
         if url_match:
             url = _truncate_delegate_progress(url_match.group(0), 60)

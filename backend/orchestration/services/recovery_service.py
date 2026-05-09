@@ -177,6 +177,10 @@ class RecoveryService:
         The UI reads ``ErrorObservation.error_category`` directly so it never
         needs to parse rendered error text.
         """
+        from backend.core.errors import (
+            AgentRuntimeDisconnectedError,
+            LLMContextWindowExceedError,
+        )
         from backend.inference.exceptions import (
             APIConnectionError,
             AuthenticationError,
@@ -186,10 +190,6 @@ class RecoveryService:
             RateLimitError,
             ServiceUnavailableError,
             Timeout,
-        )
-        from backend.core.errors import (
-            AgentRuntimeDisconnectedError,
-            LLMContextWindowExceedError,
         )
 
         if isinstance(exc, (RateLimitError, ServiceUnavailableError)):

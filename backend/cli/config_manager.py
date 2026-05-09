@@ -236,6 +236,7 @@ def run_onboarding() -> AppConfig:
     _console.print()
     try:
         from backend import get_version
+
         version = get_version()
     except Exception:
         version = ''

@@ -28,8 +28,6 @@ from backend.cli.status_chrome import (
     _token_progress_bar,
     autonomy_chrome_suffix,
     pt_compact_line_plain,
-    pt_stats_row1_fragments,
-    pt_stats_row2_fragments,
     status_fields_from_hud,
     workspace_path_display_max,
 )

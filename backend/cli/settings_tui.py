@@ -154,8 +154,14 @@ def _render_ai_tab(console: Console) -> None:
     provider, model = HUDBar.describe_model(config.get_llm_config().model)
     table.add_row('Provider', provider, '')
     table.add_row('Model', model, Text('[m] change', style=f'dim {CLR_BRAND}'))
-    table.add_row('API Key', get_masked_api_key(config), Text('[k] change', style=f'dim {CLR_BRAND}'))
-    table.add_row('Budget/task', get_budget(config), Text('[b] change', style=f'dim {CLR_BRAND}'))
+    table.add_row(
+        'API Key',
+        get_masked_api_key(config),
+        Text('[k] change', style=f'dim {CLR_BRAND}'),
+    )
+    table.add_row(
+        'Budget/task', get_budget(config), Text('[b] change', style=f'dim {CLR_BRAND}')
+    )
     icons = 'on' if get_cli_tool_icons_enabled(config) else 'off'
     table.add_row('Tool icons', icons, Text('[i] toggle', style=f'dim {CLR_BRAND}'))
 

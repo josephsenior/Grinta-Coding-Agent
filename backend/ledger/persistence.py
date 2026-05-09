@@ -175,9 +175,7 @@ class EventPersistence:
         if self._sqlite_store is not None:
             try:
                 self._sqlite_store.write_event(event_id, payload)
-                self._record_persist_success(
-                    event_id, is_critical=False, mode='sqlite'
-                )
+                self._record_persist_success(event_id, is_critical=False, mode='sqlite')
                 return
             except Exception as exc:
                 logger.warning(

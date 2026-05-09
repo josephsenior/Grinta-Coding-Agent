@@ -248,9 +248,7 @@ class TestShutdown:
         store = _make_file_store()
         block_writer = threading.Event()
         store.write.side_effect = (
-            lambda fn, _: block_writer.wait()
-            if not fn.endswith('.pending')
-            else None
+            lambda fn, _: block_writer.wait() if not fn.endswith('.pending') else None
         )
         writer = DurableEventWriter(store, max_queue_size=4, put_timeout=0.05)
         writer.start()

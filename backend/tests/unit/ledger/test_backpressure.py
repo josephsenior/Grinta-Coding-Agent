@@ -125,7 +125,8 @@ class TestDropOldest:
     @pytest.mark.asyncio
     async def test_drop_oldest_after_queue_drained_not_lost(self):
         """Simulate race: queue was full at check-time, consumer drained it
-        before _try_drop_oldest_and_put ran. The event must still be enqueued."""
+        before _try_drop_oldest_and_put ran. The event must still be enqueued.
+        """
         bp = BackpressureManager(max_queue_size=3, drop_policy='drop_oldest')
         q: asyncio.Queue = _make_queue(maxsize=3)
         for i in range(3):
@@ -206,6 +207,7 @@ class TestCriticalEvents:
         await bp.enqueue_event(_make_event(1), q)
         await bp.enqueue_event(_make_event(2), q)
         assert q.qsize() == 2
+
         # Critical event should still get through — consumer frees a slot
         async def consume():
             await asyncio.sleep(0.01)

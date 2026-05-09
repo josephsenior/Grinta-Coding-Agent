@@ -8,8 +8,6 @@ Classes:
 
 from __future__ import annotations
 
-import dataclasses
-
 from dataclasses import dataclass, field
 from typing import ClassVar
 
@@ -41,6 +39,7 @@ class Action(Event, metaclass=CanonicalMeta):
     security_risk: ActionSecurityRisk = field(
         default=ActionSecurityRisk.LOW, init=False
     )
+
     def __post_init__(self) -> None:
         # Ensure confirmation_state always has a value (idempotent with field default)
         if not hasattr(self, 'confirmation_state'):

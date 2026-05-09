@@ -2803,7 +2803,12 @@ async def test_renderer_preserves_retry_label_on_rate_limited_state_change() -> 
         StatusObservation(
             content='Auto-recovering · 1/3 in 5s · Timeout',
             status_type='retry_pending',
-            extras={'attempt': 1, 'max_attempts': 3, 'delay_seconds': 5.0, 'reason': 'Timeout'},
+            extras={
+                'attempt': 1,
+                'max_attempts': 3,
+                'delay_seconds': 5.0,
+                'reason': 'Timeout',
+            },
         )
     )
     await renderer.handle_event(

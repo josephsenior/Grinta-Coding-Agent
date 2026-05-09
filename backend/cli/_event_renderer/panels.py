@@ -194,7 +194,9 @@ def _worker_elapsed(worker: dict[str, Any]) -> Text:
     if status in ('done', 'failed'):
         finished_at = worker.get('finished_at')
         if finished_at is not None:
-            elapsed = max(0, int(finished_at - (worker.get('started_at') or finished_at)))
+            elapsed = max(
+                0, int(finished_at - (worker.get('started_at') or finished_at))
+            )
     if elapsed < 60:
         label = f'{elapsed}s'
     elif elapsed < 3600:

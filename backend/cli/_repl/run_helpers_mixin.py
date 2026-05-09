@@ -238,9 +238,7 @@ class RunHelpersMixin:
         try:
             await _setup_mcp_tools(agent, self._runtime, self._memory)
         except Exception as exc:
-            logger.warning(
-                'MCP warmup failed after chat became ready', exc_info=True
-            )
+            logger.warning('MCP warmup failed after chat became ready', exc_info=True)
             self._hud.update_mcp_servers(0)
             err_msg = f'MCP warmup failed: {exc}'
             self._bootstrap_status(err_msg, session, renderer, kind='warning')
@@ -250,6 +248,7 @@ class RunHelpersMixin:
         from backend.integrations.mcp.mcp_bootstrap_status import (
             get_mcp_bootstrap_status,
         )
+
         status = get_mcp_bootstrap_status()
         client_count = int(status.get('connected_client_count', 0))
         errors = status.get('conversion_errors', []) or []

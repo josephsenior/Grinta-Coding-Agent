@@ -38,9 +38,6 @@ from backend.cli._event_renderer.apply_patch import (
 from backend.cli._event_renderer.constants import (
     BROWSER_TOOL_COMMANDS as _BROWSER_TOOL_COMMANDS,
 )
-from backend.cli._event_renderer.constants import (
-    DIRECTORY_VIEW_PREFIX as _DIRECTORY_VIEW_PREFIX,
-)
 from backend.cli._event_renderer.delegate import (
     summarize_delegate_observation as _summarize_delegate_observation,
 )
@@ -427,7 +424,9 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         # Use the structured category set by RecoveryService at the exception
         # site — no text matching needed for typed provider/runtime errors.
         error_category = getattr(obs, 'error_category', None)
-        use_notice = _use_recoverable_notice_style(error_content, error_category=error_category)
+        use_notice = _use_recoverable_notice_style(
+            error_content, error_category=error_category
+        )
         if use_notice:
             last_notice_content = getattr(self, '_last_notice_error_content', None)
             if (
@@ -451,7 +450,6 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         # state).  Ledger HUD is driven by AgentStateChangedObservation.
         if not use_notice:
             self._hud.update_ledger('Error')
-
 
     def _render_user_reject_observation(self, obs: UserRejectObservation) -> None:
         self._flush_pending_tool_cards()
@@ -540,7 +538,11 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             last_action = detail
 
         action_count = (previous or {}).get('action_count', 0)
-        if status == 'running' and detail and detail != (previous or {}).get('last_action', ''):
+        if (
+            status == 'running'
+            and detail
+            and detail != (previous or {}).get('last_action', '')
+        ):
             action_count += 1
 
         return {
@@ -874,7 +876,8 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         pending = cast(Any, self._take_pending_activity_card('delegate'))
         workers_data = getattr(self, '_delegate_workers', {}) or {}
         result_message, result_kind, extra_lines = _summarize_delegate_observation(
-            obs, workers_data=workers_data,
+            obs,
+            workers_data=workers_data,
         )
         if pending is not None:
             self._render_pending_activity_card(

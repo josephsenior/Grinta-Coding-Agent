@@ -6,7 +6,6 @@ from typing import ClassVar
 from backend.core.schemas import ObservationType
 from backend.ledger.observation.observation import Observation
 
-
 # Structured error categories set at the source (RecoveryService) so the UI
 # never needs to guess the error type from rendered text.
 ERROR_CATEGORY_RATE_LIMIT = 'rate_limit'

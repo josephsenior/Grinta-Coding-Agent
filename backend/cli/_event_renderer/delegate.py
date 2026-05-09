@@ -24,11 +24,14 @@ from backend.ledger.action import DelegateTaskAction
 from backend.ledger.observation import DelegateTaskObservation
 
 
-def _worker_elapsed_str(started_at: float | None, finished_at: float | None = None) -> str:
+def _worker_elapsed_str(
+    started_at: float | None, finished_at: float | None = None
+) -> str:
     """Format elapsed time as a short string like '12s' or '1m30s'."""
     if started_at is None:
         return ''
     import time
+
     end = finished_at if finished_at is not None else time.monotonic()
     elapsed = max(0, int(end - started_at))
     if elapsed < 60:
@@ -147,9 +150,14 @@ def _worker_summary_lines(
                 info.get('started_at'),
                 info.get('finished_at'),
             )
-            extra_lines.append(_format_worker_result_line(
-                label, w_status, action_count, elapsed,
-            ))
+            extra_lines.append(
+                _format_worker_result_line(
+                    label,
+                    w_status,
+                    action_count,
+                    elapsed,
+                )
+            )
     else:
         # Fallback to the old behavior when no worker data available
         for status, label in worker_statuses[:3]:
@@ -205,7 +213,8 @@ def summarize_delegate_observation(
     worker_statuses = _parse_worker_statuses(lines)
     if worker_statuses:
         return _worker_summary_lines(
-            worker_statuses, error,
+            worker_statuses,
+            error,
             workers_data=workers_data,
             sorted_workers=sorted_workers,
         )
@@ -222,7 +231,8 @@ def summarize_delegate_observation(
             statuses.append((w_status, label))
         if statuses:
             return _worker_summary_lines(
-                statuses, error,
+                statuses,
+                error,
                 workers_data=workers_data,
                 sorted_workers=sorted_workers,
             )
