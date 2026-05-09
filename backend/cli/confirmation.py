@@ -25,6 +25,7 @@ from backend.cli.theme import (
     STYLE_BOLD_DIM,
     STYLE_DEFAULT,
     STYLE_DIM,
+    STYLE_EMPTY,
 )
 from backend.core.enums import ActionSecurityRisk, AgentState
 from backend.ledger.action import (
@@ -122,7 +123,7 @@ def render_confirmation(
             WarningPanel(
                 'This action can modify your system or environment.\n'
                 'Type [bold]yes[/bold] to confirm, or [bold]n[/bold] to reject.',
-                title='[bold red]⚠  REQUIRES APPROVAL[/bold red]',
+                title='[bold #f87171]⚠  REQUIRES APPROVAL[/bold #f87171]',
                 title_align='left',
                 border_style=CLR_RISK_HIGH,
                 box=box.HEAVY,
@@ -135,7 +136,7 @@ def render_confirmation(
         header_style=STYLE_BOLD_DIM,
         border_style=CLR_CARD_BORDER,
         show_lines=False,
-        box=box.ROUNDED,
+        box=box.SIMPLE,
         pad_edge=False,
     )
     table.add_column('Target', style=STYLE_DIM, no_wrap=True, overflow='fold')
@@ -148,9 +149,9 @@ def render_confirmation(
         Text(risk_text, style=risk_style),
     )
 
-    # Risk badge in the title gives an at-a-glance signal even when the row
-    # is scrolled out of focus on small terminals.
+    # Cleaner title with risk badge
     title = Text()
+    title.append('  ', style=STYLE_EMPTY)
     title.append('Approve this action  ', style=STYLE_BOLD)
     title.append(f' {risk_text} ', style=f'reverse {risk_style}')
 
@@ -181,7 +182,6 @@ def render_confirmation(
         )
 
     if is_high_risk:
-        # HIGH risk requires typing "yes" in full — no single-key approval.
         hint = Text('  ')
         hint.append('[yes]', style=f'bold {CLR_RISK_HIGH}')
         hint.append(' approve  ', style=CLR_META)
@@ -232,7 +232,9 @@ def render_confirmation(
     if answer == 'a':
         return ConfirmationDecision(approved=True, remember=True)
     if answer == 'd':
-        return ConfirmationDecision(approved=True, remember=False, suppress_low_risk=True)
+        return ConfirmationDecision(
+            approved=True, remember=False, suppress_low_risk=True
+        )
     return ConfirmationDecision(approved=answer == 'y', remember=False)
 
 

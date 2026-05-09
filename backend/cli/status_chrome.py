@@ -126,7 +126,9 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
         ledger_status=str(hud.ledger_status),
         agent_state_label=str(hud.agent_state_label or 'Ready').strip(),
         autonomy_level=str(hud.autonomy_level or 'balanced').strip().lower(),
-        workspace_path=_shorten_home(str(getattr(hud, 'workspace_path', '') or '').strip()),
+        workspace_path=_shorten_home(
+            str(getattr(hud, 'workspace_path', '') or '').strip()
+        ),
         condensation_count=int(getattr(hud, 'condensation_count', 0) or 0),
         token_usage_pct=0
         if hud.context_limit == 0
@@ -150,7 +152,7 @@ def _shorten_home(path: str) -> str:
         return path
     home = str(Path.home())
     if path.lower().startswith(home.lower()):
-        return '~' + path[len(home):]
+        return '~' + path[len(home) :]
     return path
 
 
@@ -202,22 +204,25 @@ def ledger_fake_prompt_style(ledger_status: str) -> str:
 
 
 def _token_progress_bar(pct: int, width: int = 8) -> str:
-    """Generate a token usage progress bar.
+    """Generate a token usage progress bar with a smoother gradient look.
+
+    Uses filled blocks (█) and light blocks (░) for a modern, premium feel
+    instead of the previous `=------` ASCII style.
 
     Args:
         pct: Percentage (0-100)
         width: Number of bar characters
 
     Returns:
-        Progress bar string like '#####-- 65%'
+        Progress bar string like ████░░░░ 65%
     """
     if pct <= 0:
-        return f'[{"-" * width}] 0%'
+        return f'[{"░" * width}] 0%'
     if pct >= 100:
-        return f'[{pct}%]'  # Show 100% without bar to save space
+        return '[100%]'  # Show 100% without bar to save space
     filled = pct * width // 100
     empty = width - filled
-    return f'[{"=" * filled}{"-" * empty}] {pct}%'
+    return f'[{"█" * filled}{"░" * empty}] {pct}%'
 
 
 def rich_compact_hud_line(
@@ -226,7 +231,7 @@ def rich_compact_hud_line(
     *,
     term_width: int | None = None,
 ) -> Text:
-    """Single-line Rich HUD: workspace, autonomy, model, tokens, cost, calls, MCP, skills, icon.
+    """Single-line Rich HUD: workspace, model, tokens, cost, calls, MCP, skills, state.
 
     Args:
         fields: StatusFields from HUD
@@ -234,7 +239,7 @@ def rich_compact_hud_line(
         term_width: Terminal column count for path ellipsis (None → no truncation)
     """
     if minimal:
-        # Minimal mode: just model, tokens, cost, state
+        # Minimal mode: just model, tokens, cost, state — cleaner than before
         parts: list[tuple[str, str]] = []
         if fields.model_display and fields.model_display != '(not set)/(not set)':
             parts.append((fields.model_display, CLR_HUD_MODEL))
@@ -255,61 +260,74 @@ def rich_compact_hud_line(
             txt.append(content, style=style)
         return txt
 
-    # Full mode - all the information
+    # Full mode — grouped with subtle separators for a premium feel
     auto_lbl, auto_style = autonomy_word_label(fields.autonomy_level)
-    group_sep = ('  │  ', CLR_SEP)
-    item_sep = (' · ', CLR_SEP)
 
-    parts: list[tuple[str, str]] = [
-        (' ', ''),
-    ]
+    parts: list[tuple[str, str]] = []
+
+    # Brand prefix
+    parts.append((' GRINTA ', CLR_BRAND))
+    parts.append((' ', ''))
 
     if fields.workspace_path:
         ws_budget = workspace_path_display_max(term_width or 80)
         ws_display = HUDBar.ellipsize_path(fields.workspace_path, ws_budget)
         parts.append((ws_display, CLR_HUD_DETAIL))
         parts.append((' ', ''))
-        parts.append(group_sep)
 
-    parts.extend([
-        (fields.agent_state_label, ledger_rich_style(fields.ledger_status)),
-        (' ', ''),
-        group_sep,
-        (auto_lbl, auto_style),
-        (' ', ''),
-        (fields.model_display, CLR_HUD_MODEL),
-        item_sep,
-    ])
+    # Separator
+    parts.append((' ▸ ', CLR_SEP))
 
-    # Show a progress bar only when context limit is known.
+    # State + autonomy
+    parts.append((fields.agent_state_label, ledger_rich_style(fields.ledger_status)))
+    parts.append((' ', ''))
+    parts.append((' { ', CLR_SEP))
+    parts.append((auto_lbl, auto_style))
+    parts.append((' }', CLR_SEP))
+
+    # Model
+    parts.append(('  ', ''))
+    parts.append((fields.model_display, CLR_HUD_MODEL))
+    parts.append((' ', ''))
+
+    # Separator
+    parts.append((' ▸ ', CLR_SEP))
+
+    # Tokens with progress bar
     has_limit = '/' in fields.token_display_compact
     if has_limit:
-        parts.append((
-            f'{_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
-            CLR_HUD_DETAIL,
-        ))
+        parts.append(
+            (
+                f'{_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
+                CLR_HUD_DETAIL,
+            )
+        )
     else:
         parts.append((fields.token_display_compact, CLR_HUD_DETAIL))
 
-    parts.extend([
-        group_sep,
-        (f'Cost: ${fields.cost_usd:.3f}', CLR_HUD_DETAIL),
-        item_sep,
-        (f'Calls: {fields.llm_calls}', CLR_HUD_DETAIL),
-        group_sep,
-        (f'MCP: {fields.mcp_short}', CLR_HUD_DETAIL),
-        item_sep,
-        (f'Skills: {fields.skills_short}', CLR_HUD_DETAIL),
-    ])
+    # Cost & calls
+    parts.append((' ▸ ', CLR_SEP))
+    parts.append((f'Cost: ${fields.cost_usd:.3f}', CLR_HUD_DETAIL))
+
+    parts.append(('  ', ''))
+    parts.append((f'{fields.llm_calls}c', CLR_HUD_DETAIL))
+
+    # MCP & skills
+    parts.append(('  ', ''))
+    parts.append((f'MCP:{fields.mcp_short}', CLR_HUD_DETAIL))
+    parts.append(('  ', ''))
+    parts.append((f'Skills:{fields.skills_short}', CLR_HUD_DETAIL))
 
     if fields.condensation_count > 0:
-        parts.append(group_sep)
+        parts.append(('  ', ''))
         parts.append((f'💧 {fields.condensation_count}x', CLR_HUD_DETAIL))
 
-    parts.append(group_sep)
+    # Ledger state icon
+    parts.append(('  ', ''))
     parts.append(
         (ledger_icon(fields.ledger_status), ledger_rich_style(fields.ledger_status))
     )
+
     txt = Text()
     for content, style in parts:
         txt.append(content, style=style)
@@ -453,13 +471,9 @@ def pt_stats_row2_fragments(
     width: int,
     *,
     ledger_style: str,
-    sep: str = '  \u2022  ',
+    sep: str = '  •  ',
 ) -> list[tuple[str, str]]:
-    """Telemetry row with optional wrap (matches previous Repl behavior).
-
-    MCP/skills stay on HUD / Live chrome; the prompt toolbar stays compact with
-    ledger + calls only after provider/model/tokens/cost (see Repl comment).
-    """
+    """Telemetry row with optional wrap (matches previous Repl behavior)."""
     ws_raw = fields.workspace_path
     base: list[tuple[str, str]] = []
     if ws_raw:

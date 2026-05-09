@@ -2,8 +2,6 @@
 
 Activity rows use a **primary** line (verb + short detail) and an optional **secondary**
 line in dim styles (results, stats) to reduce clutter versus separate ``>`` / outcome rows.
-
-Legacy ``> label`` helpers remain for tests and any code that still prints a single row.
 """
 
 from __future__ import annotations
@@ -18,8 +16,6 @@ from rich.text import Text
 
 from backend.cli.layout_tokens import (
     ACTIVITY_CARD_TITLE_STYLE,
-    ACTIVITY_CARD_TITLE_TERMINAL,
-    ACTIVITY_SECTION_TITLE,
     CALLOUT_PANEL_PADDING,
 )
 from backend.cli.path_links import linkify_plain
@@ -47,7 +43,6 @@ from backend.cli.theme import (
 )
 
 # Stripped from user-visible transcripts (still present on stored observations for the LLM).
-# Handles well-formed closers and streaming/unclosed fragments (``.*?`` then ``\Z``).
 _APP_RESULT_VALIDATION_RE = re.compile(
     r'\s*<APP_RESULT_VALIDATION\b[^>]*>.*?(?:</APP_RESULT_VALIDATION>|\Z)',
     re.DOTALL | re.IGNORECASE,
@@ -60,26 +55,23 @@ def strip_tool_result_validation_annotations(text: str) -> str:
 
 
 _GROUND_PREFIX = '    > '
-# Primary row layout: ``<2-space indent><bold verb><2-space gap><detail>``
-# Secondary/result rows: ``<4-space indent><icon><space><text>``
-_ACTIVITY_PRIMARY_INDENT = '  '
+# Primary row layout with tighter indent and better visual hierarchy.
+_ACTIVITY_PRIMARY_INDENT = ' '
 _ACTIVITY_GAP = '  '
 _ACTIVITY_SECONDARY_INDENT = '    '
-_ACTIVITY_RESULT_INDENT = '    '
+_ACTIVITY_RESULT_INDENT = '      '
 
 
 def format_activity_primary(verb: str, detail: str | Text) -> Text:
-    """Bold verb + detail on one line.
+    """Bold verb + detail on one line with a clean visual prefix.
 
-    Uses ``  Verb  detail`` layout — no fixed-width verb column so it
-    reads naturally in proportionally-spaced terminals. Plain-string
-    *detail* is linkified for ``file://`` and workspace paths so
-    terminals can open them via OSC-8 hyperlinks.
+    Uses a `▸` prefix for a modern, premium feel instead of the previous
+    bare indent — making the activity flow easier to scan at a glance.
     """
-    from backend.cli.theme import CLR_VERB
+    from backend.cli.theme import CLR_SEP, CLR_VERB
 
     line = Text()
-    line.append(_ACTIVITY_PRIMARY_INDENT, style=STYLE_EMPTY)
+    line.append('▸ ', style=f'dim {CLR_SEP}')
     line.append((verb or 'Did').strip(), style=CLR_VERB)
     if isinstance(detail, Text):
         if detail.plain.strip():
@@ -215,6 +207,7 @@ def format_activity_block(
 def format_activity_turn_header() -> Text:
     """Section heading before the first tool/shell row each agent turn."""
     from rich.rule import Rule
+
     return Rule(style=f'dim {CLR_TURN_RULE}')
 
 
@@ -222,30 +215,19 @@ _REASONING_SENTENCE_ENDERS = ('.', '!', '?', ':', ';', '"', "'", ')', ']', '…'
 
 
 def format_reasoning_snapshot(lines: list[str]) -> Group:
-    """Transcript block for reasoning that finished (after the live panel closes).
-
-    Models frequently emit a few tokens of preamble ("Let me check the file…",
-    "I'll build it as a single HTML page…") and then switch to a tool call
-    mid-thought. The CLI flushes whatever reasoning has accumulated when the
-    action fires, which can leave the last committed line dangling without
-    terminal punctuation — reading like a truncation bug.
-
-    To make the UX read as intentional rather than broken, we append a single
-    ``…`` to the final line when it doesn't already end in a
-    sentence-terminator. The ellipsis is visually consistent with the
-    streaming-cursor indicator and signals "the model continued into an
-    action" rather than "text was lost".
-    """
+    """Transcript block for reasoning that finished (after the live panel closes)."""
     cleaned = [ln.strip() for ln in lines if (ln or '').strip()]
     if not cleaned:
         return Group()
     last = cleaned[-1]
     if last and not last.endswith(_REASONING_SENTENCE_ENDERS):
         cleaned[-1] = f'{last}…'
-    # Same blue-gray roman style as the live Thinking body (see ``CLR_THOUGHT_BODY``)
-    # so post-turn snapshots match what streamed, without italic fade-out.
-    # Indent consistently with card secondary lines.
-    return Group(*[Text(f'{_ACTIVITY_RESULT_INDENT}{line}', style=CLR_REASONING_COMMITTED) for line in cleaned])
+    return Group(
+        *[
+            Text(f'{_ACTIVITY_RESULT_INDENT}{line}', style=CLR_REASONING_COMMITTED)
+            for line in cleaned
+        ]
+    )
 
 
 def format_activity_shell_block(
@@ -259,15 +241,7 @@ def format_activity_shell_block(
     extra_lines: list[Any] | None = None,
     title: str | None = None,
 ) -> Any:
-    """Rounded Terminal card — same visual style as other tool cards.
-
-    The default ``title`` is ``Terminal`` so plain shell commands render as
-    before. Internal tools (apply_patch, analyze_project_structure, …) carry
-    a friendlier title derived from their ``tool_call_metadata.function_name``
-    via :func:`backend.cli.tool_call_display.tool_headline`; the renderer
-    forwards that title here so the user sees e.g. ``Apply patch`` instead
-    of a generic ``Terminal`` header for tool-authored commands.
-    """
+    """Shell command activity block — same visual style as other tool cards."""
     return format_activity_block(
         verb,
         detail,
@@ -311,11 +285,7 @@ def format_live_panel(
     accent_style: str,
     padding: tuple[int, int] | None = None,
 ) -> Panel:
-    """Chrome for the Rich ``Live`` block: minimal frame, subdued border.
-
-    Stacked draft / thinking / task strips stay readable without the visual
-    weight of rounded transcript callouts (:func:`format_callout_panel`).
-    """
+    """Chrome for the Rich ``Live`` block: minimal frame, subdued border."""
     panel_title = Text((title or '').strip(), style=f'bold {accent_style}')
     return Panel(
         body,

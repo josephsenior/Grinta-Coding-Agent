@@ -488,7 +488,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         body = Text((text or '').rstrip(), style=STYLE_DEFAULT)
         panel = Panel(
             Padding(body, CALLOUT_PANEL_PADDING),
-            title=Text('You', style=STYLE_BOLD_DIM),
+            title=Text('  You  ', style=STYLE_BOLD_DIM),
             title_align='left',
             box=box.ROUNDED,
             border_style=CLR_USER_BORDER,
@@ -1306,16 +1306,15 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         if not self._delegate_workers:
             return
         running = sum(
-            1 for w in self._delegate_workers.values()
+            1
+            for w in self._delegate_workers.values()
             if w.get('status') in ('running', 'starting')
         )
         done = sum(
-            1 for w in self._delegate_workers.values()
-            if w.get('status') == 'done'
+            1 for w in self._delegate_workers.values() if w.get('status') == 'done'
         )
         failed = sum(
-            1 for w in self._delegate_workers.values()
-            if w.get('status') == 'failed'
+            1 for w in self._delegate_workers.values() if w.get('status') == 'failed'
         )
         total = len(self._delegate_workers)
 
@@ -1329,9 +1328,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
         status_text = ', '.join(parts) if parts else f'{total} worker(s)'
         self._ensure_reasoning()
-        self._reasoning.commit_thought(
-            f'Waiting for {total} worker(s) · {status_text}'
-        )
+        self._reasoning.commit_thought(f'Waiting for {total} worker(s) · {status_text}')
 
     def _reset_delegate_panel(self, *, batch_id: int | None) -> None:
         """Start a fresh delegated-worker panel for a new delegation batch."""

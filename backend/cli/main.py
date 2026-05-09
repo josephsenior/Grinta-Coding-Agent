@@ -217,15 +217,15 @@ def _configure_redirected_streams(*streams: object | None) -> None:
 
 
 _GRINTA_LOGO_LINES: tuple[str, ...] = (
-    r'  [red]▄▄████████████████████████████████▄▄[/red]  ',
-    r'[red]▄██████████████████████████████████████▄[/red]',
-    r'[red]▀▀▀▀▀▀▀██████████████████████████▀▀▀▀▀▀▀[/red]',
-    r'       [red]███[/red][black]▄▄▄▄▄[/black][red]████████████[/red][black]▄▄▄▄▄[/black][red]███[/red]       ',
-    r'       [red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red][black]▄[/black][red]████[/red][black]▄[/black][red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red]       ',
-    r'       [red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red][black]▀▄▄▄▄▀[/black][red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red]       ',
-    r'       [red]███[/red][black]▀▀▀▀▀[/black][red]████████████[/red][black]▀▀▀▀▀[/black][red]███[/red]       ',
-    r'     [red]▄████████████████████████████▄[/red]     ',
-    r'   [red]▄████████████████████████████████▄[/red]   ',
+    r'  [#2dd4bf]▄▄████████████████████████████████▄▄[/#2dd4bf]  ',
+    r'[#2dd4bf]▄██████████████████████████████████████▄[/#2dd4bf]',
+    r'[#2dd4bf]▀▀▀▀▀▀▀██████████████████████████▀▀▀▀▀▀▀[/#2dd4bf]',
+    r'       [#2dd4bf]███[/#2dd4bf][black]▄▄▄▄▄[/black][#2dd4bf]████████████[/#2dd4bf][black]▄▄▄▄▄[/black][#2dd4bf]███[/#2dd4bf]       ',
+    r'       [#2dd4bf]███[/#2dd4bf][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][#2dd4bf]███[/#2dd4bf][black]▄[/black][#2dd4bf]████[/#2dd4bf][black]▄[/black][#2dd4bf]███[/#2dd4bf][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][#2dd4bf]███[/#2dd4bf]       ',
+    r'       [#2dd4bf]███[/#2dd4bf][black]█[/black][black on white]   [/black on white][black]█[/black][#2dd4bf]███[/#2dd4bf][black]▀▄▄▄▄▀[/black][#2dd4bf]███[/#2dd4bf][black]█[/black][black on white]   [/black on white][black]█[/black][#2dd4bf]███[/#2dd4bf]       ',
+    r'       [#2dd4bf]███[/#2dd4bf][black]▀▀▀▀▀[/black][#2dd4bf]████████████[/#2dd4bf][black]▀▀▀▀▀[/black][#2dd4bf]███[/#2dd4bf]       ',
+    r'     [#2dd4bf]▄████████████████████████████▄[/#2dd4bf]     ',
+    r'   [#2dd4bf]▄████████████████████████████████▄[/#2dd4bf]   ',
     r'                                        ',
 )
 
@@ -267,12 +267,11 @@ def _build_splash_lines() -> list[Any]:
 def _is_returning_user() -> bool:
     """Check if the user has run grinta before (history file exists)."""
     from backend.cli.repl import _HISTORY_FILE
+
     return _HISTORY_FILE.exists()
 
 
-def show_grinta_splash(
-    console: Any | None = None, *, compact: bool = False
-) -> None:
+def show_grinta_splash(console: Any | None = None, *, compact: bool = False) -> None:
     """Render the GRINTA boot splash with ASCII text inside panel.
 
     Parameters
@@ -289,7 +288,7 @@ def show_grinta_splash(
     from rich.text import Text
 
     console = console or Console()
-    from backend.cli.theme import STYLE_DIM, STYLE_ITALIC_DIM
+    from backend.cli.theme import CLR_BRAND, STYLE_DIM, STYLE_ITALIC_DIM
 
     _D = STYLE_DIM
 
@@ -318,8 +317,8 @@ def show_grinta_splash(
         )
         panel = Panel(
             content,
-            title='[bold dim] >_ [/]',
-            border_style=_D,
+            title='[bold #2dd4bf] ~ [/]',
+            border_style=CLR_BRAND,
             box=ROUNDED,
             padding=(1, 4),
         )
@@ -339,14 +338,10 @@ def _compact_splash(console: Any) -> None:
     from backend.cli.theme import CLR_BRAND, CLR_HUD_MODEL, STYLE_DIM
 
     console.print()
-    console.print(
-        Align.center(Text('GRINTA', style=CLR_BRAND))
-    )
+    console.print(Align.center(Text('GRINTA', style=CLR_BRAND)))
     console.print()
     console.print(
-        Align.center(
-            Text('AI coding agent for the terminal.', style=CLR_HUD_MODEL)
-        )
+        Align.center(Text('AI coding agent for the terminal.', style=CLR_HUD_MODEL))
     )
     console.print()
     console.print(
@@ -441,6 +436,7 @@ async def _async_main(
     if theme:
         os.environ['GRINTA_THEME'] = theme
         from backend.cli.theme import set_theme_preset
+
         set_theme_preset(theme)
     if verbose:
         os.environ['GRINTA_VERBOSE'] = '1'
