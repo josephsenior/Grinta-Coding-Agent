@@ -261,14 +261,26 @@ def rich_compact_hud_line(
         parts.append(group_sep)
 
     parts.extend([
+        (fields.agent_state_label, ledger_rich_style(fields.ledger_status)),
+        (' ', ''),
+        group_sep,
         (auto_lbl, auto_style),
         (' ', ''),
         (fields.model_display, CLR_HUD_MODEL),
         item_sep,
-        (
+    ])
+
+    # Show a progress bar only when context limit is known.
+    has_limit = '/' in fields.token_display_compact
+    if has_limit:
+        parts.append((
             f'{_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
             CLR_HUD_DETAIL,
-        ),
+        ))
+    else:
+        parts.append((fields.token_display_compact, CLR_HUD_DETAIL))
+
+    parts.extend([
         group_sep,
         (f'Cost: ${fields.cost_usd:.3f}', CLR_HUD_DETAIL),
         item_sep,
