@@ -1154,7 +1154,9 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         """Sync agent/autonomy labels into the HUD, then return telemetry dict."""
         hud = self._hud.state
         state_label = self._prompt_state_label()
-        self._hud.update_agent_state(state_label)
+        current_label = (hud.agent_state_label or '').strip()
+        if not current_label.startswith(('Backoff', 'Retrying')):
+            self._hud.update_agent_state(state_label)
         ac = (
             getattr(self._controller, 'autonomy_controller', None)
             if self._controller is not None
@@ -1219,16 +1221,15 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         return f' {controls}\n {telemetry} '
 
     def _prompt_bottom_toolbar(self) -> Any:
-        """Context-aware status under the input; no filled backgrounds (terminal default).
+        """Single-line status under the input; no filled backgrounds (terminal default).
 
-        - **Idle** (Ready): single compact line
-        - **Running**: full two-line display with all stats
-        - **Needs approval**: full display with prominent state badge
+        Always compact — state label reflects the current agent state (Ready,
+        Running, Backoff N/5 …) so the user always sees status without layout
+        churn.
         """
         width = shutil.get_terminal_size((110, 24)).columns
         self._prompt_panel_data()
         fields = status_fields_from_hud(self._hud.state, self._hud.bundled_skill_count)
-        is_idle = fields.agent_state_label.strip().lower() == 'ready'
 
         fragments: list[tuple[str, str]] = []
 
@@ -1243,54 +1244,31 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             self._append_footer_system_fragments(fragments, add)
             return fragments
 
-        if is_idle:
-            # Compact single line when idle
-            if fields.workspace_path:
-                ws_budget = workspace_path_display_max(width)
-                ws_display = HUDBar.ellipsize_path(fields.workspace_path, ws_budget)
-                add('class:prompt.value', ws_display)
-                add('class:prompt.sep', '  ·  ')
-            add('class:prompt.value', fields.agent_state_label)
+        if fields.workspace_path:
+            ws_budget = workspace_path_display_max(width)
+            ws_display = HUDBar.ellipsize_path(fields.workspace_path, ws_budget)
+            add('class:prompt.value', ws_display)
             add('class:prompt.sep', '  ·  ')
+        add('class:prompt.value', fields.agent_state_label)
+        add('class:prompt.sep', '  ·  ')
+        add(
+            self._prompt_autonomy_style(),
+            autonomy_chrome_suffix(fields.autonomy_level),
+        )
+        add('class:prompt.sep', '  ·  ')
+        add('class:prompt.model', fields.model_display)
+        add('class:prompt.sep', '  ·  ')
+        has_limit = '/' in fields.token_display_compact
+        if has_limit:
             add(
-                self._prompt_autonomy_style(),
-                autonomy_chrome_suffix(fields.autonomy_level),
+                'class:prompt.value',
+                f'{_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
             )
+        else:
+            add('class:prompt.value', fields.token_display_compact)
+        if fields.cost_usd > 0:
             add('class:prompt.sep', '  ·  ')
-            add('class:prompt.model', fields.model_display)
-            add('class:prompt.sep', '  ·  ')
-            has_limit = '/' in fields.token_display_compact
-            if has_limit:
-                add(
-                    'class:prompt.value',
-                    f'{_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
-                )
-            else:
-                add('class:prompt.value', fields.token_display_compact)
-            if fields.cost_usd > 0:
-                add('class:prompt.sep', '  ·  ')
-                add('class:prompt.value', f'${fields.cost_usd:.3f}')
-            self._append_footer_system_fragments(fragments, add)
-            return fragments
-
-        # Full two-line display when agent is active
-        add('class:prompt.dim', '\u2500' * width)
-        add('', '\n')
-        fragments.extend(
-            pt_stats_row1_fragments(
-                fields,
-                self._prompt_state_style(),
-                self._prompt_autonomy_style(),
-            )
-        )
-        add('', '\n')
-        fragments.extend(
-            pt_stats_row2_fragments(
-                fields,
-                width=width,
-                ledger_style=self._prompt_ledger_style(fields.ledger_status),
-            )
-        )
+            add('class:prompt.value', f'${fields.cost_usd:.3f}')
         self._append_footer_system_fragments(fragments, add)
         return fragments
 

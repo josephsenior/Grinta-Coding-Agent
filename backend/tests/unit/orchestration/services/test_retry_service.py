@@ -196,7 +196,7 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(event.status_type, 'retry_pending')
         self.assertEqual(event.extras['attempt'], 1)
         self.assertEqual(event.extras['max_attempts'], 3)
-        self.assertIn('auto-recovering', event.content.lower())
+        self.assertEqual(event.content, '')
 
     @patch('backend.orchestration.services.retry_service.get_retry_queue')
     async def test_schedule_retry_rate_limit_error_longer_delay(self, mock_get_queue):
@@ -260,7 +260,7 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(event, StatusObservation)
         self.assertEqual(event.status_type, 'retry_pending')
         self.assertEqual(event.extras['attempt'], 2)
-        self.assertIn('2/5', event.content)
+        self.assertEqual(event.content, '')
 
     @patch('backend.orchestration.services.retry_service.get_retry_queue')
     async def test_schedule_retry_returns_false_after_max_attempts(
@@ -422,7 +422,7 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(event.status_type, 'retry_resuming')
         self.assertEqual(event.extras['attempt'], 2)
         self.assertEqual(event.extras['max_attempts'], 5)
-        self.assertIn('2/5', event.content)
+        self.assertEqual(event.content, '')
 
         # Should set state to running
         self.mock_controller.set_agent_state_to.assert_called_once()

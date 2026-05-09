@@ -335,6 +335,8 @@ class ContextMemory:
         """Track error observation as anchor if substantive. Returns True if handled."""
         if not isinstance(event, ErrorObservation):
             return False
+        if getattr(event, 'notify_ui_only', False):
+            return False
         error_text = (event.content or '').strip()
         if len(error_text) < 12:
             return False
@@ -420,6 +422,8 @@ class ContextMemory:
         self, event: Event
     ) -> tuple[str, str, str, dict[str, Any]] | None:
         if not isinstance(event, ErrorObservation):
+            return None
+        if getattr(event, 'notify_ui_only', False):
             return None
         content = (event.content or '').strip()
         if not content:

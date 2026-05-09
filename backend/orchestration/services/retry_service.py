@@ -214,7 +214,7 @@ class RetryService:
             metadata['pending_action'] = ToolTelemetry.action_to_dict(
                 controller._pending_action
             )
-        initial_delay = self._compute_initial_delay(exc, queue)
+        initial_delay = self._compute_initial_delay(exc, queue, attempt=next_attempt - 1)
 
         task = await queue.schedule(
             controller_id=controller.id or '',
@@ -231,16 +231,12 @@ class RetryService:
         # budget so recovery overhead doesn't burn into the task runway.
         self._compensate_iterations_for_connection_error(exc)
 
-        human_message = (
-            f'Auto-recovering · {next_attempt}/{task.max_attempts} in '
-            f'{self._format_retry_delay(initial_delay)} · {type(exc).__name__}'
-        )
         controller.state.set_last_error(
             f'{type(exc).__name__}: retry scheduled', source='RetryService'
         )
         self._emit_retry_status(
             status_type='retry_pending',
-            content=human_message,
+            content='',
             extras={
                 'attempt': next_attempt,
                 'max_attempts': task.max_attempts,
@@ -480,10 +476,9 @@ class RetryService:
     def _emit_retry_resume_status(
         self, task: RetryTask, *, retry_reason: str, attempt: int
     ) -> None:
-        message = f'Resuming · {attempt}/{task.max_attempts} · {retry_reason}'
         self._emit_retry_status(
             status_type='retry_resuming',
-            content=message,
+            content='',
             extras={
                 'attempt': attempt,
                 'max_attempts': task.max_attempts,

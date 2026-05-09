@@ -2780,9 +2780,10 @@ async def test_renderer_shows_retry_pending_status_in_hud() -> None:
     )
 
     output = _console_output(console)
-    assert 'auto-recovering' in output.lower()
+    assert 'Backoff' in hud.state.agent_state_label
     assert hud.state.ledger_status == 'Backoff'
-    assert hud.state.agent_state_label.startswith('Auto Retry 1/3')
+    assert hud.state.agent_state_label.startswith('Backoff 1/3')
+    assert 'status ·' not in output
 
 
 @pytest.mark.asyncio
@@ -2802,7 +2803,7 @@ async def test_renderer_preserves_retry_label_on_rate_limited_state_change() -> 
         StatusObservation(
             content='Auto-recovering · 1/3 in 5s · Timeout',
             status_type='retry_pending',
-            extras={'attempt': 1, 'max_attempts': 3, 'reason': 'Timeout'},
+            extras={'attempt': 1, 'max_attempts': 3, 'delay_seconds': 5.0, 'reason': 'Timeout'},
         )
     )
     await renderer.handle_event(
@@ -2810,7 +2811,7 @@ async def test_renderer_preserves_retry_label_on_rate_limited_state_change() -> 
     )
 
     assert hud.state.ledger_status == 'Backoff'
-    assert hud.state.agent_state_label.startswith('Auto Retry 1/3')
+    assert hud.state.agent_state_label.startswith('Backoff 1/3')
 
 
 @pytest.mark.asyncio
@@ -2831,7 +2832,7 @@ async def test_renderer_dedupes_identical_retry_status_lines() -> None:
     await renderer.handle_event(obs)
 
     output = _console_output(console)
-    assert output.count('status · Auto-recovering') == 1
+    assert 'status' not in output or output.count('status ·') == 0
 
 
 @pytest.mark.asyncio
