@@ -227,8 +227,8 @@ def build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
     """
     table = Table.grid(expand=True, padding=(0, 1))
     table.add_column(width=3)  # spinner / status icon
-    table.add_column(width=WORKER_LABEL_WIDTH, min=8)  # worker label
-    table.add_column(width=WORKER_TIMER_WIDTH, min=6)  # elapsed timer
+    table.add_column(width=WORKER_LABEL_WIDTH)  # worker label
+    table.add_column(width=WORKER_TIMER_WIDTH)  # elapsed timer
     table.add_column(ratio=1)  # action / detail text
 
     if not workers:

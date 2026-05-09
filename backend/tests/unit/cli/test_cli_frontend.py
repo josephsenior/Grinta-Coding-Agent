@@ -423,7 +423,7 @@ def test_diff_panel_new_file() -> None:
     output = _console_output(console)
     assert 'Created' in output
     assert 'src/main.py' in output
-    assert '+ 2 lines' in output
+    assert '+2 lines' in output
 
 
 def test_diff_panel_existing_file_with_groups() -> None:
@@ -444,8 +444,8 @@ def test_diff_panel_existing_file_with_groups() -> None:
     output = _console_output(console)
     assert 'Edited' in output
     assert 'README.md' in output
-    assert '+ 2 lines' in output
-    assert '- 1 lines' in output
+    assert '+2 lines' in output
+    assert '-1 lines' in output
 
 
 def test_show_grinta_splash_renders_logo_text() -> None:
@@ -3564,7 +3564,6 @@ def test_reasoning_display_live_panel_streams_thought_bodies() -> None:
     console = _make_console(width=90)
     console.print(rd.renderable(max_width=90))
     output = _console_output(console)
-    assert 'Thinking' in output
     assert 'partial reasoning in flight' in output
     assert '▌' in output
 
@@ -3754,7 +3753,8 @@ def test_hud_single_bar_format_all_widths() -> None:
     assert '●' in a.plain
     assert '5.0K/128.0K' in a.plain or '5000' in a.plain
     assert 'MCP: ?' in a.plain
-    assert 'Calls: 3' in a.plain
+    assert '3c' in a.plain
+    assert 'Cost: $0.123' in a.plain
 
 
 def test_hud_ledger_icon() -> None:

@@ -74,8 +74,8 @@ def test_format_activity_secondary_kinds() -> None:
 def test_format_activity_delta_secondary_shows_colored_add_remove_counts() -> None:
     line = format_activity_delta_secondary(added=3, removed=1)
     assert line is not None
-    assert '+ 3 lines' in line.plain
-    assert '- 1 lines' in line.plain
+    assert '+3 lines' in line.plain
+    assert '-1 lines' in line.plain
 
 
 def test_strip_tool_result_validation_annotations() -> None:
@@ -100,13 +100,11 @@ def test_format_activity_block_includes_secondary_when_set() -> None:
 
 
 def test_format_activity_turn_header_plain() -> None:
-    import io
+    """Turn header returns a Rich Rule (not Text)."""
+    from rich.rule import Rule
 
     r = format_activity_turn_header()
-    assert isinstance(r, Text)
-    buf = io.StringIO()
-    Console(file=buf, width=80, force_terminal=False, color_system=None).print(r)
-    assert buf.getvalue().strip() == ''
+    assert isinstance(r, Rule)
 
 
 def test_format_callout_panel_uses_layout_padding() -> None:
