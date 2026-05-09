@@ -186,6 +186,10 @@ class ReasoningDisplay:
         """Return a copy of committed thought lines without clearing them."""
         return list(self._committed_lines)
 
+    def get_streaming_line(self) -> str:
+        """Return the current streaming thought line."""
+        return self._streaming_line
+
     def update_cost(self, cost_usd: float) -> None:
         """Track current session cost for budget burn display."""
         self._current_cost = cost_usd

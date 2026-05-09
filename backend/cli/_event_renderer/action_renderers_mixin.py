@@ -178,44 +178,27 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
     def _render_message_action(self, action: MessageAction) -> None:
         host = cast(ActionRenderersHost, self)
-        # Suppress mid-task internal messages that were intercepted by the
-        # event router (e.g. verbose model text between checkpoint and next
-        # tool call). Still clear the streaming preview and stop reasoning
-        # so Live panel doesn't linger.
         if bool(getattr(action, 'suppress_cli', False)):
             self._stop_reasoning()
-        # Get thought from action field, or extract from content if not present
         thought = (getattr(action, 'thought', None) or '').strip()
         content = (action.content or '').strip()
 
-        # If no dedicated thought field, try to capture from Live reasoning display
         if not thought:
             captured_thoughts = host._reasoning.snapshot_thoughts()
             if captured_thoughts:
                 thought = '\n'.join(captured_thoughts)
 
-        # Fallback: extract thinking from content first line
-        if not thought and content:
-            lines = content.split('\n', 3)
-            if len(lines) >= 2:
-                first_line = lines[0].strip().lower()
-                thinking_indicators = [
-                    'i should',
-                    "i'll",
-                    'let me',
-                    'the user is',
-                    'i need to',
-                    'analyzing',
-                ]
-                if any(first_line.startswith(ind) for ind in thinking_indicators):
-                    # First line looks like thinking, extract it
-                    thought = lines[0].strip()
-                    content = '\n'.join(lines[1:]).strip()
+            streaming_line = host._reasoning.get_streaming_line()
+            if streaming_line and streaming_line.strip():
+                if thought:
+                    thought = f'{thought}\n{streaming_line}'
+                else:
+                    thought = streaming_line
 
         if thought and content:
-            display_content = f'Thinking: {thought}\n\n{content}'
+            display_content = f'{thought}\n\n{content}'
         elif thought:
-            display_content = f'Thinking: {thought}'
+            display_content = thought
         else:
             display_content = content
         display_content = _sanitize_visible_transcript_text(display_content)
