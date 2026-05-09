@@ -319,9 +319,9 @@ def rich_compact_hud_line(
 
     # MCP & skills
     parts.append(('  ', ''))
-    parts.append((f'MCP:{fields.mcp_short}', CLR_HUD_DETAIL))
+    parts.append((f'MCP: {fields.mcp_short}', CLR_HUD_DETAIL))
     parts.append(('  ', ''))
-    parts.append((f'Skills:{fields.skills_short}', CLR_HUD_DETAIL))
+    parts.append((f'Skills: {fields.skills_short}', CLR_HUD_DETAIL))
 
     if fields.condensation_count > 0:
         parts.append(('  ', ''))
