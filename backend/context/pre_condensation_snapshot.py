@@ -150,6 +150,8 @@ def _extract_errors(event: Event, snapshot: dict) -> None:
 
     cls_name = type(event).__name__
     if cls_name == 'ErrorObservation':
+        if getattr(event, 'notify_ui_only', False):
+            return
         content = str(getattr(event, 'content', ''))[:_MAX_CONTENT_LENGTH]
         if content:
             snapshot['recent_errors'].append(content)

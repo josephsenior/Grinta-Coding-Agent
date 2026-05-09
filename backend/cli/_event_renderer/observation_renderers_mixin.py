@@ -416,8 +416,11 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
                 return
         elif status_type in ('retry_pending', 'retry_resuming'):
             self._handle_retry_status(obs, status_type=status_type)
-            force_visible_status = True
-            retry_signature = (status_type, str(getattr(obs, 'content', '') or ''))
+            retry_sig = (status_type, str(getattr(obs, 'content', '') or ''))
+            if getattr(self, '_last_retry_status_signature', None) == retry_sig:
+                return
+            setattr(self, '_last_retry_status_signature', retry_sig)
+            return
         else:
             setattr(self, '_last_retry_status_signature', None)
         self._render_status_content(
@@ -480,26 +483,18 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             floor=attempt,
         )
         self._hud.update_ledger('Backoff')
-        prefix = 'Auto Retry' if status_type == 'retry_pending' else 'Retrying'
-        # Sticky HUD line: include rate-limit kind + ETA so the user sees *why*
-        # we're waiting and *how long* the provider asked for.
-        suffix_parts: list[str] = []
-        kind = extras.get('rate_limit_kind')
-        if kind:
-            suffix_parts.append(str(kind).upper())
-        retry_after = extras.get('retry_after')
-        if not retry_after:
-            retry_after = extras.get('delay_seconds')
-        eta = None
-        try:
-            if retry_after is not None:
-                eta = float(retry_after)
-                if eta > 0:
-                    suffix_parts.append(f'ETA {eta:.0f}s' if eta >= 1 else 'ETA <1s')
-        except (TypeError, ValueError):
-            pass
-        suffix = f' [{" · ".join(suffix_parts)}]' if suffix_parts else ''
-        self._hud.update_agent_state(f'{prefix} {attempt}/{max_attempts}{suffix}')
+        if status_type == 'retry_pending':
+            delay_seconds = extras.get('delay_seconds')
+            try:
+                delay = float(delay_seconds) if delay_seconds else 10.0
+            except (TypeError, ValueError):
+                delay = 10.0
+            delay_str = f'{int(delay)}s' if delay >= 1 else '<1s'
+            self._hud.update_agent_state(
+                f'Backoff {attempt}/{max_attempts} (retrying in {delay_str})'
+            )
+        else:
+            self._hud.update_agent_state(f'Retrying {attempt}/{max_attempts}')
 
     @staticmethod
     def _coerce_positive_int(value: Any, *, default: int, floor: int = 1) -> int:

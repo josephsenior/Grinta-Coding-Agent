@@ -863,7 +863,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         if state == AgentState.RATE_LIMITED:
             self._hud.update_ledger('Backoff')
             current_label = (self._hud.state.agent_state_label or '').strip()
-            if not current_label.startswith(('Auto Retry', 'Retrying')):
+            if not current_label.startswith(('Backoff', 'Retrying')):
                 self._hud.update_agent_state('Waiting on recovery')
         elif state == AgentState.RUNNING:
             self._hud.update_ledger('Healthy')

@@ -240,8 +240,8 @@ def get_retry_queue() -> RetryQueue | None:
         return None
 
     backend_name = os.getenv('RETRY_QUEUE_BACKEND', 'memory').lower()
-    base_delay = float(os.getenv('RETRY_QUEUE_RETRY_DELAY_SECONDS', '5.0'))
-    max_delay = float(os.getenv('RETRY_QUEUE_MAX_DELAY_SECONDS', '30.0'))
+    base_delay = float(os.getenv('RETRY_QUEUE_RETRY_DELAY_SECONDS', '10.0'))
+    max_delay = float(os.getenv('RETRY_QUEUE_MAX_DELAY_SECONDS', '120.0'))
     # Generous default: the system is autonomous, so prefer many quiet retries
     # over surfacing transient infrastructure errors to the agent. Combined
     # with the inner Tenacity loop (DEFAULT_LLM_NUM_RETRIES = 5, plus the
