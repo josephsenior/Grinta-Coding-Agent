@@ -1058,9 +1058,19 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         await run_in_terminal(_sync_print)
 
     def _append_assistant_message(
-        self, display_content: str, *, attachments: list[Any] | None = None
+        self, display_content: str | Any, *, attachments: list[Any] | None = None
     ) -> None:
         """Render a committed assistant message block in the transcript."""
+        from rich.text import Text as RichText
+
+        if isinstance(display_content, RichText):
+            self._last_assistant_message_text = display_content.plain
+            self._append_history(Text(''))
+            self._append_history(display_content)
+            for attachment in attachments or []:
+                self._append_history(attachment)
+            return
+
         display_content = _sanitize_visible_transcript_text(display_content)
         if not display_content:
             return

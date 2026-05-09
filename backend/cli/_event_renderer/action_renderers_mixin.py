@@ -177,6 +177,9 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self._handle_streaming_chunk(action)
 
     def _render_message_action(self, action: MessageAction) -> None:
+        from rich.text import Text
+        from backend.cli.theme import CLR_THOUGHT_BODY, CLR_AUTONOMY_BALANCED
+
         host = cast(ActionRenderersHost, self)
         if bool(getattr(action, 'suppress_cli', False)):
             self._stop_reasoning()
@@ -195,19 +198,44 @@ class ActionRenderersMixin(_ActionRenderersBase):
                 else:
                     thought = streaming_line
 
-        if thought and content:
-            display_content = f'{thought}\n\n{content}'
-        elif thought:
-            display_content = thought
-        else:
+        if not thought:
             display_content = content
-        display_content = _sanitize_visible_transcript_text(display_content)
-        if not display_content:
+            if display_content:
+                display_content = _sanitize_visible_transcript_text(display_content)
+            if not display_content:
+                self.refresh()
+                return
+            self._stop_reasoning()
+            attachments = self._message_action_attachments(action)
+            self._append_assistant_message(display_content, attachments=attachments)
+            return
+
+        display_parts: list[Any] = []
+
+        thought_text = Text()
+        thought_text.append('Thinking:\n', style=f'bold {CLR_AUTONOMY_BALANCED}')
+        for line in thought.split('\n'):
+            thought_text.append(f'  {line}\n', style=CLR_THOUGHT_BODY)
+        display_parts.append(thought_text)
+
+        if content:
+            sanitized_content = _sanitize_visible_transcript_text(content)
+            if sanitized_content:
+                display_parts.append(Text(sanitized_content))
+
+        if not display_parts:
             self.refresh()
             return
+
         self._stop_reasoning()
         attachments = self._message_action_attachments(action)
-        self._append_assistant_message(display_content, attachments=attachments)
+
+        if len(display_parts) == 1:
+            final_content = display_parts[0]
+        else:
+            final_content = Text().join(Text('\n', style='reset'), display_parts)
+
+        self._append_assistant_message(final_content, attachments=attachments)
 
     @staticmethod
     def _message_action_attachments(action: MessageAction) -> list[Any]:
