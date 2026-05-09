@@ -255,7 +255,10 @@ class RunHelpersMixin:
         errors = status.get('conversion_errors', []) or []
 
         if client_count > 0:
-            detail = f'{client_count}/{server_count} MCP server(s) connected.'
+            if server_count > 0:
+                detail = f'{client_count}/{server_count} MCP server(s) connected.'
+            else:
+                detail = f'{client_count} MCP server(s) connected.'
             if verbose and errors:
                 detail += f' {len(errors)} conversion error(s).'
         else:
