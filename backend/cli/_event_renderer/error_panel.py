@@ -48,6 +48,30 @@ from backend.cli.theme import (
     CLR_WARN_BODY,
     CLR_WARN_ICON,
 )
+from backend.ledger.observation.error import (
+    ERROR_CATEGORY_AUTH,
+    ERROR_CATEGORY_CONTEXT_WINDOW,
+    ERROR_CATEGORY_MODEL_NOT_FOUND,
+    ERROR_CATEGORY_NETWORK,
+    ERROR_CATEGORY_RATE_LIMIT,
+    ERROR_CATEGORY_RUNTIME_DISCONNECTED,
+    ERROR_CATEGORY_TIMEOUT,
+)
+
+# Categories that should be rendered as calm notices rather than red errors.
+_NOTICE_CATEGORIES: frozenset[str] = frozenset({
+    ERROR_CATEGORY_RATE_LIMIT,
+    ERROR_CATEGORY_TIMEOUT,
+    ERROR_CATEGORY_NETWORK,
+})
+
+# Categories that are hard failures — always red, never a notice.
+_CRITICAL_CATEGORIES: frozenset[str] = frozenset({
+    ERROR_CATEGORY_AUTH,
+    ERROR_CATEGORY_MODEL_NOT_FOUND,
+    ERROR_CATEGORY_RUNTIME_DISCONNECTED,
+})
+
 
 
 @dataclass(frozen=True)
@@ -58,8 +82,27 @@ class _GuidanceRule:
     guidance: ErrorGuidance
 
 
-def use_recoverable_notice_style(error_text: str) -> bool:
-    """True for timeouts and provider hiccups; False for hard failures."""
+def use_recoverable_notice_style(
+    error_text: str,
+    *,
+    error_category: str | None = None,
+) -> bool:
+    """True for transient provider/network hiccups; False for hard failures.
+
+    When *error_category* is provided (set by RecoveryService from the actual
+    exception type) it is used directly — no text parsing.  Text matching is
+    the fallback for system messages that don't originate from RecoveryService.
+    """
+    # Deterministic path: category was set at the source.
+    if error_category is not None:
+        if error_category in _CRITICAL_CATEGORIES:
+            return False
+        if error_category in _NOTICE_CATEGORIES:
+            return True
+        # ERROR_CATEGORY_CONTEXT_WINDOW: hard stop, not recoverable notice.
+        return False
+
+    # Fallback: text-based heuristics for system messages (no error_category).
     lower = error_text.lower()
     if contains_any(lower, CRITICAL_ERROR_FRAGMENTS):
         return False
@@ -156,8 +199,16 @@ def build_recovery_text(
     return recovery
 
 
-def notice_panel_title(error_text: str) -> str:
+def notice_panel_title(error_text: str, *, error_category: str | None = None) -> str:
     """Short cyan banner title for recoverable (notice-style) issues."""
+    # Deterministic path: use category when available.
+    if error_category == ERROR_CATEGORY_RATE_LIMIT:
+        return 'Rate or quota limit'
+    if error_category == ERROR_CATEGORY_TIMEOUT:
+        return 'Request timed out'
+    if error_category == ERROR_CATEGORY_NETWORK:
+        return 'Connection issue'
+    # Fallback: text matching for system messages.
     lower = error_text.lower()
     for matcher, label in _NOTICE_TITLE_RULES:
         if matcher(lower):
@@ -240,16 +291,23 @@ def build_error_panel(
     title: str = 'Error',
     accent_style: str = 'red',
     force_notice: bool | None = None,
+    error_category: str | None = None,
     content_width: int | None = None,
 ) -> Panel | Text:
     """Render a structured panel with recovery guidance when available."""
-    # Rate limit errors: return simple message, skip noisy panel
-    guidance = error_guidance(error_text)
-    if (
-        guidance is not None
-        and guidance.error_code
-        and guidance.error_code.startswith('ERR-RATE')
-    ):
+    # Rate limit errors: return a compact single-line notice, skip the full panel.
+    # Use error_category when available; fall back to guidance text code.
+    is_rate_limit = error_category == ERROR_CATEGORY_RATE_LIMIT
+    if not is_rate_limit:
+        guidance = error_guidance(error_text)
+        is_rate_limit = (
+            guidance is not None
+            and guidance.error_code is not None
+            and guidance.error_code.startswith('ERR-RATE')
+        )
+    else:
+        guidance = error_guidance(error_text)
+    if is_rate_limit:
         return Text(
             'Rate or quota limit reached — retrying automatically.',
             style=f'dim {CLR_META}',
@@ -259,7 +317,7 @@ def build_error_panel(
     use_notice = (
         force_notice
         if force_notice is not None
-        else use_recoverable_notice_style(error_text)
+        else use_recoverable_notice_style(error_text, error_category=error_category)
     )
     border = LIVE_PANEL_ACCENT_STYLE if use_notice else accent_style
     body_parts = _build_error_body(
@@ -274,6 +332,7 @@ def build_error_panel(
     panel_title = _build_panel_title(
         title=title,
         error_text=error_text,
+        error_category=error_category,
         use_notice=use_notice,
         accent_style=accent_style,
     )
@@ -327,12 +386,13 @@ def _build_panel_title(
     *,
     title: str,
     error_text: str,
+    error_category: str | None = None,
     use_notice: bool,
     accent_style: str,
 ) -> Text:
     if use_notice:
         accent = LIVE_PANEL_ACCENT_STYLE
-        panel_label = notice_panel_title(error_text)
+        panel_label = notice_panel_title(error_text, error_category=error_category)
         return Text(f'ℹ  {panel_label}', style=f'bold {accent}')
     return Text(title.strip() or 'Error', style=f'{accent_style} bold')
 

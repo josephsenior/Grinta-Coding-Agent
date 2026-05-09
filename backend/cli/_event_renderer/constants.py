@@ -106,6 +106,11 @@ DIRECTORY_VIEW_PREFIX = 'Directory contents of '
 # -- Error classification ----------------------------------------------------
 
 # Provider / network / quota issues — calm cyan "notice" styling.
+# NOTE: Rate-limit, network, and timeout categories from RecoveryService are now
+# classified via ErrorObservation.error_category (set from the actual exception
+# type) and no longer need text matching.  The fragments below are kept only
+# for internal Grinta system messages that reach the UI through other paths
+# (e.g. add_system_message) and don't have a structured error_category.
 RECOVERABLE_NOTICE_FRAGMENTS: tuple[str, ...] = (
     'verification required',
     'blind retries are blocked',
@@ -121,23 +126,14 @@ RECOVERABLE_NOTICE_FRAGMENTS: tuple[str, ...] = (
     'retrying without streaming',
     'stream timed out',
     'fallback completion timed out',
-    # RecoveryService / providers: compact line has no space in "RateLimitError".
-    'provider limit',
+    # RecoveryService compact class names — kept as belt-and-suspenders for
+    # any code paths that stringify the error before error_category is read.
     'ratelimiterror',
     'serviceunavailableerror',
     'waiting before retrying',
-    'rate limit',
-    'too many requests',
-    '429',
-    'quota',
-    'billing',
-    'insufficient_quota',
     'connection',
     'unreachable',
     'connect error',
-    'dns',
-    'ssl',
-    'certificate',
     'econnrefused',
     'econnreset',
     'context length',

@@ -5,12 +5,17 @@ from __future__ import annotations
 from backend.cli._event_renderer.error_categories._matchers import _any
 from backend.cli._event_renderer.panels import ErrorGuidance, _GuidanceRule
 
+# These strings come verbatim from provider SDKs and RecoveryService log lines.
+# Keep them specific so generic words like "quota" or "billing" in file paths
+# or user messages do not trigger a false-positive rate-limit notice.
 RATE_LIMIT_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
     _GuidanceRule(
         _any(
+            # RecoveryService/litellm compact error class names
+            'ratelimiterror',
+            'serviceunavailableerror',
+            # Grinta internal: RecoveryService emits this phrase
             'provider limit reached',
-            'ratelimiterror:',
-            'serviceunavailableerror:',
         ),
         ErrorGuidance(
             summary='The provider is briefly limiting requests (rate or capacity).',
@@ -23,12 +28,21 @@ RATE_LIMIT_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
     ),
     _GuidanceRule(
         _any(
-            '429',
-            'rate limit',
+            # HTTP status phrases as returned by providers
+            '429 too many requests',
+            # Phrase-level matches only — avoids matching unrelated "rate" or "limit" words
+            'rate limit exceeded',
+            'rate limit reached',
+            'rate limit hit',
+            'rate_limit_exceeded',
             'too many requests',
+            # OpenAI / Azure quota phrases
             'insufficient_quota',
-            'quota',
-            'billing',
+            'quota exceeded',
+            'quota has been exceeded',
+            # Billing-specific phrases
+            'billing hard limit',
+            'billing limit reached',
         ),
         ErrorGuidance(
             summary='The provider is rejecting more requests because of rate or billing limits.',

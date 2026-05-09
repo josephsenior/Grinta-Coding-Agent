@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
@@ -79,6 +80,7 @@ from backend.cli.tool_call_display import (
 from backend.cli.transcript import (
     format_activity_delta_secondary,
     format_activity_result_secondary,
+    format_activity_secondary,
     format_activity_shell_block,
     format_callout_panel,
     strip_tool_result_validation_annotations,
@@ -153,6 +155,16 @@ def _cmd_stdout_syntax_extras(content: str) -> list[Any] | None:
             line_numbers=n_lines > 10,
         )
     ]
+
+
+def _looks_like_command_echo(line: str) -> bool:
+    """Check if a line is likely the echoed command (not actual output)."""
+    l = line.strip()
+    if not l:
+        return True
+    if l.startswith('$ ') or l.startswith('❯ ') or l.startswith('> '):
+        return True
+    return False
 
 
 class ObservationRenderersMixin(_ObservationRenderersBase):
@@ -294,7 +306,9 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         # CmdOutputObservation defaults to exit_code=-1 when unknown; treat any
         # non-zero exit code (including -1) as a failure.
         if exit_code is not None and exit_code != 0:
-            return self._cmd_observation_failure(exit_code, content), 'err', None
+            msg = self._cmd_observation_failure(exit_code, content)
+            extras = self._cmd_observation_failure_extras(content)
+            return msg, 'err', extras
         # Plain shell success: hide verbose stdout.
         return self._cmd_observation_success(exit_code, content)
 
@@ -307,6 +321,31 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         return msg
 
     @staticmethod
+    def _cmd_observation_failure_extras(content: str) -> list[Any] | None:
+        """Return extra lines for a failed command's error output."""
+        raw_lines = (
+            [ln.strip() for ln in content.split('\n') if ln.strip()] if content else []
+        )
+        if not raw_lines:
+            return None
+        preview_lines = [ln for ln in raw_lines if not _looks_like_command_echo(ln)][:3]
+        if not preview_lines:
+            return None
+        extra = []
+        for line in preview_lines:
+            if len(line) > 180:
+                line = line[:177] + '...'
+            extra.append(format_activity_secondary(line, kind='err'))
+        if len(raw_lines) > 3:
+            extra.append(
+                format_activity_secondary(
+                    f'... {len(raw_lines) - 3} more line{"s" if len(raw_lines) - 3 != 1 else ""}',
+                    kind='err',
+                )
+            )
+        return extra or None
+
+    @staticmethod
     def _cmd_observation_success(
         exit_code: int | None,
         content: str,
@@ -314,9 +353,34 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         raw_lines = (
             [ln.strip() for ln in content.split('\n') if ln.strip()] if content else []
         )
-        msg: str | None = 'done' if (raw_lines or exit_code == 0) else None
         result_kind = 'ok' if exit_code == 0 else 'neutral'
-        return msg, result_kind, _cmd_stdout_syntax_extras(content)
+
+        syntax_extras = _cmd_stdout_syntax_extras(content)
+        if syntax_extras is not None:
+            msg: str | None = None
+            return msg, result_kind, syntax_extras
+
+        if raw_lines:
+            preview_lines = raw_lines[:3]
+            preview = '\n'.join(preview_lines)
+            if len(preview) > 240:
+                preview = preview[:237] + '...'
+            msg = f'exit {exit_code}' if exit_code is not None else 'done'
+            extra = [
+                format_activity_secondary(preview, kind='neutral'),
+            ]
+            if len(raw_lines) > 3:
+                extra.append(
+                    format_activity_secondary(
+                        f'... {len(raw_lines) - 3} more line{"s" if len(raw_lines) - 3 != 1 else ""}',
+                        kind='neutral',
+                    )
+                )
+            return msg, result_kind, extra
+
+        if exit_code is not None:
+            return f'exit {exit_code}', result_kind, None
+        return None, result_kind, None
 
     def _render_file_edit_observation(self, obs: FileEditObservation) -> None:
         self._stop_reasoning()
@@ -354,18 +418,16 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             self._render_pending_activity_card(pending, extra_lines=extra_lines)
 
     def _render_error_observation(self, obs: ErrorObservation) -> None:
-        # agent_only observations are internal system feedback (e.g. "FINISH
-        # BLOCKED"). The agent still receives them in context, but they must
-        # not appear in the user-facing transcript.
         if getattr(obs, 'agent_only', False):
-            return
-        if getattr(obs, 'notify_ui_only', False):
             return
         self._stop_reasoning()
         self._flush_pending_tool_cards()
         self._clear_streaming_preview()
         error_content = getattr(obs, 'content', str(obs))
-        use_notice = _use_recoverable_notice_style(error_content)
+        # Use the structured category set by RecoveryService at the exception
+        # site — no text matching needed for typed provider/runtime errors.
+        error_category = getattr(obs, 'error_category', None)
+        use_notice = _use_recoverable_notice_style(error_content, error_category=error_category)
         if use_notice:
             last_notice_content = getattr(self, '_last_notice_error_content', None)
             if (
@@ -380,6 +442,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             _build_error_panel(
                 error_content,
                 force_notice=use_notice,
+                error_category=error_category,
                 content_width=self._console.width,
             ),
         )
@@ -388,6 +451,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         # state).  Ledger HUD is driven by AgentStateChangedObservation.
         if not use_notice:
             self._hud.update_ledger('Error')
+
 
     def _render_user_reject_observation(self, obs: UserRejectObservation) -> None:
         self._flush_pending_tool_cards()
@@ -439,10 +503,12 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         worker_id = str(extras.get('worker_id') or '').strip()
         if not worker_id:
             return False
+        previous = self._delegate_workers.get(worker_id, {})
         self._delegate_workers[worker_id] = self._delegate_worker_record(
             obs,
             extras,
             worker_id,
+            previous=previous,
         )
         self._set_delegate_panel()
         return True
@@ -452,16 +518,41 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         obs: StatusObservation,
         extras: Any,
         worker_id: str,
+        previous: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         order = extras.get('order', 9999)
         if not isinstance(order, int):
             order = 9999
+        status = str(extras.get('worker_status') or 'running')
+
+        now = time.monotonic()
+        started_at = (previous or {}).get('started_at', now)
+        if status in ('done', 'failed'):
+            started_at = (previous or {}).get('started_at', now)
+
+        finished_at = (previous or {}).get('finished_at')
+        if status in ('done', 'failed') and finished_at is None:
+            finished_at = now
+
+        last_action = (previous or {}).get('last_action', '')
+        detail = str(extras.get('detail') or getattr(obs, 'content', '') or '')
+        if status == 'running' and detail:
+            last_action = detail
+
+        action_count = (previous or {}).get('action_count', 0)
+        if status == 'running' and detail and detail != (previous or {}).get('last_action', ''):
+            action_count += 1
+
         return {
             'label': str(extras.get('worker_label') or worker_id),
-            'status': str(extras.get('worker_status') or 'running'),
+            'status': status,
             'task': str(extras.get('task_description') or 'subtask'),
-            'detail': str(extras.get('detail') or getattr(obs, 'content', '') or ''),
+            'detail': detail,
             'order': order,
+            'started_at': started_at,
+            'finished_at': finished_at,
+            'last_action': last_action,
+            'action_count': action_count,
         }
 
     def _delegate_batch_mismatch(self, batch_id: Any) -> bool:
@@ -573,18 +664,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
 
     @staticmethod
     def _file_read_result_message(content: str, n_lines: int) -> str:
-        """``text_editor view`` on a directory returns ``Directory contents of …:``.
-
-        Followed by entries; report entries instead of lines for that case.
-        """
-        if not content.startswith(_DIRECTORY_VIEW_PREFIX):
-            return f'{n_lines:,} lines' if n_lines else 'empty file'
-        n_entries = max(0, n_lines - 1)
-        if n_entries == 1:
-            return '1 entry'
-        if n_entries:
-            return f'{n_entries:,} entries'
-        return 'empty directory'
+        return ''
 
     def _render_mcp_observation(self, obs: MCPObservation) -> None:
         self._stop_reasoning()
@@ -792,7 +872,10 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
     ) -> None:
         self._stop_reasoning()
         pending = cast(Any, self._take_pending_activity_card('delegate'))
-        result_message, result_kind, extra_lines = _summarize_delegate_observation(obs)
+        workers_data = getattr(self, '_delegate_workers', {}) or {}
+        result_message, result_kind, extra_lines = _summarize_delegate_observation(
+            obs, workers_data=workers_data,
+        )
         if pending is not None:
             self._render_pending_activity_card(
                 pending,

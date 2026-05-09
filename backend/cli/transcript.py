@@ -60,29 +60,27 @@ def strip_tool_result_validation_annotations(text: str) -> str:
 
 
 _GROUND_PREFIX = '    > '
-# Activity rows use a fixed verb column so details line up across tools.
+# Primary row layout: ``<2-space indent><bold verb><2-space gap><detail>``
+# Secondary/result rows: ``<4-space indent><icon><space><text>``
 _ACTIVITY_PRIMARY_INDENT = '  '
-_ACTIVITY_VERB_WIDTH = 12
 _ACTIVITY_GAP = '  '
-_ACTIVITY_SECONDARY_INDENT = (
-    _ACTIVITY_PRIMARY_INDENT + (' ' * _ACTIVITY_VERB_WIDTH) + _ACTIVITY_GAP
-)
+_ACTIVITY_SECONDARY_INDENT = '    '
+_ACTIVITY_RESULT_INDENT = '    '
 
 
 def format_activity_primary(verb: str, detail: str | Text) -> Text:
-    """Bold verb + detail on one line (no ``>`` prefix).
+    """Bold verb + detail on one line.
 
-    Plain-string *detail* is linkified for ``file://`` and workspace paths so
+    Uses ``  Verb  detail`` layout — no fixed-width verb column so it
+    reads naturally in proportionally-spaced terminals. Plain-string
+    *detail* is linkified for ``file://`` and workspace paths so
     terminals can open them via OSC-8 hyperlinks.
     """
     from backend.cli.theme import CLR_VERB
 
     line = Text()
     line.append(_ACTIVITY_PRIMARY_INDENT, style=STYLE_EMPTY)
-    line.append(
-        f'{(verb or "Did").strip():<{_ACTIVITY_VERB_WIDTH}}',
-        style=CLR_VERB,
-    )
+    line.append((verb or 'Did').strip(), style=CLR_VERB)
     if isinstance(detail, Text):
         if detail.plain.strip():
             line.append(_ACTIVITY_GAP, style=STYLE_EMPTY)
@@ -97,7 +95,6 @@ def format_activity_primary(verb: str, detail: str | Text) -> Text:
 
 def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
     """Continuation row for inline stats and previews inside activity cards."""
-    line = Text(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)
     styles = {
         'ok': CLR_OK_BODY,
         'err': CLR_ERR_BODY,
@@ -105,6 +102,7 @@ def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
         'neutral': CLR_INFO_BODY,
     }
     body_style = styles.get(kind, styles['neutral'])
+    line = Text(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)
     line.append_text(
         linkify_plain(
             (message or '').strip(),
@@ -117,14 +115,17 @@ def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
 
 
 def format_activity_result_secondary(message: str, *, kind: str = 'neutral') -> Text:
-    """Continuation row for user-visible results within an activity card."""
+    """Continuation row for user-visible results within an activity card.
+
+    Prefixed with a colored status icon: ``✓`` (ok), ``✗`` (err), ``•`` (neutral).
+    """
     styles: dict[str, tuple[str, str, str]] = {
         'ok': (mark_ok(), CLR_OK_ICON, CLR_OK_BODY),
         'err': (mark_err(), CLR_ERR_ICON, CLR_ERR_BODY),
         'neutral': (mark_info(), CLR_INFO_ICON, CLR_INFO_BODY),
     }
     icon, icon_style, text_style = styles.get(kind, styles['neutral'])
-    line = Text(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)
+    line = Text(_ACTIVITY_RESULT_INDENT, style=STYLE_EMPTY)
     line.append(f'{icon} ', style=icon_style)
     line.append_text(
         linkify_plain(
@@ -148,22 +149,22 @@ def format_activity_delta_secondary(
     if not added and not removed:
         return None
 
-    line = Text(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)
+    line = Text(_ACTIVITY_RESULT_INDENT, style=STYLE_EMPTY)
     wrote = False
     if added:
-        line.append(f'+ {added:,} {added_label}', style=f'dim {CLR_DIFF_ADD}')
+        line.append(f'+{added:,} {added_label}', style=f'dim {CLR_DIFF_ADD}')
         wrote = True
     if removed:
         if wrote:
             line.append('  ', style=STYLE_DIM)
-        line.append(f'- {removed:,} {removed_label}', style=f'dim {CLR_DIFF_REM}')
+        line.append(f'-{removed:,} {removed_label}', style=f'dim {CLR_DIFF_REM}')
     return line
 
 
 def format_activity_validation_callout(message: str) -> Panel:
     """Bordered callout for post-edit syntax / lint feedback (distinct from shell errors)."""
     body = Text()
-    body.append(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)
+    body.append(_ACTIVITY_RESULT_INDENT, style=STYLE_EMPTY)
     body.append(f'{MARK_WARN} ', style=CLR_WARN_ICON)
     body.append('Validation', style=f'bold {CLR_WARN_BODY}')
     body.append(' — ', style=STYLE_DIM)
@@ -203,9 +204,9 @@ def format_activity_block(
     if extra_lines:
         parts.extend(extra_lines)
     content = Group(*parts)
-    if title is not None:
+    if title:
         title_line = Text()
-        title_line.append('  ', style=STYLE_EMPTY)
+        title_line.append(_ACTIVITY_PRIMARY_INDENT, style=STYLE_EMPTY)
         title_line.append((title or '').strip(), style=ACTIVITY_CARD_TITLE_STYLE)
         return Group(title_line, content)
     return content
@@ -213,10 +214,8 @@ def format_activity_block(
 
 def format_activity_turn_header() -> Text:
     """Section heading before the first tool/shell row each agent turn."""
-    line = Text()
-    line.append('  ', style=STYLE_EMPTY)
-    line.append(ACTIVITY_SECTION_TITLE, style=CLR_TURN_RULE)
-    return line
+    from rich.rule import Rule
+    return Rule(style=f'dim {CLR_TURN_RULE}')
 
 
 _REASONING_SENTENCE_ENDERS = ('.', '!', '?', ':', ';', '"', "'", ')', ']', '…')
@@ -245,7 +244,8 @@ def format_reasoning_snapshot(lines: list[str]) -> Group:
         cleaned[-1] = f'{last}…'
     # Same blue-gray roman style as the live Thinking body (see ``CLR_THOUGHT_BODY``)
     # so post-turn snapshots match what streamed, without italic fade-out.
-    return Group(*[Text(line, style=CLR_REASONING_COMMITTED) for line in cleaned])
+    # Indent consistently with card secondary lines.
+    return Group(*[Text(f'{_ACTIVITY_RESULT_INDENT}{line}', style=CLR_REASONING_COMMITTED) for line in cleaned])
 
 
 def format_activity_shell_block(
@@ -276,7 +276,7 @@ def format_activity_shell_block(
         result_message=result_message,
         result_kind=result_kind,
         extra_lines=extra_lines,
-        title=title or ACTIVITY_CARD_TITLE_TERMINAL,
+        title=title,
     )
 
 

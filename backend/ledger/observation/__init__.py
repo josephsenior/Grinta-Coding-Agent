@@ -17,7 +17,16 @@ from backend.ledger.observation.commands import (
 )
 from backend.ledger.observation.debugger import DebuggerObservation
 from backend.ledger.observation.empty import NullObservation
-from backend.ledger.observation.error import ErrorObservation
+from backend.ledger.observation.error import (
+    ERROR_CATEGORY_AUTH,
+    ERROR_CATEGORY_CONTEXT_WINDOW,
+    ERROR_CATEGORY_MODEL_NOT_FOUND,
+    ERROR_CATEGORY_NETWORK,
+    ERROR_CATEGORY_RATE_LIMIT,
+    ERROR_CATEGORY_RUNTIME_DISCONNECTED,
+    ERROR_CATEGORY_TIMEOUT,
+    ErrorObservation,
+)
 from backend.ledger.observation.file_download import FileDownloadObservation
 from backend.ledger.observation.files import (
     FileEditObservation,
@@ -43,6 +52,13 @@ __all__ = [
     'DebuggerObservation',
     'DelegateTaskObservation',
     'LspQueryObservation',
+    'ERROR_CATEGORY_AUTH',
+    'ERROR_CATEGORY_CONTEXT_WINDOW',
+    'ERROR_CATEGORY_MODEL_NOT_FOUND',
+    'ERROR_CATEGORY_NETWORK',
+    'ERROR_CATEGORY_RATE_LIMIT',
+    'ERROR_CATEGORY_RUNTIME_DISCONNECTED',
+    'ERROR_CATEGORY_TIMEOUT',
     'ErrorObservation',
     'FileDownloadObservation',
     'FileEditObservation',

@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 from rich import box
 from rich.panel import Panel
+from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-from backend.cli._event_renderer.constants import DELEGATE_WORKER_STATUS_STYLES
-from backend.cli.layout_tokens import LIVE_PANEL_ACCENT_STYLE
+from backend.cli.layout_tokens import (
+    LIVE_PANEL_ACCENT_STYLE,
+    WORKER_LABEL_WIDTH,
+    WORKER_PANEL_ACCENT_STYLE,
+    WORKER_TIMER_WIDTH,
+)
 from backend.cli.theme import (
     CLR_INFO_BODY,
     CLR_INFO_ICON,
@@ -20,6 +26,12 @@ from backend.cli.theme import (
     CLR_OK_ICON,
     CLR_WARN_BODY,
     CLR_WARN_ICON,
+    CLR_WORKER_ACTION,
+    CLR_WORKER_LABEL,
+    CLR_WORKER_LABEL_DONE,
+    CLR_WORKER_LABEL_FAILED,
+    CLR_WORKER_SPINNER,
+    CLR_WORKER_TIMER,
     STYLE_DEFAULT,
     STYLE_DIM,
     STYLE_SYSTEM_TAG_AUTONOMY,
@@ -150,41 +162,101 @@ def build_task_panel(task_list: list[dict[str, Any]]) -> Any:
     )
 
 
+def _worker_status_icon(status: str) -> Any:
+    """Return a renderable for the worker status column."""
+    if status == 'running':
+        return Spinner('dots', style=CLR_WORKER_SPINNER, speed=1.0)
+    if status == 'done':
+        return Text('✓', style='bold green')
+    if status == 'failed':
+        return Text('✗', style='bold red')
+    if status == 'starting':
+        return Spinner('line', style=CLR_WORKER_SPINNER, speed=0.5)
+    return Text('•', style=STYLE_DIM)
+
+
+def _worker_label_style(status: str, label: str) -> Text:
+    """Return styled worker label text."""
+    if status == 'done':
+        return Text(label, style=CLR_WORKER_LABEL_DONE, no_wrap=True)
+    if status == 'failed':
+        return Text(label, style=CLR_WORKER_LABEL_FAILED, no_wrap=True)
+    return Text(label, style=CLR_WORKER_LABEL, no_wrap=True)
+
+
+def _worker_elapsed(worker: dict[str, Any]) -> Text:
+    """Format worker elapsed time as ``⏱ 12s``."""
+    started_at = worker.get('started_at')
+    if started_at is None:
+        return Text('', style=CLR_WORKER_TIMER)
+    elapsed = max(0, int(time.monotonic() - started_at))
+    status = worker.get('status', 'running')
+    if status in ('done', 'failed'):
+        finished_at = worker.get('finished_at')
+        if finished_at is not None:
+            elapsed = max(0, int(finished_at - (worker.get('started_at') or finished_at)))
+    if elapsed < 60:
+        label = f'{elapsed}s'
+    elif elapsed < 3600:
+        label = f'{elapsed // 60}m{elapsed % 60:02d}s'
+    else:
+        label = f'{elapsed // 3600}h{(elapsed % 3600) // 60:02d}m'
+    return Text(label, style=CLR_WORKER_TIMER, no_wrap=True)
+
+
+def _worker_action_text(worker: dict[str, Any]) -> Text:
+    """Return the last action or detail text for a worker."""
+    last_action = worker.get('last_action', '') or ''
+    detail = worker.get('detail', '') or ''
+    text = last_action or detail
+    if not text:
+        text = worker.get('task', 'working…')
+    if len(text) > 60:
+        text = text[:57] + '…'
+    return Text(text, style=CLR_WORKER_ACTION, no_wrap=True)
+
+
 def build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
-    """Render delegated worker progress as a compact reusable panel block."""
+    """Render delegated worker progress as a dynamic per-worker panel block.
+
+    Each worker row shows:
+      ◌ Worker label  ⏱ 12s  Last action description…
+    Uses Rich Spinner for running workers, static marks for done/failed.
+    """
     table = Table.grid(expand=True, padding=(0, 1))
-    table.add_column()
-    table.add_column(ratio=1)
+    table.add_column(width=3)  # spinner / status icon
+    table.add_column(width=WORKER_LABEL_WIDTH, min=8)  # worker label
+    table.add_column(width=WORKER_TIMER_WIDTH, min=6)  # elapsed timer
+    table.add_column(ratio=1)  # action / detail text
 
-    for _order, label, status, task, detail in delegate_worker_panel_signature(workers):
-        badge = Text()
-        badge_style = DELEGATE_WORKER_STATUS_STYLES.get(status, STYLE_DIM)
-        badge.append('• ', style=f'bold {badge_style}')
-        badge.append(
-            status.upper(),
-            style=f'bold {badge_style}',
+    if not workers:
+        return format_live_panel(
+            'Workers (0)',
+            Text('Waiting for workers…', style=STYLE_DIM),
+            accent_style=WORKER_PANEL_ACCENT_STYLE,
+            padding=(0, 1),
         )
 
-        body = Text()
-        if label:
-            body.append(f'{label}  ', style=STYLE_DIM)
-        body.append(task or 'subtask', style=STYLE_DEFAULT)
-        if detail and detail != task:
-            body.append(f'\n{detail}', style=STYLE_DIM)
-        table.add_row(badge, body)
-
-    empty_state: Any = (
-        table
-        if workers
-        else Text(
-            'No parallel workers — subtasks appear here when the agent delegates.',
-            style=STYLE_DIM,
-        )
+    sorted_workers = sorted(
+        workers.items(),
+        key=lambda item: (item[1].get('order', 9999), item[1].get('label', '')),
     )
+
+    for worker_id, info in sorted_workers:
+        status = info.get('status', 'running')
+        label = info.get('label', worker_id)
+
+        icon = _worker_status_icon(status)
+        label_t = _worker_label_style(status, label)
+        timer = _worker_elapsed(info)
+        action = _worker_action_text(info)
+
+        table.add_row(icon, label_t, timer, action)
+
     return format_live_panel(
         f'Workers ({len(workers)})',
-        empty_state,
-        accent_style=LIVE_PANEL_ACCENT_STYLE,
+        table,
+        accent_style=WORKER_PANEL_ACCENT_STYLE,
         padding=(0, 1),
     )
 

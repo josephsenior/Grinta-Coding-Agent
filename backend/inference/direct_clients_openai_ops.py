@@ -35,14 +35,55 @@ def extract_openai_http_status(exc: Exception) -> int | None:
     return None  # type: ignore[unreachable]
 
 
+def _extract_oai_error_message(raw: str) -> str | None:
+    """Try to extract a clean error message from an OpenAI error body.
+
+    Handles both real JSON and Python-repr dicts (single quotes,
+    ``datetime`` objects, etc.).
+    """
+    import ast
+    import re
+
+    m = re.search(r'\{.*\}', raw, re.DOTALL)
+    if not m:
+        return None
+    body_str = m.group(0)
+    body: dict | None = None
+    # Try JSON first (spec-compliant providers)
+    try:
+        import json as _json
+        body = _json.loads(body_str)
+    except Exception:
+        pass
+    # Fall back to Python-literal eval (OpenAI SDK uses str() on dicts)
+    if body is None:
+        try:
+            body = ast.literal_eval(body_str)
+        except Exception:
+            return None
+    if not isinstance(body, dict):
+        return None
+    error = body.get('error')
+    if isinstance(error, dict):
+        return error.get('message') or None
+    if isinstance(error, str):
+        return error
+    return None
+
+
 def simplify_openai_unauthorized_message(exc: Exception, status_code: int) -> str:
     """User-facing text for 401/403; drops misleading JSON-decode noise."""
     try:
         raw = str(exc)
     except Exception:
         raw = f'{type(exc).__name__} (unprintable exception)'
-    if status_code != 401:
-        return raw
+    if status_code == 403:
+        reason = _extract_oai_error_message(raw) or 'access denied'
+        if reason and reason[0].islower():
+            reason = reason[0].upper() + reason[1:]
+        if not reason.endswith('.'):
+            reason += '.'
+        return reason
     low = raw.lower()
     if 'invalid character' in low and (
         'unauthorized' in low or 'body: unauthorized' in low

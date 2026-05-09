@@ -1291,6 +1291,8 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._delegate_panel_signature = _delegate_worker_panel_signature(
             self._delegate_workers
         )
+        # Update reasoning display to show delegate state instead of "Thinking"
+        self._update_reasoning_for_delegate_state()
         if (
             self._live is None
             and self._delegate_panel_signature
@@ -1299,6 +1301,38 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             self._print_or_buffer(self._delegate_panel)
             self._last_printed_delegate_panel_signature = self._delegate_panel_signature
 
+    def _update_reasoning_for_delegate_state(self) -> None:
+        """Update the reasoning display to reflect delegate worker state."""
+        if not self._delegate_workers:
+            return
+        running = sum(
+            1 for w in self._delegate_workers.values()
+            if w.get('status') in ('running', 'starting')
+        )
+        done = sum(
+            1 for w in self._delegate_workers.values()
+            if w.get('status') == 'done'
+        )
+        failed = sum(
+            1 for w in self._delegate_workers.values()
+            if w.get('status') == 'failed'
+        )
+        total = len(self._delegate_workers)
+
+        parts = []
+        if running:
+            parts.append(f'{running} running')
+        if done:
+            parts.append(f'{done} done')
+        if failed:
+            parts.append(f'{failed} failed')
+
+        status_text = ', '.join(parts) if parts else f'{total} worker(s)'
+        self._ensure_reasoning()
+        self._reasoning.commit_thought(
+            f'Waiting for {total} worker(s) · {status_text}'
+        )
+
     def _reset_delegate_panel(self, *, batch_id: int | None) -> None:
         """Start a fresh delegated-worker panel for a new delegation batch."""
         self._delegate_workers = {}
@@ -1306,6 +1340,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._delegate_panel = None
         self._delegate_panel_signature = None
         self._last_printed_delegate_panel_signature = None
+        # Reset reasoning back from delegate-aware state
+        if self._reasoning.active:
+            self._reasoning.update_action('')
 
     def _flush_thinking_block(self) -> None:
         """Print accumulated thoughts as a persistent dim block.
