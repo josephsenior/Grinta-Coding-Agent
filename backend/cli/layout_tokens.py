@@ -94,5 +94,5 @@ def spacer_live_section() -> Text:
 
 
 # Sidebar configuration for right-side panel (Tasks, MCP, Skills)
-SIDEBAR_VISIBLE_MIN_WIDTH = 120
+SIDEBAR_VISIBLE_MIN_WIDTH = 80
 SIDEBAR_WIDTH_RATIO = 0.3
