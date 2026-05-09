@@ -364,9 +364,7 @@ def _apply_json_security_config(cfg: AppConfig, data: dict[str, object]) -> None
         merged = {**cfg.security.model_dump(), **filtered}
         cfg.security = SecurityConfig.model_validate(merged)
     except Exception as exc:
-        logger.app_logger.warning(
-            'Skipping invalid security config overrides: %s', exc
-        )
+        logger.app_logger.warning('Skipping invalid security config overrides: %s', exc)
 
 
 # ---------------------------------------------------------------------------

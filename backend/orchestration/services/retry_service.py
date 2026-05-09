@@ -214,7 +214,9 @@ class RetryService:
             metadata['pending_action'] = ToolTelemetry.action_to_dict(
                 controller._pending_action
             )
-        initial_delay = self._compute_initial_delay(exc, queue, attempt=next_attempt - 1)
+        initial_delay = self._compute_initial_delay(
+            exc, queue, attempt=next_attempt - 1
+        )
 
         task = await queue.schedule(
             controller_id=controller.id or '',

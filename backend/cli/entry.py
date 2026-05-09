@@ -72,12 +72,14 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
         help='Set project root directory',
     )
     parser.add_argument(
-        '--no-splash', '--quiet',
+        '--no-splash',
+        '--quiet',
         action='store_true',
         help='Start without the animated splash screen',
     )
     parser.add_argument(
-        '--verbose', '-v',
+        '--verbose',
+        '-v',
         action='store_true',
         help='Verbose mode: show detailed bootstrap and status information',
     )

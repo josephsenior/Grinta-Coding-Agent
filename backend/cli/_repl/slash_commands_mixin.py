@@ -688,12 +688,14 @@ class SlashCommandsMixin:
         for line in diff_body.split('\n'):
             if line.startswith('diff --git'):
                 if current and current_path:
-                    files.append({
-                        'path': current_path,
-                        'lines': current,
-                        'added': added,
-                        'removed': removed,
-                    })
+                    files.append(
+                        {
+                            'path': current_path,
+                            'lines': current,
+                            'added': added,
+                            'removed': removed,
+                        }
+                    )
                 current = [line]
                 current_path = ''
                 added = 0
@@ -709,12 +711,14 @@ class SlashCommandsMixin:
                     removed += 1
 
         if current and current_path:
-            files.append({
-                'path': current_path,
-                'lines': current,
-                'added': added,
-                'removed': removed,
-            })
+            files.append(
+                {
+                    'path': current_path,
+                    'lines': current,
+                    'added': added,
+                    'removed': removed,
+                }
+            )
 
         return files
 
@@ -835,7 +839,7 @@ class SlashCommandsMixin:
                 if args[i + 1] in allowed:
                     sort_by = args[i + 1]
                 else:
-                    self._warn(f"Sort must be one of: {', '.join(allowed)}")
+                    self._warn(f'Sort must be one of: {", ".join(allowed)}')
                     return True
                 i += 2
             elif a in ('--delete', '-d') and i + 1 < len(args):
@@ -872,13 +876,9 @@ class SlashCommandsMixin:
         if delete_targets:
             if self._renderer is not None:
                 with self._renderer.suspend_live():
-                    delete_sessions(
-                        self._console, delete_targets, config=self._config
-                    )
+                    delete_sessions(self._console, delete_targets, config=self._config)
             else:
-                delete_sessions(
-                    self._console, delete_targets, config=self._config
-                )
+                delete_sessions(self._console, delete_targets, config=self._config)
             return True
 
         if preview_idx is not None:

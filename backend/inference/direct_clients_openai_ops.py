@@ -52,6 +52,7 @@ def _extract_oai_error_message(raw: str) -> str | None:
     # Try JSON first (spec-compliant providers)
     try:
         import json as _json
+
         body = _json.loads(body_str)
     except Exception:
         pass

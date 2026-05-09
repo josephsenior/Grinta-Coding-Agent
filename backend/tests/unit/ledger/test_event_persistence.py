@@ -90,9 +90,7 @@ class TestEventPersistenceInit:
         assert ep.user_id == 'u-42'
 
     def test_initial_health_fields_none(self):
-        ep = EventPersistence(
-            sid='sess-4', file_store=MagicMock(), user_id=None
-        )
+        ep = EventPersistence(sid='sess-4', file_store=MagicMock(), user_id=None)
         snap = ep.get_health_snapshot()
         assert snap['last_confirmed_event_id'] is None
         assert snap['last_confirmed_critical_event_id'] is None
@@ -107,9 +105,7 @@ class TestEventPersistenceInit:
 class TestHealthTracking:
     def test_sqlite_write_updates_last_confirmed(self):
         """SQLite path records _last_confirmed_event_id."""
-        ep = EventPersistence(
-            sid='sess-h1', file_store=MagicMock(), user_id=None
-        )
+        ep = EventPersistence(sid='sess-h1', file_store=MagicMock(), user_id=None)
         ep._sqlite_store = MagicMock()
         ep._sqlite_store.write_event = MagicMock()
 
@@ -122,9 +118,7 @@ class TestHealthTracking:
 
     def test_sqlite_write_health_snapshot(self):
         """Health snapshot reflects SQLite writes."""
-        ep = EventPersistence(
-            sid='sess-h2', file_store=MagicMock(), user_id=None
-        )
+        ep = EventPersistence(sid='sess-h2', file_store=MagicMock(), user_id=None)
         ep._sqlite_store = MagicMock()
         ep._sqlite_store.write_event = MagicMock()
 

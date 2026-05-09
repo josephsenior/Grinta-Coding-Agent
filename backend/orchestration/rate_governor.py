@@ -111,7 +111,8 @@ class LLMRateGovernor:
         self, *, provider: str | None = None, model: str | None = None
     ) -> int:
         """Return the effective TPM limit, applying learned per-model ceiling
-        and the memory-pressure factor."""
+        and the memory-pressure factor.
+        """
         configured = self.max_tokens_per_minute
         if configured <= 0:
             return 0
