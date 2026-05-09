@@ -61,7 +61,7 @@ def test_pt_compact_line_joins_same_segments_as_toolbar_contract() -> None:
     fields = status_fields_from_hud(bar.state, bar.bundled_skill_count)
     line = pt_compact_line_plain(fields)
     assert 'Running' in line
-    assert 'autonomy:full' in line
+    assert 'Autonomy: full' in line
     assert 'google/gemini' in line
     assert '$0.012' in line
 
