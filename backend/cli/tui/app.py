@@ -111,7 +111,7 @@ class GrintaScreen(Screen):
         self._agent_task: asyncio.Task[Any] | None = None
         self._runtime_stub: Any = None
         self._memory_stub: Any = None
-        self._running = True
+        self._agent_running = True
         self._pending_confirm: asyncio.Event | None = None
         self._confirm_result: str | None = None
         self._input_lock = asyncio.Lock()
@@ -197,7 +197,7 @@ class GrintaScreen(Screen):
         elif cmd in ('/clear', '/c'):
             self.clear_transcript()
         elif cmd in ('/quit', '/q', '/exit'):
-            self._running = False
+            self._agent_running = False
             self.app.exit()
         elif cmd == '/settings':
             self.add_system_message('/settings opens settings TUI (coming soon)')
@@ -259,7 +259,7 @@ class GrintaScreen(Screen):
         self.clear_transcript()
 
     def action_suspend(self) -> None:
-        self._running = False
+        self._agent_running = False
         self.app.exit()
 
     def _scroll_to_bottom(self) -> None:
