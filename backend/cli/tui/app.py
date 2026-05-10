@@ -324,7 +324,7 @@ class GrintaScreen(Screen):
             _create_runtime,
         )
         from backend.core.config import load_app_config
-        from backend.core.llm_registry import LLMRegistry
+        from backend.inference.llm_registry import LLMRegistry
 
         app_config = load_app_config()
         llm_registry = LLMRegistry.from_config(app_config)
