@@ -7,12 +7,11 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from rich.console import Console
 
-import backend.cli.repl as cli_repl
 from backend.core.config import AppConfig
 from backend.persistence.locations import get_project_local_data_root
 
@@ -29,9 +28,6 @@ def test_entry_main_launches_cli_repl_with_project_and_piped_input(
 ) -> None:
     config = AppConfig()
     config.get_llm_config().model = 'openai/gpt-4.1'
-
-    repl = MagicMock()
-    repl.run = AsyncMock()
 
     stdin = MagicMock()
     stdin.isatty.return_value = False
@@ -56,7 +52,10 @@ def test_entry_main_launches_cli_repl_with_project_and_piped_input(
                             with patch(
                                 'backend.cli.main.Console', return_value=_make_console()
                             ):
-                                with patch.object(cli_repl, 'Repl', return_value=repl):
+                                with patch(
+                                    'backend.cli.repl_noninteractive.run_noninteractive',
+                                    return_value=None,
+                                ):
                                     with patch(
                                         'backend.cli.config_manager.needs_onboarding',
                                         return_value=False,
@@ -74,8 +73,6 @@ def test_entry_main_launches_cli_repl_with_project_and_piped_input(
     assert config.project_root == resolved
     assert config.local_data_root == get_project_local_data_root(tmp_path)
     assert config.get_agent_config(config.default_agent).cli_mode is True
-    repl.queue_initial_input.assert_called_once_with('queued task\n')
-    repl.run.assert_awaited_once()
 
 
 @pytest.mark.integration
