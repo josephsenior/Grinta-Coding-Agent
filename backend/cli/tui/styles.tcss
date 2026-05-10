@@ -1,188 +1,105 @@
-/* Grinta TUI — Textual CSS theme */
+/* Grinta TUI — Deep Navy Theme
+ * Modern, premium dark aesthetic with cyan accents.
+ */
 
 Screen {
-    background: #0d1117;
-    color: #dbe7f3;
+    background: #070b14;
+    color: #e2e8f0;
 }
 
-/* Header */
+/* ── Header ────────────────────────────────────────── */
+
 GrintaHeader {
-    height: 3;
-    background: #1a2332;
-    border-bottom: solid #2dd4bf;
+    height: 2;
+    background: #0d1526;
+    border-bottom: solid #1e3a5f;
     dock: top;
+    padding: 0 2;
 }
 
-GrintaHeader .brand {
-    color: #2dd4bf;
-    text-style: bold;
-}
+/* ── Transcript ────────────────────────────────────── */
 
-GrintaHeader .state {
-    color: #34d399;
-}
-
-GrintaHeader .state-running {
-    color: #2dd4bf;
-    text-style: bold;
-}
-
-GrintaHeader .state-waiting {
-    color: #fbbf24;
-    text-style: bold;
-}
-
-GrintaHeader .state-error {
-    color: #f87171;
-    text-style: bold;
-}
-
-GrintaHeader .separator {
-    color: #4a7a95;
-}
-
-GrintaHeader .value {
-    color: #dbe7f3;
-}
-
-GrintaHeader .detail {
-    color: #8da5b6;
-}
-
-/* Transcript area */
 Transcript {
-    background: #0d1117;
-    scrollbar-color: #4a7a95 #1a2332;
-    scrollbar-size: 1 1;
+    background: #070b14;
+    scrollbar-color: #2d4a6f #070b14;
+    scrollbar-size: 2 8;
 }
 
-Transcript .user-bubble {
-    color: #dbe7f3;
-    background: #1e3a4f;
-    padding: 0 1;
-    border: solid #2dd4bf;
-}
+/* ── Input area ────────────────────────────────────── */
 
-Transcript .agent-bubble {
-    color: #dbe7f3;
-    background: #0f1c2d;
-    padding: 0 1;
-    border: solid #4a7a95;
-}
-
-Transcript .tool-card {
-    background: #141d2a;
-    border: solid #4a7a95;
-    padding: 0 1;
-}
-
-Transcript .tool-card-header {
-    color: #2dd4bf;
-    text-style: bold;
-}
-
-Transcript .tool-card-body {
-    color: #b4c4d5;
-}
-
-Transcript .system-message {
-    color: #8da5b6;
-    text-style: italic;
-}
-
-Transcript .error-message {
-    color: #f87171;
-    text-style: bold;
-}
-
-Transcript .success-message {
-    color: #34d399;
-}
-
-Transcript .markdown-body {
-    color: #dbe7f3;
-}
-
-Transcript .rule {
-    color: #4a6b82;
-}
-
-/* Input area */
 InputArea {
     height: 3;
-    background: #1a2332;
-    border-top: solid #2a4a5a;
+    background: #0d1526;
+    border-top: solid #1e3a5f;
     dock: bottom;
+    padding: 0 4;
 }
 
-InputArea .prompt {
-    color: #2dd4bf;
+InputArea Static {
+    color: #00d4ff;
     text-style: bold;
+    padding: 0 4;
 }
 
 InputArea TextArea {
-    background: #1e2a3a;
-    color: #dbe7f3;
-    border: solid #2a4a5a;
-    height: 3;
+    background: #070b14;
+    color: #e2e8f0;
+    border: solid #1e3a5f;
+    padding: 2 8;
 }
 
 InputArea TextArea:focus {
-    border: solid #2dd4bf;
+    border: solid #00d4ff;
 }
 
-/* Footer */
+InputArea.processing TextArea {
+    border: solid #00d4ff;
+}
+
+/* ── Footer ────────────────────────────────────────── */
+
 GrintaFooter {
     height: 1;
-    background: #1a2332;
-    color: #8da5b6;
+    background: #0d1526;
+    color: #64748b;
     dock: bottom;
+    text-align: center;
 }
 
-/* Confirmation modal */
+GrintaFooter.hidden {
+    display: none;
+}
+
+/* ── Confirmation dialog ───────────────────────────── */
+
 GrintaConfirmDialog {
-    background: #1a2332;
-    border: solid #fbbf24;
-    padding: 1 2;
+    background: #111d30;
+    border: solid #2d4a6f;
+    padding: 2 4;
+    width: 60;
+    align: center top;
 }
 
 GrintaConfirmDialog .title {
-    color: #fbbf24;
+    color: #00d4ff;
     text-style: bold;
+    margin-bottom: 1;
 }
 
 GrintaConfirmDialog .body {
-    color: #dbe7f3;
+    color: #e2e8f0;
+    margin-bottom: 2;
 }
 
 GrintaConfirmDialog Button {
-    background: #2a4a5a;
-    color: #dbe7f3;
+    background: #0d1526;
+    color: #e2e8f0;
+    border: solid #2d4a6f;
+    margin: 0 1;
 }
 
 GrintaConfirmDialog Button:hover {
-    background: #2dd4bf;
-    color: #0d1117;
-}
-
-/* Spinner */
-Spinner {
-    color: #2dd4bf;
-}
-
-/* DataTable */
-DataTable {
-    background: #0d1117;
-    color: #dbe7f3;
-    border: solid #4a7a95;
-}
-
-DataTable .header-cell {
-    background: #1a2332;
-    color: #2dd4bf;
-    text-style: bold;
-}
-
-DataTable .row-hover {
-    background: #1e3a4f;
+    background: #00d4ff;
+    color: #070b14;
+    border: solid #00d4ff;
 }
