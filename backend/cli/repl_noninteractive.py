@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.prompt import Prompt
@@ -17,6 +17,7 @@ from rich.prompt import Prompt
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.theme import mark_prompt
+from backend.core.enums import AgentState
 
 if TYPE_CHECKING:
     from backend.cli.config_manager import AppConfig
@@ -32,44 +33,53 @@ async def run_noninteractive(
     verbose: bool = False,
 ) -> None:
     """Run non-interactive REPL: bootstrap agent, read lines, dispatch, print."""
-    from backend.core.config import load_app_config
     from backend.cli.event_renderer import CLIEventRenderer
+    from backend.core.config import load_app_config
 
     hud = HUDBar()
     reasoning = ReasoningDisplay()
     renderer = CLIEventRenderer(console=console, hud=hud, reasoning=reasoning)
 
-    # -- bootstrap -----------------------------------------------------------
-    from backend.core.bootstrap.main import (
-        _create_agent,
-        _create_event_stream,
-        _create_memory,
-        _create_runtime,
-    )
-    from backend.core.llm_registry import LLMRegistry
-    from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.core.bootstrap.agent_control_loop import run_agent_until_done
+    from backend.core.bootstrap.setup import create_agent, create_memory, create_runtime
+    from backend.core.llm_registry import LLMRegistry
+    from backend.orchestration.conversation_stats import ConversationStats
+    from backend.orchestration.orchestration_config import OrchestrationConfig
+    from backend.orchestration.session_orchestrator import SessionOrchestrator
 
     console.print('[dim]Initializing engine...[/dim]')
 
     app_config = load_app_config()
     llm_registry = LLMRegistry.from_config(app_config)
-    runtime = await _create_runtime(app_config)
-    agent = _create_agent(app_config, runtime, llm_registry)
-    memory = _create_memory(app_config)
-    event_stream = _create_event_stream()
+    runtime = create_runtime(app_config, llm_registry)
+
+    event_stream = runtime.event_stream
+    if event_stream is None:
+        console.print('[red]Runtime has no event stream[/red]')
+        return
+
+    agent = create_agent(app_config, llm_registry)
+    memory = create_memory(runtime, event_stream, event_stream.sid)
+    conversation_stats = ConversationStats(
+            file_store=event_stream.file_store,
+            conversation_id=event_stream.sid,
+            user_id=None,
+        )
 
     controller = SessionOrchestrator(
-        agent=agent,
-        event_stream=event_stream,
-        memory=memory,
-        runtime=runtime,
-        config=config,
+        config=OrchestrationConfig(
+            agent=agent,
+            event_stream=event_stream,
+            conversation_stats=conversation_stats,
+            iteration_delta=config.max_iterations,
+            headless_mode=True,
+        )
     )
+    controller.runtime = runtime
 
     renderer.subscribe(event_stream, event_stream.sid)
 
-    end_states = ['AWAITING_USER_INPUT', 'FINISHED', 'ERROR', 'STOPPED']
+    end_states: list[AgentState] = [AgentState.AWAITING_USER_INPUT, AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED]
     agent_task = asyncio.create_task(
         run_agent_until_done(controller, runtime, memory, end_states)
     )
@@ -77,8 +87,8 @@ async def run_noninteractive(
     console.print('[dim]Engine ready.[/dim]')
 
     # -- input loop ----------------------------------------------------------
-    from backend.ledger.action import MessageAction
     from backend.core.enums import EventSource
+    from backend.ledger.action import MessageAction
 
     try:
         if initial_input:

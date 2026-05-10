@@ -247,7 +247,8 @@ class TestCreatePlaybook:
         playbook = CreatePlaybook(repo='owner/repo')
         assert playbook.repo == 'owner/repo'
         assert playbook.vcs_provider is None
-        assert playbook.title is None
+        title = playbook.title
+        assert title is None
 
     def test_create_with_all_fields(self):
         """Test creating with all fields."""

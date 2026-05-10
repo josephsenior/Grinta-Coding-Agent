@@ -24,12 +24,8 @@ from backend.cli.config_manager import get_current_model
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.status_chrome import (
-    STATUS_CHROME_COMPACT_WIDTH,
-    _token_bar as _token_progress_bar,
     autonomy_chrome_suffix,
-    pt_compact_line_plain,
     status_fields_from_hud,
-    workspace_path_display_max,
 )
 from backend.cli.theme import CLR_STATUS_ERR, mark_prompt, prompt_toolkit_style_dict
 from backend.core.config import (

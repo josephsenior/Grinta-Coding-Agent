@@ -187,3 +187,66 @@ async def test_tui_message_helpers(mock_config):
 
         log = s.query_one('#transcript-log')
         assert log is not None
+
+
+@pytest.mark.asyncio
+async def test_tui_run_agent_loop_is_awaitable(mock_config):
+    """Verify _run_agent_loop is a proper coroutine (architectural check)."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        assert asyncio.iscoroutinefunction(s._run_agent_loop)
+
+
+@pytest.mark.asyncio
+async def test_tui_drain_events_noop_when_empty(mock_config):
+    """Verify drain_events is safe to call with no pending events."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = s._renderer
+        if renderer is not None:
+            renderer.drain_events()
+        else:
+            from backend.cli.hud import HUDBar
+            from backend.cli.reasoning_display import ReasoningDisplay
+            from backend.cli.tui.app import TUIRenderer
+
+            renderer = TUIRenderer(
+                console=console,
+                hud=HUDBar(),
+                reasoning=ReasoningDisplay(),
+                tui=s,
+                loop=loop,
+            )
+            renderer.drain_events()
+        await pilot.pause()
+
+
+@pytest.mark.asyncio
+async def test_tui_render_header_from_hud_state(mock_config):
+    """Verify _render_header reads from hud.state.agent_state_label."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._hud.update_agent_state('CustomState')
+        s._render_header()
+
+        header = s.query_one('#header-bar')
+        assert 'CustomState' in header.renderable
+        await pilot.pause()

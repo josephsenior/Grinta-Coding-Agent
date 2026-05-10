@@ -594,6 +594,21 @@ class OrchestratorExecutor:
 
         await self._apply_fallback_completion(fallback, state, event_stream)
 
+    async def _handle_first_chunk_timeout_safe(
+        self,
+        call_params: dict[str, Any],
+        event_stream: EventStream | None,
+        state: _AsyncStreamingState,
+        first_chunk_timeout: float,
+    ) -> bool:
+        try:
+            await self._handle_first_chunk_timeout_fallback(
+                call_params, event_stream, state, first_chunk_timeout
+            )
+            return True
+        except Exception:
+            return False
+
     async def _consume_first_stream_chunk(
         self,
         stream_aiter: Any,
@@ -608,24 +623,30 @@ class OrchestratorExecutor:
         if self._step_cancelled:
             return False
 
+        got_chunk = False
+        chunk: Any = None
         try:
-            first_chunk = await asyncio.wait_for(
+            chunk = await asyncio.wait_for(
                 stream_aiter.__anext__(),
                 timeout=first_chunk_timeout,
             )
+            got_chunk = True
         except StopAsyncIteration:
             return False
         except asyncio.TimeoutError:
-            await self._handle_first_chunk_timeout_fallback(
-                call_params,
-                event_stream,
-                state,
-                first_chunk_timeout,
+            fallback_succeeded = await self._handle_first_chunk_timeout_safe(
+                call_params, event_stream, state, first_chunk_timeout
             )
+            if not fallback_succeeded:
+                return False
+
+        if not got_chunk:
             return False
 
         if self._step_cancelled:
             return False
+
+        first_chunk = chunk
 
         choices = first_chunk.get('choices', [])
         if choices:
@@ -683,8 +704,9 @@ class OrchestratorExecutor:
                 event_stream,
             )
 
-            if self._step_cancelled:
-                return
+            if not self._step_cancelled:
+                continue
+            return
 
     async def _consume_async_stream(
         self,

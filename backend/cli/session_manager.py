@@ -415,8 +415,8 @@ def delete_sessions(
         except Exception as e:
             console.print(f'  [red]Failed[/] {sid[:12]}: {e}')
 
-    for e in errors:
-        console.print(f'[yellow]{e}[/]')
+    for err in errors:
+        console.print(f'[yellow]{err}[/]')
 
     return 0 if deleted == len(to_delete) else 1
 

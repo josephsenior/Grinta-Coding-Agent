@@ -51,6 +51,7 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
     _console: Any
     _hud: Any
     _reasoning: Any
+    _suppress_low_risk_confirmations: bool
 
     # -- wait for agent to be idle -----------------------------------------
 

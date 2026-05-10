@@ -142,47 +142,66 @@ class LspResult:
             )
         if self.error:
             return f'LSP error: {self.error}'
-        if command in ('find_definition', 'find_references'):
-            if not self.locations:
-                return 'No results found.'
-            lines = [f'Found {len(self.locations)} result(s):']
-            for loc in self.locations[:20]:  # cap output
-                lines.append(f'  - {loc}')
-            return '\n'.join(lines)
-        if command == 'hover':
-            return self.hover_text or 'No hover information available.'
-        if command == 'list_symbols':
-            if not self.symbols:
-                return 'No symbols found.'
-            lines = [f'Symbols in file ({len(self.symbols)}):']
-            for sym in self.symbols[:40]:
-                lines.append(f'  - {sym}')
-            return '\n'.join(lines)
-        if command in ('diagnostics', 'get_diagnostics'):
-            if not self.locations:
-                return 'No diagnostics found. File looks clean.'
-            lines = [f'Diagnostics ({len(self.locations)} issue(s)):']
-            for loc in self.locations[:30]:
-                lines.append(f'  - {loc}')
-            return '\n'.join(lines)
-        if command == 'code_action':
-            if not self.code_actions:
-                return (
-                    'No code actions / quick-fixes available at this location. '
-                    'Either the file is clean or the language server has no '
-                    'suggestions for this range. Apply edits manually via '
-                    '`symbol_editor` or `text_editor`.'
-                )
-            lines = [
-                f'Available code actions ({len(self.code_actions)}; ★ = preferred):',
-                '(Discovery-only — no auto-apply yet. Implement the chosen fix '
-                'via `symbol_editor` / `text_editor` and re-run `get_diagnostics` '
-                'to verify.)',
-            ]
-            for act in self.code_actions[:25]:
-                lines.append(f'  {act}')
-            return '\n'.join(lines)
+
+        handlers = {
+            'find_definition': self._format_locations,
+            'find_references': self._format_locations,
+            'hover': self._format_hover,
+            'list_symbols': self._format_symbols,
+            'diagnostics': self._format_diagnostics,
+            'get_diagnostics': self._format_diagnostics,
+            'code_action': self._format_code_actions,
+        }
+
+        handler = handlers.get(command)
+        if handler:
+            return handler()
         return str(self)
+
+    def _format_locations(self) -> str:
+        if not self.locations:
+            return 'No results found.'
+        lines = [f'Found {len(self.locations)} result(s):']
+        for loc in self.locations[:20]:
+            lines.append(f'  - {loc}')
+        return '\n'.join(lines)
+
+    def _format_hover(self) -> str:
+        return self.hover_text or 'No hover information available.'
+
+    def _format_symbols(self) -> str:
+        if not self.symbols:
+            return 'No symbols found.'
+        lines = [f'Symbols in file ({len(self.symbols)}):']
+        for sym in self.symbols[:40]:
+            lines.append(f'  - {sym}')
+        return '\n'.join(lines)
+
+    def _format_diagnostics(self) -> str:
+        if not self.locations:
+            return 'No diagnostics found. File looks clean.'
+        lines = [f'Diagnostics ({len(self.locations)} issue(s)):']
+        for loc in self.locations[:30]:
+            lines.append(f'  - {loc}')
+        return '\n'.join(lines)
+
+    def _format_code_actions(self) -> str:
+        if not self.code_actions:
+            return (
+                'No code actions / quick-fixes available at this location. '
+                'Either the file is clean or the language server has no '
+                'suggestions for this range. Apply edits manually via '
+                '`symbol_editor` or `text_editor`.'
+            )
+        lines = [
+            f'Available code actions ({len(self.code_actions)}; ★ = preferred):',
+            '(Discovery-only — no auto-apply yet. Implement the chosen fix '
+            'via `symbol_editor` / `text_editor` and re-run `get_diagnostics` '
+            'to verify.)',
+        ]
+        for act in self.code_actions[:25]:
+            lines.append(f'  {act}')
+        return '\n'.join(lines)
 
 
 # ── Core client ────────────────────────────────────────────────────────────
@@ -444,51 +463,62 @@ class LspClient:
         if not server_cmd:
             return LspResult(available=False)
 
-        # First collect diagnostics for the file so we can pass them as
-        # context to ``textDocument/codeAction`` — most servers only return
-        # quickfixes when the matching diagnostic is present in the request.
+        diagnostics_payload = self._collect_diagnostics_for_code_action(
+            server_cmd, uri, abs_path, source
+        )
+
+        req_range, relevant_diags = self._build_code_action_range_and_diags(
+            source, diagnostics_payload, lsp_line, lsp_col
+        )
+
+        return self._execute_code_action_request(
+            server_cmd, uri, abs_path, source, req_range, relevant_diags
+        )
+
+    def _collect_diagnostics_for_code_action(
+        self, server_cmd: list[str], uri: str, abs_path: str, source: str
+    ) -> list[dict[str, Any]]:
         diag_msgs = self._build_init_msgs(uri, abs_path)
         diag_msgs[2]['params']['textDocument']['text'] = source
         diag_msgs.append(
             {'jsonrpc': '2.0', 'method': 'shutdown', 'id': 99, 'params': {}}
         )
         diag_responses = self._rpc(diag_msgs, server_cmd)
-        diagnostics_payload: list[dict[str, Any]] = []
         for resp in diag_responses:
             if resp.get('method') == 'textDocument/publishDiagnostics':
                 params = resp.get('params', {})
                 if params.get('uri') == uri:
-                    diagnostics_payload = list(params.get('diagnostics', []))
-                    break
+                    return list(params.get('diagnostics', []))
+        return []
 
-        # If a position was given, restrict the request range to a single
-        # point so the server returns only actions relevant to that location.
-        # Otherwise (line<=1 and column<=1 → caller did not specify a target)
-        # request actions for the whole file.
+    def _build_code_action_range_and_diags(
+        self, source: str, diagnostics_payload: list[dict[str, Any]], lsp_line: int, lsp_col: int
+    ) -> tuple[dict, list[dict[str, Any]]]:
         if lsp_line == 0 and lsp_col == 0:
             line_count = source.count('\n') + 1
             req_range = {
                 'start': {'line': 0, 'character': 0},
                 'end': {'line': max(0, line_count - 1), 'character': 0},
             }
-            relevant_diags = diagnostics_payload
-        else:
-            req_range = {
-                'start': {'line': lsp_line, 'character': lsp_col},
-                'end': {'line': lsp_line, 'character': lsp_col},
-            }
-            # Filter diagnostics to those overlapping the requested point.
-            relevant_diags = [
-                d
-                for d in diagnostics_payload
-                if self._diag_contains_point(d, lsp_line, lsp_col)
-            ]
-            # Fall back to all diagnostics if the point matched nothing — the
-            # server may still surface refactor / source actions independent
-            # of diagnostics.
-            if not relevant_diags:
-                relevant_diags = diagnostics_payload
+            return req_range, diagnostics_payload
 
+        req_range = {
+            'start': {'line': lsp_line, 'character': lsp_col},
+            'end': {'line': lsp_line, 'character': lsp_col},
+        }
+        relevant_diags = [
+            d
+            for d in diagnostics_payload
+            if self._diag_contains_point(d, lsp_line, lsp_col)
+        ]
+        if not relevant_diags:
+            relevant_diags = diagnostics_payload
+        return req_range, relevant_diags
+
+    def _execute_code_action_request(
+        self, server_cmd: list[str], uri: str, abs_path: str, source: str,
+        req_range: dict, relevant_diags: list[dict[str, Any]]
+    ) -> LspResult:
         msgs = self._build_init_msgs(uri, abs_path)
         msgs[2]['params']['textDocument']['text'] = source
         msgs.append(
@@ -499,9 +529,7 @@ class LspClient:
                 'params': {
                     'textDocument': {'uri': uri},
                     'range': req_range,
-                    'context': {
-                        'diagnostics': relevant_diags,
-                    },
+                    'context': {'diagnostics': relevant_diags},
                 },
             }
         )
@@ -511,32 +539,35 @@ class LspClient:
         for resp in responses:
             if resp.get('id') == 30 and 'result' in resp:
                 result = resp.get('result') or []
-                actions: list[LspCodeAction] = []
-                seen_titles: set[str] = set()
-                for item in result:
-                    if not isinstance(item, dict):
-                        continue
-                    title = str(item.get('title', '')).strip()
-                    if not title or title in seen_titles:
-                        continue
-                    seen_titles.add(title)
-                    diag_msg = ''
-                    diags = item.get('diagnostics') or []
-                    if diags and isinstance(diags[0], dict):
-                        diag_msg = str(diags[0].get('message', '')).strip()
-                    actions.append(
-                        LspCodeAction(
-                            title=title,
-                            kind=str(item.get('kind', '')),
-                            is_preferred=bool(item.get('isPreferred', False)),
-                            diagnostic_message=diag_msg,
-                        )
-                    )
-                # Preferred actions first, then alphabetical for stability.
-                actions.sort(key=lambda a: (not a.is_preferred, a.title.lower()))
+                actions = self._parse_code_action_items(result)
                 return LspResult(available=True, code_actions=actions)
 
         return LspResult(available=True, code_actions=[])
+
+    def _parse_code_action_items(self, result: list) -> list[LspCodeAction]:
+        actions: list[LspCodeAction] = []
+        seen_titles: set[str] = set()
+        for item in result:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get('title', '')).strip()
+            if not title or title in seen_titles:
+                continue
+            seen_titles.add(title)
+            diag_msg = ''
+            diags = item.get('diagnostics') or []
+            if diags and isinstance(diags[0], dict):
+                diag_msg = str(diags[0].get('message', '')).strip()
+            actions.append(
+                LspCodeAction(
+                    title=title,
+                    kind=str(item.get('kind', '')),
+                    is_preferred=bool(item.get('isPreferred', False)),
+                    diagnostic_message=diag_msg,
+                )
+            )
+        actions.sort(key=lambda a: (not a.is_preferred, a.title.lower()))
+        return actions
 
     @staticmethod
     def _diag_contains_point(diag: dict, lsp_line: int, lsp_col: int) -> bool:
@@ -578,37 +609,39 @@ class LspClient:
 
         msgs = self._build_init_msgs(uri, abs_path)
         msgs[2]['params']['textDocument']['text'] = source
-        msgs.append(
-            {
-                'jsonrpc': '2.0',
-                'id': 10,
-                'method': 'textDocument/hover',
-                'params': {
-                    'textDocument': {'uri': uri},
-                    'position': {'line': lsp_line, 'character': lsp_col},
-                },
-            }
-        )
+        msgs.append(self._build_hover_request_message(uri, lsp_line, lsp_col))
         msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 11, 'params': {}})
 
         responses = self._rpc(msgs, server_cmd)
         for resp in responses:
             if resp.get('id') == 10 and 'result' in resp:
-                result = resp['result']
-                if result and 'contents' in result:
-                    contents = result['contents']
-                    if isinstance(contents, dict):
-                        return LspResult(
-                            available=True, hover_text=contents.get('value', '')
-                        )
-                    elif isinstance(contents, list):
-                        return LspResult(
-                            available=True,
-                            hover_text='\n'.join([str(c) for c in contents]),
-                        )
-                    return LspResult(available=True, hover_text=str(contents))
+                return self._parse_hover_response(resp['result'])
 
         return LspResult(available=True, hover_text='No hover info')
+
+    def _build_hover_request_message(self, uri: str, lsp_line: int, lsp_col: int) -> dict[str, Any]:
+        return {
+            'jsonrpc': '2.0',
+            'id': 10,
+            'method': 'textDocument/hover',
+            'params': {
+                'textDocument': {'uri': uri},
+                'position': {'line': lsp_line, 'character': lsp_col},
+            },
+        }
+
+    def _parse_hover_response(self, result: Any) -> LspResult:
+        if result and 'contents' in result:
+            contents = result['contents']
+            if isinstance(contents, dict):
+                return LspResult(available=True, hover_text=contents.get('value', ''))
+            elif isinstance(contents, list):
+                return LspResult(
+                    available=True,
+                    hover_text='\n'.join([str(c) for c in contents]),
+                )
+            return LspResult(available=True, hover_text=str(contents))
+        return LspResult(available=True)
 
     def _query_locations(
         self,
@@ -623,53 +656,10 @@ class LspClient:
         if not server_cmd:
             return LspResult(available=False)
 
-        # Attempt real LSP; fall back to AST grep on failure (for Python)
         try:
-            msg_id = 10
-            msgs = self._build_init_msgs(uri, abs_path)
-            # Override textDocument text
-            msgs[2]['params']['textDocument']['text'] = source
-            lsp_method = (
-                'textDocument/definition'
-                if command == 'find_definition'
-                else 'textDocument/references'
+            return self._try_lsp_locations(
+                server_cmd, command, uri, abs_path, source, lsp_line, lsp_col
             )
-            msg: dict[str, Any] = {
-                'jsonrpc': '2.0',
-                'id': msg_id,
-                'method': lsp_method,
-                'params': {
-                    'textDocument': {'uri': uri},
-                    'position': {'line': lsp_line, 'character': lsp_col},
-                },
-            }
-            if command == 'find_references':
-                msg['params']['context'] = {'includeDeclaration': True}
-            msgs.append(msg)
-            msgs.append(
-                {'jsonrpc': '2.0', 'method': 'shutdown', 'id': msg_id + 1, 'params': {}}
-            )
-
-            responses = self._rpc(msgs, server_cmd)
-            for resp in responses:
-                if resp.get('id') == msg_id and 'result' in resp:
-                    result = resp['result']
-                    if not result:
-                        return LspResult(available=True)
-                    if isinstance(result, dict):
-                        result = [result]
-                    locations = []
-                    for loc in result:
-                        start = loc.get('range', {}).get('start', {})
-                        path = loc.get('uri', '').replace('file://', '')
-                        locations.append(
-                            LspLocation(
-                                file=path,
-                                line=start.get('line', 0) + 1,
-                                column=start.get('character', 0) + 1,
-                            )
-                        )
-                    return LspResult(available=True, locations=locations)
         except Exception as e:
             logger.debug('LSP RPC failed: %s', e)
 
@@ -679,6 +669,61 @@ class LspClient:
         return LspResult(
             available=True, error='LSP query failed and no fallback available'
         )
+
+    def _try_lsp_locations(
+        self, server_cmd: list[str], command: str, uri: str, abs_path: str,
+        source: str, lsp_line: int, lsp_col: int
+    ) -> LspResult:
+        msg_id = 10
+        msgs = self._build_init_msgs(uri, abs_path)
+        msgs[2]['params']['textDocument']['text'] = source
+        msgs.append(self._build_location_request_message(command, msg_id, uri, lsp_line, lsp_col))
+        msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': msg_id + 1, 'params': {}})
+
+        responses = self._rpc(msgs, server_cmd)
+        for resp in responses:
+            if resp.get('id') == msg_id and 'result' in resp:
+                return self._parse_location_response(resp['result'])
+        return LspResult(available=True)
+
+    def _build_location_request_message(
+        self, command: str, msg_id: int, uri: str, lsp_line: int, lsp_col: int
+    ) -> dict[str, Any]:
+        lsp_method = (
+            'textDocument/definition'
+            if command == 'find_definition'
+            else 'textDocument/references'
+        )
+        msg: dict[str, Any] = {
+            'jsonrpc': '2.0',
+            'id': msg_id,
+            'method': lsp_method,
+            'params': {
+                'textDocument': {'uri': uri},
+                'position': {'line': lsp_line, 'character': lsp_col},
+            },
+        }
+        if command == 'find_references':
+            msg['params']['context'] = {'includeDeclaration': True}
+        return msg
+
+    def _parse_location_response(self, result: Any) -> LspResult:
+        if not result:
+            return LspResult(available=True)
+        if isinstance(result, dict):
+            result = [result]
+        locations = []
+        for loc in result:
+            start = loc.get('range', {}).get('start', {})
+            path = loc.get('uri', '').replace('file://', '')
+            locations.append(
+                LspLocation(
+                    file=path,
+                    line=start.get('line', 0) + 1,
+                    column=start.get('character', 0) + 1,
+                )
+            )
+        return LspResult(available=True, locations=locations)
 
 
 # ── AST-based fallbacks (no pylsp needed) ─────────────────────────────────
