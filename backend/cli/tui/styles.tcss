@@ -1,0 +1,188 @@
+/* Grinta TUI — Textual CSS theme */
+
+Screen {
+    background: #0d1117;
+    color: #dbe7f3;
+}
+
+/* Header */
+GrintaHeader {
+    height: 3;
+    background: #1a2332;
+    border-bottom: solid #2dd4bf;
+    dock: top;
+}
+
+GrintaHeader .brand {
+    color: #2dd4bf;
+    text-style: bold;
+}
+
+GrintaHeader .state {
+    color: #34d399;
+}
+
+GrintaHeader .state-running {
+    color: #2dd4bf;
+    text-style: bold;
+}
+
+GrintaHeader .state-waiting {
+    color: #fbbf24;
+    text-style: bold;
+}
+
+GrintaHeader .state-error {
+    color: #f87171;
+    text-style: bold;
+}
+
+GrintaHeader .separator {
+    color: #4a7a95;
+}
+
+GrintaHeader .value {
+    color: #dbe7f3;
+}
+
+GrintaHeader .detail {
+    color: #8da5b6;
+}
+
+/* Transcript area */
+Transcript {
+    background: #0d1117;
+    scrollbar-color: #4a7a95 #1a2332;
+    scrollbar-size: 1 1;
+}
+
+Transcript .user-bubble {
+    color: #dbe7f3;
+    background: #1e3a4f;
+    padding: 0 1;
+    border: solid #2dd4bf;
+}
+
+Transcript .agent-bubble {
+    color: #dbe7f3;
+    background: #0f1c2d;
+    padding: 0 1;
+    border: solid #4a7a95;
+}
+
+Transcript .tool-card {
+    background: #141d2a;
+    border: solid #4a7a95;
+    padding: 0 1;
+}
+
+Transcript .tool-card-header {
+    color: #2dd4bf;
+    text-style: bold;
+}
+
+Transcript .tool-card-body {
+    color: #b4c4d5;
+}
+
+Transcript .system-message {
+    color: #8da5b6;
+    text-style: italic;
+}
+
+Transcript .error-message {
+    color: #f87171;
+    text-style: bold;
+}
+
+Transcript .success-message {
+    color: #34d399;
+}
+
+Transcript .markdown-body {
+    color: #dbe7f3;
+}
+
+Transcript .rule {
+    color: #4a6b82;
+}
+
+/* Input area */
+InputArea {
+    height: 3;
+    background: #1a2332;
+    border-top: solid #2a4a5a;
+    dock: bottom;
+}
+
+InputArea .prompt {
+    color: #2dd4bf;
+    text-style: bold;
+}
+
+InputArea TextArea {
+    background: #1e2a3a;
+    color: #dbe7f3;
+    border: solid #2a4a5a;
+    height: 3;
+}
+
+InputArea TextArea:focus {
+    border: solid #2dd4bf;
+}
+
+/* Footer */
+GrintaFooter {
+    height: 1;
+    background: #1a2332;
+    color: #8da5b6;
+    dock: bottom;
+}
+
+/* Confirmation modal */
+GrintaConfirmDialog {
+    background: #1a2332;
+    border: solid #fbbf24;
+    padding: 1 2;
+}
+
+GrintaConfirmDialog .title {
+    color: #fbbf24;
+    text-style: bold;
+}
+
+GrintaConfirmDialog .body {
+    color: #dbe7f3;
+}
+
+GrintaConfirmDialog Button {
+    background: #2a4a5a;
+    color: #dbe7f3;
+}
+
+GrintaConfirmDialog Button:hover {
+    background: #2dd4bf;
+    color: #0d1117;
+}
+
+/* Spinner */
+Spinner {
+    color: #2dd4bf;
+}
+
+/* DataTable */
+DataTable {
+    background: #0d1117;
+    color: #dbe7f3;
+    border: solid #4a7a95;
+}
+
+DataTable .header-cell {
+    background: #1a2332;
+    color: #2dd4bf;
+    text-style: bold;
+}
+
+DataTable .row-hover {
+    background: #1e3a4f;
+}

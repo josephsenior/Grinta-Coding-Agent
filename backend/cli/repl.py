@@ -1218,58 +1218,6 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         )
         return f' {controls}\n {telemetry} '
 
-    def _prompt_bottom_toolbar(self) -> Any:
-        """Single-line status under the input; no filled backgrounds (terminal default).
-
-        Always compact — state label reflects the current agent state (Ready,
-        Running, Backoff N/5 …) so the user always sees status without layout
-        churn.
-        """
-        width = shutil.get_terminal_size((110, 24)).columns
-        self._prompt_panel_data()
-        fields = status_fields_from_hud(self._hud.state, self._hud.bundled_skill_count)
-
-        fragments: list[tuple[str, str]] = []
-
-        def add(style: str, text: str) -> None:
-            fragments.append((style, text))
-
-        if width < STATUS_CHROME_COMPACT_WIDTH:
-            add(
-                'class:prompt.dim',
-                pt_compact_line_plain(fields, term_width=width),
-            )
-            self._append_footer_system_fragments(fragments, add)
-            return fragments
-
-        if fields.workspace_path:
-            ws_budget = workspace_path_display_max(width)
-            ws_display = HUDBar.ellipsize_path(fields.workspace_path, ws_budget)
-            add('class:prompt.value', ws_display)
-            add('class:prompt.sep', '  ·  ')
-        add('class:prompt.value', fields.agent_state_label)
-        add('class:prompt.sep', '  ·  ')
-        add(
-            self._prompt_autonomy_style(),
-            autonomy_chrome_suffix(fields.autonomy_level),
-        )
-        add('class:prompt.sep', '  ·  ')
-        add('class:prompt.model', fields.model_display)
-        add('class:prompt.sep', '  ·  ')
-        has_limit = '/' in fields.token_display_compact
-        if has_limit:
-            add(
-                'class:prompt.value',
-                f'{_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
-            )
-        else:
-            add('class:prompt.value', fields.token_display_compact)
-        if fields.cost_usd > 0:
-            add('class:prompt.sep', '  ·  ')
-            add('class:prompt.value', f'${fields.cost_usd:.3f}')
-        self._append_footer_system_fragments(fragments, add)
-        return fragments
-
     def _prompt_panel_message(self) -> Any:
         return [
             ('class:prompt.arrow', self._prompt_message()),
@@ -1288,7 +1236,6 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
         return PromptSession(
             message=self._prompt_panel_message,
-            bottom_toolbar=self._prompt_bottom_toolbar,
             history=FileHistory(str(_ensure_history())),
             key_bindings=_build_bindings(),
             completer=_build_command_completer(

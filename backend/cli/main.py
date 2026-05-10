@@ -413,7 +413,6 @@ async def _async_main(
     theme: str | None = None,
     verbose: bool = False,
 ) -> None:
-    from backend.cli.repl import Repl
     from backend.core.config import load_app_config
     from backend.core.logger import configure_file_logging
     from backend.persistence.locations import get_project_local_data_root
@@ -469,11 +468,28 @@ async def _async_main(
             return
         config = config_or_none
 
-        # -- launch REPL -------------------------------------------------------
-        repl = Repl(config, console)
-        if initial_input:
-            repl.queue_initial_input(initial_input)
-        await repl.run()
+        # -- detect TTY and route to TUI or fallback --------------------------
+        if sys.stdin.isatty():
+            from backend.cli.tui.main import _async_main_tui
+
+            await _async_main_tui(
+                config=config,
+                console=console,
+                model=model,
+                show_splash=False,
+                minimal=minimal,
+                accessible=_accessible_mode,
+                verbose=verbose,
+            )
+        else:
+            from backend.cli.repl_noninteractive import run_noninteractive
+
+            await run_noninteractive(
+                config=config,
+                console=console,
+                initial_input=initial_input,
+                verbose=verbose,
+            )
     finally:
         from backend.inference.direct_clients import aclose_shared_http_clients
 

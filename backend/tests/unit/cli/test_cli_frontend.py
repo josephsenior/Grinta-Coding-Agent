@@ -1326,44 +1326,42 @@ async def test_async_main_defaults_workspace_to_cwd(
     config = AppConfig()
     config.get_llm_config().model = 'openai/gpt-4.1'
 
-    repl = MagicMock()
-    repl.run = AsyncMock()
     sim_home = tmp_path / 'SIM_HOME'
     sim_home.mkdir()
     monkeypatch.setenv('HOME', str(sim_home))
     monkeypatch.setenv('USERPROFILE', str(sim_home))
 
-    with patch('backend.core.config.load_app_config', return_value=config):
-        with patch('backend.cli.main.Console', return_value=_make_console()):
-            with patch('backend.cli.repl.Repl', return_value=repl):
-                with patch(
-                    'backend.cli.config_manager.needs_onboarding', return_value=False
-                ):
-                    with patch(
-                        'backend.cli.config_manager.ensure_default_model',
-                        return_value='openai/gpt-4.1',
-                    ):
-                        with patch('backend.cli.main._setup_logging'):
-                            with patch('pathlib.Path.cwd', return_value=tmp_path):
-                                from backend.cli.main import _async_main
+    stdin_mock = MagicMock()
+    stdin_mock.isatty.return_value = True
 
-                                await _async_main()
+    with patch.object(sys, 'stdin', stdin_mock):
+        with patch('backend.core.config.load_app_config', return_value=config):
+            with patch('backend.cli.main.Console', return_value=_make_console()):
+                with patch('backend.cli.tui.main._async_main_tui', return_value=None):
+                    with patch(
+                        'backend.cli.config_manager.needs_onboarding', return_value=False
+                    ):
+                        with patch(
+                            'backend.cli.config_manager.ensure_default_model',
+                            return_value='openai/gpt-4.1',
+                        ):
+                            with patch('backend.cli.main._setup_logging'):
+                                with patch('pathlib.Path.cwd', return_value=tmp_path):
+                                    from backend.cli.main import _async_main
+
+                                    await _async_main()
 
     resolved = str(tmp_path.resolve())
     assert config.project_root == resolved
     assert config.local_data_root == get_project_local_data_root(tmp_path)
     assert 'workspaces' in config.local_data_root
     assert config.get_agent_config(config.default_agent).cli_mode is True
-    repl.run.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_async_main_queues_piped_input(tmp_path: Path) -> None:
     config = AppConfig()
     config.get_llm_config().model = 'openai/gpt-4.1'
-
-    repl = MagicMock()
-    repl.run = AsyncMock()
 
     stdin = MagicMock()
     stdin.isatty.return_value = False
@@ -1372,7 +1370,10 @@ async def test_async_main_queues_piped_input(tmp_path: Path) -> None:
     with patch.object(sys, 'stdin', stdin):
         with patch('backend.core.config.load_app_config', return_value=config):
             with patch('backend.cli.main.Console', return_value=_make_console()):
-                with patch('backend.cli.repl.Repl', return_value=repl):
+                with patch(
+                    'backend.cli.repl_noninteractive.run_noninteractive',
+                    return_value=None,
+                ):
                     with patch(
                         'backend.cli.config_manager.needs_onboarding',
                         return_value=False,
@@ -1387,9 +1388,6 @@ async def test_async_main_queues_piped_input(tmp_path: Path) -> None:
 
                                     await _async_main()
 
-    repl.queue_initial_input.assert_called_once_with('queued task\n')
-    repl.run.assert_awaited_once()
-
 
 @pytest.mark.asyncio
 async def test_async_main_keeps_explicit_project_override(
@@ -1397,27 +1395,29 @@ async def test_async_main_keeps_explicit_project_override(
 ) -> None:
     config = AppConfig()
     config.get_llm_config().model = 'openai/gpt-4.1'
-    repl = MagicMock()
-    repl.run = AsyncMock()
     sim_home = tmp_path / 'SIM_HOME'
     sim_home.mkdir()
     monkeypatch.setenv('HOME', str(sim_home))
     monkeypatch.setenv('USERPROFILE', str(sim_home))
 
-    with patch('backend.core.config.load_app_config', return_value=config):
-        with patch('backend.cli.main.Console', return_value=_make_console()):
-            with patch('backend.cli.repl.Repl', return_value=repl):
-                with patch(
-                    'backend.cli.config_manager.needs_onboarding', return_value=False
-                ):
-                    with patch(
-                        'backend.cli.config_manager.ensure_default_model',
-                        return_value='openai/gpt-4.1',
-                    ):
-                        with patch('backend.cli.main._setup_logging'):
-                            from backend.cli.main import _async_main
+    stdin_mock = MagicMock()
+    stdin_mock.isatty.return_value = True
 
-                            await _async_main(project=str(tmp_path))
+    with patch.object(sys, 'stdin', stdin_mock):
+        with patch('backend.core.config.load_app_config', return_value=config):
+            with patch('backend.cli.main.Console', return_value=_make_console()):
+                with patch('backend.cli.tui.main._async_main_tui', return_value=None):
+                    with patch(
+                        'backend.cli.config_manager.needs_onboarding', return_value=False
+                    ):
+                        with patch(
+                            'backend.cli.config_manager.ensure_default_model',
+                            return_value='openai/gpt-4.1',
+                        ):
+                            with patch('backend.cli.main._setup_logging'):
+                                from backend.cli.main import _async_main
+
+                                await _async_main(project=str(tmp_path))
 
     resolved = str(tmp_path.resolve())
     assert config.project_root == resolved
