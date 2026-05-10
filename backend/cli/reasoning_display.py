@@ -34,10 +34,10 @@ _PANEL_CHROME_WIDTH = CALLOUT_PANEL_CHROME_WIDTH
 
 # Character used at the end of the latest thought while streaming is active.
 # Uses a thinner block character for a more subtle instrumentation feel.
-_STREAM_CURSOR = '\u258c'
+_STREAM_CURSOR = "\u258c"
 
 # Left gutter marker for reasoning blocks (vertical bar in teal).
-_GUTTER_MARKER = '┃'
+_GUTTER_MARKER = "┃"
 
 # Safety cap on stored logical lines (streaming can be very chatty).
 _MAX_STORED_THOUGHT_LINES = 50_000
@@ -59,7 +59,7 @@ def _thought_lines_for_display(
     *stable_wrap_width* pins the wrap column during streaming so rapid token
     updates do not change the line break positions (wrap jitter).
     """
-    stripped = (line or '').strip()
+    stripped = (line or "").strip()
     if not stripped:
         return []
     if max_width is None or max_width <= _PANEL_CHROME_WIDTH + 12:
@@ -93,8 +93,8 @@ class ReasoningDisplay:
     def __init__(self) -> None:
         self._active = False
         self._committed_lines: list[str] = []
-        self._streaming_line: str = ''
-        self._current_action: str = ''
+        self._streaming_line: str = ""
+        self._current_action: str = ""
         self._max_lines: int = _MAX_STORED_THOUGHT_LINES
         self._start_time: float | None = None
         self._cost_at_start: float = 0.0
@@ -114,17 +114,17 @@ class ReasoningDisplay:
         if self._start_time is None:
             self._start_time = time.monotonic()
         if not was_active:
-            _prompt_role_debug.log_reasoning_transition('reasoning.start', '')
+            _prompt_role_debug.log_reasoning_transition("reasoning.start", "")
 
     def stop(self) -> None:
         self._active = False
         self._committed_lines.clear()
-        self._streaming_line = ''
-        self._current_action = ''
+        self._streaming_line = ""
+        self._current_action = ""
         self._start_time = None
         self._streaming = False
         self._stream_wrap_width = None
-        _prompt_role_debug.log_reasoning_transition('reasoning.stop', '')
+        _prompt_role_debug.log_reasoning_transition("reasoning.stop", "")
 
     @property
     def active(self) -> bool:
@@ -146,7 +146,7 @@ class ReasoningDisplay:
             if now - self._last_debug_stream_log >= 1.0:
                 self._last_debug_stream_log = now
                 _prompt_role_debug.log_reasoning_transition(
-                    'reasoning.set_streaming_thought', text
+                    "reasoning.set_streaming_thought", text
                 )
         self._streaming_line = text.strip()
         self._streaming = bool(self._streaming_line)
@@ -159,7 +159,7 @@ class ReasoningDisplay:
         lines are preserved for the final assistant message.
         """
         self.start()
-        _prompt_role_debug.log_reasoning_transition('reasoning.commit_thought', text)
+        _prompt_role_debug.log_reasoning_transition("reasoning.commit_thought", text)
         for line in text.splitlines():
             stripped = line.strip()
             if not stripped:
@@ -175,9 +175,9 @@ class ReasoningDisplay:
 
     def update_action(self, label: str) -> None:
         self.start()
-        new = (label or '').strip()
+        new = (label or "").strip()
         if new != self._current_action:
-            _prompt_role_debug.log_reasoning_transition('reasoning.update_action', new)
+            _prompt_role_debug.log_reasoning_transition("reasoning.update_action", new)
             self._current_action = new
             # Action changes end any prior streaming run — the model is
             # committing to a next step, not still generating text.
@@ -280,9 +280,11 @@ class ReasoningDisplay:
         for i, row in enumerate(wrapped_rows):
             # First row of each entry gets the gutter marker
             if i in entry_starts:
-                rows.append(Text(f'{_GUTTER_MARKER} {row}', style=CLR_THOUGHT_BODY))
+                rows.append(Text(f"{_GUTTER_MARKER} {row}", style=CLR_THOUGHT_BODY))
             else:
-                rows.append(Text(f'  {row}', style=CLR_THOUGHT_BODY))
+                rows.append(Text(f"  {row}", style=CLR_THOUGHT_BODY))
 
         if clipped:
-            rows.append(Text(f'{_GUTTER_MARKER} … showing latest thoughts', style=CLR_META))
+            rows.append(
+                Text(f"{_GUTTER_MARKER} … showing latest thoughts", style=CLR_META)
+            )
