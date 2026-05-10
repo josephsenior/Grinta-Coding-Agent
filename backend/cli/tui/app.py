@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +17,17 @@ from textual.widgets import Button, Label, RichLog, Static, TextArea
 
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
+from backend.cli.theme import (
+    NAVY_BORDER,
+    NAVY_BRAND,
+    NAVY_BRAND_DIM,
+    NAVY_ERROR,
+    NAVY_READY,
+    NAVY_TEXT_MUTED,
+    NAVY_TEXT_PRIMARY,
+    NAVY_TEXT_SECONDARY,
+    NAVY_WAITING,
+)
 
 if TYPE_CHECKING:
     from backend.cli.config_manager import AppConfig
@@ -116,12 +128,20 @@ class GrintaScreen(Screen):
         self._confirm_result: str | None = None
         self._input_lock = asyncio.Lock()
 
+    _STATE_COLORS = {
+        'Ready': NAVY_READY,
+        'Running': NAVY_BRAND,
+        'Error': NAVY_ERROR,
+        'Review': NAVY_WAITING,
+        'Paused': NAVY_WAITING,
+    }
+
     def compose(self) -> ComposeResult:
         yield GrintaHeader(id='header-bar')
         with Transcript(id='transcript-scroll'):
             yield RichLog(id='transcript-log', markup=True, auto_scroll=True)
         with InputArea(id='input-row'):
-            yield Static('[bold #2dd4bf]>[/] ', id='input-prompt')
+            yield Static('❯ ', id='input-prompt')
             yield TextArea(id='input')
         yield GrintaFooter(id='footer-hint')
 
@@ -139,14 +159,15 @@ class GrintaScreen(Screen):
         model = hud.state.model or '(not set)'
         workspace = hud.state.workspace_path or Path(os.getcwd()).name
         state = hud.state.agent_state_label or 'Ready'
+        state_color = self._STATE_COLORS.get(state, NAVY_TEXT_SECONDARY)
         header.update(
-            f'[bold #2dd4bf]GRINTA[/] '
-            f'[dim #4a7a95]|[/] '
-            f'[#8da5b6]model:[/] [#dbe7f3]{model}[/] '
-            f'[dim #4a7a95]|[/] '
-            f'[#8da5b6]ws:[/] [#dbe7f3]{workspace}[/] '
-            f'[dim #4a7a95]|[/] '
-            f'[#8da5b6]state:[/] [#34d399]{state}[/]'
+            f'[bold {NAVY_BRAND}]GRINTA[/]'
+            f'  [{NAVY_BORDER}]|[/]'
+            f'  [{NAVY_TEXT_SECONDARY}]model[/] [{NAVY_TEXT_PRIMARY}]{model}[/]'
+            f'  [{NAVY_BORDER}]|[/]'
+            f'  [{NAVY_TEXT_SECONDARY}]ws[/] [{NAVY_TEXT_PRIMARY}]{workspace}[/]'
+            f'  [{NAVY_BORDER}]|[/]'
+            f'  [{state_color}]{state}[/]'
         )
 
     def action_submit_input(self) -> None:
@@ -172,6 +193,7 @@ class GrintaScreen(Screen):
             self.add_user_message(text)
             self._update_footer('Working...')
             self._update_header_state('Running')
+            self.query_one('#input-row', InputArea).add_class('processing')
 
             try:
                 if self._controller is None:
@@ -185,6 +207,7 @@ class GrintaScreen(Screen):
 
             self._update_header_state('Ready')
             self._update_footer('Ready. Type a task or /help')
+            self.query_one('#input-row', InputArea).remove_class('processing')
 
     def _update_header_state(self, state: str) -> None:
         self._hud.update_agent_state(state)
@@ -225,32 +248,49 @@ class GrintaScreen(Screen):
 
     # ── transcript helpers ──────────────────────────────────────────────────
 
+    @staticmethod
+    def _fmt_ts() -> str:
+        return datetime.now().strftime(f'[{NAVY_TEXT_SECONDARY}]%H:%M:%S[/]')
+
     def _get_log(self) -> RichLog:
         return self.query_one('#transcript-log', RichLog)
 
     def add_user_message(self, text: str) -> None:
-        self._get_log().write(f'[bold #2dd4bf]>[+] [dim]you[/dim][/] {text}')
+        self._get_log().write(
+            f'[bold {NAVY_BRAND}]❯[/]'
+            f'  {self._fmt_ts()}'
+            f'  [{NAVY_TEXT_MUTED}]you[/]'
+            f'  [{NAVY_TEXT_PRIMARY}]{text}[/]'
+        )
 
     def add_agent_message(self, text: str) -> None:
-        self._get_log().write(f'[bold #4a7a95]>[*] [dim]grinta[/dim][/] {text}')
+        self._get_log().write(
+            f'[bold {NAVY_BRAND_DIM}]❯[/]'
+            f'  {self._fmt_ts()}'
+            f'  [{NAVY_TEXT_MUTED}]grinta[/]'
+            f'  [{NAVY_TEXT_PRIMARY}]{text}[/]'
+        )
 
     def add_system_message(self, text: str) -> None:
-        self._get_log().write(f'[#8da5b6]{text}[/]')
+        self._get_log().write(f'[{NAVY_TEXT_SECONDARY}]{text}[/]')
 
     def add_error(self, text: str) -> None:
-        self._get_log().write(f'[bold #f87171]! {text}[/]')
+        self._get_log().write(f'[bold {NAVY_ERROR}]✗ {text}[/]')
 
     def add_success(self, text: str) -> None:
-        self._get_log().write(f'[bold #34d399]+ {text}[/]')
+        self._get_log().write(f'[bold {NAVY_READY}]✓ {text}[/]')
 
     def add_tool_start(self, tool_name: str) -> None:
-        self._get_log().write(f'  [bold #2dd4bf]>[/] [bold #2dd4bf]{tool_name}[/]')
+        self._get_log().write(
+            f'  [bold {NAVY_BRAND_DIM}]▸[/]'
+            f'  [bold {NAVY_TEXT_PRIMARY}]{tool_name}[/]'
+        )
 
     def add_tool_result(self, text: str) -> None:
-        self._get_log().write(f'    {text}')
+        self._get_log().write(f'    [{NAVY_TEXT_MUTED}]{text}[/]')
 
     def add_divider(self) -> None:
-        self._get_log().write('[dim #4a6b82]' + '─' * 70 + '[/]')
+        self._get_log().write(f'[{NAVY_BORDER}]' + '─' * 70 + '[/]')
 
     def clear_transcript(self) -> None:
         self._get_log().clear()
@@ -269,7 +309,7 @@ class GrintaScreen(Screen):
 
     def _update_footer(self, hint: str) -> None:
         self.query_one('#footer-hint', GrintaFooter).update(
-            f'[#8da5b6]{hint}[/]'
+            f'[{NAVY_TEXT_SECONDARY}]{hint}[/]'
         )
 
     # ── HUD sync ─────────────────────────────────────────────────────────────
