@@ -426,6 +426,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             pass
         stream = self.event_stream
         try:
+            self._step_pending = False
             if self._step_task is not None and not self._step_task.done():
                 self._step_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
@@ -486,6 +487,9 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         """
         if self._step_task and not self._step_task.done():
             self._step_pending = True
+            return
+
+        if self.get_agent_state() == AgentState.AWAITING_USER_INPUT:
             return
 
         # Always schedule on the main event loop, not the caller's loop.
@@ -630,6 +634,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
     async def stop(self) -> None:
         """Stop the agent, best-effort kill runtime processes, and clear pending actions."""
         logger.info('Stopping agent...')
+        self._step_pending = False
         # Signal the executor to stop streaming immediately.
         agent = getattr(self, 'agent', None)
         if agent is not None:
