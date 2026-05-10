@@ -12,8 +12,8 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from textual.app import App
 from rich.console import Console as RichConsole
+from textual.app import App
 
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
@@ -80,8 +80,6 @@ async def run_tui(
     verbose: bool = False,
 ) -> None:
     """Run the Grinta TUI. This is the TUI equivalent of Repl.run()."""
-    from backend.core.config import load_app_config
-
     loop = asyncio.get_running_loop()
 
     app = GrintaTUIApp(config=config, console=console, loop=loop)

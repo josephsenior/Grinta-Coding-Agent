@@ -281,7 +281,6 @@ class GrintaScreen(Screen):
     # ── bootstrap ───────────────────────────────────────────────────────────
 
     async def _bootstrap(self) -> None:
-        from backend.core.config import load_app_config
 
         self.add_system_message('Initializing engine...')
 
@@ -324,8 +323,8 @@ class GrintaScreen(Screen):
             _create_memory,
             _create_runtime,
         )
-        from backend.core.llm_registry import LLMRegistry
         from backend.core.config import load_app_config
+        from backend.core.llm_registry import LLMRegistry
 
         app_config = load_app_config()
         llm_registry = LLMRegistry.from_config(app_config)
@@ -382,8 +381,8 @@ class GrintaScreen(Screen):
             )
 
     async def _dispatch_to_agent(self, text: str) -> None:
-        from backend.ledger.action import MessageAction
         from backend.core.enums import EventSource
+        from backend.ledger.action import MessageAction
 
         if self._controller is None or self._event_stream is None:
             return
@@ -471,16 +470,16 @@ class TUIRenderer:
         return self._state_event
 
     def _process_event(self, event: Any) -> None:
-        from backend.ledger.observation import (
-            AgentStateChangedObservation,
-            CmdOutputObservation,
-            NullObservation,
-        )
         from backend.ledger.action import (
             CmdRunAction,
             MessageAction,
             NullAction,
             StreamingChunkAction,
+        )
+        from backend.ledger.observation import (
+            AgentStateChangedObservation,
+            CmdOutputObservation,
+            NullObservation,
         )
 
         self._update_metrics(event)
@@ -508,7 +507,6 @@ class TUIRenderer:
 
     def _update_metrics(self, event: Any) -> None:
         from backend.ledger.observation import (
-            LLMMetricsObservation,
             ToolResultObservation,
         )
 
