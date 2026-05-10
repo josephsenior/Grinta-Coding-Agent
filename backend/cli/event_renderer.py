@@ -688,20 +688,14 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
         main_content = Group(*body_items)
 
-        fake_prompt: Any | None = None
-        if self._get_prompt_session is None or self._get_prompt_session() is None:
-            fake_prompt = self._render_fake_prompt(main_width)
+        fake_prompt = self._render_fake_prompt(main_width)
 
         if sidebar is not None:
             from rich.columns import Columns
-
             content_with_hud = Group(main_content, fake_prompt)
             yield Columns([content_with_hud, sidebar])
         else:
-            if fake_prompt is not None:
-                content_with_hud = Group(main_content, fake_prompt)
-            else:
-                content_with_hud = main_content
+            content_with_hud = Group(main_content, fake_prompt)
             yield content_with_hud
 
     def _collect_live_sections(self) -> list[Any]:
