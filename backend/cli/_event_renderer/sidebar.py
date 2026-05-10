@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from rich import box
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -212,19 +211,9 @@ def build_sidebar(
     """Build the sidebar with only the Tasks panel.
 
     Returns None if terminal is too narrow for sidebar.
+    Task panel is kept in logic but hidden from UI.
     """
-    if not should_show_sidebar(terminal_width):
-        return None
-
-    sidebar_width = compute_sidebar_width(terminal_width)
-    tasks_panel = build_task_list_panel(task_list, width=sidebar_width)
-
-    return Panel(
-        tasks_panel,
-        box=box.SIMPLE,
-        border_style=LIVE_PANEL_ACCENT_STYLE,
-        padding=(0, 0),
-    )
+    return None
 
 
 def load_playbook_skills() -> list[str]:
