@@ -153,7 +153,7 @@ class GrintaScreen(Screen):
         if self._input_lock.locked():
             return
         ta = self.query_one('#input', TextArea)
-        text = ta.value.strip()
+        text = ta.text.strip()
         if not text:
             return
         asyncio.get_running_loop().create_task(self._handle_input(text))
@@ -235,7 +235,7 @@ class GrintaScreen(Screen):
         self._get_log().write(f'[bold #4a7a95]>[*] [dim]grinta[/dim][/] {text}')
 
     def add_system_message(self, text: str) -> None:
-        self._get_log().write(f'[dim #8da5b6]{text}[/dim]')
+        self._get_log().write(f'[#8da5b6]{text}[/]')
 
     def add_error(self, text: str) -> None:
         self._get_log().write(f'[bold #f87171]! {text}[/]')
