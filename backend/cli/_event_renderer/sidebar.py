@@ -209,7 +209,7 @@ def build_sidebar(
     *,
     terminal_width: int = 120,
 ) -> Panel | None:
-    """Build the complete sidebar with all three panels.
+    """Build the sidebar with only the Tasks panel.
 
     Returns None if terminal is too narrow for sidebar.
     """
@@ -217,22 +217,10 @@ def build_sidebar(
         return None
 
     sidebar_width = compute_sidebar_width(terminal_width)
-
     tasks_panel = build_task_list_panel(task_list, width=sidebar_width)
-    mcp_panel = build_mcp_servers_panel(mcp_servers, width=sidebar_width)
-    skills_list = None if skill_count is None else _load_playbook_skills()
-    skills_panel = build_skills_panel(skills_list, width=sidebar_width)
-
-    from rich.console import Group
-
-    sidebar_content = Group(
-        tasks_panel,
-        mcp_panel,
-        skills_panel,
-    )
 
     return Panel(
-        sidebar_content,
+        tasks_panel,
         box=box.SIMPLE,
         border_style=LIVE_PANEL_ACCENT_STYLE,
         padding=(0, 0),

@@ -125,9 +125,6 @@ from backend.cli._event_renderer.sidebar import (
 from backend.cli._event_renderer.sidebar import (
     compute_main_width as _compute_main_width,
 )
-from backend.cli._event_renderer.sidebar import (
-    compute_sidebar_width as _compute_sidebar_width,
-)
 from backend.cli._event_renderer.text_utils import (
     normalize_reasoning_text as _normalize_reasoning_text,
 )
@@ -663,7 +660,6 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         # so Rich does not clip tall turns (Live vertical_overflow ellipsis).
         max_width = max(options.max_width or 0, self._console.width)
         main_width = _compute_main_width(max_width)
-        sidebar_width = _compute_sidebar_width(max_width)
 
         # Build task list from _task_panel_signature for sidebar
         task_list = []
@@ -971,6 +967,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     def _after_state_stopped(self, *, previous_state: Any) -> None:
         del previous_state
         self._stop_reasoning()
+        self._streaming_accumulated = ''
+        self._reasoning._streaming_line = ''
+        self._reasoning._committed_lines.clear()
         self._clear_streaming_preview()
 
     # -- helpers -----------------------------------------------------------
@@ -1400,6 +1399,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._streaming_accumulated = ''
         self._streaming_final = False
         self._stream_wrap_width = None
+        self._reasoning._streaming_line = ''
         self.refresh()
 
     @staticmethod

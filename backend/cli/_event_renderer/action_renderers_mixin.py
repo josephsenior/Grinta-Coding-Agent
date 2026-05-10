@@ -178,7 +178,8 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
     def _render_message_action(self, action: MessageAction) -> None:
         from rich.text import Text
-        from backend.cli.theme import CLR_THOUGHT_BODY, CLR_AUTONOMY_BALANCED
+
+        from backend.cli.theme import CLR_AUTONOMY_BALANCED, CLR_THOUGHT_BODY
 
         host = cast(ActionRenderersHost, self)
         if bool(getattr(action, 'suppress_cli', False)):
@@ -203,6 +204,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
             if display_content:
                 display_content = _sanitize_visible_transcript_text(display_content)
             if not display_content:
+                self._stop_reasoning()
                 self.refresh()
                 return
             self._stop_reasoning()
@@ -224,6 +226,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
                 display_parts.append(Text(sanitized_content))
 
         if not display_parts:
+            self._stop_reasoning()
             self.refresh()
             return
 
