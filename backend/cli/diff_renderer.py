@@ -180,11 +180,11 @@ class DiffPanel:
     def _build_panel(parts: list[Any]) -> Panel:
         return Panel(
             Group(*parts),
-            title=Text('File', style=CLR_CARD_TITLE),
+            title=Text('', style=CLR_CARD_TITLE),
             title_align='left',
             border_style=CLR_CARD_BORDER,
-            box=box.ROUNDED,
-            padding=(0, 1),
+            box=box.SQUARE,
+            padding=(0, 0),
         )
 
     @staticmethod
@@ -208,9 +208,9 @@ class DiffPanel:
         return Syntax(
             diff_str,
             lexer='diff',
-            theme='monokai',
+            theme='material',
             word_wrap=True,
-            padding=(1, 2),
+            padding=(0, 1),
             background_color='default',
             line_numbers=True,
         )

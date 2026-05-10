@@ -26,15 +26,15 @@ from backend.cli.theme import (
     CLR_META,
     CLR_SEP,
     CLR_STATE_RUNNING,
-    CLR_STATUS_ERR,
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
+    CLR_STATUS_ERR,
     STYLE_EMPTY,
     use_ascii_cli_symbols,
 )
 
 # Below this terminal width, toolbar and Live fake prompt use one dense status line.
-STATUS_CHROME_COMPACT_WIDTH = 72
+STATUS_CHROME_COMPACT_WIDTH = 60
 
 _UNKNOWN_PROVIDERS = frozenset({'(not set)', '(unknown)'})
 
@@ -63,10 +63,10 @@ def workspace_path_display_max(term_width: int) -> int:
     """Path ellipsis budget for compact status lines (tighter when *term_width* is small)."""
     w = int(term_width)
     if w < 48:
-        return 12
+        return 10
     if w < STATUS_CHROME_COMPACT_WIDTH:
-        return 18
-    return 28
+        return 16
+    return 24
 
 
 @dataclass(frozen=True)
@@ -142,7 +142,7 @@ def autonomy_word_label(level: str) -> tuple[str, str]:
     if raw == 'full':
         return 'Full', CLR_AUTONOMY_FULL
     if raw == 'conservative':
-        return 'Conservative', CLR_AUTONOMY_CONSERVATIVE
+        return 'Conserv', CLR_AUTONOMY_CONSERVATIVE
     return 'Balanced', CLR_AUTONOMY_BALANCED
 
 
@@ -203,26 +203,26 @@ def ledger_fake_prompt_style(ledger_status: str) -> str:
     return CLR_STATUS_OK + ' bold'
 
 
-def _token_progress_bar(pct: int, width: int = 8) -> str:
-    """Generate a token usage progress bar with a smoother gradient look.
+def _token_bar(pct: int, width: int = 5) -> str:
+    """Generate a compact token usage bar using thin characters.
 
-    Uses filled blocks (█) and light blocks (░) for a modern, premium feel
-    instead of the previous `=------` ASCII style.
+    Uses thin blocks (▰) and light blocks (▱) for a minimal, instrumentation feel.
+    At 100% shows a compact [OK] indicator instead of a full bar.
 
     Args:
         pct: Percentage (0-100)
         width: Number of bar characters
 
     Returns:
-        Progress bar string like ████░░░░ 65%
+        Compact progress bar string like ▰▰▰▱▱ 65%
     """
     if pct <= 0:
-        return f'[{"░" * width}] 0%'
+        return f'[{"▱" * width}] 0%'
     if pct >= 100:
-        return '[100%]'  # Show 100% without bar to save space
+        return '[MAX]'
     filled = pct * width // 100
     empty = width - filled
-    return f'[{"█" * filled}{"░" * empty}] {pct}%'
+    return f'[{"▰" * filled}{"▱" * empty}] {pct}%'
 
 
 def _rich_compact_hud_minimal(fields: StatusFields) -> Text:
@@ -233,7 +233,7 @@ def _rich_compact_hud_minimal(fields: StatusFields) -> Text:
         parts.append((' · ', CLR_SEP))
     parts.append(
         (
-            f'{_token_progress_bar(fields.token_usage_pct, width=5)} {fields.token_display_compact}',
+            f'{_token_bar(fields.token_usage_pct)} {fields.token_display_compact}',
             CLR_HUD_DETAIL,
         )
     )
@@ -265,13 +265,13 @@ def rich_compact_hud_line(
         # Minimal mode: just model, tokens, cost, state — cleaner than before
         return _rich_compact_hud_minimal(fields)
 
-    # Full mode — grouped with subtle separators for a premium feel
+    # Full mode — grouped with subtle separators for a compact instrumentation feel
     auto_lbl, auto_style = autonomy_word_label(fields.autonomy_level)
 
     parts: list[tuple[str, str]] = []
 
     # Brand prefix
-    parts.append((' GRINTA ', CLR_BRAND))
+    parts.append(('GRINTA', CLR_BRAND))
     parts.append((' ', ''))
 
     if fields.workspace_path:
@@ -280,52 +280,42 @@ def rich_compact_hud_line(
         parts.append((ws_display, CLR_HUD_DETAIL))
         parts.append((' ', ''))
 
-    # Separator
-    parts.append((' ▸ ', CLR_SEP))
-
-    # State + autonomy
-    parts.append((fields.agent_state_label, ledger_rich_style(fields.ledger_status)))
+    # State
+    parts.append((f'[{fields.agent_state_label}]', ledger_rich_style(fields.ledger_status)))
     parts.append((' ', ''))
-    parts.append((' { ', CLR_SEP))
     parts.append((auto_lbl, auto_style))
-    parts.append((' }', CLR_SEP))
 
     # Model
-    parts.append(('  ', ''))
+    parts.append((' · ', CLR_SEP))
     parts.append((fields.model_display, CLR_HUD_MODEL))
-    parts.append((' ', ''))
 
-    # Separator
-    parts.append((' ▸ ', CLR_SEP))
-
-    # Tokens with progress bar
+    # Tokens with compact bar
+    parts.append((' · ', CLR_SEP))
     has_limit = '/' in fields.token_display_compact
     if has_limit:
         parts.append(
             (
-                f'{_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
+                f'{_token_bar(fields.token_usage_pct)} {fields.token_display_compact}',
                 CLR_HUD_DETAIL,
             )
         )
     else:
         parts.append((fields.token_display_compact, CLR_HUD_DETAIL))
 
-    # Cost & calls
-    parts.append((' ▸ ', CLR_SEP))
-    parts.append((f'Cost: ${fields.cost_usd:.3f}', CLR_HUD_DETAIL))
-
-    parts.append(('  ', ''))
-    parts.append((f'{fields.llm_calls}c', CLR_HUD_DETAIL))
+    # Cost & calls — compact format
+    parts.append((' · ', CLR_SEP))
+    parts.append((f'${fields.cost_usd:.3f}', CLR_HUD_DETAIL))
+    parts.append((f'/{fields.llm_calls}c', CLR_HUD_DETAIL))
 
     # MCP & skills
-    parts.append(('  ', ''))
-    parts.append((f'MCP: {fields.mcp_short}', CLR_HUD_DETAIL))
-    parts.append(('  ', ''))
-    parts.append((f'Skills: {fields.skills_short}', CLR_HUD_DETAIL))
+    parts.append((' · ', CLR_SEP))
+    parts.append((f'M:{fields.mcp_short}', CLR_HUD_DETAIL))
+    parts.append((' ', ''))
+    parts.append((f'S:{fields.skills_short}', CLR_HUD_DETAIL))
 
     if fields.condensation_count > 0:
-        parts.append(('  ', ''))
-        parts.append((f'💧 {fields.condensation_count}x', CLR_HUD_DETAIL))
+        parts.append((' · ', CLR_SEP))
+        parts.append((f'C:{fields.condensation_count}x', CLR_HUD_DETAIL))
 
     # Ledger state icon
     parts.append(('  ', ''))
@@ -363,13 +353,16 @@ def rich_fake_prompt_metrics_row(fields: StatusFields) -> Text:
     """Single stats row: model, tokens, cost, calls, MCP, skills, ledger text."""
     sep = SEP_ITEM
     ledger_style = ledger_fake_prompt_style(fields.ledger_status)
+    has_limit = '/' in fields.token_display_compact
+    token_display = (
+        f'Tokens: {_token_bar(fields.token_usage_pct)} {fields.token_display_compact}'
+        if has_limit
+        else f'Tokens: {fields.token_display_compact}'
+    )
     primary_parts: list[tuple[str, str]] = [
         (fields.model_display, CLR_HUD_MODEL),
         sep,
-        (
-            f'Tokens: {_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}',
-            CLR_HUD_DETAIL,
-        ),
+        (token_display, CLR_HUD_DETAIL),
         sep,
         (f'Cost: ${fields.cost_usd:.3f}', CLR_HUD_DETAIL),
         sep,
@@ -400,7 +393,7 @@ def rich_fake_prompt_input_row(fields: StatusFields) -> Any:
         subline = 'Agent working · ctrl+c to interrupt'
         spin_style = CLR_BRAND
     else:
-        subline = f'{state_l} · ctrl+c if you need to interrupt'
+        subline = f'{state_l} · ctrl+c if needed'
         spin_style = f'dim {CLR_META}'
     text_style = f'italic {CLR_META}'
     input_row = Table.grid()
@@ -482,11 +475,11 @@ def pt_stats_row2_fragments(
     ws_raw = fields.workspace_path
     base: list[tuple[str, str]] = []
     if ws_raw:
-        ws_max = max(18, min(72, width - 50))
+        ws_max = max(16, min(64, width - 50))
         ws_show = HUDBar.ellipsize_path(ws_raw, ws_max)
         base.extend(
             [
-                ('class:prompt.dim', 'workspace:'),
+                ('class:prompt.dim', 'ws:'),
                 ('class:prompt.sep', ' '),
                 ('class:prompt.model', ws_show),
                 ('class:prompt.sep', sep),
@@ -504,7 +497,7 @@ def pt_stats_row2_fragments(
             ('class:prompt.sep', sep),
             (
                 'class:prompt.value',
-                f'Tokens: {_token_progress_bar(fields.token_usage_pct)} {fields.token_display_compact}'
+                f'Tokens: {_token_bar(fields.token_usage_pct)} {fields.token_display_compact}'
                 if '/' in fields.token_display_compact
                 else f'Tokens: {fields.token_display_compact}',
             ),

@@ -23,7 +23,7 @@ from rich.text import Text
 from backend.cli.layout_tokens import (
     CALLOUT_PANEL_CHROME_WIDTH,
 )
-from backend.cli.theme import CLR_AUTONOMY_BALANCED, CLR_META, CLR_THOUGHT_BODY
+from backend.cli.theme import CLR_META, CLR_THOUGHT_BODY
 from backend.engine import prompt_role_debug as _prompt_role_debug
 
 # Panel chrome overhead: live ``MINIMAL`` frame + horizontal padding from
@@ -33,9 +33,11 @@ from backend.engine import prompt_role_debug as _prompt_role_debug
 _PANEL_CHROME_WIDTH = CALLOUT_PANEL_CHROME_WIDTH
 
 # Character used at the end of the latest thought while streaming is active.
-# Rich spinner in the header already conveys "thinking" — this cursor conveys
-# "tokens are still flowing for this specific thought".
+# Uses a thinner block character for a more subtle instrumentation feel.
 _STREAM_CURSOR = '\u258c'
+
+# Left gutter marker for reasoning blocks (vertical bar in teal).
+_GUTTER_MARKER = '┃'
 
 # Safety cap on stored logical lines (streaming can be very chatty).
 _MAX_STORED_THOUGHT_LINES = 50_000
@@ -47,9 +49,9 @@ def _thought_lines_for_display(
     *,
     stable_wrap_width: int | None = None,
 ) -> list[str]:
-    """One logical thought line \u2192 one or more panel rows (wrap when width is known).
+    """One logical thought line → one or more panel rows (wrap when width is known).
 
-    Never truncates with an ellipsis \u2014 we prefer to wrap across multiple
+    Never truncates with an ellipsis — we prefer to wrap across multiple
     rows so the user can read the full thought. When the terminal is too
     narrow to meaningfully wrap, we fall back to returning the line as-is
     (Rich will then soft-wrap the row itself).
@@ -83,7 +85,7 @@ class ReasoningDisplay:
 
         rd = ReasoningDisplay()
         rd.start()
-        rd.set_streaming_thought("Analyzing the codebase\u2026")
+        rd.set_streaming_thought("Analyzing the codebase…")
         rd.update_action("Reading file src/main.py")
         rd.stop()
     """
@@ -99,9 +101,9 @@ class ReasoningDisplay:
         self._current_cost: float = 0.0
         self._last_debug_stream_log: float = 0.0
         # True when ``set_streaming_thought`` has written content since the
-        # last non-streaming update \u2014 drives the trailing stream cursor.
+        # last non-streaming update — drives the trailing stream cursor.
         self._streaming: bool = False
-        # First computed wrap width while streaming \u2014 kept stable until streaming ends.
+        # First computed wrap width while streaming — kept stable until streaming ends.
         self._stream_wrap_width: int | None = None
 
     # -- lifecycle ---------------------------------------------------------
@@ -152,7 +154,7 @@ class ReasoningDisplay:
     def commit_thought(self, text: str) -> None:
         """Append a distinct reasoning step to the committed history.
 
-        Called for AgentThinkAction / AgentThinkObservation \u2014 these represent
+        Called for AgentThinkAction / AgentThinkObservation — these represent
         the model committing to a discrete reasoning step.  The committed
         lines are preserved for the final assistant message.
         """
@@ -177,7 +179,7 @@ class ReasoningDisplay:
         if new != self._current_action:
             _prompt_role_debug.log_reasoning_transition('reasoning.update_action', new)
             self._current_action = new
-            # Action changes end any prior streaming run \u2014 the model is
+            # Action changes end any prior streaming run — the model is
             # committing to a next step, not still generating text.
             self._streaming = False
             self._stream_wrap_width = None
@@ -249,7 +251,7 @@ class ReasoningDisplay:
         wrapped_rows: list[str] = []
         entry_starts: set[int] = set()
 
-        # Each committed line is its own thought entry with ``Thinking:`` on line 0.
+        # Each committed line is its own thought entry with a gutter marker.
         for line in self._committed_lines:
             entry_wrapped = _thought_lines_for_display(
                 line, max_width, stable_wrap_width=stable
@@ -275,8 +277,12 @@ class ReasoningDisplay:
         if wrapped_rows and self._streaming and self._streaming_line:
             wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
 
-        for row in wrapped_rows:
-            rows.append(Text(f'  {row}', style=CLR_THOUGHT_BODY))
+        for i, row in enumerate(wrapped_rows):
+            # First row of each entry gets the gutter marker
+            if i in entry_starts:
+                rows.append(Text(f'{_GUTTER_MARKER} {row}', style=CLR_THOUGHT_BODY))
+            else:
+                rows.append(Text(f'  {row}', style=CLR_THOUGHT_BODY))
 
         if clipped:
-            rows.append(Text('\u2026 showing latest thoughts', style=CLR_META))
+            rows.append(Text(f'{_GUTTER_MARKER} … showing latest thoughts', style=CLR_META))
