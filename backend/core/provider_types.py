@@ -173,15 +173,14 @@ class CreatePlaybook(BaseModel):
 
         return validate_non_empty_string(v, name='repo')
 
-    @field_validator('title')
+    @field_validator('title', mode='after')
     @classmethod
     def validate_title(cls, v: str | None) -> str | None:
         """Validate title is non-empty if provided."""
-        if v is not None:
-            from backend.core.type_safety.type_safety import validate_non_empty_string
-
-            return validate_non_empty_string(v, name='title')
-        return v
+        if v is None:
+            return None
+        from backend.core.type_safety.type_safety import validate_non_empty_string
+        return validate_non_empty_string(v, name='title')
 
 
 # ---------------------------------------------------------------------------

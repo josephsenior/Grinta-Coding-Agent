@@ -51,9 +51,6 @@ from backend.cli._event_renderer.error_panel import (
     use_recoverable_notice_style as _use_recoverable_notice_style,
 )
 from backend.cli._event_renderer.text_utils import (
-    pty_output_transcript_caption as _pty_output_transcript_caption,
-)
-from backend.cli._event_renderer.text_utils import (
     sanitize_visible_transcript_text as _sanitize_visible_transcript_text,
 )
 from backend.cli._event_renderer.text_utils import (
@@ -156,10 +153,10 @@ def _cmd_stdout_syntax_extras(content: str) -> list[Any] | None:
 
 def _looks_like_command_echo(line: str) -> bool:
     """Check if a line is likely the echoed command (not actual output)."""
-    l = line.strip()
-    if not l:
+    stripped_line = line.strip()
+    if not stripped_line:
         return True
-    if l.startswith('$ ') or l.startswith('❯ ') or l.startswith('> '):
+    if stripped_line.startswith('$ ') or stripped_line.startswith('❯ ') or stripped_line.startswith('> '):
         return True
     return False
 
@@ -690,7 +687,6 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         raw = getattr(obs, 'content', '') or ''
         display = strip_tool_result_validation_annotations(raw)
         content = display.strip()
-        session_id = (getattr(obs, 'session_id', '') or '').strip()
         has_new = getattr(obs, 'has_new_output', None)
         # Suppress entirely when there's nothing new — these are just polling
         # reads and the "no new text" caption is noise for the human user.

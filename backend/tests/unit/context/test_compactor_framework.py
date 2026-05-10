@@ -334,7 +334,7 @@ class TestBaseLLMCompactor:
 
     def test_add_response_metadata_records_response_and_metrics(self):
         c = ConcreteLLMCompactor(llm=MagicMock(), max_size=10)
-        c.llm.metrics.get.return_value = {'tokens': 5}  # type: ignore[union-attr]
+        c.llm.metrics.get.return_value = {'tokens': 5}
 
         with patch(
             'backend.core.pydantic_compat.model_dump_with_options',

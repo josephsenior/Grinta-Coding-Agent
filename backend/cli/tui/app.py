@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -31,9 +30,10 @@ from backend.cli.theme import (
 
 if TYPE_CHECKING:
     from backend.cli.config_manager import AppConfig
+    from backend.core.enums import AgentState
 
 
-logger = logging.getLogger('grinta.tui')
+from backend.core.logger import app_logger as logger
 
 
 class GrintaHeader(Static):
@@ -128,12 +128,36 @@ class GrintaScreen(Screen):
         self._confirm_result: str | None = None
         self._input_lock = asyncio.Lock()
 
+    _STATE_LABELS = {
+        'starting': 'Starting…',
+        'loading': 'Loading…',
+        'running': 'Running',
+        'awaiting_user_input': 'Ready',
+        'paused': 'Paused',
+        'stopped': 'Stopped',
+        'finished': 'Finished',
+        'rejected': 'Rejected',
+        'error': 'Error',
+        'awaiting_user_confirmation': 'Confirm',
+        'user_confirmed': 'Confirmed',
+        'user_rejected': 'Rejected',
+        'rate_limited': 'Rate Limited',
+    }
+
     _STATE_COLORS = {
-        'Ready': NAVY_READY,
-        'Running': NAVY_BRAND,
-        'Error': NAVY_ERROR,
-        'Review': NAVY_WAITING,
-        'Paused': NAVY_WAITING,
+        'starting': NAVY_WAITING,
+        'loading': NAVY_WAITING,
+        'running': NAVY_BRAND,
+        'awaiting_user_input': NAVY_READY,
+        'paused': NAVY_WAITING,
+        'stopped': NAVY_TEXT_MUTED,
+        'finished': NAVY_READY,
+        'rejected': NAVY_ERROR,
+        'error': NAVY_ERROR,
+        'awaiting_user_confirmation': NAVY_WAITING,
+        'user_confirmed': NAVY_READY,
+        'user_rejected': NAVY_ERROR,
+        'rate_limited': NAVY_WAITING,
     }
 
     def compose(self) -> ComposeResult:
@@ -158,8 +182,9 @@ class GrintaScreen(Screen):
         hud = self._hud
         model = hud.state.model or '(not set)'
         workspace = hud.state.workspace_path or Path(os.getcwd()).name
-        state = hud.state.agent_state_label or 'Ready'
-        state_color = self._STATE_COLORS.get(state, NAVY_TEXT_SECONDARY)
+        raw_state = hud.state.agent_state_label or 'Ready'
+        display_state = self._STATE_LABELS.get(raw_state.lower(), raw_state)
+        state_color = self._STATE_COLORS.get(raw_state.lower(), NAVY_TEXT_SECONDARY)
         header.update(
             f'[bold {NAVY_BRAND}]GRINTA[/]'
             f'  [{NAVY_BORDER}]|[/]'
@@ -167,7 +192,7 @@ class GrintaScreen(Screen):
             f'  [{NAVY_BORDER}]|[/]'
             f'  [{NAVY_TEXT_SECONDARY}]ws[/] [{NAVY_TEXT_PRIMARY}]{workspace}[/]'
             f'  [{NAVY_BORDER}]|[/]'
-            f'  [{state_color}]{state}[/]'
+            f'  [{state_color}]{display_state}[/]'
         )
 
     def action_submit_input(self) -> None:
@@ -192,22 +217,26 @@ class GrintaScreen(Screen):
 
             self.add_user_message(text)
             self._update_footer('Working...')
-            self._update_header_state('Running')
             self.query_one('#input-row', InputArea).add_class('processing')
 
             try:
                 if self._controller is None:
                     await self._bootstrap()
+                else:
+                    await self._ensure_agent_task()
                 await self._dispatch_to_agent(text)
             except Exception:
                 logger.exception('Error during agent turn')
                 self.add_error('Agent error — check logs')
                 self._update_footer('Ready. Type a task or /help')
-                self._update_header_state('Ready')
-
-            self._update_header_state('Ready')
-            self._update_footer('Ready. Type a task or /help')
-            self.query_one('#input-row', InputArea).remove_class('processing')
+            finally:
+                self._update_footer('Ready. Type a task or /help')
+                self.query_one('#input-row', InputArea).remove_class('processing')
+                if self._renderer:
+                    self._renderer.drain_events()
+                    self._update_header_state(
+                        self._hud.state.agent_state_label or 'Ready'
+                    )
 
     def _update_header_state(self, state: str) -> None:
         self._hud.update_agent_state(state)
@@ -318,107 +347,192 @@ class GrintaScreen(Screen):
         self._hud.update_agent_state(self._hud.state.agent_state_label or 'Ready')
         self._render_header()
 
-    # ── bootstrap ───────────────────────────────────────────────────────────
+    # ── bootstrap (synchronous — all core factory calls are sync) ──────────
 
     async def _bootstrap(self) -> None:
+        """Bootstrap the agent engine asynchronously.
 
+        The synchronous factory calls (create_runtime, create_agent, etc.) are
+        run in a thread so they don't block the Textual message pump. HUD is
+        updated at each phase so the UI stays responsive.
+        """
+        logger.info('TUI _bootstrap: starting')
+        self._hud.update_agent_state('Initializing')
+        self._render_header()
         self.add_system_message('Initializing engine...')
 
         config = self._config
-        project_root = getattr(config, 'project_root', None)
 
         try:
-            agent, memory, event_stream, runtime = await self._bootstrap_session(
-                config, project_root
+            agent, memory, event_stream, runtime, controller = await asyncio.to_thread(
+                self._bootstrap_sync, config
             )
-            self._event_stream = event_stream
-            self._runtime_stub = runtime
-            self._memory_stub = memory
-
-            if self._renderer is None:
-                self._renderer = TUIRenderer(
-                    console=self._rich_console,
-                    hud=self._hud,
-                    reasoning=self._reasoning,
-                    tui=self,
-                    loop=self._loop,
-                )
-            self._renderer.subscribe(event_stream, event_stream.sid)
-
-            self._controller = self._get_or_create_controller(
-                agent, runtime, memory, config
-            )
-            self.add_system_message('Engine ready.')
         except Exception:
-            logger.exception('Bootstrap failed')
-            self.add_error('Initialization failed — check logs')
+            logger.exception('TUI _bootstrap: failed in thread')
             raise
 
-    async def _bootstrap_session(
-        self, config: Any, project_root: Any
-    ) -> tuple[Any, Any, Any, Any]:
-        from backend.core.bootstrap.main import (
-            _create_agent,
-            _create_event_stream,
-            _create_memory,
-            _create_runtime,
+        logger.info(
+            'TUI _bootstrap: controller created, initial state=%s (type=%s)',
+            controller.get_agent_state(),
+            type(controller.get_agent_state()),
         )
-        from backend.core.config import load_app_config
-        from backend.inference.llm_registry import LLMRegistry
 
-        app_config = load_app_config()
-        llm_registry = LLMRegistry.from_config(app_config)
-        runtime = await _create_runtime(app_config)
-        agent = _create_agent(app_config, runtime, llm_registry)
-        memory = _create_memory(app_config)
-        event_stream = _create_event_stream()
+        self._event_stream = event_stream
+        self._runtime_stub = runtime
+        self._memory_stub = memory
+        self._controller = controller
+
+        if self._renderer is None:
+            self._renderer = TUIRenderer(
+                console=self._rich_console,
+                hud=self._hud,
+                reasoning=self._reasoning,
+                tui=self,
+                loop=self._loop,
+            )
+        self._renderer.subscribe(event_stream, event_stream.sid)
+
+        state_after_create = controller.get_agent_state()
+        logger.info('TUI _bootstrap: state after renderer subscribe=%s', state_after_create)
+        self._hud.update_agent_state(str(state_after_create))
+        self._render_header()
+        self._renderer.drain_events()
+        self.add_system_message('Engine ready.')
+
+    def _bootstrap_sync(
+        self, config: Any,
+    ) -> tuple[Any, Any, Any, Any, Any]:
+        """Synchronous bootstrap — runs in a thread. Returns components tuple."""
+        agent, memory, event_stream, runtime = self._create_session(config)
+        controller = self._get_or_create_controller(
+            agent, runtime, memory, config,
+        )
+        return agent, memory, event_stream, runtime, controller
+
+    def _create_session(
+        self, config: Any,
+    ) -> tuple[Any, Any, Any, Any]:
+        """Create agent, memory, event stream, and runtime.
+
+        All bootstrap factory calls are synchronous. This mirrors the
+        established bootstrap pattern from ``backend.core.bootstrap``.
+        """
+        from backend.core.bootstrap.main import (
+            create_agent,
+            create_registry_and_conversation_stats,
+        )
+        from backend.core.bootstrap.setup import (
+            create_memory,
+            create_runtime,
+        )
+        from backend.ledger import EventStream
+        from backend.persistence import get_file_store
+
+        file_store = get_file_store(config)
+        event_stream = EventStream(sid='grinta-tui', file_store=file_store)
+
+        llm_registry, _conv_stats, _app_cfg = (
+            create_registry_and_conversation_stats(
+                config,
+                sid=event_stream.sid,
+                user_id='tui',
+            )
+        )
+        runtime = create_runtime(
+            config,
+            llm_registry=llm_registry,
+            sid=event_stream.sid,
+            event_stream=event_stream,
+        )
+        agent = create_agent(config, llm_registry)
+        memory = create_memory(runtime, event_stream, sid=event_stream.sid)
         return agent, memory, event_stream, runtime
 
     def _get_or_create_controller(
-        self, agent: Any, runtime: Any, memory: Any, config: Any
+        self, agent: Any, runtime: Any, memory: Any, config: Any,
     ) -> Any:
+        from backend.orchestration.conversation_stats import ConversationStats
+        from backend.orchestration.orchestration_config import OrchestrationConfig
         from backend.orchestration.session_orchestrator import SessionOrchestrator
 
         return SessionOrchestrator(
-            agent=agent,
-            event_stream=self._event_stream,
-            memory=memory,
-            runtime=runtime,
-            config=config,
+            config=OrchestrationConfig(
+                agent=agent,
+                event_stream=self._event_stream,
+                conversation_stats=ConversationStats(
+                    file_store=self._event_stream.file_store,
+                    conversation_id=self._event_stream.sid,
+                    user_id=None,
+                ),
+                iteration_delta=config.max_iterations,
+                headless_mode=True,
+            )
         )
+
+    async def _run_agent_loop(self) -> None:
+        """Background agent loop — mirrors REPL's run_agent_until_done pattern."""
+        from backend.core.bootstrap.agent_control_loop import run_agent_until_done
+        from backend.core.schemas import AgentState
+
+        end_states = [
+            AgentState.AWAITING_USER_INPUT,
+            AgentState.FINISHED,
+            AgentState.ERROR,
+            AgentState.STOPPED,
+        ]
+        try:
+            await run_agent_until_done(
+                self._controller,
+                self._runtime_stub,
+                self._memory_stub,
+                end_states,
+            )
+        except Exception:
+            logger.exception('Agent loop exited with error')
 
     async def _ensure_agent_task(self) -> None:
         from backend.core.bootstrap.agent_control_loop import run_agent_until_done
-        from backend.core.enums import AgentState
+        from backend.core.schemas import AgentState
 
         if self._controller is None:
             return
 
         state = self._controller.get_agent_state()
-        try:
-            state = AgentState(state)
-        except (ValueError, TypeError):
-            pass
-
+        logger.info('TUI _ensure_agent_task: current state=%s', state)
         if state in {
+            AgentState.LOADING,
             AgentState.AWAITING_USER_INPUT,
             AgentState.FINISHED,
             AgentState.ERROR,
             AgentState.REJECTED,
             AgentState.STOPPED,
         }:
+            logger.info('TUI _ensure_agent_task: transitioning %s -> RUNNING', state)
             await self._controller.set_agent_state_to(AgentState.RUNNING)
+        elif state == AgentState.RUNNING:
+            logger.info('TUI _ensure_agent_task: already RUNNING')
+
+        state_after = self._controller.get_agent_state()
+        logger.info('TUI _ensure_agent_task: state after transition=%s', state_after)
 
         if self._agent_task is None or self._agent_task.done():
+            logger.info('TUI _ensure_agent_task: creating new agent task')
             self._agent_task = asyncio.create_task(
                 run_agent_until_done(
                     self._controller,
                     self._runtime_stub,
                     self._memory_stub,
-                    ['AWAITING_USER_INPUT', 'FINISHED', 'ERROR', 'STOPPED'],
+                    [
+                        AgentState.AWAITING_USER_INPUT,
+                        AgentState.FINISHED,
+                        AgentState.ERROR,
+                        AgentState.STOPPED,
+                    ],
                 ),
                 name='grinta-tui-agent',
             )
+        else:
+            logger.info('TUI _ensure_agent_task: agent task already running (task=%s)', self._agent_task)
 
     async def _dispatch_to_agent(self, text: str) -> None:
         from backend.core.enums import EventSource
@@ -434,11 +548,11 @@ class GrintaScreen(Screen):
         self._controller.step()
 
         end_states = {
-            'AWAITING_USER_INPUT',
-            'FINISHED',
-            'ERROR',
-            'STOPPED',
-            'AWAITING_USER_CONFIRMATION',
+            AgentState.AWAITING_USER_INPUT,
+            AgentState.FINISHED,
+            AgentState.ERROR,
+            AgentState.STOPPED,
+            AgentState.AWAITING_USER_CONFIRMATION,
         }
         while True:
             await asyncio.sleep(0.1)
@@ -546,18 +660,13 @@ class TUIRenderer:
             self._handle_state_change(event)
 
     def _update_metrics(self, event: Any) -> None:
-        from backend.ledger.observation import (
-            ToolResultObservation,
-        )
-
         if hasattr(event, 'model') and event.model:
             self._hud.update_model(event.model)
         if hasattr(event, 'llm_metrics') and event.llm_metrics:
             self._hud.update_from_llm_metrics(event.llm_metrics)
-        if isinstance(event, ToolResultObservation):
-            cost = getattr(event, 'cost_usd', 0) or 0
-            if cost > 0:
-                self._hud.update_cost(self._hud.state.cost_usd + cost)
+        cost = getattr(event, 'cost_usd', None)
+        if cost is not None and cost > 0:
+            self._hud.update_cost(self._hud.state.cost_usd + cost)
 
     def _handle_state_change(self, obs: Any) -> None:
         from backend.core.enums import AgentState
@@ -570,9 +679,8 @@ class TUIRenderer:
 
         self._current_state = state
         self._hud.update_agent_state(str(state))
-
         self._state_event.set()
-        try:
-            self._loop.call_soon_threadsafe(self._state_event.set)
-        except RuntimeError:
-            pass
+        if self._loop.is_running():
+            self._loop.call_soon_threadsafe(self._tui._render_header)
+        else:
+            self._tui._render_header()

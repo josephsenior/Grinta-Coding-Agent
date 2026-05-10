@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+from typing import Any
 
 from backend.integrations.mcp.mcp_tool_aliases import (
     _slugify_segment,
@@ -10,14 +10,16 @@ from backend.integrations.mcp.tool import MCPClientTool
 
 
 class _Client:
+    """Mock MCPClient for testing without full inheritance."""
+
     def __init__(self, server_name: str, tools: list[MCPClientTool]) -> None:
-        self._server_config = SimpleNamespace(name=server_name)
+        self._server_config = type('_', (), {'name': server_name})()
         self.tools = tools
         self.tool_map: dict[str, MCPClientTool] = {t.name: t for t in tools}
         self.exposed_to_protocol: dict[str, str] = {}
-        self.alias_args: tuple | None = None
+        self.alias_args: tuple[Any, Any] | None = None
 
-    def register_alias_context(self, mcps, reserved) -> None:  # noqa: ANN001
+    def register_alias_context(self, mcps: Any, reserved: Any) -> None:
         self.alias_args = (mcps, reserved)
 
 
@@ -32,7 +34,7 @@ def test_slugify_segment_basic_and_fallback() -> None:
 
 def test_prepare_mcp_tool_exposed_names_keeps_unique_tools() -> None:
     c = _Client('srv', [_tool('fetch_data'), _tool('health')])
-    prepare_mcp_tool_exposed_names([c], reserved={'shell'})  # type: ignore[arg-type]
+    prepare_mcp_tool_exposed_names([c], reserved={'shell'})  # type: ignore[arg-type,list-item]
     assert [t.name for t in c.tools] == ['fetch_data', 'health']
     assert c.exposed_to_protocol == {'fetch_data': 'fetch_data', 'health': 'health'}
     assert c.alias_args is not None
@@ -41,7 +43,7 @@ def test_prepare_mcp_tool_exposed_names_keeps_unique_tools() -> None:
 def test_prepare_mcp_tool_exposed_names_resolves_collisions() -> None:
     c1 = _Client('alpha', [_tool('search')])
     c2 = _Client('beta server', [_tool('search'), _tool('search')])
-    prepare_mcp_tool_exposed_names([c1, c2], reserved={'search'})  # type: ignore[arg-type]
+    prepare_mcp_tool_exposed_names([c1, c2], reserved={'search'})  # type: ignore[arg-type,list-item]
 
     names_1 = [t.name for t in c1.tools]
     names_2 = [t.name for t in c2.tools]
