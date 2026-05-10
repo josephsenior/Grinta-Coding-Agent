@@ -433,6 +433,15 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             pending_service = self.services.pending_action
             if pending_service is not None:
                 pending_service.shutdown()
+            # Signal the executor to stop streaming immediately so no more
+            # StreamingChunkAction events are emitted after agent stop.
+            agent = getattr(self, 'agent', None)
+            if agent is not None:
+                executor = getattr(agent, 'executor', None)
+                if executor is not None:
+                    cancel_fn = getattr(executor, 'cancel_step', None)
+                    if cancel_fn is not None:
+                        cancel_fn()
             if set_stop_state:
                 await self.set_agent_state_to(AgentState.STOPPED)
             self.state_tracker.close(stream)
@@ -621,6 +630,14 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
     async def stop(self) -> None:
         """Stop the agent, best-effort kill runtime processes, and clear pending actions."""
         logger.info('Stopping agent...')
+        # Signal the executor to stop streaming immediately.
+        agent = getattr(self, 'agent', None)
+        if agent is not None:
+            executor = getattr(agent, 'executor', None)
+            if executor is not None:
+                cancel_fn = getattr(executor, 'cancel_step', None)
+                if cancel_fn is not None:
+                    cancel_fn()
         runtime = getattr(self, 'runtime', None)
         hard_kill = getattr(runtime, 'hard_kill', None)
         if callable(hard_kill):

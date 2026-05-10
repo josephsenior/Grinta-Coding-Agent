@@ -152,6 +152,11 @@ class OrchestratorExecutor:
         )
         self._checkpoint_cache: OrderedDict[str, StreamingCheckpoint] = OrderedDict()
         self._recovery_blocked_reasons: dict[str, str] = {}
+        self._step_cancelled = False
+
+    def cancel_step(self) -> None:
+        """Signal the current (or next) streaming step to abort early."""
+        self._step_cancelled = True
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -165,10 +170,10 @@ class OrchestratorExecutor:
         self._raise_if_recovery_blocked(event_stream)
         start_time = time.time()
         error_message: str | None = None
-        response: ModelResponse | None = None
+        self._step_cancelled = False
 
-        # Write-ahead checkpoint before invoking the model.
-        #
+        call_params = dict(params)
+
         # NOTE: Grinta's DirectLLMClient implementations intentionally expose
         # deterministic *non-streaming* completion for all providers. Native
         # streaming support varies widely across SDKs and tends to be the
@@ -600,6 +605,9 @@ class OrchestratorExecutor:
         if first_chunk_timeout is None:
             return True
 
+        if self._step_cancelled:
+            return False
+
         try:
             first_chunk = await asyncio.wait_for(
                 stream_aiter.__anext__(),
@@ -614,6 +622,9 @@ class OrchestratorExecutor:
                 state,
                 first_chunk_timeout,
             )
+            return False
+
+        if self._step_cancelled:
             return False
 
         choices = first_chunk.get('choices', [])
@@ -640,6 +651,9 @@ class OrchestratorExecutor:
         from backend.inference.exceptions import Timeout as LLMTimeout
 
         while True:
+            if self._step_cancelled:
+                return
+
             try:
                 chunk = await asyncio.wait_for(
                     anext(stream_aiter),
@@ -668,6 +682,9 @@ class OrchestratorExecutor:
                 state,
                 event_stream,
             )
+
+            if self._step_cancelled:
+                return
 
     async def _consume_async_stream(
         self,
@@ -848,6 +865,7 @@ class OrchestratorExecutor:
 
         start_time = time.time()
         error_message: str | None = None
+        self._step_cancelled = False
 
         call_params = dict(params)
         call_params.pop('stream', None)
