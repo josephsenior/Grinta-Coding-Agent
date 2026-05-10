@@ -43,7 +43,7 @@ class GrintaTUIApp(App):
         self._loop = loop
         self._hud = HUDBar()
         self._reasoning = ReasoningDisplay()
-        self._running = True
+        self._session_running = True
         self._pending_confirm: asyncio.Event | None = None
         self._confirm_result: str | None = None
         self._event_stream: Any | None = None
@@ -54,11 +54,11 @@ class GrintaTUIApp(App):
 
     def compose(self):
         """Layout is handled by the pushed screen."""
-        pass
+        return iter([])
 
     async def on_mount(self) -> None:
         from backend.cli.tui.app import GrintaScreen
-        self.push_screen(GrintaScreen(
+        await self.push_screen(GrintaScreen(
             config=self._config,
             console=self._console,
             loop=self._loop,
@@ -85,7 +85,7 @@ async def run_tui(
     loop = asyncio.get_running_loop()
 
     app = GrintaTUIApp(config=config, console=console, loop=loop)
-    app._hud.update_model(config.model or '(not set)')
+    app._hud.update_model(config.get_llm_config().model or '(not set)')
     app._hud.update_workspace(
         str(Path(os.getcwd()).resolve())
         if not getattr(config, 'project_root', None)
