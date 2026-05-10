@@ -216,19 +216,6 @@ def _configure_redirected_streams(*streams: object | None) -> None:
                 pass
 
 
-_GRINTA_LOGO_LINES: tuple[str, ...] = (
-    r'  [#2dd4bf]▄▄████████████████████████████████▄▄[/#2dd4bf]  ',
-    r'[#2dd4bf]▄██████████████████████████████████████▄[/#2dd4bf]',
-    r'[#2dd4bf]▀▀▀▀▀▀▀██████████████████████████▀▀▀▀▀▀▀[/#2dd4bf]',
-    r'       [#2dd4bf]███[/#2dd4bf][black]▄▄▄▄▄[/black][#2dd4bf]████████████[/#2dd4bf][black]▄▄▄▄▄[/black][#2dd4bf]███[/#2dd4bf]       ',
-    r'       [#2dd4bf]███[/#2dd4bf][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][#2dd4bf]███[/#2dd4bf][black]▄[/black][#2dd4bf]████[/#2dd4bf][black]▄[/black][#2dd4bf]███[/#2dd4bf][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][#2dd4bf]███[/#2dd4bf]       ',
-    r'       [#2dd4bf]███[/#2dd4bf][black]█[/black][black on white]   [/black on white][black]█[/black][#2dd4bf]███[/#2dd4bf][black]▀▄▄▄▄▀[/black][#2dd4bf]███[/#2dd4bf][black]█[/black][black on white]   [/black on white][black]█[/black][#2dd4bf]███[/#2dd4bf]       ',
-    r'       [#2dd4bf]███[/#2dd4bf][black]▀▀▀▀▀[/black][#2dd4bf]████████████[/#2dd4bf][black]▀▀▀▀▀[/black][#2dd4bf]███[/#2dd4bf]       ',
-    r'     [#2dd4bf]▄████████████████████████████▄[/#2dd4bf]     ',
-    r'   [#2dd4bf]▄████████████████████████████████▄[/#2dd4bf]   ',
-    r'                                        ',
-)
-
 _GRINTA_FALLBACK_BANNER: tuple[str, ...] = (
     '  ____ ____  ___ _   _ _____  _',
     ' / ___|  _ \\|_ _| \\ | |_   _|/ \\',
@@ -250,16 +237,14 @@ def _build_splash_lines() -> list[Any]:
     except Exception:
         raw = list(_GRINTA_FALLBACK_BANNER)
 
-    logo_width = 40
     text_width = max((len(ln) for ln in raw), default=0)
-    width = max(logo_width, text_width)
 
     lines: list[Any] = []
     for ln in raw:
         from backend.cli.theme import CLR_SPLASH_FIGLET
 
         t = Text(ln, style=CLR_SPLASH_FIGLET)
-        pad = max(0, width - len(t))
+        pad = max(0, text_width - len(t))
         lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
     return lines
 
@@ -272,31 +257,20 @@ def _is_returning_user() -> bool:
 
 
 def show_grinta_splash(console: Any | None = None, *, compact: bool = False) -> None:
-    """Render the GRINTA boot splash with ASCII text inside panel.
+    """Render the GRINTA boot splash with instrumentation-style branding.
 
     Parameters
     ----------
     console:
         Rich console to print to.
     compact:
-        When True, show a condensed 3-line version for returning users.
+        When True, show a condensed 2-line version for returning users.
     """
     from rich.align import Align
-    from rich.box import ROUNDED
-    from rich.console import Group
-    from rich.panel import Panel
     from rich.text import Text
 
     console = console or Console()
-    from backend.cli.theme import CLR_BRAND, STYLE_DIM, STYLE_ITALIC_DIM
-
-    _D = STYLE_DIM
-
-    _TAGLINE = 'AI coding agent for the terminal.'
-    _HINT = (
-        'Describe a task · /help · /settings · /sessions · '
-        'grinta sessions list · /quit to leave'
-    )
+    from backend.cli.theme import CLR_META, STYLE_DIM
 
     if compact:
         _compact_splash(console)
@@ -309,25 +283,16 @@ def show_grinta_splash(console: Any | None = None, *, compact: bool = False) -> 
             figlet_text.append('\n')
         figlet_text.append(line)
 
-    def _frame() -> Any:
-        content = Group(
-            figlet_text,
-            Text(''),
-            Text(_TAGLINE, style=STYLE_ITALIC_DIM, justify='center'),
-        )
-        panel = Panel(
-            content,
-            title='[bold #2dd4bf] ~ [/]',
-            border_style=CLR_BRAND,
-            box=ROUNDED,
-            padding=(1, 4),
-        )
-        rows = [Text(''), Align.center(panel), Text('')]
-        rows.append(Align.center(Text(_HINT, style=STYLE_DIM)))
-        rows.append(Text(''))
-        return Group(*rows)  # type: ignore[arg-type]
+    _TAGLINE = 'AI coding agent for the terminal.'
+    _HINT = 'Describe a task  ·  /help  ·  /settings  ·  /sessions  ·  /quit'
 
-    console.print(_frame())
+    console.print()
+    console.print(Align.center(figlet_text))
+    console.print()
+    console.print(Align.center(Text(_TAGLINE, style=CLR_META)))
+    console.print()
+    console.print(Align.center(Text(_HINT, style=STYLE_DIM)))
+    console.print()
 
 
 def _compact_splash(console: Any) -> None:
@@ -335,13 +300,13 @@ def _compact_splash(console: Any) -> None:
     from rich.align import Align
     from rich.text import Text
 
-    from backend.cli.theme import CLR_BRAND, CLR_HUD_MODEL, STYLE_DIM
+    from backend.cli.theme import CLR_BRAND, CLR_META, STYLE_DIM
 
     console.print()
     console.print(Align.center(Text('GRINTA', style=CLR_BRAND)))
     console.print()
     console.print(
-        Align.center(Text('AI coding agent for the terminal.', style=CLR_HUD_MODEL))
+        Align.center(Text('AI coding agent for the terminal.', style=CLR_META))
     )
     console.print()
     console.print(

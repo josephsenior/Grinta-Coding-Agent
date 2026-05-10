@@ -20,17 +20,17 @@ from backend.cli.theme import (
     CLR_WORKER_BORDER,
 )
 
-# Slightly tighter horizontal inset for a more polished, modern feel.
-TRANSCRIPT_LEFT_INSET = 3
-TRANSCRIPT_RIGHT_INSET = 3
+# Tighter horizontal inset for the compact instrumentation aesthetic.
+TRANSCRIPT_LEFT_INSET = 2
+TRANSCRIPT_RIGHT_INSET = 2
 
-# Inner padding for rounded callout-style panels (vertical, horizontal).
+# Minimal inner padding for callout-style panels (vertical, horizontal).
 CALLOUT_PANEL_PADDING = (0, 1)
 
 # Inner padding for activity tool cards (tight horizontal rhythm).
-ACTIVITY_PANEL_PADDING = (0, 1)
+ACTIVITY_PANEL_PADDING = (0, 0)
 
-# Vertical space below each activity block — tighter than before for premium density.
+# Vertical space below each activity block — zero for maximum density.
 ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 0, 0)
 
 # Horizontal chrome added by ``format_callout_panel`` and rounded activity
@@ -85,7 +85,7 @@ def frame_live_body(renderable: Any) -> Any:
 
 def gap_below_live_section(renderable: Any) -> Any:
     """Vertical rhythm between stacked live sections (task / draft / working)."""
-    return Padding(renderable, pad=(0, 0, 1, 0), expand=False)
+    return Padding(renderable, pad=(0, 0, 0, 0), expand=False)
 
 
 def spacer_live_section() -> Text:
