@@ -137,7 +137,7 @@ class GrintaScreen(Screen):
         header = self.query_one('#header-bar', GrintaHeader)
         hud = self._hud
         model = hud.state.model or '(not set)'
-        workspace = hud.state.workspace or Path(os.getcwd()).name
+        workspace = hud.state.workspace_path or Path(os.getcwd()).name
         state = hud.state.agent_state_label or 'Ready'
         header.update(
             f'[bold #2dd4bf]GRINTA[/] '
