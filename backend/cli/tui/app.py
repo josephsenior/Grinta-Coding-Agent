@@ -269,7 +269,7 @@ class GrintaScreen(Screen):
 
     def _update_footer(self, hint: str) -> None:
         self.query_one('#footer-hint', GrintaFooter).update(
-            f'[dim #8da5b6]{hint}[/dim]'
+            f'[#8da5b6]{hint}[/]'
         )
 
     # ── HUD sync ─────────────────────────────────────────────────────────────
