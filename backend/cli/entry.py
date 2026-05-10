@@ -102,7 +102,7 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
         '--theme',
         choices=['default', 'dark', 'light', 'high-contrast', 'ocean', 'mono', 'deep-system-instrumentation'],
         default=None,
-        help='Color theme preset (default: dark). Overrides GRINTA_THEME env var.',
+        help='Color theme preset (default: deep-system-instrumentation). Overrides GRINTA_THEME env var.',
     )
     parser.add_argument(
         '--version',

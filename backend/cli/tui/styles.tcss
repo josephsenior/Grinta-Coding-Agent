@@ -1,18 +1,19 @@
-/* Grinta TUI — Deep Navy Theme
- * Modern, premium dark aesthetic with cyan accents.
+/* Grinta TUI — "Deep System Instrumentation" Theme
+ * NASA mission-control aesthetic.
+ * Deep Navy (#0a0e14) background, Teal (#5fb3b3) accents.
  */
 
 Screen {
-    background: #070b14;
-    color: #e2e8f0;
+    background: #0a0e14;
+    color: #d8dee9;
 }
 
 /* ── Header ────────────────────────────────────────── */
 
 GrintaHeader {
     height: 2;
-    background: #0d1526;
-    border-bottom: solid #1e3a5f;
+    background: #0f151c;
+    border-bottom: solid #1b2b34;
     dock: top;
     padding: 0 2;
 }
@@ -20,8 +21,8 @@ GrintaHeader {
 /* ── Transcript ────────────────────────────────────── */
 
 Transcript {
-    background: #070b14;
-    scrollbar-color: #2d4a6f #070b14;
+    background: #0a0e14;
+    scrollbar-color: #2b3b44 #0a0e14;
     scrollbar-size: 2 8;
 }
 
@@ -29,39 +30,39 @@ Transcript {
 
 InputArea {
     height: 3;
-    background: #0d1526;
-    border-top: solid #1e3a5f;
+    background: #0f151c;
+    border-top: solid #1b2b34;
     dock: bottom;
     padding: 0 4;
 }
 
 InputArea Static {
-    color: #00d4ff;
+    color: #5fb3b3;
     text-style: bold;
     padding: 0 4;
 }
 
 InputArea TextArea {
-    background: #070b14;
-    color: #e2e8f0;
-    border: solid #1e3a5f;
+    background: #0a0e14;
+    color: #d8dee9;
+    border: solid #1b2b34;
     padding: 2 8;
 }
 
 InputArea TextArea:focus {
-    border: solid #00d4ff;
+    border: solid #5fb3b3;
 }
 
 InputArea.processing TextArea {
-    border: solid #00d4ff;
+    border: solid #5fb3b3;
 }
 
 /* ── Footer ────────────────────────────────────────── */
 
 GrintaFooter {
     height: 1;
-    background: #0d1526;
-    color: #64748b;
+    background: #0f151c;
+    color: #65737e;
     dock: bottom;
     text-align: center;
 }
@@ -73,33 +74,33 @@ GrintaFooter.hidden {
 /* ── Confirmation dialog ───────────────────────────── */
 
 GrintaConfirmDialog {
-    background: #111d30;
-    border: solid #2d4a6f;
+    background: #0f151c;
+    border: solid #1b2b34;
     padding: 2 4;
     width: 60;
     align: center top;
 }
 
 GrintaConfirmDialog .title {
-    color: #00d4ff;
+    color: #5fb3b3;
     text-style: bold;
     margin-bottom: 1;
 }
 
 GrintaConfirmDialog .body {
-    color: #e2e8f0;
+    color: #d8dee9;
     margin-bottom: 2;
 }
 
 GrintaConfirmDialog Button {
-    background: #0d1526;
-    color: #e2e8f0;
-    border: solid #2d4a6f;
+    background: #0f151c;
+    color: #d8dee9;
+    border: solid #1b2b34;
     margin: 0 1;
 }
 
 GrintaConfirmDialog Button:hover {
-    background: #00d4ff;
-    color: #070b14;
-    border: solid #00d4ff;
+    background: #5fb3b3;
+    color: #0a0e14;
+    border: solid #5fb3b3;
 }

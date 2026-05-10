@@ -42,13 +42,13 @@ Extended diagnostics (for example MCP/skills counts) should live in explicit sta
 
 ## Available theme presets
 
-| Preset | Description |
-|--------|-------------|
-| `default` / `dark` | Navy-dark with cyan accents (original) |
-| `light` | Light background variant |
-| `high-contrast` | Accessibility-first: bold ANSI colors, no hex |
-| `ocean` | Blue-water palette |
-| `mono` | Monochrome with dim/bold only |
+| Preset                        | Description                                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default` / `dark`            | Navy-dark with cyan accents (original)                                                                                                            |
+| `light`                       | Light background variant                                                                                                                          |
+| `high-contrast`               | Accessibility-first: bold ANSI colors, no hex                                                                                                     |
+| `ocean`                       | Blue-water palette                                                                                                                                |
+| `mono`                        | Monochrome with dim/bold only                                                                                                                     |
 | `deep-system-instrumentation` | NASA mission-control aesthetic: `#0a0e14` navy bg, `#5fb3b3` teal accents, `#99c794` emerald, `#ec5f67` coral. Designed for long coding sessions. |
 
 ### Theme activation
@@ -58,17 +58,17 @@ Extended diagnostics (for example MCP/skills counts) should live in explicit sta
 
 ## "Deep System Instrumentation" palette reference
 
-| Element | Hex | Description |
-|---------|-----|-------------|
-| Background | `#0a0e14` | Deep navy ink |
-| Surface | `#0f151c` | Card/panel surfaces |
-| Borders | `#1b2b34` | Subtle structural dividers |
+| Element        | Hex       | Description                             |
+| -------------- | --------- | --------------------------------------- |
+| Background     | `#0a0e14` | Deep navy ink                           |
+| Surface        | `#0f151c` | Card/panel surfaces                     |
+| Borders        | `#1b2b34` | Subtle structural dividers              |
 | Primary accent | `#5fb3b3` | Teal — headers, spinners, active states |
-| Text primary | `#d8dee9` | Warm white |
-| Text secondary | `#65737e` | Slate — timestamps, metadata |
-| Success | `#99c794` | Muted emerald |
-| Warning | `#fac863` | Warm amber |
-| Error | `#ec5f67` | Soft coral red |
+| Text primary   | `#d8dee9` | Warm white                              |
+| Text secondary | `#65737e` | Slate — timestamps, metadata            |
+| Success        | `#99c794` | Muted emerald                           |
+| Warning        | `#fac863` | Warm amber                              |
+| Error          | `#ec5f67` | Soft coral red                          |
 
 ## Layout tokens
 

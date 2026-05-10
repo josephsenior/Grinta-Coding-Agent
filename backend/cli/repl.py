@@ -25,7 +25,7 @@ from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.status_chrome import (
     STATUS_CHROME_COMPACT_WIDTH,
-    _token_progress_bar,
+    _token_bar as _token_progress_bar,
     autonomy_chrome_suffix,
     pt_compact_line_plain,
     status_fields_from_hud,
