@@ -373,6 +373,12 @@ class GrintaScreen(Screen):
             lines.append(f'  [{NAVY_TEXT_DIM}]{thought}[/]')
         if self._reasoning._streaming_line:
             lines.append(f'  [{NAVY_TEXT_TERTIARY}]{self._reasoning._streaming_line}[/]')
+        # Show ETA footer if available.
+        eta = self._reasoning.eta_display
+        if eta:
+            elapsed = self._reasoning.elapsed_seconds
+            elapsed_str = f'{elapsed}s' if elapsed is not None else '?'
+            lines.append(f'  [{NAVY_TEXT_MUTED}]step {self._reasoning.step_count} · {elapsed_str} elapsed · {eta}[/]')
         panel.update('\n'.join(lines) if lines else '')
 
     # ── Transcript helpers ──────────────────────────────────────────────────

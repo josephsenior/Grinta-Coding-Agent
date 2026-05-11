@@ -418,9 +418,15 @@ def rich_fake_prompt_compact_line(
     path_budget = workspace_path_display_max(term_width)
     ws_prefix = f'{HUDBar.ellipsize_path(ws, path_budget)} · ' if ws else ''
     autonomy_display = autonomy_chrome_suffix(fields.autonomy_level)
+    has_limit = '/' in fields.token_display_compact
+    token_display = (
+        f'{_token_bar(fields.token_usage_pct, 4)} {fields.token_display_compact}'
+        if has_limit and fields.token_usage_pct > 0
+        else fields.token_display_compact
+    )
     line = (
         f'{ws_prefix}{fields.agent_state_label} · {autonomy_display} · '
-        f'{fields.model_display} · {fields.token_display_compact} · '
+        f'{fields.model_display} · {token_display} · '
         f'${fields.cost_usd:.3f}'
     )
     return Text(line, style=CLR_META)
@@ -445,9 +451,15 @@ def pt_compact_line_plain(fields: StatusFields, *, term_width: int = 120) -> str
     path_budget = workspace_path_display_max(term_width)
     ws_prefix = f'{HUDBar.ellipsize_path(ws, path_budget)} · ' if ws else ''
     autonomy_display = autonomy_chrome_suffix(fields.autonomy_level)
+    has_limit = '/' in fields.token_display_compact
+    token_display = (
+        f'{_token_bar(fields.token_usage_pct, 4)} {fields.token_display_compact}'
+        if has_limit and fields.token_usage_pct > 0
+        else fields.token_display_compact
+    )
     return (
         f'{ws_prefix}{fields.agent_state_label} · {autonomy_display} · '
-        f'{fields.model_display} · {fields.token_display_compact} · '
+        f'{fields.model_display} · {token_display} · '
         f'${fields.cost_usd:.3f}'
     )
 

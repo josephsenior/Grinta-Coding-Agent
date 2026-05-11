@@ -105,6 +105,9 @@ class ReasoningDisplay:
         self._streaming: bool = False
         # First computed wrap width while streaming — kept stable until streaming ends.
         self._stream_wrap_width: int | None = None
+        # Step tracking for ETA estimation.
+        self._step_count: int = 0
+        self._step_times: list[float] = []  # monotonic timestamps of each commit
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -124,6 +127,8 @@ class ReasoningDisplay:
         self._start_time = None
         self._streaming = False
         self._stream_wrap_width = None
+        self._step_count = 0
+        self._step_times.clear()
         _prompt_role_debug.log_reasoning_transition('reasoning.stop', '')
 
     @property
@@ -135,6 +140,54 @@ class ReasoningDisplay:
         if self._start_time is None:
             return None
         return max(0, int(time.monotonic() - self._start_time))
+
+    @property
+    def step_count(self) -> int:
+        """Number of committed reasoning steps in this turn."""
+        return self._step_count
+
+    @property
+    def avg_step_duration(self) -> float | None:
+        """Average seconds per step, or None if fewer than 2 steps."""
+        if len(self._step_times) < 2 or self._start_time is None:
+            return None
+        total = self._step_times[-1] - self._start_time
+        return total / len(self._step_times)
+
+    @property
+    def eta_display(self) -> str | None:
+        """Formatted ETA string like '~2m 15s remaining', or None if not enough data.
+
+        Uses a rolling average of the last 5 step durations to estimate
+        remaining time. Returns None until at least 3 steps have completed.
+        """
+        if self._start_time is None or self._step_count < 3:
+            return None
+        # Use rolling window of last 5 step intervals for responsiveness.
+        window = min(5, len(self._step_times) - 1)
+        if window < 1:
+            return None
+        recent_times = self._step_times[-window - 1 :]
+        intervals = [
+            recent_times[i + 1] - recent_times[i] for i in range(len(recent_times) - 1)
+        ]
+        avg = sum(intervals) / len(intervals)
+        if avg <= 0:
+            return None
+        # Heuristic: agent tasks typically need ~8-15 steps.
+        # Use the current step count to project forward.
+        estimated_total = max(self._step_count + 3, int(self._step_count * 1.3))
+        remaining_steps = max(0, estimated_total - self._step_count)
+        eta_seconds = int(remaining_steps * avg)
+        if eta_seconds <= 0:
+            return None
+        if eta_seconds < 60:
+            return f'~{eta_seconds}s remaining'
+        minutes = eta_seconds // 60
+        seconds = eta_seconds % 60
+        if seconds > 0:
+            return f'~{minutes}m {seconds}s remaining'
+        return f'~{minutes}m remaining'
 
     # -- updates -----------------------------------------------------------
 
@@ -172,6 +225,9 @@ class ReasoningDisplay:
         # A committed thought ends any prior streaming run.
         self._streaming = False
         self._stream_wrap_width = None
+        # Track step timing for ETA.
+        self._step_count += 1
+        self._step_times.append(time.monotonic())
 
     def update_action(self, label: str) -> None:
         self.start()
@@ -229,6 +285,14 @@ class ReasoningDisplay:
 
         if self.live_panel_shows_thought_rows():
             self._append_thought_rows(rows, max_width, max_lines)
+
+        # Append ETA footer if available.
+        eta = self.eta_display
+        if eta and rows:
+            elapsed = self.elapsed_seconds
+            elapsed_str = f'{elapsed}s' if elapsed is not None else '?'
+            footer = f'{_GUTTER_MARKER} step {self._step_count} · {elapsed_str} elapsed · {eta}'
+            rows.append(Text(footer, style=CLR_META))
 
         if not rows:
             return Group()

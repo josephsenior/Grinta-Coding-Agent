@@ -805,11 +805,75 @@ class SlashCommandsMixin:
             if self._renderer is not None
             else ''
         )
+        if not last_reply.strip():
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    'No assistant reply available to copy yet.',
+                    title='warning',
+                )
+            return True
         ok, msg = _copy_to_system_clipboard(last_reply)
         if self._renderer is not None:
-            self._renderer.add_system_message(
-                msg, title='clipboard' if ok else 'warning'
+            if ok:
+                char_count = len(last_reply.strip())
+                line_count = last_reply.strip().count('\n') + 1
+                self._renderer.add_system_message(
+                    f'Copied {char_count} characters ({line_count} lines) to clipboard.',
+                    title='clipboard',
+                )
+            else:
+                self._renderer.add_system_message(msg, title='warning')
+        return True
+
+    def _cmd_search(self, parsed) -> bool:
+        """Search the current session transcript for matching text."""
+        query = ' '.join(parsed.args).strip()
+        if not query:
+            self._warn('Usage: /search <text to find>')
+            return True
+        if self._event_stream is None:
+            self._warn('No active session to search.')
+            return True
+
+        from rich import box
+        from rich.table import Table
+
+        from backend.cli.theme import CLR_BRAND, CLR_CARD_BORDER, CLR_META, STYLE_DIM
+
+        try:
+            events = self._event_stream.get_matching_events(
+                query=query, limit=20, reverse=True
             )
+        except Exception:
+            self._warn('Search failed. See logs for details.')
+            return True
+
+        if not events:
+            self._renderer.add_system_message(
+                f'No results found for "{query}".', title='search'
+            )
+            return True
+
+        table = Table(
+            show_header=True,
+            header_style=f'bold {CLR_BRAND}',
+            box=box.SIMPLE,
+            pad_edge=False,
+            show_lines=False,
+        )
+        table.add_column('#', style=STYLE_DIM, width=6, justify='right')
+        table.add_column('Type', style=CLR_META, width=18)
+        table.add_column('Preview', style=CLR_CARD_BORDER, overflow='fold')
+
+        for evt in events:
+            evt_type = type(evt).__name__.replace('Action', '').replace('Observation', '')
+            content = getattr(evt, 'content', '') or getattr(evt, 'message', '') or ''
+            preview = content.strip()[:120].replace('\n', ' ')
+            table.add_row(str(getattr(evt, 'id', '?')), evt_type, preview)
+
+        self._renderer.add_system_message(
+            table, title=f'search: "{query}" ({len(events)} results)'
+        )
         return True
 
     def _cmd_sessions(self, parsed) -> bool:
