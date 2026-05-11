@@ -26,11 +26,10 @@ class SecretMasker:
     """
 
     PLACEHOLDER = '<secret_hidden>'
-    # Top-level event fields that must never be masked so the event
-    # structure (type, id, source, etc.) stays intact.
     TOP_LEVEL_PROTECTED_FIELDS = frozenset(
         {'timestamp', 'id', 'source', 'cause', 'action', 'observation', 'message'}
     )
+    _MAX_SECRETS = 5000
 
     def __init__(self) -> None:
         self.secrets: dict[str, str] = {}
@@ -47,8 +46,17 @@ class SecretMasker:
         self._rebuild_cache()
 
     def update_secrets(self, secrets: dict[str, str]) -> None:
-        """Merge additional secrets and recompile patterns."""
+        """Merge additional secrets and recompile patterns.
+
+        Caps total secrets at ``_MAX_SECRETS`` by evicting the oldest
+        entries (insertion-order) when the limit is exceeded.
+        """
         self.secrets.update(secrets)
+        if len(self.secrets) > self._MAX_SECRETS:
+            excess = len(self.secrets) - self._MAX_SECRETS
+            keys_to_evict = list(self.secrets.keys())[:excess]
+            for key in keys_to_evict:
+                del self.secrets[key]
         self._rebuild_cache()
 
     def replace_secrets(

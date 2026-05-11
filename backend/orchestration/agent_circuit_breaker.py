@@ -38,6 +38,8 @@ from backend.ledger.observation import ErrorObservation
 TEXT_EDITOR_TOOL_NAME = 'text_editor'
 TEXT_EDITOR_SYNTAX_TOOL_NAME = 'text_editor_syntax'
 
+_PER_TOOL_ERRORS_MAX = 100
+
 
 def classify_text_editor_error_bucket(content: str) -> str:
     """Map text_editor error text to a circuit-breaker per-tool bucket.
@@ -328,8 +330,6 @@ class CircuitBreaker:
             tool_name: Optional tool name for per-tool tracking
 
         """
-        # Syntax validation failures are higher-variance; do not consume the
-        # global consecutive-error budget (else they trip before the syntax bucket).
         if tool_name != TEXT_EDITOR_SYNTAX_TOOL_NAME:
             self.consecutive_errors += 1
         self.recent_errors.append(str(error))
@@ -338,6 +338,12 @@ class CircuitBreaker:
             self._per_tool_errors[tool_name] = (
                 self._per_tool_errors.get(tool_name, 0) + 1
             )
+            if len(self._per_tool_errors) > _PER_TOOL_ERRORS_MAX:
+                stale_keys = sorted(
+                    self._per_tool_errors, key=self._per_tool_errors.get
+                )[: len(self._per_tool_errors) - _PER_TOOL_ERRORS_MAX]
+                for key in stale_keys:
+                    del self._per_tool_errors[key]
 
     def record_success(self, tool_name: str = '') -> None:
         """Record a successful action.
@@ -441,6 +447,20 @@ class CircuitBreaker:
         self.recent_actions_success.clear()
         self._per_tool_errors.clear()
         logger.info('Circuit breaker reset')
+
+    def reset_task_counters(self) -> None:
+        """Reset cumulative task-scoped counters that should not persist across tasks.
+
+        Called when the agent receives a new user message indicating a task
+        switch. This prevents false-positive breaker trips caused by
+        accumulated ``stuck_detection_count`` or ``high_risk_action_count``
+        from previous tasks.
+        """
+        self.stuck_detection_count = 0
+        self.high_risk_action_count = 0
+        logger.debug(
+            'Circuit breaker task counters reset (stuck=0, high_risk=0)'
+        )
 
     def _update_metrics(self, state: State) -> None:
         """Update metrics from state.

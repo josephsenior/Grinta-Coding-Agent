@@ -41,7 +41,7 @@ class DurableEventWriter:
         self,
         file_store: FileStore,
         *,
-        max_queue_size: int = 4096,
+        max_queue_size: int = 2048,
         put_timeout: float = 2.0,
     ) -> None:
         self._file_store = file_store

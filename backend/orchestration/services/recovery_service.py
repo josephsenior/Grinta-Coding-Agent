@@ -255,7 +255,7 @@ class RecoveryService:
                     controller.step()
                 return True
         except Exception:
-            logger.debug('Aggressive compaction failed', exc_info=True)
+            logger.warning('Aggressive compaction failed', exc_info=True)
         return False
 
     async def _handle_limit_exceeded_exception(
