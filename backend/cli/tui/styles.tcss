@@ -48,12 +48,12 @@ MetricsGrid {
 }
 
 MetricsCard {
-    height: 4;
+    height: auto;
     width: 1fr;
-    background: #0f1525;
-    border: tall #1b233a;
+    background: #101626;
+    border: tall #1d253e;
     padding: 0 1;
-    margin: 0 0 0 1;
+    margin: 0 0 0 0;
     color: #e9e9e9;
 }
 
@@ -82,46 +82,58 @@ ReasoningPanel.active {
 
 /* ── Transcript ────────────────────────────────────── */
 Transcript {
-    background: #0a0e1b;
+    background: #101626;
+    border: tall #1d253e;
     scrollbar-color: #33405d #161e31;
     scrollbar-color-hover: #404f71 #161e31;
     scrollbar-color-active: #4f608a #161e31;
     scrollbar-size: 1 8;
     padding: 0 1;
+    margin: 0;
+}
+
+Transcript:focus {
+    border: tall #384673;
 }
 
 /* ── InputBar ──────────────────────────────────────── */
 InputBar {
-    height: 3;
-    background: #0f1525;
-    border-top: tall #1b233a;
-    padding: 0 1;
+    height: auto;
+    background: #101626;
+    border: tall #1d253e;
+    padding: 0;
+    margin: 0;
     dock: bottom;
 }
 
+InputBar:focus-within {
+    border: tall #384673;
+}
+
 InputBar Static {
-    color: #91abec;
+    color: #bbc8e8;
     text-style: bold;
-    padding: 0 1;
+    padding: 1;
     content-align: center middle;
-    width: 2;
+    width: 3;
 }
 
 InputBar TextArea {
-    background: #0a0e1b;
+    background: #101626;
     color: #e9e9e9;
     border: none;
     padding: 0 1;
+    min-height: 2;
+    max-height: 10;
 }
 
 InputBar TextArea:focus {
-    border: heavy #43548b;
-    background: #0f1525;
+    border: none;
+    background: #101626;
 }
 
 InputBar.processing TextArea {
-    background: #0f1525;
-    border: heavy #91abec;
+    background: #101626;
 }
 
 /* ── FooterBar ─────────────────────────────────────── */

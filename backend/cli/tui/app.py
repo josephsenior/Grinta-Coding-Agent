@@ -242,13 +242,21 @@ class GrintaScreen(Screen):
 
     def on_mount(self) -> None:
         _trace('on_mount: GrintaScreen mounted')
+        
+        # Panelize the main layout sections
+        transcript = self.query_one('#transcript-scroll', Transcript)
+        transcript.border_title = '[#bbc8e8]Session Log[/]'
+        
+        input_bar = self.query_one('#input-bar', InputBar)
+        input_bar.border_title = '[#bbc8e8]Terminal[/]'
+        
         self._render_topbar()
         self._render_metrics_grid()
         self._update_footer_bar()
         ta = self.query_one('#input', TextArea)
         ta.focus()
         ta.cursor_blink = True
-        self.query_one('#transcript-scroll', Transcript).scroll_home(animate=False)
+        transcript.scroll_home(animate=False)
         _trace('on_mount: done')
 
     def on_unmount(self) -> None:
@@ -293,8 +301,8 @@ class GrintaScreen(Screen):
         hud = self._hud
         provider, model = HUDBar.describe_model(hud.state.model)
         autonomy = hud.state.autonomy_level
+        card.border_title = '[#bbc8e8]Model[/]'
         card.update(
-            f'[{NAVY_BRAND}]▸ Model[/]\n'
             f'  [{NAVY_TEXT_PRIMARY}]{provider}[/]\n'
             f'  [{NAVY_TEXT_TERTIARY}]{model}[/]\n'
             f'  [{NAVY_TEXT_MUTED}]{autonomy}[/]'
@@ -307,8 +315,8 @@ class GrintaScreen(Screen):
         limit = hud.state.context_limit
         bar = self._render_context_bar(used, limit)
         condensations = hud.state.condensation_count
+        card.border_title = '[#bbc8e8]Context[/]'
         card.update(
-            f'[{NAVY_BRAND}]▸ Context[/]\n'
             f'  {bar}\n'
             f'  [{NAVY_TEXT_MUTED}]{used:,} / {limit:,} tokens[/]\n'
             f'  [{NAVY_TEXT_MUTED}]{condensations} condensations[/]'
@@ -334,8 +342,8 @@ class GrintaScreen(Screen):
         hud = self._hud
         cost = hud.state.cost_usd
         calls = hud.state.llm_calls
+        card.border_title = '[#bbc8e8]Cost[/]'
         card.update(
-            f'[{NAVY_BRAND}]▸ Cost[/]\n'
             f'  [{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]\n'
             f'  [{NAVY_TEXT_TERTIARY}]{calls} LLM calls[/]'
         )
@@ -353,8 +361,8 @@ class GrintaScreen(Screen):
         mcp = hud.state.mcp_servers
         mcp_str = f'{mcp} MCP' if mcp is not None else '— MCP'
         skills = HUDBar.count_bundled_playbook_skills()
+        card.border_title = '[#bbc8e8]Status[/]'
         card.update(
-            f'[{NAVY_BRAND}]▸ Status[/]\n'
             f'  [{state_color}]● {display_state}[/]\n'
             f'  [{NAVY_TEXT_TERTIARY}]{mcp_str}[/]\n'
             f'  [{NAVY_TEXT_MUTED}]{skills} skills[/]'
