@@ -146,10 +146,11 @@ class ConversationResumer:
         state = mgr.restore_checkpoint(latest)
         if state is None:
             return None, None
-        # Convert State to dict for portability
-        state_dict: dict[str, Any] = {}
-        if hasattr(state, '__dict__'):
-            state_dict = {
-                k: v for k, v in state.__dict__.items() if not k.startswith('_')
-            }
+        # Use the canonical serialization path which correctly handles
+        # enums, metrics, control flags, and nested dataclasses.
+        from backend.orchestration.state.state import (
+            _build_state_serialization_doc,
+        )
+
+        state_dict = _build_state_serialization_doc(state.__getstate__())
         return state_dict, latest

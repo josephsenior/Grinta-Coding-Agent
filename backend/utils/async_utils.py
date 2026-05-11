@@ -463,3 +463,30 @@ def run_or_schedule(coro: Coroutine[Any, Any, Any]) -> None:
         loop.run_until_complete(coro)
     finally:
         loop.close()
+
+
+async def drain_background_tasks(
+    *,
+    max_rounds: int = 20,
+    task_set: set[asyncio.Task[Any]] | None = None,
+) -> None:
+    """Await all in-flight background tasks spawned via ``run_or_schedule``.
+
+    Repeatedly snapshots the task set and gathers pending tasks until no new
+    tasks appear (each task may itself schedule further tasks).  This is a
+    proper barrier replacement for ``await asyncio.sleep(0)`` which only
+    yields once and does not guarantee that background callbacks have
+    completed.
+
+    Args:
+        max_rounds: Safety cap to prevent infinite loops if tasks keep
+            spawning new tasks indefinitely.
+        task_set: The task set to drain. Defaults to the module-level
+            ``_background_tasks``.
+    """
+    target = task_set if task_set is not None else _background_tasks
+    for _ in range(max_rounds):
+        pending = {t for t in target if not t.done()}
+        if not pending:
+            break
+        await asyncio.gather(*pending, return_exceptions=True)

@@ -28,6 +28,9 @@ class ParallelBatchDecision:
     should_execute_parallel: bool
     actions: tuple[Any, ...]
     reason: str
+    #: Actions that were safe for parallel execution but exceeded the batch
+    #: size cap. The caller must re-queue these so they are not lost.
+    overflow: tuple[Any, ...] = ()
 
 
 class ActionScheduler:
@@ -78,13 +81,15 @@ class ActionScheduler:
             )
 
         capped = tuple(actions[: self.max_parallel_batch_size])
+        overflow = tuple(actions[self.max_parallel_batch_size :])
         reason = (
             'parallel_safe_batch'
-            if len(capped) == len(actions)
+            if not overflow
             else 'parallel_safe_batch_capped'
         )
         return ParallelBatchDecision(
             should_execute_parallel=True,
             actions=capped,
             reason=reason,
+            overflow=overflow,
         )
