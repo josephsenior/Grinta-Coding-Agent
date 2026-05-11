@@ -834,6 +834,9 @@ class SlashCommandsMixin:
         if self._event_stream is None:
             self._warn('No active session to search.')
             return True
+        if self._renderer is None:
+            self._warn('Renderer not available.')
+            return True
 
         from rich import box
         from rich.table import Table

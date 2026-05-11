@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, PropertyMock
 import pytest
 from rich.console import Console as RichConsole
 
+from textual.widgets import Static
 from backend.cli.tui.app import GrintaScreen, InputBar, TextArea
 from backend.cli.tui.main import GrintaTUIApp
 
@@ -39,7 +40,7 @@ async def test_tui_mounts(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        topbar = s.query_one('#top-bar')
+        topbar = s.query_one('#top-bar', Static)
         assert topbar is not None
         assert 'Grinta' in topbar.renderable
 
@@ -161,7 +162,7 @@ async def test_tui_update_hud_state(mock_config):
         await pilot.pause()
 
         # State now lives in the metrics status card, not topbar
-        status_card = s.query_one('#metrics-status')
+        status_card = s.query_one('#metrics-status', Static)
         assert 'Running' in status_card.renderable
 
 

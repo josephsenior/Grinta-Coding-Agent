@@ -63,8 +63,8 @@ class SQLiteEventStore:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._write_lock = threading.Lock()
         self._conn: sqlite3.Connection | None = None
-        # Dedicated read connection — WAL mode allows concurrent readers
-        self._read_conn: sqlite3.Connection | None = None
+        # Dedicated thread-local for read connections - WAL mode allows concurrent readers
+        self._local = threading.local()
         self._ensure_schema()
 
     # ------------------------------------------------------------------
@@ -91,29 +91,42 @@ class SQLiteEventStore:
         return self._conn
 
     def _get_read_conn(self) -> sqlite3.Connection:
-        """Return a read-only connection for concurrent queries."""
-        if self._read_conn is None:
-            self._read_conn = sqlite3.connect(
+        """Return a thread-local read-only connection for concurrent queries."""
+        conn = getattr(self._local, 'read_conn', None)
+        if conn is None:
+            conn = sqlite3.connect(
                 str(self._db_path),
                 check_same_thread=False,
                 timeout=10.0,
             )
-            self._read_conn.execute('PRAGMA journal_mode=WAL')
-            self._read_conn.execute('PRAGMA query_only=ON')
-            self._read_conn.execute('PRAGMA busy_timeout=5000')
-            self._read_conn.row_factory = sqlite3.Row
-        return self._read_conn
+            conn.execute('PRAGMA journal_mode=WAL')
+            conn.execute('PRAGMA query_only=ON')
+            conn.execute('PRAGMA busy_timeout=5000')
+            conn.row_factory = sqlite3.Row
+            self._local.read_conn = conn
+        return conn
 
     def _ensure_schema(self) -> None:
         with self._write_lock:
             conn = self._get_conn()
-            conn.executescript(_CREATE_SQL)
-            # Record schema version
-            conn.execute(
-                'INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)',
-                ('schema_version', str(_SCHEMA_VERSION)),
-            )
-            conn.commit()
+            try:
+                conn.executescript(_CREATE_SQL)
+                # Record schema version
+                conn.execute(
+                    'INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)',
+                    ('schema_version', str(_SCHEMA_VERSION)),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
+    def __del__(self) -> None:
+        """Ensure connection closure during garbage collection."""
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def check_integrity(self) -> bool:
         """Run PRAGMA integrity_check and return True if the database is healthy.
@@ -144,9 +157,12 @@ class SQLiteEventStore:
     def close(self) -> None:
         """Close the database connections."""
         with self._write_lock:
-            if self._read_conn is not None:
-                self._read_conn.close()
-                self._read_conn = None
+            # Clean up the thread-local read connection if it exists in the current thread
+            read_conn = getattr(self._local, 'read_conn', None)
+            if read_conn is not None:
+                read_conn.close()
+                self._local.read_conn = None
+            
             if self._conn is not None:
                 self._conn.close()
                 self._conn = None
@@ -297,8 +313,12 @@ class SQLiteEventStore:
         """Delete a single event."""
         with self._write_lock:
             conn = self._get_conn()
-            conn.execute('DELETE FROM events WHERE id = ?', (event_id,))
-            conn.commit()
+            try:
+                conn.execute('DELETE FROM events WHERE id = ?', (event_id,))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
 
     def delete_from(self, start_id: int) -> int:
         """Delete all events with ID >= *start_id*.
@@ -308,9 +328,13 @@ class SQLiteEventStore:
         """
         with self._write_lock:
             conn = self._get_conn()
-            cursor = conn.execute('DELETE FROM events WHERE id >= ?', (start_id,))
-            conn.commit()
-            return cursor.rowcount
+            try:
+                cursor = conn.execute('DELETE FROM events WHERE id >= ?', (start_id,))
+                conn.commit()
+                return cursor.rowcount
+            except Exception:
+                conn.rollback()
+                raise
 
     # ------------------------------------------------------------------
     # Repr

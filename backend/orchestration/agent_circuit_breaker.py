@@ -340,7 +340,7 @@ class CircuitBreaker:
             )
             if len(self._per_tool_errors) > _PER_TOOL_ERRORS_MAX:
                 stale_keys = sorted(
-                    self._per_tool_errors, key=self._per_tool_errors.get
+                    self._per_tool_errors, key=lambda k: self._per_tool_errors[k]
                 )[: len(self._per_tool_errors) - _PER_TOOL_ERRORS_MAX]
                 for key in stale_keys:
                     del self._per_tool_errors[key]

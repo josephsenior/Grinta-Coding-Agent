@@ -118,7 +118,7 @@ class EventStream(EventStore):
     secrets: dict[str, str]
     _subscribers: dict[str, dict[str, Callable]]
     _lock: threading.Lock
-    _async_queue: asyncio.Queue[Event | object] | None
+    _async_queue: asyncio.Queue[Event] | None
     _queue_thread: threading.Thread
     _queue_loop: asyncio.AbstractEventLoop | None
     _delivery_pool: ThreadPoolExecutor
@@ -863,10 +863,11 @@ class EventStream(EventStore):
                     remaining = deliver_deadline - asyncio.get_event_loop().time()
                     if remaining > 0 and event is not self._stop_sentinel:
                         try:
-                            await asyncio.wait_for(
-                                self._dispatch_event(event),
-                                timeout=remaining,
-                            )
+                            if isinstance(event, Event):
+                                await asyncio.wait_for(
+                                    self._dispatch_event(event),
+                                    timeout=remaining,
+                                )
                         except (asyncio.TimeoutError, Exception):
                             pass
                     self._async_queue.task_done()

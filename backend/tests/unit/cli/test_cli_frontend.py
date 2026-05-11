@@ -1842,7 +1842,7 @@ def test_reasoning_display_elapsed_time() -> None:
         'backend.cli.reasoning_display.time.monotonic', side_effect=[100.0, 105.0]
     ):
         rd.start()
-        rd.update_thought('test')
+        rd.set_streaming_thought('test')
         console = _make_console(width=80)
         console.print(rd.renderable())
     output = _console_output(console)

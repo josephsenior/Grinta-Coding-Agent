@@ -597,6 +597,7 @@ class EventRouterService:
             """Run one worker agent and return (success, content, error_message)."""
             worker_id = f'pending_worker_{worker_order}'
             worker_marked_terminal = False
+            worker_controller = None
 
             def _emit_worker_progress(status: str, detail: str) -> None:
                 progress = _build_delegate_progress_observation(

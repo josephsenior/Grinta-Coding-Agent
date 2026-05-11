@@ -232,7 +232,8 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default_factory=set, description='Allowed file extensions'
     )
     defaults_dict: ClassVar[dict] = {}
-    _minimal_mode: bool = PrivateAttr(default=False)
+     _minimal_mode: bool = PrivateAttr(default=False)
+     _accessible_mode: bool = PrivateAttr(default=False)
     model_config = ConfigDict(extra='forbid', arbitrary_types_allowed=True)
 
     def get_llm_config(self, name: str = 'llm') -> LLMConfig:
