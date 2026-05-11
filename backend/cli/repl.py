@@ -1007,6 +1007,8 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         self._prompt_ctrl_c_hint_shown: bool = False
         #: When True, LOW-risk actions are auto-approved without prompt.
         self._suppress_low_risk_confirmations: bool = False
+        #: Circuit breaker: consecutive prompt input failures.
+        self._consecutive_input_failures: int = 0
 
     def _invalidate_pt(self) -> None:
         sess = self._pt_session
@@ -1286,7 +1288,7 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             complete_style=CompleteStyle.MULTI_COLUMN,
             reserve_space_for_menu=8,
             enable_history_search=True,
-            multiline=False,
+            multiline=True,
             mouse_support=False,
             style=prompt_style,
             erase_when_done=True,
@@ -1402,7 +1404,6 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         from backend.core.bootstrap.setup import create_controller
 
         try:
-            bootstrap_task: asyncio.Task[None] | None = None  # type: ignore
             config = self._config
             self._hud.update_model(get_current_model(config))
             self._hud.update_workspace(getattr(config, 'project_root', None))
@@ -1473,22 +1474,23 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
                         run_agent_until_done,
                         end_states,
                     )
-                except BaseException:
+                except BaseException as exc:
                     logger.exception('Unhandled exception in REPL iteration')
                     import traceback
 
                     traceback.print_exc()
                     diag('run() caught BaseException, continuing')
-                    self._console.print(
-                        f'[{CLR_STATUS_ERR}]Fatal error in REPL loop:[/] '
-                        'see log or stderr for details.'
-                    )
+                    try:
+                        self._console.print(
+                            f'[{CLR_STATUS_ERR}]Fatal error in REPL loop:[/] '
+                            'see log or stderr for details.'
+                        )
+                    except Exception:
+                        pass
                     # Continue looping so user can retry rather than silently
                     # terminating the session. Do NOT suppress SystemExit/KeyboardInterrupt
                     # — those still need to bubble up.
-                    import sys
-
-                    if isinstance(sys.exc_info()[1], (SystemExit, KeyboardInterrupt)):
+                    if isinstance(exc, (SystemExit, KeyboardInterrupt)):
                         raise
                     continue
                 if stop is None:

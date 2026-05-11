@@ -130,20 +130,19 @@ class ObservationService:
     async def _resolve_primary_pending_action(
         self, controller: Any, observation: Observation
     ) -> Any | None:
+        cause = getattr(observation, 'cause', None)
         pending_action = self._pending_service.get()
         if pending_action is None:
             return None
         if self._matches_pending_action(pending_action, observation):
             return pending_action
-        if getattr(observation, 'cause', None) is None:
+        if cause is None:
             return None
         if self._is_background_observation(observation):
             logger.debug(
-                'Silently dropping background observation %s (cause=%r) '
-                'that arrived after pending advanced to id=%r',
+                'Silently dropping background observation %s '
+                'that arrived with no cause after pending advanced.',
                 type(observation).__name__,
-                getattr(observation, 'cause', None),
-                getattr(pending_action, 'id', None),
             )
             return None
         self._report_pending_action_mismatch(

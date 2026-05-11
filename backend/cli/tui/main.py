@@ -11,8 +11,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-if os.getenv('DEBUG', '').strip().lower() not in ('true', '1', 'yes'):
-    os.environ['DEBUG'] = '1'
+# Respect the user's DEBUG setting; do not override it.
 
 from rich.console import Console as RichConsole
 from rich.theme import Theme as RichTheme

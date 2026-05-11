@@ -612,29 +612,52 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                 self._executor.close()
             self._executor = None
 
-        # Wait a bit for processes to release file handles before removing workspace
+        # Offload blocking cleanup to a thread when an event loop is running
+        # so we don't stall the async controller / REPL.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop is not None and loop.is_running():
+            asyncio.create_task(self._async_close_cleanup())
+        else:
+            self._sync_close_cleanup()
+
+        super().close()
+
+    def _sync_close_cleanup(self) -> None:
+        """Synchronous workspace teardown (safe for atexit / non-async callers)."""
+        import shutil
         import time
 
-        time.sleep(0.5)  # Brief wait for Windows file handle release
+        time.sleep(0.5)
+        self._remove_workspace(shutil, time)
 
-        # Clean up workspace with retry logic, but never remove a user workspace.
+    async def _async_close_cleanup(self) -> None:
+        """Asynchronous workspace teardown (non-blocking for async callers)."""
+        import shutil
+        import time
+
+        await asyncio.sleep(0.5)
+        self._remove_workspace(shutil, time)
+
+    def _remove_workspace(self, shutil_mod: Any, time_mod: Any) -> None:
+        """Remove the temporary workspace with retry logic."""
         if (
             self._owns_workspace
             and self._temp_workspace
             and os.path.exists(self._temp_workspace)
         ):
-            import shutil
-
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    shutil.rmtree(self._temp_workspace)
+                    shutil_mod.rmtree(self._temp_workspace)
                     break
                 except (PermissionError, OSError) as e:
                     if attempt < max_retries - 1:
-                        time.sleep(1.0)  # Wait before retry
+                        time_mod.sleep(1.0)
                         continue
-                    # Last attempt failed, log warning but don't raise
                     try:
                         logger.warning(
                             'Failed to remove workspace %s after %s attempts: %s',
@@ -643,10 +666,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                             e,
                         )
                     except Exception:
-                        # Logger might be closed, ignore
                         pass
-
-        super().close()
 
     @property
     def workspace_root(self) -> Path:
@@ -697,16 +717,23 @@ class LocalRuntimeInProcess(ActionExecutionClient):
 
     def additional_agent_instructions(self) -> str:
         """Provide runtime-specific instructions about the local environment and paths."""
+        import sys
+
         workspace_root = self.workspace_root.absolute()
         project_root = (
             Path(self.project_root).absolute() if self.project_root else workspace_root
+        )
+        platform_name = (
+            'Windows'
+            if sys.platform.startswith('win')
+            else ('macOS' if sys.platform == 'darwin' else 'Linux')
         )
 
         return (
             '### Local Environment Context\n'
             f'- **Workspace Root (Absolute)**: {workspace_root}\n'
             f'- **Project Root (Absolute)**: {project_root}\n'
-            f'- **Platform**: Windows\n'
+            f'- **Platform**: {platform_name}\n'
             'Always use absolute paths when referencing files in the project tree to avoid ambiguity '
             'between nested source directories (e.g. `src/` vs `flask/src/`).'
         )

@@ -14,9 +14,9 @@ Functions:
 from __future__ import annotations
 
 import asyncio
-import atexit
 import copy
 import os
+import weakref
 from abc import abstractmethod
 from collections.abc import Callable
 from pathlib import Path
@@ -109,6 +109,17 @@ AGENT_LEVEL_ACTIONS: frozenset[str] = frozenset(
         'streaming_chunk',
     }
 )
+
+
+def _run_runtime_close(ref: weakref.ref[Runtime]) -> None:
+    """Static finalizer callback — invoked when a Runtime is GC'd or at shutdown."""
+    runtime = ref()
+    if runtime is None:
+        return
+    try:
+        runtime.close()
+    except Exception:
+        pass
 
 
 def _default_env_vars(runtime_config: RuntimeConfig) -> dict[str, str]:
@@ -218,7 +229,15 @@ class Runtime(
         self.status_callback = status_callback
         self.attach_to_existing = attach_to_existing
         self.config = copy.deepcopy(config)
-        atexit.register(self.close)
+        # Use weakref.finalize instead of atexit.register so that:
+        # 1. Each runtime instance gets its own cleanup trigger.
+        # 2. When the runtime is GC'd, the finalizer fires.
+        # 3. During interpreter shutdown, pending finalizers still run.
+        # 4. Old instances that have been GC'd don't leave stale atexit handlers
+        #    that could clean up resources owned by newer instances.
+        self._finalizer = weakref.finalize(
+            self, _run_runtime_close, weakref.ref(self)
+        )
         self.initial_env_vars = _default_env_vars(config.runtime_config)
         if env_vars is not None:
             self.initial_env_vars.update(env_vars)

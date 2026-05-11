@@ -836,6 +836,11 @@ class EventRouterService:
                                     event
                                 )
                             except Exception as exc:
+                                self._ctrl.log(
+                                    'error',
+                                    f'Worker runtime bridge execution failed: {type(exc).__name__}: {exc}',
+                                    extra={'msg_type': 'WORKER_RUNTIME_ERROR'},
+                                )
                                 observation = ErrorObservation(
                                     content=(
                                         f'Worker action error: '

@@ -243,8 +243,13 @@ class StepGuardService:
             return True
 
         state = getattr(controller, 'state', None)
-        if self._consume_stuck_cooldown(state):
-            return True
+        # Only consume cooldown during the main step, not during batch-drain
+        # sub-iterations.  Batch drain processes queued non-runnable actions
+        # without LLM calls; consuming cooldown there burns through the
+        # model's recovery turns before it gets a chance to act.
+        if not getattr(controller, '_draining_batch', False):
+            if self._consume_stuck_cooldown(state):
+                return True
 
         rep_score = stuck_service.compute_repetition_score()
         self._set_repetition_score(state, rep_score)
@@ -269,6 +274,10 @@ class StepGuardService:
         # Cooldown: after a stuck detection the model needs N uninterrupted turns
         # to act on the recovery directive.  Do not re-evaluate is_stuck() until
         # the cooldown has elapsed.
+        #
+        # Cooldown is consumed once per full step() cycle (not per _step_inner()
+        # sub-iteration during batch drain) so the model gets the full cooldown
+        # period of actual LLM turns. The callers gate this on draining_batch.
         if state is None:
             return False
 

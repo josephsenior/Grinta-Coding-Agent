@@ -113,17 +113,17 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         """Initializes a new instance of the SessionOrchestrator class."""
         self.config = config
 
-        # Capture the main event loop so step() can schedule tasks on it
-        # even when called from EventStream's thread-pool dispatcher
-        # (which runs on throw-away event loops).
+        # The main event loop is resolved dynamically in step() via
+        # get_main_event_loop() so we never capture a throw-away worker
+        # loop during thread-pool construction or session resume.
+        # We only prime the global registry here when we happen to be on
+        # the real main loop during normal construction.
         try:
-            self._main_loop: asyncio.AbstractEventLoop | None = (
-                asyncio.get_running_loop()
-            )
+            loop = asyncio.get_running_loop()
         except RuntimeError:
-            self._main_loop = None
-        if self._main_loop is not None:
-            set_main_event_loop(self._main_loop)
+            loop = None
+        if loop is not None:
+            set_main_event_loop(loop)
 
         # Attributes set by telemetry service during pipeline initialization
         self._reflection_middleware_enabled: bool = False
@@ -429,8 +429,10 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             self._step_pending = False
             if self._step_task is not None and not self._step_task.done():
                 self._step_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await self._step_task
+                try:
+                    await asyncio.wait_for(self._step_task, timeout=10.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass
             pending_service = self.services.pending_action
             if pending_service is not None:
                 pending_service.shutdown()
@@ -484,7 +486,13 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         The task is always scheduled on the main event loop (captured during
         __init__) because this method is often called from EventStream's
         thread-pool dispatcher which runs disposable event loops.
+
+        Thread-safe: if called concurrently, only one step task will be created.
+        Additional concurrent calls set _step_pending to ensure the step runs again.
         """
+        if self._closed:
+            return
+
         if self._step_task and not self._step_task.done():
             self._step_pending = True
             return
@@ -492,12 +500,10 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         if self.get_agent_state() == AgentState.AWAITING_USER_INPUT:
             return
 
-        # Always schedule on the main event loop, not the caller's loop.
-        main_loop = self._main_loop
+        main_loop = getattr(self, '_main_loop', None)
         if main_loop is not None and main_loop.is_running():
             main_loop.call_soon_threadsafe(self._create_step_task)
         else:
-            # Fallback: we ARE on the main loop (e.g. headless / CLI mode)
             self._create_step_task()
 
     def _create_step_task(self) -> None:
@@ -539,6 +545,8 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
 
     def on_event(self, event: Event) -> None:
         """Callback from the event stream. Notifies the controller of incoming events."""
+        if self._closed:
+            return
         run_or_schedule(self._on_event(event))
 
     def _schedule_coroutine(self, coro: Coroutine[Any, Any, Any]) -> None:
@@ -547,22 +555,30 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
 
     async def _on_event(self, event: Event) -> None:
         """Handle incoming events from the event stream."""
+        if self._closed:
+            return
         await self.event_router.route_event(event)
         # Drive the agent loop forward for events that should trigger a step.
         # This is necessary in the server (event-driven) path because there is
         # no external polling loop like run_agent_until_done in CLI/headless mode.
         # Examples: ThinkObservation, most tool observations (after pending is
         # cleared by observation_service.trigger_step), etc.
-        if self.should_step(event):
+        if not self._closed and self.should_step(event):
             self.step()
 
     def _reset(self) -> None:
-        """Resets the agent controller."""
+        """Resets the agent controller.
+
+        Must be called only from within the step lock to prevent concurrent mutation
+        of action contexts and agent state during an active step.
+        """
         self._clear_action_contexts()
         self._emit_pending_action_error_if_unmatched()
         self._emit_dropped_agent_actions()
         self._pending_action = None
-        self.agent.reset()
+        agent = getattr(self, 'agent', None)
+        if agent is not None:
+            agent.reset()
 
     def _clear_action_contexts(self) -> None:
         """Clear action context caches."""
@@ -719,36 +735,16 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             self._step_pending = True
             return
         async with self._step_lock:
-            await self._step_inner()
-            # Yield to the event loop so that any pending _on_event tasks
-            # (e.g. the one that sets state to AWAITING_USER_INPUT after a
-            # MessageAction arrives) have a chance to run before we decide
-            # whether to trigger another step.  Without this, a
-            # _step_pending=True set by an observation callback during
-            # streaming could kick off a second LLM call while the agent
-            # state is still RUNNING.
-            await asyncio.sleep(0)
-            # Drain any steps that were requested while we held the lock.
-            # If _step_inner returns early (e.g. can_step() is False because
-            # a pending action exists), do NOT lose the request — keep
-            # _step_pending True so the next trigger retries correctly.
-            drain_attempts = 0
-            while (
-                self._step_pending and drain_attempts < DEFAULT_AGENT_STEP_DRAIN_LIMIT
-            ):
-                drain_attempts += 1
+            drained_count = 0
+            while drained_count < DEFAULT_AGENT_STEP_DRAIN_LIMIT:
+                drained_count += 1
+                await self._step_inner()
+                await asyncio.sleep(0)
+                if not self._step_pending:
+                    break
                 self._step_pending = False
                 if not self.step_prerequisites.can_step():
-                    # Can't step right now (e.g. pending action exists).
-                    # Don't lose the request — it will be re-triggered by
-                    # observation_service.trigger_step() when the pending
-                    # action clears, or by the watchdog timer.
                     break
-                # Yield between outer-drain iterations so _on_event background
-                # tasks from the previous _step_inner() update state.history
-                # before the next step's condense_history() check.
-                await asyncio.sleep(0)
-                await self._step_inner()
 
     async def _step_inner(self) -> None:
         """Inner step logic, guarded by _step_lock."""
@@ -830,6 +826,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             if (
                 not self._pending_action
                 and self.get_agent_state() == AgentState.RUNNING
+                and not self._closed
             ):
                 self.step()
 
@@ -1027,9 +1024,6 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         pending_service = self.services.pending_action
         if pending_service:
             return pending_service.get()
-        service = getattr(self, 'action_service', None)
-        if service:
-            return service.get_pending_action()
         return None
 
     @_pending_action.setter
@@ -1037,10 +1031,6 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         pending_service = self.services.pending_action
         if pending_service:
             pending_service.set(action)
-            return
-        service = getattr(self, 'action_service', None)
-        if service:
-            service.set_pending_action(action)
 
     def get_state(self) -> State:
         """Returns the current running state object.

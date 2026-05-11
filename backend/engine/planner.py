@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 from typing import TYPE_CHECKING, Any
 
@@ -26,7 +25,7 @@ _INJECTED_MSG_MARKERS = (
     '<EXTRA_INFO>',
 )
 
-logger = logging.getLogger(__name__)
+from backend.core.logger import app_logger as logger
 
 
 def _maybe_log_prompt_metrics(messages: list) -> None:
@@ -374,10 +373,6 @@ class OrchestratorPlanner:
         return msgs
 
     def _determine_tool_choice(self, messages: list, state: State) -> str | dict | None:
-        last_user_msg = self._get_last_user_message(messages)
-        if not last_user_msg:
-            return 'auto'
-
         # Let the LLM decide whether to use tools — "auto" is more robust
         # than brittle regex-based question/action classification.
         return 'auto'

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from backend.execution.utils.process_registry import TaskCancellationService
 from backend.execution.utils.unified_shell import (
@@ -97,7 +97,7 @@ class SessionManager:
                 tools=self.tool_registry,
                 username=self.username,
                 no_change_timeout_seconds=int(
-                    os.environ.get('NO_CHANGE_TIMEOUT_SECONDS', 10)
+                    os.environ.get('NO_CHANGE_TIMEOUT_SECONDS', 30)
                 ),
                 max_memory_mb=self.max_memory_gb * 1024 if self.max_memory_gb else None,
                 cancellation_service=self.cancellation_service,
@@ -198,3 +198,34 @@ class SessionManager:
                     exc_info=True,
                 )
         return closed
+
+    def is_default_session_alive(self) -> bool:
+        """Check if the default session's backing process is still alive.
+
+        Returns True if the default session exists and its process is running,
+        or if the session has no process (e.g., in-process session).
+        Returns False if the default session is dead or does not exist.
+        """
+        session = self.sessions.get('default')
+        if session is None:
+            return False
+        proc = getattr(session, '_process', None)
+        if proc is not None and hasattr(proc, 'poll'):
+            return proc.poll() is None
+        # No process attribute — assume alive (in-process session).
+        return True
+
+    def ensure_default_session(self, **kwargs: Any) -> Any:
+        """Ensure the default session exists and is alive.
+
+        If the default session's process has died, close it and create a fresh one.
+        """
+        if self.is_default_session_alive():
+            return self.sessions.get('default')
+        # Default session is dead — close and recreate.
+        try:
+            self.close_session('default')
+            logger.info('ensure_default_session: replaced dead default session')
+        except Exception:
+            logger.debug('ensure_default_session: close failed', exc_info=True)
+        return self.create_session('default', **kwargs)

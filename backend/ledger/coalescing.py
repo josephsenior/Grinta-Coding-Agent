@@ -17,6 +17,7 @@ Usage::
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -77,6 +78,7 @@ class EventCoalescer:
         self._max_batch = max_batch
         self._coalesce_types = coalesce_types or _COALESCE_TYPES
         self._pending: dict[str, CoalescedBatch] = {}
+        self._lock = threading.Lock()
         # Stats
         self._coalesced_count: int = 0
         self._flushed_count: int = 0
@@ -92,59 +94,63 @@ class EventCoalescer:
             The representative event to emit if the batch is full
             (auto-flush), or ``None`` if still accumulating.
         """
-        event_type = type(event).__name__
-        batch = self._pending.get(event_type)
+        with self._lock:
+            event_type = type(event).__name__
+            batch = self._pending.get(event_type)
 
-        if batch is None:
-            self._pending[event_type] = CoalescedBatch(event)
+            if batch is None:
+                self._pending[event_type] = CoalescedBatch(event)
+                return None
+
+            batch.add(event)
+            self._coalesced_count += 1
+
+            # Auto-flush on batch size
+            if batch.size >= self._max_batch:
+                return self._flush_batch(event_type)
+
+            # Auto-flush on window expiry
+            if batch.age_ms >= self._window_ms:
+                return self._flush_batch(event_type)
+
             return None
-
-        batch.add(event)
-        self._coalesced_count += 1
-
-        # Auto-flush on batch size
-        if batch.size >= self._max_batch:
-            return self._flush_batch(event_type)
-
-        # Auto-flush on window expiry
-        if batch.age_ms >= self._window_ms:
-            return self._flush_batch(event_type)
-
-        return None
 
     def flush_all(self) -> list[Event]:
         """Flush all pending batches.
 
         Returns a list of representative events (one per batch).
         """
-        results: list[Event] = []
-        for event_type in list(self._pending):
-            ev = self._flush_batch(event_type)
-            if ev:
-                results.append(ev)
-        return results
-
-    def flush_expired(self) -> list[Event]:
-        """Flush only batches that have exceeded the coalescing window."""
-        results: list[Event] = []
-        for event_type in list(self._pending):
-            batch = self._pending.get(event_type)
-            if batch and batch.age_ms >= self._window_ms:
+        with self._lock:
+            results: list[Event] = []
+            for event_type in list(self._pending):
                 ev = self._flush_batch(event_type)
                 if ev:
                     results.append(ev)
-        return results
+            return results
+
+    def flush_expired(self) -> list[Event]:
+        """Flush only batches that have exceeded the coalescing window."""
+        with self._lock:
+            results: list[Event] = []
+            for event_type in list(self._pending):
+                batch = self._pending.get(event_type)
+                if batch and batch.age_ms >= self._window_ms:
+                    ev = self._flush_batch(event_type)
+                    if ev:
+                        results.append(ev)
+            return results
 
     def snapshot(self) -> dict[str, Any]:
         """Diagnostic snapshot."""
-        return {
-            'pending_batches': len(self._pending),
-            'pending_events': sum(b.size for b in self._pending.values()),
-            'coalesced_total': self._coalesced_count,
-            'flushed_total': self._flushed_count,
-            'window_ms': self._window_ms,
-            'max_batch': self._max_batch,
-        }
+        with self._lock:
+            return {
+                'pending_batches': len(self._pending),
+                'pending_events': sum(b.size for b in self._pending.values()),
+                'coalesced_total': self._coalesced_count,
+                'flushed_total': self._flushed_count,
+                'window_ms': self._window_ms,
+                'max_batch': self._max_batch,
+            }
 
     # ------------------------------------------------------------------ #
     # Internal
@@ -158,16 +164,5 @@ class EventCoalescer:
 
         self._flushed_count += 1
 
-        # For streaming chunks: use the latest event (it has accumulated content)
-        if event_type == 'StreamingChunkAction':
-            return self._merge_streaming_chunks(batch)
-
-        # For state changes: use the latest state
-        # For other types: use the last event (most recent)
+        # For state changes and other types: use the last event (most recent).
         return batch.events[-1]
-
-    def _merge_streaming_chunks(self, batch: CoalescedBatch) -> Event:
-        """Merge streaming chunk events into a single representative event."""
-        return batch.events[-1]
-        # StreamingChunkAction has 'accumulated' field — the last event
-        # already contains all accumulated content. Return it directly.

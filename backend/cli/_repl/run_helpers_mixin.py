@@ -399,6 +399,7 @@ class RunHelpersMixin:
 
     async def _read_repl_input(self, session: Any | None) -> str | None:
         """Read one line of input. Returns None to break the loop, '' to continue."""
+        _MAX_CONSECUTIVE_FAILURES = 10
         try:
             if session is None:
                 user_input = await self._read_non_interactive_input()
@@ -414,6 +415,7 @@ class RunHelpersMixin:
                     'a second press.[/]'
                 )
                 self._prompt_ctrl_c_hint_shown = True
+            self._consecutive_input_failures = 0
             return ''
         except EOFError:
             self._console.print(f'[{STYLE_DIM}]Input closed. Exiting.[/]')
@@ -424,15 +426,29 @@ class RunHelpersMixin:
             logger.debug('REPL: prompt input cancelled')
             return ''
         except Exception as e:
+            self._consecutive_input_failures += 1
             logger.exception('Prompt input failed')
-            self._console.print(
-                f'[{CLR_STATUS_ERR}]Prompt input failed:[/] {e}',
-            )
-            import traceback
-
-            traceback.print_exc()
+            try:
+                self._console.print(
+                    f'[{CLR_STATUS_ERR}]Prompt input failed ({self._consecutive_input_failures}/{_MAX_CONSECUTIVE_FAILURES}):[/] {e}',
+                )
+            except Exception:
+                pass
+            if self._consecutive_input_failures >= _MAX_CONSECUTIVE_FAILURES:
+                logger.error(
+                    'Too many consecutive prompt failures (%d), forcing exit',
+                    self._consecutive_input_failures,
+                )
+                try:
+                    self._console.print(
+                        f'[{CLR_STATUS_ERR}]Too many consecutive input failures. Exiting.[/]'
+                    )
+                except Exception:
+                    pass
+                return None
             return ''
 
+        self._consecutive_input_failures = 0
         if not self._running:
             logger.debug('REPL: _read_repl_input: _running is False, returning None')
             return None
@@ -661,6 +677,13 @@ class RunHelpersMixin:
         if self._renderer is not None:
             self._renderer.stop_live()
         await self._cancel_task_silently(agent_task)
+        # Explicitly close MCP connections before releasing runtime.
+        if self._memory is not None:
+            close_mcp = getattr(self._memory, 'close_mcp_clients', None)
+            if callable(close_mcp):
+                with contextlib.suppress(Exception):
+                    await close_mcp()
+                    logger.debug('REPL: _finalize_repl_run: closed MCP clients')
         if self._acquire_result is not None:
             from backend.execution import runtime_orchestrator
 

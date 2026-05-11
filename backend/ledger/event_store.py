@@ -301,17 +301,25 @@ class EventStore(EventStoreABC):
         Returns:
             Latest event object
 
+        Raises:
+            ValueError: If no events exist in the stream
         """
-        return self.get_event(self.cur_id - 1)
+        latest_id = self.cur_id - 1
+        if latest_id < 0:
+            raise ValueError('No events in stream — cannot get latest event.')
+        return self.get_event(latest_id)
 
     def get_latest_event_id(self) -> int:
         """Get ID of most recent event.
 
         Returns:
-            Latest event ID
+            Latest event ID, or -1 if no events exist
 
         """
-        return self.cur_id - 1
+        cur = self.cur_id
+        if cur <= 0:
+            return -1
+        return cur - 1
 
     def filtered_events_by_source(self, source: EventSource) -> Iterable[Event]:
         """Filter events by source (USER, AGENT, ENVIRONMENT, etc.).
@@ -364,9 +372,71 @@ class EventStore(EventStoreABC):
     def _get_id_from_filename(filename: str) -> int:
         try:
             return int(filename.split('/')[-1].split('.')[0])
-        except ValueError:
+        except (ValueError, IndexError):
             logger.debug('get id from filename (%s) failed.', filename)
             return -1
+
+    def prune_old_events(self, keep_recent: int = 1000) -> int:
+        """Delete persisted event files older than the most recent *keep_recent* events.
+
+        Returns the number of events pruned.  Cache pages for pruned events
+        are also deleted.  This is a best-effort operation — failures are
+        logged but do not raise.
+        """
+        from backend.persistence.locations import get_conversation_events_dir
+
+        try:
+            latest_id = self.get_latest_event_id()
+        except Exception:
+            return 0
+        if latest_id <= keep_recent:
+            return 0
+        cutoff_id = latest_id - keep_recent
+        pruned = 0
+        events_dir = get_conversation_events_dir(self.sid, self.user_id)
+        try:
+            entries = self.file_store.list_dir(events_dir)
+        except Exception:
+            return 0
+        for entry in entries:
+            if not entry.endswith('.json'):
+                continue
+            eid = self._get_id_from_filename(entry)
+            if eid < 0 or eid >= cutoff_id:
+                continue
+            try:
+                self.file_store.delete(f'{events_dir}{entry}')
+                pruned += 1
+            except Exception:
+                logger.debug('prune_old_events: could not delete %s', entry, exc_info=True)
+        # Also prune stale cache pages.
+        try:
+            cache_dir = f'{events_dir}event_cache/'
+            cache_entries = self.file_store.list_dir(cache_dir)
+            for entry in cache_entries:
+                if not entry.endswith('.json'):
+                    continue
+                # Cache pages are named start-end.json
+                try:
+                    parts = entry.replace('.json', '').split('-')
+                    page_end = int(parts[1])
+                except (ValueError, IndexError):
+                    continue
+                if page_end <= cutoff_id:
+                    try:
+                        self.file_store.delete(f'{cache_dir}{entry}')
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        if pruned > 0:
+            logger.info(
+                'prune_old_events: removed %d events older than id %d for session %s',
+                pruned,
+                cutoff_id,
+                self.sid,
+            )
+        return pruned
 
 
 __all__ = ['EventStore']

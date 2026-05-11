@@ -185,8 +185,6 @@ class OrchestratorExecutor:
             anchor_event_id=self._checkpoint_anchor_event_id(event_stream),
         )
 
-        call_params = dict(params)
-
         try:
             call_params['stream'] = False
             response = self._llm.completion(**call_params)
@@ -901,6 +899,10 @@ class OrchestratorExecutor:
         from backend.core.llm_step_timeout import llm_step_timeout_seconds_from_env
 
         timeout_seconds = llm_step_timeout_seconds_from_env()
+        # Always enforce a ceiling so a hung LLM stream cannot block forever.
+        _DEFAULT_STREAM_CEILING = 300.0
+        if timeout_seconds is None or timeout_seconds <= 0:
+            timeout_seconds = _DEFAULT_STREAM_CEILING
 
         response = None
         loop = asyncio.get_running_loop()
@@ -917,10 +919,7 @@ class OrchestratorExecutor:
                     state,
                 )
             )
-            if timeout_seconds is None:
-                await consume_task
-            else:
-                await asyncio.wait_for(consume_task, timeout=timeout_seconds)
+            await asyncio.wait_for(consume_task, timeout=timeout_seconds)
             tool_calls_list = self._finalize_stream_tool_calls(state)
             visible_accum = self._visible_stream_content(state.content_accumulate)
             self._emit_final_stream_event(

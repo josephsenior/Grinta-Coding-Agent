@@ -57,6 +57,11 @@ RECALL_PIPELINE_TIMEOUT_SECONDS = 90.0
 # Max seconds waiting for an observation matching a tool call before timing out.
 # 0 or negative = disabled (no timeout error, no watchdog).
 DEFAULT_PENDING_ACTION_TIMEOUT = 120.0
+# Hard cap on how long run_agent_until_done polls before forcing termination.
+# 0 or negative = disabled (no hard cap).  Env override allows long sessions.
+DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS = float(
+    os.getenv('GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS', '0')
+)
 # MCP (stdio/SSE) can exceed the default (npx cold start, slow servers). Pending actions use max(base, this).
 MCP_PENDING_ACTION_TIMEOUT_FLOOR = 180.0
 # Foreground shell commands (env setup, installs, builds) often run far longer than
@@ -517,6 +522,11 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     'GRINTA_DEBUGGER_SYNC_POOL_WORKERS': (
         '6',
         'Thread cap for dedicated DebuggerAction sync pool (isolated from general bridge EXECUTOR)',
+    ),
+    'GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS': (
+        '0',
+        'Hard cap (seconds) for run_agent_until_done polling; 0 disables the cap entirely '
+        'so long sessions are never forcibly terminated.',
     ),
     # API versioning
     'APP_PERMISSIVE_API': (

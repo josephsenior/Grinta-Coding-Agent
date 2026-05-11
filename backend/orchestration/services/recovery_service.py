@@ -28,6 +28,7 @@ from backend.inference.exceptions import (
 )
 from backend.ledger import EventSource
 from backend.ledger.observation import ErrorObservation
+from backend.ledger.observation.agent import AgentThinkObservation
 from backend.ledger.observation.error import (
     ERROR_CATEGORY_AUTH,
     ERROR_CATEGORY_CONTEXT_WINDOW,
@@ -218,8 +219,44 @@ class RecoveryService:
     async def _handle_hard_stop_exception(self, controller, exc: Exception) -> bool:
         if not isinstance(exc, _HARD_STOP_EXCEPTIONS):
             return False
+        # For context window errors, attempt aggressive compaction before giving up.
+        if isinstance(exc, (ContextWindowExceededError, LLMContextWindowExceedError)):
+            if await self._attempt_aggressive_compaction(controller):
+                return True
         await self._set_awaiting_user_input_if_allowed(controller)
         return True
+
+    async def _attempt_aggressive_compaction(self, controller) -> bool:
+        """Try to aggressively compact context and retry. Returns True if recovery succeeded."""
+        try:
+            services = getattr(controller, 'services', None)
+            if services is None:
+                return False
+            context_service = getattr(services, 'context', None)
+            if context_service is None:
+                return False
+            # Force a compaction by calling the compactor directly.
+            compactor = getattr(context_service, 'compactor', None)
+            if compactor is None:
+                return False
+            # Emit a think observation so the agent knows what happened.
+            self._context.emit_event(
+                AgentThinkObservation(
+                    content='Context window exceeded. Aggressively compacting context to continue.',
+                ),
+                EventSource.ENVIRONMENT,
+            )
+            # Trigger compaction via the context service.
+            force_compaction = getattr(context_service, 'force_compaction', None)
+            if callable(force_compaction):
+                await force_compaction()
+                logger.info('Aggressive compaction succeeded, resuming agent')
+                if _recovery_may_set_state(controller, AgentState.RUNNING):
+                    controller.step()
+                return True
+        except Exception:
+            logger.debug('Aggressive compaction failed', exc_info=True)
+        return False
 
     async def _handle_limit_exceeded_exception(
         self, controller, exc: Exception
@@ -345,9 +382,37 @@ class RecoveryService:
             'Agent-survivable error (%s): staying RUNNING so model can adapt',
             type(exc).__name__,
         )
+        # Secondary safety net: track consecutive survivable-error self-steps
+        # to prevent infinite retry loops when the circuit breaker is disabled
+        # or misconfigured.  The circuit breaker is the primary defence
+        # (default: 5 consecutive errors); this is a hard backstop.
+        state = getattr(controller, 'state', None)
+        if state is not None and hasattr(state, 'extra_data'):
+            count = state.extra_data.get('__survivable_error_consecutive', 0) + 1
+            state.extra_data['__survivable_error_consecutive'] = count
+            _MAX_SURVIVABLE = 20
+            if count > _MAX_SURVIVABLE:
+                logger.error(
+                    'Survivable error loop detected: %d consecutive errors. '
+                    'Transitioning to AWAITING_USER_INPUT.',
+                    count,
+                )
+                state.extra_data['__survivable_error_consecutive'] = 0
+                await self._set_awaiting_user_input_if_allowed(controller)
+                return
+        else:
+            count = 0
+
         self._inject_task_reconciliation_directive(controller, exc)
         pause = 2.0 if isinstance(exc, (InternalServerError, Timeout)) else 1.0
         await asyncio.sleep(pause)
+        # Atomic check-then-step: verify state is still RUNNING before stepping.
+        if not _recovery_may_set_state(controller, AgentState.RUNNING):
+            logger.debug(
+                'Skipping post-error step: state changed during sleep (now %s)',
+                controller.get_agent_state(),
+            )
+            return
         if controller.get_agent_state() == AgentState.RUNNING:
             controller.step()
 

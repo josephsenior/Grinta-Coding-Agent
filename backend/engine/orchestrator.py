@@ -608,6 +608,7 @@ class Orchestrator(Agent):
 
         result = await self.executor.async_execute(params, self.event_stream)
 
+        # Ensure extra_data cleanup always runs, even if async_execute raises.
         try:
             if hasattr(state, 'ack_planning_directive'):
                 state.ack_planning_directive(source='Orchestrator')
@@ -631,11 +632,11 @@ class Orchestrator(Agent):
     # Test/mocking helpers
     # ------------------------------------------------------------------ #
     def set_llm(self, llm) -> None:  # pragma: no cover - used in tests
-        """Replace the active LLM and propagate to planner/executor.
+        """Replace the active LLM and propagate to planner/executor/compactor.
 
         Some unit tests inject a mock LLM after agent construction. The
-        executor and planner capture the original reference at init time,
-        so we provide an explicit helper to keep their internal references
+        executor, planner, and compactor capture the original reference at init
+        time, so we provide an explicit helper to keep their internal references
         in sync to avoid unintended real network calls.
         """
         self.llm = llm
@@ -645,6 +646,13 @@ class Orchestrator(Agent):
         if hasattr(self, 'executor') and hasattr(self.executor, '_llm'):
             with contextlib.suppress(Exception):
                 self.executor._llm = llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
+        # Also update the memory manager's compactor's LLM reference so
+        # token budget calculations use the correct model after a swap.
+        if hasattr(self, 'memory_manager'):
+            mm = self.memory_manager
+            if hasattr(mm, 'compactor') and hasattr(mm.compactor, 'llm'):
+                with contextlib.suppress(Exception):
+                    mm.compactor.llm = llm
 
     def _consume_pending_action(self) -> Action | None:
         if not self.pending_actions:
