@@ -165,11 +165,15 @@ class SQLiteEventStore:
 
         with self._write_lock:
             conn = self._get_conn()
-            conn.execute(
-                'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
-                (event_id, timestamp, event_type, source, payload),
-            )
-            conn.commit()
+            try:
+                conn.execute(
+                    'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
+                    (event_id, timestamp, event_type, source, payload),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
 
     def write_events_batch(self, events: list[tuple[int, dict[str, Any]]]) -> None:
         """Persist multiple events in a single transaction.
@@ -193,11 +197,15 @@ class SQLiteEventStore:
 
         with self._write_lock:
             conn = self._get_conn()
-            conn.executemany(
-                'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
-                rows,
-            )
-            conn.commit()
+            try:
+                conn.executemany(
+                    'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
+                    rows,
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
 
     # ------------------------------------------------------------------
     # Read

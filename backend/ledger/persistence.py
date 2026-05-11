@@ -105,6 +105,7 @@ class EventPersistence:
             if recent_persist_failures is not None
             else deque(maxlen=500)
         )
+        self._persist_failure_window_seconds: int = 600
         self.stats: dict[str, int] = {
             'persist_failures': 0,
             'cache_write_failures': 0,
@@ -448,7 +449,7 @@ class EventPersistence:
             try:
                 self.file_store.write(pending_file, event_json)
             except Exception as exc:
-                logger.debug(
+                logger.warning(
                     'WAL: could not write .pending marker %s: %s',
                     pending_file,
                     exc,
@@ -459,7 +460,7 @@ class EventPersistence:
             try:
                 self.file_store.delete(pending_file)
             except Exception as exc:
-                logger.debug(
+                logger.warning(
                     'WAL: could not remove .pending marker %s: %s',
                     pending_file,
                     exc,

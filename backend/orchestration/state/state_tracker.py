@@ -20,10 +20,9 @@ from backend.orchestration.state.state import State
 # this cap prevents user-facing context memory growth.
 MAX_HISTORY_EVENTS: int = 10_000
 
-# Estimated byte-size cap for the in-memory history list.
-# When the rough size estimate exceeds this, oldest events are trimmed
-# regardless of the count cap.
 MAX_HISTORY_BYTES: int = 200 * 1024 * 1024  # 200 MB
+
+_BYTE_ESTIMATE_INTERVAL: int = 10
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event
@@ -66,6 +65,7 @@ class StateTracker:
             ),
             exclude_hidden=True,
         )
+        self._events_since_last_byte_estimate: int = 0
 
     # pylint: disable=R0917
     def set_initial_state(
@@ -232,15 +232,25 @@ class StateTracker:
         if len(history) > MAX_HISTORY_EVENTS:
             need_trim = True
             reason = f'count {len(history)} > {MAX_HISTORY_EVENTS}'
-        elif len(history) > 100:  # only estimate when list is non-trivial
-            estimated_bytes = self._estimate_history_bytes(history)
-            if estimated_bytes > MAX_HISTORY_BYTES:
-                need_trim = True
-                reason = f'estimated size {estimated_bytes // (1024 * 1024)}MB > {MAX_HISTORY_BYTES // (1024 * 1024)}MB'
+        else:
+            self._events_since_last_byte_estimate += 1
+            if (
+                len(history) > 100
+                and self._events_since_last_byte_estimate >= _BYTE_ESTIMATE_INTERVAL
+            ):
+                self._events_since_last_byte_estimate = 0
+                estimated_bytes = self._estimate_history_bytes(history)
+                if estimated_bytes > MAX_HISTORY_BYTES:
+                    need_trim = True
+                    reason = (
+                        f'estimated size {estimated_bytes // (1024 * 1024)}MB'
+                        f' > {MAX_HISTORY_BYTES // (1024 * 1024)}MB'
+                    )
 
         if need_trim:
             trim_count = max(len(history) // 4, 1)
             self.state.history = history[trim_count:]
+            self._events_since_last_byte_estimate = 0
             logger.debug(
                 'Trimmed %d oldest events from state.history (%s, now %d)',
                 trim_count,

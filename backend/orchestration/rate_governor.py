@@ -49,6 +49,7 @@ class LLMRateGovernor:
         # pre-emptively throttle below it without waiting for another 429.
         # Stores the *most conservative* (smallest) observed limit per key.
         self._observed_tpm_ceiling: dict[tuple[str, str], int] = {}
+        self._observed_tpm_ceiling_max: int = 20
 
     def record_rate_limit_event(
         self,
@@ -89,6 +90,12 @@ class LLMRateGovernor:
         prev = self._observed_tpm_ceiling.get(key)
         if prev is None or ceiling < prev:
             self._observed_tpm_ceiling[key] = ceiling
+            if len(self._observed_tpm_ceiling) > self._observed_tpm_ceiling_max:
+                oldest_keys = list(self._observed_tpm_ceiling.keys())[
+                    : len(self._observed_tpm_ceiling) - self._observed_tpm_ceiling_max
+                ]
+                for k in oldest_keys:
+                    del self._observed_tpm_ceiling[k]
             logger.info(
                 'Learned TPM ceiling for %s/%s: %d tokens/%ds (was %s)',
                 prov,

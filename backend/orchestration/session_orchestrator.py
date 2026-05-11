@@ -62,7 +62,7 @@ ERROR_ACTION_NOT_EXECUTED_ERROR = (
     'Runtime error or restart prevented this action from completing (unlike cancelling with '
     'Stop or Ctrl+C). The execution environment may have crashed or been recycled. '
     'Any previously established system state, dependencies, or environment variables '
-    'may have been lost.'
+    'may have been lost. Consider using /resume to restore a crashed session.'
 )
 
 
@@ -1149,6 +1149,11 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
     ) -> MessageAction | None:
         """Get the first user message for this agent.
 
+        The cache is intentionally not used when *events* is passed, as the
+        caller supplies an explicit event list that may differ from the stream.
+        When the cache is populated from the stream, it is validated against
+        the current history to avoid returning a stale reference after trimming.
+
         Args:
             events: Optional list of events to search through. If None, uses the event stream.
 
@@ -1166,7 +1171,9 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                 None,
             )
         if self._cached_first_user_message is not None:
-            return self._cached_first_user_message
+            if self._cached_first_user_message in self.state.history:
+                return self._cached_first_user_message
+            self._cached_first_user_message = None
         self._cached_first_user_message = next(
             (
                 e

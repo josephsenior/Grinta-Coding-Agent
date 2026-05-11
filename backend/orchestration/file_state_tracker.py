@@ -36,6 +36,7 @@ def file_manifest_path() -> Path:
 
 
 _MAX_TRACKED_FILES = 50
+_MAX_READ_SNAPSHOTS = 50
 
 
 @dataclass
@@ -90,6 +91,13 @@ class FileStateTracker:
             oldest_key = min(self._files, key=lambda k: self._files[k].timestamp)
             del self._files[oldest_key]
             self._read_snapshots.pop(oldest_key, None)
+        # Independently evict stale read snapshots to prevent unbounded growth
+        if len(self._read_snapshots) > _MAX_READ_SNAPSHOTS:
+            stale_keys = [
+                k for k in self._read_snapshots if k not in self._files
+            ]
+            for k in stale_keys:
+                del self._read_snapshots[k]
 
     def record_read_snapshot_from_disk(self, path_str: str) -> None:
         """Store mtime + sha256 of file bytes after a read (for staleness checks)."""

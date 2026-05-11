@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -107,7 +108,7 @@ class ContextMemory:
 
         # Context tracking (decisions, anchors, vector memory)
         self._ctx = ContextTracker(vector_store=vector_store)
-        self._indexed_event_ids: set[str] = set()
+        self._indexed_event_ids: OrderedDict[str, None] = OrderedDict()
         self._indexed_event_ids_max: int = 10000
 
     # Delegate context-tracking API to ContextTracker
@@ -387,25 +388,9 @@ class ContextMemory:
         if event_id in self._indexed_event_ids:
             return
         self.store_in_memory(event_id, role, content, metadata)
-        self._indexed_event_ids.add(event_id)
-        # Evict oldest entries if the set grows beyond the cap.
-        # Use a deterministic eviction strategy (pop oldest by insertion order)
-        # instead of set.pop() which removes an arbitrary element.
-        if len(self._indexed_event_ids) > self._indexed_event_ids_max:
-            excess = len(self._indexed_event_ids) - self._indexed_event_ids_max
-            from collections import OrderedDict
-            if not hasattr(self, '_indexed_event_ids_order'):
-                self._indexed_event_ids_order: OrderedDict[int, None] = OrderedDict()
-            # Ensure the order tracking is in sync with the set.
-            for eid in list(self._indexed_event_ids_order):
-                if eid not in self._indexed_event_ids:
-                    del self._indexed_event_ids_order[eid]
-            # Track newly added event_id.
-            self._indexed_event_ids_order[event_id] = None
-            # Evict oldest entries.
-            while len(self._indexed_event_ids) > self._indexed_event_ids_max and self._indexed_event_ids_order:
-                oldest_id, _ = self._indexed_event_ids_order.popitem(last=False)
-                self._indexed_event_ids.discard(oldest_id)
+        self._indexed_event_ids[event_id] = None
+        while len(self._indexed_event_ids) > self._indexed_event_ids_max:
+            self._indexed_event_ids.popitem(last=False)
 
     def _memory_record_user_message(
         self, event: Event

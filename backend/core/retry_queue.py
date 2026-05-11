@@ -3,16 +3,23 @@
 Scheduled retry metadata is process-local by design. If the CLI process exits
 or crashes before a retry fires, pending retry metadata is lost and the next run
 resumes from the durable event/session state instead.
+
+A lightweight JSON sidecar file is written to session storage on every
+``schedule()`` and removed on ``mark_success()`` / ``mark_failure()`` (when
+the task is removed). On startup, ``recover_pending()`` can be called to
+re-inject tasks that were in-flight at crash time.
 """
 
 from __future__ import annotations
 
 import asyncio
 import heapq
+import json
 import os
 import time
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from backend.core.logger import app_logger as logger
@@ -87,18 +94,45 @@ class BaseRetryBackend:
 
 
 class InMemoryRetryBackend(BaseRetryBackend):
-    """In-memory retry backend with heap-based scheduling."""
+    """In-memory retry backend with heap-based scheduling and optional sidecar persistence."""
 
-    def __init__(self) -> None:
+    def __init__(self, persist_dir: str | Path | None = None) -> None:
         self._tasks: dict[str, RetryTask] = {}
         self._heap: list[tuple[float, str]] = []
         self._lock = asyncio.Lock()
         self._dead_letter: list[RetryTask] = []
+        self._persist_dir = Path(persist_dir) if persist_dir else None
+        if self._persist_dir:
+            self._persist_dir.mkdir(parents=True, exist_ok=True)
+
+    def _sidecar_path(self, task_id: str) -> Path | None:
+        if self._persist_dir is None:
+            return None
+        return self._persist_dir / f'retry_{task_id}.json'
+
+    def _write_sidecar(self, task: RetryTask) -> None:
+        path = self._sidecar_path(task.id)
+        if path is None:
+            return
+        try:
+            path.write_text(json.dumps(task.to_dict()), encoding='utf-8')
+        except Exception:
+            logger.debug('Retry sidecar write failed for %s', task.id, exc_info=True)
+
+    def _remove_sidecar(self, task_id: str) -> None:
+        path = self._sidecar_path(task_id)
+        if path is None:
+            return
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            logger.debug('Retry sidecar remove failed for %s', task_id, exc_info=True)
 
     async def schedule(self, task: RetryTask) -> RetryTask:
         async with self._lock:
             self._tasks[task.id] = task
             heapq.heappush(self._heap, (task.next_attempt_at, task.id))
+        self._write_sidecar(task)
         logger.debug('Scheduled retry task %s (attempts=%s)', task.id, task.attempts)
         return task
 
@@ -126,6 +160,7 @@ class InMemoryRetryBackend(BaseRetryBackend):
     async def mark_success(self, task: RetryTask) -> None:
         async with self._lock:
             self._tasks.pop(task.id, None)
+        self._remove_sidecar(task.id)
         logger.debug('Retry task %s succeeded, removed from queue', task.id)
 
     async def mark_failure(
@@ -141,10 +176,12 @@ class InMemoryRetryBackend(BaseRetryBackend):
                     task.id,
                     task.max_attempts,
                 )
+                self._remove_sidecar(task.id)
                 return None
             task.next_attempt_at = time.time() + backoff_seconds
             self._tasks[task.id] = task
             heapq.heappush(self._heap, (task.next_attempt_at, task.id))
+            self._write_sidecar(task)
             logger.info(
                 'Retry task %s scheduled again in %.1fs (attempt %s/%s)',
                 task.id,
@@ -158,7 +195,42 @@ class InMemoryRetryBackend(BaseRetryBackend):
         async with self._lock:
             self._dead_letter.append(task)
             self._tasks.pop(task.id, None)
+        self._remove_sidecar(task.id)
         logger.error('Retry task %s moved to dead letter queue', task.id)
+
+    def recover_pending(self) -> list[RetryTask]:
+        """Re-cover sidecar tasks left over from a previous process crash.
+
+        Scans ``persist_dir`` for ``retry_*.json`` files and loads any
+        tasks whose ``next_attempt_at`` is still in the future.  Tasks
+        whose next attempt has already passed are placed in the dead
+        letter queue to avoid replaying stale retries.
+
+        Returns the list of recovered tasks for diagnostic logging.
+        """
+        if self._persist_dir is None:
+            return []
+        recovered: list[RetryTask] = []
+        try:
+            for path in self._persist_dir.glob('retry_*.json'):
+                try:
+                    data = json.loads(path.read_text(encoding='utf-8'))
+                    task = RetryTask.from_dict(data)
+                except Exception:
+                    logger.debug('Retry sidecar corrupt: %s', path, exc_info=True)
+                    continue
+                if task.next_attempt_at <= time.time():
+                    self._dead_letter.append(task)
+                    self._remove_sidecar(task.id)
+                    logger.info('Retry sidecar expired, moved to dead letter: %s', task.id)
+                else:
+                    self._tasks[task.id] = task
+                    heapq.heappush(self._heap, (task.next_attempt_at, task.id))
+                    recovered.append(task)
+                    logger.info('Retry sidecar recovered: %s', task.id)
+        except Exception:
+            logger.debug('Retry sidecar scan failed', exc_info=True)
+        return recovered
 
 
 class RetryQueue:
@@ -257,7 +329,9 @@ def get_retry_queue() -> RetryQueue | None:
             backend_name,
         )
 
-    backend: BaseRetryBackend = InMemoryRetryBackend()
+    backend: BaseRetryBackend = InMemoryRetryBackend(
+        persist_dir=os.getenv('RETRY_QUEUE_PERSIST_DIR') or None
+    )
     logger.info('RetryQueue using process-local in-memory backend')
 
     _retry_queue = RetryQueue(

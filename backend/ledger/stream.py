@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
+import os
 import threading
 import time
 import weakref
@@ -165,6 +167,22 @@ class EventStream(EventStore):
         super().__init__(sid, file_store, user_id)
         self._started_at_monotonic = time.monotonic()
         self._stop_flag = threading.Event()
+
+        self._session_lock_path: str | None = None
+        try:
+            from backend.persistence.locations import get_conversation_dir
+            conv_dir = get_conversation_dir(sid, user_id)
+            lock_dir = os.path.join(str(file_store.root) if hasattr(file_store, 'root') else conv_dir, '.locks')
+            os.makedirs(lock_dir, exist_ok=True)
+            self._session_lock_path = os.path.join(lock_dir, f'{sid}.lock')
+            lock_data = f'pid={os.getpid()};started={time.time():.0f}'
+            try:
+                with open(self._session_lock_path, 'w', encoding='utf-8') as f:
+                    f.write(lock_data)
+            except Exception:
+                logger.debug('Could not write session lock file', exc_info=True)
+        except Exception:
+            logger.debug('Session lock setup skipped', exc_info=True)
         event_defaults = get_event_runtime_defaults()
 
         # ---- Composition: backpressure manager ----------------------------
@@ -270,6 +288,7 @@ class EventStream(EventStore):
 
     def _shutdown_async_queue(self) -> None:
         if self._inline_delivery:
+            self._delivery_pool.shutdown(wait=False)
             return
         if self._queue_loop and self._stop_event:
             future = asyncio.run_coroutine_threadsafe(
@@ -311,10 +330,16 @@ class EventStream(EventStore):
         if hasattr(self, '_finalizer'):
             self._finalizer.detach()
         self._stop_flag.set()
+        self._flush_write_page_cache()
         self._shutdown_async_queue()
         with self._lock:
             self._subscribers.clear()
             self._activity_listeners.clear()
+        if self._session_lock_path:
+            try:
+                os.unlink(self._session_lock_path)
+            except OSError:
+                pass
         self._close_persist_and_super()
 
     def get_backpressure_snapshot(self) -> dict[str, int]:
@@ -329,13 +354,14 @@ class EventStream(EventStore):
         snapshot['persist_failures_window_count'] = int(
             len(self._persist._recent_persist_failures)
         )
-        if snapshot.get('rate_window_seconds', 0) > 0:
-            rw = snapshot['rate_window_seconds']
-            snapshot['persist_failures_per_minute'] = int(
-                round(len(self._persist._recent_persist_failures) * 60 / rw)
-            )
-        else:
-            snapshot['persist_failures_per_minute'] = 0
+        now = time.monotonic()
+        window = self._persist._persist_failure_window_seconds
+        recent_failures = [
+            ts for ts in self._persist._recent_persist_failures if now - ts < window
+        ]
+        snapshot['persist_failures_per_minute'] = int(
+            round(len(recent_failures) * 60 / max(window, 1))
+        ) if window > 0 else 0
         dw = self._persist.durable_writer
         if dw:
             snapshot['durable_writer_drops'] = int(dw.drop_count)
@@ -424,6 +450,15 @@ class EventStream(EventStore):
             return None
         return merged
 
+    def _dispatch_coalesced_flushed(self, event: Event) -> None:
+        """Dispatch a coalescer-flushed event through the normal delivery path."""
+        if self._should_drop_due_to_shutdown(event, EventSource.ENVIRONMENT):
+            return
+        if EventSource.USER or self._inline_delivery:
+            self._dispatch_event_inline(event)
+        else:
+            self._enqueue_serialized_event(event)
+
     def _run_pre_dispatch_hook_if_runnable(self, sanitized_event: Event) -> None:
         hook = self.pre_runnable_action_dispatch
         if not (callable(hook) and getattr(sanitized_event, 'runnable', False)):
@@ -447,6 +482,10 @@ class EventStream(EventStore):
         if resolved is None:
             return
         event = resolved
+
+        if self._coalescer:
+            for flushed in self._coalescer.flush_expired():
+                self._dispatch_coalesced_flushed(flushed)
 
         self._ensure_event_can_be_added(event)
         event.timestamp = datetime.now()
@@ -487,6 +526,8 @@ class EventStream(EventStore):
         """
         callbacks = self._snapshot_subscribers()
         if not callbacks:
+            return
+        if getattr(self, '_closed', False):
             return
         for subscriber_id, callback_id, callback in callbacks:
             try:
@@ -569,6 +610,42 @@ class EventStream(EventStore):
                 self._write_page_cache = []
 
         return sanitized_event, data, cache_page_data
+
+    def _flush_write_page_cache(self) -> None:
+        """Flush any partial write-page cache entries to persistence.
+
+        Called during close() to persist partial cache pages for read
+        performance. Events are already individually durably persisted;
+        this only improves batch read performance on session restore.
+        """
+        with self._lock:
+            if not self._write_page_cache:
+                return
+            page_data = self._write_page_cache
+            self._write_page_cache = []
+        if not page_data:
+            return
+        cache_payload = self._persist.build_cache_payload(page_data)
+        if cache_payload is None and len(page_data) > 0:
+            start_id = page_data[0].get('id', 0)
+            cache_filename = self._persist._get_filename_for_cache(
+                start_id, start_id + len(page_data)
+            )
+            cache_payload = (cache_filename, json.dumps(page_data))
+        if cache_payload:
+            try:
+                self._persist.file_store.write(cache_payload[0], cache_payload[1])
+            except Exception:
+                logger.debug('Failed to flush partial write page cache on close', exc_info=True)
+
+    def _dispatch_coalesced_flushed(self, event: Event) -> None:
+        """Dispatch a coalescer-flushed event through the normal delivery path."""
+        if self._should_drop_due_to_shutdown(event, EventSource.ENVIRONMENT):
+            return
+        if self._inline_delivery:
+            self._dispatch_event_inline(event)
+        else:
+            self._enqueue_serialized_event(event)
 
     def _enqueue_serialized_event(self, event: Event) -> None:
         if not self._queue_ready.wait(timeout=2):
