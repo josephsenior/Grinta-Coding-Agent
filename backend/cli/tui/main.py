@@ -7,22 +7,22 @@ bootstraps the agent, and runs the Textual application.
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+if os.getenv('DEBUG', '').strip().lower() not in ('true', '1', 'yes'):
+    os.environ['DEBUG'] = '1'
 
 from rich.console import Console as RichConsole
 from textual.app import App
 
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.cli.config_manager import AppConfig
-
-
-logger = logging.getLogger('grinta.tui')
 
 
 class GrintaTUIApp(App):

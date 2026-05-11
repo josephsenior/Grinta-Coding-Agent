@@ -1,12 +1,41 @@
-"""Grinta TUI — Textual Application screen and widgets."""
+"""Grinta TUI — Textual Application screen and widgets.
+
+Mission Control design — dolphie-inspired dashboard aesthetic.
+Deep navy panels, teal accents, color-coded metrics, compact data-dense layout.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+if os.getenv('DEBUG', '').strip().lower() not in ('true', '1', 'yes'):
+    os.environ['DEBUG'] = '1'
+
+# Bullet-proof direct trace — bypasses all logging infra.
+_TRACE_PATH = Path(r'C:\Users\GIGABYTE\Desktop\Grinta\tui-trace.log')
+
+def _trace(msg: str) -> None:
+    try:
+        with open(_TRACE_PATH, 'a', encoding='utf-8') as f:
+            f.write(f'{datetime.now().isoformat()}  {msg}\n')
+            f.flush()
+    except Exception:
+        pass
+
+# Ensure TUI logs go to app.log as requested by the user.
+_APP_LOG_PATH = Path(r'C:\Users\GIGABYTE\Desktop\Grinta\app.log')
+_tui_logger = logging.getLogger('grinta.tui')
+_tui_logger.setLevel(logging.DEBUG)
+if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(_APP_LOG_PATH) for h in _tui_logger.handlers):
+    _fh = logging.FileHandler(_APP_LOG_PATH, mode='a', encoding='utf-8')
+    _fh.setLevel(logging.DEBUG)
+    _fh.setFormatter(logging.Formatter('%(asctime)s  %(name)s  %(levelname)s  %(message)s'))
+    _tui_logger.addHandler(_fh)
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -28,28 +57,58 @@ from backend.cli.theme import (
     NAVY_WAITING,
 )
 
-if TYPE_CHECKING:
-    from backend.cli.config_manager import AppConfig
-    from backend.core.enums import AgentState
-
-
+from backend.cli.config_manager import AppConfig
+from backend.core.bootstrap.agent_control_loop import run_agent_until_done
+from backend.core.bootstrap.main import create_agent, create_registry_and_conversation_stats
+from backend.core.bootstrap.setup import create_memory, create_runtime
+from backend.core.enums import AgentState, EventSource
 from backend.core.logger import app_logger as logger
+from backend.ledger import EventStream
+from backend.ledger.action import (
+    CmdRunAction,
+    MessageAction,
+    NullAction,
+    StreamingChunkAction,
+)
+from backend.ledger.observation import (
+    AgentStateChangedObservation,
+    CmdOutputObservation,
+    NullObservation,
+)
+from backend.orchestration.conversation_stats import ConversationStats
+from backend.orchestration.orchestration_config import OrchestrationConfig
+from backend.orchestration.session_orchestrator import SessionOrchestrator
+from backend.persistence import get_file_store
 
 
-class GrintaHeader(Static):
-    """Top status bar — always docked at top."""
+# ── Widget classes ────────────────────────────────────────────────────────
+
+class TopBar(Static):
+    """Compact 1-line top bar — app name, workspace, model, help hint."""
+
+
+class MetricsGrid(Horizontal):
+    """Horizontal row of metric cards."""
+
+
+class MetricsCard(Static):
+    """Single metric card with title and value rows."""
+
+
+class ReasoningPanel(Static):
+    """Collapsible panel showing current action and streaming thoughts."""
 
 
 class Transcript(VerticalScroll):
-    """Scrollable transcript area — main content region."""
+    """Scrollable conversation transcript."""
 
 
-class InputArea(Horizontal):
-    """Bottom input row — prompt + text entry."""
+class InputBar(Horizontal):
+    """Compact bottom input row."""
 
 
-class GrintaFooter(Static):
-    """Context-sensitive hint bar at the very bottom."""
+class FooterBar(Static):
+    """1-line keyboard shortcuts footer."""
 
 
 class GrintaConfirmDialog(ModalScreen[str | None]):
@@ -89,8 +148,10 @@ class GrintaConfirmDialog(ModalScreen[str | None]):
                 return
 
 
+# ── Main screen ───────────────────────────────────────────────────────────
+
 class GrintaScreen(Screen):
-    """Main TUI screen — agent interaction layout."""
+    """Main TUI screen — Mission Control layout."""
 
     CSS_PATH = 'styles.tcss'
 
@@ -161,50 +222,251 @@ class GrintaScreen(Screen):
     }
 
     def compose(self) -> ComposeResult:
-        yield GrintaHeader(id='header-bar')
+        yield TopBar(id='top-bar')
+        with MetricsGrid(id='metrics-grid'):
+            yield MetricsCard(id='metrics-model', classes='metrics-card')
+            yield MetricsCard(id='metrics-context', classes='metrics-card')
+            yield MetricsCard(id='metrics-cost', classes='metrics-card')
+            yield MetricsCard(id='metrics-status', classes='metrics-card')
+        yield ReasoningPanel(id='reasoning-panel')
         with Transcript(id='transcript-scroll'):
             yield RichLog(id='transcript-log', markup=True, auto_scroll=True)
-        with InputArea(id='input-row'):
-            yield Static('❯ ', id='input-prompt')
+        with InputBar(id='input-bar'):
+            yield Static('❯', id='input-prompt')
             yield TextArea(id='input')
-        yield GrintaFooter(id='footer-hint')
+        yield FooterBar(id='footer-bar')
 
     def on_mount(self) -> None:
-        self._render_header()
+        _trace('on_mount: GrintaScreen mounted')
+        self._render_topbar()
+        self._render_metrics_grid()
+        self._update_footer_bar()
         ta = self.query_one('#input', TextArea)
         ta.focus()
         ta.cursor_blink = True
-        self._update_footer('Ready. Type a task or /help')
         self.query_one('#transcript-scroll', Transcript).scroll_home(animate=False)
+        _trace('on_mount: done')
 
-    def _render_header(self) -> None:
-        header = self.query_one('#header-bar', GrintaHeader)
+    def on_unmount(self) -> None:
+        _trace('on_unmount: GrintaScreen unmounting')
+        if self._event_stream is not None:
+            try:
+                close_fn = getattr(self._event_stream, 'close', None)
+                if callable(close_fn):
+                    close_fn()
+                    _trace('on_unmount: event_stream closed')
+            except Exception as exc:
+                _trace(f'on_unmount: event_stream close failed: {exc}')
+        _trace('on_unmount: done')
+
+    # ── TopBar ──────────────────────────────────────────────────────────────
+
+    def _render_topbar(self) -> None:
+        topbar = self.query_one('#top-bar', TopBar)
         hud = self._hud
         model = hud.state.model or '(not set)'
         workspace = hud.state.workspace_path or Path(os.getcwd()).name
-        raw_state = hud.state.agent_state_label or 'Ready'
-        display_state = self._STATE_LABELS.get(raw_state.lower(), raw_state)
-        state_color = self._STATE_COLORS.get(raw_state.lower(), NAVY_TEXT_SECONDARY)
-        header.update(
-            f'[bold {NAVY_BRAND}]GRINTA[/]'
-            f'  [{NAVY_BORDER}]|[/]'
-            f'  [{NAVY_TEXT_SECONDARY}]model[/] [{NAVY_TEXT_PRIMARY}]{model}[/]'
-            f'  [{NAVY_BORDER}]|[/]'
-            f'  [{NAVY_TEXT_SECONDARY}]ws[/] [{NAVY_TEXT_PRIMARY}]{workspace}[/]'
-            f'  [{NAVY_BORDER}]|[/]'
-            f'  [{state_color}]{display_state}[/]'
+        topbar.update(
+            f'[bold {NAVY_BRAND}]Grinta[/]'
+            f'  [{NAVY_TEXT_MUTED}]v3.0.7[/]'
+            f'    {workspace}'
+            f'    [{NAVY_TEXT_MUTED}]{model}[/]'
+            f'    [{NAVY_TEXT_MUTED}]press ? for help[/]'
         )
 
+    # ── MetricsGrid ─────────────────────────────────────────────────────────
+
+    def _render_metrics_grid(self) -> None:
+        self._update_model_card()
+        self._update_context_card()
+        self._update_cost_card()
+        self._update_status_card()
+
+    def _update_model_card(self) -> None:
+        card = self.query_one('#metrics-model', MetricsCard)
+        hud = self._hud
+        provider, model = HUDBar.describe_model(hud.state.model)
+        autonomy = hud.state.autonomy_level
+        card.update(
+            f'[{NAVY_BRAND}]▸ Model[/]\n'
+            f'  [{NAVY_TEXT_PRIMARY}]{provider}[/]\n'
+            f'  [{NAVY_TEXT_MUTED}]{model}[/]\n'
+            f'  [{NAVY_TEXT_MUTED}]{autonomy}[/]'
+        )
+
+    def _update_context_card(self) -> None:
+        card = self.query_one('#metrics-context', MetricsCard)
+        hud = self._hud
+        used = hud.state.context_tokens
+        limit = hud.state.context_limit
+        bar = self._render_context_bar(used, limit)
+        condensations = hud.state.condensation_count
+        card.update(
+            f'[{NAVY_BRAND}]▸ Context[/]\n'
+            f'  {bar}\n'
+            f'  [{NAVY_TEXT_MUTED}]{used:,} / {limit:,} tokens[/]\n'
+            f'  [{NAVY_TEXT_MUTED}]{condensations} condensations[/]'
+        )
+
+    def _render_context_bar(self, used: int, limit: int) -> str:
+        if limit <= 0:
+            return f'[{NAVY_TEXT_MUTED}]no limit[/]'
+        pct = min(100, int(used / limit * 100))
+        filled = int(pct / 10)
+        empty = 10 - filled
+        if pct < 70:
+            color = '#99c794'  # green
+        elif pct < 90:
+            color = '#fac863'  # yellow
+        else:
+            color = '#ec5f67'  # red
+        bar = f'[{color}]{"█" * filled}[/][{NAVY_BORDER}]{"░" * empty}[/]'
+        return f'{bar}  [{color}]{pct}%[/]'
+
+    def _update_cost_card(self) -> None:
+        card = self.query_one('#metrics-cost', MetricsCard)
+        hud = self._hud
+        cost = hud.state.cost_usd
+        calls = hud.state.llm_calls
+        card.update(
+            f'[{NAVY_BRAND}]▸ Cost[/]\n'
+            f'  [{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]\n'
+            f'  [{NAVY_TEXT_MUTED}]{calls} LLM calls[/]'
+        )
+
+    def _update_status_card(self) -> None:
+        card = self.query_one('#metrics-status', MetricsCard)
+        hud = self._hud
+        raw_state = hud.state.agent_state_label or 'Ready'
+        display_state = self._STATE_LABELS.get(raw_state.lower(), raw_state)
+        state_color = self._STATE_COLORS.get(raw_state.lower(), NAVY_TEXT_MUTED)
+        mcp = hud.state.mcp_servers
+        mcp_str = f'{mcp} MCP' if mcp is not None else '— MCP'
+        skills = HUDBar.count_bundled_playbook_skills()
+        card.update(
+            f'[{NAVY_BRAND}]▸ Status[/]\n'
+            f'  [{state_color}]● {display_state}[/]\n'
+            f'  [{NAVY_TEXT_MUTED}]{mcp_str}[/]\n'
+            f'  [{NAVY_TEXT_MUTED}]{skills} skills[/]'
+        )
+
+    # ── ReasoningPanel ──────────────────────────────────────────────────────
+
+    def _update_reasoning_panel(self) -> None:
+        panel = self.query_one('#reasoning-panel', ReasoningPanel)
+        if not self._reasoning.active:
+            panel.remove_class('active')
+            panel.update('')
+            return
+        panel.add_class('active')
+        lines: list[str] = []
+        if self._reasoning._current_action:
+            lines.append(f'[{NAVY_BRAND_DIM}]▸ {self._reasoning._current_action}[/]')
+        for thought in self._reasoning._committed_lines[-2:]:
+            lines.append(f'  [{NAVY_TEXT_MUTED}]{thought}[/]')
+        if self._reasoning._streaming_line:
+            lines.append(f'  [{NAVY_TEXT_SECONDARY}]{self._reasoning._streaming_line}[/]')
+        panel.update('\n'.join(lines) if lines else '')
+
+    # ── Transcript helpers ──────────────────────────────────────────────────
+
+    def _get_log(self) -> RichLog:
+        return self.query_one('#transcript-log', RichLog)
+
+    def add_user_message(self, text: str) -> None:
+        """User message — inline, color-coded prefix (dolphie style)."""
+        self._get_log().write(
+            f'[{NAVY_BRAND}]❯ you[/]  [{NAVY_TEXT_PRIMARY}]{text}[/]'
+        )
+
+    def add_agent_message(self, text: str) -> None:
+        """Agent message — card-style bordered panel."""
+        self._get_log().write(
+            f'[{NAVY_BRAND_DIM}]┌ grinta ─────────────────────────────────────────[/]\n'
+            f'[{NAVY_TEXT_PRIMARY}]{text}[/]\n'
+            f'[{NAVY_BRAND_DIM}]└─────────────────────────────────────────────────[/]'
+        )
+
+    def add_system_message(self, text: str) -> None:
+        self._get_log().write(f'[{NAVY_TEXT_SECONDARY}]{text}[/]')
+
+    def add_error(self, text: str) -> None:
+        self._get_log().write(f'[bold {NAVY_ERROR}]✗ {text}[/]')
+
+    def add_success(self, text: str) -> None:
+        self._get_log().write(f'[bold {NAVY_READY}]✓ {text}[/]')
+
+    def add_tool_start(self, tool_name: str) -> None:
+        """Tool call — indented with ▸ prefix."""
+        self._get_log().write(
+            f'  [{NAVY_BRAND_DIM}]▸[/]  [{NAVY_TEXT_PRIMARY}]{tool_name}[/]'
+        )
+
+    def add_tool_result(self, text: str) -> None:
+        """Tool result — double-indented."""
+        self._get_log().write(f'    [{NAVY_TEXT_MUTED}]{text}[/]')
+
+    def add_divider(self) -> None:
+        self._get_log().write(f'[{NAVY_BORDER}]' + '─' * 50 + '[/]')
+
+    def clear_transcript(self) -> None:
+        self._get_log().clear()
+
+    def action_clear_transcript(self) -> None:
+        self.clear_transcript()
+
+    def action_suspend(self) -> None:
+        self._agent_running = False
+        self.app.exit()
+
+    def _scroll_to_bottom(self) -> None:
+        self.query_one('#transcript-scroll', Transcript).scroll_end(animate=False)
+
+    # ── FooterBar ───────────────────────────────────────────────────────────
+
+    def _update_footer_bar(self) -> None:
+        self.query_one('#footer-bar', FooterBar).update(
+            f'[{NAVY_TEXT_MUTED}]'
+            f'^C Quit  '
+            f'^L Clear  '
+            f'Enter Send'
+            f'[/]'
+        )
+
+    # ── Input handling ──────────────────────────────────────────────────────
+
     def action_submit_input(self) -> None:
+        _trace(f'action_submit_input: lock_locked={self._input_lock.locked()}')
         if self._input_lock.locked():
+            _trace('action_submit_input: lock held, ignoring')
             return
         ta = self.query_one('#input', TextArea)
         text = ta.text.strip()
+        _trace(f'action_submit_input: text_len={len(text)}')
         if not text:
+            _trace('action_submit_input: empty text, ignoring')
             return
-        asyncio.get_running_loop().create_task(self._handle_input(text))
+        _trace(f'action_submit_input: creating task for _handle_input')
+        try:
+            task = asyncio.create_task(self._handle_input(text))
+            _trace(f'action_submit_input: task created {task}')
+
+            def _on_done(t: asyncio.Task[Any]) -> None:
+                exc = t.exception()
+                if exc:
+                    _trace(f'_handle_input task FAILED: {type(exc).__name__}: {exc}')
+                else:
+                    _trace(f'_handle_input task completed OK')
+
+            task.add_done_callback(_on_done)
+        except Exception as exc:
+            _trace(f'action_submit_input: create_task FAILED: {type(exc).__name__}: {exc}')
 
     async def _handle_input(self, text: str) -> None:
+        try:
+            _trace(f'_handle_input ENTER text={text[:80]}')
+        except Exception as exc:
+            _trace(f'_handle_input: _trace FAILED: {type(exc).__name__}: {exc}')
         async with self._input_lock:
             ta = self.query_one('#input', TextArea)
             ta.clear()
@@ -216,31 +478,60 @@ class GrintaScreen(Screen):
                 return
 
             self.add_user_message(text)
-            self._update_footer('Working...')
-            self.query_one('#input-row', InputArea).add_class('processing')
+            self._update_footer_bar()
+            self.query_one('#input-bar', InputBar).add_class('processing')
 
             try:
+                _trace(f'_handle_input: controller={self._controller is not None}')
                 if self._controller is None:
+                    _trace('_handle_input: calling _bootstrap()')
+                    logger.info('[TUI] _handle_input: bootstrapping (no controller)')
+                    self.add_system_message('[bold]Bootstrapping engine…[/]')
                     await self._bootstrap()
+                    _trace(f'_handle_input: _bootstrap done, state={self._controller.get_agent_state()}')
+                    logger.info('[TUI] _handle_input: bootstrap complete, state=%s',
+                                self._controller.get_agent_state())
+                    self.add_system_message('[bold]Engine ready — dispatching task[/]')
                 else:
+                    _trace('_handle_input: controller exists, calling _ensure_agent_task()')
+                    logger.info('[TUI] _handle_input: controller exists, ensuring task')
                     await self._ensure_agent_task()
+                _trace('_handle_input: calling _dispatch_to_agent()')
+                logger.info('[TUI] _handle_input: dispatching to agent')
                 await self._dispatch_to_agent(text)
+                _trace(f'_handle_input: _dispatch_to_agent done, state={self._controller.get_agent_state()}')
+                logger.info('[TUI] _handle_input: dispatch complete, state=%s',
+                            self._controller.get_agent_state() if self._controller else 'N/A')
             except Exception:
-                logger.exception('Error during agent turn')
-                self.add_error('Agent error — check logs')
-                self._update_footer('Ready. Type a task or /help')
+                _trace('_handle_input: EXCEPTION in try block')
+                logger.exception('[TUI] _handle_input FAILED')
+                self.add_error('Agent error — check app.log')
+                self._update_footer_bar()
+                if self._controller:
+                    try:
+                        actual = str(self._controller.get_agent_state())
+                        self._hud.update_agent_state(actual or 'Error')
+                        self._render_topbar()
+                        self._render_metrics_grid()
+                    except Exception:
+                        self._hud.update_agent_state('Error')
+                        self._render_topbar()
+                        self._render_metrics_grid()
             finally:
-                self._update_footer('Ready. Type a task or /help')
-                self.query_one('#input-row', InputArea).remove_class('processing')
+                self._update_footer_bar()
+                self.query_one('#input-bar', InputBar).remove_class('processing')
                 if self._renderer:
                     self._renderer.drain_events()
-                    self._update_header_state(
-                        self._hud.state.agent_state_label or 'Ready'
-                    )
+                state_label = self._hud.state.agent_state_label or 'Ready'
+                logger.info('[TUI] _handle_input: finally, HUD state=%r', state_label)
+                self._hud.update_agent_state(state_label)
+                self._render_topbar()
+                self._render_metrics_grid()
 
-    def _update_header_state(self, state: str) -> None:
-        self._hud.update_agent_state(state)
-        self._render_header()
+    def update_hud(self) -> None:
+        self._hud.update_agent_state(self._hud.state.agent_state_label or 'Ready')
+        self._render_topbar()
+        self._render_metrics_grid()
 
     async def _handle_slash_command(self, text: str) -> None:
         cmd = text.lower().strip()
@@ -275,102 +566,49 @@ class GrintaScreen(Screen):
         self.add_divider()
         self._scroll_to_bottom()
 
-    # ── transcript helpers ──────────────────────────────────────────────────
-
-    @staticmethod
-    def _fmt_ts() -> str:
-        return datetime.now().strftime(f'[{NAVY_TEXT_SECONDARY}]%H:%M:%S[/]')
-
-    def _get_log(self) -> RichLog:
-        return self.query_one('#transcript-log', RichLog)
-
-    def add_user_message(self, text: str) -> None:
-        self._get_log().write(
-            f'[bold {NAVY_BRAND}]❯[/]'
-            f'  {self._fmt_ts()}'
-            f'  [{NAVY_TEXT_MUTED}]you[/]'
-            f'  [{NAVY_TEXT_PRIMARY}]{text}[/]'
-        )
-
-    def add_agent_message(self, text: str) -> None:
-        self._get_log().write(
-            f'[bold {NAVY_BRAND_DIM}]❯[/]'
-            f'  {self._fmt_ts()}'
-            f'  [{NAVY_TEXT_MUTED}]grinta[/]'
-            f'  [{NAVY_TEXT_PRIMARY}]{text}[/]'
-        )
-
-    def add_system_message(self, text: str) -> None:
-        self._get_log().write(f'[{NAVY_TEXT_SECONDARY}]{text}[/]')
-
-    def add_error(self, text: str) -> None:
-        self._get_log().write(f'[bold {NAVY_ERROR}]✗ {text}[/]')
-
-    def add_success(self, text: str) -> None:
-        self._get_log().write(f'[bold {NAVY_READY}]✓ {text}[/]')
-
-    def add_tool_start(self, tool_name: str) -> None:
-        self._get_log().write(
-            f'  [bold {NAVY_BRAND_DIM}]▸[/]'
-            f'  [bold {NAVY_TEXT_PRIMARY}]{tool_name}[/]'
-        )
-
-    def add_tool_result(self, text: str) -> None:
-        self._get_log().write(f'    [{NAVY_TEXT_MUTED}]{text}[/]')
-
-    def add_divider(self) -> None:
-        self._get_log().write(f'[{NAVY_BORDER}]' + '─' * 70 + '[/]')
-
-    def clear_transcript(self) -> None:
-        self._get_log().clear()
-
-    def action_clear_transcript(self) -> None:
-        self.clear_transcript()
-
-    def action_suspend(self) -> None:
-        self._agent_running = False
-        self.app.exit()
-
-    def _scroll_to_bottom(self) -> None:
-        self.query_one('#transcript-scroll', Transcript).scroll_end(animate=False)
-
-    # ── footer ─────────────────────────────────────────────────────────────
-
-    def _update_footer(self, hint: str) -> None:
-        self.query_one('#footer-hint', GrintaFooter).update(
-            f'[{NAVY_TEXT_SECONDARY}]{hint}[/]'
-        )
-
-    # ── HUD sync ─────────────────────────────────────────────────────────────
-
-    def update_hud(self) -> None:
-        self._hud.update_agent_state(self._hud.state.agent_state_label or 'Ready')
-        self._render_header()
-
-    # ── bootstrap (synchronous — all core factory calls are sync) ──────────
+    # ── Bootstrap (preserved agent logic) ───────────────────────────────────
 
     async def _bootstrap(self) -> None:
-        """Bootstrap the agent engine asynchronously.
-
-        The synchronous factory calls (create_runtime, create_agent, etc.) are
-        run in a thread so they don't block the Textual message pump. HUD is
-        updated at each phase so the UI stays responsive.
-        """
+        _trace('_bootstrap: start')
         logger.info('TUI _bootstrap: starting')
         self._hud.update_agent_state('Initializing')
-        self._render_header()
+        self._render_topbar()
+        self._render_metrics_grid()
         self.add_system_message('Initializing engine...')
 
         config = self._config
 
         try:
-            agent, memory, event_stream, runtime, controller = await asyncio.to_thread(
-                self._bootstrap_sync, config
+            agent, event_stream, runtime = await asyncio.to_thread(
+                self._bootstrap_sync_phase1, config
             )
-        except Exception:
-            logger.exception('TUI _bootstrap: failed in thread')
+        except Exception as exc:
+            _trace(f'_bootstrap: EXCEPTION phase1 {type(exc).__name__}: {exc}')
+            logger.exception('TUI _bootstrap: failed in phase1')
             raise
 
+        _trace(f'_bootstrap: runtime created, type={type(runtime).__name__}')
+
+        connect_fn = getattr(runtime, 'connect', None)
+        if callable(connect_fn):
+            try:
+                _trace('_bootstrap: awaiting runtime.connect()')
+                await connect_fn()
+                _trace('_bootstrap: runtime.connect() OK')
+            except Exception as exc:
+                _trace(f'_bootstrap: runtime.connect() FAILED: {type(exc).__name__}: {exc}')
+                raise
+
+        try:
+            memory, controller = await asyncio.to_thread(
+                self._bootstrap_sync_phase2, agent, runtime, event_stream, config
+            )
+        except Exception as exc:
+            _trace(f'_bootstrap: EXCEPTION phase2 {type(exc).__name__}: {exc}')
+            logger.exception('TUI _bootstrap: failed in phase2')
+            raise
+
+        _trace(f'_bootstrap: controller created, state={controller.get_agent_state()}')
         logger.info(
             'TUI _bootstrap: controller created, initial state=%s (type=%s)',
             controller.get_agent_state(),
@@ -381,6 +619,10 @@ class GrintaScreen(Screen):
         self._runtime_stub = runtime
         self._memory_stub = memory
         self._controller = controller
+
+        from backend.utils.async_utils import set_main_event_loop
+        set_main_event_loop(self._loop)
+        _trace(f'_bootstrap: set_main_event_loop to {self._loop}')
 
         if self._renderer is None:
             self._renderer = TUIRenderer(
@@ -393,44 +635,23 @@ class GrintaScreen(Screen):
         self._renderer.subscribe(event_stream, event_stream.sid)
 
         state_after_create = controller.get_agent_state()
+        _trace(f'_bootstrap: state after subscribe={state_after_create}')
         logger.info('TUI _bootstrap: state after renderer subscribe=%s', state_after_create)
         self._hud.update_agent_state(str(state_after_create))
-        self._render_header()
+        self._render_topbar()
+        self._render_metrics_grid()
         self._renderer.drain_events()
+        _trace('_bootstrap: done')
         self.add_system_message('Engine ready.')
 
-    def _bootstrap_sync(
+    def _bootstrap_sync_phase1(
         self, config: Any,
-    ) -> tuple[Any, Any, Any, Any, Any]:
-        """Synchronous bootstrap — runs in a thread. Returns components tuple."""
-        agent, memory, event_stream, runtime = self._create_session(config)
-        controller = self._get_or_create_controller(
-            agent, runtime, memory, config,
-        )
-        return agent, memory, event_stream, runtime, controller
-
-    def _create_session(
-        self, config: Any,
-    ) -> tuple[Any, Any, Any, Any]:
-        """Create agent, memory, event stream, and runtime.
-
-        All bootstrap factory calls are synchronous. This mirrors the
-        established bootstrap pattern from ``backend.core.bootstrap``.
-        """
-        from backend.core.bootstrap.main import (
-            create_agent,
-            create_registry_and_conversation_stats,
-        )
-        from backend.core.bootstrap.setup import (
-            create_memory,
-            create_runtime,
-        )
-        from backend.ledger import EventStream
-        from backend.persistence import get_file_store
-
+    ) -> tuple[Any, Any, Any]:
+        _trace('_bootstrap_sync_phase1: get_file_store')
         file_store = get_file_store(config)
+        _trace('_bootstrap_sync_phase1: EventStream')
         event_stream = EventStream(sid='grinta-tui', file_store=file_store)
-
+        _trace('_bootstrap_sync_phase1: create_registry_and_conversation_stats')
         llm_registry, _conv_stats, _app_cfg = (
             create_registry_and_conversation_stats(
                 config,
@@ -438,30 +659,41 @@ class GrintaScreen(Screen):
                 user_id='tui',
             )
         )
+        _trace('_bootstrap_sync_phase1: create_runtime')
         runtime = create_runtime(
             config,
             llm_registry=llm_registry,
             sid=event_stream.sid,
             event_stream=event_stream,
         )
+        _trace('_bootstrap_sync_phase1: create_agent')
         agent = create_agent(config, llm_registry)
+        _trace('_bootstrap_sync_phase1: done')
+        return agent, event_stream, runtime
+
+    def _bootstrap_sync_phase2(
+        self, agent: Any, runtime: Any, event_stream: Any, config: Any,
+    ) -> tuple[Any, Any]:
+        _trace('_bootstrap_sync_phase2: create_memory')
         memory = create_memory(runtime, event_stream, sid=event_stream.sid)
-        return agent, memory, event_stream, runtime
+        _trace('_bootstrap_sync_phase2: create_memory done')
+        _trace('_bootstrap_sync_phase2: controller')
+        controller = self._get_or_create_controller(
+            agent, runtime, memory, event_stream, config,
+        )
+        _trace('_bootstrap_sync_phase2: controller done')
+        return memory, controller
 
     def _get_or_create_controller(
-        self, agent: Any, runtime: Any, memory: Any, config: Any,
+        self, agent: Any, runtime: Any, memory: Any, event_stream: Any, config: Any,
     ) -> Any:
-        from backend.orchestration.conversation_stats import ConversationStats
-        from backend.orchestration.orchestration_config import OrchestrationConfig
-        from backend.orchestration.session_orchestrator import SessionOrchestrator
-
         return SessionOrchestrator(
             config=OrchestrationConfig(
                 agent=agent,
-                event_stream=self._event_stream,
+                event_stream=event_stream,
                 conversation_stats=ConversationStats(
-                    file_store=self._event_stream.file_store,
-                    conversation_id=self._event_stream.sid,
+                    file_store=event_stream.file_store,
+                    conversation_id=event_stream.sid,
                     user_id=None,
                 ),
                 iteration_delta=config.max_iterations,
@@ -470,10 +702,7 @@ class GrintaScreen(Screen):
         )
 
     async def _run_agent_loop(self) -> None:
-        """Background agent loop — mirrors REPL's run_agent_until_done pattern."""
-        from backend.core.bootstrap.agent_control_loop import run_agent_until_done
-        from backend.core.schemas import AgentState
-
+        _trace('_run_agent_loop: ENTER')
         end_states = [
             AgentState.AWAITING_USER_INPUT,
             AgentState.FINISHED,
@@ -481,23 +710,26 @@ class GrintaScreen(Screen):
             AgentState.STOPPED,
         ]
         try:
+            _trace('_run_agent_loop: calling run_agent_until_done')
             await run_agent_until_done(
                 self._controller,
                 self._runtime_stub,
                 self._memory_stub,
                 end_states,
             )
-        except Exception:
+            _trace('_run_agent_loop: run_agent_until_done returned')
+        except Exception as exc:
+            _trace(f'_run_agent_loop: EXCEPTION {type(exc).__name__}: {exc}')
             logger.exception('Agent loop exited with error')
+        _trace('_run_agent_loop: EXIT')
 
     async def _ensure_agent_task(self) -> None:
-        from backend.core.bootstrap.agent_control_loop import run_agent_until_done
-        from backend.core.schemas import AgentState
-
         if self._controller is None:
+            _trace('_ensure_agent_task: no controller, returning')
             return
 
         state = self._controller.get_agent_state()
+        _trace(f'_ensure_agent_task: current state={state}')
         logger.info('TUI _ensure_agent_task: current state=%s', state)
         if state in {
             AgentState.LOADING,
@@ -507,15 +739,19 @@ class GrintaScreen(Screen):
             AgentState.REJECTED,
             AgentState.STOPPED,
         }:
+            _trace(f'_ensure_agent_task: transitioning {state} -> RUNNING')
             logger.info('TUI _ensure_agent_task: transitioning %s -> RUNNING', state)
             await self._controller.set_agent_state_to(AgentState.RUNNING)
         elif state == AgentState.RUNNING:
+            _trace('_ensure_agent_task: already RUNNING')
             logger.info('TUI _ensure_agent_task: already RUNNING')
 
         state_after = self._controller.get_agent_state()
+        _trace(f'_ensure_agent_task: state after transition={state_after}')
         logger.info('TUI _ensure_agent_task: state after transition=%s', state_after)
 
         if self._agent_task is None or self._agent_task.done():
+            _trace('_ensure_agent_task: creating new agent task')
             logger.info('TUI _ensure_agent_task: creating new agent task')
             self._agent_task = asyncio.create_task(
                 run_agent_until_done(
@@ -531,40 +767,84 @@ class GrintaScreen(Screen):
                 ),
                 name='grinta-tui-agent',
             )
+
+            def _on_agent_done(t: asyncio.Task[Any]) -> None:
+                exc = t.exception()
+                if exc:
+                    _trace(f'_agent_task FAILED: {type(exc).__name__}: {exc}')
+                    logger.exception('TUI _agent_task failed')
+                else:
+                    _trace('_agent_task completed OK')
+
+            self._agent_task.add_done_callback(_on_agent_done)
         else:
+            _trace(f'_ensure_agent_task: agent task already running task={self._agent_task}')
             logger.info('TUI _ensure_agent_task: agent task already running (task=%s)', self._agent_task)
 
     async def _dispatch_to_agent(self, text: str) -> None:
-        from backend.core.enums import EventSource
-        from backend.ledger.action import MessageAction
-
+        _trace('_dispatch_to_agent: ENTER')
         if self._controller is None or self._event_stream is None:
+            _trace('_dispatch_to_agent: missing controller or event_stream, returning')
             return
 
-        await self._ensure_agent_task()
+        try:
+            await self._ensure_agent_task()
+            _trace('_dispatch_to_agent: _ensure_agent_task OK')
+        except Exception as exc:
+            _trace(f'_dispatch_to_agent: _ensure_agent_task FAILED: {type(exc).__name__}: {exc}')
+            raise
 
         action = MessageAction(content=text)
         self._event_stream.add_event(action, EventSource.USER)
-        self._controller.step()
-
-        end_states = {
-            AgentState.AWAITING_USER_INPUT,
-            AgentState.FINISHED,
-            AgentState.ERROR,
-            AgentState.STOPPED,
-            AgentState.AWAITING_USER_CONFIRMATION,
-        }
+        try:
+            self._controller.step()
+            _trace('_dispatch_to_agent: step() OK')
+        except Exception as exc:
+            _trace(f'_dispatch_to_agent: step() FAILED: {type(exc).__name__}: {exc}')
+            raise
+        _trace('_dispatch_to_agent: event added, step() called')
+        try:
+            logger.info('[TUI] _dispatch_to_agent: event added, step() called')
+        except Exception as exc:
+            _trace(f'_dispatch_to_agent: logger.info FAILED: {type(exc).__name__}: {exc}')
+        try:
+            end_states = {
+                AgentState.AWAITING_USER_INPUT,
+                AgentState.FINISHED,
+                AgentState.ERROR,
+                AgentState.STOPPED,
+                AgentState.AWAITING_USER_CONFIRMATION,
+            }
+            _trace('_dispatch_to_agent: end_states created')
+        except Exception as exc:
+            _trace(f'_dispatch_to_agent: end_states FAILED: {type(exc).__name__}: {exc}')
+            raise
+        loop_count = 0
+        _trace('_dispatch_to_agent: entering poll loop')
         while True:
-            await asyncio.sleep(0.1)
-            state = self._controller.get_agent_state()
-            if state in end_states:
-                break
-            if self._agent_task and self._agent_task.done():
-                break
-            if self._renderer:
-                self._renderer.drain_events()
+            try:
+                await asyncio.sleep(0.1)
+                loop_count += 1
+                state = self._controller.get_agent_state()
+                if loop_count == 1 or loop_count % 20 == 0:
+                    _trace(f'_dispatch_to_agent: poll #{loop_count}, state={state}')
+                    logger.info('[TUI] _dispatch_to_agent: poll #%d, state=%s', loop_count, state)
+                if state in end_states:
+                    _trace(f'_dispatch_to_agent: reached end state {state}')
+                    logger.info('[TUI] _dispatch_to_agent: reached end state %s', state)
+                    break
+                if self._agent_task and self._agent_task.done():
+                    _trace(f'_dispatch_to_agent: agent task done, state={state}')
+                    logger.info('[TUI] _dispatch_to_agent: agent task done, state=%s', state)
+                    break
+                if self._renderer:
+                    self._renderer.drain_events()
+            except Exception as exc:
+                _trace(f'_dispatch_to_agent: poll loop EXCEPTION {type(exc).__name__}: {exc}')
+                raise
+        _trace('_dispatch_to_agent: poll loop exited')
 
-    # ── confirmation ────────────────────────────────────────────────────────
+    # ── Confirmation ────────────────────────────────────────────────────────
 
     async def confirm(
         self,
@@ -577,6 +857,8 @@ class GrintaScreen(Screen):
         result = await self.app.push_screen_wait(dialog)
         return result
 
+
+# ── TUIRenderer ───────────────────────────────────────────────────────────
 
 class TUIRenderer:
     """Textual renderer — subscribes to event stream and updates TUI widgets."""
@@ -606,11 +888,13 @@ class TUIRenderer:
     def drain_events(self) -> None:
         if not self._pending_events:
             return
+        _trace(f'TUIRenderer.drain_events: {len(self._pending_events)} pending')
         while self._pending_events:
             event = self._pending_events.pop(0)
             self._process_event(event)
 
     def _on_event(self, event: Any) -> None:
+        _trace(f'TUIRenderer._on_event: {type(event).__name__}')
         self._pending_events.append(event)
         try:
             self._loop.call_soon_threadsafe(self._state_event.set)
@@ -624,24 +908,11 @@ class TUIRenderer:
         return self._state_event
 
     def _process_event(self, event: Any) -> None:
-        from backend.ledger.action import (
-            CmdRunAction,
-            MessageAction,
-            NullAction,
-            StreamingChunkAction,
-        )
-        from backend.ledger.observation import (
-            AgentStateChangedObservation,
-            CmdOutputObservation,
-            NullObservation,
-        )
-
+        _trace(f'TUIRenderer._process_event: {type(event).__name__} source={getattr(event, "source", None)}')
         self._update_metrics(event)
 
         if isinstance(event, NullAction) or isinstance(event, NullObservation):
             return
-
-        from backend.core.enums import EventSource
 
         source = getattr(event, 'source', None)
 
@@ -655,9 +926,43 @@ class TUIRenderer:
             if output:
                 self._tui.add_tool_result(output[:500])
         elif isinstance(event, StreamingChunkAction):
-            self._tui.add_agent_message(event.accumulated or '')
+            self._handle_streaming_chunk(event)
         elif isinstance(event, AgentStateChangedObservation):
             self._handle_state_change(event)
+
+    def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
+        """Handle streaming chunk — update reasoning in real-time, transcript only on final."""
+        # Real-time thinking/reasoning tokens
+        thinking = (action.thinking_accumulated or '').strip()
+        if thinking:
+            self._reasoning.start()
+            self._reasoning.set_streaming_thought(thinking)
+            self._tui._update_reasoning_panel()
+            self._state_event.set()
+
+        # Tool call streaming: show in reasoning display
+        if action.is_tool_call:
+            tool_name = action.tool_call_name or 'tool'
+            self._reasoning.start()
+            self._reasoning.update_action(f'{tool_name}…')
+            self._tui._update_reasoning_panel()
+            self._state_event.set()
+            return
+
+        # Live cost update during streaming
+        cost = getattr(action, 'cost_usd', None)
+        if cost is not None and cost > 0:
+            self._hud.update_cost(self._hud.state.cost_usd + cost)
+            self._tui._update_cost_card()
+
+        # Only add to transcript when streaming is complete
+        if action.is_final:
+            text = (action.accumulated or '').strip()
+            if text:
+                self._tui.add_agent_message(text)
+            self._reasoning.stop()
+            self._tui._update_reasoning_panel()
+            self._tui._render_metrics_grid()
 
     def _update_metrics(self, event: Any) -> None:
         if hasattr(event, 'model') and event.model:
@@ -669,8 +974,6 @@ class TUIRenderer:
             self._hud.update_cost(self._hud.state.cost_usd + cost)
 
     def _handle_state_change(self, obs: Any) -> None:
-        from backend.core.enums import AgentState
-
         state = obs.agent_state
         try:
             state = AgentState(state)
@@ -681,6 +984,18 @@ class TUIRenderer:
         self._hud.update_agent_state(str(state))
         self._state_event.set()
         if self._loop.is_running():
-            self._loop.call_soon_threadsafe(self._tui._render_header)
+            self._loop.call_soon_threadsafe(self._tui._render_topbar)
+            self._loop.call_soon_threadsafe(self._tui._render_metrics_grid)
         else:
-            self._tui._render_header()
+            self._tui._render_topbar()
+            self._tui._render_metrics_grid()
+
+        # Clear reasoning panel when agent becomes idle
+        if state in {
+            AgentState.AWAITING_USER_INPUT,
+            AgentState.FINISHED,
+            AgentState.ERROR,
+            AgentState.STOPPED,
+        }:
+            self._reasoning.stop()
+            self._tui._update_reasoning_panel()

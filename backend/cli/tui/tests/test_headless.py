@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, PropertyMock
 import pytest
 from rich.console import Console as RichConsole
 
-from backend.cli.tui.app import GrintaScreen, InputArea, TextArea
+from backend.cli.tui.app import GrintaScreen, InputBar, TextArea
 from backend.cli.tui.main import GrintaTUIApp
 
 
@@ -39,13 +39,12 @@ async def test_tui_mounts(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        header = s.query_one('#header-bar')
-        assert header is not None
-        assert 'GRINTA' in header.renderable
+        topbar = s.query_one('#top-bar')
+        assert topbar is not None
+        assert 'Grinta' in topbar.renderable
 
-        footer = s.query_one('#footer-hint')
+        footer = s.query_one('#footer-bar')
         assert footer is not None
-        assert 'Ready' in footer.renderable
 
 
 @pytest.mark.asyncio
@@ -65,8 +64,8 @@ async def test_tui_input_and_transcript(mock_config):
         transcript = s.query_one('#transcript-log')
         assert transcript is not None
 
-        input_row = s.query_one('#input-row', InputArea)
-        assert 'processing' not in input_row.classes
+        input_bar = s.query_one('#input-bar', InputBar)
+        assert 'processing' not in input_bar.classes
 
 
 @pytest.mark.asyncio
@@ -147,8 +146,8 @@ async def test_tui_unknown_command(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_update_header_state(mock_config):
-    """Verify _update_header_state works."""
+async def test_tui_update_hud_state(mock_config):
+    """Verify update_hud works with new topbar+metrics layout."""
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -157,11 +156,13 @@ async def test_tui_update_header_state(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        s._update_header_state('Running')
+        s._hud.update_agent_state('Running')
+        s.update_hud()
         await pilot.pause()
 
-        header = s.query_one('#header-bar')
-        assert 'Running' in header.renderable
+        # State now lives in the metrics status card, not topbar
+        status_card = s.query_one('#metrics-status')
+        assert 'Running' in status_card.renderable
 
 
 @pytest.mark.asyncio
@@ -234,8 +235,8 @@ async def test_tui_drain_events_noop_when_empty(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_render_header_from_hud_state(mock_config):
-    """Verify _render_header reads from hud.state.agent_state_label."""
+async def test_tui_metrics_grid_exists(mock_config):
+    """Verify metrics grid with 4 cards is present."""
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -244,9 +245,8 @@ async def test_tui_render_header_from_hud_state(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        s._hud.update_agent_state('CustomState')
-        s._render_header()
+        grid = s.query_one('#metrics-grid')
+        assert grid is not None
 
-        header = s.query_one('#header-bar')
-        assert 'CustomState' in header.renderable
-        await pilot.pause()
+        cards = grid.query('MetricsCard')
+        assert len(cards) == 4
