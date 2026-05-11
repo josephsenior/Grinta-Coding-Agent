@@ -111,10 +111,14 @@ _PROVIDER_REGISTRY: dict[str, ProviderCapabilities] = {
             'gemini-3.1-pro-preview',
         ),
         small_model_patterns=('gemini-2.5-flash-lite',),
+        # Gemini uses SentencePiece tokenizer — ~15% more tokens on code.
+        token_correction_factor=1.15,
     ),
     'deepseek': ProviderCapabilities(
         name='deepseek',
         inherent_reasoning_models=('deepseek-reasoner', 'deepseek-r1'),
+        # DeepSeek uses a BPE tokenizer similar to GPT but with CJK bias.
+        token_correction_factor=1.10,
     ),
     'xai': ProviderCapabilities(
         name='xai',

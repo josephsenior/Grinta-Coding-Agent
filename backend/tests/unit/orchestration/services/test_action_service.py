@@ -78,15 +78,13 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
 
         await self.service.run(mock_action, mock_ctx)
 
-        # Should evaluate action
+        # evaluate_action is called for runnable actions
         self.mock_confirmation_service.evaluate_action.assert_called_once_with(
             mock_action
         )
 
-        # Should set pending (action is runnable)
-        self.mock_pending_service.set.assert_called()
-
-        # Should handle confirmation
+        # handle_confirmation is called (pending is now set via event stream
+        # pre_runnable_action_dispatch hook in real usage, not directly here)
         self.mock_confirmation_service.handle_pending_confirmation.assert_called_once()
 
         # Should run execute

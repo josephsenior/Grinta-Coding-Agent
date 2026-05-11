@@ -117,8 +117,24 @@ class DurableEventWriter:
         if not self._thread or not self._thread.is_alive():
             return False
 
-        # Write WAL marker before enqueue so a crash between enqueue
-        # and flush is recoverable via EventPersistence.replay_pending_events().
+        try:
+            # Block up to _put_timeout before dropping — gives the writer
+            # thread a chance to drain under transient load spikes.
+            self._queue.put(persisted_event, timeout=self._put_timeout)
+        except queue.Full:
+            self._drops += 1
+            logger.warning(
+                'DurableEventWriter queue full after %.1fs; dropped event id=%s filename=%s (total drops: %d)',
+                self._put_timeout,
+                persisted_event.event_id,
+                persisted_event.filename,
+                self._drops,
+            )
+            return False
+
+        # Write WAL marker AFTER successful enqueue so a crash between
+        # enqueue and flush is recoverable, but a dropped event never
+        # gets a WAL marker that could be resurrected on crash recovery.
         serialized = json.dumps(persisted_event.payload)
         pending_path = self._pending_path(persisted_event.filename)
         try:
@@ -129,31 +145,7 @@ class DurableEventWriter:
                 pending_path,
                 exc,
             )
-
-        try:
-            # Block up to _put_timeout before dropping — gives the writer
-            # thread a chance to drain under transient load spikes.
-            self._queue.put(persisted_event, timeout=self._put_timeout)
-            return True
-        except queue.Full:
-            self._drops += 1
-            # Clean up the WAL marker — the event is being dropped
-            try:
-                self._file_store.delete(pending_path)
-            except Exception as exc:
-                logger.debug(
-                    'WAL: could not remove .pending marker %s: %s',
-                    pending_path,
-                    exc,
-                )
-            logger.warning(
-                'DurableEventWriter queue full after %.1fs; dropped event id=%s filename=%s (total drops: %d)',
-                self._put_timeout,
-                persisted_event.event_id,
-                persisted_event.filename,
-                self._drops,
-            )
-            return False
+        return True
 
     def _run(self) -> None:
         while not self._stop_flag.is_set():

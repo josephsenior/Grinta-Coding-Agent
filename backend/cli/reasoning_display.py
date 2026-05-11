@@ -227,7 +227,11 @@ class ReasoningDisplay:
         self._stream_wrap_width = None
         # Track step timing for ETA.
         self._step_count += 1
-        self._step_times.append(time.monotonic())
+        now = time.monotonic()
+        self._step_times.append(now)
+        # Keep only the last 100 timestamps to bound memory within long turns.
+        if len(self._step_times) > 100:
+            self._step_times = self._step_times[-100:]
 
     def update_action(self, label: str) -> None:
         self.start()

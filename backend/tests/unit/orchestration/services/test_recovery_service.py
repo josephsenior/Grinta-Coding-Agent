@@ -41,6 +41,8 @@ def ctrl(mock_context):
     c.retry_service = MagicMock()
     c.retry_service.schedule_retry_after_failure = AsyncMock(return_value=False)
     c.get_agent_state = MagicMock(return_value=AgentState.RUNNING)
+    c.state = MagicMock()
+    c.state.extra_data = {}
     return c
 
 
@@ -255,6 +257,7 @@ class TestTaskReconciliationDirective:
         state.plan = plan
         state.set_planning_directive = MagicMock()
         state.history = []
+        state.extra_data = {}
         return state
 
     @pytest.mark.asyncio
@@ -288,6 +291,7 @@ class TestTaskReconciliationDirective:
         state.plan = plan
         state.set_planning_directive = MagicMock()
         state.history = []
+        state.extra_data = {}
         ctrl.state = state
         ctrl.get_agent_state.return_value = AgentState.RUNNING
 
@@ -323,6 +327,7 @@ class TestTaskReconciliationDirective:
         state.plan = None
         state.set_planning_directive = MagicMock()
         state.history = []
+        state.extra_data = {}
         ctrl.state = state
         ctrl.get_agent_state.return_value = AgentState.RUNNING
 

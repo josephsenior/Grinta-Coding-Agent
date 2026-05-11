@@ -159,8 +159,11 @@ class GuardBus:
             if cause is not None:
                 attach_observation_cause(obs, cause, context=cause_context)
             event_stream.add_event(obs, EventSource.ENVIRONMENT)
-            if not force:
-                slot.record(priority)
+            # Always record the slot to prevent a subsequent non-force guard
+            # signal from emitting a second observation for the same turn.
+            # The XOR rule (one observation per turn) must hold regardless of
+            # the force flag.
+            slot.record(priority)
             logger.debug(
                 'GuardBus: emitted observation %s (priority=%d, turn=%d, force=%s)',
                 error_id,

@@ -47,11 +47,16 @@ class ContextWindowMiddleware(ToolInvocationMiddleware):
         if context_window <= 0:
             return
         prompt_tokens = getattr(last, 'prompt_tokens', 0)
-        pct = prompt_tokens / context_window
+        completion_tokens = getattr(last, 'completion_tokens', 0)
+        total_tokens = getattr(last, 'total_tokens', 0)
+        # Use total_tokens when available (most accurate); otherwise sum
+        # prompt + completion so tool calls and reasoning are accounted for.
+        used_tokens = total_tokens if total_tokens > 0 else (prompt_tokens + completion_tokens)
+        pct = used_tokens / context_window
         for threshold in self._THRESHOLDS:
             if pct >= threshold and threshold not in self._alerted_thresholds:
                 self._alerted_thresholds.add(threshold)
-                self._emit_alert(threshold, prompt_tokens, context_window, pct)
+                self._emit_alert(threshold, used_tokens, context_window, pct)
 
     def _emit_alert(
         self,

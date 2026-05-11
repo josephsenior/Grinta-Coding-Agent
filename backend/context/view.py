@@ -146,9 +146,18 @@ class View(BaseModel):
         # Find and insert summary if available
         summary, summary_offset, is_prewarmed = View._find_summary_info(events)
         if summary is not None and summary_offset is not None:
-            logger.info('Inserting summary at offset %s', summary_offset)
-            kept_events.insert(
+            # Clamp the offset to the kept_events list bounds.  The offset comes
+            # from a CondensationAction created before pruning, so after pruning
+            # it may point beyond the list length.
+            clamped_offset = max(0, min(summary_offset, len(kept_events)))
+            logger.info(
+                'Inserting summary at offset %s (original=%s, kept_events=%d)',
+                clamped_offset,
                 summary_offset,
+                len(kept_events),
+            )
+            kept_events.insert(
+                clamped_offset,
                 AgentCondensationObservation(
                     content=summary, is_prewarmed=is_prewarmed
                 ),

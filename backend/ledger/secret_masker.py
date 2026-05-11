@@ -10,6 +10,7 @@ pub/sub and backpressure while preserving stable event formatting.
 from __future__ import annotations
 
 import re
+import threading
 from typing import Any
 
 
@@ -35,6 +36,7 @@ class SecretMasker:
         self.secrets: dict[str, str] = {}
         self._secret_pattern: re.Pattern[str] | None = None
         self._secret_bytes: list[bytes] = []
+        self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ #
     # Public API                                                          #
@@ -69,14 +71,15 @@ class SecretMasker:
         """Precompile a single regex from all non-empty secret values."""
         tokens = [str(s) for s in self.secrets.values() if isinstance(s, str) and s]
         unique = sorted(set(tokens), key=len, reverse=True)
-        if unique:
-            self._secret_pattern = re.compile(
-                '|'.join(re.escape(t) for t in unique), flags=re.IGNORECASE
-            )
-            self._secret_bytes = [t.encode('utf-8') for t in unique]
-        else:
-            self._secret_pattern = None
-            self._secret_bytes = []
+        with self._lock:
+            if unique:
+                self._secret_pattern = re.compile(
+                    '|'.join(re.escape(t) for t in unique), flags=re.IGNORECASE
+                )
+                self._secret_bytes = [t.encode('utf-8') for t in unique]
+            else:
+                self._secret_pattern = None
+                self._secret_bytes = []
 
     def _sanitize_value(self, value: Any) -> Any:
         if isinstance(value, dict):
@@ -91,16 +94,28 @@ class SecretMasker:
             return self._mask_bytes(value)
         return value
 
+    @property
+    def _safe_pattern(self) -> re.Pattern[str] | None:
+        with self._lock:
+            return self._secret_pattern
+
+    @property
+    def _safe_bytes(self) -> list[bytes]:
+        with self._lock:
+            return list(self._secret_bytes)
+
     def _mask_string(self, value: str) -> str:
-        if not value or not self._secret_pattern:
+        pattern = self._safe_pattern
+        if not value or not pattern:
             return value
-        return self._secret_pattern.sub(self.PLACEHOLDER, value)
+        return pattern.sub(self.PLACEHOLDER, value)
 
     def _mask_bytes(self, value: bytes) -> bytes:
-        if not value or not self._secret_bytes:
+        tokens = self._safe_bytes
+        if not value or not tokens:
             return value
         masked = value
-        for token in self._secret_bytes:
+        for token in tokens:
             if token:
                 masked = masked.replace(token, self.PLACEHOLDER.encode('utf-8'))
         return masked

@@ -266,7 +266,9 @@ class RetryService:
 
         task.cancel()
         try:
-            # If we're on the same loop the task was created on, await it
+            # Always await the task.  If we're on a different loop, bridge
+            # back to the task's loop so it actually unwinds rather than
+            # leaking as a cancelled-but-not-awaited zombie.
             try:
                 current_loop = asyncio.get_running_loop()
             except RuntimeError:
@@ -274,12 +276,14 @@ class RetryService:
 
             if self._task_loop is not None and current_loop is self._task_loop:
                 await task
-            else:
-                # Different or no running loop; rely on cancellation without awaiting
-                logger.debug(
-                    'Retry worker for controller %s cancelled without await due to loop mismatch',
-                    self.controller.id,
+            elif self._task_loop is not None:
+                future = asyncio.run_coroutine_threadsafe(
+                    self._await_task(task), self._task_loop
                 )
+                future.result(timeout=5.0)
+            else:
+                # No loop to bridge to; best-effort wait
+                await task
         except asyncio.CancelledError:  # pragma: no cover - expected cancellation path
             logger.debug(
                 'Retry worker cancellation acknowledged for controller %s',
@@ -294,6 +298,11 @@ class RetryService:
         finally:
             self._retry_worker_task = None
             self._task_loop = None
+
+    @staticmethod
+    async def _await_task(task: asyncio.Task[Any]) -> None:
+        """Helper to await a task inside run_coroutine_threadsafe."""
+        await task
 
     # ------------------------------------------------------------------ #
     # Internal helpers (mirrors former SessionOrchestrator implementations)

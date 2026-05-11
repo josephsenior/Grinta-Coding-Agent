@@ -113,8 +113,10 @@ class RollbackMiddleware(ToolInvocationMiddleware):
                 pass
 
         if not workspace or not os.path.isdir(workspace):
-            logger.debug('RollbackMiddleware: cannot resolve workspace path — disabled')
-            self._enabled = False
+            logger.debug(
+                'RollbackMiddleware: workspace %r not available yet — skipping checkpoint',
+                workspace,
+            )
             return None
 
         try:
@@ -132,7 +134,9 @@ class RollbackMiddleware(ToolInvocationMiddleware):
             logger.warning(
                 'RollbackMiddleware: failed to create RollbackManager', exc_info=True
             )
-            self._enabled = False
+            # Do NOT permanently disable — the workspace may become writable
+            # later (e.g. mount appeared, permissions fixed).  Next risky
+            # action will retry initialisation.
 
         return self._manager
 

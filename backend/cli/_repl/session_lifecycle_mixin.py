@@ -177,6 +177,9 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
     ) -> bool:
         """Return True when the wait loop should break out (agent is idle)."""
         if state in self._IDLE_AGENT_STATES:
+            # Reset confirmation counter when agent leaves confirmation state.
+            if hasattr(self, '_confirmation_prompt_count'):
+                self._confirmation_prompt_count = 0
             if renderer is not None:
                 await self._drain_renderer_until_settled(renderer)
                 state = controller.get_agent_state()
@@ -211,6 +214,7 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
     ) -> None:
         logger.warning('Agent wait exceeded %ds hard timeout', active_timeout)
         from backend.cli.notifications import notify
+        from backend.core.schemas import AgentState
 
         notify(
             'Grinta — Timeout',
@@ -228,6 +232,12 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
             agent_task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await agent_task
+        # Transition controller out of RUNNING so the next user message
+        # starts from a clean, valid state machine position.
+        controller = getattr(self, '_controller', None)
+        if controller is not None:
+            with contextlib.suppress(Exception):
+                await controller.set_agent_state_to(AgentState.ERROR)
 
     async def _drain_renderer_until_settled(
         self,
@@ -254,8 +264,8 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         if agent_task and not agent_task.done():
             agent_task.cancel()
             try:
-                await agent_task
-            except (asyncio.CancelledError, Exception):
+                await asyncio.wait_for(agent_task, timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
                 pass
 
         # Clear stale _next_action to prevent swallowing user messages after interrupt
@@ -318,7 +328,7 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
             return None
         runtime, repo_directory, acquire_result, event_stream = runtime_bundle
 
-        await self._wire_resume_runtime_state(
+        wire_ok = await self._wire_resume_runtime_state(
             config,
             runtime,
             agent,
@@ -327,6 +337,8 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
             acquire_result,
             event_stream,
         )
+        if not wire_ok:
+            return None
         controller = self._build_resume_controller(
             agent,
             runtime,
@@ -411,6 +423,17 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         acquire_result = runtime_state[2]
         event_stream = runtime.event_stream
         if event_stream is None:
+            # Clean up partially initialized runtime to prevent resource leaks.
+            if acquire_result is not None:
+                try:
+                    from backend.execution import runtime_orchestrator
+
+                    runtime_orchestrator.release(acquire_result)
+                except Exception:
+                    logger.debug(
+                        'Failed to release acquire_result during cleanup',
+                        exc_info=True,
+                    )
             if self._renderer is not None:
                 self._renderer.add_system_message(
                     'Resume failed: no event stream.', title='error'
@@ -427,7 +450,8 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         repo_directory: Any,
         acquire_result: Any,
         event_stream: Any,
-    ) -> None:
+    ) -> bool:
+        """Wire up runtime state for resume. Returns True on success, False on failure."""
         from backend.core.bootstrap.main import _setup_memory_and_mcp
 
         if self._acquire_result is not None:
@@ -439,15 +463,24 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         self._runtime = runtime
         self._acquire_result = acquire_result
 
-        memory = await _setup_memory_and_mcp(
-            config,
-            runtime,
-            resolved_id,
-            repo_directory,
-            None,
-            None,
-            agent,
-        )
+        try:
+            memory = await _setup_memory_and_mcp(
+                config,
+                runtime,
+                resolved_id,
+                repo_directory,
+                None,
+                None,
+                agent,
+            )
+        except Exception as exc:
+            logger.error('Resume failed during memory/MCP setup: %s', exc, exc_info=True)
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    f'Resume failed during memory/MCP setup: {exc}',
+                    title='error',
+                )
+            return False
         self._memory = memory
         mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
         try:
@@ -461,6 +494,7 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
             renderer = cast(Any, self._renderer)
             renderer.reset_subscription()
             renderer.subscribe(event_stream, event_stream.sid)
+        return True
 
     def _build_resume_controller(
         self,
@@ -492,6 +526,27 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
 
     async def _handle_confirmation(self, controller) -> None:
         """Prompt user for Y/N on a pending action, then resume the engine."""
+        # Guard against infinite confirmation loops: if we've prompted
+        # too many times without the agent transitioning state, break out.
+        if not hasattr(self, '_confirmation_prompt_count'):
+            self._confirmation_prompt_count = 0
+        self._confirmation_prompt_count += 1
+        if self._confirmation_prompt_count > 5:
+            logger.warning(
+                'Confirmation loop detected (%d prompts), auto-rejecting',
+                self._confirmation_prompt_count,
+            )
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    'Confirmation loop detected — auto-rejecting to prevent hang.',
+                    title='warning',
+                )
+            action = build_confirmation_action(False)
+            if self._event_stream:
+                self._event_stream.add_event(action, EventSource.USER)
+            self._confirmation_prompt_count = 0
+            return
+
         pending = None
         try:
             pending = controller.get_pending_action()

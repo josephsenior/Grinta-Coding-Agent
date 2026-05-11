@@ -99,5 +99,30 @@ class RuntimeSupervisor:
             self._config.readiness_timeout_s,
         )
 
+    async def check_liveness(self, runtime: object) -> bool:
+        """Check if the runtime is still alive.
+
+        Returns True if the runtime is responsive, False if it has died.
+        This is a lightweight check that should be called periodically during
+        long-running agent sessions.
+        """
+        if runtime is None:
+            return False
+        # Check if the runtime has a liveness probe.
+        probe = getattr(runtime, 'is_alive', None)
+        if callable(probe):
+            try:
+                result = probe()
+                if asyncio.iscoroutine(result):
+                    result = await result
+                return bool(result)
+            except Exception:
+                return False
+        # Fallback: check runtime_initialized flag.
+        try:
+            return bool(getattr(runtime, 'runtime_initialized', False))
+        except Exception:
+            return False
+
 
 runtime_supervisor = RuntimeSupervisor()

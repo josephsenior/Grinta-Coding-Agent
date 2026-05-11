@@ -92,6 +92,7 @@ class EventPersistence:
         get_filename_for_cache: Any = None,
         cache_size: int = 50,
         recent_persist_failures: deque[float] | None = None,
+        existing_sqlite_store: Any = None,
     ) -> None:
         self.sid = sid
         self.file_store = file_store
@@ -117,9 +118,12 @@ class EventPersistence:
         self._last_persist_failure_at_monotonic: float | None = None
         self._last_persistence_mode: str | None = None
 
-        # Optional SQLite accelerator
-        self._sqlite_store: Any = None
-        if str(os.getenv('APP_SQLITE_EVENTS', 'true')).lower() in (
+        # Optional SQLite accelerator — reuse an existing store from the parent
+        # EventStream to avoid dual SQLite connections to the same events.db.
+        self._sqlite_store: Any = existing_sqlite_store
+        if self._sqlite_store is None and str(
+            os.getenv('APP_SQLITE_EVENTS', 'true')
+        ).lower() in (
             '1',
             'true',
             'yes',
@@ -305,26 +309,31 @@ class EventPersistence:
                 quarantine_exc,
             )
 
-    def replay_pending_events(self) -> None:
+    def replay_pending_events(self) -> int:
         """Scan the events directory for ``.pending`` WAL markers.
 
         Recovers any events left as ``.pending`` after a crash and cleans
         up stale markers whose canonical event files already exist.
+
+        Returns
+        -------
+        int
+            Number of events recovered from pending files.
         """
         try:
             events_dir = get_conversation_events_dir(self.sid, self.user_id)
             all_files = self.file_store.list(events_dir)
         except FileNotFoundError:
-            return
+            return 0
         except Exception:
             logger.debug(
                 'WAL replay: could not list events dir for %s', self.sid, exc_info=True
             )
-            return
+            return 0
 
         pending_files = [f for f in all_files if f.endswith('.pending')]
         if not pending_files:
-            return
+            return 0
 
         recovered, cleaned, failed = 0, 0, 0
         for pending_name in pending_files:
@@ -346,6 +355,7 @@ class EventPersistence:
                 failed,
                 extra={'session_id': self.sid, 'user_id': self.user_id},
             )
+        return recovered
 
     def close(self) -> None:
         """Shutdown durable writer and SQLite store."""

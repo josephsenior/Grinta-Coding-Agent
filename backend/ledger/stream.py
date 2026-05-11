@@ -194,6 +194,7 @@ class EventStream(EventStore):
             get_filename_for_cache=self._get_filename_for_cache,
             cache_size=self.cache_size,
             recent_persist_failures=deque(),
+            existing_sqlite_store=getattr(self, '_sqlite_store', None),
         )
 
         # ---- Queue / threading setup --------------------------------------
@@ -218,7 +219,6 @@ class EventStream(EventStore):
             self._queue_thread.start()
         else:
             # In inline mode the queue thread is not used; mark ready immediately.
-            self._queue_thread = threading.Thread(target=lambda: None, daemon=True)
             self._queue_ready.set()
 
         # ---- Subscribers / secrets -----------------------------------------
@@ -251,7 +251,7 @@ class EventStream(EventStore):
         self._finalizer = weakref.finalize(self, _warn_unclosed_stream, self.sid)
 
         # Replay any incomplete writes from a previous crash
-        self._persist.replay_pending_events()
+        recovered_count = self._persist.replay_pending_events()
 
         # ---- Event coalescing (opt-in via env var) -------------------------
         _coalesce = bool(event_defaults.coalesce)
@@ -263,8 +263,9 @@ class EventStream(EventStore):
             if _coalesce
             else None
         )
-        # If WAL replay recovered events, reset cur_id from disk
-        if self._persist.stats.get('persist_failures', 0) == 0:
+        # If WAL replay recovered events, invalidate cur_id so the next
+        # add_event() rescans storage and assigns a safe, monotonic ID.
+        if recovered_count > 0:
             self._cur_id = None
 
     def _shutdown_async_queue(self) -> None:
@@ -302,16 +303,18 @@ class EventStream(EventStore):
 
         Idempotent: safe to call multiple times (e.g. explicit close + finalizer).
         """
-        if getattr(self, '_closed', False):
-            return
-        self._closed = True
+        with self._lock:
+            if getattr(self, '_closed', False):
+                return
+            self._closed = True
         # Detach safety finalizer — we're closing explicitly.
         if hasattr(self, '_finalizer'):
             self._finalizer.detach()
         self._stop_flag.set()
         self._shutdown_async_queue()
-        self._subscribers.clear()
-        self._activity_listeners.clear()
+        with self._lock:
+            self._subscribers.clear()
+            self._activity_listeners.clear()
         self._close_persist_and_super()
 
     def get_backpressure_snapshot(self) -> dict[str, int]:
@@ -385,12 +388,13 @@ class EventStream(EventStore):
             ValueError: If callback_id already exists for this subscriber
 
         """
-        if subscriber_id not in self._subscribers:
-            self._subscribers[subscriber_id] = {}
-        if callback_id in self._subscribers[subscriber_id]:
-            msg = f'Callback ID on subscriber {subscriber_id} already exists: {callback_id}'
-            raise ValueError(msg)
-        self._subscribers[subscriber_id][callback_id] = callback
+        with self._lock:
+            if subscriber_id not in self._subscribers:
+                self._subscribers[subscriber_id] = {}
+            if callback_id in self._subscribers[subscriber_id]:
+                msg = f'Callback ID on subscriber {subscriber_id} already exists: {callback_id}'
+                raise ValueError(msg)
+            self._subscribers[subscriber_id][callback_id] = callback
 
     def unsubscribe(
         self, subscriber_id: EventStreamSubscriber, callback_id: str
@@ -402,13 +406,14 @@ class EventStream(EventStore):
             callback_id: Callback identifier to remove
 
         """
-        if subscriber_id not in self._subscribers:
-            logger.debug('Subscriber not found during unsubscribe: %s', subscriber_id)
-            return
-        if callback_id not in self._subscribers[subscriber_id]:
-            logger.debug('Callback not found during unsubscribe: %s', callback_id)
-            return
-        self._clean_up_subscriber(subscriber_id, callback_id)
+        with self._lock:
+            if subscriber_id not in self._subscribers:
+                logger.debug('Subscriber not found during unsubscribe: %s', subscriber_id)
+                return
+            if callback_id not in self._subscribers[subscriber_id]:
+                logger.debug('Callback not found during unsubscribe: %s', callback_id)
+                return
+            self._clean_up_subscriber(subscriber_id, callback_id)
 
     def _maybe_merge_coalesced_event(self, event: Event) -> Event | None:
         """Return event to process, or None if caller should return early."""
@@ -582,7 +587,7 @@ class EventStream(EventStore):
             future = asyncio.run_coroutine_threadsafe(
                 self._enqueue_event(event), self._queue_loop
             )
-            future.result()
+            future.result(timeout=5.0)
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning('Failed to enqueue event id=%s: %s', event.id, exc)
 
@@ -666,6 +671,10 @@ class EventStream(EventStore):
             try:
                 if not self._stop_flag.is_set():
                     await self._dispatch_event(cast(Event, event))
+            except asyncio.CancelledError:
+                queue.task_done()
+                self._bp.queue_size = queue.qsize()
+                raise
             except Exception as e:
                 logger.error('Error dispatching event: %s', e)
             finally:
@@ -719,7 +728,9 @@ class EventStream(EventStore):
                 )
                 # Block this worker thread until the coroutine completes so
                 # ``_dispatch_event``'s ``gather`` reflects true completion.
-                future.result()
+                # Use a generous timeout to prevent a stalled callback from
+                # blocking all downstream event delivery.
+                future.result(timeout=30)
             else:
                 # No main loop registered (e.g. unit tests with no app loop).
                 # Fall back to a disposable loop; no cross-loop primitives
@@ -769,15 +780,27 @@ class EventStream(EventStore):
             except Exception:
                 pass
 
-        # Drain any remaining queued items to keep internal unfinished-task
-        # counters consistent (in case anyone else awaits join()).
+        # Best-effort delivery of remaining queued events with a short timeout.
+        # This prevents event loss during clean shutdown while avoiding deadlock
+        # if subscribers are stalled.
         if self._async_queue:
+            deliver_deadline = asyncio.get_event_loop().time() + 2.0
             while True:
                 try:
-                    self._async_queue.get_nowait()
+                    event = self._async_queue.get_nowait()
                 except asyncio.QueueEmpty:
                     break
                 else:
+                    # Attempt delivery with remaining budget.
+                    remaining = deliver_deadline - asyncio.get_event_loop().time()
+                    if remaining > 0 and event is not self._stop_sentinel:
+                        try:
+                            await asyncio.wait_for(
+                                self._dispatch_event(event),
+                                timeout=remaining,
+                            )
+                        except (asyncio.TimeoutError, Exception):
+                            pass
                     self._async_queue.task_done()
 
         self._stop_event.set()

@@ -121,15 +121,35 @@ async def run_agent_until_done(
     status_callback = _create_status_callback(controller)
     _set_status_callbacks(runtime, controller, memory, status_callback)
 
-    # Kick the agent once to ensure progress starts even if no event arrives
-    try:
-        controller.step()
-    except Exception:
-        logger.warning('Initial controller.step() failed', exc_info=True)
+    # Skip the initial step if the controller is already in an end state or not
+    # in a stepping-compatible state (e.g. restored from a crashed session).
+    if controller.state.agent_state not in end_states:
+        try:
+            controller.step()
+        except Exception:
+            logger.warning('Initial controller.step() failed', exc_info=True)
 
     # Wait for the agent to reach an end state.  Steps are driven by the
-    # event-driven mechanism (observation_service.trigger_step, _on_event →
-    # should_step, etc.) — NOT by polling.  The initial step() above kicks
+    # event-driven mechanism (observation_service.trigger_step, _on_event ->
+    # should_step, etc.) rather than by polling.  The initial step() above kicks
     # things off; all subsequent steps are triggered by events.
+    #
+    # A timeout guard prevents orphaned polling when the event-driven state
+    # machine stalls (e.g. due to a provider outage or infinite loop).
+    import time as _time
+
+    from backend.core.constants import DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS
+
+    _started = _time.monotonic()
+    # 0 or negative disables the hard cap entirely, allowing arbitrarily
+    # long coding sessions without forced termination.
+    _max_poll_seconds = DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS
     while controller.state.agent_state not in end_states:  # noqa: ASYNC110
         await asyncio.sleep(0.5)
+        if _max_poll_seconds > 0 and _time.monotonic() - _started > _max_poll_seconds:
+            logger.error(
+                'run_agent_until_done: timeout after %.0fs in state=%s',
+                _max_poll_seconds,
+                controller.state.agent_state,
+            )
+            break

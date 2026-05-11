@@ -9,15 +9,17 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import threading
+from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 if os.getenv('DEBUG', '').strip().lower() not in ('true', '1', 'yes'):
     os.environ['DEBUG'] = '1'
 
 # Bullet-proof direct trace — bypasses all logging infra.
-_TRACE_PATH = Path(r'C:\Users\GIGABYTE\Desktop\Grinta\tui-trace.log')
+_TRACE_PATH = Path(__file__).resolve().parent.parent.parent.parent / 'tui-trace.log'
 
 def _trace(msg: str) -> None:
     try:
@@ -27,8 +29,7 @@ def _trace(msg: str) -> None:
     except Exception:
         pass
 
-# Ensure TUI logs go to app.log as requested by the user.
-_APP_LOG_PATH = Path(r'C:\Users\GIGABYTE\Desktop\Grinta\app.log')
+_APP_LOG_PATH = Path(__file__).resolve().parent.parent.parent.parent / 'app.log'
 _tui_logger = logging.getLogger('grinta.tui')
 _tui_logger.setLevel(logging.DEBUG)
 if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(_APP_LOG_PATH) for h in _tui_logger.handlers):
@@ -65,7 +66,7 @@ from backend.core.bootstrap.main import create_agent, create_registry_and_conver
 from backend.core.bootstrap.setup import create_memory, create_runtime
 from backend.core.enums import AgentState, EventSource
 from backend.core.logger import app_logger as logger
-from backend.ledger import EventStream
+from backend.ledger import EventStream, EventStreamSubscriber
 from backend.ledger.action import (
     CmdRunAction,
     MessageAction,
@@ -252,6 +253,8 @@ class GrintaScreen(Screen):
 
     def on_unmount(self) -> None:
         _trace('on_unmount: GrintaScreen unmounting')
+        if self._renderer:
+            self._renderer._event_stream = None
         if self._event_stream is not None:
             try:
                 close_fn = getattr(self._event_stream, 'close', None)
@@ -391,6 +394,10 @@ class GrintaScreen(Screen):
         self._get_log().write(
             f'[{NAVY_BRAND}]❯ you[/]  [{NAVY_TEXT_PRIMARY}]{text}[/]'
         )
+        # Clear reasoning panel and streaming dedup state for the new turn
+        if self._renderer:
+            self._renderer._streamed_final_text = None
+            self._renderer._turn_active = True
 
     def add_agent_message(self, text: str) -> None:
         """Agent message — compact bordered panel."""
@@ -808,15 +815,12 @@ class GrintaScreen(Screen):
 
         action = MessageAction(content=text)
         self._event_stream.add_event(action, EventSource.USER)
+        # NOTE: _ensure_agent_task (via run_agent_until_done) already calls
+        # controller.step() internally.  We skip the redundant explicit step()
+        # to avoid double-processing the queued MessageAction.
+        _trace('_dispatch_to_agent: event added')
         try:
-            self._controller.step()
-            _trace('_dispatch_to_agent: step() OK')
-        except Exception as exc:
-            _trace(f'_dispatch_to_agent: step() FAILED: {type(exc).__name__}: {exc}')
-            raise
-        _trace('_dispatch_to_agent: event added, step() called')
-        try:
-            logger.info('[TUI] _dispatch_to_agent: event added, step() called')
+            logger.info('[TUI] _dispatch_to_agent: event added')
         except Exception as exc:
             _trace(f'_dispatch_to_agent: logger.info FAILED: {type(exc).__name__}: {exc}')
         try:
@@ -832,6 +836,9 @@ class GrintaScreen(Screen):
             _trace(f'_dispatch_to_agent: end_states FAILED: {type(exc).__name__}: {exc}')
             raise
         loop_count = 0
+        import time as _time
+        _poll_started = _time.monotonic()
+        _max_poll_seconds = 600  # 10-minute hard cap for the polling loop
         _trace('_dispatch_to_agent: entering poll loop')
         while True:
             try:
@@ -851,6 +858,13 @@ class GrintaScreen(Screen):
                     break
                 if self._renderer:
                     self._renderer.drain_events()
+                # Hard timeout: prevent infinite polling if the agent gets stuck.
+                if _time.monotonic() - _poll_started > _max_poll_seconds:
+                    _trace('_dispatch_to_agent: poll timeout reached')
+                    logger.error('[TUI] _dispatch_to_agent: poll timeout after %.0fs in state=%s',
+                                 _max_poll_seconds, state)
+                    self.add_error('Agent timed out — check app.log')
+                    break
             except Exception as exc:
                 _trace(f'_dispatch_to_agent: poll loop EXCEPTION {type(exc).__name__}: {exc}')
                 raise
@@ -891,26 +905,31 @@ class TUIRenderer:
         self._event_stream: Any | None = None
         self._state_event = asyncio.Event()
         self._current_state: Any = None
-        self._pending_events: list[Any] = []
+        self._pending_events: deque[Any] = deque()
+        self._pending_lock = threading.Lock()
         # Track the last message rendered via streaming final chunk —
         # used to suppress duplicate MessageAction from the backend.
         self._streamed_final_text: str | None = None
+        # Tracks whether the current turn is complete to prevent cross-turn leak.
+        self._turn_active: bool = False
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
-        event_stream.subscribe(self, self._on_event, sid)
+        event_stream.subscribe(EventStreamSubscriber.MAIN, self._on_event, sid)
 
     def drain_events(self) -> None:
         if not self._pending_events:
             return
         _trace(f'TUIRenderer.drain_events: {len(self._pending_events)} pending')
-        while self._pending_events:
-            event = self._pending_events.pop(0)
-            self._process_event(event)
+        with self._pending_lock:
+            while self._pending_events:
+                event = self._pending_events.popleft()
+        self._process_event(event)
 
     def _on_event(self, event: Any) -> None:
         _trace(f'TUIRenderer._on_event: {type(event).__name__}')
-        self._pending_events.append(event)
+        with self._pending_lock:
+            self._pending_events.append(event)
         try:
             self._loop.call_soon_threadsafe(self._state_event.set)
         except RuntimeError:
@@ -972,10 +991,8 @@ class TUIRenderer:
             return
 
         # Live cost update during streaming
-        cost = getattr(action, 'cost_usd', None)
-        if cost is not None and cost > 0:
-            self._hud.update_cost(self._hud.state.cost_usd + cost)
-            self._tui._update_cost_card()
+        # NOTE: _update_metrics (called for every event) already accumulates cost
+        # via event.cost_usd.  We skip adding cost here to avoid double-counting.
 
         # Only add to transcript when streaming is complete
         if action.is_final:
@@ -1006,12 +1023,11 @@ class TUIRenderer:
         self._current_state = state
         self._hud.update_agent_state(str(state))
         self._state_event.set()
-        if self._loop.is_running():
-            self._loop.call_soon_threadsafe(self._tui._render_topbar)
-            self._loop.call_soon_threadsafe(self._tui._render_metrics_grid)
-        else:
-            self._tui._render_topbar()
-            self._tui._render_metrics_grid()
+        # Direct calls since _handle_state_change runs on the main loop
+        # (called from _process_event which is called from drain_events on the
+        # main thread).  No need for call_soon_threadsafe.
+        self._tui._render_topbar()
+        self._tui._render_metrics_grid()
 
         # Clear reasoning panel when agent becomes idle
         if state in {
@@ -1022,3 +1038,6 @@ class TUIRenderer:
         }:
             self._reasoning.stop()
             self._tui._update_reasoning_panel()
+            # Reset streaming dedup state at turn boundary.
+            self._streamed_final_text = None
+            self._turn_active = False

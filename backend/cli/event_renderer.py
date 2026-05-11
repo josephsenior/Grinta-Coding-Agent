@@ -198,7 +198,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._state_event = asyncio.Event()
         self._subscribed = False
         self._max_budget = max_budget
-        self._pending_events: deque[Any] = deque()
+        self._pending_events: deque[Any] = deque(maxlen=10000)
         self._last_assistant_message_text: str = ''
         self._budget_warned_80 = False
         self._budget_warned_100 = False
@@ -385,7 +385,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         if current_size != self._last_console_size:
             self._last_console_size = current_size
             force = True
-        self._live.update(self, refresh=force)
+        try:
+            self._live.update(self, refresh=force)
+        except Exception:
+            logger.debug('Live.update() failed', exc_info=True)
 
     async def handle_event(self, event: Any) -> None:
         self._process_event_data(event)
@@ -629,7 +632,14 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         """
         while self._pending_events:
             event = self._pending_events.popleft()
-            self._process_event_data(event)
+            try:
+                self._process_event_data(event)
+            except Exception:
+                logger.debug(
+                    'Error processing event %s: %s',
+                    type(event).__name__,
+                    exc_info=True,
+                )
         self.refresh(force=True)
 
     def _process_event_data(self, event: Any) -> None:
@@ -659,6 +669,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         # Committed transcript lines are printed via console.print immediately
         # so Rich does not clip tall turns (Live vertical_overflow ellipsis).
         max_width = max(options.max_width or 0, self._console.width)
+        if max_width < 20:
+            yield Text('Terminal too narrow', style='dim')
+            return
         main_width = _compute_main_width(max_width)
 
         # Build task list from _task_panel_signature for sidebar

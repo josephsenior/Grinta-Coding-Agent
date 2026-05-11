@@ -7,6 +7,7 @@ no Textual — just simple Rich prints and blocking reads.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import sys
 from typing import TYPE_CHECKING
@@ -94,7 +95,7 @@ async def run_noninteractive(
         if initial_input:
             lines = [initial_input]
         else:
-            lines = sys.stdin.readlines() if not sys.stdin.isatty() else []
+            lines = sys.stdin.readlines()
 
         if not lines:
             # Interactive fallback within non-TTY — one-shot Prompt
@@ -118,7 +119,13 @@ async def run_noninteractive(
             controller.step()
 
             # Wait for agent to complete
-            end_state_set = {'AWAITING_USER_INPUT', 'FINISHED', 'ERROR', 'STOPPED', 'AWAITING_USER_CONFIRMATION'}
+            end_state_set = {
+                AgentState.AWAITING_USER_INPUT,
+                AgentState.FINISHED,
+                AgentState.ERROR,
+                AgentState.STOPPED,
+                AgentState.AWAITING_USER_CONFIRMATION,
+            }
             while True:
                 await asyncio.sleep(0.1)
                 state = controller.get_agent_state()
@@ -137,8 +144,16 @@ async def run_noninteractive(
             await asyncio.wait_for(agent_task, timeout=5.0)
         except (asyncio.TimeoutError, asyncio.CancelledError):
             pass
+        # Close HTTP connections after the agent task has been cancelled to
+        # ensure no in-flight requests remain.  The agent's `run_agent_until_done`
+        # may still hold open connections, but cancel + wait_for gives it time
+        # to unwind before we close the shared clients.
         from backend.inference.direct_clients import aclose_shared_http_clients
         await aclose_shared_http_clients()
+        # Close the event stream to release persistence resources.
+        if event_stream is not None:
+            with contextlib.suppress(Exception):
+                event_stream.close()
 
 
 def _handle_slash_command(text: str, console: Console) -> None:
