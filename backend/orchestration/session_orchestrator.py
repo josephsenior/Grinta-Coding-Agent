@@ -142,9 +142,8 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         )
 
         # Guard against concurrent step execution across dispatch threads.
-        # Uses asyncio.Lock for proper async safety (threading.Lock is fragile
-        # in async contexts and can deadlock on event-loop refactors).
-        self._step_lock = asyncio.Lock()
+        # Initialized lazily to ensure correct event loop binding.
+        self._step_lock_instance: asyncio.Lock | None = None
         # Separate threading-safe gate for the sync step() entry point.
         # EventStream callbacks arrive from a thread pool; without this lock
         # two concurrent calls can both see _step_task as done and both create
@@ -728,6 +727,13 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             extra={'msg_type': 'STEP'},
         )
 
+    @property
+    def _step_lock(self) -> asyncio.Lock:
+        """Lazily initialize the lock on the current event loop."""
+        if self._step_lock_instance is None:
+            self._step_lock_instance = asyncio.Lock()
+        return self._step_lock_instance
+
     async def _step(self) -> None:
         """Execute one agent step.
 
@@ -896,29 +902,24 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         failed_actions: list[Action] = []
         for i, result in enumerate(results):
             if isinstance(result, BaseException):
+                if isinstance(result, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
+                    raise result
                 failed_action = batch[i]
                 _mark_retry_serial_after_parallel_failure(failed_action)
                 failed_actions.append(failed_action)
                 action_type = getattr(batch[i], 'action', type(batch[i]).__name__)
                 logger.warning(
-                    '[P2-B] Parallel batch action %d (%s) failed: %s',
+                    '[P2-B] Parallel batch action %d (%s) failed, deferring to serial execution: %s',
                     i,
                     action_type,
                     result,
                 )
-                error_obs = ErrorObservation(
-                    content=f'Parallel batch action {action_type} failed: {result}',
-                    error_id='PARALLEL_BATCH_FAILURE',
-                )
-                attach_observation_cause(
-                    error_obs,
-                    failed_action,
-                    context='session_orchestrator._try_parallel_read_batch',
-                )
-                self.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
 
-        for index, action in enumerate(failed_actions):
-            pending.insert(index, action)
+        if failed_actions:
+            current_pending = getattr(self.agent, 'pending_actions', None)
+            if current_pending is not None:
+                for action in reversed(failed_actions):
+                    current_pending.insert(0, action)
 
         await self._handle_post_execution()
         return True
@@ -1018,11 +1019,28 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
 
                 self.state.set_memory_pressure(level, source='SessionOrchestrator')
 
-                # If we have a prewarmed value ready, inject it for condense_history!
-                if level == 'CRITICAL' and self.memory_pressure.has_prewarmed:
-                    prewarmed = self.memory_pressure.consume_prewarmed()
-                    self.state.turn_signals.prewarmed_compaction = prewarmed
-                    logger.info('Injected prewarmed compaction into turn signals.')
+                if level == 'CRITICAL':
+                    if self.memory_pressure.has_prewarmed:
+                        prewarmed = self.memory_pressure.consume_prewarmed()
+                        self.state.turn_signals.prewarmed_compaction = prewarmed
+                        logger.info('Injected prewarmed compaction into turn signals.')
+                        
+                        # Apply the compaction to actually shrink history to prevent bloat
+                        if prewarmed:
+                            self.state.history.clear()
+                            self.state.history.extend(prewarmed)
+                            self.memory_pressure.record_condensation()
+                            logger.info('Successfully condensed and truncated history to prevent memory leak.')
+                    else:
+                        # Fallback condensation if no prewarm is available
+                        # Cut history in half (keeping first few and last few to preserve context bounds)
+                        hist = self.state.history
+                        if len(hist) > 50:
+                            compacted = hist[:10] + hist[-40:]
+                            self.state.history.clear()
+                            self.state.history.extend(compacted)
+                            self.memory_pressure.record_condensation()
+                            logger.warning('Performed aggressive fallback history condensation.')
 
     async def _run_control_flags_safely(self) -> bool:
         """Run control flags with exception handling."""

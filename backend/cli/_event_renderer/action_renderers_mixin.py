@@ -236,7 +236,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
         if len(display_parts) == 1:
             final_content = display_parts[0]
         else:
-            final_content = Text().join(Text('\n', style='reset'), display_parts)
+            final_content = Text('\n', style='reset').join(display_parts)
 
         self._append_assistant_message(final_content, attachments=attachments)
 

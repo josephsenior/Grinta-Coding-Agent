@@ -945,7 +945,7 @@ def _build_bindings() -> Any:
                         'dialog.title': 'bg:#0f1525 #91abec bold',
                         'dialog.body text-area': 'bg:#0a0e1b #e9e9e9',
                     }),
-                ).to_async(app)
+                ).run_async()
                 if result and result.strip():
                     # Insert the search command into the buffer
                     app.current_buffer.text = f'/search {result.strip()}'

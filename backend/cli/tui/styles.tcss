@@ -41,7 +41,7 @@ TopBar .topbar-help {
 
 /* ── MetricsGrid ───────────────────────────────────── */
 MetricsGrid {
-    height: 4;
+    height: auto;
     background: #0a0e1b;
     padding: 0 1;
     margin: 0;
@@ -90,6 +90,7 @@ Transcript {
     scrollbar-size: 1 8;
     padding: 0 1;
     margin: 0;
+    height: 1fr;
 }
 
 Transcript:focus {
@@ -98,7 +99,7 @@ Transcript:focus {
 
 /* ── InputBar ──────────────────────────────────────── */
 InputBar {
-    height: auto;
+    max-height: 10;
     background: #101626;
     border: tall #1d253e;
     padding: 0;
@@ -123,8 +124,8 @@ InputBar TextArea {
     color: #e9e9e9;
     border: none;
     padding: 0 1;
-    min-height: 2;
-    max-height: 10;
+    height: auto;
+    max-height: 8;
 }
 
 InputBar TextArea:focus {

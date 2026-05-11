@@ -10,7 +10,7 @@ import re
 from typing import Any
 
 from rich import box
-from rich.console import Group
+from rich.console import Group, RenderableType
 from rich.panel import Panel
 from rich.text import Text
 
@@ -204,7 +204,7 @@ def format_activity_block(
     return content
 
 
-def format_activity_turn_header() -> Text:
+def format_activity_turn_header() -> RenderableType:
     """Section heading before the first tool/shell row each agent turn."""
     from rich.rule import Rule
 

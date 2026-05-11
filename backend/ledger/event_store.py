@@ -395,7 +395,7 @@ class EventStore(EventStoreABC):
         pruned = 0
         events_dir = get_conversation_events_dir(self.sid, self.user_id)
         try:
-            entries = self.file_store.list_dir(events_dir)
+            entries = self.file_store.list(events_dir)
         except Exception:
             return 0
         for entry in entries:
@@ -412,7 +412,7 @@ class EventStore(EventStoreABC):
         # Also prune stale cache pages.
         try:
             cache_dir = f'{events_dir}event_cache/'
-            cache_entries = self.file_store.list_dir(cache_dir)
+            cache_entries = self.file_store.list(cache_dir)
             for entry in cache_entries:
                 if not entry.endswith('.json'):
                     continue

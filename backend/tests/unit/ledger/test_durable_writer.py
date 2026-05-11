@@ -337,7 +337,7 @@ class TestWALMarkers:
             drain_blocker.wait()
             return original_drain(self_inner)
 
-        writer._drain_batch = MethodType(patched_drain, writer)
+        writer._drain_batch = MethodType(patched_drain, writer)  # type: ignore[method-assign]
         writer.start()
         try:
             # Writer thread is blocked in patched_drain, so queue stays full
