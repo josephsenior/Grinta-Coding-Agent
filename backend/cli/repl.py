@@ -327,6 +327,12 @@ _SLASH_COMMANDS = (
         help_section='control',
     ),
     SlashCommandSpec(
+        '/search',
+        'Search the session transcript for matching text',
+        '/search <query>',
+        help_section='control',
+    ),
+    SlashCommandSpec(
         '/clear', 'Clear the visible transcript', '/clear', help_section='control'
     ),
     SlashCommandSpec(
@@ -920,6 +926,35 @@ def _build_bindings() -> Any:
         """Alt+Enter inserts a newline (multi-line input)."""
         event.current_buffer.insert_text('\n')
 
+    @kb.add(Keys.ControlR, eager=True)
+    def _transcript_search(event):
+        """Ctrl+R opens a transcript search prompt."""
+        from prompt_toolkit.shortcuts import input_dialog
+        from prompt_toolkit.styles import Style
+
+        app = event.app
+
+        async def _do_search():
+            try:
+                result = await input_dialog(
+                    title='Search Transcript',
+                    text='Enter search query:',
+                    style=Style.from_dict({
+                        'dialog': 'bg:#1b233a',
+                        'dialog.body': 'bg:#0f1525 #e9e9e9',
+                        'dialog.title': 'bg:#0f1525 #91abec bold',
+                        'dialog.body text-area': 'bg:#0a0e1b #e9e9e9',
+                    }),
+                ).to_async(app)
+                if result and result.strip():
+                    # Insert the search command into the buffer
+                    app.current_buffer.text = f'/search {result.strip()}'
+                    app.current_buffer.validate_and_handle()
+            except Exception:
+                pass
+
+        app.create_background_task(_do_search())
+
     return kb
 
 
@@ -1163,13 +1198,22 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         fields = status_fields_from_hud(self._hud.state, self._hud.bundled_skill_count)
         mcp_txt = HUDBar._format_mcp_servers_label(hud.mcp_servers)
         skills_txt = HUDBar._format_skills_label(self._hud.bundled_skill_count)
+
+        # Build token display with inline progress bar.
+        from backend.cli.status_chrome import _token_bar
+        has_limit = '/' in fields.token_display_compact
+        if has_limit and fields.token_usage_pct > 0:
+            token_with_bar = f'{_token_bar(fields.token_usage_pct, 4)} {fields.token_display_compact}'
+        else:
+            token_with_bar = fields.token_display_compact
+
         return {
             'state_label': fields.agent_state_label,
             'autonomy_label': autonomy_chrome_suffix(fields.autonomy_level),
             'workspace': fields.workspace_path,
             'provider': fields.provider,
             'model': fields.model,
-            'token_display': fields.token_display_compact,
+            'token_display': token_with_bar,
             'cost': f'${fields.cost_usd:.3f}',
             'calls': f'{fields.llm_calls} calls',
             'mcp': mcp_txt,

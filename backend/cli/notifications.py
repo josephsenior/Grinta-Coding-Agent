@@ -10,7 +10,6 @@ import logging
 import os
 import shutil
 import subprocess
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +80,7 @@ def _notify_windows(title: str, body: str) -> None:
     # Fallback: simple msg.exe (older Windows, less pretty).
     try:
         subprocess.run(
-            ['msg', '*', f'/TIME:5', f'{title}: {body}'],
+            ['msg', '*', '/TIME:5', f'{title}: {body}'],
             capture_output=True,
             timeout=5,
             check=False,

@@ -175,6 +175,8 @@ def build_recovery_text(
     wrap_width: int | None = None,
 ) -> Text:
     """Render a guidance block for the error / notice panel."""
+    from backend.cli.path_links import linkify_plain
+
     recovery = Text()
     if for_notice:
         recovery.append('Next steps\n', style=f'bold dim {CLR_RECOVERY_HINT}')
@@ -186,7 +188,9 @@ def build_recovery_text(
         step_style = CLR_WARN_BODY
     if guidance.summary and not guidance.omit_summary_in_recovery and not for_notice:
         sum_block = wrap_panel_text_block(guidance.summary, wrap_width=wrap_width)
-        recovery.append(sum_block, style=sum_style)
+        recovery.append_text(
+            linkify_plain(sum_block, plain_style=sum_style, link_files=True)
+        )
         if guidance.steps:
             recovery.append('\n', style=sum_style)
     # Show error code for user reference (dimmed so it doesn't distract)
@@ -195,7 +199,9 @@ def build_recovery_text(
     for index, step in enumerate(guidance.steps, start=1):
         line = f'{index}. {step}'
         line = wrap_panel_text_block(line, wrap_width=wrap_width)
-        recovery.append(line, style=step_style)
+        recovery.append_text(
+            linkify_plain(line, plain_style=step_style, link_files=True)
+        )
         if index < len(guidance.steps):
             recovery.append('\n', style=step_style)
     return recovery
@@ -362,6 +368,8 @@ def _build_error_body(
     accent_style: str,
     wrap_w: int,
 ) -> list[Any]:
+    from backend.cli.path_links import linkify_plain
+
     headline_style = (
         f'bold {LIVE_PANEL_ACCENT_STYLE}' if use_notice else f'{accent_style} bold'
     )
@@ -371,10 +379,16 @@ def _build_error_body(
         error_text, summary=summary, use_notice=use_notice, guidance=guidance
     )
     headline = wrap_panel_text_block(headline, wrap_width=wrap_w)
-    body_parts: list[Any] = [Text(headline, style=headline_style)]
+    body_parts: list[Any] = [
+        linkify_plain(headline, plain_style=headline_style, link_files=True)
+    ]
     if guidance is None and detail:
         body_parts.append(
-            Text(wrap_panel_text_block(detail, wrap_width=wrap_w), style=detail_style)
+            linkify_plain(
+                wrap_panel_text_block(detail, wrap_width=wrap_w),
+                plain_style=detail_style,
+                link_files=True,
+            )
         )
     if guidance is not None:
         body_parts.append(Text(''))
