@@ -450,15 +450,6 @@ class EventStream(EventStore):
             return None
         return merged
 
-    def _dispatch_coalesced_flushed(self, event: Event) -> None:
-        """Dispatch a coalescer-flushed event through the normal delivery path."""
-        if self._should_drop_due_to_shutdown(event, EventSource.ENVIRONMENT):
-            return
-        if EventSource.USER or self._inline_delivery:
-            self._dispatch_event_inline(event)
-        else:
-            self._enqueue_serialized_event(event)
-
     def _run_pre_dispatch_hook_if_runnable(self, sanitized_event: Event) -> None:
         hook = self.pre_runnable_action_dispatch
         if not (callable(hook) and getattr(sanitized_event, 'runnable', False)):

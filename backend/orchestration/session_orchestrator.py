@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import inspect
+import threading
 import time
 from collections.abc import Callable, Coroutine
 from typing import TYPE_CHECKING, Any, cast
@@ -144,6 +145,11 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         # Uses asyncio.Lock for proper async safety (threading.Lock is fragile
         # in async contexts and can deadlock on event-loop refactors).
         self._step_lock = asyncio.Lock()
+        # Separate threading-safe gate for the sync step() entry point.
+        # EventStream callbacks arrive from a thread pool; without this lock
+        # two concurrent calls can both see _step_task as done and both create
+        # step tasks, violating the "only one step at a time" invariant.
+        self._step_gate = threading.Lock()
         # When a step is requested while another is running, this flag ensures
         # the dropped request is re-queued after the current step completes.
         self._step_pending = False
@@ -493,18 +499,21 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         if self._closed:
             return
 
-        if self._step_task and not self._step_task.done():
-            self._step_pending = True
-            return
+        # Atomic gate: prevents two threads from both seeing _step_task as done
+        # and both creating step tasks.
+        with self._step_gate:
+            if self._step_task and not self._step_task.done():
+                self._step_pending = True
+                return
 
-        if self.get_agent_state() == AgentState.AWAITING_USER_INPUT:
-            return
+            if self.get_agent_state() == AgentState.AWAITING_USER_INPUT:
+                return
 
-        main_loop = getattr(self, '_main_loop', None)
-        if main_loop is not None and main_loop.is_running():
-            main_loop.call_soon_threadsafe(self._create_step_task)
-        else:
-            self._create_step_task()
+            main_loop = getattr(self, '_main_loop', None)
+            if main_loop is not None and main_loop.is_running():
+                main_loop.call_soon_threadsafe(self._create_step_task)
+            else:
+                self._create_step_task()
 
     def _create_step_task(self) -> None:
         """Create the step task on the current (main) running loop."""
@@ -804,9 +813,12 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                         logger.info('Agent is no longer running, stopping drain.')
                         break
                     await self.action_execution.execute_action(action)
-                    # Yield so _on_event tasks update state.history before the next
-                    # get_next_action() → astep() → condense_history() check.
-                    await asyncio.sleep(0)
+                    # Drain background _on_event tasks so state.history is
+                    # updated before the next get_next_action() → astep()
+                    # → condense_history() check.
+                    from backend.utils.async_utils import drain_background_tasks
+
+                    await drain_background_tasks()
                     await self._handle_post_execution()
         finally:
             self._draining_batch = False
@@ -818,11 +830,12 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         # that would re-trigger the step loop.  Schedule the next step so the
         # agent can proceed to the LLM call instead of stalling indefinitely.
         if not self._pending_action:
-            # Give background _on_event tasks one turn to flip state after
-            # agent messages such as wait_for_response handoffs. Without this,
-            # _step_inner can queue the next LLM call before the event router
-            # moves the agent to AWAITING_USER_INPUT.
-            await asyncio.sleep(0)
+            # Drain background _on_event tasks so state transitions from agent
+            # messages (e.g. wait_for_response handoffs) are fully processed
+            # before deciding whether to queue the next LLM call.
+            from backend.utils.async_utils import drain_background_tasks
+
+            await drain_background_tasks()
             if (
                 not self._pending_action
                 and self.get_agent_state() == AgentState.RUNNING
@@ -871,9 +884,10 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                 pending.remove(action)
 
         logger.debug(
-            '[scheduler] Parallel tool batch: executing %d actions (%s)',
+            '[scheduler] Parallel tool batch: executing %d actions (%s, %d overflow deferred)',
             len(batch),
             decision.reason,
+            len(decision.overflow),
         )
         results = await asyncio.gather(
             *(self.action_execution.execute_action(a) for a in batch),

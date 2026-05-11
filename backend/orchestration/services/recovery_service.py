@@ -406,6 +406,12 @@ class RecoveryService:
         self._inject_task_reconciliation_directive(controller, exc)
         pause = 2.0 if isinstance(exc, (InternalServerError, Timeout)) else 1.0
         await asyncio.sleep(pause)
+        # Reset the consecutive-error counter on successful recovery.
+        # Without this, the counter grows monotonically and eventually
+        # triggers the hard backstop (>20) even when the agent recovers
+        # between intermittent failures.
+        if state is not None and hasattr(state, 'extra_data'):
+            state.extra_data['__survivable_error_consecutive'] = 0
         # Atomic check-then-step: verify state is still RUNNING before stepping.
         if not _recovery_may_set_state(controller, AgentState.RUNNING):
             logger.debug(

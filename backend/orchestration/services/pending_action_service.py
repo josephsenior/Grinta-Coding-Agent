@@ -204,27 +204,70 @@ class PendingActionService:
         return self._outstanding[best_id]
 
     def _purge_timeouts(self) -> None:
-        controller = self._context.get_controller()
+        """Remove timed-out actions; defer observation emission to async path."""
         now = time.time()
-        dead: list[int] = []
+        dead: list[tuple[Action, float]] = []
         for aid, (action, ts) in list(self._outstanding.items()):
             elapsed = now - ts
             limit = self._effective_timeout_seconds(self._timeout, action)
             if math.isfinite(limit) and elapsed > limit:
-                self._handle_timeout(controller, action, elapsed)
-                dead.append(aid)
-        for aid in dead:
-            self._outstanding.pop(aid, None)
-            self._progress_log_buckets.pop(aid, None)
+                dead.append((action, elapsed))
+                self._outstanding.pop(aid, None)
+                self._progress_log_buckets.pop(aid, None)
 
         if self._legacy_pending is not None:
             action, ts = self._legacy_pending
             elapsed = now - ts
             limit = self._effective_timeout_seconds(self._timeout, action)
             if math.isfinite(limit) and elapsed > limit:
-                self._handle_timeout(controller, action, elapsed)
+                dead.append((action, elapsed))
                 self._legacy_pending = None
                 self._progress_log_buckets.pop('legacy', None)
+
+        # Defer observation emission to async path to avoid recursive
+        # event delivery when called from the sync step loop.
+        if dead:
+            self._defer_timeout_observations(dead)
+
+    def _defer_timeout_observations(
+        self, timed_out: list[tuple[Action, float]]
+    ) -> None:
+        """Schedule timeout observations on the main event loop."""
+        from backend.utils.async_utils import run_or_schedule
+
+        async def _emit():
+            controller = self._context.get_controller()
+            for action, elapsed in timed_out:
+                self._emit_timeout_observation(controller, action, elapsed)
+
+        run_or_schedule(_emit())
+
+    def _emit_timeout_observation(
+        self, controller, action: Action, elapsed: float
+    ) -> None:
+        """Actually emit the timeout ErrorObservation (async context)."""
+        action_id = getattr(action, 'id', 'unknown')
+        action_type = type(action).__name__
+        controller.log(
+            'warning',
+            f'Pending action timed out after {elapsed:.1f}s, auto-clearing: {action_type} (id={action_id})',
+            extra={'msg_type': 'PENDING_ACTION_TIMEOUT_CLEARED'},
+        )
+        timeout_obs = ErrorObservation(
+            content=(
+                f'Pending action timed out after {elapsed:.1f}s: {action_type}. '
+                f'WARNING: The operation may still complete in the background. '
+                f'Before proceeding, verify the current state of any files or '
+                f'resources this action was modifying to avoid working with '
+                f'stale assumptions.'
+            ),
+            error_id='PENDING_ACTION_TIMEOUT',
+            timeout_kind='pending_action',
+        )
+        attach_observation_cause(
+            timeout_obs, action, context='pending_action_service.timeout'
+        )
+        controller.event_stream.add_event(timeout_obs, EventSource.ENVIRONMENT)
 
     def get(self) -> Action | None:
         self._purge_timeouts()
@@ -286,29 +329,9 @@ class PendingActionService:
         )
 
     def _handle_timeout(self, controller, action: Action, elapsed: float) -> None:
+        """Called by watchdog timer — defer observation to async path."""
         self._cancel_watchdog()
-        action_id = getattr(action, 'id', 'unknown')
-        action_type = type(action).__name__
-        controller.log(
-            'warning',
-            f'Pending action timed out after {elapsed:.1f}s, auto-clearing: {action_type} (id={action_id})',
-            extra={'msg_type': 'PENDING_ACTION_TIMEOUT_CLEARED'},
-        )
-        timeout_obs = ErrorObservation(
-            content=(
-                f'Pending action timed out after {elapsed:.1f}s: {action_type}. '
-                f'WARNING: The operation may still complete in the background. '
-                f'Before proceeding, verify the current state of any files or '
-                f'resources this action was modifying to avoid working with '
-                f'stale assumptions.'
-            ),
-            error_id='PENDING_ACTION_TIMEOUT',
-            timeout_kind='pending_action',
-        )
-        attach_observation_cause(
-            timeout_obs, action, context='pending_action_service.timeout'
-        )
-        controller.event_stream.add_event(timeout_obs, EventSource.ENVIRONMENT)
+        self._defer_timeout_observations([(action, elapsed)])
 
     def _schedule_watchdog_if_needed(self) -> None:
         """Schedule the next watchdog using the soonest finite timeout among rows."""
