@@ -316,6 +316,7 @@ class SlashCommandsMixin:
         '/diff': '_cmd_diff',
         '/checkpoint': '_cmd_checkpoint',
         '/copy': '_cmd_copy',
+        '/search': '_cmd_search',
         '/sessions': '_cmd_sessions',
         '/resume': '_cmd_resume',
         '/autonomy': '_cmd_autonomy',

@@ -39,7 +39,7 @@ if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(_APP_LOG
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Label, RichLog, Static, TextArea
 
@@ -51,9 +51,11 @@ from backend.cli.theme import (
     NAVY_BRAND_DIM,
     NAVY_ERROR,
     NAVY_READY,
+    NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
     NAVY_TEXT_PRIMARY,
     NAVY_TEXT_SECONDARY,
+    NAVY_TEXT_TERTIARY,
     NAVY_WAITING,
 )
 
@@ -84,7 +86,7 @@ from backend.persistence import get_file_store
 # ── Widget classes ────────────────────────────────────────────────────────
 
 class TopBar(Static):
-    """Compact 1-line top bar — app name, workspace, model, help hint."""
+    """Compact 1-line top bar — 3-zone layout: title | workspace+model | help."""
 
 
 class MetricsGrid(Horizontal):
@@ -132,14 +134,15 @@ class GrintaConfirmDialog(ModalScreen[str | None]):
         self._recommended = recommended
 
     def compose(self) -> ComposeResult:
-        yield Label(f'[bold]{self._dialog_title}[/]', classes='title')
-        yield Label(self._dialog_body, classes='body')
-        for i, (key, label) in enumerate(self._options):
-            yield Button(
-                label,
-                id=f'confirm-{key}',
-                variant='primary' if i == (self._recommended or 0) else 'default',
-            )
+        with Vertical():
+            yield Label(f'[bold]{self._dialog_title}[/]', classes='title')
+            yield Label(self._dialog_body, classes='body')
+            for i, (key, label) in enumerate(self._options):
+                yield Button(
+                    label,
+                    id=f'confirm-{key}',
+                    variant='primary' if i == (self._recommended or 0) else 'default',
+                )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         for key, _label in self._options:
@@ -267,11 +270,11 @@ class GrintaScreen(Screen):
         model = hud.state.model or '(not set)'
         workspace = hud.state.workspace_path or Path(os.getcwd()).name
         topbar.update(
-            f'[bold {NAVY_BRAND}]Grinta[/]'
+            f'[{NAVY_BRAND}]Grinta[/]'
             f'  [{NAVY_TEXT_MUTED}]v3.0.7[/]'
-            f'    {workspace}'
+            f'    [{NAVY_TEXT_SECONDARY}]{workspace}[/]'
             f'    [{NAVY_TEXT_MUTED}]{model}[/]'
-            f'    [{NAVY_TEXT_MUTED}]press ? for help[/]'
+            f'    [{NAVY_TEXT_DIM}]press ? for help[/]'
         )
 
     # ── MetricsGrid ─────────────────────────────────────────────────────────
@@ -290,7 +293,7 @@ class GrintaScreen(Screen):
         card.update(
             f'[{NAVY_BRAND}]▸ Model[/]\n'
             f'  [{NAVY_TEXT_PRIMARY}]{provider}[/]\n'
-            f'  [{NAVY_TEXT_MUTED}]{model}[/]\n'
+            f'  [{NAVY_TEXT_TERTIARY}]{model}[/]\n'
             f'  [{NAVY_TEXT_MUTED}]{autonomy}[/]'
         )
 
@@ -315,11 +318,11 @@ class GrintaScreen(Screen):
         filled = int(pct / 10)
         empty = 10 - filled
         if pct < 70:
-            color = '#99c794'  # green
+            color = '#54efae'  # green
         elif pct < 90:
-            color = '#fac863'  # yellow
+            color = '#f6ff8f'  # yellow
         else:
-            color = '#ec5f67'  # red
+            color = '#fd8383'  # red
         bar = f'[{color}]{"█" * filled}[/][{NAVY_BORDER}]{"░" * empty}[/]'
         return f'{bar}  [{color}]{pct}%[/]'
 
@@ -331,22 +334,26 @@ class GrintaScreen(Screen):
         card.update(
             f'[{NAVY_BRAND}]▸ Cost[/]\n'
             f'  [{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]\n'
-            f'  [{NAVY_TEXT_MUTED}]{calls} LLM calls[/]'
+            f'  [{NAVY_TEXT_TERTIARY}]{calls} LLM calls[/]'
         )
 
     def _update_status_card(self) -> None:
         card = self.query_one('#metrics-status', MetricsCard)
         hud = self._hud
         raw_state = hud.state.agent_state_label or 'Ready'
-        display_state = self._STATE_LABELS.get(raw_state.lower(), raw_state)
-        state_color = self._STATE_COLORS.get(raw_state.lower(), NAVY_TEXT_MUTED)
+        # Strip 'AgentState.' prefix if present for lookup
+        lookup_key = raw_state.lower()
+        if lookup_key.startswith('agentstate.'):
+            lookup_key = lookup_key[len('agentstate.'):]
+        display_state = self._STATE_LABELS.get(lookup_key, raw_state)
+        state_color = self._STATE_COLORS.get(lookup_key, NAVY_TEXT_MUTED)
         mcp = hud.state.mcp_servers
         mcp_str = f'{mcp} MCP' if mcp is not None else '— MCP'
         skills = HUDBar.count_bundled_playbook_skills()
         card.update(
             f'[{NAVY_BRAND}]▸ Status[/]\n'
             f'  [{state_color}]● {display_state}[/]\n'
-            f'  [{NAVY_TEXT_MUTED}]{mcp_str}[/]\n'
+            f'  [{NAVY_TEXT_TERTIARY}]{mcp_str}[/]\n'
             f'  [{NAVY_TEXT_MUTED}]{skills} skills[/]'
         )
 
@@ -363,9 +370,9 @@ class GrintaScreen(Screen):
         if self._reasoning._current_action:
             lines.append(f'[{NAVY_BRAND_DIM}]▸ {self._reasoning._current_action}[/]')
         for thought in self._reasoning._committed_lines[-2:]:
-            lines.append(f'  [{NAVY_TEXT_MUTED}]{thought}[/]')
+            lines.append(f'  [{NAVY_TEXT_DIM}]{thought}[/]')
         if self._reasoning._streaming_line:
-            lines.append(f'  [{NAVY_TEXT_SECONDARY}]{self._reasoning._streaming_line}[/]')
+            lines.append(f'  [{NAVY_TEXT_TERTIARY}]{self._reasoning._streaming_line}[/]')
         panel.update('\n'.join(lines) if lines else '')
 
     # ── Transcript helpers ──────────────────────────────────────────────────
@@ -380,15 +387,15 @@ class GrintaScreen(Screen):
         )
 
     def add_agent_message(self, text: str) -> None:
-        """Agent message — card-style bordered panel."""
+        """Agent message — compact bordered panel."""
         self._get_log().write(
-            f'[{NAVY_BRAND_DIM}]┌ grinta ─────────────────────────────────────────[/]\n'
+            f'[{NAVY_BRAND_DIM}]┌ grinta[/]\n'
             f'[{NAVY_TEXT_PRIMARY}]{text}[/]\n'
-            f'[{NAVY_BRAND_DIM}]└─────────────────────────────────────────────────[/]'
+            f'[{NAVY_BRAND_DIM}]└[/]'
         )
 
     def add_system_message(self, text: str) -> None:
-        self._get_log().write(f'[{NAVY_TEXT_SECONDARY}]{text}[/]')
+        self._get_log().write(f'[{NAVY_TEXT_MUTED}]{text}[/]')
 
     def add_error(self, text: str) -> None:
         self._get_log().write(f'[bold {NAVY_ERROR}]✗ {text}[/]')
@@ -399,7 +406,7 @@ class GrintaScreen(Screen):
     def add_tool_start(self, tool_name: str) -> None:
         """Tool call — indented with ▸ prefix."""
         self._get_log().write(
-            f'  [{NAVY_BRAND_DIM}]▸[/]  [{NAVY_TEXT_PRIMARY}]{tool_name}[/]'
+            f'  [{NAVY_BRAND_DIM}]▸[/]  [{NAVY_TEXT_TERTIARY}]{tool_name}[/]'
         )
 
     def add_tool_result(self, text: str) -> None:
@@ -427,9 +434,9 @@ class GrintaScreen(Screen):
     def _update_footer_bar(self) -> None:
         self.query_one('#footer-bar', FooterBar).update(
             f'[{NAVY_TEXT_MUTED}]'
-            f'^C Quit  '
-            f'^L Clear  '
-            f'Enter Send'
+            f'[^C] Quit   '
+            f'[^L] Clear   '
+            f'[Enter] Send'
             f'[/]'
         )
 
@@ -486,12 +493,12 @@ class GrintaScreen(Screen):
                 if self._controller is None:
                     _trace('_handle_input: calling _bootstrap()')
                     logger.info('[TUI] _handle_input: bootstrapping (no controller)')
-                    self.add_system_message('[bold]Bootstrapping engine…[/]')
+                    self.add_system_message(f'[{NAVY_BRAND}]Bootstrapping engine…[/]')
                     await self._bootstrap()
                     _trace(f'_handle_input: _bootstrap done, state={self._controller.get_agent_state()}')
                     logger.info('[TUI] _handle_input: bootstrap complete, state=%s',
                                 self._controller.get_agent_state())
-                    self.add_system_message('[bold]Engine ready — dispatching task[/]')
+                    self.add_system_message(f'[{NAVY_READY}]Engine ready — dispatching task[/]')
                 else:
                     _trace('_handle_input: controller exists, calling _ensure_agent_task()')
                     logger.info('[TUI] _handle_input: controller exists, ensuring task')
@@ -551,18 +558,17 @@ class GrintaScreen(Screen):
 
     def show_help(self) -> None:
         self.add_divider()
-        self.add_system_message('GRINTA — AI-Powered Development Platform')
+        self.add_system_message(f'[{NAVY_BRAND}]GRINTA[/] — AI-Powered Development Platform')
         self.add_divider()
-        help_text = (
-            '  /help      Show this help\n'
-            '  /clear     Clear transcript\n'
-            '  /settings  Open settings\n'
-            '  /sessions  Manage sessions\n'
-            '  /quit      Exit Grinta\n'
-            '  Ctrl+C     Stop agent\n'
-            '  Tab        Newline in input'
+        self._get_log().write(
+            f'  [{NAVY_TEXT_SECONDARY}]/help[/]      [{NAVY_TEXT_TERTIARY}]Show this help[/]\n'
+            f'  [{NAVY_TEXT_SECONDARY}]/clear[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
+            f'  [{NAVY_TEXT_SECONDARY}]/settings[/]  [{NAVY_TEXT_TERTIARY}]Open settings[/]\n'
+            f'  [{NAVY_TEXT_SECONDARY}]/sessions[/]  [{NAVY_TEXT_TERTIARY}]Manage sessions[/]\n'
+            f'  [{NAVY_TEXT_SECONDARY}]/quit[/]      [{NAVY_TEXT_TERTIARY}]Exit Grinta[/]\n'
+            f'  [{NAVY_TEXT_SECONDARY}]Ctrl+C[/]     [{NAVY_TEXT_TERTIARY}]Stop agent[/]\n'
+            f'  [{NAVY_TEXT_SECONDARY}]Tab[/]        [{NAVY_TEXT_TERTIARY}]Newline in input[/]'
         )
-        self._get_log().write(help_text)
         self.add_divider()
         self._scroll_to_bottom()
 
@@ -574,7 +580,7 @@ class GrintaScreen(Screen):
         self._hud.update_agent_state('Initializing')
         self._render_topbar()
         self._render_metrics_grid()
-        self.add_system_message('Initializing engine...')
+        self.add_system_message(f'[{NAVY_BRAND}]Initializing engine…[/]')
 
         config = self._config
 
@@ -642,7 +648,7 @@ class GrintaScreen(Screen):
         self._render_metrics_grid()
         self._renderer.drain_events()
         _trace('_bootstrap: done')
-        self.add_system_message('Engine ready.')
+        self.add_system_message(f'[{NAVY_READY}]Engine ready.[/]')
 
     def _bootstrap_sync_phase1(
         self, config: Any,
@@ -880,6 +886,9 @@ class TUIRenderer:
         self._state_event = asyncio.Event()
         self._current_state: Any = None
         self._pending_events: list[Any] = []
+        # Track the last message rendered via streaming final chunk —
+        # used to suppress duplicate MessageAction from the backend.
+        self._streamed_final_text: str | None = None
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
@@ -917,7 +926,14 @@ class TUIRenderer:
         source = getattr(event, 'source', None)
 
         if isinstance(event, MessageAction) and source == EventSource.AGENT:
-            self._tui.add_agent_message(event.content or '')
+            content = event.content or ''
+            # Skip if this MessageAction duplicates a message already rendered
+            # by the final StreamingChunkAction for this turn.
+            if content and content == self._streamed_final_text:
+                self._streamed_final_text = None
+                return
+            if content:
+                self._tui.add_agent_message(content)
         elif isinstance(event, CmdRunAction) and source == EventSource.AGENT:
             cmd = getattr(event, 'command', '') or ''
             self._tui.add_tool_start(cmd[:80])
@@ -959,6 +975,7 @@ class TUIRenderer:
         if action.is_final:
             text = (action.accumulated or '').strip()
             if text:
+                self._streamed_final_text = text
                 self._tui.add_agent_message(text)
             self._reasoning.stop()
             self._tui._update_reasoning_panel()

@@ -183,10 +183,25 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
             if state == AgentState.AWAITING_USER_CONFIRMATION:
                 await self._handle_confirmation(controller)
                 return False
-            return state in self._IDLE_AGENT_STATES
+            if state in self._IDLE_AGENT_STATES:
+                self._fire_idle_notification(state)
+                return True
+            return False
         if state == AgentState.AWAITING_USER_CONFIRMATION:
             await self._handle_confirmation(controller)
         return False
+
+    @staticmethod
+    def _fire_idle_notification(state: AgentState) -> None:
+        """Fire a desktop notification when the agent reaches an idle state."""
+        from backend.cli.notifications import notify_agent_error, notify_agent_idle
+
+        if state == AgentState.ERROR:
+            notify_agent_error()
+        elif state == AgentState.AWAITING_USER_INPUT:
+            notify_agent_idle(needs_input=True)
+        elif state in (AgentState.FINISHED, AgentState.STOPPED):
+            notify_agent_idle(needs_input=False)
 
     async def _handle_agent_hard_timeout(
         self,
@@ -195,6 +210,13 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         active_timeout: int,
     ) -> None:
         logger.warning('Agent wait exceeded %ds hard timeout', active_timeout)
+        from backend.cli.notifications import notify
+
+        notify(
+            'Grinta — Timeout',
+            f'Agent timed out after {active_timeout} seconds.',
+            urgency='critical',
+        )
         if renderer is not None:
             renderer.add_system_message(
                 f'Agent timed out after {active_timeout} seconds. Returning to prompt.',

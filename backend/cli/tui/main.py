@@ -15,11 +15,21 @@ if os.getenv('DEBUG', '').strip().lower() not in ('true', '1', 'yes'):
     os.environ['DEBUG'] = '1'
 
 from rich.console import Console as RichConsole
+from rich.theme import Theme as RichTheme
 from textual.app import App
 
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
-from backend.core.logger import app_logger as logger
+
+# ── Rich theme for consistent markup in RichLog/Static widgets ─────────────
+_RICH_THEME = RichTheme({
+    'repr.number': '#e9e9e9',
+    'repr.string': '#54efae',
+    'repr.bool': '#91abec',
+    'repr.none': '#969aad',
+    'repr.url': '#91abec',
+    'repr.uuid': '#969aad',
+})
 
 if TYPE_CHECKING:
     from backend.cli.config_manager import AppConfig
@@ -52,6 +62,9 @@ class GrintaTUIApp(App):
         self._renderer: Any | None = None
         self._input_lock = asyncio.Lock()
 
+        # Register Rich theme for consistent markup rendering
+        self._console.push_theme(_RICH_THEME)
+
     def compose(self):
         """Layout is handled by the pushed screen."""
         return iter([])
@@ -66,6 +79,9 @@ class GrintaTUIApp(App):
             reasoning=self._reasoning,
             app=self,
         ))
+
+    def on_unmount(self) -> None:
+        self._console.pop_theme()
 
     def update_hud(self) -> None:
         screen = self.screen

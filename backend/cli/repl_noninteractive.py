@@ -42,7 +42,7 @@ async def run_noninteractive(
 
     from backend.core.bootstrap.agent_control_loop import run_agent_until_done
     from backend.core.bootstrap.setup import create_agent, create_memory, create_runtime
-    from backend.core.llm_registry import LLMRegistry
+    from backend.inference.llm_registry import LLMRegistry
     from backend.orchestration.conversation_stats import ConversationStats
     from backend.orchestration.orchestration_config import OrchestrationConfig
     from backend.orchestration.session_orchestrator import SessionOrchestrator
@@ -50,7 +50,7 @@ async def run_noninteractive(
     console.print('[dim]Initializing engine...[/dim]')
 
     app_config = load_app_config()
-    llm_registry = LLMRegistry.from_config(app_config)
+    llm_registry = LLMRegistry(app_config)
     runtime = create_runtime(app_config, llm_registry)
 
     event_stream = runtime.event_stream
