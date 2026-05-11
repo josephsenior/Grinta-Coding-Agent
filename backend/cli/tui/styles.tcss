@@ -1,80 +1,113 @@
-/* Grinta TUI — "Deep System Instrumentation" Theme
- * NASA mission-control aesthetic.
- * Deep Navy (#0a0e14) background, Teal (#5fb3b3) accents.
- */
+/* Grinta TUI - "Mission Control" Theme */
 
 Screen {
     background: #0a0e14;
     color: #d8dee9;
 }
 
-/* ── Header ────────────────────────────────────────── */
-
-GrintaHeader {
-    height: 2;
-    background: #0f151c;
-    border-bottom: solid #1b2b34;
-    dock: top;
+/* ── TopBar ────────────────────────────────────────── */
+TopBar {
+    height: 1;
+    background: #192036;
+    color: #65737e;
     padding: 0 2;
 }
 
-/* ── Transcript ────────────────────────────────────── */
+/* ── MetricsGrid ───────────────────────────────────── */
+MetricsGrid {
+    height: 5;
+    background: #0a0e14;
+    padding: 0 1;
+    margin-bottom: 1;
+}
 
+MetricsCard {
+    height: 5;
+    width: 1fr;
+    background: #131b2e;
+    border: solid #3a4f6a;
+    padding: 0 1;
+    margin: 0 0 0 1;
+    color: #d8dee9;
+}
+
+MetricsCard:first-of-type {
+    margin-left: 0;
+}
+
+/* ── ReasoningPanel ────────────────────────────────── */
+ReasoningPanel {
+    height: auto;
+    max-height: 3;
+    background: #0f1525;
+    border-left: solid #5fb3b3;
+    padding: 0 2;
+    margin-bottom: 1;
+    display: none;
+}
+
+ReasoningPanel.active {
+    display: block;
+}
+
+/* ── Transcript ────────────────────────────────────── */
 Transcript {
     background: #0a0e14;
-    scrollbar-color: #2b3b44 #0a0e14;
-    scrollbar-size: 2 8;
+    scrollbar-color: #33405d #0a0e14;
+    scrollbar-size: 1 8;
+    padding: 0 1;
 }
 
-/* ── Input area ────────────────────────────────────── */
-
-InputArea {
+/* ── InputBar ──────────────────────────────────────── */
+InputBar {
     height: 3;
-    background: #0f151c;
+    background: #0f1525;
     border-top: solid #1b2b34;
+    padding: 0 1;
     dock: bottom;
-    padding: 0 4;
 }
 
-InputArea Static {
+InputBar Static {
     color: #5fb3b3;
     text-style: bold;
-    padding: 0 4;
+    padding: 0 1;
+    content-align: center middle;
+    width: 2;
 }
 
-InputArea TextArea {
+InputBar TextArea {
     background: #0a0e14;
     color: #d8dee9;
-    border: solid #1b2b34;
-    padding: 2 8;
+    border: none;
+    padding: 1 2;
 }
 
-InputArea TextArea:focus {
-    border: solid #5fb3b3;
-}
-
-InputArea.processing TextArea {
-    border: solid #5fb3b3;
-}
-
-/* ── Footer ────────────────────────────────────────── */
-
-GrintaFooter {
-    height: 1;
+InputBar TextArea:focus {
+    border: none;
     background: #0f151c;
+}
+
+InputBar.processing TextArea {
+    background: #0f151c;
+}
+
+/* ── FooterBar ─────────────────────────────────────── */
+FooterBar {
+    height: 1;
+    background: #192036;
     color: #65737e;
     dock: bottom;
     text-align: center;
+    content-align: center middle;
 }
 
-GrintaFooter.hidden {
+FooterBar.hidden {
     display: none;
 }
 
 /* ── Confirmation dialog ───────────────────────────── */
-
 GrintaConfirmDialog {
-    background: #0f151c;
+    background: #0f1525;
     border: solid #1b2b34;
     padding: 2 4;
     width: 60;
@@ -93,7 +126,7 @@ GrintaConfirmDialog .body {
 }
 
 GrintaConfirmDialog Button {
-    background: #0f151c;
+    background: #0f1525;
     color: #d8dee9;
     border: solid #1b2b34;
     margin: 0 1;
@@ -103,4 +136,9 @@ GrintaConfirmDialog Button:hover {
     background: #5fb3b3;
     color: #0a0e14;
     border: solid #5fb3b3;
+}
+
+/* ── Utility classes ───────────────────────────────── */
+.hidden {
+    display: none;
 }
