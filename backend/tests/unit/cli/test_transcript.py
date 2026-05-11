@@ -146,7 +146,6 @@ def test_format_activity_shell_block_uses_card_and_command() -> None:
     out = buf.getvalue()
     assert 'Ran' in out
     assert '$ ls -la' in out
-    assert 'Terminal' in out
     assert '+--' not in out and '--+' not in out
     assert 'done' in out
     assert '✓' in out

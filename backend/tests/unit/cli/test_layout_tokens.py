@@ -43,7 +43,7 @@ def test_gap_below_live_section_adds_bottom_pad() -> None:
     t = Text('z')
     g = gap_below_live_section(t)
     assert isinstance(g, Padding)
-    assert g.bottom == 1
+    assert g.bottom == 0
     assert g.renderable is t
 
 

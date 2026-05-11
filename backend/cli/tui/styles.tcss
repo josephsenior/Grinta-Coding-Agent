@@ -1,38 +1,68 @@
-/* Grinta TUI - "Mission Control" Theme */
+/* Grinta TUI — Dolphie-Inspired "Deep System Instrumentation" Theme
+ *
+ * Deep navy backgrounds (#0a0e1b → #0f1525 → #131a2c → #192036)
+ * Blue-white text hierarchy (#e9e9e9 → #bbc8e8 → #c5c7d2 → #969aad)
+ * Periwinkle blue accent (#91abec) for interactive/highlight elements
+ * Tall borders for 3D panel depth, heavy borders for input focus states
+ */
 
 Screen {
-    background: #0a0e14;
-    color: #d8dee9;
+    background: #0a0e1b;
+    color: #e9e9e9;
 }
 
 /* ── TopBar ────────────────────────────────────────── */
 TopBar {
     height: 1;
     background: #192036;
-    color: #65737e;
+    color: #969aad;
     padding: 0 2;
+    dock: top;
+}
+
+TopBar .topbar-title {
+    width: 15%;
+    color: #91abec;
+    text-style: bold;
+}
+
+TopBar .topbar-host {
+    width: 70%;
+    content-align: center middle;
+    color: #bbc8e8;
+    text-style: bold;
+}
+
+TopBar .topbar-help {
+    width: 15%;
+    content-align: right middle;
+    color: #8f9fc1;
 }
 
 /* ── MetricsGrid ───────────────────────────────────── */
 MetricsGrid {
-    height: 5;
-    background: #0a0e14;
+    height: 4;
+    background: #0a0e1b;
     padding: 0 1;
-    margin-bottom: 1;
+    margin: 0;
 }
 
 MetricsCard {
-    height: 5;
+    height: 4;
     width: 1fr;
-    background: #131b2e;
-    border: solid #3a4f6a;
+    background: #0f1525;
+    border: tall #1b233a;
     padding: 0 1;
     margin: 0 0 0 1;
-    color: #d8dee9;
+    color: #e9e9e9;
 }
 
 MetricsCard:first-of-type {
     margin-left: 0;
+}
+
+MetricsCard:focus {
+    border: tall #384673;
 }
 
 /* ── ReasoningPanel ────────────────────────────────── */
@@ -40,7 +70,7 @@ ReasoningPanel {
     height: auto;
     max-height: 3;
     background: #0f1525;
-    border-left: solid #5fb3b3;
+    border-left: tall #91abec;
     padding: 0 2;
     margin-bottom: 1;
     display: none;
@@ -52,8 +82,10 @@ ReasoningPanel.active {
 
 /* ── Transcript ────────────────────────────────────── */
 Transcript {
-    background: #0a0e14;
-    scrollbar-color: #33405d #0a0e14;
+    background: #0a0e1b;
+    scrollbar-color: #33405d #161e31;
+    scrollbar-color-hover: #404f71 #161e31;
+    scrollbar-color-active: #4f608a #161e31;
     scrollbar-size: 1 8;
     padding: 0 1;
 }
@@ -62,13 +94,13 @@ Transcript {
 InputBar {
     height: 3;
     background: #0f1525;
-    border-top: solid #1b2b34;
+    border-top: tall #1b233a;
     padding: 0 1;
     dock: bottom;
 }
 
 InputBar Static {
-    color: #5fb3b3;
+    color: #91abec;
     text-style: bold;
     padding: 0 1;
     content-align: center middle;
@@ -76,26 +108,27 @@ InputBar Static {
 }
 
 InputBar TextArea {
-    background: #0a0e14;
-    color: #d8dee9;
+    background: #0a0e1b;
+    color: #e9e9e9;
     border: none;
-    padding: 1 2;
+    padding: 0 1;
 }
 
 InputBar TextArea:focus {
-    border: none;
-    background: #0f151c;
+    border: heavy #43548b;
+    background: #0f1525;
 }
 
 InputBar.processing TextArea {
-    background: #0f151c;
+    background: #0f1525;
+    border: heavy #91abec;
 }
 
 /* ── FooterBar ─────────────────────────────────────── */
 FooterBar {
     height: 1;
     background: #192036;
-    color: #65737e;
+    color: #969aad;
     dock: bottom;
     text-align: center;
     content-align: center middle;
@@ -107,35 +140,74 @@ FooterBar.hidden {
 
 /* ── Confirmation dialog ───────────────────────────── */
 GrintaConfirmDialog {
-    background: #0f1525;
-    border: solid #1b2b34;
+    background: #0d1015 70%;
+}
+
+GrintaConfirmDialog > Vertical {
+    background: #131626;
+    border: tall #384673;
     padding: 2 4;
     width: 60;
     align: center top;
 }
 
 GrintaConfirmDialog .title {
-    color: #5fb3b3;
+    color: #91abec;
     text-style: bold;
     margin-bottom: 1;
 }
 
 GrintaConfirmDialog .body {
-    color: #d8dee9;
+    color: #e9e9e9;
     margin-bottom: 2;
 }
 
 GrintaConfirmDialog Button {
-    background: #0f1525;
-    color: #d8dee9;
-    border: solid #1b2b34;
+    background: #282c42;
+    color: #e9e9e9;
+    border-top: tall #54597b;
+    border-bottom: tall #171922;
     margin: 0 1;
 }
 
 GrintaConfirmDialog Button:hover {
-    background: #5fb3b3;
-    color: #0a0e14;
-    border: solid #5fb3b3;
+    background: #383e5c;
+    border-top: tall #69709a;
+    border-bottom: tall #171922;
+}
+
+GrintaConfirmDialog Button.-primary {
+    background: #192c5b;
+    border-top: tall #425894;
+    border-bottom: tall #0d1525;
+}
+
+GrintaConfirmDialog Button.-primary:hover {
+    background: #203875;
+    border-top: tall #425894;
+    border-bottom: tall #0d1525;
+}
+
+/* ── Toast notifications ──────────────────────────── */
+Toast {
+    background: #20283e;
+    border-right: wide #192036;
+}
+
+Toast.-information {
+    border-left: wide #91abec;
+}
+
+Toast.-success {
+    border-left: wide #5bd088;
+}
+
+Toast.-warning {
+    border-left: wide #f0e357;
+}
+
+Toast.-error {
+    border-left: wide #f05757;
 }
 
 /* ── Utility classes ───────────────────────────────── */

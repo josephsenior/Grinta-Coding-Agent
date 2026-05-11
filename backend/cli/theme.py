@@ -231,101 +231,101 @@ def _apply_theme_overrides() -> None:
         STYLE_BOLD_DIM = 'bold white'
 
     elif preset == 'deep-system-instrumentation':
-        # "Deep System Instrumentation" — NASA mission control / Dolphie TUI
-        # aesthetic. Deep Navy background, Teal accents, muted status colors,
-        # designed for long coding sessions with minimal eye strain.
-        CLR_CARD_BORDER = '#1b2b34'
-        CLR_META = '#65737e'
-        CLR_BRAND = 'bold #5fb3b3'
-        CLR_BRAND_HUE = '#5fb3b3'
-        CLR_STATUS_OK = '#99c794'
-        CLR_STATUS_WARN = '#fac863'
-        CLR_STATUS_ERR = '#ec5f67'
-        CLR_HUD_MODEL = 'bold #d8dee9'
-        CLR_HUD_DETAIL = '#65737e'
-        CLR_OK_BODY = '#99c794'
-        CLR_OK_ICON = 'bold #99c794'
-        CLR_ERR_BODY = '#ec5f67'
-        CLR_ERR_ICON = 'bold #ec5f67'
-        CLR_WARN_BODY = '#fac863'
-        CLR_WARN_ICON = 'bold #fac863'
-        CLR_INFO_BODY = '#5fb3b3'
-        CLR_INFO_ICON = 'bold #5fb3b3'
-        CLR_SEP = '#1b2b34'
-        CLR_CARD_TITLE = 'bold #5fb3b3'
-        CLR_THINKING_BORDER = '#1b2b34'
-        CLR_LIVE_PANEL_BORDER = '#1b2b34'
-        CLR_THOUGHT_BODY = '#65737e'
-        CLR_SECTION_RULE = '#1b2b34'
-        CLR_RISK_HIGH = 'bold #ec5f67'
-        CLR_RISK_MEDIUM = '#fac863'
-        CLR_RISK_LOW = '#99c794'
-        CLR_SPLASH_FIGLET = 'bold #5fb3b3'
-        CLR_SPLASH_LOGO_ACCENT = '#5fb3b3'
-        CLR_VERB = 'bold #5fb3b3'
-        CLR_DETAIL = '#d8dee9'
-        CLR_SECONDARY = '#65737e'
-        CLR_SECONDARY_OK = 'dim #99c794'
-        CLR_SECONDARY_ERR = 'dim #ec5f67'
-        CLR_DIFF_ADD = '#99c794'
-        CLR_DIFF_REM = '#ec5f67'
-        CLR_DIFF_ADD_DIM = 'dim #99c794'
-        CLR_DIFF_REM_DIM = 'dim #ec5f67'
-        MSG_STYLE_SUCCESS_MARK = 'bold #99c794'
-        MSG_STYLE_PROVIDER_HINT = '#5fb3b3'
-        STYLE_SYSTEM_TAG_WARNING = '#fac863'
-        STYLE_SYSTEM_TAG_AUTONOMY = '#5fb3b3'
-        STYLE_SYSTEM_TAG_STATUS = '#99c794'
-        STYLE_SYSTEM_TAG_SETTINGS = '#5fb3b3'
-        STYLE_SYSTEM_TAG_SYSTEM = '#5fb3b3'
-        STYLE_SYSTEM_TAG_TIMEOUT = '#fac863'
-        STYLE_SYSTEM_TAG_NOTE = '#5fb3b3'
-        STYLE_DELEGATE_STARTING = '#5fb3b3'
-        STYLE_DELEGATE_RUNNING = '#fac863'
-        STYLE_DELEGATE_DONE = '#99c794'
-        STYLE_DELEGATE_FAILED = '#ec5f67'
-        CLR_WORKER_SPINNER = '#5fb3b3'
-        CLR_WORKER_TIMER = '#65737e'
-        CLR_WORKER_LABEL = 'bold #d8dee9'
-        CLR_WORKER_ACTION = '#65737e'
-        CLR_WORKER_LABEL_DONE = 'bold #99c794'
-        CLR_WORKER_LABEL_FAILED = 'bold #ec5f67'
-        CLR_WORKER_BORDER = '#1b2b34'
-        CLR_SPINNER = '#5fb3b3'
-        CLR_ACTION = 'bold #d8dee9'
-        CLR_DRAFT_BORDER = '#5fb3b3'
-        CLR_DECISION_BORDER = '#fac863'
-        CLR_USER_BORDER = 'dim #5fb3b3'
-        CLR_STATE_RUNNING = '#5fb3b3 bold'
-        CLR_AUTONOMY_BALANCED = '#99c794'
-        CLR_AUTONOMY_FULL = '#fac863 bold'
-        CLR_AUTONOMY_CONSERVATIVE = '#5fb3b3 bold'
-        CLR_QUESTION_TEXT = '#fac863'
-        CLR_OPTION_TEXT = '#d8dee9'
-        CLR_OPTION_RECOMMENDED = '#fac863'
-        CLR_OUTPUT_PANEL_BORDER = '#1b2b34'
-        CLR_OUTPUT_PANEL_TITLE = 'dim #65737e'
-        CLR_RECOVERY_HINT = '#5fb3b3'
-        CLR_RECOVERY_HINT_DIM = 'dim #5fb3b3'
-        STYLE_BOLD_DIM = 'bold #65737e'
-        CLR_MUTED_TEXT = '#1b2b34'
+        # "Deep System Instrumentation" — Dolphie-inspired aesthetic.
+        # Deep navy backgrounds, periwinkle blue accents, blue-white text
+        # hierarchy, muted semantic colors. Designed for long coding sessions.
+        CLR_CARD_BORDER = '#1b233a'
+        CLR_META = '#969aad'
+        CLR_BRAND = 'bold #91abec'
+        CLR_BRAND_HUE = '#91abec'
+        CLR_STATUS_OK = '#54efae'
+        CLR_STATUS_WARN = '#f6ff8f'
+        CLR_STATUS_ERR = '#fd8383'
+        CLR_HUD_MODEL = 'bold #e9e9e9'
+        CLR_HUD_DETAIL = '#969aad'
+        CLR_OK_BODY = '#54efae'
+        CLR_OK_ICON = 'bold #54efae'
+        CLR_ERR_BODY = '#fd8383'
+        CLR_ERR_ICON = 'bold #fd8383'
+        CLR_WARN_BODY = '#f6ff8f'
+        CLR_WARN_ICON = 'bold #f6ff8f'
+        CLR_INFO_BODY = '#91abec'
+        CLR_INFO_ICON = 'bold #91abec'
+        CLR_SEP = '#1b233a'
+        CLR_CARD_TITLE = 'bold #91abec'
+        CLR_THINKING_BORDER = '#1b233a'
+        CLR_LIVE_PANEL_BORDER = '#1b233a'
+        CLR_THOUGHT_BODY = '#8f9fc1'
+        CLR_SECTION_RULE = '#32416a'
+        CLR_RISK_HIGH = 'bold #fd8383'
+        CLR_RISK_MEDIUM = '#f6ff8f'
+        CLR_RISK_LOW = '#54efae'
+        CLR_SPLASH_FIGLET = 'bold #91abec'
+        CLR_SPLASH_LOGO_ACCENT = '#91abec'
+        CLR_VERB = 'bold #91abec'
+        CLR_DETAIL = '#e9e9e9'
+        CLR_SECONDARY = '#969aad'
+        CLR_SECONDARY_OK = 'dim #54efae'
+        CLR_SECONDARY_ERR = 'dim #fd8383'
+        CLR_DIFF_ADD = '#54efae'
+        CLR_DIFF_REM = '#fd8383'
+        CLR_DIFF_ADD_DIM = 'dim #54efae'
+        CLR_DIFF_REM_DIM = 'dim #fd8383'
+        MSG_STYLE_SUCCESS_MARK = 'bold #54efae'
+        MSG_STYLE_PROVIDER_HINT = '#91abec'
+        STYLE_SYSTEM_TAG_WARNING = '#f6ff8f'
+        STYLE_SYSTEM_TAG_AUTONOMY = '#91abec'
+        STYLE_SYSTEM_TAG_STATUS = '#54efae'
+        STYLE_SYSTEM_TAG_SETTINGS = '#91abec'
+        STYLE_SYSTEM_TAG_SYSTEM = '#91abec'
+        STYLE_SYSTEM_TAG_TIMEOUT = '#f6ff8f'
+        STYLE_SYSTEM_TAG_NOTE = '#91abec'
+        STYLE_DELEGATE_STARTING = '#91abec'
+        STYLE_DELEGATE_RUNNING = '#f6ff8f'
+        STYLE_DELEGATE_DONE = '#54efae'
+        STYLE_DELEGATE_FAILED = '#fd8383'
+        CLR_WORKER_SPINNER = '#91abec'
+        CLR_WORKER_TIMER = '#969aad'
+        CLR_WORKER_LABEL = 'bold #e9e9e9'
+        CLR_WORKER_ACTION = '#969aad'
+        CLR_WORKER_LABEL_DONE = 'bold #54efae'
+        CLR_WORKER_LABEL_FAILED = 'bold #fd8383'
+        CLR_WORKER_BORDER = '#1b233a'
+        CLR_SPINNER = '#91abec'
+        CLR_ACTION = 'bold #e9e9e9'
+        CLR_DRAFT_BORDER = '#91abec'
+        CLR_DECISION_BORDER = '#f6ff8f'
+        CLR_USER_BORDER = 'dim #91abec'
+        CLR_STATE_RUNNING = '#91abec bold'
+        CLR_AUTONOMY_BALANCED = '#54efae'
+        CLR_AUTONOMY_FULL = '#f6ff8f bold'
+        CLR_AUTONOMY_CONSERVATIVE = '#91abec bold'
+        CLR_QUESTION_TEXT = '#f6ff8f'
+        CLR_OPTION_TEXT = '#e9e9e9'
+        CLR_OPTION_RECOMMENDED = '#f6ff8f'
+        CLR_OUTPUT_PANEL_BORDER = '#1b233a'
+        CLR_OUTPUT_PANEL_TITLE = 'dim #969aad'
+        CLR_RECOVERY_HINT = '#91abec'
+        CLR_RECOVERY_HINT_DIM = 'dim #91abec'
+        STYLE_BOLD_DIM = 'bold #969aad'
+        CLR_MUTED_TEXT = '#1b233a'
 
         # prompt_toolkit overrides
-        PT_DEFAULT_FG = '#d8dee9'
-        PT_PLACEHOLDER_DIM = '#1b2b34'
-        PT_FOOTER_BADGE_BRACKET = '#1b2b34'
-        PT_FOOTER_BADGE_CORE = 'bold #5fb3b3'
-        PT_FOOTER_KICKER = 'bold #5fb3b3'
-        PT_FOOTER_WARN_BRACKET = '#5f1f1f'
-        PT_FOOTER_WARN_CORE = 'bold #fac863'
-        PT_FOOTER_WARN_KICKER = 'bold #fac863'
-        PT_FOOTER_WARN_SEP = '#5f1f1f'
-        PT_COMPLETION_MENU_BG = 'bg:#0f151c #65737e'
-        PT_COMPLETION_MENU_CURRENT = 'bg:#1b2b34 bold #5fb3b3'
-        PT_COMPLETION_META_BG = 'bg:#0a0e14 #65737e'
-        PT_COMPLETION_META_CURRENT = 'bg:#1b2b34 #5fb3b3'
-        PT_SCROLLBAR_BG = 'bg:#0a0e14'
-        PT_SCROLLBAR_BUTTON = 'bg:#1b2b34'
+        PT_DEFAULT_FG = '#e9e9e9'
+        PT_PLACEHOLDER_DIM = '#1b233a'
+        PT_FOOTER_BADGE_BRACKET = '#1b233a'
+        PT_FOOTER_BADGE_CORE = 'bold #91abec'
+        PT_FOOTER_KICKER = 'bold #91abec'
+        PT_FOOTER_WARN_BRACKET = '#3d1f1f'
+        PT_FOOTER_WARN_CORE = 'bold #f6ff8f'
+        PT_FOOTER_WARN_KICKER = 'bold #f6ff8f'
+        PT_FOOTER_WARN_SEP = '#3d1f1f'
+        PT_COMPLETION_MENU_BG = 'bg:#0f1525 #969aad'
+        PT_COMPLETION_MENU_CURRENT = 'bg:#1b233a bold #91abec'
+        PT_COMPLETION_META_BG = 'bg:#0a0e1b #969aad'
+        PT_COMPLETION_META_CURRENT = 'bg:#1b233a #91abec'
+        PT_SCROLLBAR_BG = 'bg:#0a0e1b'
+        PT_SCROLLBAR_BUTTON = 'bg:#1b233a'
 
 
 def use_ascii_cli_symbols() -> bool:
@@ -380,35 +380,35 @@ def accessible_mode_enabled() -> bool:
 # Designed for long coding sessions with minimal eye strain.
 
 # ── Backgrounds ────────────────────────────────────────────────────────────────
-HUD_BG = '#0f151c'  # HUD footer background (slightly lighter than main bg)
+HUD_BG = '#0f1525'  # HUD footer background (slightly lighter than main bg)
 
 # ── Separators & borders ───────────────────────────────────────────────────────
-CLR_SEP = '#1b2b34'  # bullet separator and lightweight dividers
-CLR_CARD_BORDER = '#1b2b34'  # rounded card / panel border (navy)
+CLR_SEP = '#1b233a'  # bullet separator and lightweight dividers
+CLR_CARD_BORDER = '#1b233a'  # rounded card / panel border (navy)
 
 # ── HUD display text ──────────────────────────────────────────────────────────
-CLR_HUD_MODEL = 'bold #d8dee9'  # model name (warm white)
-CLR_HUD_DETAIL = '#65737e'  # tokens, cost, calls (slate grey)
-CLR_META = '#65737e'  # subdued metadata, timers, helper text
-CLR_MUTED_TEXT = '#1b2b34'  # long-form secondary labels / values
-# Brand — teal for instrumentation feel.
-CLR_BRAND = 'bold #5fb3b3'  # GRINTA wordmark / active spinner hue
-CLR_BRAND_HUE = '#5fb3b3'  # brand teal without bold modifier
+CLR_HUD_MODEL = 'bold #e9e9e9'  # model name (near-white)
+CLR_HUD_DETAIL = '#969aad'  # tokens, cost, calls (cool gray)
+CLR_META = '#969aad'  # subdued metadata, timers, helper text
+CLR_MUTED_TEXT = '#1b233a'  # long-form secondary labels / values
+# Brand — periwinkle blue for instrumentation feel.
+CLR_BRAND = 'bold #91abec'  # GRINTA wordmark / active spinner hue
+CLR_BRAND_HUE = '#91abec'  # brand blue without bold modifier
 
 # ── Status semantic colors (HUD ledger / footer badges) ──────────────────────
-CLR_STATUS_OK = '#99c794'  # Healthy / Ready (muted emerald)
-CLR_STATUS_WARN = '#fac863'  # Review / Paused (warm amber)
-CLR_STATUS_ERR = '#ec5f67'  # Error (soft coral red)
+CLR_STATUS_OK = '#54efae'  # Healthy / Ready (bright green)
+CLR_STATUS_WARN = '#f6ff8f'  # Review / Paused (lime yellow)
+CLR_STATUS_ERR = '#fd8383'  # Error (soft red)
 
 # ── Result tones (paired body/icon hues for activity rows + tone panels) ─────
-CLR_OK_BODY = '#99c794'  # success body text
-CLR_OK_ICON = 'bold #99c794'  # success icon / accent
-CLR_ERR_BODY = '#ec5f67'  # error body text
-CLR_ERR_ICON = 'bold #ec5f67'  # error icon / accent
-CLR_WARN_BODY = '#fac863'  # warning body text
-CLR_WARN_ICON = 'bold #fac863'  # warning icon / accent
-CLR_INFO_BODY = '#5fb3b3'  # info body text
-CLR_INFO_ICON = 'bold #5fb3b3'  # info icon / accent
+CLR_OK_BODY = '#54efae'  # success body text
+CLR_OK_ICON = 'bold #54efae'  # success icon / accent
+CLR_ERR_BODY = '#fd8383'  # error body text
+CLR_ERR_ICON = 'bold #fd8383'  # error icon / accent
+CLR_WARN_BODY = '#f6ff8f'  # warning body text
+CLR_WARN_ICON = 'bold #f6ff8f'  # warning icon / accent
+CLR_INFO_BODY = '#91abec'  # info body text
+CLR_INFO_ICON = 'bold #91abec'  # info icon / accent
 
 # ── Shared UI markers (keep iconography consistent) ───────────────────────────
 MARK_OK = '✓'
@@ -421,131 +421,194 @@ MARK_PROMPT = '❯'
 STYLE_DIM = 'dim'
 STYLE_DEFAULT = 'default'
 STYLE_BOLD = 'bold'
-STYLE_BOLD_DIM = 'bold #65737e'
+STYLE_BOLD_DIM = 'bold #969aad'
 STYLE_ITALIC_DIM = 'dim italic'
 STYLE_EMPTY = ''
 
 # ── Activity card chrome ──────────────────────────────────────────────────────
-CLR_CARD_TITLE = 'bold #5fb3b3'  # panel title text (teal)
+CLR_CARD_TITLE = 'bold #91abec'  # panel title text (periwinkle blue)
 
 # ── Activity row text ─────────────────────────────────────────────────────────
-CLR_VERB = 'bold #5fb3b3'  # action verb (teal)
-CLR_DETAIL = '#d8dee9'  # action detail (warm white)
-CLR_SECONDARY = '#65737e'  # secondary row (slate)
-CLR_SECONDARY_OK = 'dim #99c794'  # secondary row (success)
-CLR_SECONDARY_ERR = 'dim #ec5f67'  # secondary row (error)
+CLR_VERB = 'bold #91abec'  # action verb (periwinkle blue)
+CLR_DETAIL = '#e9e9e9'  # action detail (near-white)
+CLR_SECONDARY = '#969aad'  # secondary row (cool gray)
+CLR_SECONDARY_OK = 'dim #54efae'  # secondary row (success)
+CLR_SECONDARY_ERR = 'dim #fd8383'  # secondary row (error)
 
 # ── Diff colors ───────────────────────────────────────────────────────────────
-CLR_DIFF_ADD = '#99c794'  # added lines (emerald)
-CLR_DIFF_REM = '#ec5f67'  # removed lines (coral)
-CLR_DIFF_ADD_DIM = 'dim #99c794'  # apply_patch +N delta (secondary line)
-CLR_DIFF_REM_DIM = 'dim #ec5f67'  # apply_patch -N delta
+CLR_DIFF_ADD = '#54efae'  # added lines (bright green)
+CLR_DIFF_REM = '#fd8383'  # removed lines (soft red)
+CLR_DIFF_ADD_DIM = 'dim #54efae'  # apply_patch +N delta (secondary line)
+CLR_DIFF_REM_DIM = 'dim #fd8383'  # apply_patch -N delta
 
 # ── Inline Rich markup (prefer these over raw [red] / [green] in prose) ───────
-MSG_STYLE_SUCCESS_MARK = 'bold #99c794'  # short ✓ success flashes (onboarding)
-MSG_STYLE_PROVIDER_HINT = '#5fb3b3'  # provider name in onboarding lines
+MSG_STYLE_SUCCESS_MARK = 'bold #54efae'  # short ✓ success flashes (onboarding)
+MSG_STYLE_PROVIDER_HINT = '#91abec'  # provider name in onboarding lines
 
 # ── System message tags (panels / notices) ────────────────────────────────────
-STYLE_SYSTEM_TAG_WARNING = '#fac863'
-STYLE_SYSTEM_TAG_AUTONOMY = '#5fb3b3'
-STYLE_SYSTEM_TAG_STATUS = '#99c794'
-STYLE_SYSTEM_TAG_SETTINGS = '#5fb3b3'
-STYLE_SYSTEM_TAG_SYSTEM = '#5fb3b3'
-STYLE_SYSTEM_TAG_TIMEOUT = '#fac863'
-STYLE_SYSTEM_TAG_NOTE = '#5fb3b3'
+STYLE_SYSTEM_TAG_WARNING = '#f6ff8f'
+STYLE_SYSTEM_TAG_AUTONOMY = '#91abec'
+STYLE_SYSTEM_TAG_STATUS = '#54efae'
+STYLE_SYSTEM_TAG_SETTINGS = '#91abec'
+STYLE_SYSTEM_TAG_SYSTEM = '#91abec'
+STYLE_SYSTEM_TAG_TIMEOUT = '#f6ff8f'
+STYLE_SYSTEM_TAG_NOTE = '#91abec'
 
 # ── Delegate worker row accents ────────────────────────────────────────────────
-STYLE_DELEGATE_STARTING = '#5fb3b3'
-STYLE_DELEGATE_RUNNING = '#fac863'
-STYLE_DELEGATE_DONE = '#99c794'
-STYLE_DELEGATE_FAILED = '#ec5f67'
+STYLE_DELEGATE_STARTING = '#91abec'
+STYLE_DELEGATE_RUNNING = '#f6ff8f'
+STYLE_DELEGATE_DONE = '#54efae'
+STYLE_DELEGATE_FAILED = '#fd8383'
 
 # ── Worker live-panel chrome (spinner, timer, action text) ────────────────────
-CLR_WORKER_SPINNER = '#5fb3b3'  # spinner during delegation (matches brand teal)
-CLR_WORKER_TIMER = '#65737e'  # worker elapsed timer
-CLR_WORKER_LABEL = 'bold #d8dee9'  # worker name/label
-CLR_WORKER_ACTION = '#65737e'  # last action / reasoning line
-CLR_WORKER_LABEL_DONE = 'bold #99c794'  # completed worker label
-CLR_WORKER_LABEL_FAILED = 'bold #ec5f67'  # failed worker label
-CLR_WORKER_BORDER = '#1b2b34'  # worker card border (navy)
+CLR_WORKER_SPINNER = '#91abec'  # spinner during delegation (matches brand blue)
+CLR_WORKER_TIMER = '#969aad'  # worker elapsed timer
+CLR_WORKER_LABEL = 'bold #e9e9e9'  # worker name/label
+CLR_WORKER_ACTION = '#969aad'  # last action / reasoning line
+CLR_WORKER_LABEL_DONE = 'bold #54efae'  # completed worker label
+CLR_WORKER_LABEL_FAILED = 'bold #fd8383'  # failed worker label
+CLR_WORKER_BORDER = '#1b233a'  # worker card border (navy)
 
 # ── Reasoning / thinking chrome ────────────────────────────────────────────────
-CLR_SPINNER = '#5fb3b3'  # spinner icon (matches brand teal)
-CLR_ACTION = 'bold #d8dee9'  # current action label text
-CLR_THINKING_BORDER = '#1b2b34'  # reasoning / live panel border accent (navy)
-CLR_LIVE_PANEL_BORDER = '#1b2b34'  # Live Rich block border
-CLR_THOUGHT_BODY = '#65737e'  # Live Thinking + flushed reasoning snapshot (slate)
+CLR_SPINNER = '#91abec'  # spinner icon (matches brand blue)
+CLR_ACTION = 'bold #e9e9e9'  # current action label text
+CLR_THINKING_BORDER = '#1b233a'  # reasoning / live panel border accent (navy)
+CLR_LIVE_PANEL_BORDER = '#1b233a'  # Live Rich block border
+CLR_THOUGHT_BODY = '#8f9fc1'  # Live Thinking + flushed reasoning snapshot (dim blue)
 CLR_REASONING_SNAP = CLR_THOUGHT_BODY  # legacy alias; keep in sync
-CLR_DRAFT_BORDER = '#5fb3b3'  # draft reply preview border accent (brand teal)
-CLR_DECISION_BORDER = '#fac863'  # approval / question / options accent (amber)
-CLR_USER_BORDER = 'dim #5fb3b3'  # user message panel border (brand teal dim)
-CLR_STATE_RUNNING = '#5fb3b3 bold'  # running / active state badge (brand teal)
-CLR_AUTONOMY_BALANCED = '#99c794'  # balanced autonomy tag
-CLR_AUTONOMY_FULL = '#fac863 bold'  # full autonomy tag (amber)
-CLR_AUTONOMY_CONSERVATIVE = '#5fb3b3 bold'  # conservative autonomy (teal)
+CLR_DRAFT_BORDER = '#91abec'  # draft reply preview border accent (brand blue)
+CLR_DECISION_BORDER = '#f6ff8f'  # approval / question / options accent (lime yellow)
+CLR_USER_BORDER = 'dim #91abec'  # user message panel border (brand blue dim)
+CLR_STATE_RUNNING = '#91abec bold'  # running / active state badge (brand blue)
+CLR_AUTONOMY_BALANCED = '#54efae'  # balanced autonomy tag
+CLR_AUTONOMY_FULL = '#f6ff8f bold'  # full autonomy tag (lime yellow)
+CLR_AUTONOMY_CONSERVATIVE = '#91abec bold'  # conservative autonomy (blue)
 
 # ── Section divider ────────────────────────────────────────────────────────────
-CLR_SECTION_RULE = '#1b2b34'  # "Tools & commands" divider rule
+CLR_SECTION_RULE = '#32416a'  # "Tools & commands" divider rule
 
 # ── Confirmation UI ────────────────────────────────────────────────────────────
-CLR_RISK_HIGH = 'bold #ec5f67'
-CLR_RISK_MEDIUM = '#fac863'
-CLR_RISK_LOW = '#99c794'
-CLR_RISK_ASK = '#fac863'
+CLR_RISK_HIGH = 'bold #fd8383'
+CLR_RISK_MEDIUM = '#f6ff8f'
+CLR_RISK_LOW = '#54efae'
+CLR_RISK_ASK = '#f6ff8f'
 
 # ── Decision callouts (questions, options, escalations) ──────────────────────
-CLR_QUESTION_TEXT = '#fac863'  # question / escalation prose body
-CLR_OPTION_TEXT = '#d8dee9'  # neutral option label body
-CLR_OPTION_RECOMMENDED = '#fac863'  # recommended option marker
+CLR_QUESTION_TEXT = '#f6ff8f'  # question / escalation prose body
+CLR_OPTION_TEXT = '#e9e9e9'  # neutral option label body
+CLR_OPTION_RECOMMENDED = '#f6ff8f'  # recommended option marker
 
 # ── Secondary panels (terminal output, recovery notice) ──────────────────────
-CLR_OUTPUT_PANEL_BORDER = '#1b2b34'  # nested terminal output panel
-CLR_OUTPUT_PANEL_TITLE = 'dim #65737e'  # nested panel title (session id, lines)
+CLR_OUTPUT_PANEL_BORDER = '#1b233a'  # nested terminal output panel
+CLR_OUTPUT_PANEL_TITLE = 'dim #969aad'  # nested panel title (session id, lines)
 
 # ── Reasoning / activity rule chrome ─────────────────────────────────────────
 CLR_REASONING_COMMITTED = CLR_THOUGHT_BODY  # transcript snapshot (same as live body)
-CLR_TURN_RULE = 'dim #65737e'  # "Activity" rule above first tool row
-CLR_RECOVERY_HINT = '#5fb3b3'  # "Next steps" headline body in recovery notice
-CLR_RECOVERY_HINT_DIM = 'dim #5fb3b3'  # recovery body / numbered steps
+CLR_TURN_RULE = 'dim #969aad'  # "Activity" rule above first tool row
+CLR_RECOVERY_HINT = '#91abec'  # "Next steps" headline body in recovery notice
+CLR_RECOVERY_HINT_DIM = 'dim #91abec'  # recovery body / numbered steps
 
 # ── Splash branding ──────────────────────────────────────────────────────────
-CLR_SPLASH_LOGO_ACCENT = '#5fb3b3'  # logo block art (brand teal)
-CLR_SPLASH_FIGLET = 'bold #5fb3b3'  # large GRINTA wordmark on the splash (teal)
+CLR_SPLASH_LOGO_ACCENT = '#91abec'  # logo block art (brand blue)
+CLR_SPLASH_FIGLET = 'bold #91abec'  # large GRINTA wordmark on the splash (blue)
 
 # ── prompt_toolkit (``Style.from_dict``) — keep in sync with Rich tokens above ---
-PT_DEFAULT_FG = '#d8dee9'
-PT_PLACEHOLDER_DIM = '#1b2b34'
-PT_FOOTER_BADGE_BRACKET = '#1b2b34'
-PT_FOOTER_BADGE_CORE = 'bold #5fb3b3'
-PT_FOOTER_KICKER = 'bold #5fb3b3'
-PT_FOOTER_WARN_BRACKET = '#5f1f1f'
-PT_FOOTER_WARN_CORE = 'bold #fac863'
-PT_FOOTER_WARN_KICKER = 'bold #fac863'
-PT_FOOTER_WARN_SEP = '#5f1f1f'
-PT_COMPLETION_MENU_BG = 'bg:#0f151c #65737e'
-PT_COMPLETION_MENU_CURRENT = 'bg:#1b2b34 bold #5fb3b3'
-PT_COMPLETION_META_BG = 'bg:#0a0e14 #65737e'
-PT_COMPLETION_META_CURRENT = 'bg:#1b2b34 #5fb3b3'
-PT_SCROLLBAR_BG = 'bg:#0a0e14'
-PT_SCROLLBAR_BUTTON = 'bg:#1b2b34'
+PT_DEFAULT_FG = '#e9e9e9'
+PT_PLACEHOLDER_DIM = '#1b233a'
+PT_FOOTER_BADGE_BRACKET = '#1b233a'
+PT_FOOTER_BADGE_CORE = 'bold #91abec'
+PT_FOOTER_KICKER = 'bold #91abec'
+PT_FOOTER_WARN_BRACKET = '#3d1f1f'
+PT_FOOTER_WARN_CORE = 'bold #f6ff8f'
+PT_FOOTER_WARN_KICKER = 'bold #f6ff8f'
+PT_FOOTER_WARN_SEP = '#3d1f1f'
+PT_COMPLETION_MENU_BG = 'bg:#0f1525 #969aad'
+PT_COMPLETION_MENU_CURRENT = 'bg:#1b233a bold #91abec'
+PT_COMPLETION_META_BG = 'bg:#0a0e1b #969aad'
+PT_COMPLETION_META_CURRENT = 'bg:#1b233a #91abec'
+PT_SCROLLBAR_BG = 'bg:#0a0e1b'
+PT_SCROLLBAR_BUTTON = 'bg:#1b233a'
 
 
 # ── Navy TUI Palette ──────────────────────────────────────────────────────────
-# Deep Navy theme for the Textual TUI — "Deep System Instrumentation" aesthetic.
-NAVY_BG = '#0a0e14'  # deepest background (screen)
-NAVY_SURFACE = '#0f151c'  # panels, cards, containers
-NAVY_SURFACE_RISING = '#1b2b34'  # elevated surfaces (hover, focus)
-NAVY_BORDER = '#1b2b34'  # structural dividers / borders
-NAVY_BORDER_BRIGHT = '#2b3b44'  # active/focused borders
-NAVY_BRAND = '#5fb3b3'  # primary accent — teal
-NAVY_BRAND_DIM = '#4a9999'  # secondary accent (darker teal)
-NAVY_TEXT_PRIMARY = '#d8dee9'  # readable body text
-NAVY_TEXT_SECONDARY = '#65737e'  # labels, timestamps
-NAVY_TEXT_MUTED = '#1b2b34'  # placeholder, disabled
-NAVY_READY = '#99c794'  # green — Ready
-NAVY_RUNNING = '#5fb3b3'  # teal — Running / processing
-NAVY_WAITING = '#fac863'  # amber — Review / Paused
-NAVY_ERROR = '#ec5f67'  # coral red — Error
+# Deep Navy theme for the Textual TUI — Dolphie-inspired aesthetic.
+# Deep navy backgrounds with blue-white text hierarchy and muted accent colors.
+# Designed for long coding sessions with minimal eye strain.
+
+# Backgrounds (depth hierarchy: bg → surface → rising → topbar)
+NAVY_BG = '#0a0e1b'  # deepest background (screen root)
+NAVY_SURFACE = '#0f1525'  # panels, cards, containers
+NAVY_SURFACE_RISING = '#131a2c'  # elevated surfaces (odd rows, hover)
+NAVY_SURFACE_TOP = '#192036'  # topbar, footerbar background
+NAVY_MODAL_BG = '#131626'  # modal screen background
+NAVY_MODAL_OVERLAY = '#0d1015'  # semi-transparent modal overlay
+
+# Borders (muted blue spectrum — subtle but visible)
+NAVY_BORDER = '#1b233a'  # structural dividers / panel borders
+NAVY_BORDER_BRIGHT = '#384673'  # active/focused borders, modal borders
+NAVY_BORDER_INPUT = '#252e49'  # input field default border
+NAVY_BORDER_INPUT_FOCUS = '#43548b'  # input field focused border
+NAVY_BORDER_HIGHLIGHT = '#32416a'  # rules, dividers
+
+# Text hierarchy (blue-white spectrum: primary → secondary → muted → disabled)
+NAVY_TEXT_PRIMARY = '#e9e9e9'  # readable body text (near-white)
+NAVY_TEXT_SECONDARY = '#bbc8e8'  # panel titles, labels (light blue)
+NAVY_TEXT_TERTIARY = '#c5c7d2'  # headers, secondary labels (cool gray)
+NAVY_TEXT_MUTED = '#969aad'  # disabled, placeholder text
+NAVY_TEXT_DIM = '#8f9fc1'  # help text, timestamps
+
+# Accent — periwinkle blue (primary interactive highlight)
+NAVY_BRAND = '#91abec'  # primary accent — periwinkle blue
+NAVY_BRAND_DIM = '#6171a6'  # secondary accent (muted periwinkle)
+
+# Status semantic colors
+NAVY_READY = '#54efae'  # green — Ready / Success / Healthy
+NAVY_RUNNING = '#91abec'  # periwinkle — Running / Processing
+NAVY_WAITING = '#f6ff8f'  # lime yellow — Review / Paused / Warning
+NAVY_ERROR = '#fd8383'  # soft red — Error / Danger
+
+# Status accents (for borders, badges, toast accents)
+NAVY_GREEN_ACCENT = '#5bd088'  # success toast/border accent
+NAVY_RED_ACCENT = '#f05757'  # error toast/border accent
+NAVY_YELLOW_ACCENT = '#f0e357'  # warning toast/border accent
+NAVY_PURPLE_ACCENT = '#b565f3'  # tertiary accent (purple)
+
+# Scrollbar (3-state: default → hover → active)
+NAVY_SCROLLBAR_TRACK = '#161e31'  # scrollbar track background
+NAVY_SCROLLBAR_THUMB = '#33405d'  # scrollbar thumb default
+NAVY_SCROLLBAR_HOVER = '#404f71'  # scrollbar thumb hover
+NAVY_SCROLLBAR_ACTIVE = '#4f608a'  # scrollbar thumb active/drag
+
+# Button (3D raised effect: lighter top, darker bottom)
+NAVY_BUTTON_BG = '#282c42'  # default button background
+NAVY_BUTTON_BG_HOVER = '#383e5c'  # button hover background
+NAVY_BUTTON_BORDER_TOP = '#54597b'  # button top edge (lighter — 3D)
+NAVY_BUTTON_BORDER_BOTTOM = '#171922'  # button bottom edge (darker — 3D)
+NAVY_BUTTON_PRIMARY_BG = '#192c5b'  # primary button background
+NAVY_BUTTON_PRIMARY_HOVER = '#203875'  # primary button hover
+NAVY_BUTTON_PRIMARY_BORDER_TOP = '#425894'  # primary button top accent
+
+# Interactive states
+NAVY_OPTION_HIGHLIGHTED = '#22293e'  # keyboard-highlighted option bg
+NAVY_OPTION_HIGHLIGHTED_TEXT = '#9babd4'  # highlighted option text
+NAVY_OPTION_HOVER = '#35405f'  # mouse-hovered option bg
+NAVY_OPTION_HOVER_TEXT = '#cbdbfe'  # hovered option text
+
+# Sparkline (for future metric graphs)
+NAVY_SPARKLINE_MAX = '#869fd9'  # sparkline peak
+NAVY_SPARKLINE_MIN = '#384c7a'  # sparkline valley
+
+# Loading indicator
+NAVY_LOADING = '#8fb0ee'  # loading spinner color
+
+# Progress bar
+NAVY_PROGRESS_BAR = '#91abec'  # progress bar fill
+NAVY_PROGRESS_BG = '#3a3f51'  # progress bar track
+NAVY_PROGRESS_COMPLETE = '#54efae'  # completed progress bar
+
+# Legacy aliases (keep backward compatibility during transition)
+NAVY_READY_OLD = '#99c794'  # old green — used in theme.py presets
+NAVY_RUNNING_OLD = '#5fb3b3'  # old teal
 
 
 # Apply theme preset overrides after all constants are defined.

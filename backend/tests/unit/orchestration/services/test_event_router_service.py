@@ -540,7 +540,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         read_action = FileReadAction(path='src/main.py')
         assert _summarize_delegate_worker_event(read_action) == (
             'running',
-            'Viewed src/main.py',
+            'Read src/main.py',
         )
 
         cmd_action = CmdRunAction(

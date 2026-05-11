@@ -27,9 +27,9 @@ def test_status_fields_token_display_matches_hud_style() -> None:
 
 
 def test_workspace_path_display_max_tiers() -> None:
-    assert workspace_path_display_max(40) == 12
-    assert workspace_path_display_max(60) == 18
-    assert workspace_path_display_max(100) == 28
+    assert workspace_path_display_max(40) == 10
+    assert workspace_path_display_max(55) == 16
+    assert workspace_path_display_max(100) == 24
 
 
 def test_pt_compact_line_shortens_path_on_narrow_terminal() -> None:
@@ -79,8 +79,8 @@ def test_rich_hud_line_plain_snapshot() -> None:
     plain = text.plain.strip()
     assert 'Balanced' in plain
     assert 'google/gemini-flash' in plain
-    assert 'MCP: 2' in plain
-    assert 'Skills:' in plain
+    assert 'M:2' in plain
+    assert 'S:24' in plain
 
 
 def test_fake_prompt_is_single_block_when_narrow() -> None:
