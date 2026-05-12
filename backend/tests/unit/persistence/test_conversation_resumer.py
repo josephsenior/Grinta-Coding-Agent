@@ -294,7 +294,6 @@ class TestLoadLatestCheckpoint:
         fs = MagicMock()
         resumer = ConversationResumer(fs)
 
-        # Use a simple namespace instead of MagicMock to avoid __dict__ conflicts
         class FakeState:
             def __init__(self):
                 self.iteration = 5
@@ -302,11 +301,24 @@ class TestLoadLatestCheckpoint:
                 self._private = True
 
             def __getstate__(self):
+                from dataclasses import dataclass
+
+                @dataclass
+                class FakeFlag:
+                    current_value: int = 0
+
+                @dataclass
+                class FakeMetrics:
+                    total_tokens: int = 0
+
+                    def get(self):
+                        return {}
+
                 return {
                     'session_id': 'sid-1',
                     'agent_state': 'running',
-                    'iteration_flag': MagicMock(),
-                    'budget_flag': MagicMock(),
+                    'iteration_flag': FakeFlag(),
+                    'budget_flag': FakeFlag(),
                     'inputs': {},
                     'outputs': {},
                     'extra_data': {},
@@ -325,7 +337,8 @@ class TestLoadLatestCheckpoint:
             assert name == 'cp3'
             mgr.restore_checkpoint.assert_called_once_with('cp3')
             assert state is not None
-            assert 'iteration' in state
+            assert 'session_id' in state
+            assert state['session_id'] == 'sid-1'
             assert '_private' not in state
 
     async def test_returns_none_when_restore_fails(self):

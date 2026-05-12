@@ -51,6 +51,7 @@ class TestHttpOk:
 
     def test_successful_request_returns_true(self) -> None:
         fake_resp = MagicMock()
+        fake_resp.status = 200
         fake_resp.__enter__ = lambda s: s
         fake_resp.__exit__ = MagicMock(return_value=False)
         with patch('urllib.request.urlopen', return_value=fake_resp):

@@ -473,14 +473,12 @@ def run_or_schedule(coro: Coroutine[Any, Any, Any]) -> None:
     # each call's run_until_complete is a discrete, self-contained unit.
     with _fallback_loop_lock:
         global _fallback_loop  # noqa: PLW0603
-        if _fallback_loop is None:
+        if _fallback_loop is None or _fallback_loop.is_closed():
             _fallback_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(_fallback_loop)
-            # Register cleanup on process exit to avoid "Event loop
-            # destroyed" warnings from atexit.
             def _close_fallback_loop() -> None:
                 global _fallback_loop  # noqa: PLW0603
-                if _fallback_loop is not None:
+                if _fallback_loop is not None and not _fallback_loop.is_closed():
                     _fallback_loop.run_until_complete(_fallback_loop.shutdown_asyncgens())
                     _fallback_loop.close()
                     _fallback_loop = None

@@ -238,15 +238,16 @@ class PendingActionService:
     def _defer_timeout_observations(
         self, timed_out: list[tuple[Action, float]]
     ) -> None:
-        """Schedule timeout observations on the main event loop."""
-        from backend.utils.async_utils import run_or_schedule
+        """Emit timeout observations synchronously to avoid test isolation issues.
 
-        async def _emit():
-            controller = self._context.get_controller()
-            for action, elapsed in timed_out:
-                self._emit_timeout_observation(controller, action, elapsed)
-
-        run_or_schedule(_emit())
+        The original design used run_or_schedule to defer emission to the async
+        context, but this causes test failures where the task doesn't complete
+        before the test's event loop closes. Running synchronously ensures
+        observations are emitted before get() returns.
+        """
+        controller = self._context.get_controller()
+        for action, elapsed in timed_out:
+            self._emit_timeout_observation(controller, action, elapsed)
 
     def _emit_timeout_observation(
         self, controller, action: Action, elapsed: float
