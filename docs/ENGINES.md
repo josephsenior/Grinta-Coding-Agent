@@ -70,7 +70,7 @@ See:
 
 - `backend/engine/prompts/prompt_builder.py`
 - `backend/engine/README.md`
-- [journey/15-prompts-are-programs.md](journey/15-prompts-are-programs.md)
+- Historical context: [journey/15-prompts-are-programs.md](journey/15-prompts-are-programs.md)
 
 ---
 

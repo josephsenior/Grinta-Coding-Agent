@@ -9,7 +9,7 @@ Related docs:
 - CI tiers (what PRs gate): `docs/CI.md`
 - Regression test placement: `docs/REGRESSION_TESTS.md`
 - Terminology contract: `docs/VOCABULARY.md`
-- Historical rationale: `docs/journey/README.md`
+- Historical context (not current spec): `docs/journey/README.md`
 
 ## Table of Contents
 
@@ -191,4 +191,4 @@ If a change touches orchestration, run at least one focused orchestration suite 
 
 ---
 
-For current architecture and contracts, use `docs/ARCHITECTURE.md` and `docs/ADR.md`. The journey under `docs/journey/` is narrative context, not a live spec — use this document for day-to-day contributor operations.
+For current architecture and contracts, use `docs/ARCHITECTURE.md` and `docs/ADR.md`. The journey under `docs/journey/` contains historical narrative — use this document for day-to-day contributor operations.

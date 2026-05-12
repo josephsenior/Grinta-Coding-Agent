@@ -66,6 +66,9 @@ ERROR_ACTION_NOT_EXECUTED_ERROR = (
     'may have been lost. Consider using /resume to restore a crashed session.'
 )
 
+PARALLEL_TOOL_BATCH_RETRIES = 1
+PARALLEL_TOOL_BATCH_BACKOFF_SECONDS = 0.25
+
 
 def _mark_retry_serial_after_parallel_failure(action: Action) -> None:
     cast(Any, action)._retry_serial_after_parallel_failure = True
@@ -144,6 +147,8 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         # Guard against concurrent step execution across dispatch threads.
         # Initialized lazily to ensure correct event loop binding.
         self._step_lock_instance: asyncio.Lock | None = None
+        self._step_lock_loop: asyncio.AbstractEventLoop | None = None
+        self._step_owner_task: asyncio.Task[Any] | None = None
         # Separate threading-safe gate for the sync step() entry point.
         # EventStream callbacks arrive from a thread pool; without this lock
         # two concurrent calls can both see _step_task as done and both create
@@ -730,8 +735,19 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
     @property
     def _step_lock(self) -> asyncio.Lock:
         """Lazily initialize the lock on the current event loop."""
-        if self._step_lock_instance is None:
+        current_loop = None
+        with contextlib.suppress(RuntimeError):
+            current_loop = asyncio.get_running_loop()
+        if (
+            self._step_lock_instance is None
+            or (
+                current_loop is not None
+                and self._step_lock_loop is not None
+                and current_loop is not self._step_lock_loop
+            )
+        ):
             self._step_lock_instance = asyncio.Lock()
+            self._step_lock_loop = current_loop
         return self._step_lock_instance
 
     async def _step(self) -> None:
@@ -746,20 +762,29 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         current step will re-trigger after it completes — no events are
         silently dropped.
         """
-        if self._step_lock.locked():
-            self._step_pending = True
+        async with self._step_lock:
+            self._step_owner_task = asyncio.current_task()
+            try:
+                drained_count = 0
+                while drained_count < DEFAULT_AGENT_STEP_DRAIN_LIMIT:
+                    drained_count += 1
+                    await self._step_inner()
+                    await asyncio.sleep(0)
+                    if not self._step_pending:
+                        break
+                    self._step_pending = False
+                    if not self.step_prerequisites.can_step():
+                        break
+            finally:
+                self._step_owner_task = None
+
+    async def reset_controller(self) -> None:
+        owner = self._step_owner_task
+        if owner is not None and asyncio.current_task() is owner:
+            self._reset()
             return
         async with self._step_lock:
-            drained_count = 0
-            while drained_count < DEFAULT_AGENT_STEP_DRAIN_LIMIT:
-                drained_count += 1
-                await self._step_inner()
-                await asyncio.sleep(0)
-                if not self._step_pending:
-                    break
-                self._step_pending = False
-                if not self.step_prerequisites.can_step():
-                    break
+            self._reset()
 
     async def _step_inner(self) -> None:
         """Inner step logic, guarded by _step_lock."""
@@ -884,10 +909,33 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         if not batch:
             return False
 
-        # Remove only scheduled actions so overflow items remain queued.
-        for action in batch:
-            with contextlib.suppress(ValueError):
-                pending.remove(action)
+        def _detach_parallel_batch(queue: object, expected: list[Action]) -> bool:
+            if not expected:
+                return True
+            popleft = getattr(queue, 'popleft', None)
+            if callable(popleft):
+                for exp in expected:
+                    try:
+                        got = popleft()
+                    except Exception:
+                        return False
+                    if got is not exp:
+                        appendleft = getattr(queue, 'appendleft', None)
+                        if callable(appendleft):
+                            appendleft(got)
+                        return False
+                return True
+            if isinstance(queue, list):
+                if len(queue) < len(expected):
+                    return False
+                if any(queue[i] is not expected[i] for i in range(len(expected))):
+                    return False
+                del queue[: len(expected)]
+                return True
+            return False
+
+        if not _detach_parallel_batch(pending, batch):
+            return False
 
         logger.debug(
             '[scheduler] Parallel tool batch: executing %d actions (%s, %d overflow deferred)',
@@ -895,31 +943,68 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             decision.reason,
             len(decision.overflow),
         )
-        results = await asyncio.gather(
-            *(self.action_execution.execute_action(a) for a in batch),
-            return_exceptions=True,
-        )
+        def _prepend_action(queue: object, action: Action) -> None:
+            appendleft = getattr(queue, 'appendleft', None)
+            if callable(appendleft):
+                appendleft(action)
+                return
+            insert = getattr(queue, 'insert', None)
+            if callable(insert):
+                insert(0, action)
+
+        to_run = list(batch)
+        attempt = 0
         failed_actions: list[Action] = []
-        for i, result in enumerate(results):
-            if isinstance(result, BaseException):
-                if isinstance(result, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
-                    raise result
-                failed_action = batch[i]
-                _mark_retry_serial_after_parallel_failure(failed_action)
-                failed_actions.append(failed_action)
-                action_type = getattr(batch[i], 'action', type(batch[i]).__name__)
-                logger.warning(
-                    '[P2-B] Parallel batch action %d (%s) failed, deferring to serial execution: %s',
-                    i,
-                    action_type,
-                    result,
-                )
+        last_failures: list[BaseException] = []
+        while True:
+            results = await asyncio.gather(
+                *(self.action_execution.execute_action(a) for a in to_run),
+                return_exceptions=True,
+            )
+            failed_actions = []
+            last_failures = []
+            for i, result in enumerate(results):
+                if isinstance(result, BaseException):
+                    if isinstance(
+                        result, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)
+                    ):
+                        raise result
+                    failed_action = to_run[i]
+                    failed_actions.append(failed_action)
+                    last_failures.append(result)
+                    action_type = getattr(
+                        failed_action, 'action', type(failed_action).__name__
+                    )
+                    logger.warning(
+                        '[P2-B] Parallel batch action %d (%s) failed: %s',
+                        i,
+                        action_type,
+                        result,
+                    )
+            if not failed_actions or attempt >= PARALLEL_TOOL_BATCH_RETRIES:
+                break
+            await asyncio.sleep(PARALLEL_TOOL_BATCH_BACKOFF_SECONDS * (2**attempt))
+            to_run = list(failed_actions)
+            attempt += 1
+
+        for failed_action in failed_actions:
+            _mark_retry_serial_after_parallel_failure(failed_action)
 
         if failed_actions:
+            for failure in last_failures:
+                try:
+                    if isinstance(failure, Exception):
+                        await self._react_to_exception(failure)
+                    else:
+                        await self._react_to_exception(RuntimeError(str(failure)))
+                except Exception:
+                    logger.debug(
+                        'Failed to react to parallel batch exception', exc_info=True
+                    )
             current_pending = getattr(self.agent, 'pending_actions', None)
             if current_pending is not None:
                 for action in reversed(failed_actions):
-                    current_pending.insert(0, action)
+                    _prepend_action(current_pending, action)
 
         await self._handle_post_execution()
         return True
@@ -1024,23 +1109,8 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                         prewarmed = self.memory_pressure.consume_prewarmed()
                         self.state.turn_signals.prewarmed_compaction = prewarmed
                         logger.info('Injected prewarmed compaction into turn signals.')
-                        
-                        # Apply the compaction to actually shrink history to prevent bloat
-                        if prewarmed:
-                            self.state.history.clear()
-                            self.state.history.extend(prewarmed)
-                            self.memory_pressure.record_condensation()
-                            logger.info('Successfully condensed and truncated history to prevent memory leak.')
                     else:
-                        # Fallback condensation if no prewarm is available
-                        # Cut history in half (keeping first few and last few to preserve context bounds)
-                        hist = self.state.history
-                        if len(hist) > 50:
-                            compacted = hist[:10] + hist[-40:]
-                            self.state.history.clear()
-                            self.state.history.extend(compacted)
-                            self.memory_pressure.record_condensation()
-                            logger.warning('Performed aggressive fallback history condensation.')
+                        self.state.turn_signals.prewarmed_compaction = None
 
     async def _run_control_flags_safely(self) -> bool:
         """Run control flags with exception handling."""

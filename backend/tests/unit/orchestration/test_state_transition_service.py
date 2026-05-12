@@ -120,8 +120,8 @@ class _FakeContext:
     def save_state(self):
         self._saved = True
 
-    def reset_controller(self):
-        pass
+    async def reset_controller(self):
+        return None
 
     def clear_pending_action(self):
         self.pending_action = None
@@ -157,7 +157,10 @@ class TestStateTransitionServiceUnit:
         svc = StateTransitionService(ctx)
         # Monkey-patch reset_controller to track call
         reset_called = []
-        ctx.reset_controller = lambda: reset_called.append(True)
+        async def _reset():
+            reset_called.append(True)
+
+        ctx.reset_controller = _reset
         await svc.set_agent_state(AgentState.STOPPED)
         assert reset_called
 
@@ -165,6 +168,9 @@ class TestStateTransitionServiceUnit:
         ctx.state = _FakeState(AgentState.RUNNING)
         svc = StateTransitionService(ctx)
         reset_called = []
-        ctx.reset_controller = lambda: reset_called.append(True)
+        async def _reset():
+            reset_called.append(True)
+
+        ctx.reset_controller = _reset
         await svc.set_agent_state(AgentState.ERROR)
         assert reset_called

@@ -114,24 +114,28 @@ Minimal known-good example:
 
 ## LLM Provider Issues
 
-### 401 / invalid API key
+### 401 — Invalid API key
 
-Check that your key matches your provider and model prefix.
+**Symptom:** Authentication errors on startup or during calls.
 
-Examples:
+**Fix:** Verify your key matches the provider and model prefix:
+- OpenAI key with `openai/...` models
+- Anthropic key with `anthropic/...` models
+- Google key with `google/...` models
 
-- OpenAI key with `openai/...`
-- Anthropic key with `anthropic/...`
-- Google key with `google/...`
+See [USER_GUIDE.md](USER_GUIDE.md#llm-provider-setup) for configuration examples.
 
-### 402 / insufficient balance
+### 402 — Insufficient balance
 
-This is provider-side billing. Verify account credits and organization/project selection.
+**Symptom:** Provider reports billing/payment issues.
+
+**Fix:** This is provider-side. Verify account credits and organization/project selection in your provider dashboard.
 
 ### Model not found
 
-Use a provider-qualified model id when possible:
+**Symptom:** Model doesn't exist or isn't available.
 
+**Fix:** Use provider-qualified model IDs:
 - `openai/gpt-4o-mini`
 - `anthropic/claude-sonnet-4-20250514`
 - `google/gemini-2.5-pro`
@@ -139,7 +143,9 @@ Use a provider-qualified model id when possible:
 
 ### Ollama unavailable
 
-Start Ollama first:
+**Symptom:** Connection refused or timeout when using local models.
+
+**Fix:** Start Ollama first:
 
 ```bash
 ollama serve
@@ -208,10 +214,15 @@ That matches the required CI unit gates. A bare `uv run pytest` from the repo ro
 
 ---
 
-If the issue persists, open an issue with:
+## Need more help?
 
-1. Repro steps
-2. Exact command used
-3. Full error output
-4. OS and Python version
-5. Redacted `settings.json` fields (`llm_provider`, `llm_model`, base_url presence)
+If the issue persists:
+
+1. Check [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md) for version/platform compatibility
+2. Review recent changes in [CHANGELOG.md](../CHANGELOG.md)
+3. Open an issue with:
+   - Repro steps
+   - Exact command used
+   - Full error output
+   - OS and Python version
+   - Redacted `settings.json` fields (`llm_provider`, `llm_model`, base_url presence)
