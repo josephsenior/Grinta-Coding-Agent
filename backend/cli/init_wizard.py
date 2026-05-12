@@ -94,33 +94,107 @@ def _get_platform_info() -> str:
     return f'{system} ({platform.release()})'
 
 
-def _http_ok(url: str) -> bool:
-    """Best-effort liveness probe; only http/https URLs are accepted."""
+def _http_ok(url: str, timeout: float = 1.0) -> bool:
+    """Best-effort liveness probe; only http/https URLs are accepted.
+
+    Args:
+        url: The URL to probe
+        timeout: Connection timeout in seconds (default 1.0 for faster detection)
+
+    Returns:
+        True if the URL responds with HTTP 2xx, False otherwise.
+    """
     if not (url.startswith('http://') or url.startswith('https://')):
         return False
     try:
-        req = urllib.request.Request(url)  # nosec B310 (scheme guarded above)
-        with urllib.request.urlopen(req, timeout=0.5):  # nosec B310
-            return True
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', f'Grinta-init/{sys.version_info[:2]}')
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return 200 <= response.status < 300
+    except urllib.error.URLError:
+        return False
     except Exception:
         return False
 
 
 def _ollama_running(base_url: str) -> bool:
+    """Check if Ollama server is running."""
     return _http_ok(f'{base_url}/api/tags')
 
 
 def _lmstudio_running(base_url: str) -> bool:
+    """Check if LM Studio server is running."""
     return _http_ok(f'{base_url}/models')
 
 
 def _detect_local() -> list[str]:
+    """Detect locally running model servers (Ollama, LM Studio).
+
+    Returns list of detected providers. Empty list if no local servers found.
+    This is a best-effort detection and should not block setup.
+    """
     found: list[str] = []
-    if _ollama_running(_PROVIDER_PRESETS['ollama']['base_url']):
-        found.append('ollama')
-    if _lmstudio_running(_PROVIDER_PRESETS['lmstudio']['base_url']):
-        found.append('lmstudio')
+
+    try:
+        if _ollama_running(_PROVIDER_PRESETS['ollama']['base_url']):
+            found.append('ollama')
+    except Exception:
+        pass
+
+    try:
+        if _lmstudio_running(_PROVIDER_PRESETS['lmstudio']['base_url']):
+            found.append('lmstudio')
+    except Exception:
+        pass
+
     return found
+
+
+def _check_settings_directory_writable(settings_path: Path) -> tuple[bool, str]:
+    """Check if settings directory is writable, create if needed.
+
+    Returns:
+        (is_writable, error_message)
+    """
+    parent = settings_path.parent
+
+    if parent.exists():
+        if not os.access(parent, os.W_OK):
+            return False, f"Settings directory exists but is not writable: {parent}"
+        return True, ''
+
+    try:
+        parent.mkdir(parents=True, exist_ok=True)
+        test_file = parent / '.write_test'
+        test_file.write_text('test', encoding='utf-8')
+        test_file.unlink()
+        return True, ''
+    except PermissionError:
+        return False, f"Cannot create settings directory (permission denied): {parent}"
+    except OSError as e:
+        return False, f"Cannot create settings directory: {parent} ({e})"
+
+
+def _atomic_json_write(path: Path, data: dict[str, Any]) -> None:
+    """Write JSON atomically to prevent corruption on failure."""
+    import tempfile
+
+    content = json.dumps(data, indent=2) + '\n'
+    tmp_fd, tmp_path = tempfile.mkstemp(
+        dir=path.parent,
+        prefix='.settings_',
+        suffix='.tmp'
+    )
+    try:
+        with os.fdopen(tmp_fd, 'w', encoding='utf-8') as f:
+            f.write(content)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def _settings_path(project_root: Path | None = None) -> Path:
