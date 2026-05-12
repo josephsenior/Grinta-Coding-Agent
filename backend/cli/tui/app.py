@@ -11,39 +11,15 @@ import logging
 import os
 import threading
 from collections import deque
-from datetime import datetime
+
 from pathlib import Path
 from typing import Any
 
 if os.getenv("DEBUG", "").strip().lower() not in ("true", "1", "yes"):
     os.environ["DEBUG"] = "1"
 
-# Bullet-proof direct trace — bypasses all logging infra.
-_TRACE_PATH = Path(__file__).resolve().parent.parent.parent.parent / "tui-trace.log"
-
-
-def _trace(msg: str) -> None:
-    try:
-        with open(_TRACE_PATH, "a", encoding="utf-8") as f:
-            f.write(f"{datetime.now().isoformat()}  {msg}\n")
-            f.flush()
-    except Exception:
-        pass
-
-
-_APP_LOG_PATH = Path(__file__).resolve().parent.parent.parent.parent / "app.log"
 _tui_logger = logging.getLogger("grinta.tui")
 _tui_logger.setLevel(logging.DEBUG)
-if not any(
-    isinstance(h, logging.FileHandler) and h.baseFilename == str(_APP_LOG_PATH)
-    for h in _tui_logger.handlers
-):
-    _fh = logging.FileHandler(_APP_LOG_PATH, mode="a", encoding="utf-8")
-    _fh.setLevel(logging.DEBUG)
-    _fh.setFormatter(
-        logging.Formatter("%(asctime)s  %(name)s  %(levelname)s  %(message)s")
-    )
-    _tui_logger.addHandler(_fh)
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -251,7 +227,7 @@ class GrintaScreen(Screen):
         yield FooterBar(id="footer-bar")
 
     def on_mount(self) -> None:
-        _trace("on_mount: GrintaScreen mounted")
+        _tui_logger.debug("on_mount: GrintaScreen mounted")
 
         # Panelize the main layout sections
         transcript = self.query_one("#transcript-scroll", Transcript)
@@ -267,10 +243,10 @@ class GrintaScreen(Screen):
         ta.focus()
         ta.cursor_blink = True
         transcript.scroll_home(animate=False)
-        _trace("on_mount: done")
+        _tui_logger.debug("on_mount: done")
 
     def on_unmount(self) -> None:
-        _trace("on_unmount: GrintaScreen unmounting")
+        _tui_logger.debug("on_unmount: GrintaScreen unmounting")
         if self._renderer:
             self._renderer._event_stream = None
         if self._event_stream is not None:
@@ -278,10 +254,10 @@ class GrintaScreen(Screen):
                 close_fn = getattr(self._event_stream, "close", None)
                 if callable(close_fn):
                     close_fn()
-                    _trace("on_unmount: event_stream closed")
+                    _tui_logger.debug("on_unmount: event_stream closed")
             except Exception as exc:
-                _trace(f"on_unmount: event_stream close failed: {exc}")
-        _trace("on_unmount: done")
+                _tui_logger.debug(f"on_unmount: event_stream close failed: {exc}")
+        _tui_logger.debug("on_unmount: done")
 
     # ── TopBar ──────────────────────────────────────────────────────────────
 
@@ -476,39 +452,39 @@ class GrintaScreen(Screen):
     # ── Input handling ──────────────────────────────────────────────────────
 
     def action_submit_input(self) -> None:
-        _trace(f"action_submit_input: lock_locked={self._input_lock.locked()}")
+        _tui_logger.debug(f"action_submit_input: lock_locked={self._input_lock.locked()}")
         if self._input_lock.locked():
-            _trace("action_submit_input: lock held, ignoring")
+            _tui_logger.debug("action_submit_input: lock held, ignoring")
             return
         ta = self.query_one("#input", TextArea)
         text = ta.text.strip()
-        _trace(f"action_submit_input: text_len={len(text)}")
+        _tui_logger.debug(f"action_submit_input: text_len={len(text)}")
         if not text:
-            _trace("action_submit_input: empty text, ignoring")
+            _tui_logger.debug("action_submit_input: empty text, ignoring")
             return
-        _trace(f"action_submit_input: creating task for _handle_input")
+        _tui_logger.debug(f"action_submit_input: creating task for _handle_input")
         try:
             task = asyncio.create_task(self._handle_input(text))
-            _trace(f"action_submit_input: task created {task}")
+            _tui_logger.debug(f"action_submit_input: task created {task}")
 
             def _on_done(t: asyncio.Task[Any]) -> None:
                 exc = t.exception()
                 if exc:
-                    _trace(f"_handle_input task FAILED: {type(exc).__name__}: {exc}")
+                    _tui_logger.debug(f"_handle_input task FAILED: {type(exc).__name__}: {exc}")
                 else:
-                    _trace(f"_handle_input task completed OK")
+                    _tui_logger.debug(f"_handle_input task completed OK")
 
             task.add_done_callback(_on_done)
         except Exception as exc:
-            _trace(
+            _tui_logger.debug(
                 f"action_submit_input: create_task FAILED: {type(exc).__name__}: {exc}"
             )
 
     async def _handle_input(self, text: str) -> None:
         try:
-            _trace(f"_handle_input ENTER text={text[:80]}")
+            _tui_logger.debug(f"_handle_input ENTER text={text[:80]}")
         except Exception as exc:
-            _trace(f"_handle_input: _trace FAILED: {type(exc).__name__}: {exc}")
+            _tui_logger.debug(f"_handle_input: _trace FAILED: {type(exc).__name__}: {exc}")
         async with self._input_lock:
             ta = self.query_one("#input", TextArea)
             ta.clear()
@@ -524,15 +500,15 @@ class GrintaScreen(Screen):
             self.query_one("#input-bar", InputBar).add_class("processing")
 
             try:
-                _trace(f"_handle_input: controller={self._controller is not None}")
+                _tui_logger.debug(f"_handle_input: controller={self._controller is not None}")
                 if self._controller is None:
-                    _trace("_handle_input: calling _bootstrap()")
+                    _tui_logger.debug("_handle_input: calling _bootstrap()")
                     logger.info("[TUI] _handle_input: bootstrapping (no controller)")
                     self.add_system_message(f"[{NAVY_BRAND}]Bootstrapping engine…[/]")
                     await self._bootstrap()
                     if self._controller is None:
                         raise RuntimeError("Bootstrap failed to initialize controller")
-                    _trace(
+                    _tui_logger.debug(
                         f"_handle_input: _bootstrap done, state={self._controller.get_agent_state()}"
                     )
                     logger.info(
@@ -543,16 +519,16 @@ class GrintaScreen(Screen):
                         f"[{NAVY_READY}]Engine ready — dispatching task[/]"
                     )
                 else:
-                    _trace(
+                    _tui_logger.debug(
                         "_handle_input: controller exists, calling _ensure_agent_task()"
                     )
                     logger.info("[TUI] _handle_input: controller exists, ensuring task")
                     await self._ensure_agent_task()
                 assert self._controller is not None, "Controller must be initialized after agent task setup"
-                _trace("_handle_input: calling _dispatch_to_agent()")
+                _tui_logger.debug("_handle_input: calling _dispatch_to_agent()")
                 logger.info("[TUI] _handle_input: dispatching to agent")
                 await self._dispatch_to_agent(text)
-                _trace(
+                _tui_logger.debug(
                     f"_handle_input: _dispatch_to_agent done, state={self._controller.get_agent_state()}"
                 )
                 logger.info(
@@ -560,7 +536,7 @@ class GrintaScreen(Screen):
                     self._controller.get_agent_state() if self._controller else "N/A",
                 )
             except Exception:
-                _trace("_handle_input: EXCEPTION in try block")
+                _tui_logger.debug("_handle_input: EXCEPTION in try block")
                 logger.exception("[TUI] _handle_input FAILED")
                 self.add_error("Agent error — check app.log")
                 self._update_footer_bar()
@@ -627,7 +603,7 @@ class GrintaScreen(Screen):
     # ── Bootstrap (preserved agent logic) ───────────────────────────────────
 
     async def _bootstrap(self) -> None:
-        _trace("_bootstrap: start")
+        _tui_logger.debug("_bootstrap: start")
         logger.info("TUI _bootstrap: starting")
         self._hud.update_agent_state("Initializing")
         self._render_topbar()
@@ -641,20 +617,20 @@ class GrintaScreen(Screen):
                 self._bootstrap_sync_phase1, config
             )
         except Exception as exc:
-            _trace(f"_bootstrap: EXCEPTION phase1 {type(exc).__name__}: {exc}")
+            _tui_logger.debug(f"_bootstrap: EXCEPTION phase1 {type(exc).__name__}: {exc}")
             logger.exception("TUI _bootstrap: failed in phase1")
             raise
 
-        _trace(f"_bootstrap: runtime created, type={type(runtime).__name__}")
+        _tui_logger.debug(f"_bootstrap: runtime created, type={type(runtime).__name__}")
 
         connect_fn = getattr(runtime, "connect", None)
         if callable(connect_fn):
             try:
-                _trace("_bootstrap: awaiting runtime.connect()")
+                _tui_logger.debug("_bootstrap: awaiting runtime.connect()")
                 await connect_fn()
-                _trace("_bootstrap: runtime.connect() OK")
+                _tui_logger.debug("_bootstrap: runtime.connect() OK")
             except Exception as exc:
-                _trace(
+                _tui_logger.debug(
                     f"_bootstrap: runtime.connect() FAILED: {type(exc).__name__}: {exc}"
                 )
                 raise
@@ -664,11 +640,11 @@ class GrintaScreen(Screen):
                 self._bootstrap_sync_phase2, agent, runtime, event_stream, config
             )
         except Exception as exc:
-            _trace(f"_bootstrap: EXCEPTION phase2 {type(exc).__name__}: {exc}")
+            _tui_logger.debug(f"_bootstrap: EXCEPTION phase2 {type(exc).__name__}: {exc}")
             logger.exception("TUI _bootstrap: failed in phase2")
             raise
 
-        _trace(f"_bootstrap: controller created, state={controller.get_agent_state()}")
+        _tui_logger.debug(f"_bootstrap: controller created, state={controller.get_agent_state()}")
         logger.info(
             "TUI _bootstrap: controller created, initial state=%s (type=%s)",
             controller.get_agent_state(),
@@ -683,7 +659,7 @@ class GrintaScreen(Screen):
         from backend.utils.async_utils import set_main_event_loop
 
         set_main_event_loop(self._loop)
-        _trace(f"_bootstrap: set_main_event_loop to {self._loop}")
+        _tui_logger.debug(f"_bootstrap: set_main_event_loop to {self._loop}")
 
         if self._renderer is None:
             self._renderer = TUIRenderer(
@@ -696,7 +672,7 @@ class GrintaScreen(Screen):
         self._renderer.subscribe(event_stream, event_stream.sid)
 
         state_after_create = controller.get_agent_state()
-        _trace(f"_bootstrap: state after subscribe={state_after_create}")
+        _tui_logger.debug(f"_bootstrap: state after subscribe={state_after_create}")
         logger.info(
             "TUI _bootstrap: state after renderer subscribe=%s", state_after_create
         )
@@ -704,33 +680,33 @@ class GrintaScreen(Screen):
         self._render_topbar()
         self._render_metrics_grid()
         self._renderer.drain_events()
-        _trace("_bootstrap: done")
+        _tui_logger.debug("_bootstrap: done")
         self.add_system_message(f"[{NAVY_READY}]Engine ready.[/]")
 
     def _bootstrap_sync_phase1(
         self,
         config: Any,
     ) -> tuple[Any, Any, Any]:
-        _trace("_bootstrap_sync_phase1: get_file_store")
+        _tui_logger.debug("_bootstrap_sync_phase1: get_file_store")
         file_store = get_file_store(config)
-        _trace("_bootstrap_sync_phase1: EventStream")
+        _tui_logger.debug("_bootstrap_sync_phase1: EventStream")
         event_stream = EventStream(sid="grinta-tui", file_store=file_store)
-        _trace("_bootstrap_sync_phase1: create_registry_and_conversation_stats")
+        _tui_logger.debug("_bootstrap_sync_phase1: create_registry_and_conversation_stats")
         llm_registry, _conv_stats, _app_cfg = create_registry_and_conversation_stats(
             config,
             sid=event_stream.sid,
             user_id="tui",
         )
-        _trace("_bootstrap_sync_phase1: create_runtime")
+        _tui_logger.debug("_bootstrap_sync_phase1: create_runtime")
         runtime = create_runtime(
             config,
             llm_registry=llm_registry,
             sid=event_stream.sid,
             event_stream=event_stream,
         )
-        _trace("_bootstrap_sync_phase1: create_agent")
+        _tui_logger.debug("_bootstrap_sync_phase1: create_agent")
         agent = create_agent(config, llm_registry)
-        _trace("_bootstrap_sync_phase1: done")
+        _tui_logger.debug("_bootstrap_sync_phase1: done")
         return agent, event_stream, runtime
 
     def _bootstrap_sync_phase2(
@@ -740,10 +716,10 @@ class GrintaScreen(Screen):
         event_stream: Any,
         config: Any,
     ) -> tuple[Any, Any]:
-        _trace("_bootstrap_sync_phase2: create_memory")
+        _tui_logger.debug("_bootstrap_sync_phase2: create_memory")
         memory = create_memory(runtime, event_stream, sid=event_stream.sid)
-        _trace("_bootstrap_sync_phase2: create_memory done")
-        _trace("_bootstrap_sync_phase2: controller")
+        _tui_logger.debug("_bootstrap_sync_phase2: create_memory done")
+        _tui_logger.debug("_bootstrap_sync_phase2: controller")
         controller = self._get_or_create_controller(
             agent,
             runtime,
@@ -751,7 +727,7 @@ class GrintaScreen(Screen):
             event_stream,
             config,
         )
-        _trace("_bootstrap_sync_phase2: controller done")
+        _tui_logger.debug("_bootstrap_sync_phase2: controller done")
         return memory, controller
 
     def _get_or_create_controller(
@@ -778,9 +754,9 @@ class GrintaScreen(Screen):
 
     async def _run_agent_loop(self) -> None:
         if self._controller is None:
-            _trace("_run_agent_loop: no controller, aborting")
+            _tui_logger.debug("_run_agent_loop: no controller, aborting")
             return
-        _trace("_run_agent_loop: ENTER")
+        _tui_logger.debug("_run_agent_loop: ENTER")
         end_states = [
             AgentState.AWAITING_USER_INPUT,
             AgentState.FINISHED,
@@ -788,26 +764,26 @@ class GrintaScreen(Screen):
             AgentState.STOPPED,
         ]
         try:
-            _trace("_run_agent_loop: calling run_agent_until_done")
+            _tui_logger.debug("_run_agent_loop: calling run_agent_until_done")
             await run_agent_until_done(
                 self._controller,
                 self._runtime_stub,
                 self._memory_stub,
                 end_states,
             )
-            _trace("_run_agent_loop: run_agent_until_done returned")
+            _tui_logger.debug("_run_agent_loop: run_agent_until_done returned")
         except Exception as exc:
-            _trace(f"_run_agent_loop: EXCEPTION {type(exc).__name__}: {exc}")
+            _tui_logger.debug(f"_run_agent_loop: EXCEPTION {type(exc).__name__}: {exc}")
             logger.exception("Agent loop exited with error")
-        _trace("_run_agent_loop: EXIT")
+        _tui_logger.debug("_run_agent_loop: EXIT")
 
     async def _ensure_agent_task(self) -> None:
         if self._controller is None:
-            _trace("_ensure_agent_task: no controller, returning")
+            _tui_logger.debug("_ensure_agent_task: no controller, returning")
             return
 
         state = self._controller.get_agent_state()
-        _trace(f"_ensure_agent_task: current state={state}")
+        _tui_logger.debug(f"_ensure_agent_task: current state={state}")
         logger.info("TUI _ensure_agent_task: current state=%s", state)
         if state in {
             AgentState.LOADING,
@@ -817,19 +793,19 @@ class GrintaScreen(Screen):
             AgentState.REJECTED,
             AgentState.STOPPED,
         }:
-            _trace(f"_ensure_agent_task: transitioning {state} -> RUNNING")
+            _tui_logger.debug(f"_ensure_agent_task: transitioning {state} -> RUNNING")
             logger.info("TUI _ensure_agent_task: transitioning %s -> RUNNING", state)
             await self._controller.set_agent_state_to(AgentState.RUNNING)
         elif state == AgentState.RUNNING:
-            _trace("_ensure_agent_task: already RUNNING")
+            _tui_logger.debug("_ensure_agent_task: already RUNNING")
             logger.info("TUI _ensure_agent_task: already RUNNING")
 
         state_after = self._controller.get_agent_state()
-        _trace(f"_ensure_agent_task: state after transition={state_after}")
+        _tui_logger.debug(f"_ensure_agent_task: state after transition={state_after}")
         logger.info("TUI _ensure_agent_task: state after transition=%s", state_after)
 
         if self._agent_task is None or self._agent_task.done():
-            _trace("_ensure_agent_task: creating new agent task")
+            _tui_logger.debug("_ensure_agent_task: creating new agent task")
             logger.info("TUI _ensure_agent_task: creating new agent task")
             self._agent_task = asyncio.create_task(
                 run_agent_until_done(
@@ -849,14 +825,14 @@ class GrintaScreen(Screen):
             def _on_agent_done(t: asyncio.Task[Any]) -> None:
                 exc = t.exception()
                 if exc:
-                    _trace(f"_agent_task FAILED: {type(exc).__name__}: {exc}")
+                    _tui_logger.debug(f"_agent_task FAILED: {type(exc).__name__}: {exc}")
                     logger.exception("TUI _agent_task failed")
                 else:
-                    _trace("_agent_task completed OK")
+                    _tui_logger.debug("_agent_task completed OK")
 
             self._agent_task.add_done_callback(_on_agent_done)
         else:
-            _trace(
+            _tui_logger.debug(
                 f"_ensure_agent_task: agent task already running task={self._agent_task}"
             )
             logger.info(
@@ -865,16 +841,16 @@ class GrintaScreen(Screen):
             )
 
     async def _dispatch_to_agent(self, text: str) -> None:
-        _trace("_dispatch_to_agent: ENTER")
+        _tui_logger.debug("_dispatch_to_agent: ENTER")
         if self._controller is None or self._event_stream is None:
-            _trace("_dispatch_to_agent: missing controller or event_stream, returning")
+            _tui_logger.debug("_dispatch_to_agent: missing controller or event_stream, returning")
             return
 
         try:
             await self._ensure_agent_task()
-            _trace("_dispatch_to_agent: _ensure_agent_task OK")
+            _tui_logger.debug("_dispatch_to_agent: _ensure_agent_task OK")
         except Exception as exc:
-            _trace(
+            _tui_logger.debug(
                 f"_dispatch_to_agent: _ensure_agent_task FAILED: {type(exc).__name__}: {exc}"
             )
             raise
@@ -884,11 +860,11 @@ class GrintaScreen(Screen):
         # NOTE: _ensure_agent_task (via run_agent_until_done) already calls
         # controller.step() internally.  We skip the redundant explicit step()
         # to avoid double-processing the queued MessageAction.
-        _trace("_dispatch_to_agent: event added")
+        _tui_logger.debug("_dispatch_to_agent: event added")
         try:
             logger.info("[TUI] _dispatch_to_agent: event added")
         except Exception as exc:
-            _trace(
+            _tui_logger.debug(
                 f"_dispatch_to_agent: logger.info FAILED: {type(exc).__name__}: {exc}"
             )
         try:
@@ -899,9 +875,9 @@ class GrintaScreen(Screen):
                 AgentState.STOPPED,
                 AgentState.AWAITING_USER_CONFIRMATION,
             }
-            _trace("_dispatch_to_agent: end_states created")
+            _tui_logger.debug("_dispatch_to_agent: end_states created")
         except Exception as exc:
-            _trace(
+            _tui_logger.debug(
                 f"_dispatch_to_agent: end_states FAILED: {type(exc).__name__}: {exc}"
             )
             raise
@@ -910,25 +886,25 @@ class GrintaScreen(Screen):
 
         _poll_started = _time.monotonic()
         _max_poll_seconds = 600  # 10-minute hard cap for the polling loop
-        _trace("_dispatch_to_agent: entering poll loop")
+        _tui_logger.debug("_dispatch_to_agent: entering poll loop")
         while True:
             try:
                 await asyncio.sleep(0.1)
                 loop_count += 1
                 state = self._controller.get_agent_state()
                 if loop_count == 1 or loop_count % 20 == 0:
-                    _trace(f"_dispatch_to_agent: poll #{loop_count}, state={state}")
+                    _tui_logger.debug(f"_dispatch_to_agent: poll #{loop_count}, state={state}")
                     logger.info(
                         "[TUI] _dispatch_to_agent: poll #%d, state=%s",
                         loop_count,
                         state,
                     )
                 if state in end_states:
-                    _trace(f"_dispatch_to_agent: reached end state {state}")
+                    _tui_logger.debug(f"_dispatch_to_agent: reached end state {state}")
                     logger.info("[TUI] _dispatch_to_agent: reached end state %s", state)
                     break
                 if self._agent_task and self._agent_task.done():
-                    _trace(f"_dispatch_to_agent: agent task done, state={state}")
+                    _tui_logger.debug(f"_dispatch_to_agent: agent task done, state={state}")
                     logger.info(
                         "[TUI] _dispatch_to_agent: agent task done, state=%s", state
                     )
@@ -937,7 +913,7 @@ class GrintaScreen(Screen):
                     self._renderer.drain_events()
                 # Hard timeout: prevent infinite polling if the agent gets stuck.
                 if _time.monotonic() - _poll_started > _max_poll_seconds:
-                    _trace("_dispatch_to_agent: poll timeout reached")
+                    _tui_logger.debug("_dispatch_to_agent: poll timeout reached")
                     logger.error(
                         "[TUI] _dispatch_to_agent: poll timeout after %.0fs in state=%s",
                         _max_poll_seconds,
@@ -946,11 +922,11 @@ class GrintaScreen(Screen):
                     self.add_error("Agent timed out — check app.log")
                     break
             except Exception as exc:
-                _trace(
+                _tui_logger.debug(
                     f"_dispatch_to_agent: poll loop EXCEPTION {type(exc).__name__}: {exc}"
                 )
                 raise
-        _trace("_dispatch_to_agent: poll loop exited")
+        _tui_logger.debug("_dispatch_to_agent: poll loop exited")
 
     # ── Confirmation ────────────────────────────────────────────────────────
 
@@ -1003,14 +979,14 @@ class TUIRenderer:
     def drain_events(self) -> None:
         if not self._pending_events:
             return
-        _trace(f"TUIRenderer.drain_events: {len(self._pending_events)} pending")
+        _tui_logger.debug(f"TUIRenderer.drain_events: {len(self._pending_events)} pending")
         with self._pending_lock:
             while self._pending_events:
                 event = self._pending_events.popleft()
         self._process_event(event)
 
     def _on_event(self, event: Any) -> None:
-        _trace(f"TUIRenderer._on_event: {type(event).__name__}")
+        _tui_logger.debug(f"TUIRenderer._on_event: {type(event).__name__}")
         with self._pending_lock:
             self._pending_events.append(event)
         try:
@@ -1023,7 +999,7 @@ class TUIRenderer:
         return self._state_event
 
     def _process_event(self, event: Any) -> None:
-        _trace(
+        _tui_logger.debug(
             f'TUIRenderer._process_event: {type(event).__name__} source={getattr(event, "source", None)}'
         )
         self._update_metrics(event)
