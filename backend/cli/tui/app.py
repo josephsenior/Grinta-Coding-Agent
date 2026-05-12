@@ -1,7 +1,6 @@
 """Grinta TUI — Textual Application screen and widgets.
 
-Mission Control design — dolphie-inspired dashboard aesthetic.
-Deep navy panels, teal accents, color-coded metrics, compact data-dense layout.
+Clean minimal layout — top bar, transcript, input bar, and compact HUD bar.
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, Label, RichLog, Static, TextArea
+from textual.widgets import Button, Input, Label, RichLog, Static
 
 from backend.cli.config_manager import AppConfig
 from backend.cli.hud import HUDBar
@@ -71,22 +70,6 @@ from backend.persistence import get_file_store
 # ── Widget classes ────────────────────────────────────────────────────────
 
 
-class TopBar(Static):
-    """Compact 1-line top bar — 3-zone layout: title | workspace+model | help."""
-
-
-class MetricsGrid(Horizontal):
-    """Horizontal row of metric cards."""
-
-
-class MetricsCard(Static):
-    """Single metric card with title and value rows."""
-
-
-class ReasoningPanel(Static):
-    """Collapsible panel showing current action and streaming thoughts."""
-
-
 class Transcript(VerticalScroll):
     """Scrollable conversation transcript."""
 
@@ -95,8 +78,8 @@ class InputBar(Horizontal):
     """Compact bottom input row."""
 
 
-class FooterBar(Static):
-    """1-line keyboard shortcuts footer."""
+class HUD(Static):
+    """Single-line HUD bar — all metrics in one row."""
 
 
 class GrintaConfirmDialog(ModalScreen[str | None]):
@@ -212,36 +195,21 @@ class GrintaScreen(Screen):
     }
 
     def compose(self) -> ComposeResult:
-        yield TopBar(id="top-bar")
-        with MetricsGrid(id="metrics-grid"):
-            yield MetricsCard(id="metrics-model", classes="metrics-card")
-            yield MetricsCard(id="metrics-context", classes="metrics-card")
-            yield MetricsCard(id="metrics-cost", classes="metrics-card")
-            yield MetricsCard(id="metrics-status", classes="metrics-card")
-        yield ReasoningPanel(id="reasoning-panel")
         with Transcript(id="transcript-scroll"):
-            yield RichLog(id="transcript-log", markup=True, auto_scroll=True)
+            yield RichLog(id="transcript-log", markup=True, auto_scroll=True, wrap=True)
         with InputBar(id="input-bar"):
-            yield Static("❯", id="input-prompt")
-            yield TextArea(id="input")
-        yield FooterBar(id="footer-bar")
+            yield Input(id="input", placeholder=">")
+        yield HUD(id="hud-bar")
 
     def on_mount(self) -> None:
         _tui_logger.debug("on_mount: GrintaScreen mounted")
 
-        # Panelize the main layout sections
-        transcript = self.query_one("#transcript-scroll", Transcript)
-        transcript.border_title = "[#bbc8e8]Session Log[/]"
-
-        input_bar = self.query_one("#input-bar", InputBar)
-        input_bar.border_title = "[#bbc8e8]Terminal[/]"
-
-        self._render_topbar()
-        self._render_metrics_grid()
-        self._update_footer_bar()
-        ta = self.query_one("#input", TextArea)
+        self._render_hud_bar()
+        ta = self.query_one("#input", Input)
         ta.focus()
-        ta.cursor_blink = True
+        # Disable cursor blink to avoid escape sequences in input
+        ta.cursor_blink = False
+        transcript = self.query_one("#transcript-scroll", Transcript)
         transcript.scroll_home(animate=False)
         _tui_logger.debug("on_mount: done")
 
@@ -259,128 +227,69 @@ class GrintaScreen(Screen):
                 _tui_logger.debug(f"on_unmount: event_stream close failed: {exc}")
         _tui_logger.debug("on_unmount: done")
 
-    # ── TopBar ──────────────────────────────────────────────────────────────
+    # ── HUD Bar ─────────────────────────────────────────────
 
-    def _render_topbar(self) -> None:
-        topbar = self.query_one("#top-bar", TopBar)
+    def _render_hud_bar(self) -> None:
         hud = self._hud
+
+        # Top bar info: Grinta, version, workspace, model
         model = hud.state.model or "(not set)"
         workspace = hud.state.workspace_path or Path(os.getcwd()).name
-        topbar.update(
-            f"[{NAVY_BRAND}]Grinta[/]"
-            f"  [{NAVY_TEXT_MUTED}]v3.0.7[/]"
-            f"    [{NAVY_TEXT_SECONDARY}]{workspace}[/]"
-            f"    [{NAVY_TEXT_MUTED}]{model}[/]"
-            f"    [{NAVY_TEXT_DIM}]press ? for help[/]"
-        )
 
-    # ── MetricsGrid ─────────────────────────────────────────────────────────
-
-    def _render_metrics_grid(self) -> None:
-        self._update_model_card()
-        self._update_context_card()
-        self._update_cost_card()
-        self._update_status_card()
-
-    def _update_model_card(self) -> None:
-        card = self.query_one("#metrics-model", MetricsCard)
-        hud = self._hud
-        provider, model = HUDBar.describe_model(hud.state.model)
-        autonomy = hud.state.autonomy_level
-        card.border_title = "[#bbc8e8]Model[/]"
-        card.update(
-            f"  [{NAVY_TEXT_PRIMARY}]{provider}[/]\n"
-            f"  [{NAVY_TEXT_TERTIARY}]{model}[/]\n"
-            f"  [{NAVY_TEXT_MUTED}]{autonomy}[/]"
-        )
-
-    def _update_context_card(self) -> None:
-        card = self.query_one("#metrics-context", MetricsCard)
-        hud = self._hud
-        used = hud.state.context_tokens
-        limit = hud.state.context_limit
-        bar = self._render_context_bar(used, limit)
-        condensations = hud.state.condensation_count
-        card.border_title = "[#bbc8e8]Context[/]"
-        card.update(
-            f"  {bar}\n"
-            f"  [{NAVY_TEXT_MUTED}]{used:,} / {limit:,} tokens[/]\n"
-            f"  [{NAVY_TEXT_MUTED}]{condensations} condensations[/]"
-        )
-
-    def _render_context_bar(self, used: int, limit: int) -> str:
-        if limit <= 0:
-            return f"[{NAVY_TEXT_MUTED}]no limit[/]"
-        pct = min(100, int(used / limit * 100))
-        filled = int(pct / 10)
-        empty = 10 - filled
-        if pct < 70:
-            color = "#54efae"  # green
-        elif pct < 90:
-            color = "#f6ff8f"  # yellow
-        else:
-            color = "#fd8383"  # red
-        bar = f'[{color}]{"█" * filled}[/][{NAVY_BORDER}]{"░" * empty}[/]'
-        return f"{bar}  [{color}]{pct}%[/]"
-
-    def _update_cost_card(self) -> None:
-        card = self.query_one("#metrics-cost", MetricsCard)
-        hud = self._hud
-        cost = hud.state.cost_usd
-        calls = hud.state.llm_calls
-        card.border_title = "[#bbc8e8]Cost[/]"
-        card.update(
-            f"  [{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]\n"
-            f"  [{NAVY_TEXT_TERTIARY}]{calls} LLM calls[/]"
-        )
-
-    def _update_status_card(self) -> None:
-        card = self.query_one("#metrics-status", MetricsCard)
-        hud = self._hud
         raw_state = hud.state.agent_state_label or "Ready"
-        # Strip 'AgentState.' prefix if present for lookup
+        # Handle various state string formats
         lookup_key = raw_state.lower()
         if lookup_key.startswith("agentstate."):
             lookup_key = lookup_key[len("agentstate.") :]
-        display_state = self._STATE_LABELS.get(lookup_key, raw_state)
-        state_color = self._STATE_COLORS.get(lookup_key, NAVY_TEXT_MUTED)
+        # Handle "AgentState.RUNNING" format too
+        if "." in lookup_key:
+            lookup_key = lookup_key.split(".")[-1]
+        
+        # Default to "Ready" if state not found or looks like "Starting"
+        if lookup_key not in self._STATE_LABELS or lookup_key == "starting":
+            lookup_key = "awaiting_user_input"  # defaults to Ready
+            
+        display_state = self._STATE_LABELS.get(lookup_key, "Ready")
+        state_color = self._STATE_COLORS.get(lookup_key, NAVY_BRAND)
+
+        _provider, model_short = HUDBar.describe_model(hud.state.model)
+        autonomy = hud.state.autonomy_level
+
+        used = hud.state.context_tokens
+        limit = hud.state.context_limit
+
+        cost = hud.state.cost_usd or 0
+        calls = hud.state.llm_calls
+
         mcp = hud.state.mcp_servers
-        mcp_str = f"{mcp} MCP" if mcp is not None else "— MCP"
         skills = HUDBar.count_bundled_playbook_skills()
-        card.border_title = "[#bbc8e8]Status[/]"
-        card.update(
-            f"  [{state_color}]● {display_state}[/]\n"
-            f"  [{NAVY_TEXT_TERTIARY}]{mcp_str}[/]\n"
-            f"  [{NAVY_TEXT_MUTED}]{skills} skills[/]"
-        )
 
-    # ── ReasoningPanel ──────────────────────────────────────────────────────
+        # Build HUD with top bar info
+        parts = []
+        # Top bar stats
+        parts.append(f"[{NAVY_BRAND}]Grinta[/]")
+        parts.append(f"[{NAVY_TEXT_MUTED}]v3.0.7[/]")
+        parts.append(f"[{NAVY_TEXT_SECONDARY}]{workspace}[/]")
+        # State and autonomy - use model_short only once
+        parts.append(f"[{state_color}]● {display_state}[/]")
+        parts.append(f"[{NAVY_TEXT_SECONDARY}]{model_short}[/]")
+        parts.append(f"[{NAVY_TEXT_TERTIARY}][{NAVY_BRAND}]{autonomy}[/]")
+        # Usage
+        if limit > 0:
+            parts.append(f"[{NAVY_TEXT_DIM}]{used:,}/{limit:,}[/]")
+        else:
+            parts.append(f"[{NAVY_TEXT_DIM}]{used:,} t[/]")
+        # Cost
+        parts.append(f"[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]")
+        # Stats
+        parts.append(f"[{NAVY_TEXT_DIM}]{calls}c[/]")
+        if mcp is not None:
+            parts.append(f"[{NAVY_TEXT_DIM}]{mcp}MCP[/]")
+        parts.append(f"[{NAVY_TEXT_DIM}]{skills}sk[/]")
+        # Help hint
+        parts.append(f"[{NAVY_TEXT_DIM}]? help[/]")
 
-    def _update_reasoning_panel(self) -> None:
-        panel = self.query_one("#reasoning-panel", ReasoningPanel)
-        if not self._reasoning.active:
-            panel.remove_class("active")
-            panel.update("")
-            return
-        panel.add_class("active")
-        lines: list[str] = []
-        if self._reasoning._current_action:
-            lines.append(f"[{NAVY_BRAND_DIM}]▸ {self._reasoning._current_action}[/]")
-        for thought in self._reasoning._committed_lines[-2:]:
-            lines.append(f"  [{NAVY_TEXT_DIM}]{thought}[/]")
-        if self._reasoning._streaming_line:
-            lines.append(
-                f"  [{NAVY_TEXT_TERTIARY}]{self._reasoning._streaming_line}[/]"
-            )
-        # Show ETA footer if available.
-        eta = self._reasoning.eta_display
-        if eta:
-            elapsed = self._reasoning.elapsed_seconds
-            elapsed_str = f"{elapsed}s" if elapsed is not None else "?"
-            lines.append(
-                f"  [{NAVY_TEXT_MUTED}]step {self._reasoning.step_count} · {elapsed_str} elapsed · {eta}[/]"
-            )
-        panel.update("\n".join(lines) if lines else "")
+        self.query_one("#hud-bar", HUD).update("  ".join(parts))
 
     # ── Transcript helpers ──────────────────────────────────────────────────
 
@@ -388,20 +297,23 @@ class GrintaScreen(Screen):
         return self.query_one("#transcript-log", RichLog)
 
     def add_user_message(self, text: str) -> None:
-        """User message — inline, color-coded prefix (dolphie style)."""
-        self._get_log().write(f"[{NAVY_BRAND}]❯ you[/]  [{NAVY_TEXT_PRIMARY}]{text}[/]")
+        """User message — with left border marker (dynamic, fills width naturally)."""
+        self._get_log().write(
+            f"[#91abec]│[/#91abec] [#e9e9e9]{text}[/#e9e9e9]"
+        )
         # Clear reasoning panel and streaming dedup state for the new turn
         if self._renderer:
             self._renderer._streamed_final_text = None
             self._renderer._turn_active = True
+            self._renderer._last_thinking_len = 0
 
     def add_agent_message(self, text: str) -> None:
-        """Agent message — compact bordered panel."""
-        self._get_log().write(
-            f"[{NAVY_BRAND_DIM}]┌ grinta[/]\n"
-            f"[{NAVY_TEXT_PRIMARY}]{text}[/]\n"
-            f"[{NAVY_BRAND_DIM}]└[/]"
-        )
+        """Agent message — plain text."""
+        self._get_log().write(f"[{NAVY_TEXT_PRIMARY}]{text}[/]")
+
+    def add_thinking(self, text: str) -> None:
+        """Real-time thinking/reasoning — shown in transcript while streaming."""
+        self._get_log().write(f"[dim]{text}[/]")
 
     def add_system_message(self, text: str) -> None:
         self._get_log().write(f"[{NAVY_TEXT_MUTED}]{text}[/]")
@@ -438,17 +350,6 @@ class GrintaScreen(Screen):
     def _scroll_to_bottom(self) -> None:
         self.query_one("#transcript-scroll", Transcript).scroll_end(animate=False)
 
-    # ── FooterBar ───────────────────────────────────────────────────────────
-
-    def _update_footer_bar(self) -> None:
-        self.query_one("#footer-bar", FooterBar).update(
-            f"[{NAVY_TEXT_MUTED}]"
-            f"[^C] Quit   "
-            f"[^L] Clear   "
-            f"[Enter] Send"
-            f"[/]"
-        )
-
     # ── Input handling ──────────────────────────────────────────────────────
 
     def action_submit_input(self) -> None:
@@ -456,8 +357,8 @@ class GrintaScreen(Screen):
         if self._input_lock.locked():
             _tui_logger.debug("action_submit_input: lock held, ignoring")
             return
-        ta = self.query_one("#input", TextArea)
-        text = ta.text.strip()
+        ta = self.query_one("#input", Input)
+        text = ta.value.strip()
         _tui_logger.debug(f"action_submit_input: text_len={len(text)}")
         if not text:
             _tui_logger.debug("action_submit_input: empty text, ignoring")
@@ -486,7 +387,7 @@ class GrintaScreen(Screen):
         except Exception as exc:
             _tui_logger.debug(f"_handle_input: _trace FAILED: {type(exc).__name__}: {exc}")
         async with self._input_lock:
-            ta = self.query_one("#input", TextArea)
+            ta = self.query_one("#input", Input)
             ta.clear()
             ta.focus()
             self._scroll_to_bottom()
@@ -496,7 +397,7 @@ class GrintaScreen(Screen):
                 return
 
             self.add_user_message(text)
-            self._update_footer_bar()
+            self._render_hud_bar()
             self.query_one("#input-bar", InputBar).add_class("processing")
 
             try:
@@ -504,7 +405,7 @@ class GrintaScreen(Screen):
                 if self._controller is None:
                     _tui_logger.debug("_handle_input: calling _bootstrap()")
                     logger.info("[TUI] _handle_input: bootstrapping (no controller)")
-                    self.add_system_message(f"[{NAVY_BRAND}]Bootstrapping engine…[/]")
+                    # Internal bootstrap - no user-facing message
                     await self._bootstrap()
                     if self._controller is None:
                         raise RuntimeError("Bootstrap failed to initialize controller")
@@ -515,9 +416,7 @@ class GrintaScreen(Screen):
                         "[TUI] _handle_input: bootstrap complete, state=%s",
                         self._controller.get_agent_state(),
                     )
-                    self.add_system_message(
-                        f"[{NAVY_READY}]Engine ready — dispatching task[/]"
-                    )
+                    # Internal ready - no user-facing message
                 else:
                     _tui_logger.debug(
                         "_handle_input: controller exists, calling _ensure_agent_task()"
@@ -539,32 +438,31 @@ class GrintaScreen(Screen):
                 _tui_logger.debug("_handle_input: EXCEPTION in try block")
                 logger.exception("[TUI] _handle_input FAILED")
                 self.add_error("Agent error — check app.log")
-                self._update_footer_bar()
+                self._render_hud_bar()
                 if self._controller:
                     try:
                         actual = str(self._controller.get_agent_state())
                         self._hud.update_agent_state(actual or "Error")
-                        self._render_topbar()
-                        self._render_metrics_grid()
+                        self._render_hud_bar()
+                        self._render_hud_bar()
                     except Exception:
                         self._hud.update_agent_state("Error")
-                        self._render_topbar()
-                        self._render_metrics_grid()
+                        self._render_hud_bar()
+                        self._render_hud_bar()
             finally:
-                self._update_footer_bar()
+                self._render_hud_bar()
                 self.query_one("#input-bar", InputBar).remove_class("processing")
                 if self._renderer:
                     self._renderer.drain_events()
                 state_label = self._hud.state.agent_state_label or "Ready"
                 logger.info("[TUI] _handle_input: finally, HUD state=%r", state_label)
                 self._hud.update_agent_state(state_label)
-                self._render_topbar()
-                self._render_metrics_grid()
+                self._render_hud_bar()
+                self._render_hud_bar()
 
     def update_hud(self) -> None:
         self._hud.update_agent_state(self._hud.state.agent_state_label or "Ready")
-        self._render_topbar()
-        self._render_metrics_grid()
+        self._render_hud_bar()
 
     async def _handle_slash_command(self, text: str) -> None:
         cmd = text.lower().strip()
@@ -606,9 +504,9 @@ class GrintaScreen(Screen):
         _tui_logger.debug("_bootstrap: start")
         logger.info("TUI _bootstrap: starting")
         self._hud.update_agent_state("Initializing")
-        self._render_topbar()
-        self._render_metrics_grid()
-        self.add_system_message(f"[{NAVY_BRAND}]Initializing engine…[/]")
+        self._render_hud_bar()
+        self._render_hud_bar()
+        # Internal only - no user-facing message
 
         config = self._config
 
@@ -677,11 +575,11 @@ class GrintaScreen(Screen):
             "TUI _bootstrap: state after renderer subscribe=%s", state_after_create
         )
         self._hud.update_agent_state(str(state_after_create))
-        self._render_topbar()
-        self._render_metrics_grid()
+        self._render_hud_bar()
+        self._render_hud_bar()
         self._renderer.drain_events()
         _tui_logger.debug("_bootstrap: done")
-        self.add_system_message(f"[{NAVY_READY}]Engine ready.[/]")
+        # Internal only - no user-facing message
 
     def _bootstrap_sync_phase1(
         self,
@@ -971,6 +869,8 @@ class TUIRenderer:
         self._streamed_final_text: str | None = None
         # Tracks whether the current turn is complete to prevent cross-turn leak.
         self._turn_active: bool = False
+        # Track thinking stream position to avoid re-rendering duplicates
+        self._last_thinking_len: int = 0
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
@@ -1031,37 +931,37 @@ class TUIRenderer:
             self._handle_state_change(event)
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
-        """Handle streaming chunk — update reasoning in real-time, transcript only on final."""
-        # Real-time thinking/reasoning tokens
-        thinking = (action.thinking_accumulated or "").strip()
-        if thinking:
-            self._reasoning.start()
-            self._reasoning.set_streaming_thought(thinking)
-            self._tui._update_reasoning_panel()
-            self._state_event.set()
-
-        # Tool call streaming: show in reasoning display
+        """Handle streaming chunk — show thinking in real-time, final message when complete."""
+        # Tool call streaming
         if action.is_tool_call:
             tool_name = action.tool_call_name or "tool"
-            self._reasoning.start()
-            self._reasoning.update_action(f"{tool_name}…")
-            self._tui._update_reasoning_panel()
+            self._tui.add_thinking(f"[{NAVY_TEXT_TERTIARY}]▸ Tool[/]  [dim]{tool_name}…[/]")
             self._state_event.set()
             return
 
-        # Live cost update during streaming
-        # NOTE: _update_metrics (called for every event) already accumulates cost
-        # via event.cost_usd.  We skip adding cost here to avoid double-counting.
+        # Real-time thinking/reasoning streaming - only show NEW content
+        thinking = (action.thinking_accumulated or "").strip()
+        if thinking:
+            new_thinking = thinking[self._last_thinking_len:]
+            if new_thinking:
+                # Show "Thinking:" header only when starting a new block (last_len is 0)
+                # Combine header + content in one line with spacing
+                if self._last_thinking_len == 0:
+                    self._tui.add_thinking(f"[{NAVY_TEXT_TERTIARY}]▸ Thinking[/]  {new_thinking}")
+                else:
+                    self._tui.add_thinking(new_thinking)
+                self._last_thinking_len = len(thinking)
+            self._state_event.set()
 
-        # Only add to transcript when streaming is complete
+        # Only add final message to transcript when streaming is complete
         if action.is_final:
+            # Reset thinking tracker for next turn
+            self._last_thinking_len = 0
             text = (action.accumulated or "").strip()
             if text:
                 self._streamed_final_text = text
                 self._tui.add_agent_message(text)
-            self._reasoning.stop()
-            self._tui._update_reasoning_panel()
-            self._tui._render_metrics_grid()
+            self._tui._render_hud_bar()
 
     def _update_metrics(self, event: Any) -> None:
         if hasattr(event, "model") and event.model:
@@ -1082,21 +982,13 @@ class TUIRenderer:
         self._current_state = state
         self._hud.update_agent_state(str(state))
         self._state_event.set()
-        # Direct calls since _handle_state_change runs on the main loop
-        # (called from _process_event which is called from drain_events on the
-        # main thread).  No need for call_soon_threadsafe.
-        self._tui._render_topbar()
-        self._tui._render_metrics_grid()
+        self._tui._render_hud_bar()
 
-        # Clear reasoning panel when agent becomes idle
         if state in {
             AgentState.AWAITING_USER_INPUT,
             AgentState.FINISHED,
             AgentState.ERROR,
             AgentState.STOPPED,
         }:
-            self._reasoning.stop()
-            self._tui._update_reasoning_panel()
-            # Reset streaming dedup state at turn boundary.
             self._streamed_final_text = None
             self._turn_active = False

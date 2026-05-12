@@ -160,9 +160,8 @@ async def run_agent_until_done(
                 break
     finally:
         if _ran_loop:
-            try:
-                from backend.utils.async_utils import drain_background_tasks
-
-                await drain_background_tasks(max_rounds=5)
-            except Exception:
-                pass
+            # Drain is intentionally omitted here — the TUI gates new messages on
+            # _agent_task.done(), and this cleanup delays completion. Background
+            # tasks are independently scheduled and don't need this coroutine to
+            # wait for them.  The TUI's run_tui finally block handles final drain.
+            pass
