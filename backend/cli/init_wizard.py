@@ -268,15 +268,20 @@ def _collect_api_key(console: Console, preset: dict[str, Any]) -> str:
 
 
 def run_init(project_root: Path | None = None, console: Console | None = None) -> int:
-    """Run the wizard. Returns shell-style exit code."""
+    """Run the wizard. Returns shell-style exit code.
+
+    Exit codes:
+        0 - Success
+        1 - General error
+        2 - Settings directory not writable
+        3 - Invalid input
+    """
     console = console or Console(no_color=no_color_enabled())
-    project_root = (project_root or Path.cwd()).resolve()
-    settings_file = _settings_path()
-    existing = _load_existing(settings_file)
+    platform_info = _get_platform_info()
 
     console.print(
         Panel.fit(
-            '[bold]Welcome to Grinta.[/bold]\n'
+            f'[bold]Welcome to Grinta.[/bold] ({platform_info})\n'
             'This wizard configures your LLM provider and writes [bold]settings.json[/bold].\n'
             'API keys are stored in a sibling [bold].env[/bold] file when provided.\n'
             f'Re-run any time with [{CLR_BRAND}]grinta init[/].',
@@ -286,13 +291,31 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
         )
     )
 
+    project_root = (project_root or Path.cwd()).resolve()
+    settings_file = _settings_path()
+    existing = _load_existing(settings_file)
+
+    can_write, write_error = _check_settings_directory_writable(settings_file)
+    if not can_write:
+        console.print(
+            f'[{CLR_STATUS_WARN}]Warning:[/] {write_error}',
+            style=CLR_STATUS_WARN
+        )
+        console.print(
+            f'[{CLR_META}]Tip: Set APP_ROOT environment variable to a writable directory.\n'
+            f'  Example: APP_ROOT=~/.grinta grinta init[/]'
+        )
+        return 2
+
     if existing and not _confirm_overwrite_existing(console, existing):
         return 0
 
+    console.print(f'[{CLR_META}]Detecting local model servers...[/]', end='')
     detected = _detect_local()
+    console.print(' done.')
     if detected:
         console.print(
-            f'[{CLR_STATUS_OK}]Detected local provider(s):[/] {", ".join(detected)}'
+            f'[{CLR_STATUS_OK}]Found local:[/] {", ".join(detected)}'
         )
 
     _print_provider_table(console, detected)
@@ -307,6 +330,14 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
         'Model id (provider/model)',
         default=preset['default_model'],
     )
+
+    if not model or not model.strip():
+        console.print(
+            f'[{CLR_STATUS_WARN}]Error:[/] Model cannot be empty.',
+            style=CLR_STATUS_WARN
+        )
+        return 3
+
     api_key = _collect_api_key(console, preset)
     base_url = Prompt.ask(
         'Base URL (leave blank for default)',
@@ -319,10 +350,37 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
         'llm_api_key': LLM_API_KEY_SETTINGS_PLACEHOLDER if api_key else '',
         'llm_base_url': base_url,
     }
-    settings_file.parent.mkdir(parents=True, exist_ok=True)
-    settings_file.write_text(json.dumps(settings, indent=2) + '\n', encoding='utf-8')
+
+    try:
+        _atomic_json_write(settings_file, settings)
+    except PermissionError:
+        console.print(
+            f'[{CLR_STATUS_WARN}]Error:[/] Cannot write to {settings_file}',
+            style=CLR_STATUS_WARN
+        )
+        return 2
+    except Exception as e:
+        console.print(
+            f'[{CLR_STATUS_WARN}]Error:[/] Failed to write settings: {e}',
+            style=CLR_STATUS_WARN
+        )
+        return 1
+
     if api_key:
-        persist_llm_api_key_to_dotenv(api_key, settings_json_path=settings_file)
+        try:
+            persist_llm_api_key_to_dotenv(api_key, settings_json_path=settings_file)
+        except PermissionError:
+            console.print(
+                f'[{CLR_STATUS_WARN}]Warning:[/] Could not write .env file. '
+                'API key will need to be set via environment variable.',
+                style=CLR_STATUS_WARN
+            )
+        except Exception as e:
+            console.print(
+                f'[{CLR_STATUS_WARN}]Warning:[/] Could not persist API key: {e}',
+                style=CLR_STATUS_WARN
+            )
+
     console.print(
         Panel.fit(
             f'Wrote [bold]{settings_file}[/bold]\n'
@@ -335,7 +393,6 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
         )
     )
 
-    # Surface a security checklist link if it exists.
     checklist = project_root / 'docs' / 'SECURITY_CHECKLIST.md'
     if checklist.exists():
         console.print(

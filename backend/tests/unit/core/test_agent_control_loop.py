@@ -157,7 +157,9 @@ class TestRunAgentUntilDone:
         assert callable(runtime.status_callback)
         assert runtime.status_callback is controller.status_callback
         assert controller.status_callback is memory.status_callback
-        controller.step.assert_called_once_with()
+        # When already in an end state, step() is NOT called (skipped).
+        # The agent is already terminal so no further stepping is needed.
+        assert controller.step.call_count == 0
         mock_sleep.assert_not_awaited()
 
     @patch(

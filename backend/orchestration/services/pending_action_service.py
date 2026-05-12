@@ -98,6 +98,7 @@ class PendingActionService:
         self._progress_log_buckets: dict[int | str, int] = {}
         self._watchdog_handle: asyncio.TimerHandle | threading.Timer | None = None
         self._watchdog_delay_s: float = timeout + 2
+        self._lock = threading.Lock()
 
     @staticmethod
     def _effective_timeout_seconds(base: float, action: Action) -> float:

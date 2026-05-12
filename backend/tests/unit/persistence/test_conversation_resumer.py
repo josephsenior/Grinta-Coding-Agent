@@ -301,6 +301,19 @@ class TestLoadLatestCheckpoint:
                 self.status = 'active'
                 self._private = True
 
+            def __getstate__(self):
+                return {
+                    'session_id': 'sid-1',
+                    'agent_state': 'running',
+                    'iteration_flag': MagicMock(),
+                    'budget_flag': MagicMock(),
+                    'inputs': {},
+                    'outputs': {},
+                    'extra_data': {},
+                    'iteration': self.iteration,
+                    'status': self.status,
+                }
+
         with patch(
             'backend.orchestration.state.session_checkpoint_manager.SessionCheckpointManager'
         ) as MockMgr:
