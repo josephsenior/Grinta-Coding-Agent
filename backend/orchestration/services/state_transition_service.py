@@ -183,7 +183,7 @@ class StateTransitionService:
             source='StateTransitionService.set_agent_state',
         )
 
-        self._handle_state_reset(new_state)
+        await self._handle_state_reset(new_state)
         self._handle_error_recovery(old_state, new_state)
         self._handle_pending_action_confirmation(new_state)
 
@@ -194,9 +194,9 @@ class StateTransitionService:
         )
         self._context.save_state()
 
-    def _handle_state_reset(self, new_state: AgentState) -> None:
+    async def _handle_state_reset(self, new_state: AgentState) -> None:
         if new_state in (AgentState.STOPPED, AgentState.ERROR):
-            self._context.reset_controller()
+            await self._context.reset_controller()
 
     def _handle_error_recovery(
         self, old_state: AgentState, new_state: AgentState

@@ -598,6 +598,7 @@ class EventRouterService:
             worker_id = f'pending_worker_{worker_order}'
             worker_marked_terminal = False
             worker_controller = None
+            worker_stream = None
 
             def _emit_worker_progress(status: str, detail: str) -> None:
                 progress = _build_delegate_progress_observation(
@@ -977,9 +978,6 @@ class EventRouterService:
                     else f'Agent did not finish gracefully (State: {final_state.value}).'
                 )
 
-                # Cleanup the worker after capturing final state and outputs.
-                await worker_controller.close(set_stop_state=False)
-
                 if success and not worker_marked_terminal:
                     _emit_worker_progress('done', 'Completed')
                 elif not success and not worker_marked_terminal:
@@ -990,6 +988,14 @@ class EventRouterService:
                 self._ctrl.log('error', f'Worker execution failed: {e}')
                 _emit_worker_progress('failed', f'Worker execution crashed: {e}')
                 return False, '', f'Worker execution crashed: {e}'
+            finally:
+                try:
+                    if worker_controller is not None:
+                        await worker_controller.close(set_stop_state=False)
+                    elif worker_stream is not None:
+                        worker_stream.close()
+                except Exception:
+                    pass
 
         async def _run_subagent():
             """Dispatch single or parallel workers and post the final observation."""

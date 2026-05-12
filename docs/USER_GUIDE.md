@@ -230,4 +230,4 @@ uv run python -m backend.cli.entry --help
 
 For architecture internals, see `docs/ARCHITECTURE.md`.
 For contributor-facing internals, see `docs/DEVELOPER.md`.
-For historical decisions and pivots, see `docs/journey/README.md`.
+For debugging issues, see `docs/TROUBLESHOOTING.md`.

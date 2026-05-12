@@ -1,7 +1,7 @@
 # Grinta Architecture
 
 This document describes the current Grinta architecture for maintainers.
-For design history and major pivots, see `docs/journey/README.md`.
+For historical context and design rationale (not current spec), see `docs/journey/README.md`.
 
 ## High-Level Shape
 
@@ -187,3 +187,6 @@ Core runtime protections include:
 - security policy checks in execution path
 
 These controls are designed to reduce false-success runs and uncontrolled loops while keeping the local workflow fast.
+
+For detailed reliability patterns, see [RELIABILITY.md](RELIABILITY.md).
+For performance considerations, see [PERFORMANCE.md](PERFORMANCE.md).

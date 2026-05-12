@@ -18,7 +18,9 @@ in ``EventStream._persist_event()``.
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import os
 import sqlite3
 import threading
 from pathlib import Path
@@ -29,6 +31,8 @@ from backend.core import json_compat as json
 _SCHEMA_VERSION = 1
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_MAX_PAYLOAD_BYTES = 25 * 1024 * 1024
 
 _CREATE_SQL = """\
 CREATE TABLE IF NOT EXISTS events (
@@ -63,15 +67,37 @@ class SQLiteEventStore:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._write_lock = threading.Lock()
         self._conn: sqlite3.Connection | None = None
+        self._closed = False
         # Dedicated thread-local for read connections - WAL mode allows concurrent readers
         self._local = threading.local()
+        self._read_conns: set[sqlite3.Connection] = set()
+        self._read_conns_lock = threading.Lock()
         self._ensure_schema()
 
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _max_payload_bytes() -> int:
+        raw = str(
+            os.getenv('GRINTA_SQLITE_EVENT_MAX_PAYLOAD_BYTES', '')
+        ).strip()
+        if raw:
+            try:
+                v = int(raw)
+                if v > 0:
+                    return v
+            except Exception:
+                pass
+        return DEFAULT_MAX_PAYLOAD_BYTES
+
+    def _ensure_open(self) -> None:
+        if self._closed:
+            raise RuntimeError('SQLiteEventStore is closed')
+
     def _get_conn(self) -> sqlite3.Connection:
+        self._ensure_open()
         if self._conn is None:
             self._conn = sqlite3.connect(
                 str(self._db_path),
@@ -85,13 +111,14 @@ class SQLiteEventStore:
             # maintained. See SQLite docs: "When synchronous is NORMAL
             # (Normal), the SQLite database engine will still sync at the
             # most critical moments, but less often than in FULL mode."
-            self._conn.execute('PRAGMA synchronous=NORMAL')
+            self._conn.execute('PRAGMA synchronous=FULL')
             self._conn.execute('PRAGMA busy_timeout=5000')
             self._conn.row_factory = sqlite3.Row
         return self._conn
 
     def _get_read_conn(self) -> sqlite3.Connection:
         """Return a thread-local read-only connection for concurrent queries."""
+        self._ensure_open()
         conn = getattr(self._local, 'read_conn', None)
         if conn is None:
             conn = sqlite3.connect(
@@ -104,6 +131,8 @@ class SQLiteEventStore:
             conn.execute('PRAGMA busy_timeout=5000')
             conn.row_factory = sqlite3.Row
             self._local.read_conn = conn
+            with self._read_conns_lock:
+                self._read_conns.add(conn)
         return conn
 
     def _ensure_schema(self) -> None:
@@ -157,14 +186,23 @@ class SQLiteEventStore:
     def close(self) -> None:
         """Close the database connections."""
         with self._write_lock:
-            # Clean up the thread-local read connection if it exists in the current thread
+            if self._closed:
+                return
+            self._closed = True
             read_conn = getattr(self._local, 'read_conn', None)
             if read_conn is not None:
-                read_conn.close()
+                with contextlib.suppress(Exception):
+                    read_conn.close()
                 self._local.read_conn = None
-            
+            with self._read_conns_lock:
+                to_close = list(self._read_conns)
+                self._read_conns.clear()
+            for conn in to_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
             if self._conn is not None:
-                self._conn.close()
+                with contextlib.suppress(Exception):
+                    self._conn.close()
                 self._conn = None
 
     # ------------------------------------------------------------------
@@ -220,6 +258,7 @@ class SQLiteEventStore:
         with self._write_lock:
             conn = self._get_conn()
             try:
+                conn.execute('BEGIN IMMEDIATE')
                 conn.executemany(
                     'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
                     rows,
@@ -242,12 +281,21 @@ class SQLiteEventStore:
             Parsed event dict, or ``None`` if not found.
         """
         conn = self._get_read_conn()
+        limit = self._max_payload_bytes()
         row = conn.execute(
-            'SELECT payload FROM events WHERE id = ?', (event_id,)
+            'SELECT length(payload) AS sz FROM events WHERE id = ?', (event_id,)
         ).fetchone()
         if row is None:
             return None
-        return json.loads(row['payload'])
+        size = int(row['sz'] or 0)
+        if size > limit:
+            raise ValueError(f'Event payload too large ({size} bytes) for id={event_id}')
+        row2 = conn.execute(
+            'SELECT payload FROM events WHERE id = ?', (event_id,)
+        ).fetchone()
+        if row2 is None:
+            return None
+        return json.loads(row2['payload'])
 
     def list_events(
         self,
@@ -271,6 +319,8 @@ class SQLiteEventStore:
         """
         clauses: list[str] = ['id >= ?']
         params: list[Any] = [start_id]
+        clauses.append('length(payload) <= ?')
+        params.append(self._max_payload_bytes())
 
         if end_id is not None:
             clauses.append('id < ?')

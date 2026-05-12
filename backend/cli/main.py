@@ -194,10 +194,6 @@ def _silence_all_loggers() -> None:
         logging.getLogger(name).setLevel(logging.CRITICAL)
 
 
-_load_dotenv_early()
-_silence_all_loggers()
-
-
 def _configure_redirected_streams(*streams: object | None) -> None:
     """Prefer UTF-8 when writing Rich output to redirected streams."""
     if not streams:

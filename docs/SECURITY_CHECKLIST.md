@@ -9,33 +9,37 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 
 ## Before each session
 
-- [ ] You trust the repository you are pointing Grinta at (no malicious `package.json` lifecycle scripts, no rogue `Makefile`, no `.envrc` you didn't write).
-- [ ] Your `settings.json` does **not** contain the only copy of any secret — secrets should live in your OS keychain or `.env` files referenced via `${VAR}` syntax.
-- [ ] You have a clean git working tree (so `git diff` is meaningful as an audit trail at the end).
-- [ ] You know your autonomy level (`/autonomy`). Use **conservative** for unfamiliar repos (confirm before every action); **balanced** (default) for normal work.
+- [ ] I trust the repository (no malicious `package.json` scripts, no rogue `Makefile`, no `.envrc` I didn't write)
+- [ ] My `settings.json` does **not** contain the only copy of any secret — secrets live in OS keychain or `.env` files via `${VAR}` syntax
+- [ ] I have a clean git working tree (so `git diff` is meaningful as an audit trail)
+- [ ] I know my autonomy level (`/autonomy`) — **conservative** for unfamiliar repos, **balanced** (default) for normal work
 
 ## Built-in protections
 
-- **Hardened-local execution policy** — `command_analyzer.py` classifies every command into NONE / LOW / MEDIUM / HIGH / CRITICAL.
-- **Hard CRITICAL refusal gate** — in `safety_validator.py::_should_block_action`, every CRITICAL-classified action is blocked regardless of profile or model output.
-- **Audit log** — every action is appended to `~/.grinta/workspaces/<id>/storage/<session>/audit/` with risk classification and outcome.
-- **Secret masker** — known secret patterns are stripped from event-stream output before display/logging.
-- **Pattern-based shell guard** — `rm -rf /`, force pushes to protected branches, encoded payloads, privilege escalation, and network exfiltration patterns are detected.
+| Protection | What it does |
+| --- | --- |
+| **Hardened-local policy** | `command_analyzer.py` classifies commands: NONE / LOW / MEDIUM / HIGH / CRITICAL |
+| **CRITICAL refusal gate** | `safety_validator.py::_should_block_action` blocks all CRITICAL actions regardless of profile |
+| **Audit log** | Every action logged to `~/.grinta/workspaces/<id>/storage/<session>/audit/` with risk classification |
+| **Secret masker** | Known secret patterns stripped from output before display/logging |
+| **Shell guard** | Detects `rm -rf /`, force pushes, encoded payloads, privilege escalation, network exfiltration |
 
 ## What Grinta is **not**
 
-- **Not** a sandbox. Pattern matching can be bypassed by sufficiently clever prompt injection or obfuscation.
-- **Not** isolated from your filesystem outside the workspace — `hardened_local` *prefers* but does not strictly enforce workspace boundaries.
-- **Not** safe against malicious build scripts triggered by tools you authorize (e.g., `npm install` on an untrusted `package.json`).
+| Misconception | Reality |
+| --- | --- |
+| A sandbox | Pattern matching can be bypassed by clever prompt injection or obfuscation |
+| Isolated from filesystem | `hardened_local` *prefers* workspace boundaries but does not strictly enforce them |
+| Safe against malicious builds | Authorized tools (e.g., `npm install` on untrusted `package.json`) can trigger malicious scripts |
 
 ## Hardening recommendations
 
-1. **Run untrusted repos inside a VM or container.** Use a disposable Docker container or a fresh user account with limited home-directory ACLs.
-2. **Stay on `conservative` autonomy** the first time you point Grinta at a new repo.
-3. **Review the audit log** (`~/.grinta/workspaces/<id>/storage/<session>/audit/`) at the end of each long session.
-4. **Keep your provider API keys scoped.** Use per-project keys with low spend limits where supported.
-5. **Pin Grinta to a known version** in production-adjacent workflows; track `CHANGELOG.md`.
-6. **Disable network-using tools** in `settings.json` `permissions` block when working offline-only.
+- [ ] Run untrusted repos in a VM or container (disposable Docker or fresh user account with limited ACLs)
+- [ ] Use **conservative** autonomy for unfamiliar repos
+- [ ] Review the audit log (`~/.grinta/workspaces/<id>/storage/<session>/audit/`) after long sessions
+- [ ] Scope API keys to per-project with low spend limits
+- [ ] Pin Grinta to a known version in production-adjacent workflows; track `CHANGELOG.md`
+- [ ] Disable network-using tools in `settings.json` `permissions` block when working offline
 
 ## Reporting a vulnerability
 

@@ -130,9 +130,9 @@ class OrchestrationContext:
         """Persist controller state."""
         self._controller.save_state()
 
-    def reset_controller(self) -> None:
+    async def reset_controller(self) -> None:
         """Reset controller internals for STOPPED/ERROR paths."""
-        self._controller._reset()
+        await self._controller.reset_controller()
 
     def pop_action_context(self, event_id: int):
         mapping = getattr(self._controller, '_action_contexts_by_event_id', None)
