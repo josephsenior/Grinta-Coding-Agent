@@ -240,6 +240,7 @@ class RunHelpersMixin:
         except Exception as exc:
             logger.warning('MCP warmup failed after chat became ready', exc_info=True)
             self._hud.update_mcp_servers(0)
+            self._handle_mcp_partial_state(agent)
             err_msg = f'MCP warmup failed: {exc}'
             self._bootstrap_status(err_msg, session, renderer, kind='warning')
             return
@@ -279,6 +280,28 @@ class RunHelpersMixin:
             self._set_footer_system_line(text, kind=kind)
         else:
             renderer.add_system_message(text, title=kind)
+
+    def _handle_mcp_partial_state(self, agent: Any) -> None:
+        """Handle partial MCP state after warmup failure.
+
+        When MCP warmup fails after tools have been registered but clients
+        weren't fully initialized, we need to clear the partial state to
+        prevent the agent from using incomplete MCP tools.
+        """
+        try:
+            mcp_config = getattr(agent.config, 'mcp', None) or getattr(
+                agent.config, 'mcp_config', None
+            )
+            if mcp_config is not None:
+                mcp_config.servers = []
+            agent.mcp_capability_status = {
+                'connected_client_count': 0,
+                'partial_initialization': True,
+                'error': 'warmup failed before full initialization',
+            }
+            logger.debug('Cleared partial MCP state after warmup failure')
+        except Exception as exc:
+            logger.warning('Failed to clear partial MCP state: %s', exc)
 
     async def _bootstrap_init_session(
         self,
@@ -418,6 +441,7 @@ class RunHelpersMixin:
             self._consecutive_input_failures = 0
             return ''
         except EOFError:
+            self._consecutive_input_failures = 0
             self._console.print(f'[{STYLE_DIM}]Input closed. Exiting.[/]')
             return None
         except asyncio.CancelledError:
@@ -677,7 +701,6 @@ class RunHelpersMixin:
         if self._renderer is not None:
             self._renderer.stop_live()
         await self._cancel_task_silently(agent_task)
-        # Explicitly close MCP connections before releasing runtime.
         if self._memory is not None:
             close_mcp = getattr(self._memory, 'close_mcp_clients', None)
             if callable(close_mcp):
@@ -687,6 +710,12 @@ class RunHelpersMixin:
         if self._acquire_result is not None:
             from backend.execution import runtime_orchestrator
 
+            runtime = self._acquire_result.runtime
+            try:
+                runtime.close()
+                logger.debug('REPL: _finalize_repl_run: closed runtime')
+            except Exception as exc:
+                logger.warning('REPL: _finalize_repl_run: runtime.close() failed: %s', exc)
             logger.debug('REPL: _finalize_repl_run: releasing acquire result')
             runtime_orchestrator.release(self._acquire_result)
         self._close_event_stream()

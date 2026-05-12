@@ -141,8 +141,6 @@ async def run_agent_until_done(
     from backend.core.constants import DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS
 
     _started = _time.monotonic()
-    # 0 or negative disables the hard cap entirely, allowing arbitrarily
-    # long coding sessions without forced termination.
     _max_poll_seconds = DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS
     while controller.state.agent_state not in end_states:  # noqa: ASYNC110
         await asyncio.sleep(0.5)

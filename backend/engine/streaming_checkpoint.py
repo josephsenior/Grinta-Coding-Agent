@@ -41,6 +41,7 @@ class CheckpointRecord:
     params_summary: dict[str, Any] = field(default_factory=dict)
     attempt: int = 1
     anchor_event_id: int | None = None
+    crash_marker: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
 
 
 @dataclass
@@ -62,6 +63,7 @@ class StreamingCheckpoint:
     """
 
     _FILENAME = 'streaming_wal.json'
+    _CRASH_EVIDENCE_DIR = 'crash_evidence'
 
     def __init__(
         self,
@@ -75,6 +77,7 @@ class StreamingCheckpoint:
         self._dir = Path(checkpoint_dir)
         self._dir.mkdir(parents=True, exist_ok=True)
         self._wal_path = self._dir / self._FILENAME
+        self._crash_evidence_dir = self._dir / self._CRASH_EVIDENCE_DIR
         self._active: CheckpointRecord | None = None
         self._max_checkpoint_age_sec = float(max_checkpoint_age_sec)
         self._discard_stale_on_recovery = bool(discard_stale_on_recovery)
@@ -141,7 +144,7 @@ class StreamingCheckpoint:
 
         Recent uncommitted checkpoints are treated as ambiguous and should
         block the next automatic retry. Corrupt or stale WAL files are
-        discarded eagerly.
+        discarded eagerly. Crash evidence is preserved before auto-discard.
         """
         if not self._wal_path.exists():
             return RecoveryInspection(status='clean')
@@ -161,7 +164,7 @@ class StreamingCheckpoint:
                         record.token,
                         reason,
                     )
-                    self._remove_wal()
+                    self._remove_wal(preserve_evidence=True)
                     return RecoveryInspection(
                         status='stale_discarded',
                         record=record,
@@ -195,7 +198,7 @@ class StreamingCheckpoint:
             )
         except Exception:
             logger.exception('Corrupt streaming WAL — discarding')
-            self._remove_wal()
+            self._remove_wal(preserve_evidence=False)
             return RecoveryInspection(
                 status='corrupt_discarded',
                 reason='checkpoint WAL could not be parsed',
@@ -225,16 +228,55 @@ class StreamingCheckpoint:
         return CheckpointRecord(**raw)
 
     def _write(self, record: CheckpointRecord) -> None:
+        temp_path = self._wal_path.with_suffix('.tmp')
         try:
-            self._wal_path.write_text(
+            temp_path.write_text(
                 json.dumps(asdict(record), default=str),
                 encoding='utf-8',
             )
+            temp_path.replace(self._wal_path)
         except OSError:
             logger.exception('Failed to write streaming WAL')
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
-    def _remove_wal(self) -> None:
+    def _preserve_crash_evidence(self, record: CheckpointRecord) -> None:
+        if not self._discard_stale_on_recovery:
+            return
+        try:
+            self._crash_evidence_dir.mkdir(parents=True, exist_ok=True)
+            crash_file = self._crash_evidence_dir / f'crash_{record.crash_marker}.json'
+            crash_data = {
+                'token': record.token,
+                'crash_marker': record.crash_marker,
+                'created_at': record.created_at,
+                'params_summary': record.params_summary,
+                'attempt': record.attempt,
+                'anchor_event_id': record.anchor_event_id,
+                'preserved_at': time.time(),
+            }
+            crash_file.write_text(json.dumps(crash_data, default=str), encoding='utf-8')
+            logger.info(
+                'Preserved crash evidence for checkpoint %s at %s',
+                record.token,
+                crash_file,
+            )
+        except OSError:
+            logger.warning('Failed to preserve crash evidence', exc_info=True)
+
+    def _remove_wal(self, preserve_evidence: bool = False) -> None:
+        record = None
+        if preserve_evidence:
+            try:
+                if self._wal_path.exists():
+                    record = self._read_record()
+            except Exception:
+                pass
         try:
             self._wal_path.unlink(missing_ok=True)
         except OSError:
             logger.exception('Failed to remove streaming WAL')
+        if record is not None:
+            self._preserve_crash_evidence(record)
