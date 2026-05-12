@@ -12,6 +12,7 @@ import json
 import os
 import threading
 import time
+import uuid
 import weakref
 from collections import deque
 from collections.abc import Callable
@@ -169,18 +170,46 @@ class EventStream(EventStore):
         self._stop_flag = threading.Event()
 
         self._session_lock_path: str | None = None
+        self._session_lock_handle: Any = None
         try:
             from backend.persistence.locations import get_conversation_dir
+
             conv_dir = get_conversation_dir(sid, user_id)
-            lock_dir = os.path.join(str(file_store.root) if hasattr(file_store, 'root') else conv_dir, '.locks')
+            lock_dir = os.path.join(
+                str(file_store.root) if hasattr(file_store, 'root') else conv_dir,
+                '.locks',
+            )
             os.makedirs(lock_dir, exist_ok=True)
             self._session_lock_path = os.path.join(lock_dir, f'{sid}.lock')
-            lock_data = f'pid={os.getpid()};started={time.time():.0f}'
+            current_pid = os.getpid()
+            current_time = time.time()
+            session_marker = uuid.uuid4().hex[:16]
+            lock_data = (
+                f'pid={current_pid};started={current_time:.0f};'
+                f'marker={session_marker};host={os.environ.get("COMPUTERNAME", "unknown")}'
+            )
             try:
+                import sys
+
+                lock_handle = None
+                if sys.platform != 'win32':
+                    import fcntl
+
+                    lock_handle = open(self._session_lock_path, 'w')
+                    fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self._session_lock_handle = lock_handle
                 with open(self._session_lock_path, 'w', encoding='utf-8') as f:
                     f.write(lock_data)
             except Exception:
-                logger.debug('Could not write session lock file', exc_info=True)
+                if lock_handle:
+                    try:
+                        if sys.platform != 'win32':
+                            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+                        lock_handle.close()
+                    except Exception:
+                        pass
+                self._session_lock_handle = None
+                logger.debug('Could not acquire session lock', exc_info=True)
         except Exception:
             logger.debug('Session lock setup skipped', exc_info=True)
         event_defaults = get_event_runtime_defaults()
@@ -281,10 +310,17 @@ class EventStream(EventStore):
             if _coalesce
             else None
         )
-        # If WAL replay recovered events, invalidate cur_id so the next
-        # add_event() rescans storage and assigns a safe, monotonic ID.
+        # If WAL replay recovered events, recalculate cur_id atomically
+        # while holding the lock to prevent race conditions with concurrent
+        # add_event() calls.
         if recovered_count > 0:
-            self._cur_id = None
+            with self._lock:
+                self._cur_id = self._calculate_cur_id()
+                logger.debug(
+                    'WAL replay: recalculated cur_id=%d after recovering %d events',
+                    self._cur_id,
+                    recovered_count,
+                )
 
     def _shutdown_async_queue(self) -> None:
         if self._inline_delivery:
@@ -326,7 +362,6 @@ class EventStream(EventStore):
             if getattr(self, '_closed', False):
                 return
             self._closed = True
-        # Detach safety finalizer — we're closing explicitly.
         if hasattr(self, '_finalizer'):
             self._finalizer.detach()
         self._stop_flag.set()
@@ -335,6 +370,18 @@ class EventStream(EventStore):
         with self._lock:
             self._subscribers.clear()
             self._activity_listeners.clear()
+        if self._session_lock_handle is not None:
+            try:
+                import sys
+
+                if sys.platform != 'win32':
+                    import fcntl
+
+                    fcntl.flock(self._session_lock_handle.fileno(), fcntl.LOCK_UN)
+                self._session_lock_handle.close()
+            except Exception:
+                pass
+            self._session_lock_handle = None
         if self._session_lock_path:
             try:
                 os.unlink(self._session_lock_path)
@@ -794,15 +841,23 @@ class EventStream(EventStore):
                     self._await_result(result),  # type: ignore[arg-type]
                     main,
                 )
-                # Block this worker thread until the coroutine completes so
-                # ``_dispatch_event``'s ``gather`` reflects true completion.
-                # Use a generous timeout to prevent a stalled callback from
-                # blocking all downstream event delivery.
                 future.result(timeout=30)
             else:
-                # No main loop registered (e.g. unit tests with no app loop).
-                # Fall back to a disposable loop; no cross-loop primitives
-                # are expected in that environment.
+                logger.warning(
+                    'No main event loop available for callback %s; '
+                    'using fallback execution (cross-loop primitives may be orphaned)',
+                    callback_id,
+                )
+                try:
+                    loop = asyncio.get_event_loop()
+                    if not loop.is_closed():
+                        future = asyncio.run_coroutine_threadsafe(
+                            self._await_result(result), loop
+                        )
+                        future.result(timeout=30)
+                        return
+                except RuntimeError:
+                    pass
                 asyncio.run(self._await_result(result))  # type: ignore[arg-type]
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error(

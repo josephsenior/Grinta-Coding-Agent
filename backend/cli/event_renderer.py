@@ -197,6 +197,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._current_state: AgentState | None = None
         self._state_event = asyncio.Event()
         self._subscribed = False
+        self._subscribed_stream: Any = None
         self._max_budget = max_budget
         self._pending_events: deque[Any] = deque(maxlen=10000)
         self._last_assistant_message_text: str = ''
@@ -395,7 +396,13 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self.refresh(force=True)
 
     def reset_subscription(self) -> None:
+        if self._subscribed and self._subscribed_stream is not None:
+            try:
+                self._subscribed_stream.unsubscribe(_SUBSCRIBER, self)
+            except Exception:
+                pass
         self._subscribed = False
+        self._subscribed_stream = None
 
     @contextmanager
     def suspend_live(self):
@@ -601,10 +608,16 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     # -- subscription ------------------------------------------------------
 
     def subscribe(self, event_stream: EventStream, sid: str) -> None:
-        if self._subscribed:
+        if self._subscribed and self._subscribed_stream is event_stream:
             return
+        if self._subscribed and self._subscribed_stream is not None:
+            try:
+                self._subscribed_stream.unsubscribe(_SUBSCRIBER, self)
+            except Exception:
+                pass
         event_stream.subscribe(_SUBSCRIBER, self._on_event_threadsafe, sid)
         self._subscribed = True
+        self._subscribed_stream = event_stream
 
     def _on_event_threadsafe(self, event: Any) -> None:
         """Called from the EventStream's delivery thread pool.

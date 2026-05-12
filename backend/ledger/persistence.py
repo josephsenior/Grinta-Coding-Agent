@@ -310,16 +310,49 @@ class EventPersistence:
                 quarantine_exc,
             )
 
+    def _quarantine_orphan_pending(self, pending_path: str) -> None:
+        """Quarantine a .pending file that couldn't be deleted after event write.
+
+        This handles the case where the event file was successfully written but
+        the .pending marker couldn't be removed (e.g., permission error on
+        Windows, or antivirus interference). The orphan is moved to a lost_events/
+        subdirectory to prevent it from being replayed on every startup.
+        """
+        try:
+            pending_normalized = pending_path.replace('\\', '/')
+            events_dir = get_conversation_events_dir(self.sid, self.user_id)
+            lost_dir = f'{events_dir}lost_events/'
+            filename = os.path.basename(pending_normalized)
+            orphan_marker = f'orphan_{time.time():.0f}_{filename}'
+            dest_path = f'{lost_dir}{orphan_marker}'
+            try:
+                event_json = self.file_store.read(pending_path)
+                self.file_store.write(dest_path, event_json)
+            except Exception:
+                pass
+            try:
+                self.file_store.delete(pending_path)
+            except Exception:
+                pass
+            logger.warning(
+                'WAL: quarantined orphan .pending file to %s (original delete failed)',
+                dest_path,
+            )
+        except Exception as quarantine_exc:
+            logger.error(
+                'WAL: could not quarantine orphan pending %s: %s',
+                pending_path,
+                quarantine_exc,
+            )
+
     def replay_pending_events(self) -> int:
         """Scan the events directory for ``.pending`` WAL markers.
 
         Recovers any events left as ``.pending`` after a crash and cleans
         up stale markers whose canonical event files already exist.
 
-        Returns
-        -------
-        int
-            Number of events recovered from pending files.
+        Returns:
+            int: Number of events recovered from pending files.
         """
         try:
             events_dir = get_conversation_events_dir(self.sid, self.user_id)
@@ -465,6 +498,7 @@ class EventPersistence:
                     pending_file,
                     exc,
                 )
+                self._quarantine_orphan_pending(pending_file)
             event_id = payload.get('id')
             if isinstance(event_id, int):
                 self._record_persist_success(
