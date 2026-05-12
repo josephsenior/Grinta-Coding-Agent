@@ -4,12 +4,20 @@ Goal: zero-friction setup. Detect local model servers (Ollama, LM Studio),
 prompt the user for a provider + key, write a valid ``settings.json``.
 
 Re-runnable: existing settings are shown and the user can keep them.
+
+Cross-platform reliability:
+- Graceful network timeouts for local provider detection
+- Proper directory creation with permissions checks
+- Atomic file writes to prevent corruption
+- Clear error messages for common failures
 """
 
 from __future__ import annotations
 
 import json
 import os
+import platform
+import sys
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -27,6 +35,7 @@ from backend.cli.theme import (
     CLR_CARD_TITLE,
     CLR_META,
     CLR_STATUS_OK,
+    CLR_STATUS_WARN,
     no_color_enabled,
 )
 from backend.core.app_paths import get_canonical_settings_path
@@ -71,6 +80,18 @@ _PROVIDER_PRESETS: dict[str, dict[str, str]] = {
         'help': 'OpenRouter (proxy to many providers)',
     },
 }
+
+
+def _get_platform_info() -> str:
+    """Get platform string for error messages."""
+    system = platform.system()
+    if system == 'Windows':
+        return 'Windows'
+    elif system == 'Darwin':
+        return 'macOS'
+    elif system == 'Linux':
+        return 'Linux'
+    return f'{system} ({platform.release()})'
 
 
 def _http_ok(url: str) -> bool:

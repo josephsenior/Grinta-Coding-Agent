@@ -6,6 +6,7 @@ import asyncio
 import atexit
 import logging
 import os
+import threading
 from collections.abc import Awaitable, Callable, Coroutine, Iterable
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
@@ -380,6 +381,13 @@ def _run_in_loop(
 # Without this, ``run_or_schedule`` would create throw-away event loops whose
 # tasks are orphaned as soon as ``run_until_complete`` finishes.
 _main_event_loop: asyncio.AbstractEventLoop | None = None
+_main_loop_lock = threading.Lock()
+
+# A cached fallback loop reused across run_or_schedule() path-3 calls.
+# Created lazily on first use, reused for subsequent calls, closed only
+# on process exit or explicit cleanup.
+_fallback_loop: asyncio.AbstractEventLoop | None = None
+_fallback_loop_lock = threading.Lock()
 
 
 def set_main_event_loop(loop: asyncio.AbstractEventLoop | None = None) -> None:
@@ -389,14 +397,16 @@ def set_main_event_loop(loop: asyncio.AbstractEventLoop | None = None) -> None:
     If *loop* is ``None``, the currently running loop is used.
     """
     global _main_event_loop  # noqa: PLW0603
-    if loop is None:
-        loop = asyncio.get_running_loop()
-    _main_event_loop = loop
+    with _main_loop_lock:
+        if loop is None:
+            loop = asyncio.get_running_loop()
+        _main_event_loop = loop
 
 
 def get_main_event_loop() -> asyncio.AbstractEventLoop | None:
     """Return the registered main event loop, or ``None``."""
-    return _main_event_loop
+    with _main_loop_lock:
+        return _main_event_loop
 
 
 def get_active_loop() -> asyncio.AbstractEventLoop | None:
@@ -456,13 +466,27 @@ def run_or_schedule(coro: Coroutine[Any, Any, Any]) -> None:
         main.call_soon_threadsafe(_schedule_on_main_loop, coro)
         return
 
-    # 3. No running loop — fall back to synchronous execution.
-    loop = asyncio.new_event_loop()
-    try:
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    # 3. No running loop — fall back to a reusable cached loop.  Creating
+    # a fresh loop per call is expensive and orphans tasks.  We keep one
+    # cached loop for path-3 calls and reuse it across all such calls
+    # within the process lifetime.  Threads sharing this loop is safe since
+    # each call's run_until_complete is a discrete, self-contained unit.
+    with _fallback_loop_lock:
+        global _fallback_loop  # noqa: PLW0603
+        if _fallback_loop is None:
+            _fallback_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(_fallback_loop)
+            # Register cleanup on process exit to avoid "Event loop
+            # destroyed" warnings from atexit.
+            def _close_fallback_loop() -> None:
+                global _fallback_loop  # noqa: PLW0603
+                if _fallback_loop is not None:
+                    _fallback_loop.run_until_complete(_fallback_loop.shutdown_asyncgens())
+                    _fallback_loop.close()
+                    _fallback_loop = None
+
+            atexit.register(_close_fallback_loop)
+        _fallback_loop.run_until_complete(coro)
 
 
 async def drain_background_tasks(

@@ -131,8 +131,9 @@ class Orchestrator(Agent):
         super().__init__(config=config, llm_registry=llm_registry)
         self.plugin_requirements = plugin_requirements or []
 
-        self.pending_actions: deque[Action] = deque()
+        self.pending_actions: deque[Action] = deque(maxlen=1000)
         self.deferred_actions: deque[Action] = deque()
+        self._consecutive_context_errors = 0
         self.event_stream: EventStream | None = None
 
         # Safety / hallucination systems
@@ -366,7 +367,7 @@ class Orchestrator(Agent):
             DEFAULT_AGENT_MAX_CONTEXT_LIMIT_ERRORS,
         )
 
-        if self._consecutive_context_errors > DEFAULT_AGENT_MAX_CONTEXT_LIMIT_ERRORS:
+        if self._consecutive_context_errors >= DEFAULT_AGENT_MAX_CONTEXT_LIMIT_ERRORS:
             degraded = await self._attempt_graceful_context_degradation(state)
             if degraded is not None:
                 self._consecutive_context_errors = 0

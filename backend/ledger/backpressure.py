@@ -121,7 +121,6 @@ class BackpressureManager:
     def get_snapshot(self, started_at: float) -> dict[str, int]:
         """Return a dict of backpressure counters for health checks."""
         self.trim_recent_window()
-        self.trim_recent_window()
         snap: dict[str, int] = dict(self.stats)
         snap['queue_size'] = self.queue_size
         snap['max_queue_size'] = self.max_queue_size

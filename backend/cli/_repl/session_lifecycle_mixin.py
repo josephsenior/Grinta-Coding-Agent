@@ -214,7 +214,7 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
     ) -> None:
         logger.warning('Agent wait exceeded %ds hard timeout', active_timeout)
         from backend.cli.notifications import notify
-        from backend.core.schemas import AgentState
+        from backend.core.enums import AgentState
 
         notify(
             'Grinta — Timeout',
