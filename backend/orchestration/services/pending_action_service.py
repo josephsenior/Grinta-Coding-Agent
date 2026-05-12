@@ -198,31 +198,36 @@ class PendingActionService:
 
     def _primary_entry(self) -> tuple[Action, float] | None:
         """Latest / highest-id outstanding row (for step guards and logging)."""
-        if not self._outstanding:
-            return self._legacy_pending
-        best_id = max(self._outstanding.keys())
-        return self._outstanding[best_id]
+        with self._lock:
+            if not self._outstanding:
+                return self._legacy_pending
+            try:
+                best_id = max(self._outstanding.keys())
+                return self._outstanding[best_id]
+            except (ValueError, KeyError):
+                return self._legacy_pending
 
     def _purge_timeouts(self) -> None:
         """Remove timed-out actions; defer observation emission to async path."""
         now = time.time()
         dead: list[tuple[Action, float]] = []
-        for aid, (action, ts) in list(self._outstanding.items()):
-            elapsed = now - ts
-            limit = self._effective_timeout_seconds(self._timeout, action)
-            if math.isfinite(limit) and elapsed > limit:
-                dead.append((action, elapsed))
-                self._outstanding.pop(aid, None)
-                self._progress_log_buckets.pop(aid, None)
+        with self._lock:
+            for aid, (action, ts) in list(self._outstanding.items()):
+                elapsed = now - ts
+                limit = self._effective_timeout_seconds(self._timeout, action)
+                if math.isfinite(limit) and elapsed > limit:
+                    dead.append((action, elapsed))
+                    self._outstanding.pop(aid, None)
+                    self._progress_log_buckets.pop(aid, None)
 
-        if self._legacy_pending is not None:
-            action, ts = self._legacy_pending
-            elapsed = now - ts
-            limit = self._effective_timeout_seconds(self._timeout, action)
-            if math.isfinite(limit) and elapsed > limit:
-                dead.append((action, elapsed))
-                self._legacy_pending = None
-                self._progress_log_buckets.pop('legacy', None)
+            if self._legacy_pending is not None:
+                action, ts = self._legacy_pending
+                elapsed = now - ts
+                limit = self._effective_timeout_seconds(self._timeout, action)
+                if math.isfinite(limit) and elapsed > limit:
+                    dead.append((action, elapsed))
+                    self._legacy_pending = None
+                    self._progress_log_buckets.pop('legacy', None)
 
         # Defer observation emission to async path to avoid recursive
         # event delivery when called from the sync step loop.

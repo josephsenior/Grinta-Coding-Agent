@@ -71,11 +71,41 @@ class DurableEventWriter:
         # Signal the writer thread to stop after its current batch.
         self._stop_flag.set()
 
-        # Wait for the queue to drain with a deadline instead of the
-        # unbounded queue.join() — a stuck store must not hang shutdown.
+        # Best-effort drain: wait for in-flight items to complete while guarding
+        # against negative counters (from double task_done() bugs in callers) and
+        # orphaned sentinels that permanently suppress the counter above zero.
         deadline = time.monotonic() + drain_timeout
+        last_remaining = self._queue.unfinished_tasks
+        stall_count = 0
         while self._queue.unfinished_tasks > 0 and time.monotonic() < deadline:
             time.sleep(0.01)
+            remaining = self._queue.unfinished_tasks
+            if remaining >= last_remaining:
+                stall_count += 1
+            else:
+                stall_count = 0
+                last_remaining = remaining
+            # Guard: counter stuck above zero due to orphaned sentinel or
+            # negative counter from double task_done().  After 500 consecutive
+            # iterations (~5s) with no progress, assume a structural issue
+            # and exit rather than spin forever.
+            if stall_count > 500:
+                logger.warning(
+                    'DurableEventWriter: drain stalled at %d unfinished tasks — '
+                    'breaking drain loop to allow shutdown. '
+                    'This usually indicates a queue counter inconsistency.',
+                    remaining,
+                )
+                break
+            # Also guard against negative counter (over-decremented): negative
+            # means items are done, so exit the drain loop.
+            if remaining < 0:
+                logger.debug(
+                    'DurableEventWriter: unfinished_tasks is %d — '
+                    'counter below zero, exiting drain loop.',
+                    remaining,
+                )
+                break
 
         remaining = self._queue.unfinished_tasks
         if remaining > 0:
@@ -135,17 +165,25 @@ class DurableEventWriter:
         # Write WAL marker AFTER successful enqueue so a crash between
         # enqueue and flush is recoverable, but a dropped event never
         # gets a WAL marker that could be resurrected on crash recovery.
+        # Failure here is non-fatal (event is already in the queue for the
+        # writer thread to flush), but we must propagate the error so the
+        # caller knows the crash-safety window is reduced.
         serialized = json.dumps(persisted_event.payload)
         pending_path = self._pending_path(persisted_event.filename)
+        wal_ok = False
         try:
             self._file_store.write(pending_path, serialized)
+            wal_ok = True
         except Exception as exc:
-            logger.debug(
-                'WAL: could not write .pending marker %s: %s',
+            logger.error(
+                'WAL: could not write .pending marker %s for event id=%d: %s. '
+                'Event is in queue and will be flushed, but crash-recovery '
+                'coverage for this event is reduced until flush completes.',
                 pending_path,
+                persisted_event.event_id,
                 exc,
             )
-        return True
+        return wal_ok
 
     def _run(self) -> None:
         while not self._stop_flag.is_set():

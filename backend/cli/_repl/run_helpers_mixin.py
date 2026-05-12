@@ -175,6 +175,9 @@ class RunHelpersMixin:
                 engine_init_exc,
             )
             if not init_ok:
+                engine_init_exc.append(
+                    RuntimeError('Session initialization failed')
+                )
                 return
 
             self._bootstrap_status('Setting up runtime…', session, renderer)
@@ -186,6 +189,9 @@ class RunHelpersMixin:
                 engine_init_exc,
             )
             if not runtime_ok:
+                engine_init_exc.append(
+                    RuntimeError('Runtime setup failed')
+                )
                 return
             engine_init_done.set()
 

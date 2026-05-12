@@ -787,7 +787,6 @@ class EventStream(EventStore):
                 if not self._stop_flag.is_set():
                     await self._dispatch_event(cast(Event, event))
             except asyncio.CancelledError:
-                queue.task_done()
                 self._bp.queue_size = queue.qsize()
                 raise
             except Exception as e:

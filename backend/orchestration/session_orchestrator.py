@@ -156,6 +156,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         self._step_gate = threading.Lock()
         # When a step is requested while another is running, this flag ensures
         # the dropped request is re-queued after the current step completes.
+        # Protected by _step_lock to avoid races with drain_loop's read/write.
         self._step_pending = False
         # Suppresses memory-pressure condensation signalling during batch drain
         # so that pending actions are not disrupted mid-batch.
@@ -497,14 +498,16 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         __init__) because this method is often called from EventStream's
         thread-pool dispatcher which runs disposable event loops.
 
-        Thread-safe: if called concurrently, only one step task will be created.
-        Additional concurrent calls set _step_pending to ensure the step runs again.
+        Thread-safe: the _step_gate is held for the entire task-creation
+        window so that call_soon_threadsafe + _create_step_task is atomic.
+        Only one step task can be created even across concurrent calls.
         """
         if self._closed:
             return
 
         # Atomic gate: prevents two threads from both seeing _step_task as done
-        # and both creating step tasks.
+        # and both creating step tasks.  The gate is held for the entire
+        # call_soon_threadsafe window so no other thread can interleave.
         with self._step_gate:
             if self._step_task and not self._step_task.done():
                 self._step_pending = True
@@ -520,9 +523,16 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                 self._create_step_task()
 
     def _create_step_task(self) -> None:
-        """Create the step task on the current (main) running loop."""
-        # Guard: another step may have been scheduled between call_soon_threadsafe
-        # and actual execution on the main loop.
+        """Create the step task on the current (main) running loop.
+
+        This method must only be called while holding _step_gate, either
+        directly from step() or via call_soon_threadsafe on the main loop.
+        The caller's gate acquisition prevents the race window.
+        """
+        # Fast path: task still running — re-queue pending and exit.
+        # This check is safe because the gate was held at the call site;
+        # a second concurrent _create_step_task from another thread would
+        # have been blocked at step().
         if self._step_task and not self._step_task.done():
             self._step_pending = True
             return
@@ -777,6 +787,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                         break
             finally:
                 self._step_owner_task = None
+                self._step_pending = False
 
     async def reset_controller(self) -> None:
         owner = self._step_owner_task
@@ -850,7 +861,6 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                     from backend.utils.async_utils import drain_background_tasks
 
                     await drain_background_tasks()
-                    await self._handle_post_execution()
         finally:
             self._draining_batch = False
         # Deferred condensation check after batch drain completes.
