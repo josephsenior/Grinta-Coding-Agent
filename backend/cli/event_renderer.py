@@ -683,7 +683,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         # so Rich does not clip tall turns (Live vertical_overflow ellipsis).
         max_width = max(options.max_width or 0, self._console.width)
         if max_width < 20:
-            yield Text('Terminal too narrow', style='dim')
+            yield Text('Terminal too narrow', style=STYLE_DIM)
             return
         main_width = _compute_main_width(max_width)
 
