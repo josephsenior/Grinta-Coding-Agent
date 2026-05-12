@@ -10,7 +10,11 @@ import time
 from collections.abc import Callable, Coroutine
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.utils.async_utils import run_or_schedule, set_main_event_loop
+from backend.utils.async_utils import (
+    get_main_event_loop,
+    run_or_schedule,
+    set_main_event_loop,
+)
 
 if TYPE_CHECKING:
     from backend.core.config import AgentConfig, LLMConfig
@@ -513,7 +517,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                 self._step_pending = True
                 return
 
-            main_loop = getattr(self, '_main_loop', None)
+            main_loop = get_main_event_loop()
             if main_loop is not None and main_loop.is_running():
                 main_loop.call_soon_threadsafe(self._create_step_task)
             else:
@@ -828,6 +832,17 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             return
 
         await self.action_execution.execute_action(action)
+
+        # P1-B: When the agent returns a MessageAction with wait_for_response,
+        # the state must be transitioned to AWAITING_USER_INPUT synchronously
+        # here (after the action is dispatched) rather than relying on the
+        # async on_event handler. If we don't, the subsequent "schedule next
+        # step" check below will see state still RUNNING and queue another LLM
+        # call, creating a spurious step task that blocks the next user message.
+        if isinstance(action, MessageAction) and action.source == EventSource.AGENT:
+            if action.wait_for_response:
+                if self.get_agent_state() == AgentState.RUNNING:
+                    await self.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
         await self._handle_post_execution()
 
         # Batch-drain queued non-blocking actions from the same LLM response.
@@ -857,7 +872,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                     # → condense_history() check.
                     from backend.utils.async_utils import drain_background_tasks
 
-                    await drain_background_tasks()
+                    await drain_background_tasks(max_rounds=2, timeout=2.0)
         finally:
             self._draining_batch = False
         # Deferred condensation check after batch drain completes.
@@ -873,7 +888,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             # before deciding whether to queue the next LLM call.
             from backend.utils.async_utils import drain_background_tasks
 
-            await drain_background_tasks()
+            await drain_background_tasks(max_rounds=2, timeout=2.0)
             if (
                 not self._pending_action
                 and self.get_agent_state() == AgentState.RUNNING

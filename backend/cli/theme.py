@@ -320,11 +320,11 @@ def _apply_theme_overrides() -> None:
         PT_FOOTER_WARN_CORE = 'bold #f6ff8f'
         PT_FOOTER_WARN_KICKER = 'bold #f6ff8f'
         PT_FOOTER_WARN_SEP = '#3d1f1f'
-        PT_COMPLETION_MENU_BG = 'bg:#0f1525 #969aad'
+        PT_COMPLETION_MENU_BG = 'bg:#060a14 #969aad'
         PT_COMPLETION_MENU_CURRENT = 'bg:#1b233a bold #91abec'
-        PT_COMPLETION_META_BG = 'bg:#0a0e1b #969aad'
+        PT_COMPLETION_META_BG = 'bg:#060a14 #969aad'
         PT_COMPLETION_META_CURRENT = 'bg:#1b233a #91abec'
-        PT_SCROLLBAR_BG = 'bg:#0a0e1b'
+        PT_SCROLLBAR_BG = 'bg:#060a14'
         PT_SCROLLBAR_BUTTON = 'bg:#1b233a'
 
 
@@ -532,15 +532,15 @@ PT_SCROLLBAR_BUTTON = 'bg:#1b233a'
 
 # ── Navy TUI Palette ──────────────────────────────────────────────────────────
 # Deep Navy theme for the Textual TUI — Dolphie-inspired aesthetic.
-# Deep navy backgrounds with blue-white text hierarchy and muted accent colors.
+# Uniform deep navy background — all widgets share the same color.
 # Designed for long coding sessions with minimal eye strain.
 
-# Backgrounds (depth hierarchy: bg → surface → rising → topbar)
-NAVY_BG = '#0a0e1b'  # deepest background (screen root)
-NAVY_SURFACE = '#0f1525'  # panels, cards, containers
-NAVY_SURFACE_RISING = '#131a2c'  # elevated surfaces (odd rows, hover)
-NAVY_SURFACE_TOP = '#192036'  # topbar, footerbar background
-NAVY_MODAL_BG = '#131626'  # modal screen background
+# Backgrounds (uniform — all surfaces share the same deep navy)
+NAVY_BG = '#060a14'  # deepest background (screen root)
+NAVY_SURFACE = '#060a14'  # panels, cards, containers — uniform with bg
+NAVY_SURFACE_RISING = '#060a14'  # elevated surfaces — uniform with bg
+NAVY_SURFACE_TOP = '#060a14'  # topbar, footerbar background — uniform with bg
+NAVY_MODAL_BG = '#060a14'  # modal screen background — uniform with bg
 NAVY_MODAL_OVERLAY = '#0d1015'  # semi-transparent modal overlay
 
 # Borders (muted blue spectrum — subtle but visible)

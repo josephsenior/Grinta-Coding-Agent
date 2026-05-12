@@ -491,6 +491,7 @@ async def drain_background_tasks(
     *,
     max_rounds: int = 20,
     task_set: set[asyncio.Task[Any]] | None = None,
+    timeout: float | None = None,
 ) -> None:
     """Await all in-flight background tasks spawned via ``run_or_schedule``.
 
@@ -505,10 +506,15 @@ async def drain_background_tasks(
             spawning new tasks indefinitely.
         task_set: The task set to drain. Defaults to the module-level
             ``_background_tasks``.
+        timeout: Optional per-round timeout in seconds. Prevents hanging
+            indefinitely when a background task never completes.
     """
     target = task_set if task_set is not None else _background_tasks
     for _ in range(max_rounds):
         pending = {t for t in target if not t.done()}
         if not pending:
             break
-        await asyncio.gather(*pending, return_exceptions=True)
+        if timeout is not None:
+            await asyncio.wait(pending, timeout=timeout)
+        else:
+            await asyncio.gather(*pending, return_exceptions=True)

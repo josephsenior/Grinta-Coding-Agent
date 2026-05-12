@@ -598,6 +598,13 @@ def main(
             async_kwargs['verbose'] = verbose
 
         diag('main() calling asyncio.run')
+
+        # Bump recursion limit for Python 3.12+ Task.cancel() which recursively
+        # cancels _fut_waiter chains (nested gathers can exceed the 1000 default).
+        import sys
+
+        sys.setrecursionlimit(5000)
+
         asyncio.run(_async_main(**async_kwargs))  # type: ignore[arg-type]
         diag('main() asyncio.run returned normally')
     except KeyboardInterrupt:
