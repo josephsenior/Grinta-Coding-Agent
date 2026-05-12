@@ -142,8 +142,10 @@ async def run_agent_until_done(
 
     _started = _time.monotonic()
     _max_poll_seconds = DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS
+    _ran_loop = False
     try:
         while controller.state.agent_state not in end_states:  # noqa: ASYNC110
+            _ran_loop = True
             await asyncio.sleep(0.5)
             if _max_poll_seconds > 0 and _time.monotonic() - _started > _max_poll_seconds:
                 logger.error(
@@ -151,20 +153,16 @@ async def run_agent_until_done(
                     _max_poll_seconds,
                     controller.state.agent_state,
                 )
-                # Attempt graceful state transition so the session remains valid
-                # for the next user message rather than being stuck in RUNNING.
                 try:
                     await controller.set_agent_state_to(AgentState.ERROR)
                 except Exception:
                     pass
                 break
     finally:
-        # Drain any background tasks that may have been scheduled during the run
-        # to ensure clean termination and prevent orphaned tasks from outliving
-        # the caller.  This also prevents resource leaks in long-running processes.
-        try:
-            from backend.utils.async_utils import drain_background_tasks
+        if _ran_loop:
+            try:
+                from backend.utils.async_utils import drain_background_tasks
 
-            await drain_background_tasks(max_rounds=5)
-        except Exception:
-            pass
+                await drain_background_tasks(max_rounds=5)
+            except Exception:
+                pass

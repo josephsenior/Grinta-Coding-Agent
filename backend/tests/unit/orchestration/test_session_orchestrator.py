@@ -4,6 +4,7 @@
 # pylint: disable=protected-access,too-many-lines
 
 import asyncio
+import threading
 import unittest
 from types import SimpleNamespace
 from typing import cast
@@ -68,7 +69,11 @@ def _make_controller() -> SessionOrchestrator:
     ctrl._lifecycle = LifecyclePhase.ACTIVE
     ctrl._cached_first_user_message = None
     ctrl._step_task = None
-    ctrl._step_lock = asyncio.Lock()
+    # _step_lock is a property with lazy initialization — set the backing
+    # attribute directly so tests can inject a pre-configured lock.
+    ctrl._step_lock_instance = asyncio.Lock()
+    ctrl._step_lock_loop = None
+    ctrl._step_gate = threading.Lock()
     ctrl._step_pending = False
     ctrl._main_loop = None
     ctrl._draining_batch = False

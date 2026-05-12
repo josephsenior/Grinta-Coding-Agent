@@ -641,8 +641,9 @@ class EventStream(EventStore):
             )
 
         with self._lock:
+            cache_entry = self._serialize_for_cache(data)
             current_write_page = self._write_page_cache
-            current_write_page.append(data)
+            current_write_page.append(cache_entry)
             if len(current_write_page) == self.cache_size:
                 cache_page_data = current_write_page
                 self._write_page_cache = []
@@ -663,13 +664,14 @@ class EventStream(EventStore):
             self._write_page_cache = []
         if not page_data:
             return
-        cache_payload = self._persist.build_cache_payload(page_data)
-        if cache_payload is None and len(page_data) > 0:
-            start_id = page_data[0].get('id', 0)
+        serialized = [self._serialize_for_cache(e) for e in page_data]
+        cache_payload = self._persist.build_cache_payload(serialized)
+        if cache_payload is None and len(serialized) > 0:
+            start_id = serialized[0].get('id', 0)
             cache_filename = self._persist._get_filename_for_cache(
-                start_id, start_id + len(page_data)
+                start_id, start_id + len(serialized)
             )
-            cache_payload = (cache_filename, json.dumps(page_data))
+            cache_payload = (cache_filename, json.dumps(serialized))
         if cache_payload:
             try:
                 self._persist.file_store.write(cache_payload[0], cache_payload[1])
@@ -736,6 +738,30 @@ class EventStream(EventStore):
         """Update secrets dictionary with additional values."""
         self._secret_masker.update_secrets(secrets)
         self.secrets = self._secret_masker.secrets
+
+    def _serialize_for_cache(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Create a JSON-safe copy of event data for cache page serialization.
+
+        Converts datetime objects and other non-serializable types to JSON-safe
+        equivalents. This mirrors the sanitization done during normal event
+        persistence so cache pages have the same format.
+        """
+        import copy
+
+        result = copy.deepcopy(data)
+        if 'timestamp' in result and hasattr(result['timestamp'], 'isoformat'):
+            result['timestamp'] = result['timestamp'].isoformat()
+        if 'observation' in result:
+            obs = result['observation']
+            if isinstance(obs, dict):
+                if 'llm_metrics' in obs and obs['llm_metrics'] is not None:
+                    m = obs['llm_metrics']
+                    if hasattr(m, 'get'):
+                        try:
+                            obs['llm_metrics'] = m.get()
+                        except Exception:
+                            obs['llm_metrics'] = None
+        return result
 
     def _replace_secrets(
         self, data: dict[str, Any], is_top_level: bool = True
