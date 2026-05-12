@@ -513,9 +513,6 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                 self._step_pending = True
                 return
 
-            if self.get_agent_state() == AgentState.AWAITING_USER_INPUT:
-                return
-
             main_loop = getattr(self, '_main_loop', None)
             if main_loop is not None and main_loop.is_running():
                 main_loop.call_soon_threadsafe(self._create_step_task)

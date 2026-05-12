@@ -471,14 +471,22 @@ def configure_file_logging() -> None:
         return
     log_dir = get_log_dir()
     os.makedirs(log_dir, exist_ok=True)
-    app_logger.addHandler(get_file_handler(log_dir, current_log_level))
-    access_logger.addHandler(get_file_handler(log_dir, current_log_level))
+    # Create a single shared file handler for unified logging
+    shared_handler = get_file_handler(log_dir, current_log_level)
+    app_logger.addHandler(shared_handler)
+    access_logger.addHandler(shared_handler)
+    # Attach the same handler to LLM loggers (prompt, response) and TUI logger
     for name in ('prompt', 'response'):
         lg = logging.getLogger(name)
+        # Remove any existing LlmFileHandler
         for h in list(lg.handlers):
             if isinstance(h, LlmFileHandler):
                 lg.removeHandler(h)
-        lg.addHandler(_get_llm_file_handler(name, logging.DEBUG))
+        if shared_handler not in lg.handlers:
+            lg.addHandler(shared_handler)
+    tui_logger = logging.getLogger('grinta.tui')
+    if shared_handler not in tui_logger.handlers:
+        tui_logger.addHandler(shared_handler)
     app_logger.debug('Logging to file in: %s', log_dir)
     _file_logging_configured = True
 
