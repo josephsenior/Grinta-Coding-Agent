@@ -1,7 +1,7 @@
 """Tests for StateTransitionService."""
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
@@ -27,6 +27,7 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
         self.mock_context.pending_action = None
         self.mock_context.state_tracker = MagicMock()
         self.mock_context.headless_mode = False
+        self.mock_context.reset_controller = AsyncMock()
 
         self.service = StateTransitionService(self.mock_context)
 

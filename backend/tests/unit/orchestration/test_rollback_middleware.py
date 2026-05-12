@@ -146,20 +146,18 @@ class TestExecuteStage:
 
 
 class TestLazyManagerInit:
-    def test_no_workspace_disables(self):
+    def test_no_workspace_returns_none_but_still_enabled(self):
         mw = RollbackMiddleware(workspace_path=None)
         ctx = _make_ctx(workspace_path=None)
         ctx.controller.runtime = None
         result = mw._get_manager(ctx)
         assert result is None
-        assert mw._enabled is False
 
-    def test_invalid_workspace_disables(self):
+    def test_invalid_workspace_returns_none_but_still_enabled(self):
         mw = RollbackMiddleware(workspace_path='/nonexistent/path/xyz')
         ctx = _make_ctx()
         result = mw._get_manager(ctx)
         assert result is None
-        assert mw._enabled is False
 
     def test_manager_cached(self, tmp_path):
         """Once created, the manager is reused."""

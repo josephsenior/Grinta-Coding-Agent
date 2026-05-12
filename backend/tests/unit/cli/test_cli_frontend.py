@@ -1732,11 +1732,11 @@ async def test_repl_run_accepts_first_message_before_mcp_warmup_finishes() -> No
     controller = MagicMock()
     agent = MagicMock()
     agent.config.enable_mcp = True
-agent.mcp_capability_status = {'connected_client_count': 0}
-        llm_registry = MagicMock()
-        conversation_stats = MagicMock()
-        acquire_result = MagicMock()
-        acquire_result.runtime = runtime
+    agent.mcp_capability_status = {'connected_client_count': 0}
+    llm_registry = MagicMock()
+    conversation_stats = MagicMock()
+    acquire_result = MagicMock()
+    acquire_result.runtime = runtime
     first_message_dispatched = asyncio.Event()
     allow_mcp_finish = asyncio.Event()
     queued_inputs: asyncio.Queue[str] = asyncio.Queue()

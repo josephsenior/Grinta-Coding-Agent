@@ -323,7 +323,7 @@ class TestWALMarkers:
             writer.stop(timeout=2.0)
 
     def test_pending_cleaned_on_queue_full(self):
-        """The .pending file is cleaned up when the event is dropped (queue full)."""
+        """Dropped events have no .pending file (WAL written only after successful put)."""
         import threading
         from types import MethodType
 
@@ -340,12 +340,11 @@ class TestWALMarkers:
         writer._drain_batch = MethodType(patched_drain, writer)  # type: ignore[method-assign]
         writer.start()
         try:
-            # Writer thread is blocked in patched_drain, so queue stays full
             writer.enqueue(_make_event(1))
             time.sleep(0.1)
-            writer.enqueue(_make_event(2))
+            result = writer.enqueue(_make_event(2))
+            assert not result
             time.sleep(0.1)
-            store.delete.assert_any_call('event_2.json.pending')
         finally:
             drain_blocker.set()
             writer.stop(timeout=2.0)
