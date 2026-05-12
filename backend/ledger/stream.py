@@ -740,28 +740,32 @@ class EventStream(EventStore):
         self.secrets = self._secret_masker.secrets
 
     def _serialize_for_cache(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Create a JSON-safe copy of event data for cache page serialization.
+        """Create a JSON-safe deep copy of event data for cache page serialization.
 
-        Converts datetime objects and other non-serializable types to JSON-safe
-        equivalents. This mirrors the sanitization done during normal event
-        persistence so cache pages have the same format.
+        Recursively traverses all nested dicts/lists and converts non-serializable
+        types (datetime, objects with .get(), etc.) to JSON-safe equivalents.
         """
-        import copy
+        import datetime as _dt
 
-        result = copy.deepcopy(data)
-        if 'timestamp' in result and hasattr(result['timestamp'], 'isoformat'):
-            result['timestamp'] = result['timestamp'].isoformat()
-        if 'observation' in result:
-            obs = result['observation']
-            if isinstance(obs, dict):
-                if 'llm_metrics' in obs and obs['llm_metrics'] is not None:
-                    m = obs['llm_metrics']
-                    if hasattr(m, 'get'):
-                        try:
-                            obs['llm_metrics'] = m.get()
-                        except Exception:
-                            obs['llm_metrics'] = None
-        return result
+        def _convert(obj: Any) -> Any:
+            if isinstance(obj, dict):
+                return {k: _convert(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [_convert(i) for i in obj]
+            elif isinstance(obj, _dt.datetime):
+                return obj.isoformat()
+            elif isinstance(obj, _dt.date):
+                return obj.isoformat()
+            elif isinstance(obj, (int, float, bool, str, type(None))):
+                return obj
+            elif hasattr(obj, 'get') and callable(obj.get):
+                try:
+                    return obj.get()
+                except Exception:
+                    pass
+            return obj
+
+        return _convert(data)
 
     def _replace_secrets(
         self, data: dict[str, Any], is_top_level: bool = True
