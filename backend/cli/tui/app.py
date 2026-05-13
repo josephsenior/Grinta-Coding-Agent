@@ -331,9 +331,9 @@ class GrintaScreen(Screen):
             self._renderer._last_thinking_len = 0
 
     def add_agent_message(self, text: str) -> None:
-        """Agent response — indented with accent marker."""
+        """Agent response — same style as user, different color."""
         safe = text.replace("[", r"\[")
-        self._write_log(f"\n  [{NAVY_BRAND}]▸[/]  {safe}")
+        self._write_log(f"\n[{NAVY_TEXT_SECONDARY}]▸ Grinta[/]  {safe}")
 
     def add_thinking(self, text: str) -> None:
         """Real-time thinking/reasoning — shown in transcript while streaming."""
