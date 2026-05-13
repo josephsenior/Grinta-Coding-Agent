@@ -70,7 +70,7 @@ HUD {
 }
 
 InputBar TextArea {
-    background: #0f1525;
+    background: #0d1525;
     color: #e9e9e9;
     border: none;
     padding: 1 1;
@@ -79,10 +79,10 @@ InputBar TextArea {
 
 InputBar TextArea:focus {
     border: none;
-    background: #060a14;
+    background: #0d1525;
 }
 
-InputBar.processing Input {
+InputBar.processing TextArea {
     background: #060a14;
 }
 

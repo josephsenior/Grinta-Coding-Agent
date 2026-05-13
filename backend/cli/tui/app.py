@@ -207,8 +207,6 @@ class GrintaScreen(Screen):
         self._render_hud_bar()
         ta = self.query_one("#input", TextArea)
         ta.focus()
-        # Disable cursor blink to avoid escape sequences in input
-        ta.cursor_blink = False
         transcript = self.query_one("#transcript-scroll", Transcript)
         transcript.scroll_home(animate=False)
         _tui_logger.debug("on_mount: done")
@@ -320,13 +318,13 @@ class GrintaScreen(Screen):
         return ''.join(parts)
 
     def _write_log(self, markup: str) -> None:
-        markup = self._break_long_runs(markup)
         t = Text.from_markup(markup)
         self._get_log().write(t)
 
     def add_user_message(self, text: str) -> None:
-        """User message — distinct visual style with left accent bar."""
-        self._write_log(f"\n[{NAVY_BRAND} bold]▸ You[/]  [{NAVY_TEXT_PRIMARY}]{text}[/{NAVY_TEXT_PRIMARY}]")
+        """User message — distinct visual style."""
+        safe = text.replace("[", r"\[")
+        self._write_log(f"\n[{NAVY_BRAND}]▸ You[/]  {safe}")
         if self._renderer:
             self._renderer._streamed_final_text = None
             self._renderer._turn_active = True
@@ -334,7 +332,8 @@ class GrintaScreen(Screen):
 
     def add_agent_message(self, text: str) -> None:
         """Agent response — indented with accent marker."""
-        self._write_log(f"\n  [{NAVY_BRAND}]▸[/]  {text}")
+        safe = text.replace("[", r"\[")
+        self._write_log(f"\n  [{NAVY_BRAND}]▸[/]  {safe}")
 
     def add_thinking(self, text: str) -> None:
         """Real-time thinking/reasoning — shown in transcript while streaming."""
