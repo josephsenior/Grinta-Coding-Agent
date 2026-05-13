@@ -197,8 +197,8 @@ class GrintaScreen(Screen):
     def compose(self) -> ComposeResult:
         with Transcript(id="transcript-scroll"):
             yield RichLog(id="transcript-log", markup=True, auto_scroll=True)
-with InputBar(id="input-bar"):
-             yield TextArea(id="input", tab_behavior="indent", submit_on="enter")
+        with InputBar(id="input-bar"):
+            yield TextArea(id="input", tab_behavior="indent", submit_on="enter")
         yield HUD(id="hud-bar")
 
     def on_mount(self) -> None:
@@ -411,7 +411,7 @@ with InputBar(id="input-bar"):
             _tui_logger.debug(f"_handle_input ENTER text={text[:80]}")
         except Exception as exc:
             _tui_logger.debug(f"_handle_input: _trace FAILED: {type(exc).__name__}: {exc}")
-async with self._input_lock:
+        async with self._input_lock:
             ta = self.query_one("#input", TextArea)
             ta.clear()
             ta.focus()
