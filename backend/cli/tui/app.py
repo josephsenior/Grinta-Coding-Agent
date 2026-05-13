@@ -17,6 +17,7 @@ from typing import Any
 _tui_logger = logging.getLogger("grinta.tui")
 _tui_logger.setLevel(logging.DEBUG)
 
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -158,6 +159,7 @@ class GrintaScreen(Screen):
         self._pending_confirm: asyncio.Event | None = None
         self._confirm_result: str | None = None
         self._input_lock = asyncio.Lock()
+        self._bootstrapping: asyncio.Event | None = None
 
     _STATE_LABELS = {
         "starting": "Starting…",
@@ -209,6 +211,15 @@ class GrintaScreen(Screen):
         transcript = self.query_one("#transcript-scroll", Transcript)
         transcript.scroll_home(animate=False)
         _tui_logger.debug("on_mount: done")
+        self._start_background_bootstrap()
+
+    def _start_background_bootstrap(self) -> None:
+        async def _bg():
+            try:
+                await self._bootstrap()
+            except Exception as exc:
+                _tui_logger.debug(f"background bootstrap failed: {exc}")
+        asyncio.create_task(_bg())
 
     def on_unmount(self) -> None:
         _tui_logger.debug("on_unmount: GrintaScreen unmounting")
@@ -293,9 +304,14 @@ class GrintaScreen(Screen):
     def _get_log(self) -> RichLog:
         return self.query_one("#transcript-log", RichLog)
 
+    def _write_log(self, markup: str) -> None:
+        t = Text.from_markup(markup)
+        t.overflow = "break"
+        self._get_log().write(t)
+
     def add_user_message(self, text: str) -> None:
         """User message — with left border marker (dynamic, fills width naturally)."""
-        self._get_log().write(
+        self._write_log(
             f"[#91abec]│[/#91abec] [#e9e9e9]{text}[/#e9e9e9]"
         )
         # Clear reasoning panel and streaming dedup state for the new turn
@@ -306,30 +322,30 @@ class GrintaScreen(Screen):
 
     def add_agent_message(self, text: str) -> None:
         """Agent message — plain text."""
-        self._get_log().write(f"[{NAVY_TEXT_PRIMARY}]{text}[/]")
+        self._write_log(f"[{NAVY_TEXT_PRIMARY}]{text}[/]")
 
     def add_thinking(self, text: str) -> None:
         """Real-time thinking/reasoning — shown in transcript while streaming."""
-        self._get_log().write(f"[dim]{text}[/]")
+        self._write_log(f"[dim]{text}[/]")
 
     def add_system_message(self, text: str) -> None:
-        self._get_log().write(f"[{NAVY_TEXT_MUTED}]{text}[/]")
+        self._write_log(f"[{NAVY_TEXT_MUTED}]{text}[/]")
 
     def add_error(self, text: str) -> None:
-        self._get_log().write(f"[bold {NAVY_ERROR}]✗ {text}[/]")
+        self._write_log(f"[bold {NAVY_ERROR}]✗ {text}[/]")
 
     def add_success(self, text: str) -> None:
-        self._get_log().write(f"[bold {NAVY_READY}]✓ {text}[/]")
+        self._write_log(f"[bold {NAVY_READY}]✓ {text}[/]")
 
     def add_tool_start(self, tool_name: str) -> None:
         """Tool call — indented with ▸ prefix."""
-        self._get_log().write(
+        self._write_log(
             f"  [{NAVY_BRAND_DIM}]▸[/]  [{NAVY_TEXT_TERTIARY}]{tool_name}[/]"
         )
 
     def add_tool_result(self, text: str) -> None:
         """Tool result — double-indented."""
-        self._get_log().write(f"    [{NAVY_TEXT_MUTED}]{text}[/]")
+        self._write_log(f"    [{NAVY_TEXT_MUTED}]{text}[/]")
 
     def add_divider(self) -> None:
         self._get_log().write(f"[{NAVY_BORDER}]" + "─" * 50 + "[/]")
@@ -400,8 +416,13 @@ class GrintaScreen(Screen):
             try:
                 _tui_logger.debug(f"_handle_input: controller={self._controller is not None}")
                 if self._controller is None:
-                    _tui_logger.debug("_handle_input: calling _bootstrap()")
-                    logger.info("[TUI] _handle_input: bootstrapping (no controller)")
+                    if self._bootstrapping is not None and not self._bootstrapping.is_set():
+                        _tui_logger.debug("_handle_input: waiting for background bootstrap")
+                        logger.info("[TUI] _handle_input: waiting for background bootstrap")
+                        await self._bootstrapping.wait()
+                    if self._controller is None:
+                        _tui_logger.debug("_handle_input: calling _bootstrap()")
+                        logger.info("[TUI] _handle_input: bootstrapping (no controller)")
                     # Internal bootstrap - no user-facing message
                     await self._bootstrap()
                     if self._controller is None:
@@ -503,80 +524,94 @@ class GrintaScreen(Screen):
         self._hud.update_agent_state("Initializing")
         self._render_hud_bar()
         self._render_hud_bar()
-        # Internal only - no user-facing message
+
+        _bootstrapping = asyncio.Event()
+        self._bootstrapping = _bootstrapping
 
         config = self._config
 
+        event_stream = None
         try:
-            agent, event_stream, runtime = await asyncio.to_thread(
-                self._bootstrap_sync_phase1, config
-            )
-        except Exception as exc:
-            _tui_logger.debug(f"_bootstrap: EXCEPTION phase1 {type(exc).__name__}: {exc}")
-            logger.exception("TUI _bootstrap: failed in phase1")
-            raise
-
-        _tui_logger.debug(f"_bootstrap: runtime created, type={type(runtime).__name__}")
-
-        connect_fn = getattr(runtime, "connect", None)
-        if callable(connect_fn):
             try:
-                _tui_logger.debug("_bootstrap: awaiting runtime.connect()")
-                await connect_fn()
-                _tui_logger.debug("_bootstrap: runtime.connect() OK")
-            except Exception as exc:
-                _tui_logger.debug(
-                    f"_bootstrap: runtime.connect() FAILED: {type(exc).__name__}: {exc}"
+                agent, event_stream, runtime = await asyncio.to_thread(
+                    self._bootstrap_sync_phase1, config
                 )
+            except Exception as exc:
+                _tui_logger.debug(f"_bootstrap: EXCEPTION phase1 {type(exc).__name__}: {exc}")
+                logger.exception("TUI _bootstrap: failed in phase1")
                 raise
 
-        try:
-            memory, controller = await asyncio.to_thread(
-                self._bootstrap_sync_phase2, agent, runtime, event_stream, config
+            _tui_logger.debug(f"_bootstrap: runtime created, type={type(runtime).__name__}")
+
+            connect_fn = getattr(runtime, "connect", None)
+            if callable(connect_fn):
+                try:
+                    _tui_logger.debug("_bootstrap: awaiting runtime.connect()")
+                    await connect_fn()
+                    _tui_logger.debug("_bootstrap: runtime.connect() OK")
+                except Exception as exc:
+                    _tui_logger.debug(
+                        f"_bootstrap: runtime.connect() FAILED: {type(exc).__name__}: {exc}"
+                    )
+                    raise
+
+            try:
+                memory, controller = await asyncio.to_thread(
+                    self._bootstrap_sync_phase2, agent, runtime, event_stream, config
+                )
+            except Exception as exc:
+                _tui_logger.debug(f"_bootstrap: EXCEPTION phase2 {type(exc).__name__}: {exc}")
+                logger.exception("TUI _bootstrap: failed in phase2")
+                raise
+
+            _tui_logger.debug(f"_bootstrap: controller created, state={controller.get_agent_state()}")
+            logger.info(
+                "TUI _bootstrap: controller created, initial state=%s (type=%s)",
+                controller.get_agent_state(),
+                type(controller.get_agent_state()),
             )
-        except Exception as exc:
-            _tui_logger.debug(f"_bootstrap: EXCEPTION phase2 {type(exc).__name__}: {exc}")
-            logger.exception("TUI _bootstrap: failed in phase2")
+
+            self._event_stream = event_stream
+            self._runtime_stub = runtime
+            self._memory_stub = memory
+            self._controller = controller
+
+            from backend.utils.async_utils import set_main_event_loop
+
+            set_main_event_loop(self._loop)
+            _tui_logger.debug(f"_bootstrap: set_main_event_loop to {self._loop}")
+
+            if self._renderer is None:
+                self._renderer = TUIRenderer(
+                    console=self._rich_console,
+                    hud=self._hud,
+                    reasoning=self._reasoning,
+                    tui=self,
+                    loop=self._loop,
+                )
+            self._renderer.subscribe(event_stream, event_stream.sid)
+
+            state_after_create = controller.get_agent_state()
+            _tui_logger.debug(f"_bootstrap: state after subscribe={state_after_create}")
+            logger.info(
+                "TUI _bootstrap: state after renderer subscribe=%s", state_after_create
+            )
+            self._hud.update_agent_state(str(state_after_create))
+            self._render_hud_bar()
+            self._render_hud_bar()
+            self._renderer.drain_events()
+            _tui_logger.debug("_bootstrap: done")
+        except BaseException:
+            if event_stream is not None:
+                close_fn = getattr(event_stream, "close", None)
+                if callable(close_fn):
+                    try:
+                        close_fn()
+                    except Exception:
+                        pass
             raise
-
-        _tui_logger.debug(f"_bootstrap: controller created, state={controller.get_agent_state()}")
-        logger.info(
-            "TUI _bootstrap: controller created, initial state=%s (type=%s)",
-            controller.get_agent_state(),
-            type(controller.get_agent_state()),
-        )
-
-        self._event_stream = event_stream
-        self._runtime_stub = runtime
-        self._memory_stub = memory
-        self._controller = controller
-
-        from backend.utils.async_utils import set_main_event_loop
-
-        set_main_event_loop(self._loop)
-        _tui_logger.debug(f"_bootstrap: set_main_event_loop to {self._loop}")
-
-        if self._renderer is None:
-            self._renderer = TUIRenderer(
-                console=self._rich_console,
-                hud=self._hud,
-                reasoning=self._reasoning,
-                tui=self,
-                loop=self._loop,
-            )
-        self._renderer.subscribe(event_stream, event_stream.sid)
-
-        state_after_create = controller.get_agent_state()
-        _tui_logger.debug(f"_bootstrap: state after subscribe={state_after_create}")
-        logger.info(
-            "TUI _bootstrap: state after renderer subscribe=%s", state_after_create
-        )
-        self._hud.update_agent_state(str(state_after_create))
-        self._render_hud_bar()
-        self._render_hud_bar()
-        self._renderer.drain_events()
-        _tui_logger.debug("_bootstrap: done")
-        # Internal only - no user-facing message
+        finally:
+            _bootstrapping.set()
 
     def _bootstrap_sync_phase1(
         self,
@@ -968,7 +1003,7 @@ class TUIRenderer:
         cost = getattr(event, "cost_usd", None)
         if cost is not None and cost > 0:
             self._hud.update_cost(self._hud.state.cost_usd + cost)
-        self._render_hud_bar()
+        self._tui._render_hud_bar()
 
     def _handle_state_change(self, obs: Any) -> None:
         state = obs.agent_state

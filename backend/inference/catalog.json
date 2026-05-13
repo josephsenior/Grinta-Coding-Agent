@@ -265,6 +265,24 @@
       "supports_parallel_tool_calls": true,
       "supports_vision": true
     },
+    "kimi-k2.6": {
+      "provider": "nvidia",
+      "aliases": [
+        "nvidia/moonshotai/kimi-k2.6",
+        "moonshotai/kimi-k2.6"
+      ],
+      "max_input_tokens": 262144,
+      "max_output_tokens": 16384,
+      "input_price_per_m": 0.75,
+      "output_price_per_m": 3.5,
+      "verified": true,
+      "featured": false,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_response_schema": true,
+      "supports_vision": true,
+      "supports_reasoning_effort": true
+    },
     "claude-opus-4-7": {
       "provider": "anthropic",
       "aliases": [
@@ -639,15 +657,18 @@
     "codestral-latest": {
       "provider": "mistral",
       "aliases": [
-        "mistral/codestral-latest"
+        "mistral/codestral-latest",
+        "codestral-2508"
       ],
       "max_input_tokens": 256000,
-      "max_output_tokens": 8192,
+      "max_output_tokens": 32768,
       "input_price_per_m": 0.3,
       "output_price_per_m": 0.9,
       "verified": true,
       "supports_function_calling": true,
-      "supports_parallel_tool_calls": true
+      "supports_parallel_tool_calls": true,
+      "strip_reasoning_effort": true,
+      "default_temperature": 0.7
     },
     "devstral-small-2507": {
       "provider": "mistral",
@@ -674,6 +695,24 @@
       "verified": true,
       "supports_function_calling": true,
       "supports_parallel_tool_calls": true
+    },
+    "mistral-medium-3-5": {
+      "provider": "mistral",
+      "aliases": [
+        "mistral/mistral-medium-3-5",
+        "mistral-medium-3.5"
+      ],
+      "max_input_tokens": 262144,
+      "max_output_tokens": 32768,
+      "input_price_per_m": 0.7,
+      "output_price_per_m": 2.5,
+      "verified": true,
+      "featured": false,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_vision": true,
+      "supports_reasoning_effort": true,
+      "default_temperature": 0.7
     },
     "zai-glm-4.7": {
       "provider": "cerebras",
