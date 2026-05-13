@@ -198,7 +198,7 @@ class GrintaScreen(Screen):
         with Transcript(id="transcript-scroll"):
             yield RichLog(id="transcript-log", markup=True, auto_scroll=True)
         with InputBar(id="input-bar"):
-            yield TextArea(id="input", tab_behavior="indent", submit_on="enter")
+            yield TextArea(id="input", tab_behavior="indent")
         yield HUD(id="hud-bar")
 
     def on_mount(self) -> None:
