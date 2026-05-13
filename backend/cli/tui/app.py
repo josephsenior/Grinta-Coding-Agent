@@ -23,7 +23,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, Input, Label, RichLog, Static
+from textual.widgets import Button, Input, Label, RichLog, Static, TextArea
 
 from backend.cli.config_manager import AppConfig
 from backend.cli.hud import HUDBar
@@ -197,15 +197,15 @@ class GrintaScreen(Screen):
     def compose(self) -> ComposeResult:
         with Transcript(id="transcript-scroll"):
             yield RichLog(id="transcript-log", markup=True, auto_scroll=True)
-        with InputBar(id="input-bar"):
-            yield Input(id="input")
+with InputBar(id="input-bar"):
+             yield TextArea(id="input", tab_behavior="indent", submit_on="enter")
         yield HUD(id="hud-bar")
 
     def on_mount(self) -> None:
         _tui_logger.debug("on_mount: GrintaScreen mounted")
 
         self._render_hud_bar()
-        ta = self.query_one("#input", Input)
+        ta = self.query_one("#input", TextArea)
         ta.focus()
         # Disable cursor blink to avoid escape sequences in input
         ta.cursor_blink = False
@@ -363,7 +363,7 @@ class GrintaScreen(Screen):
         self._write_log(f"    [{NAVY_TEXT_MUTED}]{text}[/]")
 
     def add_divider(self) -> None:
-        self._get_log().write(f"[{NAVY_BORDER}]" + "─" * 50 + "[/]")
+        self._write_log(f"[{NAVY_BORDER}]" + "─" * 50 + "[/]")
 
     def clear_transcript(self) -> None:
         self._get_log().clear()
@@ -385,8 +385,8 @@ class GrintaScreen(Screen):
         if self._input_lock.locked():
             _tui_logger.debug("action_submit_input: lock held, ignoring")
             return
-        ta = self.query_one("#input", Input)
-        text = ta.value.strip()
+        ta = self.query_one("#input", TextArea)
+        text = ta.text.strip()
         _tui_logger.debug(f"action_submit_input: text_len={len(text)}")
         if not text:
             _tui_logger.debug("action_submit_input: empty text, ignoring")
@@ -414,8 +414,8 @@ class GrintaScreen(Screen):
             _tui_logger.debug(f"_handle_input ENTER text={text[:80]}")
         except Exception as exc:
             _tui_logger.debug(f"_handle_input: _trace FAILED: {type(exc).__name__}: {exc}")
-        async with self._input_lock:
-            ta = self.query_one("#input", Input)
+async with self._input_lock:
+            ta = self.query_one("#input", TextArea)
             ta.clear()
             ta.focus()
             self._scroll_to_bottom()
