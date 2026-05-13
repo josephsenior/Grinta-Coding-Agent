@@ -107,7 +107,13 @@ class ConfigLoadSummary:
         )
 
 
-_JSON_LLM_KEYS = ('llm_model', 'llm_api_key', 'llm_base_url', 'llm_provider')
+_JSON_LLM_KEYS = (
+    'llm_model',
+    'llm_api_key',
+    'llm_base_url',
+    'llm_provider',
+    'llm_max_output_tokens',
+)
 
 
 def _load_json_settings(
@@ -241,6 +247,13 @@ def _build_json_llm_config(
     _warn_on_literal_llm_api_key(data.get('llm_api_key'))
     _sync_llm_api_key_from_env(llm_dict)
     _apply_json_llm_base_url(llm_dict, data)
+    if 'llm_max_output_tokens' in data:
+        raw = data['llm_max_output_tokens']
+        if raw is not None:
+            try:
+                llm_dict['max_output_tokens'] = int(str(raw))
+            except (ValueError, TypeError):
+                pass
     return llm_dict
 
 

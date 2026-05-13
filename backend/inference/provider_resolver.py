@@ -27,10 +27,13 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'lightning': 'https://lightning.ai/api/v1',
     # DigitalOcean AI Platform (Serverless Inference endpoint)
     'digitalocean': 'https://inference.do-ai.run/v1',
+    # Cerebras AI: OpenAI-compatible endpoint for fast inference on CS-3 systems.
+    'cerebras': 'https://api.cerebras.ai/v1',
 }
 
 KNOWN_PROVIDER_PREFIXES: set[str] = {
     'anthropic',
+    'cerebras',
     'deepinfra',
     'deepseek',
     'digitalocean',
@@ -104,7 +107,7 @@ def canonicalize_model_selection(
     prefixed_provider = extract_provider_prefix(model)
 
     # Proxy providers that need openai/ prefix for correct routing.
-    _OPENAI_COMPAT_PROVIDERS = {'lightning'}
+    _OPENAI_COMPAT_PROVIDERS = {'lightning', 'cerebras'}
 
     if normalized_provider:
         if normalized_provider in _OPENAI_COMPAT_PROVIDERS:

@@ -250,6 +250,27 @@ PROVIDER_CONFIGURATIONS: dict[str, dict[str, Any]] = {
         'handles_own_routing': False,
         'requires_custom_llm_provider': False,
     },
+    'cerebras': {
+        'name': 'cerebras',
+        'env_var': 'CEREBRAS_API_KEY',
+        'requires_protocol': True,
+        'supports_streaming': True,
+        'required_params': {'api_key', 'model'},
+        'optional_params': {
+            'base_url',
+            'timeout',
+            'temperature',
+            'max_tokens',
+            'top_p',
+            'seed',
+            'drop_params',
+        },
+        'forbidden_params': {'custom_llm_provider'},
+        'api_key_prefixes': ['csk-'],
+        'api_key_min_length': 20,
+        'handles_own_routing': False,
+        'requires_custom_llm_provider': False,
+    },
 }
 
 UNKNOWN_PROVIDER_CONFIG: dict[str, Any] = {

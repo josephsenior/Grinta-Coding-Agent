@@ -48,6 +48,7 @@ Transcript {
 Transcript RichLog,
 RichLog#transcript-log {
     background: #060a14;
+    overflow-x: hidden;
 }
 
 /* ── InputBar ──────────────────────────────────────── */

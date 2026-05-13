@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from backend.core.constants import DEFAULT_LLM_TEMPERATURE
+
 _CATALOG_PATH = Path(__file__).with_name('catalog.json')
 
 
@@ -49,6 +51,7 @@ class ModelEntry:
     use_max_completion_tokens: bool = (
         False  # Use max_completion_tokens instead of max_tokens
     )
+    default_temperature: float | None = None  # Model-recommended temperature
 
 
 @functools.lru_cache(maxsize=1)
@@ -90,6 +93,7 @@ def get_catalog() -> tuple[ModelEntry, ...]:
                 strip_top_p=info.get('strip_top_p', False),
                 strip_penalties=info.get('strip_penalties', False),
                 use_max_completion_tokens=info.get('use_max_completion_tokens', False),
+                default_temperature=info.get('default_temperature'),
             )
         )
     return tuple(entries)
@@ -184,12 +188,12 @@ def is_openai_compatible(model: str) -> bool:
     entry = lookup(model)
     if entry:
         # These providers are OpenAI-compatible
-        return entry.provider in ['openai', 'deepseek', 'mistral', 'xai']
+        return entry.provider in ['openai', 'cerebras', 'deepseek', 'mistral', 'xai']
 
     from backend.inference.provider_resolver import extract_provider_prefix
 
     provider = extract_provider_prefix(model)
-    return provider in {'openai', 'deepseek', 'mistral', 'xai'}
+    return provider in {'openai', 'cerebras', 'deepseek', 'mistral', 'xai'}
 
 
 def supports_tool_choice(model: str) -> bool:
@@ -367,6 +371,14 @@ def apply_model_param_overrides(
         call_kwargs['reasoning_effort'] = reasoning_effort
 
     _apply_catalog_token_and_penalty_strips(entry, call_kwargs)
+
+    # Apply model-recommended default temperature when user hasn't explicitly
+    # overridden (i.e. it's still the global default).
+    if (
+        entry.default_temperature is not None
+        and call_kwargs.get('temperature') == DEFAULT_LLM_TEMPERATURE
+    ):
+        call_kwargs['temperature'] = entry.default_temperature
 
     # Provider-side parallel tool_calls. Strictly capability-driven: only set
     # when the catalog entry advertises support. Provider sanitizers below

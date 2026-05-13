@@ -426,3 +426,11 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             and not uses_google_provider
         ):
             self.reasoning_effort = 'high'
+
+        # Apply catalog default_temperature when still at the global default.
+        if self.model and self.temperature == DEFAULT_LLM_TEMPERATURE:
+            from backend.inference.catalog_loader import lookup
+
+            entry = lookup(self.model)
+            if entry and entry.default_temperature is not None:
+                object.__setattr__(self, 'temperature', entry.default_temperature)

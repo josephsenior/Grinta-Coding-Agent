@@ -14,9 +14,6 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
-if os.getenv("DEBUG", "").strip().lower() not in ("true", "1", "yes"):
-    os.environ["DEBUG"] = "1"
-
 _tui_logger = logging.getLogger("grinta.tui")
 _tui_logger.setLevel(logging.DEBUG)
 
@@ -196,9 +193,9 @@ class GrintaScreen(Screen):
 
     def compose(self) -> ComposeResult:
         with Transcript(id="transcript-scroll"):
-            yield RichLog(id="transcript-log", markup=True, auto_scroll=True, wrap=True)
+            yield RichLog(id="transcript-log", markup=True, auto_scroll=True)
         with InputBar(id="input-bar"):
-            yield Input(id="input", placeholder=">")
+            yield Input(id="input")
         yield HUD(id="hud-bar")
 
     def on_mount(self) -> None:
@@ -935,7 +932,7 @@ class TUIRenderer:
         # Tool call streaming
         if action.is_tool_call:
             tool_name = action.tool_call_name or "tool"
-            self._tui.add_thinking(f"[{NAVY_TEXT_TERTIARY}]▸ Tool[/]  [dim]{tool_name}…[/]")
+            self._tui.add_thinking(f"[{NAVY_BRAND}]▸ Tool[/]  [dim]{tool_name}…[/]")
             self._state_event.set()
             return
 
@@ -947,7 +944,7 @@ class TUIRenderer:
                 # Show "Thinking:" header only when starting a new block (last_len is 0)
                 # Combine header + content in one line with spacing
                 if self._last_thinking_len == 0:
-                    self._tui.add_thinking(f"[{NAVY_TEXT_TERTIARY}]▸ Thinking[/]  {new_thinking}")
+                    self._tui.add_thinking(f"[{NAVY_BRAND}]▸ Thinking[/]  {new_thinking}")
                 else:
                     self._tui.add_thinking(new_thinking)
                 self._last_thinking_len = len(thinking)
@@ -971,6 +968,7 @@ class TUIRenderer:
         cost = getattr(event, "cost_usd", None)
         if cost is not None and cost > 0:
             self._hud.update_cost(self._hud.state.cost_usd + cost)
+        self._render_hud_bar()
 
     def _handle_state_change(self, obs: Any) -> None:
         state = obs.agent_state

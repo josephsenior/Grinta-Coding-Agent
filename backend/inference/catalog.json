@@ -674,6 +674,25 @@
       "verified": true,
       "supports_function_calling": true,
       "supports_parallel_tool_calls": true
+    },
+    "zai-glm-4.7": {
+      "provider": "cerebras",
+      "aliases": [
+        "openai/zai-glm-4.7"
+      ],
+      "max_input_tokens": 131072,
+      "max_output_tokens": 40960,
+      "input_price_per_m": 2.25,
+      "output_price_per_m": 2.75,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_response_schema": true,
+      "supports_reasoning_effort": true,
+      "supports_prompt_cache": true,
+      "use_max_completion_tokens": true,
+      "default_temperature": 1.0
     }
   },
   "tier_pricing": {
@@ -804,6 +823,10 @@
     "devstral": {
       "input": 0.25,
       "output": 0.75
+    },
+    "zai-glm-4.7": {
+      "input": 2.25,
+      "output": 2.75
     }
   }
 }
