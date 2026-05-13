@@ -57,7 +57,7 @@ RichLog#transcript-log {
 InputBar {
     height: 3;
     background: #060a14;
-    border: solid #384673;
+    border: tall #384673;
     padding: 0 2;
     margin: 0;
 }
@@ -72,14 +72,13 @@ HUD {
 InputBar Input {
     background: #0d1a2d;
     color: #c8d4e8;
-    border: solid #2a3d5c;
+    border: none;
     padding: 0 2;
     height: 100%;
-    text-style: none;
 }
 
 InputBar Input:focus {
-    border: solid #6a8fc5;
+    border: none;
     background: #0d1a2d;
     color: #c8d4e8;
 }
