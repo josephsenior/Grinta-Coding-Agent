@@ -31,6 +31,8 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'cerebras': 'https://api.cerebras.ai/v1',
     # Mistral AI: official API for Mistral models.
     'mistral': 'https://api.mistral.ai/v1',
+    # OpenCode Zen: OpenAI-compatible API for OpenCode's curated model catalog.
+    'opencode': 'https://opencode.ai/zen/v1',
 }
 
 KNOWN_PROVIDER_PREFIXES: set[str] = {
@@ -48,6 +50,7 @@ KNOWN_PROVIDER_PREFIXES: set[str] = {
     'nvidia',
     'ollama',
     'openai',
+    'opencode',
     'openrouter',
     'perplexity',
     'replicate',
@@ -109,7 +112,7 @@ def canonicalize_model_selection(
     prefixed_provider = extract_provider_prefix(model)
 
     # Proxy providers that need openai/ prefix for correct routing.
-    _OPENAI_COMPAT_PROVIDERS = {'lightning', 'cerebras'}
+    _OPENAI_COMPAT_PROVIDERS = {'lightning', 'cerebras', 'opencode'}
 
     if normalized_provider:
         if normalized_provider in _OPENAI_COMPAT_PROVIDERS:

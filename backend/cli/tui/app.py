@@ -25,6 +25,13 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Input, Label, RichLog, Static, TextArea
 
+_ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\r')
+
+
+def _strip_ansi(text: str) -> str:
+    """Strip all ANSI escape sequences and control characters from text."""
+    return _ANSI_ESCAPE_RE.sub('', text)
+
 from backend.cli.config_manager import AppConfig
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
@@ -323,7 +330,7 @@ class GrintaScreen(Screen):
 
     def add_user_message(self, text: str) -> None:
         """User message — distinct visual style."""
-        safe = text.replace("[", r"\[")
+        safe = _strip_ansi(text).replace("[", r"\[")
         self._write_log(f"\n[{NAVY_BRAND}]▸ You[/]  {safe}")
         if self._renderer:
             self._renderer._streamed_final_text = None
@@ -332,31 +339,34 @@ class GrintaScreen(Screen):
 
     def add_agent_message(self, text: str) -> None:
         """Agent response — same style as user, cyan marker."""
-        safe = text.replace("[", r"\[")
+        safe = _strip_ansi(text).replace("[", r"\[")
         self._write_log(f"\n[#00e5ff bold]▸ Grinta[/]  {safe}")
 
     def add_thinking(self, text: str) -> None:
         """Real-time thinking/reasoning — shown in transcript while streaming."""
-        self._write_log(f"[#00e5ff]{text}[/]")
+        safe = _strip_ansi(text).replace("[", r"\[")
+        self._write_log(f"[#00e5ff]{safe}[/]")
 
     def add_system_message(self, text: str) -> None:
-        self._write_log(f"[{NAVY_TEXT_MUTED}]{text}[/]")
+        self._write_log(f"[{NAVY_TEXT_MUTED}]{_strip_ansi(text).replace('[', r'\[')}[/]")
 
     def add_error(self, text: str) -> None:
-        self._write_log(f"[bold {NAVY_ERROR}]✗ {text}[/]")
+        self._write_log(f"[bold {NAVY_ERROR}]✗ {_strip_ansi(text)}[/]")
 
     def add_success(self, text: str) -> None:
-        self._write_log(f"[bold {NAVY_READY}]✓ {text}[/]")
+        self._write_log(f"[bold {NAVY_READY}]✓ {_strip_ansi(text)}[/]")
 
     def add_tool_start(self, tool_name: str) -> None:
         """Tool call — indented with ▸ prefix."""
+        safe = _strip_ansi(tool_name).replace("[", r"\[")
         self._write_log(
-            f"  [{NAVY_BRAND_DIM}]▸[/]  [{NAVY_TEXT_TERTIARY}]{tool_name}[/]"
+            f"  [{NAVY_BRAND_DIM}]▸[/]  [{NAVY_TEXT_TERTIARY}]{safe}[/]"
         )
 
     def add_tool_result(self, text: str) -> None:
         """Tool result — double-indented."""
-        self._write_log(f"    [{NAVY_TEXT_MUTED}]{text}[/]")
+        safe = _strip_ansi(text).replace("[", r"\[")
+        self._write_log(f"    [{NAVY_TEXT_MUTED}]{safe}[/]")
 
     def add_divider(self) -> None:
         self._write_log(f"[{NAVY_BORDER}]" + "─" * 50 + "[/]")
@@ -978,7 +988,7 @@ class TUIRenderer:
         # Tool call streaming
         if action.is_tool_call:
             tool_name = action.tool_call_name or "tool"
-            self._tui.add_thinking(f"[{NAVY_BRAND}]▸ Tool[/]  [dim]{tool_name}…[/]")
+            self._tui.add_thinking(f"▸ Tool  {tool_name}…")
             self._state_event.set()
             return
 
