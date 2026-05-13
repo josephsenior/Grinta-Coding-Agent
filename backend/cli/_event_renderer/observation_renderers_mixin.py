@@ -24,6 +24,7 @@ from rich import box
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.syntax import Syntax
+from rich.table import Table
 from rich.text import Text
 
 from backend.cli._event_renderer.apply_patch import (
@@ -59,12 +60,17 @@ from backend.cli._event_renderer.text_utils import (
 from backend.cli._tool_display.preview import (
     file_read_syntax_highlight as _file_read_syntax_highlight,
 )
+
 from backend.cli._typing import ObservationRenderersHost
 from backend.cli.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
 from backend.cli.theme import (
+    CLR_DETAIL,
     CLR_OUTPUT_PANEL_BORDER,
     CLR_OUTPUT_PANEL_TITLE,
     CLR_QUESTION_TEXT,
+    CLR_SECONDARY,
+    CLR_STATUS_ERR,
+    CLR_STATUS_OK,
     CLR_STATUS_WARN,
 )
 from backend.cli.tool_call_display import (
@@ -247,6 +253,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             is_internal=is_internal,
             exit_code=exit_code,
             content=content,
+            command=self._pending_shell_command or '',
         )
         inner = format_activity_shell_block(
             verb,
@@ -255,8 +262,10 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             result_kind=result_kind,
             extra_lines=extra_lines,
             title=title if is_internal else None,
+            badge_label='execute_bash',
         )
         self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
+        self._pending_shell_command = None
 
     def _reset_pending_shell(self) -> None:
         self._pending_shell_action = None
@@ -289,6 +298,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         is_internal: bool,
         exit_code: int | None,
         content: str,
+        command: str = '',
     ) -> tuple[str | None, str, list[Any] | None]:
         """Return ``(msg, result_kind, extra_lines)`` for the shell card."""
         if is_internal and _is_apply_patch_activity(title, label):
@@ -304,7 +314,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             extras = self._cmd_observation_failure_extras(content)
             return msg, 'err', extras
         # Plain shell success: hide verbose stdout.
-        return self._cmd_observation_success(exit_code, content)
+        return self._cmd_observation_success(exit_code, content, command=command)
 
     @staticmethod
     def _cmd_observation_failure(exit_code: int, content: str) -> str:
@@ -343,6 +353,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
     def _cmd_observation_success(
         exit_code: int | None,
         content: str,
+        command: str = '',
     ) -> tuple[str | None, str, list[Any] | None]:
         raw_lines = (
             [ln.strip() for ln in content.split('\n') if ln.strip()] if content else []
@@ -355,18 +366,16 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             return msg, result_kind, syntax_extras
 
         if raw_lines:
-            preview_lines = raw_lines[:3]
+            preview_lines = raw_lines[:8]
             preview = '\n'.join(preview_lines)
-            if len(preview) > 240:
-                preview = preview[:237] + '...'
+            if len(preview) > 400:
+                preview = preview[:397] + '...'
             msg = f'exit {exit_code}' if exit_code is not None else 'done'
-            extra = [
-                format_activity_secondary(preview, kind='neutral'),
-            ]
-            if len(raw_lines) > 3:
+            extra = [format_activity_secondary(preview, kind='neutral')]
+            if len(raw_lines) > 8:
                 extra.append(
                     format_activity_secondary(
-                        f'... {len(raw_lines) - 3} more line{"s" if len(raw_lines) - 3 != 1 else ""}',
+                        f'... {len(raw_lines) - 8} more line{"s" if len(raw_lines) - 8 != 1 else ""}',
                         kind='neutral',
                     )
                 )

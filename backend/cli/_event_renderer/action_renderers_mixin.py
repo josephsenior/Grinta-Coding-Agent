@@ -68,6 +68,7 @@ from backend.cli.tool_call_display import (
     format_tool_activity_rows,
     tool_headline,
 )
+from backend.cli._tool_display.renderers.think import render_message, render_think
 from backend.cli.transcript import (
     format_activity_block,
     format_activity_secondary,
@@ -179,8 +180,6 @@ class ActionRenderersMixin(_ActionRenderersBase):
     def _render_message_action(self, action: MessageAction) -> None:
         from rich.text import Text
 
-        from backend.cli.theme import CLR_AUTONOMY_BALANCED, CLR_THOUGHT_BODY
-
         host = cast(ActionRenderersHost, self)
         if bool(getattr(action, 'suppress_cli', False)):
             self._stop_reasoning()
@@ -214,11 +213,13 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
         display_parts: list[Any] = []
 
-        thought_text = Text()
-        thought_text.append('Thinking:\n', style=f'bold {CLR_AUTONOMY_BALANCED}')
-        for line in thought.split('\n'):
-            thought_text.append(f'  {line}\n', style=CLR_THOUGHT_BODY)
-        display_parts.append(thought_text)
+        extra_lines = render_message(thought)
+        first_line = thought.replace('\n', ' ').strip()[:100]
+        display_parts.append(
+            Text.from_markup(
+                '\n'.join(extra_lines[1:]),
+            )
+        )
 
         if content:
             sanitized_content = _sanitize_visible_transcript_text(content)
@@ -264,7 +265,19 @@ class ActionRenderersMixin(_ActionRenderersBase):
         if source_tool:
             self._render_tool_sourced_think(source_tool, thought)
             return
-        self._apply_reasoning_text(thought)
+
+        extra_lines = render_think(thought)
+        kind = 'neutral'
+        first_line = thought.split('\n')[0].replace('\n', ' ').strip()[:100] if thought else 'Thinking'
+
+        inner = format_activity_block(
+            'Thought',
+            first_line[:100] or 'Thinking',
+            secondary=None,
+            secondary_kind=kind,
+            extra_lines=extra_lines,
+        )
+        self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
         self.refresh()
 
     def _render_tool_sourced_think(self, source_tool: str, thought: str) -> None:
@@ -276,6 +289,25 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
         verb, title, detail = self._think_action_card_fields(source_tool, human_msg)
         self._emit_activity_turn_header()
+
+        if source_tool == 'search_code':
+            from backend.cli._tool_display.renderers.search import render_search_results
+            raw_lines = [ln for ln in human_msg.splitlines() if ln.strip() and not ln.startswith('Error running')]
+            if raw_lines and any(re.match(r'^.*:\d+:', ln) for ln in raw_lines[:5]):
+                extra_lines = render_search_results(human_msg)
+                kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
+                inner = format_activity_block(
+                    verb,
+                    detail,
+                    secondary=None,
+                    secondary_kind=kind,
+                    extra_lines=extra_lines,
+                    title=title,
+                )
+                self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
+                self.refresh()
+                return
+
         kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
         self._print_or_buffer(
             Padding(
@@ -382,6 +414,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
             detail=detail,
             secondary=stats,
             kind='file_edit',
+            badge_label='text_editor',
         )
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(self._reasoning, f'{verb} {detail}', thought)
@@ -394,6 +427,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
             verb='Created',
             detail=action.path,
             kind='file_write',
+            badge_label='text_editor',
         )
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(
@@ -407,7 +441,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
         detail = query or 'workspace context'
         if len(detail) > 100:
             detail = detail[:97] + '…'
-        self._print_activity('Recalled', detail, None, title=ACTIVITY_CARD_TITLE_MEMORY)
+        self._print_activity('Recalled', detail, None, title=ACTIVITY_CARD_TITLE_MEMORY, badge_label='recall')
         self.refresh()
 
     def _render_file_read_action(self, action: FileReadAction) -> None:
@@ -428,6 +462,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
             verb='Read',
             detail=detail,
             kind='file_read',
+            badge_label='text_editor',
         )
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(self._reasoning, f'Read {path}', thought)
@@ -437,17 +472,19 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self._flush_pending_tool_cards()
         name = getattr(action, 'name', 'tool')
         raw_args = getattr(action, 'arguments', None) or {}
-        args_dict = raw_args if isinstance(raw_args, dict) else {}
-        verb, detail, stats = format_tool_activity_rows(name, args_dict)
+        args_str = ', '.join(f'{k}={repr(v)[:40]}' for k, v in list(raw_args.items())[:2])
+        if len(args_str) > 80:
+            args_str = args_str[:77] + '…'
+        detail = f'{name}({args_str})' if args_str else name
         self._buffer_pending_activity(
             title=ACTIVITY_CARD_TITLE_MCP,
-            verb=verb,
+            verb='Called MCP',
             detail=detail,
-            secondary=stats,
             kind='mcp',
+            badge_label='mcp',
         )
         thought = getattr(action, 'thought', '') or ''
-        _sync_reasoning_after_tool_line(self._reasoning, f'{verb} {detail}', thought)
+        _sync_reasoning_after_tool_line(self._reasoning, f'MCP {name}', thought)
         self.refresh()
 
     def _render_browser_tool_action(self, action: BrowserToolAction) -> None:
@@ -463,7 +500,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
         else:
             detail = str(cmd)
             reasoning_detail = detail
-        self._print_activity(str(cmd), detail, None, title=ACTIVITY_CARD_TITLE_BROWSER)
+        self._print_activity(str(cmd), detail, None, title=ACTIVITY_CARD_TITLE_BROWSER, badge_label='browser')
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(self._reasoning, reasoning_detail, thought)
         self.refresh()
@@ -481,7 +518,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
         else:
             detail = 'interactive session'  # type: ignore[unreachable]
             reasoning_detail = detail
-        self._print_activity('Opened', detail, None, title=ACTIVITY_CARD_TITLE_BROWSER)
+        self._print_activity('Opened', detail, None, title=ACTIVITY_CARD_TITLE_BROWSER, badge_label='browser')
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(self._reasoning, reasoning_detail, thought)
         self.refresh()
@@ -499,6 +536,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
             detail=detail,
             secondary=stats,
             kind='lsp',
+            badge_label='lsp',
         )
         self.refresh()
 
@@ -558,6 +596,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
             None,
             title=ACTIVITY_CARD_TITLE_TERMINAL,
             shell_rail=True,
+            badge_label='terminal',
         )
         self._ensure_reasoning()
         pty_line = f'{ACTIVITY_CARD_TITLE_TERMINAL} · {label}'
@@ -577,7 +616,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self._last_terminal_input_sent = sent_for_echo
         cmd_detail = f'[{sess}]  $ {inp_display}' if sess else f'$ {inp_display}'
         self._print_activity(
-            'Run', cmd_detail, None, title=ACTIVITY_CARD_TITLE_TERMINAL
+            'Run', cmd_detail, None, title=ACTIVITY_CARD_TITLE_TERMINAL, badge_label='terminal'
         )
         self._ensure_reasoning()
         line = self._terminal_input_reasoning_line(sess=sess, inp_display=inp_display)
@@ -630,6 +669,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
             detail=desc_display,
             secondary=secondary,
             kind='delegate',
+            badge_label='workers',
         )
         self.refresh()
 

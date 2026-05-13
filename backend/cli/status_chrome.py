@@ -103,11 +103,11 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
     lim_tok = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
     is_estimated = getattr(hud, 'token_usage_estimated', False)
     if hud.context_tokens == 0 and hud.context_limit == 0:
-        token_display_compact = '0t'
+        token_display_compact = 'Tokens: 0'
     elif hud.context_limit == 0:
-        token_display_compact = f'{ctx}t'
+        token_display_compact = f'Tokens: {ctx}'
     else:
-        token_display_compact = f'{ctx}/{lim_tok}' if lim_tok else f'{ctx}t'
+        token_display_compact = f'Tokens: {ctx}/{lim_tok}' if lim_tok else f'Tokens: {ctx}'
     if is_estimated:
         token_display_compact += '~'  # ~ indicates estimated (not exact count)
 
@@ -139,13 +139,13 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
 
 
 def autonomy_word_label(level: str) -> tuple[str, str]:
-    """Return (short label, Rich style) for the compact HUD bar autonomy segment."""
+    """Return (label, Rich style) for the compact HUD bar autonomy segment."""
     raw = (level or 'balanced').strip().lower()
     if raw == 'full':
-        return 'Full', CLR_AUTONOMY_FULL
+        return 'Autonomy: full', CLR_AUTONOMY_FULL
     if raw == 'conservative':
-        return 'Conserv', CLR_AUTONOMY_CONSERVATIVE
-    return 'Balanced', CLR_AUTONOMY_BALANCED
+        return 'Autonomy: conservative', CLR_AUTONOMY_CONSERVATIVE
+    return 'Autonomy: balanced', CLR_AUTONOMY_BALANCED
 
 
 def _shorten_home(path: str) -> str:
@@ -309,13 +309,13 @@ def rich_compact_hud_line(
     # Cost & calls — compact format
     parts.append((' · ', CLR_SEP))
     parts.append((f'${fields.cost_usd:.3f}', CLR_HUD_DETAIL))
-    parts.append((f'/{fields.llm_calls}c', CLR_HUD_DETAIL))
+    parts.append((f'Calls: {fields.llm_calls}', CLR_HUD_DETAIL))
 
     # MCP & skills
     parts.append((' · ', CLR_SEP))
-    parts.append((f'M:{fields.mcp_short}', CLR_HUD_DETAIL))
+    parts.append((f'MCPs: {fields.mcp_short}', CLR_HUD_DETAIL))
     parts.append((' ', ''))
-    parts.append((f'S:{fields.skills_short}', CLR_HUD_DETAIL))
+    parts.append((f'Skills: {fields.skills_short}', CLR_HUD_DETAIL))
 
     if fields.condensation_count > 0:
         parts.append((' · ', CLR_SEP))

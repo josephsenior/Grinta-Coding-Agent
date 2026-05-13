@@ -82,6 +82,7 @@ class PendingActivityCard:
     secondary: str | None = None
     kind: str = 'generic'
     payload: dict[str, Any] | None = None
+    badge_label: str | None = None
 
 
 # ---------------------------------------------------------------------------

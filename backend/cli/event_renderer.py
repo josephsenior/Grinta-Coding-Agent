@@ -1215,9 +1215,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         *,
         shell_rail: bool = False,
         title: str | None = None,
+        badge_label: str | None = None,
     ) -> None:
         """Primary activity row plus optional dim stats (tool / file / shell)."""
-        self._emit_activity_turn_header()  # not a duplicate
+        self._emit_activity_turn_header()
         if shell_rail:
             inner = format_activity_shell_block(
                 verb,
@@ -1225,10 +1226,11 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
                 secondary=stats,
                 secondary_kind='neutral',
                 title=title,
+                badge_label=badge_label,
             )
         else:
             inner = format_activity_block(
-                verb, detail, secondary=stats, secondary_kind='neutral', title=title
+                verb, detail, secondary=stats, secondary_kind='neutral', title=title, badge_label=badge_label
             )
         self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
 
@@ -1241,6 +1243,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         secondary: str | None = None,
         kind: str = 'generic',
         payload: dict[str, Any] | None = None,
+        badge_label: str | None = None,
     ) -> None:
         self._flush_pending_activity_card()
         self._pending_activity_card = PendingActivityCard(
@@ -1250,6 +1253,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             secondary=secondary,
             kind=kind,
             payload=payload or {},
+            badge_label=badge_label,
         )
 
     def _take_pending_activity_card(
@@ -1270,6 +1274,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         result_message: str | None = None,
         result_kind: str = 'neutral',
         extra_lines: list[Any] | None = None,
+        badge_label: str | None = None,
     ) -> None:
         self._emit_activity_turn_header()
         inner = format_activity_block(
@@ -1281,6 +1286,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             result_kind=result_kind,
             extra_lines=extra_lines,
             title=pending.title,
+            badge_label=badge_label or pending.badge_label,
         )
         self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
 
