@@ -325,19 +325,16 @@ with InputBar(id="input-bar"):
         self._get_log().write(t)
 
     def add_user_message(self, text: str) -> None:
-        """User message — with left border marker (dynamic, fills width naturally)."""
-        self._write_log(
-            f"[#91abec]│[/#91abec] [#e9e9e9]{text}[/#e9e9e9]"
-        )
-        # Clear reasoning panel and streaming dedup state for the new turn
+        """User message — distinct visual style with left accent bar."""
+        self._write_log(f"\n[{NAVY_BRAND} bold]▸ You[/]  [{NAVY_TEXT_PRIMARY}]{text}[/{NAVY_TEXT_PRIMARY}]")
         if self._renderer:
             self._renderer._streamed_final_text = None
             self._renderer._turn_active = True
             self._renderer._last_thinking_len = 0
 
     def add_agent_message(self, text: str) -> None:
-        """Agent message — plain text."""
-        self._write_log(f"[{NAVY_TEXT_PRIMARY}]{text}[/]")
+        """Agent response — indented with accent marker."""
+        self._write_log(f"\n  [{NAVY_BRAND}]▸[/]  {text}")
 
     def add_thinking(self, text: str) -> None:
         """Real-time thinking/reasoning — shown in transcript while streaming."""
