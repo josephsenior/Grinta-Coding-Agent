@@ -50,7 +50,7 @@ RichLog#transcript-log {
     background: #060a14;
     width: 100%;
     text-wrap: wrap;
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 
 /* ── InputBar ──────────────────────────────────────── */
