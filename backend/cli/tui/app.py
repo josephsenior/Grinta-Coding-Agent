@@ -23,7 +23,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, Input, Label, RichLog, Static, TextArea
+from textual.widgets import Button, Input, Label, RichLog, Static
 
 from backend.cli.config_manager import AppConfig
 from backend.cli.hud import HUDBar
@@ -198,14 +198,14 @@ class GrintaScreen(Screen):
         with Transcript(id="transcript-scroll"):
             yield RichLog(id="transcript-log", markup=True, auto_scroll=True)
         with InputBar(id="input-bar"):
-            yield TextArea(id="input", tab_behavior="indent")
+            yield Input(id="input")
         yield HUD(id="hud-bar")
 
     def on_mount(self) -> None:
         _tui_logger.debug("on_mount: GrintaScreen mounted")
 
         self._render_hud_bar()
-        ta = self.query_one("#input", TextArea)
+        ta = self.query_one("#input", Input)
         ta.focus()
         transcript = self.query_one("#transcript-scroll", Transcript)
         transcript.scroll_home(animate=False)
@@ -381,8 +381,8 @@ class GrintaScreen(Screen):
         if self._input_lock.locked():
             _tui_logger.debug("action_submit_input: lock held, ignoring")
             return
-        ta = self.query_one("#input", TextArea)
-        text = ta.text.strip()
+        ta = self.query_one("#input", Input)
+        text = ta.value.strip()
         _tui_logger.debug(f"action_submit_input: text_len={len(text)}")
         if not text:
             _tui_logger.debug("action_submit_input: empty text, ignoring")
@@ -411,7 +411,7 @@ class GrintaScreen(Screen):
         except Exception as exc:
             _tui_logger.debug(f"_handle_input: _trace FAILED: {type(exc).__name__}: {exc}")
         async with self._input_lock:
-            ta = self.query_one("#input", TextArea)
+            ta = self.query_one("#input", Input)
             ta.clear()
             ta.focus()
             self._scroll_to_bottom()
