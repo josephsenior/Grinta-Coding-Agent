@@ -69,15 +69,15 @@ HUD {
     padding: 0 2;
 }
 
-InputBar Input {
+InputBar TextArea {
     background: #0d1a2d;
     color: #c8d4e8;
     border: none;
-    padding: 0 2;
+    padding: 1 2;
     height: 100%;
 }
 
-InputBar Input:focus {
+InputBar TextArea:focus {
     border: none;
     background: #0d1a2d;
     color: #c8d4e8;
