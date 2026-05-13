@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import threading
 from collections import deque
 
@@ -304,9 +305,23 @@ class GrintaScreen(Screen):
     def _get_log(self) -> RichLog:
         return self.query_one("#transcript-log", RichLog)
 
+    @staticmethod
+    def _break_long_runs(text: str, max_len: int = 80) -> str:
+        """Insert zero-width spaces in long continuous runs, preserving Rich markup tags."""
+        def _break_word(w: str) -> str:
+            if len(w) > max_len and not w.isspace():
+                return '\u200b'.join(w[i:i+max_len] for i in range(0, len(w), max_len))
+            return w
+        parts = re.split(r'(\[[^\[\]]*\])', text)
+        for i, part in enumerate(parts):
+            if not (part.startswith('[') and part.endswith(']')):
+                words = re.split(r'(\s+)', part)
+                parts[i] = ''.join(_break_word(w) for w in words)
+        return ''.join(parts)
+
     def _write_log(self, markup: str) -> None:
+        markup = self._break_long_runs(markup)
         t = Text.from_markup(markup)
-        t.overflow = "break"
         self._get_log().write(t)
 
     def add_user_message(self, text: str) -> None:
