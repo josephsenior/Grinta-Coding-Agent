@@ -35,6 +35,8 @@ def _strip_ansi(text: str) -> str:
 from backend.cli.config_manager import AppConfig
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
+from backend.cli._tool_display.renderers.badge import badge_for_tool_name
+from backend.cli._tool_display.renderers.output_parsers import parse_shell_output
 from backend.cli.theme import (
     NAVY_BORDER,
     NAVY_BRAND,
@@ -230,9 +232,12 @@ class GrintaScreen(Screen):
     def on_unmount(self) -> None:
         _tui_logger.debug("on_unmount: GrintaScreen unmounting")
         if self._renderer:
+            if self._renderer._event_stream:
+                self._renderer._event_stream.unsubscribe(EventStreamSubscriber.MAIN, "grinta-tui")
             self._renderer._event_stream = None
         if self._event_stream is not None:
             try:
+                self._event_stream.unsubscribe(EventStreamSubscriber.MAIN, "grinta-tui")
                 close_fn = getattr(self._event_stream, "close", None)
                 if callable(close_fn):
                     close_fn()
@@ -267,6 +272,10 @@ class GrintaScreen(Screen):
         state_color = self._STATE_COLORS.get(lookup_key, NAVY_BRAND)
 
         _provider, model_short = HUDBar.describe_model(hud.state.model)
+        if model_short and model_short != '(not set)':
+            model_display = f"Model: {_provider}/{model_short}" if _provider != '(not set)' else f"Model: {model_short}"
+        else:
+            model_display = "Model: (not set)"
         autonomy = hud.state.autonomy_level
 
         used = hud.state.context_tokens
@@ -286,20 +295,20 @@ class GrintaScreen(Screen):
         parts.append(f"[{NAVY_TEXT_SECONDARY}]{workspace}[/]")
         # State and autonomy - use model_short only once
         parts.append(f"[{state_color}]● {display_state}[/]")
-        parts.append(f"[{NAVY_TEXT_SECONDARY}]{model_short}[/]")
-        parts.append(f"[{NAVY_TEXT_TERTIARY}][{NAVY_BRAND}]{autonomy}[/]")
+        parts.append(f"[{NAVY_TEXT_SECONDARY}]{model_display}[/]")
+        parts.append(f"[{NAVY_TEXT_TERTIARY}][{NAVY_BRAND}]Autonomy: {autonomy}[/]")
         # Usage
         if limit > 0:
-            parts.append(f"[{NAVY_TEXT_DIM}]{used:,}/{limit:,}[/]")
+            parts.append(f"[{NAVY_TEXT_DIM}]Tokens: {used:,}/{limit:,}[/]")
         else:
-            parts.append(f"[{NAVY_TEXT_DIM}]{used:,} t[/]")
+            parts.append(f"[{NAVY_TEXT_DIM}]Tokens: {used:,}[/]")
         # Cost
         parts.append(f"[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]")
         # Stats
-        parts.append(f"[{NAVY_TEXT_DIM}]{calls}c[/]")
+        parts.append(f"[{NAVY_TEXT_DIM}]Calls: {calls}[/]")
         if mcp is not None:
-            parts.append(f"[{NAVY_TEXT_DIM}]{mcp}MCP[/]")
-        parts.append(f"[{NAVY_TEXT_DIM}]{skills}sk[/]")
+            parts.append(f"[{NAVY_TEXT_DIM}]MCPs: {mcp}[/]")
+        parts.append(f"[{NAVY_TEXT_DIM}]Skills: {skills}[/]")
         # Help hint
         parts.append(f"[{NAVY_TEXT_DIM}]? help[/]")
 

@@ -186,6 +186,7 @@ def format_activity_block(
     result_kind: str = 'neutral',
     extra_lines: list[Any] | None = None,
     title: str | None = None,
+    badge_label: str | None = None,
 ) -> Any:
     """Primary row plus optional secondary rows, optionally prefixed with a title."""
     parts: list[Any] = [format_activity_primary(verb, detail)]
@@ -196,11 +197,17 @@ def format_activity_block(
     if extra_lines:
         parts.extend(extra_lines)
     content = Group(*parts)
-    if title:
-        title_line = Text()
-        title_line.append(_ACTIVITY_PRIMARY_INDENT, style=STYLE_EMPTY)
-        title_line.append((title or '').strip(), style=ACTIVITY_CARD_TITLE_STYLE)
-        return Group(title_line, content)
+    if title or badge_label:
+        title_parts: list[Any] = []
+        if badge_label:
+            from backend.cli._tool_display.renderers.badge import badge_for_tool_name
+            title_parts.append(Text.from_markup(badge_for_tool_name(badge_label).render()))
+        if title:
+            title_line = Text()
+            title_line.append(_ACTIVITY_PRIMARY_INDENT, style=STYLE_EMPTY)
+            title_line.append((title or '').strip(), style=ACTIVITY_CARD_TITLE_STYLE)
+            title_parts.append(title_line)
+        return Group(Group(*title_parts), content)
     return content
 
 
@@ -240,8 +247,14 @@ def format_activity_shell_block(
     result_kind: str = 'ok',
     extra_lines: list[Any] | None = None,
     title: str | None = None,
+    badge_label: str | None = None,
 ) -> Any:
     """Shell command activity block — same visual style as other tool cards."""
+    extra_lines = list(extra_lines) if extra_lines else []
+    if badge_label:
+        from backend.cli._tool_display.renderers.badge import badge_for_tool_name
+        badge = badge_for_tool_name(badge_label)
+        extra_lines.insert(0, format_activity_secondary(badge.render(), kind='neutral'))
     return format_activity_block(
         verb,
         detail,
@@ -249,7 +262,7 @@ def format_activity_shell_block(
         secondary_kind=secondary_kind,
         result_message=result_message,
         result_kind=result_kind,
-        extra_lines=extra_lines,
+        extra_lines=extra_lines if extra_lines else None,
         title=title,
     )
 
