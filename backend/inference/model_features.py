@@ -76,6 +76,7 @@ FUNCTION_CALLING_PATTERNS: list[str] = [
     'grok-*',
     'kimi-k2*',
     'qwen3*',
+    'zai-glm-4.7*',
 ]
 REASONING_EFFORT_PATTERNS: list[str] = [
     'o1-*',
