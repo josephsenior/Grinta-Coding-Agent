@@ -29,6 +29,8 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'digitalocean': 'https://inference.do-ai.run/v1',
     # Cerebras AI: OpenAI-compatible endpoint for fast inference on CS-3 systems.
     'cerebras': 'https://api.cerebras.ai/v1',
+    # Mistral AI: official API for Mistral models.
+    'mistral': 'https://api.mistral.ai/v1',
 }
 
 KNOWN_PROVIDER_PREFIXES: set[str] = {

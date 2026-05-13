@@ -113,6 +113,7 @@ _JSON_LLM_KEYS = (
     'llm_base_url',
     'llm_provider',
     'llm_max_output_tokens',
+    'llm_reasoning_effort',
 )
 
 
@@ -254,6 +255,10 @@ def _build_json_llm_config(
                 llm_dict['max_output_tokens'] = int(str(raw))
             except (ValueError, TypeError):
                 pass
+    if 'llm_reasoning_effort' in data:
+        raw = data['llm_reasoning_effort']
+        if raw is not None and str(raw).strip():
+            llm_dict['reasoning_effort'] = str(raw).strip()
     return llm_dict
 
 
