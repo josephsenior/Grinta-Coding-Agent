@@ -95,19 +95,19 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
     """Build fields from :class:`~backend.cli.hud.HUDState` and bundled skill count."""
     provider, model = HUDBar.describe_model(hud.model)
     if provider in _UNKNOWN_PROVIDERS:
-        model_display = f'Model: {model}'
+        model_display = model
     else:
-        model_display = f'Model: {provider}/{model}'
+        model_display = f'{provider}/{model}'
 
     ctx = HUDBar._format_tokens(hud.context_tokens)
     lim_tok = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
     is_estimated = getattr(hud, 'token_usage_estimated', False)
     if hud.context_tokens == 0 and hud.context_limit == 0:
-        token_display_compact = 'Tokens: 0'
+        token_display_compact = '0'
     elif hud.context_limit == 0:
-        token_display_compact = f'Tokens: {ctx}'
+        token_display_compact = f'{ctx}'
     else:
-        token_display_compact = f'Tokens: {ctx}/{lim_tok}' if lim_tok else f'Tokens: {ctx}'
+        token_display_compact = f'{ctx}/{lim_tok}' if lim_tok else f'{ctx}'
     if is_estimated:
         token_display_compact += '~'  # ~ indicates estimated (not exact count)
 
@@ -142,10 +142,10 @@ def autonomy_word_label(level: str) -> tuple[str, str]:
     """Return (label, Rich style) for the compact HUD bar autonomy segment."""
     raw = (level or 'balanced').strip().lower()
     if raw == 'full':
-        return 'Autonomy: full', CLR_AUTONOMY_FULL
+        return 'Autonomy: Full', CLR_AUTONOMY_FULL
     if raw == 'conservative':
-        return 'Autonomy: conservative', CLR_AUTONOMY_CONSERVATIVE
-    return 'Autonomy: balanced', CLR_AUTONOMY_BALANCED
+        return 'Autonomy: Conservative', CLR_AUTONOMY_CONSERVATIVE
+    return 'Autonomy: Balanced', CLR_AUTONOMY_BALANCED
 
 
 def _shorten_home(path: str) -> str:
@@ -159,8 +159,9 @@ def _shorten_home(path: str) -> str:
 
 
 def autonomy_chrome_suffix(level: str) -> str:
-    """``Autonomy: balanced`` style string for GRINTA row / PT."""
-    return f'Autonomy: {(level or "balanced").strip().lower()}'
+    """``Autonomy: Balanced`` style string for GRINTA row / PT."""
+    l = (level or 'balanced').strip()
+    return f'Autonomy: {l.title()}'
 
 
 def ledger_icon(ledger_status: str) -> str:
@@ -309,13 +310,13 @@ def rich_compact_hud_line(
     # Cost & calls — compact format
     parts.append((' · ', CLR_SEP))
     parts.append((f'${fields.cost_usd:.3f}', CLR_HUD_DETAIL))
-    parts.append((f'Calls: {fields.llm_calls}', CLR_HUD_DETAIL))
+    parts.append((f'{fields.llm_calls}c', CLR_HUD_DETAIL))
 
     # MCP & skills
     parts.append((' · ', CLR_SEP))
-    parts.append((f'MCPs: {fields.mcp_short}', CLR_HUD_DETAIL))
+    parts.append((f'M:{fields.mcp_short}', CLR_HUD_DETAIL))
     parts.append((' ', ''))
-    parts.append((f'Skills: {fields.skills_short}', CLR_HUD_DETAIL))
+    parts.append((f'S:{fields.skills_short}', CLR_HUD_DETAIL))
 
     if fields.condensation_count > 0:
         parts.append((' · ', CLR_SEP))

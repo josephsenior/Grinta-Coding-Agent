@@ -262,7 +262,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             result_kind=result_kind,
             extra_lines=extra_lines,
             title=title if is_internal else None,
-            badge_label='execute_bash',
+            badge_label='execute_bash' if not is_internal else None,
         )
         self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
         self._pending_shell_command = None

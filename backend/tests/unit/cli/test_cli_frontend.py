@@ -1009,7 +1009,7 @@ def test_prompt_toolbar_reflects_state_and_autonomy() -> None:
     toolbar = repl._prompt_toolbar_text()
 
     assert 'Stopped' in toolbar
-    assert 'Autonomy: full' in toolbar
+    assert 'Autonomy: Full' in toolbar
     assert 'Tab for commands' in toolbar
     assert 'provider: google' in toolbar
     assert 'model: gemini-3-flash-preview' in toolbar
@@ -3719,7 +3719,7 @@ async def test_fake_prompt_single_path_narrow_and_wide_match() -> None:
     assert 'MCP:' in wide
     assert 'Running' in narrow
     assert 'google/gemini-3-flash-preview' in narrow
-    assert 'Autonomy: balanced' in narrow
+    assert 'Autonomy: Balanced' in narrow
     assert 'GRINTA' not in narrow
     assert 'MCP:' not in narrow
 
