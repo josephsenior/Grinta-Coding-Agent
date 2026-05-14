@@ -60,6 +60,7 @@ class GrintaTUIApp(App):
         self._agent_task: asyncio.Task[Any] | None = None
         self._renderer: Any | None = None
         self._input_lock = asyncio.Lock()
+        self._screen: Any | None = None
 
         # Register Rich theme for consistent markup rendering
         self._console.push_theme(_RICH_THEME)
@@ -70,7 +71,7 @@ class GrintaTUIApp(App):
 
     async def on_mount(self) -> None:
         from backend.cli.tui.app import GrintaScreen
-        await self.push_screen(GrintaScreen(
+        self._screen = await self.push_screen(GrintaScreen(
             config=self._config,
             console=self._console,
             loop=self._loop,
@@ -81,6 +82,13 @@ class GrintaTUIApp(App):
 
     def on_unmount(self) -> None:
         self._console.pop_theme()
+        if self._event_stream is not None:
+            try:
+                self._event_stream.close()
+            except Exception:
+                pass
+            self._event_stream = None
+            self._screen = None
 
     def update_hud(self) -> None:
         screen = self.screen

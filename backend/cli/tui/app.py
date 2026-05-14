@@ -338,13 +338,13 @@ class GrintaScreen(Screen):
         self._get_log().write(t)
 
     def add_user_message(self, text: str) -> None:
-        """User message — distinct visual style."""
+        """User message — same style as agent, cyan marker."""
         safe = _strip_ansi(text).replace("[", r"\[")
         self._write_log(f"\n[{NAVY_BRAND}]▸ You[/]  {safe}")
+        self._write_log("\n")
         if self._renderer:
-            self._renderer._streamed_final_text = None
-            self._renderer._turn_active = True
             self._renderer._last_thinking_len = 0
+            self._renderer._turn_active = True
 
     def add_agent_message(self, text: str) -> None:
         """Agent response — same style as user, cyan marker."""
@@ -352,9 +352,9 @@ class GrintaScreen(Screen):
         self._write_log(f"\n[#00e5ff bold]▸ Grinta[/]  {safe}")
 
     def add_thinking(self, text: str) -> None:
-        """Real-time thinking/reasoning — shown in transcript while streaming."""
+        """Real-time thinking/reasoning — muted style."""
         safe = _strip_ansi(text).replace("[", r"\[")
-        self._write_log(f"[#00e5ff]{safe}[/]")
+        self._write_log(f"\n[{NAVY_TEXT_MUTED}]{safe}[/]")
 
     def add_system_message(self, text: str) -> None:
         self._write_log(f"[{NAVY_TEXT_MUTED}]{_strip_ansi(text).replace('[', r'\[')}[/]")
@@ -859,6 +859,8 @@ class GrintaScreen(Screen):
                         loop_count,
                         state,
                     )
+                if self._renderer:
+                    self._renderer.drain_events()
                 if state in end_states:
                     _tui_logger.debug(f"_dispatch_to_agent: reached end state {state}")
                     logger.info("[TUI] _dispatch_to_agent: reached end state %s", state)
@@ -869,8 +871,6 @@ class GrintaScreen(Screen):
                         "[TUI] _dispatch_to_agent: agent task done, state=%s", state
                     )
                     break
-                if self._renderer:
-                    self._renderer.drain_events()
                 # Hard timeout: prevent infinite polling if the agent gets stuck.
                 if _time.monotonic() - _poll_started > _max_poll_seconds:
                     _tui_logger.debug("_dispatch_to_agent: poll timeout reached")
@@ -928,8 +928,6 @@ class TUIRenderer:
         self._pending_lock = threading.Lock()
         # Track the last message rendered via streaming final chunk —
         # used to suppress duplicate MessageAction from the backend.
-        self._streamed_final_text: str | None = None
-        # Tracks whether the current turn is complete to prevent cross-turn leak.
         self._turn_active: bool = False
         # Track thinking stream position to avoid re-rendering duplicates
         self._last_thinking_len: int = 0
@@ -945,7 +943,7 @@ class TUIRenderer:
         with self._pending_lock:
             while self._pending_events:
                 event = self._pending_events.popleft()
-        self._process_event(event)
+                self._process_event(event)
 
     def _on_event(self, event: Any) -> None:
         _tui_logger.debug(f"TUIRenderer._on_event: {type(event).__name__}")
@@ -973,16 +971,13 @@ class TUIRenderer:
 
         if isinstance(event, MessageAction) and source == EventSource.AGENT:
             content = event.content or ""
-            # Skip if this MessageAction duplicates a message already rendered
-            # by the final StreamingChunkAction for this turn.
-            if content and content == self._streamed_final_text:
-                self._streamed_final_text = None
-                return
             if content:
                 self._tui.add_agent_message(content)
         elif isinstance(event, CmdRunAction) and source == EventSource.AGENT:
             cmd = getattr(event, "command", "") or ""
-            self._tui.add_tool_start(cmd[:80])
+            label = getattr(event, "display_label", "") or ""
+            display = label or cmd
+            self._tui.add_tool_start(display[:80])
         elif isinstance(event, CmdOutputObservation):
             output = (event.content or "").strip()
             if output:
@@ -1019,10 +1014,6 @@ class TUIRenderer:
         if action.is_final:
             # Reset thinking tracker for next turn
             self._last_thinking_len = 0
-            text = (action.accumulated or "").strip()
-            if text:
-                self._streamed_final_text = text
-                self._tui.add_agent_message(text)
             self._tui._render_hud_bar()
 
     def _update_metrics(self, event: Any) -> None:
@@ -1053,5 +1044,4 @@ class TUIRenderer:
             AgentState.ERROR,
             AgentState.STOPPED,
         }:
-            self._streamed_final_text = None
             self._turn_active = False
