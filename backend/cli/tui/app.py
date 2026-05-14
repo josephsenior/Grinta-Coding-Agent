@@ -1377,8 +1377,8 @@ class TUIRenderer:
                 self._tui._write_log(Text(f"  {result}", style=NAVY_TEXT_MUTED))
         elif isinstance(event, PlaybookFinishAction):
             summary = getattr(event, 'final_thought', '') or getattr(event, 'thought', '') or ''
-            lines = render_finish_summary(summary)
-            self._write_lines(lines)
+            if summary:
+                self._tui._write_log(Text(f"{summary}", style=NAVY_TEXT_DIM))
         elif isinstance(event, UserRejectObservation):
             self._tui._write_log(Text("  Rejected", style=NAVY_ERROR))
         elif isinstance(event, ServerReadyObservation):
