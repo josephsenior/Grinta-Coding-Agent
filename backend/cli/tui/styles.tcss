@@ -87,7 +87,7 @@ HUD,
     height: auto;
     background: #0a1525;
     color: #969aad;
-    padding: 0 2;
+    padding: 1 2 0 2;
 }
 
 #hud-line-1 {
