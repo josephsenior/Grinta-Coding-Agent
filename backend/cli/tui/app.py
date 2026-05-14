@@ -205,7 +205,6 @@ class GrintaScreen(Screen):
     def compose(self) -> ComposeResult:
         with Transcript(id="transcript-scroll"):
             yield RichLog(id="transcript-log", markup=True, auto_scroll=True)
-            yield Static(id="thinking-panel", classes="-hidden")
         with InputBar(id="input-bar"):
             yield Static(id="spinner", classes="-hidden")
             yield TextArea(id="input")
@@ -353,34 +352,26 @@ class GrintaScreen(Screen):
         self._write_log("\n")
 
     def add_thinking(self, text: str) -> None:
-        """Real-time thinking/reasoning — update in-transcript Panel in-place."""
-        block = self.query_one("#thinking-panel", Static)
-        block.remove_class("-hidden")
+        """Real-time thinking/reasoning — write a Panel directly to the RichLog transcript."""
         spinner = self.query_one("#spinner", Static)
         spinner.remove_class("-hidden")
         spinner.update("⟳")
         safe = _strip_ansi(text).replace("[", r"\[")
-        block.update(Panel(safe, title="⟳ Thinking", border_style="dim"))
+        self._get_log().write(
+            Panel(
+                Text(safe, style=NAVY_TEXT_MUTED),
+                title="⟳ Thinking",
+                border_style="dim",
+            )
+        )
         self._scroll_to_bottom()
 
     def finalize_thinking(self) -> None:
-        """Agent turn done — write final Panel to RichLog so it persists in transcript."""
-        block = self.query_one("#thinking-panel", Static)
-        if block.has_class("-hidden"):
-            return
-        current = block.renderable
-        if isinstance(current, Panel):
-            content = getattr(current, "renderable", "")
-            self._get_log().write(
-                Panel(content, title="✓ Thinking", border_style="dim")
-            )
-        block.add_class("-hidden")
+        """Agent turn done — final Panel already written; nothing extra needed."""
         self.query_one("#spinner", Static).add_class("-hidden")
-        self._scroll_to_bottom()
 
     def _hide_thinking(self) -> None:
-        """Called when user submits a new message — hide live panel if still active."""
-        self.query_one("#thinking-panel", Static).add_class("-hidden")
+        """Called when user submits a new message — hide spinner if still active."""
         self.query_one("#spinner", Static).add_class("-hidden")
 
     def add_system_message(self, text: str) -> None:
