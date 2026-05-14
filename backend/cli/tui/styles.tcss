@@ -77,22 +77,20 @@ InputBar TextArea:focus {
     color: #c8d4e8;
 }
 
-/* ── Thinking Block ────────────────────────────────── */
-ThinkingBlock {
+/* ── Thinking Panel (live inside transcript) ────────── */
+#thinking-panel {
     background: #0a1225;
     border: solid #1b2a4a;
-    margin: 0 2;
+    margin: 0 1;
     padding: 0 1;
     height: auto;
-    max-height: 10;
-    overflow-y: auto;
 }
 
-ThinkingBlock.-hidden {
+#thinking-panel.-hidden {
     display: none;
 }
 
-/* ── Spinner ────────────────────────────────────────── */
+/* ── Spinner (in input bar) ──────────────────────────── */
 #spinner {
     width: 2;
     height: 3;
