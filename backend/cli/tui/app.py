@@ -1426,9 +1426,9 @@ class TUIRenderer:
         if action.is_final:
             # Add the actual response text to history (after thinking)
             content = (action.accumulated or "").strip()
-            if content and self._renderer:
+            if content and self._tui._renderer:
                 body = _rich_text(content)
-                self._renderer.add_to_history(body)
+                self._tui._renderer.add_to_history(body)
             self._tui.finalize_thinking()
 
     def _update_metrics(self, event: Any) -> None:
