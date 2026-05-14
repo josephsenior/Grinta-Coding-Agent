@@ -92,7 +92,7 @@ def build_task_list_panel(
         body = Text()
         if task_id and task_id != '?':
             body.append(f'{task_id} ', style=STYLE_DIM)
-        body.append(desc[:width - 15] if width else desc, style=STYLE_DEFAULT)
+        body.append(desc, style=STYLE_DEFAULT)
 
         table.add_row(status_icon, body)
         displayed_count += 1

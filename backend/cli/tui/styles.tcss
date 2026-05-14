@@ -45,6 +45,12 @@ Transcript {
 InfoSidebar {
     background: #080c18;
     padding: 1 1;
+    scrollbar-color: #33405d #161e31;
+    scrollbar-color-hover: #404f71 #161e31;
+    scrollbar-color-active: #4f608a #161e31;
+    scrollbar-size: 1 8;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 #sidebar-display {
