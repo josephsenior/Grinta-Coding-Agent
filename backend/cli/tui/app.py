@@ -59,10 +59,14 @@ from backend.core.enums import AgentState, EventSource
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventStream, EventStreamSubscriber
 from backend.ledger.action import (
+    ClarificationRequestAction,
     CmdRunAction,
+    EscalateToHumanAction,
     MessageAction,
     NullAction,
+    ProposalAction,
     StreamingChunkAction,
+    UncertaintyAction,
 )
 from backend.ledger.observation import (
     AgentStateChangedObservation,
@@ -389,17 +393,98 @@ class GrintaScreen(Screen):
     def add_success(self, text: str) -> None:
         self._write_log(f"[bold {NAVY_READY}]✓ {_strip_ansi(text)}[/]")
 
-    def add_tool_start(self, tool_name: str) -> None:
-        """Tool call — indented with ▸ prefix."""
+    def add_tool_start(self, tool_name: str, *, command: str = "") -> None:
+        """Tool call — rendered as a compact Panel."""
         safe = _strip_ansi(tool_name).replace("[", r"\[")
-        self._write_log(
-            f"  [{NAVY_BRAND_DIM}]▸[/]  [{NAVY_TEXT_TERTIARY}]{safe}[/]"
+        if command:
+            safe_cmd = _strip_ansi(command).replace("[", r"\[")
+            content = f"[{NAVY_TEXT_TERTIARY}]{safe}[/]\n[{NAVY_TEXT_MUTED}]{safe_cmd}[/]"
+        else:
+            content = f"[{NAVY_TEXT_TERTIARY}]{safe}[/]"
+        self._get_log().write(
+            Panel(
+                Text.from_markup(content),
+                title="⚡ Tool",
+                border_style="dim",
+            )
         )
+        self._scroll_to_bottom()
 
     def add_tool_result(self, text: str) -> None:
-        """Tool result — double-indented."""
+        """Tool result — rendered as a Panel."""
         safe = _strip_ansi(text).replace("[", r"\[")
-        self._write_log(f"    [{NAVY_TEXT_MUTED}]{safe}[/]")
+        self._get_log().write(
+            Panel(
+                Text(safe, style=NAVY_TEXT_MUTED),
+                title="Output",
+                border_style="dim",
+            )
+        )
+        self._scroll_to_bottom()
+
+    def add_communicate_clarification(self, action: ClarificationRequestAction) -> None:
+        """Agent asks the user a question."""
+        lines = [f"[{NAVY_TEXT_PRIMARY}]{action.question}[/]"]
+        if action.options:
+            for opt in action.options:
+                safe = _strip_ansi(opt).replace("[", r"\[")
+                lines.append(f"  [{NAVY_TEXT_TERTIARY}]· {safe}[/]")
+        if action.context:
+            safe = _strip_ansi(action.context).replace("[", r"\[")
+            lines.append(f"[{NAVY_TEXT_MUTED}]{safe}[/]")
+        self._get_log().write(
+            Panel(
+                Text.from_markup("\n".join(lines)),
+                title="❓ Question",
+                border_style="dim",
+            )
+        )
+        self._scroll_to_bottom()
+
+    def add_communicate_uncertainty(self, action: UncertaintyAction) -> None:
+        """Agent expresses uncertainty."""
+        concerns = "; ".join(action.specific_concerns) if action.specific_concerns else action.requested_information
+        safe = _strip_ansi(concerns).replace("[", r"\[")
+        self._get_log().write(
+            Panel(
+                Text(safe, style=NAVY_TEXT_PRIMARY),
+                title=f"⚠️ Uncertainty ({action.uncertainty_level:.0%})",
+                border_style="dim",
+            )
+        )
+        self._scroll_to_bottom()
+
+    def add_communicate_proposal(self, action: ProposalAction) -> None:
+        """Agent proposes a plan."""
+        lines = []
+        if action.rationale:
+            safe = _strip_ansi(action.rationale).replace("[", r"\[")
+            lines.append(f"[{NAVY_TEXT_PRIMARY}]{safe}[/]")
+        for i, opt in enumerate(action.options):
+            approach = opt.get("approach", str(opt))
+            safe = _strip_ansi(approach).replace("[", r"\[")
+            marker = "★" if i == action.recommended else "·"
+            lines.append(f"  [{NAVY_TEXT_TERTIARY}]{marker} {safe}[/]")
+        self._get_log().write(
+            Panel(
+                Text.from_markup("\n".join(lines)),
+                title="💡 Proposal",
+                border_style="dim",
+            )
+        )
+        self._scroll_to_bottom()
+
+    def add_communicate_escalate(self, action: EscalateToHumanAction) -> None:
+        """Agent escalates to human."""
+        safe = _strip_ansi(action.reason).replace("[", r"\[")
+        self._get_log().write(
+            Panel(
+                Text(safe, style=NAVY_TEXT_PRIMARY),
+                title="🚨 Escalation",
+                border_style="dim",
+            )
+        )
+        self._scroll_to_bottom()
 
     def add_divider(self) -> None:
         self._write_log(f"[{NAVY_BORDER}]" + "─" * 50 + "[/]")
@@ -997,7 +1082,7 @@ class TUIRenderer:
             cmd = getattr(event, "command", "") or ""
             label = getattr(event, "display_label", "") or ""
             display = label or cmd
-            self._tui.add_tool_start(display[:80])
+            self._tui.add_tool_start(display[:80], command=cmd[:200])
         elif isinstance(event, CmdOutputObservation):
             output = (event.content or "").strip()
             if output:
@@ -1006,6 +1091,14 @@ class TUIRenderer:
             self._handle_streaming_chunk(event)
         elif isinstance(event, AgentStateChangedObservation):
             self._handle_state_change(event)
+        elif isinstance(event, ClarificationRequestAction):
+            self._tui.add_communicate_clarification(event)
+        elif isinstance(event, UncertaintyAction):
+            self._tui.add_communicate_uncertainty(event)
+        elif isinstance(event, ProposalAction):
+            self._tui.add_communicate_proposal(event)
+        elif isinstance(event, EscalateToHumanAction):
+            self._tui.add_communicate_escalate(event)
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
         """Handle streaming chunk — show thinking in a Panel, finalize when complete."""
