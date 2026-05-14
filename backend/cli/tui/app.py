@@ -1042,7 +1042,7 @@ class GrintaScreen(Screen):
         import time as _time
 
         _poll_started = _time.monotonic()
-        _max_poll_seconds = 600  # 10-minute hard cap for the polling loop
+        _max_poll_seconds = 3600  # 1 hour hard cap for the polling loop
         _tui_logger.debug("_dispatch_to_agent: entering poll loop")
         while True:
             try:
