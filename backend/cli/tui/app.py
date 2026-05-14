@@ -1417,8 +1417,6 @@ class TUIRenderer:
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
         if action.is_tool_call:
-            # We don't add_tool_start here anymore because it clutters the UI 
-            # with generic markers. We wait for the finalized action.
             return
 
         thinking = (action.thinking_accumulated or "").strip()
@@ -1426,6 +1424,11 @@ class TUIRenderer:
             self._tui.add_thinking(thinking)
 
         if action.is_final:
+            # Add the actual response text to history (after thinking)
+            content = (action.accumulated or "").strip()
+            if content:
+                body = _rich_text(content)
+                self._renderer.add_to_history(body)
             self._tui.finalize_thinking()
 
     def _update_metrics(self, event: Any) -> None:
