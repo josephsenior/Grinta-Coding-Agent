@@ -109,6 +109,7 @@ from backend.persistence import get_file_store
 
 
 
+
 class InfoSidebar(Vertical):
     """Sidebar for Mission Control info (Tasks, MCPs, Skills)."""
 
