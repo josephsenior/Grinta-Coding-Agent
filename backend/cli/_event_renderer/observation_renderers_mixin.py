@@ -479,6 +479,10 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
 
     def _render_status_observation(self, obs: StatusObservation) -> None:
         status_type = str(getattr(obs, 'status_type', '') or '')
+        if status_type == 'mcp_ready' or status_type == 'mcp_connected':
+            extras = getattr(obs, 'extras', None) or {}
+            mcp_n = int(extras.get('connected_client_count') or 0)
+            self._hud.update_mcp_servers(mcp_n)
         force_visible_status = False
         retry_signature: tuple[str, str] | None = None
         if status_type == 'delegate_progress':

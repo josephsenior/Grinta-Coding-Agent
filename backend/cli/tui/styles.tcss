@@ -49,24 +49,15 @@ Transcript RichLog,
 RichLog#transcript-log {
     background: #060a14;
     width: 100%;
-    text-wrap: wrap;
-    overflow-x: auto;
 }
 
 /* ── InputBar ──────────────────────────────────────── */
 InputBar {
-    height: 5;
+    height: 3;
     background: #0d1a2d;
-    border: tall #384673;
-    padding: 0 2;
+    border: none;
     margin: 0;
-}
-
-HUD {
-    height: 1;
-    background: #060a14;
-    color: #969aad;
-    padding: 0 2;
+    layout: horizontal;
 }
 
 InputBar TextArea {
@@ -74,8 +65,8 @@ InputBar TextArea {
     color: #c8d4e8;
     border: none;
     padding: 1 4;
-    height: 100%;
-    text-wrap: wrap;
+    width: 100%;
+    height: 3;
 }
 
 InputBar TextArea:focus {
@@ -84,13 +75,63 @@ InputBar TextArea:focus {
     color: #c8d4e8;
 }
 
-/* ── HUD Bar ────────────────────────────────────────── */
-HUD {
-    height: 1;
-    background: #060a14;
+/* ── Stats Panel ────────────────────────────────────── */
+InputStats {
+    height: 3;
+    background: #0a1525;
     color: #969aad;
+    padding: 1 4;
     dock: bottom;
-    padding: 0 2;
+}
+
+/* ── Memory Manager Modal ────────────────────────────── */
+MemoryManagerModal {
+    background: #060a14 80%;
+}
+
+MemoryManagerModal > Vertical {
+    background: #060a14;
+    border: tall #384673;
+    padding: 2 4;
+    width: 60;
+    align: center top;
+}
+
+MemoryManagerModal .title {
+    color: #91abec;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+MemoryManagerModal .sep {
+    color: #1b233a;
+    margin-bottom: 1;
+}
+
+MemoryManagerModal .stat-row {
+    color: #e9e9e9;
+    margin-bottom: 0;
+}
+
+MemoryManagerModal .spacer {
+    margin: 1 0;
+}
+
+MemoryManagerModal .hint {
+    color: #969aad;
+    margin-bottom: 2;
+}
+
+MemoryManagerModal Button {
+    background: #192c5b;
+    border-top: tall #425894;
+    border-bottom: tall #0d1525;
+}
+
+MemoryManagerModal Button:hover {
+    background: #203875;
+    border-top: tall #425894;
+    border-bottom: tall #0d1525;
 }
 
 /* ── Confirmation dialog ───────────────────────────── */

@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, PropertyMock
 import pytest
 from rich.console import Console as RichConsole
 
-from textual.widgets import Input, Static
-from backend.cli.tui.app import GrintaScreen, HUD, InputBar
+from textual.widgets import Input, Static, TextArea
+from backend.cli.tui.app import GrintaScreen, InputBar
 from backend.cli.tui.main import GrintaTUIApp
 
 
@@ -40,11 +40,11 @@ async def test_tui_mounts(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        hud = s.query_one('#hud-bar', HUD)
-        assert hud is not None
-        assert 'Grinta' in hud.renderable
+        stats = s.query_one('#input-stats', Static)
+        assert stats is not None
+        assert 'Grinta' in stats.renderable
 
-        footer = s.query_one('#hud-bar', HUD)
+        footer = s.query_one('#input-stats', Static)
         assert footer is not None
 
 
@@ -59,7 +59,7 @@ async def test_tui_input_and_transcript(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        ta = s.query_one('#input', Input)
+        ta = s.query_one('#input', TextArea)
         assert ta is not None
 
         input_bar = s.query_one('#input-bar', InputBar)
@@ -77,11 +77,11 @@ async def test_tui_typing(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        ta = s.query_one('#input', Input)
+        ta = s.query_one('#input', TextArea)
         assert ta.focusable
 
         await pilot.press(*'hello world')
-        assert ta.value == 'hello world'
+        assert ta.text == 'hello world'
 
 
 @pytest.mark.asyncio
@@ -95,8 +95,8 @@ async def test_tui_clear_command(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        ta = s.query_one('#input', Input)
-        ta.value = '/clear'
+        ta = s.query_one('#input', TextArea)
+        ta.text = '/clear'
         await pilot.press('enter')
         await pilot.pause()
 
@@ -114,8 +114,8 @@ async def test_tui_help_shows(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        ta = s.query_one('#input', Input)
-        ta.value = '/help'
+        ta = s.query_one('#input', TextArea)
+        ta.text = '/help'
         await pilot.press('enter')
         await pilot.pause()
 
@@ -134,8 +134,8 @@ async def test_tui_unknown_command(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        ta = s.query_one('#input', Input)
-        ta.value = '/nonexistent'
+        ta = s.query_one('#input', TextArea)
+        ta.text = '/nonexistent'
         await pilot.press('enter')
         await pilot.pause()
 
@@ -158,9 +158,9 @@ async def test_tui_update_hud_state(mock_config):
         s.update_hud()
         await pilot.pause()
 
-        # State now lives in the HUD bar
-        hud = s.query_one('#hud-bar', HUD)
-        assert 'Running' in hud.renderable
+        # State now lives in the input stats panel
+        stats = s.query_one('#input-stats', Static)
+        assert 'Running' in str(stats.renderable)
 
 
 @pytest.mark.asyncio
@@ -233,8 +233,8 @@ async def test_tui_drain_events_noop_when_empty(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_hud_bar_exists(mock_config):
-    """Verify HUD bar is present."""
+async def test_tui_stats_panel_exists(mock_config):
+    """Verify stats panel in input bar is present."""
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -243,5 +243,5 @@ async def test_tui_hud_bar_exists(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        hud = s.query_one('#hud-bar')
-        assert hud is not None
+        stats = s.query_one('#input-stats')
+        assert stats is not None

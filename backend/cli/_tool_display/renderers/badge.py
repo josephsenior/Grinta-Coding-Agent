@@ -31,10 +31,10 @@ class ToolBadge:
     corner: str = "┌"
 
     def render(self) -> str:
-        return f"[{self.bracket_color}]{self.corner}[/{self.bracket_color}][{self.label_color} bold]{self.label}[/{self.label_color}][{self.bracket_color}]─[/]"
+        return f"[{self.bracket_color}]{self.corner}[/][{self.label_color} bold]{self.label}[/][{self.bracket_color}]─[/]"
 
     def render_left(self) -> str:
-        return f"[{self.bracket_color}]{self.corner}[/{self.bracket_color}][{self.label_color} bold]{self.label}[/{self.label_color}]"
+        return f"[{self.bracket_color}]{self.corner}[/][{self.label_color} bold]{self.label}[/]"
 
 
 # Tool badge definitions
