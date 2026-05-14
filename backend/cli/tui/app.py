@@ -1253,9 +1253,8 @@ class TUIRenderer:
         if isinstance(event, MessageAction):
             if source == EventSource.USER or source == "user":
                 return
-            content = event.content or ""
-            if content:
-                self._tui.add_agent_message(content)
+            # Skip - already handled via StreamingChunkAction to avoid duplicates
+            pass
         elif isinstance(event, FileReadAction):
             line_range = f"L{event.start}:L{event.end}" if event.end != -1 else f"from L{event.start}"
             lines = render_file_read(event.path, line_range)
@@ -1378,7 +1377,7 @@ class TUIRenderer:
         elif isinstance(event, PlaybookFinishAction):
             summary = getattr(event, 'final_thought', '') or getattr(event, 'thought', '') or ''
             if summary:
-                self._tui._write_log(Text(f"{summary}", style=NAVY_TEXT_DIM))
+                self._tui._write_log(Text(f"{summary}"))
         elif isinstance(event, UserRejectObservation):
             self._tui._write_log(Text("  Rejected", style=NAVY_ERROR))
         elif isinstance(event, ServerReadyObservation):
