@@ -103,11 +103,12 @@ InputBar TextArea:focus {
 }
 
 /* ── Stats Panel ────────────────────────────────────── */
-InputStats {
-    height: 3;
+HUD,
+#hud-bar {
+    height: 2;
     background: #0a1525;
     color: #969aad;
-    padding: 1 4;
+    padding: 0 2;
     dock: bottom;
 }
 
