@@ -1376,7 +1376,7 @@ class TUIRenderer:
             if result:
                 self._tui._write_log(Text(f"  {result}", style=NAVY_TEXT_MUTED))
         elif isinstance(event, PlaybookFinishAction):
-            summary = getattr(event, 'summary', '') or ''
+            summary = getattr(event, 'final_thought', '') or getattr(event, 'thought', '') or ''
             lines = render_finish_summary(summary)
             from rich.panel import Panel
             from rich.text import Text
