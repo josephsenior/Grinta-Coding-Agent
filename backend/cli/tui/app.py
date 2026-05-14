@@ -169,6 +169,7 @@ class GrintaScreen(Screen):
         self._confirm_result: str | None = None
         self._input_lock = asyncio.Lock()
         self._bootstrapping: asyncio.Event | None = None
+        self._last_thinking_written_len: int = 0
 
     _STATE_LABELS = {
         "starting": "Starting…",
@@ -341,6 +342,7 @@ class GrintaScreen(Screen):
     def add_user_message(self, text: str) -> None:
         """User message — same style as agent, cyan marker."""
         self._hide_thinking()
+        self._last_thinking_written_len = 0
         safe = _strip_ansi(text).replace("[", r"\[")
         self._write_log(f"\n[{NAVY_BRAND}]▸ You[/]  {safe}")
         self._write_log("\n")
@@ -351,8 +353,12 @@ class GrintaScreen(Screen):
         self._write_log(f"\n[#00e5ff bold]▸ Grinta[/]  {safe}")
         self._write_log("\n")
 
-    def add_thinking(self, text: str) -> None:
-        """Real-time thinking/reasoning — write a Panel directly to the RichLog transcript."""
+    def add_thinking(self, text: str, *, force: bool = False) -> None:
+        """Real-time thinking/reasoning — write a Panel to the RichLog transcript."""
+        # Throttle: skip if text hasn't grown enough (avoids flooding on rapid chunks)
+        if not force and len(text) - self._last_thinking_written_len < 80:
+            return
+        self._last_thinking_written_len = len(text)
         spinner = self.query_one("#spinner", Static)
         spinner.remove_class("-hidden")
         spinner.update("⟳")
@@ -367,7 +373,7 @@ class GrintaScreen(Screen):
         self._scroll_to_bottom()
 
     def finalize_thinking(self) -> None:
-        """Agent turn done — final Panel already written; nothing extra needed."""
+        """Agent turn done — final Panel already written to transcript."""
         self.query_one("#spinner", Static).add_class("-hidden")
 
     def _hide_thinking(self) -> None:
@@ -1010,13 +1016,13 @@ class TUIRenderer:
             self._state_event.set()
             return
 
-        # Real-time thinking/reasoning streaming — replace Panel content with full text
+        # Real-time thinking/reasoning streaming — write Panel on meaningful growth
         thinking = (action.thinking_accumulated or "").strip()
         if thinking:
-            self._tui.add_thinking(thinking)
+            self._tui.add_thinking(thinking, force=action.is_final)
             self._state_event.set()
 
-        # Final chunk — finalize thinking Panel, no agent message rendering here
+        # Final chunk — hide spinner
         if action.is_final:
             self._tui.finalize_thinking()
             self._tui._render_hud_bar()
