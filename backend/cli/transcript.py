@@ -63,15 +63,10 @@ _ACTIVITY_RESULT_INDENT = '      '
 
 
 def format_activity_primary(verb: str, detail: str | Text) -> Text:
-    """Bold verb + detail on one line with a clean visual prefix.
-
-    Uses a `▸` prefix for a modern, premium feel instead of the previous
-    bare indent — making the activity flow easier to scan at a glance.
-    """
-    from backend.cli.theme import CLR_SEP, CLR_VERB
+    """Bold verb + detail on one line."""
+    from backend.cli.theme import CLR_VERB
 
     line = Text()
-    line.append('▸ ', style=f'dim {CLR_SEP}')
     line.append((verb or 'Did').strip(), style=CLR_VERB)
     if isinstance(detail, Text):
         if detail.plain.strip():

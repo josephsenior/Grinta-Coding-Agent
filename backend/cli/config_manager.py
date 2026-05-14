@@ -246,9 +246,9 @@ def run_onboarding() -> AppConfig:
             Text.from_markup(
                 f'[{CLR_BRAND}]Welcome to Grinta{version_str}[/]\n\n'
                 "Let's get you connected to an LLM so you can start coding.\n\n"
-                f'[{CLR_META}]▸ Settings saved locally — never sent anywhere.\n'
-                '▸ API keys stored in [bold].env[/bold], never in code.\n'
-                f'▸ No telemetry by default.[/]'
+                f'[{CLR_META}]  Settings saved locally — never sent anywhere.\n'
+                '  API keys stored in [bold].env[/bold], never in code.\n'
+                f'  No telemetry by default.[/]'
             ),
             border_style=CLR_CARD_BORDER,
             padding=(1, 3),
