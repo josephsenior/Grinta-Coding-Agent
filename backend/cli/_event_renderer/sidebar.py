@@ -90,7 +90,7 @@ def build_task_list_panel(
     return format_live_panel(
         f'Tasks ({len(task_list)})',
         content,
-        accent_style=LIVE_PANEL_ACCENT_STYLE,
+        accent_style='cyan',
         padding=(0, 1),
     )
 
@@ -130,14 +130,14 @@ def build_mcp_servers_panel(
         return format_live_panel(
             'MCP Servers',
             empty_state,
-            accent_style=LIVE_PANEL_ACCENT_STYLE,
+            accent_style='cyan',
             padding=(0, 1),
         )
 
     return format_live_panel(
         f'MCP Servers ({len(mcp_servers)})',
         table,
-        accent_style=LIVE_PANEL_ACCENT_STYLE,
+        accent_style='cyan',
         padding=(0, 1),
     )
 
@@ -172,14 +172,14 @@ def build_skills_panel(
         return format_live_panel(
             'Skills',
             empty_state,
-            accent_style=LIVE_PANEL_ACCENT_STYLE,
+            accent_style='cyan',
             padding=(0, 1),
         )
 
     return format_live_panel(
         f'Skills ({len(skills)})',
         table,
-        accent_style=LIVE_PANEL_ACCENT_STYLE,
+        accent_style='cyan',
         padding=(0, 1),
     )
 

@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, PropertyMock
 import pytest
 from rich.console import Console as RichConsole
 
-from textual.widgets import Input, Static, TextArea
-from backend.cli.tui.app import GrintaScreen, InputBar
+from textual.widgets import Input, Label, Static, TextArea
+from backend.cli.tui.app import GrintaScreen, InputBar, HUD
 from backend.cli.tui.main import GrintaTUIApp
 
 
@@ -19,8 +19,10 @@ def mock_config():
     type(config).project_root = PropertyMock(return_value=None)
 
     llm_config = MagicMock()
-    llm_config.model = 'test-model'
+    llm_config.model = 'openai/gpt-4o'
+    llm_config.base_url = None
     config.get_llm_config.return_value = llm_config
+    config.get_llm_config_from_agent.return_value = llm_config
     return config
 
 
@@ -40,11 +42,11 @@ async def test_tui_mounts(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        stats = s.query_one('#input-stats', Static)
+        stats = s.query_one('#hud-line-1', Label)
         assert stats is not None
-        assert 'Grinta' in stats.renderable
+        assert 'GRINTA' in str(stats.renderable)
 
-        footer = s.query_one('#input-stats', Static)
+        footer = s.query_one('#hud-bar', HUD)
         assert footer is not None
 
 
@@ -119,7 +121,7 @@ async def test_tui_help_shows(mock_config):
         await pilot.press('enter')
         await pilot.pause()
 
-        transcript = s.query_one('#transcript-log')
+        transcript = s.query_one('#main-display')
         assert transcript is not None
 
 
@@ -139,7 +141,7 @@ async def test_tui_unknown_command(mock_config):
         await pilot.press('enter')
         await pilot.pause()
 
-        transcript = s.query_one('#transcript-log')
+        transcript = s.query_one('#main-display')
         assert transcript is not None
 
 
@@ -158,8 +160,8 @@ async def test_tui_update_hud_state(mock_config):
         s.update_hud()
         await pilot.pause()
 
-        # State now lives in the input stats panel
-        stats = s.query_one('#input-stats', Static)
+        # State now lives in the HUD bar
+        stats = s.query_one('#hud-line-2', Label)
         assert 'Running' in str(stats.renderable)
 
 
@@ -184,7 +186,7 @@ async def test_tui_message_helpers(mock_config):
         s.add_divider()
         await pilot.pause()
 
-        log = s.query_one('#transcript-log')
+        log = s.query_one('#main-display')
         assert log is not None
 
 
@@ -243,5 +245,5 @@ async def test_tui_stats_panel_exists(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        stats = s.query_one('#input-stats')
+        stats = s.query_one('#hud-bar')
         assert stats is not None

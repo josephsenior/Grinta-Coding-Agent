@@ -135,8 +135,8 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
             # Agent task finished — drain any remaining events, then break.
             if agent_task and agent_task.done():
                 if renderer is not None:
-                    await asyncio.sleep(0.05)
-                    renderer.drain_events()
+                    # Final settle after task completion to catch late events.
+                    await self._drain_renderer_until_settled(renderer, settle_delay=0.05)
                 break
 
             # Yield to the event loop.  wait_for_state_change will return
@@ -243,8 +243,8 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         self,
         renderer: Any,
         *,
-        settle_delay: float = 0.03,
-        max_passes: int = 3,
+        settle_delay: float = 0.05,
+        max_passes: int = 4,
     ) -> None:
         """Drain queued CLI events until the delivery queue stays quiet briefly."""
         for _ in range(max_passes):

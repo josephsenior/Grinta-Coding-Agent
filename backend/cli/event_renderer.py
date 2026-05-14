@@ -316,6 +316,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
         In accessible mode, flush output directly instead.
         """
+        # Process any last events while Live is still active so they land
+        # in the console scrollback immediately (avoiding run_in_terminal delay).
+        self.drain_events()
+
         # In accessible mode, flush pending output directly.
         if self._accessible:
             self._flush_thinking_block()
