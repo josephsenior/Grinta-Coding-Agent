@@ -18,6 +18,7 @@ from typing import Any
 _tui_logger = logging.getLogger("grinta.tui")
 _tui_logger.setLevel(logging.DEBUG)
 
+from rich.panel import Panel
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -25,19 +26,10 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Input, Label, RichLog, Static, TextArea
 
-_ANSI_ESCAPE_RE = re.compile(
-    r'\x1b\[[0-9;]*[a-zA-Z]'   # CSI sequences: \x1b[...m, \x1b[K, etc.
-    r'|\x1b\][^\x07]*\x07'     # OSC sequences: \x1b]...\x07
-    r'|\x1b[PX^_]'             # SOS/PM/APC sequences
-    r'|\x1b'                   # Lone escape character
-    r'|[\x00-\x08\x0b\x0c\x0e-\x1f]'  # Other control chars (keep \t \n \r)
-    r'|\r'                     # Carriage return
-)
-
 
 def _strip_ansi(text: str) -> str:
-    """Strip all ANSI escape sequences and control characters from text."""
-    return _ANSI_ESCAPE_RE.sub('', text)
+    """Strip all ANSI escape sequences from text using Rich's parser."""
+    return Text.from_ansi(text).plain
 
 from backend.cli.config_manager import AppConfig
 from backend.cli.hud import HUDBar
@@ -91,6 +83,10 @@ class Transcript(VerticalScroll):
 
 class InputBar(Horizontal):
     """Compact bottom input row."""
+
+
+class ThinkingBlock(Static):
+    """Dedicated widget for real-time thinking display — shown during agent processing."""
 
 
 class HUD(Static):
@@ -213,7 +209,9 @@ class GrintaScreen(Screen):
     def compose(self) -> ComposeResult:
         with Transcript(id="transcript-scroll"):
             yield RichLog(id="transcript-log", markup=True, auto_scroll=True)
+        yield ThinkingBlock(id="thinking-block", classes="-hidden")
         with InputBar(id="input-bar"):
+            yield Static(id="spinner", classes="-hidden")
             yield TextArea(id="input")
         yield HUD(id="hud-bar")
 
@@ -341,22 +339,42 @@ class GrintaScreen(Screen):
 
     def add_user_message(self, text: str) -> None:
         """User message — same style as agent, cyan marker."""
+        self._hide_thinking()
         safe = _strip_ansi(text).replace("[", r"\[")
         self._write_log(f"\n[{NAVY_BRAND}]▸ You[/]  {safe}")
         self._write_log("\n")
-        if self._renderer:
-            self._renderer._last_thinking_len = 0
-            self._renderer._turn_active = True
 
     def add_agent_message(self, text: str) -> None:
         """Agent response — same style as user, cyan marker."""
         safe = _strip_ansi(text).replace("[", r"\[")
         self._write_log(f"\n[#00e5ff bold]▸ Grinta[/]  {safe}")
+        self._write_log("\n")
 
     def add_thinking(self, text: str) -> None:
-        """Real-time thinking/reasoning — muted style."""
+        """Real-time thinking/reasoning — show in a distinct Panel block."""
+        block = self.query_one("#thinking-block", ThinkingBlock)
+        block.remove_class("-hidden")
+        spinner = self.query_one("#spinner", Static)
+        spinner.remove_class("-hidden")
+        spinner.update("⟳")
         safe = _strip_ansi(text).replace("[", r"\[")
-        self._write_log(f"\n[{NAVY_TEXT_MUTED}]{safe}[/]")
+        block.update(Panel(safe, title="⟳ Thinking", border_style="dim"))
+        self._scroll_to_bottom()
+
+    def finalize_thinking(self) -> None:
+        """Called when agent finishes thinking — finalize the Panel display."""
+        block = self.query_one("#thinking-block", ThinkingBlock)
+        if block.has_class("-hidden"):
+            return
+        current = block.renderable
+        if isinstance(current, Panel):
+            block.update(Panel(current.renderable, title="✓ Thinking", border_style="dim"))
+        self.query_one("#spinner", Static).add_class("-hidden")
+
+    def _hide_thinking(self) -> None:
+        """Hide the thinking block — called when user submits a new message."""
+        self.query_one("#thinking-block", ThinkingBlock).add_class("-hidden")
+        self.query_one("#spinner", Static).add_class("-hidden")
 
     def add_system_message(self, text: str) -> None:
         self._write_log(f"[{NAVY_TEXT_MUTED}]{_strip_ansi(text).replace('[', r'\[')}[/]")
@@ -500,6 +518,7 @@ class GrintaScreen(Screen):
                         self._render_hud_bar()
                         self._render_hud_bar()
             finally:
+                self.finalize_thinking()
                 self._render_hud_bar()
                 self.query_one("#input-bar", InputBar).remove_class("processing")
                 if self._renderer:
@@ -927,11 +946,7 @@ class TUIRenderer:
         self._current_state: Any = None
         self._pending_events: deque[Any] = deque()
         self._pending_lock = threading.Lock()
-        # Track the last message rendered via streaming final chunk —
-        # used to suppress duplicate MessageAction from the backend.
-        self._turn_active: bool = False
-        # Track thinking stream position to avoid re-rendering duplicates
-        self._last_thinking_len: int = 0
+
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
@@ -989,32 +1004,23 @@ class TUIRenderer:
             self._handle_state_change(event)
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
-        """Handle streaming chunk — show thinking in real-time, final message when complete."""
+        """Handle streaming chunk — show thinking in a Panel, finalize when complete."""
         # Tool call streaming
         if action.is_tool_call:
             tool_name = action.tool_call_name or "tool"
-            self._tui.add_thinking(f"▸ Tool  {tool_name}…")
+            self._tui.add_tool_start(tool_name)
             self._state_event.set()
             return
 
-        # Real-time thinking/reasoning streaming - only show NEW content
+        # Real-time thinking/reasoning streaming — replace Panel content with full text
         thinking = (action.thinking_accumulated or "").strip()
         if thinking:
-            new_thinking = thinking[self._last_thinking_len:]
-            if new_thinking:
-                # Show "Thinking:" header only when starting a new block (last_len is 0)
-                # Combine header + content in one line with spacing
-                if self._last_thinking_len == 0:
-                    self._tui.add_thinking(f"[{NAVY_BRAND}]▸ Thinking[/]  {new_thinking}")
-                else:
-                    self._tui.add_thinking(new_thinking)
-                self._last_thinking_len = len(thinking)
+            self._tui.add_thinking(thinking)
             self._state_event.set()
 
-        # Only add final message to transcript when streaming is complete
+        # Final chunk — finalize thinking Panel, no agent message rendering here
         if action.is_final:
-            # Reset thinking tracker for next turn
-            self._last_thinking_len = 0
+            self._tui.finalize_thinking()
             self._tui._render_hud_bar()
 
     def _update_metrics(self, event: Any) -> None:
@@ -1038,11 +1044,3 @@ class TUIRenderer:
         self._hud.update_agent_state(str(state))
         self._state_event.set()
         self._tui._render_hud_bar()
-
-        if state in {
-            AgentState.AWAITING_USER_INPUT,
-            AgentState.FINISHED,
-            AgentState.ERROR,
-            AgentState.STOPPED,
-        }:
-            self._turn_active = False
