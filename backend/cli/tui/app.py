@@ -364,14 +364,14 @@ class GrintaScreen(Screen):
     def add_user_message(self, text: str) -> None:
         """User message — clear bold header."""
         self._hide_thinking()
-        header = Text("\n▸ YOU\n", style="bold #91abec")
+        header = Text("\nYOU\n", style="bold #91abec")
         body = _rich_text(text)
         self._write_log(Text.assemble(header, body, "\n"))
 
     def add_agent_message(self, text: str) -> None:
         """Agent response — clear bold header."""
         self.finalize_thinking()
-        header = Text("\n▸ GRINTA\n", style="bold #54efae")
+        header = Text("\nGRINTA\n", style="bold #54efae")
         body = _rich_text(text)
         self._write_log(Text.assemble(header, body, "\n"))
 
@@ -588,6 +588,10 @@ class GrintaScreen(Screen):
         except Exception as exc:
             _tui_logger.debug(f"_handle_input: _trace FAILED: {type(exc).__name__}: {exc}")
         async with self._input_lock:
+            # Drain any stale events from previous turn before starting new one
+            if self._renderer:
+                self._renderer.drain_events()
+
             ta = self.query_one("#input", TextArea)
             ta.clear()
             ta.focus()
@@ -1117,10 +1121,9 @@ class TUIRenderer:
     def commit_live_thinking(self) -> None:
         """Commit live thinking to history and clear buffer."""
         if self._live_thinking:
-            prefix = Text("▸ ", style=NAVY_TEXT_DIM)
             body = _rich_text(self._live_thinking)
             body.stylize(NAVY_TEXT_DIM)
-            self._history.append(Text.assemble(prefix, body, "\n"))
+            self._history.append(Text.assemble(body, "\n"))
             self._live_thinking = ""
         self._refresh_display()
 
@@ -1137,10 +1140,9 @@ class TUIRenderer:
         # 1. Main Display
         items = list(self._history)
         if self._live_thinking:
-            prefix = Text("▸ ", style=NAVY_TEXT_DIM)
             body = _rich_text(self._live_thinking)
             body.stylize(NAVY_TEXT_DIM)
-            items.append(Text.assemble(prefix, body))
+            items.append(body)
         
         self._tui._get_display().update(Group(*items))
         self._tui._scroll_to_bottom()
@@ -1184,6 +1186,7 @@ class TUIRenderer:
             self._pending_events.append(event)
         try:
             self._loop.call_soon_threadsafe(self._state_event.set)
+            self._loop.call_soon_threadsafe(self.drain_events)
         except RuntimeError:
             pass
 

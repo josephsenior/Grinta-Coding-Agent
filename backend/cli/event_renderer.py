@@ -293,6 +293,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         In accessible mode no Live display is created — output is printed
         directly instead.
         """
+        self.drain_events()
         if self._accessible:
             return
         if self._live is not None:
