@@ -1153,7 +1153,9 @@ class TUIRenderer:
         if self._live_thinking:
             body = _rich_text(self._live_thinking)
             body.stylize(NAVY_TEXT_DIM)
-            self._history.append(Text.assemble(body, "\n"))
+            # Insert at BEGINNING of history so thinking appears BEFORE any tool results
+            # that came in during streaming (tool results would have been added before this)
+            self._history.insert(0, Text.assemble(body, "\n"))
             self._live_thinking = ""
         self._refresh_display()
 
