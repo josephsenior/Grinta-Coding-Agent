@@ -40,7 +40,7 @@ Transcript {
     scrollbar-color-hover: #404f71 #161e31;
     scrollbar-color-active: #4f608a #161e31;
     scrollbar-size: 1 8;
-    padding: 0 1;
+    padding: 0 0;
     margin: 0;
     height: 1fr;
     overflow-x: hidden;
@@ -75,19 +75,6 @@ InputBar TextArea:focus {
     border: none;
     background: #0d1a2d;
     color: #c8d4e8;
-}
-
-/* ── Thinking Panel (live inside transcript) ────────── */
-#thinking-panel {
-    background: #0a1225;
-    border: solid #1b2a4a;
-    margin: 0 1;
-    padding: 0 1;
-    height: auto;
-}
-
-#thinking-panel.-hidden {
-    display: none;
 }
 
 /* ── Spinner (in input bar) ──────────────────────────── */
