@@ -260,14 +260,9 @@ class GrintaScreen(Screen):
         lookup_key = raw_state.lower()
         if lookup_key.startswith("agentstate."):
             lookup_key = lookup_key[len("agentstate.") :]
-        # Handle "AgentState.RUNNING" format too
         if "." in lookup_key:
             lookup_key = lookup_key.split(".")[-1]
         
-        # Default to "Ready" if state not found or looks like "Starting"
-        if lookup_key not in self._STATE_LABELS or lookup_key == "starting":
-            lookup_key = "awaiting_user_input"  # defaults to Ready
-            
         display_state = self._STATE_LABELS.get(lookup_key, "Ready")
         state_color = self._STATE_COLORS.get(lookup_key, NAVY_BRAND)
 
@@ -502,9 +497,8 @@ class GrintaScreen(Screen):
                 self.query_one("#input-bar", InputBar).remove_class("processing")
                 if self._renderer:
                     self._renderer.drain_events()
-                state_label = self._hud.state.agent_state_label or "Ready"
-                logger.info("[TUI] _handle_input: finally, HUD state=%r", state_label)
-                self._hud.update_agent_state(state_label)
+                actual_state = str(self._controller.get_agent_state()) if self._controller else ""
+                self._hud.update_agent_state(actual_state or "Ready")
                 self._render_hud_bar()
                 self._render_hud_bar()
 
