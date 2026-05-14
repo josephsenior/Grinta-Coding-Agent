@@ -27,6 +27,22 @@ from backend.core.task_status import (
     normalize_task_status,
 )
 
+from rich import box
+
+def _create_sidebar_panel(title: str, content: Any, count: int | None = None) -> Panel:
+    title_text = Text(f"{title}", style="bold #91abec")
+    if count is not None:
+        title_text.append(f" ({count})", style="bold #54597b")
+    
+    return Panel(
+        content,
+        title=title_text,
+        title_align="left",
+        border_style="#1b233a",
+        box=box.ROUNDED,
+        padding=(0, 1)
+    )
+
 # Maximum rows to show in each scrollable panel
 SIDEBAR_MAX_ROWS = 30
 
@@ -87,12 +103,7 @@ def build_task_list_panel(
     )
 
     content = table if task_list else empty_state
-    return format_live_panel(
-        f'Tasks ({len(task_list)})',
-        content,
-        accent_style='cyan',
-        padding=(0, 1),
-    )
+    return _create_sidebar_panel('Tasks', content, len(task_list))
 
 
 def build_mcp_servers_panel(
@@ -113,12 +124,12 @@ def build_mcp_servers_panel(
             name = server.get('name', 'unknown')
             server_type = server.get('type', 'stdio')
 
-            bullet = Text('•', style=f'bold {CLR_INFO_ICON}')
+            bullet = Text('⚡ ', style=f'bold #eacb8a')
 
             type_badge = f'({server_type})'
             server_info = Text()
-            server_info.append(name, style=STYLE_DEFAULT)
-            server_info.append(f' {type_badge}', style=STYLE_DIM)
+            server_info.append(name, style="#c8d4e8")
+            server_info.append(f' {type_badge}', style="#54597b")
 
             table.add_row(bullet, server_info)
             displayed_count += 1
@@ -127,19 +138,9 @@ def build_mcp_servers_panel(
             'No MCP servers configured',
             style=STYLE_DIM,
         )
-        return format_live_panel(
-            'MCP Servers',
-            empty_state,
-            accent_style='cyan',
-            padding=(0, 1),
-        )
+        return _create_sidebar_panel('MCP Servers', empty_state, 0)
 
-    return format_live_panel(
-        f'MCP Servers ({len(mcp_servers)})',
-        table,
-        accent_style='cyan',
-        padding=(0, 1),
-    )
+    return _create_sidebar_panel('MCP Servers', table, len(mcp_servers))
 
 
 def build_skills_panel(
@@ -160,8 +161,8 @@ def build_skills_panel(
         for skill in sorted(skills):
             if displayed_count >= SIDEBAR_MAX_ROWS:
                 break
-            bullet = Text('•', style=f'bold {CLR_INFO_ICON}')
-            skill_name = Text(skill, style=STYLE_DEFAULT)
+            bullet = Text('⚙ ', style=f'bold #7a849c')
+            skill_name = Text(skill, style="#a1acc2")
             table.add_row(bullet, skill_name)
             displayed_count += 1
     else:
@@ -169,19 +170,9 @@ def build_skills_panel(
             'No skills available',
             style=STYLE_DIM,
         )
-        return format_live_panel(
-            'Skills',
-            empty_state,
-            accent_style='cyan',
-            padding=(0, 1),
-        )
+        return _create_sidebar_panel('Skills', empty_state, 0)
 
-    return format_live_panel(
-        f'Skills ({len(skills)})',
-        table,
-        accent_style='cyan',
-        padding=(0, 1),
-    )
+    return _create_sidebar_panel('Skills', table, len(skills))
 
 
 def _load_playbook_skills() -> list[str]:
