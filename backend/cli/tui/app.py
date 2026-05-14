@@ -65,8 +65,13 @@ from backend.core.enums import AgentState, EventSource
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventStream, EventStreamSubscriber
 from backend.ledger.action import (
+    Action,
+    AgentThinkAction,
+    BrowseInteractiveAction,
+    BrowserToolAction,
     ClarificationRequestAction,
     CmdRunAction,
+    CondensationAction,
     DelegateTaskAction,
     EscalateToHumanAction,
     FileEditAction,
@@ -76,28 +81,51 @@ from backend.ledger.action import (
     MCPAction,
     MessageAction,
     NullAction,
+    PlaybookFinishAction,
     ProposalAction,
+    RecallAction,
     StreamingChunkAction,
     TaskTrackingAction,
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
     UncertaintyAction,
 )
 from backend.ledger.observation import (
+    AgentCondensationObservation,
     AgentStateChangedObservation,
+    AgentThinkObservation,
+    BrowserScreenshotObservation,
     CmdOutputObservation,
+    DelegateTaskObservation,
     ErrorObservation,
+    FileDownloadObservation,
     FileEditObservation,
     FileReadObservation,
     FileWriteObservation,
+    LspQueryObservation,
     MCPObservation,
     NullObservation,
+    Observation,
+    RecallFailureObservation,
+    RecallObservation,
+    ServerReadyObservation,
+    StatusObservation,
+    SuccessObservation,
+    TaskTrackingObservation,
+    TerminalObservation,
+    UserRejectObservation,
 )
 
 from backend.cli._tool_display.renderers import (
     render_file_edit,
     render_file_read,
     render_file_create,
+    render_finish_summary,
     render_mcp_tool,
     render_shell_command,
+    render_browser_navigation,
+    render_lsp_query,
     badge_for_tool_name,
 )
 from backend.orchestration.conversation_stats import ConversationStats
@@ -1199,7 +1227,6 @@ class TUIRenderer:
         source = getattr(event, "source", None)
 
         if isinstance(event, MessageAction):
-            # Skip user messages to avoid duplication (they are rendered in _handle_input)
             if source == EventSource.USER or source == "user":
                 return
             content = event.content or ""
@@ -1216,6 +1243,20 @@ class TUIRenderer:
         elif isinstance(event, FileWriteAction):
             lines = render_file_create(event.path)
             self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, FileReadObservation):
+            summary = f"Read {event.path}"
+            if hasattr(event, 'content') and event.content:
+                text = (event.content or "")[:300]
+                self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
+                self._tui._write_log(Text(f"  {text}", style=NAVY_TEXT_MUTED))
+            else:
+                self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
+        elif isinstance(event, FileEditObservation):
+            summary = f"Edited {event.path}"
+            self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
+        elif isinstance(event, FileWriteObservation):
+            summary = f"Wrote {event.path}"
+            self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
         elif isinstance(event, MCPAction):
             lines = render_mcp_tool(event.name, event.arguments)
             self._tui._write_log(Text.from_markup("\n".join(lines)))
@@ -1232,6 +1273,84 @@ class TUIRenderer:
                 self._tui.add_tool_result(output[:500])
         elif isinstance(event, ErrorObservation):
             self._tui.add_error(event.content or "An unknown error occurred")
+        elif isinstance(event, SuccessObservation):
+            self._tui.add_success(event.content or "Done")
+        elif isinstance(event, StatusObservation):
+            msg = (event.content or "").strip()
+            if msg:
+                self._tui._write_log(Text(f"  {msg}", style=NAVY_TEXT_DIM))
+        elif isinstance(event, AgentThinkAction):
+            thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
+            if thought:
+                self._tui.add_thinking(thought)
+        elif isinstance(event, AgentThinkObservation):
+            thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
+            if thought:
+                self._tui.add_thinking(thought)
+        elif isinstance(event, BrowserToolAction):
+            action_name = getattr(event, 'action', 'browser') or 'browser'
+            url = getattr(event, 'url', '') or ''
+            lines = render_browser_navigation(action_name, url)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, BrowseInteractiveAction):
+            url = getattr(event, 'url', '') or ''
+            lines = render_browser_navigation('browse', url)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, BrowserScreenshotObservation):
+            self._tui._write_log(Text("  [browser screenshot]", style=NAVY_TEXT_MUTED))
+        elif isinstance(event, LspQueryAction):
+            query = getattr(event, 'query', '') or ''
+            symbol = getattr(event, 'symbol', '') or getattr(event, 'query', '') or ''
+            lines = render_lsp_query(symbol or query)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, LspQueryObservation):
+            content = (event.content or "").strip()
+            if content:
+                self._tui._write_log(Text(f"  {content[:300]}", style=NAVY_TEXT_MUTED))
+        elif isinstance(event, TerminalRunAction):
+            cmd = getattr(event, 'command', '') or ''
+            lines = render_shell_command(cmd)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, TerminalInputAction):
+            cmd = getattr(event, 'command', '') or getattr(event, 'input', '') or ''
+            lines = render_shell_command(cmd)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, TerminalReadAction):
+            self._tui._write_log(Text("  [terminal read]", style=NAVY_TEXT_MUTED))
+        elif isinstance(event, TerminalObservation):
+            content = (event.content or "").strip()
+            if content:
+                self._tui.add_tool_result(content[:500])
+        elif isinstance(event, RecallAction):
+            pass
+        elif isinstance(event, RecallObservation):
+            pass
+        elif isinstance(event, RecallFailureObservation):
+            pass
+        elif isinstance(event, CondensationAction):
+            self._tui._write_log(Text("  Condensing context...", style=NAVY_TEXT_DIM))
+        elif isinstance(event, AgentCondensationObservation):
+            self._tui._write_log(Text("  Context condensed", style=NAVY_TEXT_DIM))
+        elif isinstance(event, DelegateTaskAction):
+            task = getattr(event, 'task', '') or ''
+            self._tui._write_log(Text(f"  Delegate: {task[:100]}", style=NAVY_TEXT_DIM))
+        elif isinstance(event, DelegateTaskObservation):
+            result = (event.content or "").strip()[:200]
+            if result:
+                self._tui._write_log(Text(f"  {result}", style=NAVY_TEXT_MUTED))
+        elif isinstance(event, PlaybookFinishAction):
+            summary = getattr(event, 'summary', '') or ''
+            lines = render_finish_summary(summary)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, UserRejectObservation):
+            self._tui._write_log(Text("  Rejected", style=NAVY_ERROR))
+        elif isinstance(event, ServerReadyObservation):
+            self._tui._write_log(Text("  Server ready", style=NAVY_READY))
+        elif isinstance(event, FileDownloadObservation):
+            url = getattr(event, 'url', '') or ''
+            self._tui._write_log(Text(f"  Downloaded: {url}", style=NAVY_TEXT_DIM))
+        elif isinstance(event, TaskTrackingObservation):
+            pass
         elif isinstance(event, StreamingChunkAction):
             self._handle_streaming_chunk(event)
         elif isinstance(event, AgentStateChangedObservation):
@@ -1247,6 +1366,9 @@ class TUIRenderer:
         elif isinstance(event, TaskTrackingAction):
             if event.task_list is not None:
                 self._task_list = event.task_list
+        else:
+            name = type(event).__name__
+            self._tui._write_log(Text(f"  [{name}]", style=NAVY_TEXT_MUTED))
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
         if action.is_tool_call:
