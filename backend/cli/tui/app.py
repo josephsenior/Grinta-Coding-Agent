@@ -1147,19 +1147,27 @@ class TUIRenderer:
 
     def update_live_thinking(self, text: str) -> None:
         """Update the real-time reasoning buffer."""
+        is_first_chunk = not self._live_thinking
         self._live_thinking = text
+        
+        if is_first_chunk:
+            # First thinking chunk - append to history at its correct position
+            body = _rich_text(text)
+            body.stylize(NAVY_TEXT_DIM)
+            self._history.append(Text.assemble(body, "\n"))
+        else:
+            # Subsequent chunks - replace the last item (which is the thinking text)
+            if self._history:
+                body = _rich_text(text)
+                body.stylize(NAVY_TEXT_DIM)
+                self._history[-1] = Text.assemble(body, "\n")
+        
         self._refresh_display()
 
     def commit_live_thinking(self) -> None:
         """Commit live thinking to history and clear buffer."""
-        if self._live_thinking:
-            body = _rich_text(self._live_thinking)
-            body.stylize(NAVY_TEXT_DIM)
-            thinking_text = Text.assemble(body, "\n")
-            # Insert at the END of history so it appears AFTER previous content
-            # but BEFORE tool results that came during streaming (those are at the end)
-            self._history.append(thinking_text)
-            self._live_thinking = ""
+        # Thinking is already in history at the correct position - just clear the buffer
+        self._live_thinking = ""
         self._refresh_display()
 
     def clear_history(self) -> None:
@@ -1173,14 +1181,8 @@ class TUIRenderer:
         from backend.cli._event_renderer.sidebar import build_sidebar
         
         # 1. Main Display
-        # During streaming, live_thinking appears at the end (appended after history)
-        # After commit, it's in history at the correct position
+        # Thinking is now stored directly in _history - just render it as-is
         items = list(self._history)
-        if self._live_thinking:
-            body = _rich_text(self._live_thinking)
-            body.stylize(NAVY_TEXT_DIM)
-            # Insert at BEGINNING so thinking shows at TOP during streaming
-            items.insert(0, body)
         
         try:
             self._tui._get_display().update(Group(*items))
