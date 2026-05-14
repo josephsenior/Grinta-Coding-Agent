@@ -77,6 +77,33 @@ InputBar TextArea:focus {
     color: #c8d4e8;
 }
 
+/* ── Thinking Block ────────────────────────────────── */
+ThinkingBlock {
+    background: #0a1225;
+    border: solid #1b2a4a;
+    margin: 0 2;
+    padding: 0 1;
+    height: auto;
+    max-height: 10;
+    overflow-y: auto;
+}
+
+ThinkingBlock.-hidden {
+    display: none;
+}
+
+/* ── Spinner ────────────────────────────────────────── */
+#spinner {
+    width: 2;
+    height: 3;
+    content-align: center middle;
+    color: #91abec;
+}
+
+#spinner.-hidden {
+    display: none;
+}
+
 /* ── Stats Panel ────────────────────────────────────── */
 InputStats {
     height: 3;
