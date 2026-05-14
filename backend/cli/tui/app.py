@@ -25,7 +25,14 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Input, Label, RichLog, Static, TextArea
 
-_ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\r')
+_ANSI_ESCAPE_RE = re.compile(
+    r'\x1b\[[0-9;]*[a-zA-Z]'   # CSI sequences: \x1b[...m, \x1b[K, etc.
+    r'|\x1b\][^\x07]*\x07'     # OSC sequences: \x1b]...\x07
+    r'|\x1b[PX^_]'             # SOS/PM/APC sequences
+    r'|\x1b'                   # Lone escape character
+    r'|[\x00-\x08\x0b\x0c\x0e-\x1f]'  # Other control chars (keep \t \n \r)
+    r'|\r'                     # Carriage return
+)
 
 
 def _strip_ansi(text: str) -> str:
@@ -396,7 +403,7 @@ class GrintaScreen(Screen):
             _tui_logger.debug("action_submit_input: lock held, ignoring")
             return
         ta = self.query_one("#input", TextArea)
-        text = ta.text.strip()
+        text = _strip_ansi(ta.text).strip()
         _tui_logger.debug(f"action_submit_input: text_len={len(text)}")
         if not text:
             _tui_logger.debug("action_submit_input: empty text, ignoring")
