@@ -283,32 +283,38 @@ class GrintaScreen(Screen):
         mcp = hud.state.mcp_servers
         skills = HUDBar.count_bundled_playbook_skills()
 
-        # Build HUD with top bar info
-        parts = []
+        # Build two-line HUD
+        line1_parts = []
         # Top bar stats
-        parts.append(f"[{NAVY_BRAND}]Grinta[/]")
-        parts.append(f"[{NAVY_TEXT_MUTED}]v3.0.7[/]")
-        parts.append(f"[{NAVY_TEXT_SECONDARY}]{workspace}[/]")
+        line1_parts.append(f"[{NAVY_BRAND}]Grinta[/]")
+        line1_parts.append(f"[{NAVY_TEXT_MUTED}]v3.0.7[/]")
+        line1_parts.append(f"[{NAVY_TEXT_SECONDARY}]{workspace}[/]")
         # State and autonomy - use model_short only once
-        parts.append(f"[{state_color}]● {display_state}[/]")
-        parts.append(f"[{NAVY_TEXT_SECONDARY}]{model_display}[/]")
-        parts.append(f"[{NAVY_TEXT_TERTIARY}][{NAVY_BRAND}]Autonomy: {autonomy}[/]")
+        line1_parts.append(f"[{state_color}]● {display_state}[/]")
+        line1_parts.append(f"[{NAVY_TEXT_SECONDARY}]{model_display}[/]")
+        line1_parts.append(f"[{NAVY_TEXT_TERTIARY}][{NAVY_BRAND}]Autonomy: {autonomy}[/]")
+
+        line2_parts = []
         # Usage
         if limit > 0:
-            parts.append(f"[{NAVY_TEXT_DIM}]Tokens: {used:,}/{limit:,}[/]")
+            line2_parts.append(f"[{NAVY_TEXT_DIM}]Tokens: {used:,}/{limit:,}[/]")
         else:
-            parts.append(f"[{NAVY_TEXT_DIM}]Tokens: {used:,}[/]")
+            line2_parts.append(f"[{NAVY_TEXT_DIM}]Tokens: {used:,}[/]")
         # Cost
-        parts.append(f"[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]")
+        line2_parts.append(f"[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]")
         # Stats
-        parts.append(f"[{NAVY_TEXT_DIM}]Calls: {calls}[/]")
+        line2_parts.append(f"[{NAVY_TEXT_DIM}]Calls: {calls}[/]")
         if mcp is not None:
-            parts.append(f"[{NAVY_TEXT_DIM}]MCPs: {mcp}[/]")
-        parts.append(f"[{NAVY_TEXT_DIM}]Skills: {skills}[/]")
+            line2_parts.append(f"[{NAVY_TEXT_DIM}]MCPs: {mcp}[/]")
+        else:
+            line2_parts.append(f"[{NAVY_TEXT_DIM}]MCPs: 0[/]")
+        line2_parts.append(f"[{NAVY_TEXT_DIM}]Skills: {skills}[/]")
         # Help hint
-        parts.append(f"[{NAVY_TEXT_DIM}]? help[/]")
+        line2_parts.append(f"[{NAVY_TEXT_DIM}]? help[/]")
 
-        self.query_one("#hud-bar", HUD).update("  ".join(parts))
+        self.query_one("#hud-bar", HUD).update(
+            "  ".join(line1_parts) + "\n" + "  ".join(line2_parts)
+        )
 
     # ── Transcript helpers ──────────────────────────────────────────────────
 
