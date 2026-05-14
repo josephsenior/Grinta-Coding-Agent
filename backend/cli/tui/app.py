@@ -788,7 +788,8 @@ class GrintaScreen(Screen):
             logger.info(
                 "TUI _bootstrap: state after renderer subscribe=%s", state_after_create
             )
-            self._hud.update_agent_state(str(state_after_create))
+            # Show "Ready" once bootstrap completes — the agent is waiting for input
+            self._hud.update_agent_state("awaiting_user_input")
             self._render_hud_bar()
             self._render_hud_bar()
             self._renderer.drain_events()
