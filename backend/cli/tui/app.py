@@ -139,7 +139,7 @@ from backend.persistence import get_file_store
 
 
 
-class InfoSidebar(Vertical):
+class InfoSidebar(VerticalScroll):
     """Sidebar for Mission Control info (Tasks, MCPs, Skills)."""
 
 class Transcript(VerticalScroll):
@@ -1204,6 +1204,17 @@ class TUIRenderer:
                 self._tui._get_sidebar().update(sidebar)
             self._last_sidebar_state = current_state
 
+    def _write_lines(self, lines: list[Any]) -> None:
+        from rich.console import Group
+        from rich.text import Text
+        items = []
+        for line in lines:
+            if isinstance(line, str):
+                items.append(Text.from_markup(line))
+            else:
+                items.append(line)
+        self._tui._write_log(Group(*items))
+
     def drain_events(self) -> None:
         if not self._pending_events:
             self._refresh_display() # Keep sidebar/HUD in sync
@@ -1238,14 +1249,14 @@ class TUIRenderer:
         elif isinstance(event, FileReadAction):
             line_range = f"L{event.start}:L{event.end}" if event.end != -1 else f"from L{event.start}"
             lines = render_file_read(event.path, line_range)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            self._write_lines(lines)
         elif isinstance(event, FileEditAction):
             line_range = f"L{event.start_line}:L{event.end_line}" if event.start_line is not None else ""
             lines = render_file_edit("Edit", event.path, line_range)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            self._write_lines(lines)
         elif isinstance(event, FileWriteAction):
             lines = render_file_create(event.path)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            self._write_lines(lines)
         elif isinstance(event, FileReadObservation):
             summary = f"Read {event.path}"
             if hasattr(event, 'content') and event.content:
@@ -1262,14 +1273,14 @@ class TUIRenderer:
             self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
         elif isinstance(event, MCPAction):
             lines = render_mcp_tool(event.name, event.arguments)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            self._write_lines(lines)
         elif isinstance(event, CmdRunAction):
             cmd = getattr(event, "command", "") or ""
             lines = render_shell_command(cmd)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            self._write_lines(lines)
         elif isinstance(event, MCPObservation):
             lines = render_mcp_tool("mcp", result=event.content)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            self._write_lines(lines)
         elif isinstance(event, CmdOutputObservation):
             output = (event.content or "").strip()
             if output:
@@ -1294,18 +1305,18 @@ class TUIRenderer:
             action_name = getattr(event, 'action', 'browser') or 'browser'
             url = getattr(event, 'url', '') or ''
             lines = render_browser_navigation(action_name, url)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            self._write_lines(lines)
         elif isinstance(event, BrowseInteractiveAction):
             url = getattr(event, 'url', '') or ''
             lines = render_browser_navigation('browse', url)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            self._write_lines(lines)
         elif isinstance(event, BrowserScreenshotObservation):
             self._tui._write_log(Text("  [browser screenshot]", style=NAVY_TEXT_MUTED))
         elif isinstance(event, LspQueryAction):
             query = getattr(event, 'query', '') or ''
             symbol = getattr(event, 'symbol', '') or getattr(event, 'query', '') or ''
             lines = render_lsp_query(symbol or query)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            self._write_lines(lines)
         elif isinstance(event, LspQueryObservation):
             content = (event.content or "").strip()
             if content:
@@ -1344,7 +1355,7 @@ class TUIRenderer:
         elif isinstance(event, PlaybookFinishAction):
             summary = getattr(event, 'summary', '') or ''
             lines = render_finish_summary(summary)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            self._write_lines(lines)
         elif isinstance(event, UserRejectObservation):
             self._tui._write_log(Text("  Rejected", style=NAVY_ERROR))
         elif isinstance(event, ServerReadyObservation):
