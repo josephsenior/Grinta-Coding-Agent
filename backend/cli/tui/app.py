@@ -26,9 +26,16 @@ from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Input, Label, RichLog, Static, TextArea
 
 
+def _rich_text(text: str) -> Text:
+    """Convert text with potential ANSI and markup to a Rich Text object."""
+    # First, parse ANSI. Then, if we want to support markup, we'd need to be careful.
+    # Usually, we want to treat it as plain text with ANSI, OR as markup.
+    # The user specifically complained about ANSI showing up, so we prioritize ANSI parsing.
+    return Text.from_ansi(text)
+
 def _strip_ansi(text: str) -> str:
     """Strip all ANSI escape sequences from text using Rich's parser."""
-    return Text.from_ansi(text).plain
+    return _rich_text(text).plain
 
 from backend.cli.config_manager import AppConfig
 from backend.cli.hud import HUDBar
@@ -80,16 +87,18 @@ from backend.persistence import get_file_store
 # ── Widget classes ────────────────────────────────────────────────────────
 
 
-class Transcript(VerticalScroll):
-    """Scrollable conversation transcript."""
 
+class InfoSidebar(Vertical):
+    """Sidebar for Mission Control info (Tasks, MCPs, Skills)."""
+
+class Transcript(VerticalScroll):
+    """Scrollable conversation transcript container."""
 
 class InputBar(Horizontal):
-    """Compact bottom input row."""
-
+    """Bottom input row with border and prompt."""
 
 class HUD(Static):
-    """Single-line HUD bar — all metrics in one row."""
+    """Single-line status bar at the very bottom."""
 
 
 class GrintaConfirmDialog(ModalScreen[str | None]):
@@ -206,8 +215,11 @@ class GrintaScreen(Screen):
     }
 
     def compose(self) -> ComposeResult:
-        with Transcript(id="transcript-scroll"):
-            yield RichLog(id="transcript-log", markup=True, auto_scroll=True)
+        with Horizontal(id="main-layout"):
+            with Transcript(id="transcript-container"):
+                yield Static(id="main-display")
+            with InfoSidebar(id="sidebar-container"):
+                yield Static(id="sidebar-display")
         with InputBar(id="input-bar"):
             yield Static(id="spinner", classes="-hidden")
             yield TextArea(id="input")
@@ -219,10 +231,11 @@ class GrintaScreen(Screen):
         self._render_hud_bar()
         ta = self.query_one("#input", TextArea)
         ta.focus()
-        transcript = self.query_one("#transcript-scroll", Transcript)
+        transcript = self.query_one("#transcript-container", Transcript)
         transcript.scroll_home(animate=False)
         _tui_logger.debug("on_mount: done")
         self._start_background_bootstrap()
+
 
     def _start_background_bootstrap(self) -> None:
         async def _bg():
@@ -253,13 +266,7 @@ class GrintaScreen(Screen):
 
     def _render_hud_bar(self) -> None:
         hud = self._hud
-
-        # Top bar info: Grinta, version, workspace, model
-        model = hud.state.model or "(not set)"
-        workspace = hud.state.workspace_path or Path(os.getcwd()).name
-
         raw_state = hud.state.agent_state_label or "Ready"
-        # Handle various state string formats
         lookup_key = raw_state.lower()
         if lookup_key.startswith("agentstate."):
             lookup_key = lookup_key[len("agentstate.") :]
@@ -269,59 +276,39 @@ class GrintaScreen(Screen):
         display_state = self._STATE_LABELS.get(lookup_key, "Ready")
         state_color = self._STATE_COLORS.get(lookup_key, NAVY_BRAND)
 
+        cost = hud.state.cost_usd or 0
+        used = hud.state.context_tokens
+        calls = hud.state.llm_calls
+        
+        # Restore Model and Autonomy
         _provider, model_short = HUDBar.describe_model(hud.state.model)
-        if model_short and model_short != '(not set)':
-            model_display = f"Model: {_provider}/{model_short}" if _provider != '(not set)' else f"Model: {model_short}"
-        else:
-            model_display = "Model: (not set)"
+        model_display = f"{_provider}/{model_short}" if model_short != '(not set)' else "(not set)"
         autonomy = hud.state.autonomy_level
 
-        used = hud.state.context_tokens
-        limit = hud.state.context_limit
+        # Top line info
+        workspace = hud.state.workspace_path or Path(os.getcwd()).name
+        line1 = f"[#91abec bold]GRINTA[/]  |  [#bbc8e8 bold]W: {workspace}[/]  |  [#8f9fc1]v1.0 rc[/]"
 
-        cost = hud.state.cost_usd or 0
-        calls = hud.state.llm_calls
-
-        mcp = hud.state.mcp_servers
-        skills = HUDBar.count_bundled_playbook_skills()
-
-        # Build two-line HUD
-        line1_parts = []
-        # Top bar stats
-        line1_parts.append(f"[{NAVY_BRAND}]Grinta[/]")
-        line1_parts.append(f"[{NAVY_TEXT_MUTED}]v3.0.7[/]")
-        line1_parts.append(f"[{NAVY_TEXT_SECONDARY}]{workspace}[/]")
-        # State and autonomy - use model_short only once
-        line1_parts.append(f"[{state_color}]● {display_state}[/]")
-        line1_parts.append(f"[{NAVY_TEXT_SECONDARY}]{model_display}[/]")
-        line1_parts.append(f"[{NAVY_TEXT_TERTIARY}][{NAVY_BRAND}]Autonomy: {autonomy}[/]")
-
+        # Build second-line HUD
         line2_parts = []
-        # Usage
-        if limit > 0:
-            line2_parts.append(f"[{NAVY_TEXT_DIM}]Tokens: {used:,}/{limit:,}[/]")
-        else:
-            line2_parts.append(f"[{NAVY_TEXT_DIM}]Tokens: {used:,}[/]")
-        # Cost
+        line2_parts.append(f"[{state_color}]● {display_state}[/]")
+        line2_parts.append(f"[{NAVY_TEXT_SECONDARY}]Model: {model_display}[/]")
+        line2_parts.append(f"[{NAVY_BRAND}]Auto: {autonomy}[/]")
+        line2_parts.append(f"[{NAVY_TEXT_DIM}]Tkn: {used:,}[/]")
         line2_parts.append(f"[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]")
-        # Stats
         line2_parts.append(f"[{NAVY_TEXT_DIM}]Calls: {calls}[/]")
-        if mcp is not None:
-            line2_parts.append(f"[{NAVY_TEXT_DIM}]MCPs: {mcp}[/]")
-        else:
-            line2_parts.append(f"[{NAVY_TEXT_DIM}]MCPs: 0[/]")
-        line2_parts.append(f"[{NAVY_TEXT_DIM}]Skills: {skills}[/]")
-        # Help hint
-        line2_parts.append(f"[{NAVY_TEXT_DIM}]? help[/]")
 
         self.query_one("#hud-bar", HUD).update(
-            "  ".join(line1_parts) + "\n" + "  ".join(line2_parts)
+            line1 + "\n" + "  |  ".join(line2_parts)
         )
 
     # ── Transcript helpers ──────────────────────────────────────────────────
 
-    def _get_log(self) -> RichLog:
-        return self.query_one("#transcript-log", RichLog)
+    def _get_display(self) -> Static:
+        return self.query_one("#main-display", Static)
+
+    def _get_sidebar(self) -> Static:
+        return self.query_one("#sidebar-display", Static)
 
     @staticmethod
     def _break_long_runs(text: str, max_len: int = 80) -> str:
@@ -337,111 +324,188 @@ class GrintaScreen(Screen):
                 parts[i] = ''.join(_break_word(w) for w in words)
         return ''.join(parts)
 
-    def _write_log(self, markup: str) -> None:
-        t = Text.from_markup(markup)
-        self._get_log().write(t)
+    def _write_log(self, renderable: Any) -> None:
+        if self._renderer:
+            self._renderer.add_to_history(renderable)
 
     def add_user_message(self, text: str) -> None:
-        """User message — same style as agent, cyan marker."""
+        """User message — clear bold header."""
         self._hide_thinking()
-        safe = _strip_ansi(text).replace("[", r"\[")
-        self._write_log(f"\n[{NAVY_BRAND}]▸ You[/]  {safe}")
-        self._write_log("\n")
+        header = Text("\n▸ YOU\n", style="bold #91abec")
+        body = _rich_text(text)
+        self._write_log(Text.assemble(header, body, "\n"))
 
     def add_agent_message(self, text: str) -> None:
-        """Agent response — same style as user, cyan marker."""
-        safe = _strip_ansi(text).replace("[", r"\[")
-        self._write_log(f"\n[#00e5ff bold]▸ Grinta[/]  {safe}")
-        self._write_log("\n")
+        """Agent response — clear bold header."""
+        header = Text("\n▸ GRINTA\n", style="bold #54efae")
+        body = _rich_text(text)
+        self._write_log(Text.assemble(header, body, "\n"))
 
     def add_thinking(self, text: str) -> None:
-        """Real-time thinking/reasoning — write muted line to transcript."""
+        """Real-time thinking/reasoning — update live display."""
         spinner = self.query_one("#spinner", Static)
         spinner.remove_class("-hidden")
         spinner.update("⟳")
-        safe = _strip_ansi(text).replace("[", r"\[")
-        self._write_log(f"\n[{NAVY_TEXT_MUTED}]{safe}[/]")
-        self._scroll_to_bottom()
+        
+        if self._renderer:
+            self._renderer.update_live_thinking(text)
 
     def finalize_thinking(self) -> None:
         """Agent turn done — hide spinner."""
         self.query_one("#spinner", Static).add_class("-hidden")
+        if self._renderer:
+            self._renderer.commit_live_thinking()
 
     def _hide_thinking(self) -> None:
         """Called when user submits a new message — hide spinner if still active."""
         self.query_one("#spinner", Static).add_class("-hidden")
 
     def add_system_message(self, text: str) -> None:
-        self._write_log(f"[{NAVY_TEXT_MUTED}]{_strip_ansi(text).replace('[', r'\[')}[/]")
+        body = _rich_text(text)
+        body.stylize(NAVY_TEXT_MUTED)
+        self._write_log(body)
 
     def add_error(self, text: str) -> None:
-        self._write_log(f"[bold {NAVY_ERROR}]✗ {_strip_ansi(text)}[/]")
+        icon = Text("✗ ", style=f"bold {NAVY_ERROR}")
+        body = _rich_text(text)
+        body.stylize(f"bold {NAVY_ERROR}")
+        self._write_log(Text.assemble(icon, body))
 
     def add_success(self, text: str) -> None:
-        self._write_log(f"[bold {NAVY_READY}]✓ {_strip_ansi(text)}[/]")
+        icon = Text("✓ ", style=f"bold {NAVY_READY}")
+        body = _rich_text(text)
+        body.stylize(f"bold {NAVY_READY}")
+        self._write_log(Text.assemble(icon, body))
 
     def add_tool_start(self, tool_name: str, *, command: str = "") -> None:
-        """Tool call — show tool name and optional command."""
-        safe = _strip_ansi(tool_name).replace("[", r"\[")
+        """Tool call — show in transcript."""
+        icon = Text("⚙ ", style="#91abec")
+        name = _rich_text(tool_name)
+        name.stylize("#91abec")
+        
         if command:
-            safe_cmd = _strip_ansi(command).replace("[", r"\[")
-            self._write_log(f"[{NAVY_BRAND}]─ {safe}[/]  [{NAVY_TEXT_MUTED}]{safe_cmd}[/]")
+            cmd_text = Text(f" ({_strip_ansi(command)})", style="#969aad")
+            self._write_log(Text.assemble(icon, name, cmd_text))
         else:
-            self._write_log(f"[{NAVY_BRAND}]─ {safe}[/]")
-        self._scroll_to_bottom()
+            self._write_log(Text.assemble(icon, name))
 
     def add_tool_result(self, text: str) -> None:
         """Tool result — muted text."""
-        safe = _strip_ansi(text).replace("[", r"\[")
-        self._write_log(f"  [{NAVY_TEXT_MUTED}]{safe}[/]")
-        self._scroll_to_bottom()
+        body = _rich_text(text)
+        body.stylize(NAVY_TEXT_MUTED)
+        self._write_log(Text.assemble("  ", body))
 
     def add_communicate_clarification(self, action: ClarificationRequestAction) -> None:
-        """Agent asks a question — show question and options inline."""
-        safe_q = _strip_ansi(action.question).replace("[", r"\[")
-        lines = [f"[{NAVY_TEXT_PRIMARY}]? {safe_q}[/]"]
-        if action.options:
-            for opt in action.options:
-                safe = _strip_ansi(opt).replace("[", r"\[")
-                lines.append(f"  [{NAVY_TEXT_TERTIARY}]· {safe}[/]")
-        if action.context:
-            safe = _strip_ansi(action.context).replace("[", r"\[")
-            lines.append(f"  [{NAVY_TEXT_MUTED}]{safe}[/]")
-        self._write_log("\n".join(lines))
-        self._scroll_to_bottom()
+        """Agent asks a question — show question and options in a callout panel."""
+        from rich.console import Group
+        from rich.text import Text
+        from backend.cli.theme import CLR_QUESTION_TEXT, CLR_OPTION_TEXT, CLR_OPTION_RECOMMENDED
+        from backend.cli.layout_tokens import DECISION_PANEL_ACCENT_STYLE
+        from backend.cli.transcript import format_callout_panel
+
+        clarify_parts: list[Any] = []
+        if action.question:
+            t = _rich_text(action.question)
+            t.stylize(CLR_QUESTION_TEXT)
+            clarify_parts.append(t)
+        for i, opt in enumerate(action.options or [], 1):
+            line = Text()
+            line.append(f"{i}. ", style=f"bold {CLR_OPTION_RECOMMENDED}")
+            t_opt = _rich_text(opt)
+            t_opt.stylize(CLR_OPTION_TEXT)
+            line.append(t_opt)
+            clarify_parts.append(line)
+        
+        panel = format_callout_panel(
+            "Question", 
+            Group(*clarify_parts), 
+            accent_style=DECISION_PANEL_ACCENT_STYLE
+        )
+        self._write_log(panel)
 
     def add_communicate_uncertainty(self, action: UncertaintyAction) -> None:
         """Agent expresses uncertainty."""
-        msg = "; ".join(action.specific_concerns) if action.specific_concerns else action.requested_information
-        safe = _strip_ansi(msg).replace("[", r"\[")
-        self._write_log(f"[{NAVY_TEXT_PRIMARY}]⚠ {safe}[/]")
-        self._scroll_to_bottom()
+        from rich.text import Text
+        from backend.cli.theme import CLR_QUESTION_TEXT, STYLE_DIM, MARK_INFO
+        from backend.cli.layout_tokens import DECISION_PANEL_ACCENT_STYLE
+        from backend.cli.transcript import format_callout_panel
+        from rich.console import Group
+
+        parts: list[Any] = []
+        for concern in (action.specific_concerns or [])[:5]:
+            line = Text()
+            line.append(f"{MARK_INFO} ", style=STYLE_DIM)
+            t_concern = _rich_text(concern)
+            t_concern.stylize(STYLE_DIM)
+            line.append(t_concern)
+            parts.append(line)
+        if action.requested_information:
+            t_req = _rich_text(f"Need: {action.requested_information}")
+            t_req.stylize(CLR_QUESTION_TEXT)
+            parts.append(t_req)
+        
+        panel = format_callout_panel(
+            "Needs Context",
+            Group(*parts),
+            accent_style=DECISION_PANEL_ACCENT_STYLE
+        )
+        self._write_log(panel)
 
     def add_communicate_proposal(self, action: ProposalAction) -> None:
         """Agent proposes a plan."""
-        lines = []
+        from rich.text import Text
+        from backend.cli.theme import CLR_OPTION_RECOMMENDED, CLR_OPTION_TEXT, STYLE_DIM
+        from backend.cli.layout_tokens import DECISION_PANEL_ACCENT_STYLE
+        from backend.cli.transcript import format_callout_panel
+        from rich.console import Group
+
+        parts: list[Any] = []
         if action.rationale:
-            safe = _strip_ansi(action.rationale).replace("[", r"\[")
-            lines.append(f"[{NAVY_TEXT_PRIMARY}]{safe}[/]")
-        for i, opt in enumerate(action.options):
-            approach = opt.get("approach", str(opt))
-            safe = _strip_ansi(approach).replace("[", r"\[")
-            marker = "★" if i == action.recommended else "·"
-            lines.append(f"  [{NAVY_TEXT_TERTIARY}]{marker} {safe}[/]")
-        self._write_log("\n".join(lines))
-        self._scroll_to_bottom()
+            t_rat = _rich_text(action.rationale)
+            t_rat.stylize(STYLE_DIM)
+            parts.append(t_rat)
+        for i, opt in enumerate(action.options or []):
+            label = opt.get('name', opt.get('title', f"Option {i+1}"))
+            marker = " (recommended)" if i == action.recommended else ""
+            line = Text()
+            line.append(f"{i+1}. ", style=f"bold {DECISION_PANEL_ACCENT_STYLE}")
+            line.append(f"{label}{marker}", style=f"bold {CLR_OPTION_RECOMMENDED}" if i == action.recommended else f"bold {CLR_OPTION_TEXT}")
+            parts.append(line)
+            desc = opt.get('description', '')
+            if desc:
+                parts.append(Text(f"   {desc}", style=STYLE_DIM))
+
+        panel = format_callout_panel(
+            "Options",
+            Group(*parts),
+            accent_style=DECISION_PANEL_ACCENT_STYLE
+        )
+        self._write_log(panel)
 
     def add_communicate_escalate(self, action: EscalateToHumanAction) -> None:
         """Agent escalates to human."""
-        safe = _strip_ansi(action.reason).replace("[", r"\[")
-        self._write_log(f"[{NAVY_TEXT_PRIMARY}]⚠ {safe}[/]")
-        self._scroll_to_bottom()
+        from rich.text import Text
+        from backend.cli.theme import CLR_QUESTION_TEXT
+        from backend.cli.layout_tokens import DECISION_PANEL_ACCENT_STYLE
+        from backend.cli.transcript import format_callout_panel
+        
+        t_reason = _rich_text(action.reason or "The agent needs your input to continue.")
+        t_reason.stylize(CLR_QUESTION_TEXT)
+        
+        panel = format_callout_panel(
+            "Need Your Input",
+            t_reason,
+            accent_style=DECISION_PANEL_ACCENT_STYLE
+        )
+        self._write_log(panel)
 
     def add_divider(self) -> None:
-        self._write_log(f"[{NAVY_BORDER}]" + "─" * 50 + "[/]")
+        from rich.rule import Rule
+        self._write_log(Rule(style=NAVY_BORDER))
 
     def clear_transcript(self) -> None:
-        self._get_log().clear()
+        if self._renderer:
+            self._renderer.clear_history()
 
     def action_clear_transcript(self) -> None:
         self.clear_transcript()
@@ -451,7 +515,7 @@ class GrintaScreen(Screen):
         self.app.exit()
 
     def _scroll_to_bottom(self) -> None:
-        self.query_one("#transcript-scroll", Transcript).scroll_end(animate=False)
+        self.query_one("#transcript-container", Transcript).scroll_end(animate=False)
 
     # ── Input handling ──────────────────────────────────────────────────────
 
@@ -966,7 +1030,7 @@ class GrintaScreen(Screen):
 
 
 class TUIRenderer:
-    """Textual renderer — subscribes to event stream and updates TUI widgets."""
+    """Rich-driven renderer for Textual — manages history and real-time display."""
 
     def __init__(
         self,
@@ -987,22 +1051,93 @@ class TUIRenderer:
         self._pending_events: deque[Any] = deque()
         self._pending_lock = threading.Lock()
 
+        # History & Live state
+        self._history: list[Any] = []
+        self._live_thinking: str = ""
+        self._task_list: list[dict[str, Any]] = []
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
         event_stream.subscribe(EventStreamSubscriber.MAIN, self._on_event, sid)
 
+    def add_to_history(self, renderable: Any) -> None:
+        """Add a finalized renderable to history and refresh display."""
+        if isinstance(renderable, str):
+            renderable = Text.from_markup(renderable)
+        self._history.append(renderable)
+        self._refresh_display()
+
+    def update_live_thinking(self, text: str) -> None:
+        """Update the real-time reasoning buffer."""
+        self._live_thinking = text
+        self._refresh_display()
+
+    def commit_live_thinking(self) -> None:
+        """Commit live thinking to history and clear buffer."""
+        if self._live_thinking:
+            prefix = Text("▸ ", style=NAVY_TEXT_DIM)
+            body = _rich_text(self._live_thinking)
+            body.stylize(NAVY_TEXT_DIM)
+            self._history.append(Text.assemble(prefix, body, "\n"))
+            self._live_thinking = ""
+        self._refresh_display()
+
+    def clear_history(self) -> None:
+        self._history = []
+        self._live_thinking = ""
+        self._refresh_display()
+
+    def _refresh_display(self) -> None:
+        """Build the full Rich Group and update the Textual Static widgets."""
+        from rich.console import Group
+        from backend.cli._event_renderer.sidebar import build_sidebar
+        
+        # 1. Main Display
+        items = list(self._history)
+        if self._live_thinking:
+            prefix = Text("▸ ", style=NAVY_TEXT_DIM)
+            body = _rich_text(self._live_thinking)
+            body.stylize(NAVY_TEXT_DIM)
+            items.append(Text.assemble(prefix, body))
+        
+        self._tui._get_display().update(Group(*items))
+        self._tui._scroll_to_bottom()
+
+        # 2. Sidebar
+        mcp_count = self._hud.state.mcp_servers
+        skill_count = self._hud.bundled_skill_count
+        
+        # Build actual MCP server list from config
+        mcp_servers = None
+        if self._tui._config and getattr(self._tui._config, 'mcp', None) and getattr(self._tui._config.mcp, 'servers', None):
+            # We filter out the default 'app-mcp' if it's the only one or if we don't want to show internals.
+            # Actually, let's just list them all.
+            mcp_servers = [{'name': s.name, 'type': s.type} for s in self._tui._config.mcp.servers if s.name != 'app-mcp']
+        
+        # Fallback to dummy list if the config is not accessible but we have a count
+        if not mcp_servers and mcp_count:
+            mcp_servers = [{'name': f'MCP Server {i+1}', 'type': 'active'} for i in range(mcp_count)]
+
+        sidebar = build_sidebar(
+            task_list=self._task_list,
+            mcp_servers=mcp_servers,
+            skill_count=skill_count,
+            terminal_width=self._console.width
+        )
+        if sidebar:
+            self._tui._get_sidebar().update(sidebar)
+
     def drain_events(self) -> None:
         if not self._pending_events:
+            self._refresh_display() # Keep sidebar/HUD in sync
             return
-        _tui_logger.debug(f"TUIRenderer.drain_events: {len(self._pending_events)} pending")
         with self._pending_lock:
             while self._pending_events:
                 event = self._pending_events.popleft()
                 self._process_event(event)
+        self._refresh_display()
 
     def _on_event(self, event: Any) -> None:
-        _tui_logger.debug(f"TUIRenderer._on_event: {type(event).__name__}")
         with self._pending_lock:
             self._pending_events.append(event)
         try:
@@ -1010,16 +1145,8 @@ class TUIRenderer:
         except RuntimeError:
             pass
 
-    def wait_for_state_change(self, wait_timeout_sec: float = 0.1) -> asyncio.Event:
-        self._state_event.clear()
-        return self._state_event
-
     def _process_event(self, event: Any) -> None:
-        _tui_logger.debug(
-            f'TUIRenderer._process_event: {type(event).__name__} source={getattr(event, "source", None)}'
-        )
         self._update_metrics(event)
-
         if isinstance(event, NullAction) or isinstance(event, NullObservation):
             return
 
@@ -1050,26 +1177,22 @@ class TUIRenderer:
             self._tui.add_communicate_proposal(event)
         elif isinstance(event, EscalateToHumanAction):
             self._tui.add_communicate_escalate(event)
+        elif isinstance(event, TaskTrackingAction):
+            if event.task_list is not None:
+                self._task_list = event.task_list
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
-        """Handle streaming chunk — show thinking in a Panel, finalize when complete."""
-        # Tool call streaming
         if action.is_tool_call:
             tool_name = action.tool_call_name or "tool"
             self._tui.add_tool_start(tool_name)
-            self._state_event.set()
             return
 
-        # Real-time thinking/reasoning streaming — write muted line per chunk
         thinking = (action.thinking_accumulated or "").strip()
         if thinking:
             self._tui.add_thinking(thinking)
-            self._state_event.set()
 
-        # Final chunk — hide spinner
         if action.is_final:
             self._tui.finalize_thinking()
-            self._tui._render_hud_bar()
 
     def _update_metrics(self, event: Any) -> None:
         if hasattr(event, "model") and event.model:

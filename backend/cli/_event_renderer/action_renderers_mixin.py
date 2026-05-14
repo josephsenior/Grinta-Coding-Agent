@@ -65,6 +65,7 @@ from backend.cli.theme import (
     STYLE_DIM,
 )
 from backend.cli.tool_call_display import (
+    friendly_verb_for_tool,
     format_tool_activity_rows,
     tool_headline,
 )
@@ -472,13 +473,14 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self._flush_pending_tool_cards()
         name = getattr(action, 'name', 'tool')
         raw_args = getattr(action, 'arguments', None) or {}
+        verb = friendly_verb_for_tool(name, raw_args)
         args_str = ', '.join(f'{k}={repr(v)[:40]}' for k, v in list(raw_args.items())[:2])
         if len(args_str) > 80:
             args_str = args_str[:77] + '…'
         detail = f'{name}({args_str})' if args_str else name
         self._buffer_pending_activity(
             title=ACTIVITY_CARD_TITLE_MCP,
-            verb='Called MCP',
+            verb=verb,
             detail=detail,
             kind='mcp',
             badge_label='mcp',

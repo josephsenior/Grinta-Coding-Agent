@@ -28,7 +28,7 @@ from backend.core.task_status import (
 )
 
 # Maximum rows to show in each scrollable panel
-SIDEBAR_MAX_ROWS = 12
+SIDEBAR_MAX_ROWS = 30
 
 
 def should_show_sidebar(terminal_width: int) -> bool:
@@ -207,13 +207,27 @@ def build_sidebar(
     skill_count: int | None = None,
     *,
     terminal_width: int = 120,
-) -> Panel | None:
-    """Build the sidebar with only the Tasks panel.
+) -> Any | None:
+    """Build the sidebar with Tasks, MCP Servers, and Skills panels."""
+    if not should_show_sidebar(terminal_width):
+        return None
 
-    Returns None if terminal is too narrow for sidebar.
-    Task panel is kept in logic but hidden from UI.
-    """
-    return None
+    sidebar_width = compute_sidebar_width(terminal_width)
+    
+    sections: list[Any] = []
+    
+    # 1. Tasks Panel
+    sections.append(build_task_list_panel(task_list, width=sidebar_width))
+    
+    # 2. MCP Servers Panel
+    sections.append(build_mcp_servers_panel(mcp_servers, width=sidebar_width))
+    
+    # 3. Skills Panel (using total count if list not available)
+    # For simplicity, we just show the count or a few skills
+    sections.append(build_skills_panel(width=sidebar_width))
+    
+    from rich.console import Group
+    return Group(*sections)
 
 
 def load_playbook_skills() -> list[str]:
