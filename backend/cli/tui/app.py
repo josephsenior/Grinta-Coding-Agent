@@ -1141,6 +1141,8 @@ class TUIRenderer:
         if isinstance(renderable, str):
             renderable = Text.from_markup(renderable)
         self._history.append(renderable)
+        # Add margin after tool result
+        self._history.append(Text(""))
         self._refresh_display()
 
     def update_live_thinking(self, text: str) -> None:
@@ -1153,9 +1155,10 @@ class TUIRenderer:
         if self._live_thinking:
             body = _rich_text(self._live_thinking)
             body.stylize(NAVY_TEXT_DIM)
-            # Insert at BEGINNING of history so thinking appears BEFORE any tool results
-            # that came in during streaming (tool results would have been added before this)
-            self._history.insert(0, Text.assemble(body, "\n"))
+            thinking_text = Text.assemble(body, "\n")
+            # Insert at the END of history so it appears AFTER previous content
+            # but BEFORE tool results that came during streaming (those are at the end)
+            self._history.append(thinking_text)
             self._live_thinking = ""
         self._refresh_display()
 
@@ -1176,7 +1179,8 @@ class TUIRenderer:
         if self._live_thinking:
             body = _rich_text(self._live_thinking)
             body.stylize(NAVY_TEXT_DIM)
-            items.append(body)
+            # Insert at BEGINNING so thinking shows at TOP during streaming
+            items.insert(0, body)
         
         try:
             self._tui._get_display().update(Group(*items))
