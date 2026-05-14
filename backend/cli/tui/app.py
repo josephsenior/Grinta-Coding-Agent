@@ -18,7 +18,6 @@ from typing import Any
 _tui_logger = logging.getLogger("grinta.tui")
 _tui_logger.setLevel(logging.DEBUG)
 
-from rich.panel import Panel
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -173,7 +172,6 @@ class GrintaScreen(Screen):
         self._confirm_result: str | None = None
         self._input_lock = asyncio.Lock()
         self._bootstrapping: asyncio.Event | None = None
-        self._last_thinking_written_len: int = 0
 
     _STATE_LABELS = {
         "starting": "Starting…",
@@ -346,7 +344,6 @@ class GrintaScreen(Screen):
     def add_user_message(self, text: str) -> None:
         """User message — same style as agent, cyan marker."""
         self._hide_thinking()
-        self._last_thinking_written_len = 0
         safe = _strip_ansi(text).replace("[", r"\[")
         self._write_log(f"\n[{NAVY_BRAND}]▸ You[/]  {safe}")
         self._write_log("\n")
@@ -357,27 +354,17 @@ class GrintaScreen(Screen):
         self._write_log(f"\n[#00e5ff bold]▸ Grinta[/]  {safe}")
         self._write_log("\n")
 
-    def add_thinking(self, text: str, *, force: bool = False) -> None:
-        """Real-time thinking/reasoning — write a Panel to the RichLog transcript."""
-        # Throttle: skip if text hasn't grown enough (avoids flooding on rapid chunks)
-        if not force and len(text) - self._last_thinking_written_len < 80:
-            return
-        self._last_thinking_written_len = len(text)
+    def add_thinking(self, text: str) -> None:
+        """Real-time thinking/reasoning — write muted line to transcript."""
         spinner = self.query_one("#spinner", Static)
         spinner.remove_class("-hidden")
         spinner.update("⟳")
         safe = _strip_ansi(text).replace("[", r"\[")
-        self._get_log().write(
-            Panel(
-                Text(safe, style=NAVY_TEXT_MUTED),
-                title="⟳ Thinking",
-                border_style="dim",
-            )
-        )
+        self._write_log(f"\n[{NAVY_TEXT_MUTED}]{safe}[/]")
         self._scroll_to_bottom()
 
     def finalize_thinking(self) -> None:
-        """Agent turn done — final Panel already written to transcript."""
+        """Agent turn done — hide spinner."""
         self.query_one("#spinner", Static).add_class("-hidden")
 
     def _hide_thinking(self) -> None:
@@ -394,64 +381,40 @@ class GrintaScreen(Screen):
         self._write_log(f"[bold {NAVY_READY}]✓ {_strip_ansi(text)}[/]")
 
     def add_tool_start(self, tool_name: str, *, command: str = "") -> None:
-        """Tool call — rendered as a compact Panel."""
+        """Tool call — show tool name and optional command."""
         safe = _strip_ansi(tool_name).replace("[", r"\[")
         if command:
             safe_cmd = _strip_ansi(command).replace("[", r"\[")
-            content = f"[{NAVY_TEXT_TERTIARY}]{safe}[/]\n[{NAVY_TEXT_MUTED}]{safe_cmd}[/]"
+            self._write_log(f"[{NAVY_BRAND}]─ {safe}[/]  [{NAVY_TEXT_MUTED}]{safe_cmd}[/]")
         else:
-            content = f"[{NAVY_TEXT_TERTIARY}]{safe}[/]"
-        self._get_log().write(
-            Panel(
-                Text.from_markup(content),
-                title="⚡ Tool",
-                border_style="dim",
-            )
-        )
+            self._write_log(f"[{NAVY_BRAND}]─ {safe}[/]")
         self._scroll_to_bottom()
 
     def add_tool_result(self, text: str) -> None:
-        """Tool result — rendered as a Panel."""
+        """Tool result — muted text."""
         safe = _strip_ansi(text).replace("[", r"\[")
-        self._get_log().write(
-            Panel(
-                Text(safe, style=NAVY_TEXT_MUTED),
-                title="Output",
-                border_style="dim",
-            )
-        )
+        self._write_log(f"  [{NAVY_TEXT_MUTED}]{safe}[/]")
         self._scroll_to_bottom()
 
     def add_communicate_clarification(self, action: ClarificationRequestAction) -> None:
-        """Agent asks the user a question."""
-        lines = [f"[{NAVY_TEXT_PRIMARY}]{action.question}[/]"]
+        """Agent asks a question — show question and options inline."""
+        safe_q = _strip_ansi(action.question).replace("[", r"\[")
+        lines = [f"[{NAVY_TEXT_PRIMARY}]? {safe_q}[/]"]
         if action.options:
             for opt in action.options:
                 safe = _strip_ansi(opt).replace("[", r"\[")
                 lines.append(f"  [{NAVY_TEXT_TERTIARY}]· {safe}[/]")
         if action.context:
             safe = _strip_ansi(action.context).replace("[", r"\[")
-            lines.append(f"[{NAVY_TEXT_MUTED}]{safe}[/]")
-        self._get_log().write(
-            Panel(
-                Text.from_markup("\n".join(lines)),
-                title="❓ Question",
-                border_style="dim",
-            )
-        )
+            lines.append(f"  [{NAVY_TEXT_MUTED}]{safe}[/]")
+        self._write_log("\n".join(lines))
         self._scroll_to_bottom()
 
     def add_communicate_uncertainty(self, action: UncertaintyAction) -> None:
         """Agent expresses uncertainty."""
-        concerns = "; ".join(action.specific_concerns) if action.specific_concerns else action.requested_information
-        safe = _strip_ansi(concerns).replace("[", r"\[")
-        self._get_log().write(
-            Panel(
-                Text(safe, style=NAVY_TEXT_PRIMARY),
-                title=f"⚠️ Uncertainty ({action.uncertainty_level:.0%})",
-                border_style="dim",
-            )
-        )
+        msg = "; ".join(action.specific_concerns) if action.specific_concerns else action.requested_information
+        safe = _strip_ansi(msg).replace("[", r"\[")
+        self._write_log(f"[{NAVY_TEXT_PRIMARY}]⚠ {safe}[/]")
         self._scroll_to_bottom()
 
     def add_communicate_proposal(self, action: ProposalAction) -> None:
@@ -465,25 +428,13 @@ class GrintaScreen(Screen):
             safe = _strip_ansi(approach).replace("[", r"\[")
             marker = "★" if i == action.recommended else "·"
             lines.append(f"  [{NAVY_TEXT_TERTIARY}]{marker} {safe}[/]")
-        self._get_log().write(
-            Panel(
-                Text.from_markup("\n".join(lines)),
-                title="💡 Proposal",
-                border_style="dim",
-            )
-        )
+        self._write_log("\n".join(lines))
         self._scroll_to_bottom()
 
     def add_communicate_escalate(self, action: EscalateToHumanAction) -> None:
         """Agent escalates to human."""
         safe = _strip_ansi(action.reason).replace("[", r"\[")
-        self._get_log().write(
-            Panel(
-                Text(safe, style=NAVY_TEXT_PRIMARY),
-                title="🚨 Escalation",
-                border_style="dim",
-            )
-        )
+        self._write_log(f"[{NAVY_TEXT_PRIMARY}]⚠ {safe}[/]")
         self._scroll_to_bottom()
 
     def add_divider(self) -> None:
@@ -1109,10 +1060,10 @@ class TUIRenderer:
             self._state_event.set()
             return
 
-        # Real-time thinking/reasoning streaming — write Panel on meaningful growth
+        # Real-time thinking/reasoning streaming — write muted line per chunk
         thinking = (action.thinking_accumulated or "").strip()
         if thinking:
-            self._tui.add_thinking(thinking, force=action.is_final)
+            self._tui.add_thinking(thinking)
             self._state_event.set()
 
         # Final chunk — hide spinner
