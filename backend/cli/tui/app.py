@@ -1168,6 +1168,8 @@ class TUIRenderer:
         from backend.cli._event_renderer.sidebar import build_sidebar
         
         # 1. Main Display
+        # During streaming, live_thinking appears at the end (appended after history)
+        # After commit, it's in history at the correct position
         items = list(self._history)
         if self._live_thinking:
             body = _rich_text(self._live_thinking)
@@ -1269,8 +1271,7 @@ class TUIRenderer:
             summary = f"Edited {event.path}"
             self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
         elif isinstance(event, FileWriteObservation):
-            summary = f"Wrote {event.path}"
-            self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
+            pass  # Skip displaying "Wrote {path}" message
         elif isinstance(event, MCPAction):
             lines = render_mcp_tool(event.name, event.arguments)
             self._write_lines(lines)
@@ -1324,11 +1325,25 @@ class TUIRenderer:
         elif isinstance(event, TerminalRunAction):
             cmd = getattr(event, 'command', '') or ''
             lines = render_shell_command(cmd)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            from rich.panel import Panel
+            panel = Panel(
+                Text.from_markup("\n".join(lines)),
+                border_style="#3d4f6f",
+                title="Terminal",
+                title_align="left"
+            )
+            self._tui._write_log(panel)
         elif isinstance(event, TerminalInputAction):
             cmd = getattr(event, 'command', '') or getattr(event, 'input', '') or ''
             lines = render_shell_command(cmd)
-            self._tui._write_log(Text.from_markup("\n".join(lines)))
+            from rich.panel import Panel
+            panel = Panel(
+                Text.from_markup("\n".join(lines)),
+                border_style="#3d4f6f",
+                title="PWSH",
+                title_align="left"
+            )
+            self._tui._write_log(panel)
         elif isinstance(event, TerminalReadAction):
             self._tui._write_log(Text("  [terminal read]", style=NAVY_TEXT_MUTED))
         elif isinstance(event, TerminalObservation):
@@ -1355,7 +1370,15 @@ class TUIRenderer:
         elif isinstance(event, PlaybookFinishAction):
             summary = getattr(event, 'summary', '') or ''
             lines = render_finish_summary(summary)
-            self._write_lines(lines)
+            from rich.panel import Panel
+            from rich.text import Text
+            panel = Panel(
+                Text.from_markup("\n".join(lines)),
+                border_style="#22c55e",
+                title="Finished",
+                title_align="left"
+            )
+            self._tui._write_log(panel)
         elif isinstance(event, UserRejectObservation):
             self._tui._write_log(Text("  Rejected", style=NAVY_ERROR))
         elif isinstance(event, ServerReadyObservation):
