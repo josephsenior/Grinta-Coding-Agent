@@ -1378,15 +1378,7 @@ class TUIRenderer:
         elif isinstance(event, PlaybookFinishAction):
             summary = getattr(event, 'final_thought', '') or getattr(event, 'thought', '') or ''
             lines = render_finish_summary(summary)
-            from rich.panel import Panel
-            from rich.text import Text
-            panel = Panel(
-                Text.from_markup("\n".join(lines)),
-                border_style="#22c55e",
-                title="Finished",
-                title_align="left"
-            )
-            self._tui._write_log(panel)
+            self._write_lines(lines)
         elif isinstance(event, UserRejectObservation):
             self._tui._write_log(Text("  Rejected", style=NAVY_ERROR))
         elif isinstance(event, ServerReadyObservation):
