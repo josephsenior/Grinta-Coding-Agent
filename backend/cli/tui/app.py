@@ -23,6 +23,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
+from textual.css.query import NoMatches
 from textual.widgets import Button, Input, Label, RichLog, Static, TextArea
 
 
@@ -1173,7 +1174,10 @@ class TUIRenderer:
             body.stylize(NAVY_TEXT_DIM)
             items.append(body)
         
-        self._tui._get_display().update(Group(*items))
+        try:
+            self._tui._get_display().update(Group(*items))
+        except NoMatches:
+            return
         self._tui._scroll_to_bottom()
 
         # 2. Sidebar (Optimized: only update if state changed)
@@ -1215,7 +1219,6 @@ class TUIRenderer:
             self._pending_events.append(event)
         try:
             self._loop.call_soon_threadsafe(self._state_event.set)
-            self._loop.call_soon_threadsafe(self.drain_events)
         except RuntimeError:
             pass
 
