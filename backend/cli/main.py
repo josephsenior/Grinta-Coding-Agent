@@ -400,7 +400,10 @@ async def _async_main(
         set_theme_preset(theme)
     if verbose:
         os.environ['GRINTA_VERBOSE'] = '1'
-    console = _build_async_console(show_splash and not _accessible_mode)
+    # -- console setup ---------------------------------------------------------
+    # Only show CLI splash if not going to TUI to avoid terminal noise
+    is_tty = sys.stdin.isatty()
+    console = _build_async_console(show_splash and not _accessible_mode and not is_tty)
     initial_input = _read_piped_stdin()
 
     try:

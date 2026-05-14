@@ -94,10 +94,7 @@ class StatusFields:
 def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
     """Build fields from :class:`~backend.cli.hud.HUDState` and bundled skill count."""
     provider, model = HUDBar.describe_model(hud.model)
-    if provider in _UNKNOWN_PROVIDERS:
-        model_display = model
-    else:
-        model_display = f'{provider}/{model}'
+    model_display = model
 
     ctx = HUDBar._format_tokens(hud.context_tokens)
     lim_tok = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
@@ -231,7 +228,7 @@ def _token_bar(pct: int, width: int = 5) -> str:
 def _rich_compact_hud_minimal(fields: StatusFields) -> Text:
     """Minimal HUD line: just model, tokens, cost, state."""
     parts: list[tuple[str, str]] = []
-    if fields.model_display and fields.model_display != '(not set)/(not set)':
+    if fields.model_display and fields.model_display != '(not set)':
         parts.append((fields.model_display, CLR_HUD_MODEL))
         parts.append((' · ', CLR_SEP))
     parts.append(

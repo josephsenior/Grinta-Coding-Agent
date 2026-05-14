@@ -21,6 +21,9 @@ from backend.cli._tool_display.renderers.search import (
     render_search_results,
     render_search_summary,
 )
+from backend.cli._tool_display.renderers.shell import (
+    render_shell_command,
+)
 from backend.cli._tool_display.renderers.finish import (
     render_finish_summary,
 )

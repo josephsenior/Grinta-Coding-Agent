@@ -67,17 +67,38 @@ from backend.ledger import EventStream, EventStreamSubscriber
 from backend.ledger.action import (
     ClarificationRequestAction,
     CmdRunAction,
+    DelegateTaskAction,
     EscalateToHumanAction,
+    FileEditAction,
+    FileReadAction,
+    FileWriteAction,
+    LspQueryAction,
+    MCPAction,
     MessageAction,
     NullAction,
     ProposalAction,
     StreamingChunkAction,
+    TaskTrackingAction,
     UncertaintyAction,
 )
 from backend.ledger.observation import (
     AgentStateChangedObservation,
     CmdOutputObservation,
+    ErrorObservation,
+    FileEditObservation,
+    FileReadObservation,
+    FileWriteObservation,
+    MCPObservation,
     NullObservation,
+)
+
+from backend.cli._tool_display.renderers import (
+    render_file_edit,
+    render_file_read,
+    render_file_create,
+    render_mcp_tool,
+    render_shell_command,
+    badge_for_tool_name,
 )
 from backend.orchestration.conversation_stats import ConversationStats
 from backend.orchestration.orchestration_config import OrchestrationConfig
@@ -97,8 +118,11 @@ class Transcript(VerticalScroll):
 class InputBar(Horizontal):
     """Bottom input row with border and prompt."""
 
-class HUD(Static):
-    """Single-line status bar at the very bottom."""
+class HUD(Vertical):
+    """Multi-line status bar at the very bottom."""
+    def compose(self) -> ComposeResult:
+        yield Label(id="hud-line-1")
+        yield Label(id="hud-line-2")
 
 
 class GrintaConfirmDialog(ModalScreen[str | None]):
@@ -181,6 +205,8 @@ class GrintaScreen(Screen):
         self._confirm_result: str | None = None
         self._input_lock = asyncio.Lock()
         self._bootstrapping: asyncio.Event | None = None
+        
+        self._bootstrapping: asyncio.Event | None = None
 
     _STATE_LABELS = {
         "starting": "Starting…",
@@ -222,7 +248,7 @@ class GrintaScreen(Screen):
                 yield Static(id="sidebar-display")
         with InputBar(id="input-bar"):
             yield Static(id="spinner", classes="-hidden")
-            yield TextArea(id="input")
+            yield TextArea(id="input", show_line_numbers=False)
         yield HUD(id="hud-bar")
 
     def on_mount(self) -> None:
@@ -230,6 +256,7 @@ class GrintaScreen(Screen):
 
         self._render_hud_bar()
         ta = self.query_one("#input", TextArea)
+        ta.text = ""
         ta.focus()
         transcript = self.query_one("#transcript-container", Transcript)
         transcript.scroll_home(animate=False)
@@ -281,26 +308,32 @@ class GrintaScreen(Screen):
         calls = hud.state.llm_calls
         
         # Restore Model and Autonomy
-        _provider, model_short = HUDBar.describe_model(hud.state.model)
-        model_display = f"{_provider}/{model_short}" if model_short != '(not set)' else "(not set)"
+        _, model_short = HUDBar.describe_model(hud.state.model)
+        model_display = model_short if model_short != '(not set)' else "(not set)"
         autonomy = hud.state.autonomy_level
 
         # Top line info
-        workspace = hud.state.workspace_path or Path(os.getcwd()).name
-        line1 = f"[#91abec bold]GRINTA[/]  |  [#bbc8e8 bold]W: {workspace}[/]  |  [#8f9fc1]v1.0 rc[/]"
+        workspace = str(hud.state.workspace_path or Path(os.getcwd()))
+        try:
+            home = str(Path.home())
+            if workspace.startswith(home):
+                workspace = workspace.replace(home, "~", 1)
+        except Exception:
+            pass
+        line1 = f"[#91abec bold]GRINTA[/]  |  [#bbc8e8 bold]Workspace: {workspace}[/]  |  [#8f9fc1]Version: 1.0 rc[/]"
 
         # Build second-line HUD
         line2_parts = []
         line2_parts.append(f"[{state_color}]● {display_state}[/]")
         line2_parts.append(f"[{NAVY_TEXT_SECONDARY}]Model: {model_display}[/]")
         line2_parts.append(f"[{NAVY_BRAND}]Auto: {autonomy}[/]")
-        line2_parts.append(f"[{NAVY_TEXT_DIM}]Tkn: {used:,}[/]")
+        line2_parts.append(f"[{NAVY_TEXT_DIM}]Tokens: {used:,}[/]")
         line2_parts.append(f"[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]")
         line2_parts.append(f"[{NAVY_TEXT_DIM}]Calls: {calls}[/]")
 
-        self.query_one("#hud-bar", HUD).update(
-            line1 + "\n" + "  |  ".join(line2_parts)
-        )
+        hud = self.query_one("#hud-bar", HUD)
+        hud.query_one("#hud-line-1", Label).update(line1)
+        hud.query_one("#hud-line-2", Label).update("  |  ".join(line2_parts))
 
     # ── Transcript helpers ──────────────────────────────────────────────────
 
@@ -337,6 +370,7 @@ class GrintaScreen(Screen):
 
     def add_agent_message(self, text: str) -> None:
         """Agent response — clear bold header."""
+        self.finalize_thinking()
         header = Text("\n▸ GRINTA\n", style="bold #54efae")
         body = _rich_text(text)
         self._write_log(Text.assemble(header, body, "\n"))
@@ -384,8 +418,8 @@ class GrintaScreen(Screen):
         name.stylize("#91abec")
         
         if command:
-            cmd_text = Text(f" ({_strip_ansi(command)})", style="#969aad")
-            self._write_log(Text.assemble(icon, name, cmd_text))
+            cmd_text = _rich_text(command)
+            self._write_log(Text.assemble(icon, name, " (", cmd_text, ")", style="#969aad"))
         else:
             self._write_log(Text.assemble(icon, name))
 
@@ -606,10 +640,10 @@ class GrintaScreen(Screen):
                     "[TUI] _handle_input: dispatch complete, state=%s",
                     self._controller.get_agent_state() if self._controller else "N/A",
                 )
-            except Exception:
-                _tui_logger.debug("_handle_input: EXCEPTION in try block")
+            except Exception as exc:
+                _tui_logger.debug(f"_handle_input: EXCEPTION in try block: {exc}")
                 logger.exception("[TUI] _handle_input FAILED")
-                self.add_error("Agent error — check app.log")
+                self.add_error(f"Agent error: {type(exc).__name__}: {exc}")
                 self._render_hud_bar()
                 if self._controller:
                     try:
@@ -658,7 +692,8 @@ class GrintaScreen(Screen):
             f"[{NAVY_BRAND}]GRINTA[/] — AI-Powered Development Platform"
         )
         self.add_divider()
-        self._get_log().write(
+        from rich.text import Text
+        help_text = Text.from_markup(
             f"  [{NAVY_TEXT_SECONDARY}]/help[/]      [{NAVY_TEXT_TERTIARY}]Show this help[/]\n"
             f"  [{NAVY_TEXT_SECONDARY}]/clear[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n"
             f"  [{NAVY_TEXT_SECONDARY}]/settings[/]  [{NAVY_TEXT_TERTIARY}]Open settings[/]\n"
@@ -667,6 +702,7 @@ class GrintaScreen(Screen):
             f"  [{NAVY_TEXT_SECONDARY}]Ctrl+C[/]     [{NAVY_TEXT_TERTIARY}]Stop agent[/]\n"
             f"  [{NAVY_TEXT_SECONDARY}]Tab[/]        [{NAVY_TEXT_TERTIARY}]Newline in input[/]"
         )
+        self._write_log(help_text)
         self.add_divider()
         self._scroll_to_bottom()
 
@@ -736,6 +772,8 @@ class GrintaScreen(Screen):
             _tui_logger.debug(f"_bootstrap: set_main_event_loop to {self._loop}")
 
             if self._renderer is None:
+                import sys
+                is_tty = sys.stdin.isatty()
                 self._renderer = TUIRenderer(
                     console=self._rich_console,
                     hud=self._hud,
@@ -1011,6 +1049,8 @@ class GrintaScreen(Screen):
                 )
                 raise
         _tui_logger.debug("_dispatch_to_agent: poll loop exited")
+        if self._renderer:
+            self._renderer.drain_events()
 
     # ── Confirmation ────────────────────────────────────────────────────────
 
@@ -1055,6 +1095,7 @@ class TUIRenderer:
         self._history: list[Any] = []
         self._live_thinking: str = ""
         self._task_list: list[dict[str, Any]] = []
+        self._last_sidebar_state: Any = None
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
@@ -1103,29 +1144,29 @@ class TUIRenderer:
         self._tui._get_display().update(Group(*items))
         self._tui._scroll_to_bottom()
 
-        # 2. Sidebar
+        # 2. Sidebar (Optimized: only update if state changed)
         mcp_count = self._hud.state.mcp_servers
         skill_count = self._hud.bundled_skill_count
         
         # Build actual MCP server list from config
         mcp_servers = None
         if self._tui._config and getattr(self._tui._config, 'mcp', None) and getattr(self._tui._config.mcp, 'servers', None):
-            # We filter out the default 'app-mcp' if it's the only one or if we don't want to show internals.
-            # Actually, let's just list them all.
             mcp_servers = [{'name': s.name, 'type': s.type} for s in self._tui._config.mcp.servers if s.name != 'app-mcp']
         
-        # Fallback to dummy list if the config is not accessible but we have a count
         if not mcp_servers and mcp_count:
             mcp_servers = [{'name': f'MCP Server {i+1}', 'type': 'active'} for i in range(mcp_count)]
 
-        sidebar = build_sidebar(
-            task_list=self._task_list,
-            mcp_servers=mcp_servers,
-            skill_count=skill_count,
-            terminal_width=self._console.width
-        )
-        if sidebar:
-            self._tui._get_sidebar().update(sidebar)
+        current_state = (self._task_list, mcp_servers, skill_count)
+        if current_state != self._last_sidebar_state:
+            sidebar = build_sidebar(
+                task_list=self._task_list,
+                mcp_servers=mcp_servers,
+                skill_count=skill_count,
+                terminal_width=self._console.width
+            )
+            if sidebar:
+                self._tui._get_sidebar().update(sidebar)
+            self._last_sidebar_state = current_state
 
     def drain_events(self) -> None:
         if not self._pending_events:
@@ -1152,19 +1193,40 @@ class TUIRenderer:
 
         source = getattr(event, "source", None)
 
-        if isinstance(event, MessageAction) and source == EventSource.AGENT:
+        if isinstance(event, MessageAction):
+            # Skip user messages to avoid duplication (they are rendered in _handle_input)
+            if source == EventSource.USER or source == "user":
+                return
             content = event.content or ""
             if content:
                 self._tui.add_agent_message(content)
-        elif isinstance(event, CmdRunAction) and source == EventSource.AGENT:
+        elif isinstance(event, FileReadAction):
+            line_range = f"L{event.start}:L{event.end}" if event.end != -1 else f"from L{event.start}"
+            lines = render_file_read(event.path, line_range)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, FileEditAction):
+            line_range = f"L{event.start_line}:L{event.end_line}" if event.start_line is not None else ""
+            lines = render_file_edit("Edit", event.path, line_range)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, FileWriteAction):
+            lines = render_file_create(event.path)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, MCPAction):
+            lines = render_mcp_tool(event.name, event.arguments)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, CmdRunAction):
             cmd = getattr(event, "command", "") or ""
-            label = getattr(event, "display_label", "") or ""
-            display = label or cmd
-            self._tui.add_tool_start(display[:80], command=cmd[:200])
+            lines = render_shell_command(cmd)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
+        elif isinstance(event, MCPObservation):
+            lines = render_mcp_tool("mcp", result=event.content)
+            self._tui._write_log(Text.from_markup("\n".join(lines)))
         elif isinstance(event, CmdOutputObservation):
             output = (event.content or "").strip()
             if output:
                 self._tui.add_tool_result(output[:500])
+        elif isinstance(event, ErrorObservation):
+            self._tui.add_error(event.content or "An unknown error occurred")
         elif isinstance(event, StreamingChunkAction):
             self._handle_streaming_chunk(event)
         elif isinstance(event, AgentStateChangedObservation):
@@ -1183,8 +1245,8 @@ class TUIRenderer:
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
         if action.is_tool_call:
-            tool_name = action.tool_call_name or "tool"
-            self._tui.add_tool_start(tool_name)
+            # We don't add_tool_start here anymore because it clutters the UI 
+            # with generic markers. We wait for the finalized action.
             return
 
         thinking = (action.thinking_accumulated or "").strip()
@@ -1213,5 +1275,10 @@ class TUIRenderer:
 
         self._current_state = state
         self._hud.update_agent_state(str(state))
+        
+        # Ensure thinking UI is cleared on any idle/terminal state
+        if state in (AgentState.AWAITING_USER_INPUT, AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED):
+            self._tui.finalize_thinking()
+            
         self._state_event.set()
         self._tui._render_hud_bar()

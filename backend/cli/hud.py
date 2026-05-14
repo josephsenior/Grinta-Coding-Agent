@@ -195,7 +195,7 @@ class HUDBar:
         fields = status_fields_from_hud(self.state, self._bundled_skill_count)
 
         parts = []
-        if fields.model_display and fields.model_display != '(not set)/(not set)':
+        if fields.model_display and fields.model_display != '(not set)':
             parts.append(fields.model_display)
 
         parts.append(f'{fields.token_display_compact}t')
