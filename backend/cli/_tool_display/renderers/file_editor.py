@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     CLR_DETAIL,
     CLR_SECONDARY,
@@ -34,8 +33,6 @@ def render_file_edit(
     Returns a list of Rich markup lines for console.print().
     """
     lines: list[str] = []
-
-    badge = badge_for_tool_name('text_editor')
 
     if line_range:
         detail = f"{path}  [dim]·  {line_range}[/dim]"
@@ -73,8 +70,6 @@ def render_file_read(
     line_count: int = 0,
 ) -> list[str]:
     """Render a file read event."""
-    badge = badge_for_tool_name('text_editor')
-
     if line_range:
         detail = f"{path}  [dim]·  {line_range}[/dim]"
     elif line_count:
@@ -90,8 +85,6 @@ def render_file_create(
     line_count: int = 0,
 ) -> list[str]:
     """Render a new file creation."""
-    badge = badge_for_tool_name('text_editor')
-
     detail = path
     if line_count:
         detail += f"  [dim](+{line_count} lines)[/dim]"
