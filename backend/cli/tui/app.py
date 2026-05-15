@@ -1111,6 +1111,14 @@ class GrintaScreen(Screen):
 class TUIRenderer:
     """Rich-driven renderer for Textual — manages history and real-time display."""
 
+    _FILE_EDIT_VERBS: dict[str, tuple[str, bool]] = {
+        'read_file': ('Read', False),
+        'create_file': ('Created', False),
+        'insert_text': ('Inserted', True),
+        'undo_last_edit': ('Reverted', False),
+        'write': ('Wrote', False),
+    }
+
     def __init__(
         self,
         console: Any,
@@ -1260,15 +1268,66 @@ class TUIRenderer:
             # Skip - already handled via StreamingChunkAction to avoid duplicates
             pass
         elif isinstance(event, FileReadAction):
-            line_range = f"L{event.start}:L{event.end}" if event.end != -1 else f"from L{event.start}"
-            lines = render_file_read(event.path, line_range)
+            path = getattr(event, 'path', '')
+            view_range = getattr(event, 'view_range', None)
+            start = getattr(event, 'start', 0)
+            end = getattr(event, 'end', -1)
+            if view_range and len(view_range) == 2:
+                line_range = f"L{view_range[0]}:L{view_range[1]}"
+            elif start not in (0, 1) or end != -1:
+                end_str = str(end) if end != -1 else "end"
+                line_range = f"L{start}:{end_str}"
+            else:
+                line_range = ""
+            lines = render_file_read(path, line_range)
             self._write_lines(lines)
         elif isinstance(event, FileEditAction):
-            line_range = f"L{event.start_line}:L{event.end_line}" if event.start_line is not None else ""
-            lines = render_file_edit("Edit", event.path, line_range)
+            cmd = getattr(event, 'command', '')
+            path = event.path
+            insert_line = getattr(event, 'insert_line', None)
+            start = getattr(event, 'start', 1)
+            end = getattr(event, 'end', -1)
+            start_line = getattr(event, 'start_line', None)
+            end_line = getattr(event, 'end_line', None)
+
+            verb_entry = self._FILE_EDIT_VERBS.get(cmd)
+            if verb_entry is not None:
+                verb, include_stats = verb_entry
+                if include_stats and insert_line is not None:
+                    line_range = f"line {insert_line}"
+                else:
+                    line_range = ""
+            elif not cmd:
+                end_str = f"L{end}" if end != -1 else "end"
+                verb = "Edited"
+                line_range = f"L{start}:{end_str}"
+            elif cmd == 'edit':
+                edit_mode = getattr(event, 'edit_mode', '')
+                if edit_mode == 'range' and start_line is not None and end_line is not None:
+                    verb = "Edited"
+                    line_range = f"L{start_line}:L{end_line}"
+                else:
+                    verb = "Edited"
+                    line_range = ""
+            else:
+                verb = "Edited"
+                line_range = ""
+
+            lines = render_file_edit(verb, path, line_range)
             self._write_lines(lines)
         elif isinstance(event, FileWriteAction):
-            lines = render_file_create(event.path)
+            content = getattr(event, 'content', '') or ''
+            line_count = content.count('\n') + 1 if content else 0
+            start = getattr(event, 'start', 0)
+            end = getattr(event, 'end', -1)
+            if start not in (0, 1) or end != -1:
+                end_str = str(end) if end != -1 else "end"
+                line_range = f"L{start}:{end_str}"
+                lines = render_file_create(event.path)
+                if line_range and lines:
+                    lines[0] = lines[0].replace(event.path, f"{event.path}  [dim]·  {line_range}[/dim]")
+            else:
+                lines = render_file_create(event.path, line_count=line_count)
             self._write_lines(lines)
         elif isinstance(event, FileReadObservation):
             summary = f"Read {event.path}"
@@ -1280,11 +1339,20 @@ class TUIRenderer:
                 self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
         elif isinstance(event, FileEditObservation):
             diff = event.visualize_diff()
+            added = getattr(event, 'added', 0) or 0
+            removed = getattr(event, 'removed', 0) or 0
             if diff:
-                lines = render_file_edit("Edited", event.path, diff_lines=diff.splitlines())
+                lines = render_file_edit("Edited", event.path, diff_lines=diff.splitlines(), added=added, removed=removed)
                 self._write_lines(lines)
             else:
                 summary = f"Edited {event.path}"
+                if added or removed:
+                    delta_parts = []
+                    if added:
+                        delta_parts.append(f"+{added} lines")
+                    if removed:
+                        delta_parts.append(f"-{removed} lines")
+                    summary += f"  ({', '.join(delta_parts)})"
                 self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
         elif isinstance(event, FileWriteObservation):
             pass  # Skip displaying "Wrote {path}" message
