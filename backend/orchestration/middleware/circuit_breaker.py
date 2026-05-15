@@ -30,13 +30,16 @@ _PROGRESS_OBSERVATION_TYPES: tuple[str, ...] = (
 
 # Tool fallback map — when a tool fails, suggest the next alternative so the
 # model can pivot in the same turn instead of stopping to explain.
+# Keys are the name that appears in the tool_call_metadata.function_name field.
 _TOOL_FALLBACK_MAP: dict[str, list[str]] = {
     'symbol_editor': [
         'text_editor',
     ],
-    'text_editor': [],
-    'search_code': ['lsp_query'],
-    'lsp_query': ['search_code'],
+    'text_editor': [
+        'symbol_editor',
+    ],
+    'search_code': ['lsp'],
+    'lsp': ['search_code'],
 }
 
 

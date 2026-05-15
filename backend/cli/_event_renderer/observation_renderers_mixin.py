@@ -153,6 +153,7 @@ def _cmd_stdout_syntax_extras(content: str) -> list[Any] | None:
             word_wrap=True,
             theme='ansi_dark',
             line_numbers=n_lines > 10,
+            background_color='#060a14',
         )
     ]
 
@@ -737,6 +738,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
                         _terminal_output_lexer(body),
                         word_wrap=True,
                         theme='ansi_dark',
+                        background_color='#060a14',
                     ),
                     title=panel_title,
                     title_align='left',

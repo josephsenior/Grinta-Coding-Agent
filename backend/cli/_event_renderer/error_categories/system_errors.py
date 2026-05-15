@@ -20,6 +20,59 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ),
     ),
     _GuidanceRule(
+        _has("edit_mode=range requires"),
+        ErrorGuidance(
+            summary="text_editor 'edit' with edit_mode=range needs start_line and end_line.",
+            steps=(
+                'Add both start_line and end_line as integers (1-based, inclusive), and new_str as the replacement text.',
+                'Example: {"command": "edit", "edit_mode": "range", '
+                '"start_line": 1, "end_line": 10, "new_str": "..."}.',
+            ),
+            omit_summary_in_recovery=False,
+            error_code='ERR-TE-001',
+        ),
+    ),
+    _GuidanceRule(
+        _has("text_editor command 'edit' requires 'edit_mode'"),
+        ErrorGuidance(
+            summary="text_editor edit command is missing an edit_mode.",
+            steps=(
+                'Add edit_mode with one of: format, section, range, patch.',
+                'For line-range edits: edit_mode=range with start_line, end_line, and new_str.',
+                'For parser-based edits (JSON/YAML): edit_mode=format with format_kind, format_path, and format_value.',
+            ),
+            omit_summary_in_recovery=False,
+            error_code='ERR-TE-002',
+        ),
+    ),
+    _GuidanceRule(
+        _has('deterministic edit failed'),
+        ErrorGuidance(
+            summary='text_editor could not find a valid edit path for those arguments.',
+            steps=(
+                'If using edit_mode, check edit_mode is set and required params are present '
+                '(range → start_line + end_line; section → anchor_value; format → format_path).',
+                'Re-read the file first, then retry with the correct parameter set.',
+            ),
+            omit_summary_in_recovery=False,
+            error_code='ERR-TE-003',
+        ),
+    ),
+    _GuidanceRule(
+        _has('replace_range requires'),
+        ErrorGuidance(
+            summary='symbol_editor replace_range is missing required parameters.',
+            steps=(
+                'Provide all three: start_line (int, 1-based), end_line (int, inclusive), '
+                'and new_code (the replacement source text).',
+                'Example: {"command": "replace_range", "path": "f.py", '
+                '"start_line": 1, "end_line": 5, "new_code": "pass"}',
+            ),
+            omit_summary_in_recovery=False,
+            error_code='ERR-SE-001',
+        ),
+    ),
+    _GuidanceRule(
         _any(
             'resume failed',
             'no event stream',

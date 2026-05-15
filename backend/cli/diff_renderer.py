@@ -211,6 +211,6 @@ class DiffPanel:
             theme='material',
             word_wrap=True,
             padding=(0, 1),
-            background_color='default',
+            background_color='#060a14',
             line_numbers=True,
         )

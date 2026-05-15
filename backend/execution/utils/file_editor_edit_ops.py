@@ -114,10 +114,26 @@ def apply_edit_logic(
         )
 
     def branch_range() -> str | Any:
-        if start_line is None or end_line is None:
+        missing = []
+        if start_line is None:
+            missing.append('start_line')
+        if end_line is None:
+            missing.append('end_line')
+        if missing:
+            if len(missing) == 1:
+                missing_str = missing[0]
+            else:
+                missing_str = 'start_line and end_line (both)'
             return _tool_result(
                 output='',
-                error='edit_mode=range requires start_line and end_line.',
+                error=(
+                    f'[ERROR] edit_mode=range requires start_line and end_line. '
+                    f'[CAUSE] {missing_str} {"was" if len(missing) == 1 else "were"} omitted from the tool call. '
+                    f'[SUGGESTION] Provide both start_line and end_line as integers (1-based, inclusive) '
+                    f'alongside new_str. '
+                    f'Example: {{"command": "edit", "edit_mode": "range", "start_line": 1, '
+                    f'"end_line": 10, "new_str": "...replacement text..."}}.'
+                ),
                 new_content=old_content_str,
             )
         return replace_range_guarded(

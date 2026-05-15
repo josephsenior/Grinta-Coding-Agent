@@ -12,11 +12,17 @@
 Read errors quickly. If path is uncertain: {path_discovery_hint}
 
 On tool failure:
-- `symbol_editor` → `text_editor`
-- `text_editor` → `symbol_editor`
-{lsp_fallback}
+- `symbol_editor` → `text_editor` (use line ranges + new_str)
+- `text_editor` → `symbol_editor` (use the same symbol by name)
+- `search_code` → `lsp` (check locally with the language server; no shell grep)
+- `lsp` → `search_code` (wider text search)
 
-Never rerun the same failing command unchanged. Escalations must specify: (1) hypothesis, (2) action taken and outcome, (3) ruled out paths.
+Fix immediately or pivot — never re-run the same failing call unchanged.
+- Error tells you what is missing (bad argument, missing field) → fix the call and retry the same tool.
+- Error is a runtime failure (timeout, not found, permission) → pivot to the fallback tool in the same turn.
+- Error is ambiguous after one fix → escalate: say what you tried, what happened, and what ruled it out.
+
+Escalations must specify: (1) hypothesis, (2) action taken and outcome, (3) ruled out paths.
 </ERROR_RECOVERY>
 
 <RISK_PREVIEW>
