@@ -236,7 +236,6 @@ def redact_internal_result_markers(text: str) -> str:
         text,
         flags=re.DOTALL | re.IGNORECASE,
     )
-    text = re.sub(r'\[TOOL_FALLBACK\].*?(?:\n|$)', '', text)
     cleaned = re.sub(r'\n{3,}', '\n\n', text)
     return cleaned.strip()
 

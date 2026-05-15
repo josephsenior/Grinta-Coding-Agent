@@ -47,6 +47,19 @@ from backend.cli._tool_display.renderers.tasks import (
     render_task_list,
     render_task_summary,
 )
+from backend.cli._tool_display.renderers.terminal import (
+    render_browser_screenshot,
+    render_condensation_action,
+    render_condensation_complete,
+    render_delegation_action,
+    render_delegation_result,
+    render_file_download,
+    render_lsp_result,
+    render_server_ready,
+    render_terminal_output,
+    render_terminal_read,
+    render_user_reject,
+)
 
 __all__ = [
     'ToolBadge',
@@ -56,7 +69,6 @@ __all__ = [
     'render_file_read',
     'render_file_create',
     'render_shell_command',
-    'render_shell_command_rich',
     'render_search_results',
     'render_search_summary',
     'render_finish_summary',
@@ -68,4 +80,15 @@ __all__ = [
     'render_memory_update',
     'render_task_list',
     'render_task_summary',
+    'render_terminal_read',
+    'render_terminal_output',
+    'render_browser_screenshot',
+    'render_lsp_result',
+    'render_delegation_action',
+    'render_delegation_result',
+    'render_condensation_action',
+    'render_condensation_complete',
+    'render_user_reject',
+    'render_server_ready',
+    'render_file_download',
 ]

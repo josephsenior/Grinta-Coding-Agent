@@ -121,7 +121,6 @@ def split_error_text(error_text: str) -> tuple[str, str]:
         error_text,
         flags=re.DOTALL | re.IGNORECASE,
     )
-    cleaned = re.sub(r'\[TOOL_FALLBACK\].*?(?:\n|$)', '', cleaned)
     stripped = cleaned.strip()
     if not stripped:
         return 'Unknown error', ''

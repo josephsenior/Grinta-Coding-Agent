@@ -373,13 +373,26 @@ def _handle_cmd_output_observation(
 def _handle_error_observation(
     obs: ErrorObservation, max_message_chars: int | None
 ) -> Message:
+    """Format an error observation into a clean, structured message for the LLM.
+
+    Uses structured fields (fallback_tool) instead of parsing mutated content.
+    This ensures consistent formatting regardless of which middleware ran.
+    """
     error_id = getattr(obs, 'error_id', 'UNKNOWN')
-    return _handle_simple_observation(
-        obs,
-        max_message_chars,
-        prefix=f'[ERROR type={error_id}]\n',
-        suffix='\n[Error occurred in processing last action]',
-    )
+    content = _get_observation_content(obs)
+    text = truncate_content(content, max_message_chars)
+
+    parts: list[str] = [f'[ERROR type={error_id}]']
+    parts.append(text)
+
+    # Add fallback hint from structured field (set by CircuitBreakerMiddleware)
+    fallback = getattr(obs, 'fallback_tool', None)
+    if fallback:
+        parts.append(f'\n[SUGGESTION] Consider using `{fallback}` instead.')
+
+    parts.append('\n[Error occurred in processing last action]')
+
+    return Message(role='user', content=[TextContent(text='\n'.join(parts))])
 
 
 def _handle_user_reject_observation(

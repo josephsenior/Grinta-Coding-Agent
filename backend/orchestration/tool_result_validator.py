@@ -202,17 +202,7 @@ class ToolResultValidator(ToolInvocationMiddleware):
         # Keep legacy rule name for existing tests/callers.
         self.add_rule('output_size', check_large_output, severity='warning')
 
-        # 3. Error observation passthrough (informational)
-        def check_error_obs(ctx: ToolInvocationContext, obs: Observation) -> str | None:
-            from backend.ledger.observation import ErrorObservation
-
-            if isinstance(obs, ErrorObservation):
-                return f'Tool returned error: {getattr(obs, "content", "")[:200]}'
-            return None
-
-        self.add_rule('error_observation', check_error_obs, severity='warning')
-
-        # 4. Empty result detection
+        # 3. Empty result detection
         def check_empty(ctx: ToolInvocationContext, obs: Observation) -> str | None:
             if type(obs).__name__ == 'TerminalObservation':
                 has_new = getattr(obs, 'has_new_output', None)
@@ -231,7 +221,7 @@ class ToolResultValidator(ToolInvocationMiddleware):
 
         self.add_rule('empty_result', check_empty, severity='warning')
 
-        # 5. Wrong shell detection (e.g. Unix commands on PowerShell, PowerShell on Bash)
+        # 4. Wrong shell detection (e.g. Unix commands on PowerShell, PowerShell on Bash)
         def check_wrong_shell(
             ctx: ToolInvocationContext, obs: Observation
         ) -> str | None:
@@ -282,7 +272,7 @@ class ToolResultValidator(ToolInvocationMiddleware):
 
         self.add_rule('wrong_shell', check_wrong_shell, severity='warning')
 
-        # 6. Background-detached process detection
+        # 5. Background-detached process detection
         # When a command exceeds the idle-output timeout, the runtime detaches
         # it to a background session (exit_code=-2).  The LLM receives partial
         # output with an ambiguous suffix.  Without explicit guidance, models
@@ -344,25 +334,24 @@ class ToolResultValidator(ToolInvocationMiddleware):
     ) -> None:
         """Append validation information to the observation content.
 
-        Keeps the annotation compact to reduce token overhead. Truncates original
-        content for error observations to prevent context bloat.
+        Keeps the annotation compact to reduce token overhead.
+        ErrorObservations are skipped — the error content itself is the signal;
+        wrapping it in <APP_RESULT_VALIDATION> adds no value and wastes tokens.
         """
         from backend.ledger.observation import ErrorObservation
         from backend.ledger.serialization.event import truncate_content
+
+        # ErrorObservations carry their own semantic meaning — no annotation needed.
+        # The error content is already visible to the agent as a user message.
+        if isinstance(observation, ErrorObservation):
+            return
 
         content = getattr(observation, 'content', None)
         if not isinstance(content, str):
             return
 
-        # Context safeguard: truncate original content for errors or massive results
-        # before adding annotations. Error observations are truncated more
-        # aggressively since they usually contain noisy tracebacks.
-        max_original = 3000
-        if isinstance(observation, ErrorObservation):
-            max_original = 1000
-
-        if len(content) > max_original:
-            content = truncate_content(content, max_original, strategy='tail_heavy')
+        if len(content) > 3000:
+            content = truncate_content(content, 3000, strategy='tail_heavy')
 
         if not (result.warnings or result.errors or result.blocked):
             observation.content = content

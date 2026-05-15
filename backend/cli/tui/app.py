@@ -127,11 +127,22 @@ from backend.cli._tool_display.renderers import (
     render_mcp_tool,
     render_shell_command,
     render_browser_navigation,
+    render_browser_screenshot,
     render_lsp_query,
+    render_lsp_result,
     badge_for_tool_name,
     render_memory_update,
     render_task_list,
     render_search_summary,
+    render_terminal_read,
+    render_terminal_output,
+    render_delegation_action,
+    render_delegation_result,
+    render_condensation_action,
+    render_condensation_complete,
+    render_user_reject,
+    render_server_ready,
+    render_file_download,
 )
 from backend.orchestration.conversation_stats import ConversationStats
 from backend.orchestration.orchestration_config import OrchestrationConfig
@@ -1313,7 +1324,15 @@ class TUIRenderer:
                 verb = "Edited"
                 line_range = ""
 
-            lines = render_file_edit(verb, path, line_range)
+            # Compute line stats for create_file from file_text
+            added_lines = 0
+            is_new_file = False
+            if cmd == 'create_file':
+                file_text = getattr(event, 'file_text', '') or ''
+                added_lines = file_text.count('\n') + 1 if file_text else 0
+                is_new_file = True
+
+            lines = render_file_edit(verb, path, line_range, added=added_lines, new_file=is_new_file)
             self._write_lines(lines)
         elif isinstance(event, FileWriteAction):
             content = getattr(event, 'content', '') or ''
@@ -1364,8 +1383,8 @@ class TUIRenderer:
             self._write_lines(lines)
         elif isinstance(event, CmdRunAction):
             cmd = getattr(event, "command", "") or ""
-            lines = render_shell_command(cmd)
-            self._write_lines(lines)
+            panel = render_shell_command(cmd)
+            self._tui._write_log(panel)
         elif isinstance(event, MCPObservation):
             lines = render_mcp_tool("mcp", result=event.content)
             self._write_lines(lines)
@@ -1373,7 +1392,10 @@ class TUIRenderer:
             output = (event.content or "").strip()
             if output:
                 output = strip_tool_result_validation_annotations(output)
-                self._tui.add_tool_result(output[:500])
+                exit_code = getattr(event, 'exit_code', None)
+                cmd = getattr(event, 'command', '') or ''
+                panel = render_shell_command(cmd, output=output[:500], exit_code=exit_code)
+                self._tui._write_log(panel)
         elif isinstance(event, ErrorObservation):
             self._tui.add_error(event.content or "An unknown error occurred")
         elif isinstance(event, SuccessObservation):
@@ -1400,7 +1422,9 @@ class TUIRenderer:
             lines = render_browser_navigation('browse', url)
             self._write_lines(lines)
         elif isinstance(event, BrowserScreenshotObservation):
-            self._tui._write_log(Text("  [browser screenshot]", style=NAVY_TEXT_MUTED))
+            url = getattr(event, 'url', '') or ''
+            panel = render_browser_screenshot(url)
+            self._tui._write_log(panel)
         elif isinstance(event, LspQueryAction):
             query = getattr(event, 'query', '') or ''
             symbol = getattr(event, 'symbol', '') or getattr(event, 'query', '') or ''
@@ -1408,51 +1432,29 @@ class TUIRenderer:
             self._write_lines(lines)
         elif isinstance(event, LspQueryObservation):
             content = (event.content or "").strip()
-            if content:
-                self._tui._write_log(Text(f"  {content[:300]}", style=NAVY_TEXT_MUTED))
+            symbol = getattr(event, 'symbol', '') or ''
+            panel = render_lsp_result(content, symbol)
+            self._tui._write_log(panel)
         elif isinstance(event, TerminalRunAction):
             cmd = getattr(event, 'command', '') or ''
-            lines = render_shell_command(cmd)
-            from rich.panel import Panel
-            from rich.console import Group
-            items = []
-            for line in lines:
-                if isinstance(line, str):
-                    items.append(Text.from_markup(line))
-                else:
-                    items.append(line)
-            panel = Panel(
-                Group(*items),
-                border_style="#3d4f6f",
-                title="Terminal",
-                title_align="left"
-            )
+            panel = render_shell_command(cmd)
             self._tui._write_log(panel)
         elif isinstance(event, TerminalInputAction):
             cmd = getattr(event, 'command', '') or getattr(event, 'input', '') or ''
-            lines = render_shell_command(cmd)
-            from rich.panel import Panel
-            from rich.console import Group
-            items = []
-            for line in lines:
-                if isinstance(line, str):
-                    items.append(Text.from_markup(line))
-                else:
-                    items.append(line)
-            panel = Panel(
-                Group(*items),
-                border_style="#3d4f6f",
-                title="PWSH",
-                title_align="left"
-            )
+            panel = render_shell_command(cmd)
             self._tui._write_log(panel)
         elif isinstance(event, TerminalReadAction):
-            self._tui._write_log(Text("  [terminal read]", style=NAVY_TEXT_MUTED))
+            session_id = getattr(event, 'session_id', '') or ''
+            panel = render_terminal_read(session_id)
+            self._tui._write_log(panel)
         elif isinstance(event, TerminalObservation):
             content = (event.content or "").strip()
             if content:
                 content = strip_tool_result_validation_annotations(content)
-                self._tui.add_tool_result(content[:500])
+                session_id = getattr(event, 'session_id', '') or ''
+                exit_code = getattr(event, 'exit_code', None)
+                panel = render_terminal_output(content, session_id, exit_code)
+                self._tui._write_log(panel)
         elif isinstance(event, RecallAction):
             lines = render_memory_update("Recalled active context")
             self._write_lines(lines)
@@ -1461,27 +1463,34 @@ class TUIRenderer:
         elif isinstance(event, RecallFailureObservation):
             pass
         elif isinstance(event, CondensationAction):
-            self._tui._write_log(Text("  Condensing context...", style=NAVY_TEXT_DIM))
+            panel = render_condensation_action()
+            self._tui._write_log(panel)
         elif isinstance(event, AgentCondensationObservation):
-            self._tui._write_log(Text("  Context condensed", style=NAVY_TEXT_DIM))
+            panel = render_condensation_complete()
+            self._tui._write_log(panel)
         elif isinstance(event, DelegateTaskAction):
             task = getattr(event, 'task', '') or ''
-            self._tui._write_log(Text(f"  Delegate: {task[:100]}", style=NAVY_TEXT_DIM))
+            worker = getattr(event, 'worker', '') or ''
+            panel = render_delegation_action(task, worker)
+            self._tui._write_log(panel)
         elif isinstance(event, DelegateTaskObservation):
-            result = (event.content or "").strip()[:200]
-            if result:
-                self._tui._write_log(Text(f"  {result}", style=NAVY_TEXT_MUTED))
+            content = (event.content or "").strip()
+            panel = render_delegation_result(content)
+            self._tui._write_log(panel)
         elif isinstance(event, PlaybookFinishAction):
             summary = getattr(event, 'final_thought', '') or getattr(event, 'thought', '') or ''
             if summary:
                 self._tui._write_log(Text(f"{summary}"))
         elif isinstance(event, UserRejectObservation):
-            self._tui._write_log(Text("  Rejected", style=NAVY_ERROR))
+            panel = render_user_reject()
+            self._tui._write_log(panel)
         elif isinstance(event, ServerReadyObservation):
-            self._tui._write_log(Text("  Server ready", style=NAVY_READY))
+            panel = render_server_ready()
+            self._tui._write_log(panel)
         elif isinstance(event, FileDownloadObservation):
             url = getattr(event, 'url', '') or ''
-            self._tui._write_log(Text(f"  Downloaded: {url}", style=NAVY_TEXT_DIM))
+            panel = render_file_download(url)
+            self._tui._write_log(panel)
         elif isinstance(event, TaskTrackingObservation):
             pass
         elif isinstance(event, StreamingChunkAction):
@@ -1499,8 +1508,7 @@ class TUIRenderer:
         elif isinstance(event, TaskTrackingAction):
             if event.task_list is not None:
                 self._task_list = event.task_list
-                lines = render_task_list(self._task_list)
-                self._write_lines(lines)
+                # Task list is shown in sidebar panel — skip transcript rendering
         else:
             name = type(event).__name__
             self._tui._write_log(Text(f"  [{name}]", style=NAVY_TEXT_MUTED))

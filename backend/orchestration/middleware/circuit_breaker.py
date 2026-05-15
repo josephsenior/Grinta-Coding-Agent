@@ -56,25 +56,20 @@ def _effective_error_tool_name(tool_name: str, content: str) -> str:
     return classify_text_editor_error_bucket(content)
 
 
-def _fallback_hint(tool_name: str) -> str | None:
+def _fallback_tool(tool_name: str) -> str | None:
+    """Return the primary fallback tool name, or None if no fallback exists."""
     if tool_name not in _TOOL_FALLBACK_MAP:
         return None
-    fallbacks = _TOOL_FALLBACK_MAP[tool_name]
-    return (
-        f'\n\n[TOOL_FALLBACK] `{tool_name}` failed. Try: '
-        f'{", ".join(f"`{tool}`" for tool in fallbacks)} instead — pivot immediately.'
-    )
+    return _TOOL_FALLBACK_MAP[tool_name][0]
 
 
-def _append_tool_fallback_hint(observation: Observation, tool_name: str) -> None:
-    hint = _fallback_hint(tool_name)
-    if hint is None:
+def _set_fallback_hint(observation: Observation, tool_name: str) -> None:
+    """Set the fallback_tool field on an ErrorObservation for structured communication."""
+    fallback = _fallback_tool(tool_name)
+    if fallback is None:
         return
-    base_content = observation.content or ''
-    # Prevent recursive fallback triggers by avoiding duplicate hints in context
-    if hint.strip() in base_content:
-        return
-    observation.content = base_content + hint
+    if hasattr(observation, 'fallback_tool'):
+        observation.fallback_tool = fallback
 
 
 def _record_success_progress(
@@ -110,9 +105,8 @@ class CircuitBreakerMiddleware(ToolInvocationMiddleware):
         tool_name = _tool_name_for_action(ctx.action)
 
         if isinstance(observation, ErrorObservation):
-            base_content = observation.content or ''
-            effective_tool = _effective_error_tool_name(tool_name, base_content)
-            _append_tool_fallback_hint(observation, tool_name)
+            effective_tool = _effective_error_tool_name(tool_name, observation.content or '')
+            _set_fallback_hint(observation, tool_name)
             service.record_error(
                 RuntimeError(observation.content), tool_name=effective_tool
             )

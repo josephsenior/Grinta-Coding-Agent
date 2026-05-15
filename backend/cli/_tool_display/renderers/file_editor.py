@@ -34,12 +34,15 @@ def render_file_edit(
     """
     lines: list[str] = []
 
-    if line_range:
+    # Build detail with inline stats for new files
+    detail = path
+    if new_file and added:
+        detail += f"  [{CLR_STATUS_OK}]+{added}[/{CLR_STATUS_OK}]"
+    elif line_range:
         detail = f"{path}  [dim]·  {line_range}[/dim]"
-    else:
-        detail = path
 
-    if added or removed:
+    # For edits (not new files), show delta as secondary line
+    if not new_file and (added or removed):
         delta = format_activity_delta_secondary(added=added, removed=removed)
         if delta:
             lines.append(f"  {delta}")
@@ -87,6 +90,6 @@ def render_file_create(
     """Render a new file creation."""
     detail = path
     if line_count:
-        detail += f"  [dim](+{line_count} lines)[/dim]"
+        detail += f"  [{CLR_STATUS_OK}]+{line_count}[/{CLR_STATUS_OK}]"
 
     return [format_activity_primary('Created', detail)]
