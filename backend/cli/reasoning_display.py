@@ -23,7 +23,7 @@ from rich.text import Text
 from backend.cli.layout_tokens import (
     CALLOUT_PANEL_CHROME_WIDTH,
 )
-from backend.cli.theme import CLR_META, CLR_THOUGHT_BODY
+from backend.cli.theme import CLR_META, NAVY_TEXT_MUTED
 from backend.engine import prompt_role_debug as _prompt_role_debug
 
 # Panel chrome overhead: live ``MINIMAL`` frame + horizontal padding from
@@ -348,9 +348,9 @@ class ReasoningDisplay:
         for i, row in enumerate(wrapped_rows):
             # First row of each entry gets the gutter marker
             if i in entry_starts:
-                rows.append(Text(f'{_GUTTER_MARKER} {row}', style=CLR_THOUGHT_BODY))
+                rows.append(Text(f'{_GUTTER_MARKER} {row}', style=NAVY_TEXT_MUTED))
             else:
-                rows.append(Text(f'  {row}', style=CLR_THOUGHT_BODY))
+                rows.append(Text(f'  {row}', style=NAVY_TEXT_MUTED))
 
         if clipped:
             rows.append(

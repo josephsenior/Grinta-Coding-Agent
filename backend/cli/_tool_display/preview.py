@@ -307,6 +307,7 @@ def mcp_result_syntax_extras(
             word_wrap=True,
             theme='ansi_dark',
             line_numbers=False,
+            background_color='#060a14',
         )
     ]
 
@@ -359,6 +360,7 @@ def file_read_syntax_highlight(
             word_wrap=True,
             theme='monokai',
             line_numbers=True,
+            background_color='#060a14',
             padding=(1, 1),
         )
     ]

@@ -484,11 +484,6 @@ def _render_autonomy(
         windows_with_bash=windows_with_bash,
         shell_is_powershell=shell_is_powershell,
     )
-    lsp_fallback = (
-        '- `search_code` returns nothing → try `lsp`'
-        if lsp_available
-        else '- `search_code` returns nothing → try alternate search terms, do not fall back to shell.'
-    )
     tracker_on = getattr(config, 'enable_task_tracker_tool', False)
     if tracker_on:
         task_tracker_discipline_block = (
@@ -521,7 +516,6 @@ def _render_autonomy(
         task_tracker_discipline_block=task_tracker_discipline_block,
         task_sync_instruction=task_sync_instruction,
         path_discovery_hint=path_hint,
-        lsp_fallback=lsp_fallback,
         problem_solving_workflow_body=problem_solving_workflow_body,
     )
 

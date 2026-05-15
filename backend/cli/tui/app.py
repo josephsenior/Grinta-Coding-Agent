@@ -56,6 +56,7 @@ from backend.cli.theme import (
     NAVY_TEXT_TERTIARY,
     NAVY_WAITING,
 )
+from backend.cli.transcript import strip_tool_result_validation_annotations
 from backend.core.bootstrap.agent_control_loop import run_agent_until_done
 from backend.core.bootstrap.main import (
     create_agent,
@@ -128,6 +129,9 @@ from backend.cli._tool_display.renderers import (
     render_browser_navigation,
     render_lsp_query,
     badge_for_tool_name,
+    render_memory_update,
+    render_task_list,
+    render_search_summary,
 )
 from backend.orchestration.conversation_stats import ConversationStats
 from backend.orchestration.orchestration_config import OrchestrationConfig
@@ -1153,13 +1157,13 @@ class TUIRenderer:
         if is_first_chunk:
             # First thinking chunk - append to history at its correct position
             body = _rich_text(text)
-            body.stylize(NAVY_TEXT_DIM)
+            body.stylize(NAVY_TEXT_MUTED)
             self._history.append(Text.assemble(body, "\n"))
         else:
             # Subsequent chunks - replace the last item (which is the thinking text)
             if self._history:
                 body = _rich_text(text)
-                body.stylize(NAVY_TEXT_DIM)
+                body.stylize(NAVY_TEXT_MUTED)
                 self._history[-1] = Text.assemble(body, "\n")
         
         self._refresh_display()
@@ -1275,8 +1279,13 @@ class TUIRenderer:
             else:
                 self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
         elif isinstance(event, FileEditObservation):
-            summary = f"Edited {event.path}"
-            self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
+            diff = event.visualize_diff()
+            if diff:
+                lines = render_file_edit("Edited", event.path, diff_lines=diff.splitlines())
+                self._write_lines(lines)
+            else:
+                summary = f"Edited {event.path}"
+                self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
         elif isinstance(event, FileWriteObservation):
             pass  # Skip displaying "Wrote {path}" message
         elif isinstance(event, MCPAction):
@@ -1292,6 +1301,7 @@ class TUIRenderer:
         elif isinstance(event, CmdOutputObservation):
             output = (event.content or "").strip()
             if output:
+                output = strip_tool_result_validation_annotations(output)
                 self._tui.add_tool_result(output[:500])
         elif isinstance(event, ErrorObservation):
             self._tui.add_error(event.content or "An unknown error occurred")
@@ -1333,8 +1343,15 @@ class TUIRenderer:
             cmd = getattr(event, 'command', '') or ''
             lines = render_shell_command(cmd)
             from rich.panel import Panel
+            from rich.console import Group
+            items = []
+            for line in lines:
+                if isinstance(line, str):
+                    items.append(Text.from_markup(line))
+                else:
+                    items.append(line)
             panel = Panel(
-                Text.from_markup("\n".join(lines)),
+                Group(*items),
                 border_style="#3d4f6f",
                 title="Terminal",
                 title_align="left"
@@ -1344,8 +1361,15 @@ class TUIRenderer:
             cmd = getattr(event, 'command', '') or getattr(event, 'input', '') or ''
             lines = render_shell_command(cmd)
             from rich.panel import Panel
+            from rich.console import Group
+            items = []
+            for line in lines:
+                if isinstance(line, str):
+                    items.append(Text.from_markup(line))
+                else:
+                    items.append(line)
             panel = Panel(
-                Text.from_markup("\n".join(lines)),
+                Group(*items),
                 border_style="#3d4f6f",
                 title="PWSH",
                 title_align="left"
@@ -1356,9 +1380,11 @@ class TUIRenderer:
         elif isinstance(event, TerminalObservation):
             content = (event.content or "").strip()
             if content:
+                content = strip_tool_result_validation_annotations(content)
                 self._tui.add_tool_result(content[:500])
         elif isinstance(event, RecallAction):
-            pass
+            lines = render_memory_update("Recalled active context")
+            self._write_lines(lines)
         elif isinstance(event, RecallObservation):
             pass
         elif isinstance(event, RecallFailureObservation):
@@ -1402,6 +1428,8 @@ class TUIRenderer:
         elif isinstance(event, TaskTrackingAction):
             if event.task_list is not None:
                 self._task_list = event.task_list
+                lines = render_task_list(self._task_list)
+                self._write_lines(lines)
         else:
             name = type(event).__name__
             self._tui._write_log(Text(f"  [{name}]", style=NAVY_TEXT_MUTED))

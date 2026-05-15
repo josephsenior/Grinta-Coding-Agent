@@ -268,6 +268,38 @@ class TestHandleStrReplaceEditorTool:
         assert 'dry-run' in action.thought
         assert target.read_text(encoding='utf-8') == 'alpha\nbeta\n'
 
+    def test_range_missing_start_line_raises(self):
+        with pytest.raises(
+            FunctionCallValidationError,
+            match='start_line',
+        ):
+            _handle_text_editor_tool(
+                {
+                    'command': 'edit',
+                    'path': 'f.py',
+                    'edit_mode': 'range',
+                    'end_line': 5,
+                    'new_str': 'x',
+                    'security_risk': 'LOW',
+                }
+            )
+
+    def test_range_missing_end_line_raises(self):
+        with pytest.raises(
+            FunctionCallValidationError,
+            match='end_line',
+        ):
+            _handle_text_editor_tool(
+                {
+                    'command': 'edit',
+                    'path': 'f.py',
+                    'edit_mode': 'range',
+                    'start_line': 1,
+                    'new_str': 'x',
+                    'security_risk': 'LOW',
+                }
+            )
+
 
 # ---------------------------------------------------------------------------
 # _handle_summarize_context_tool

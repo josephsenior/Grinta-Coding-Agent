@@ -63,7 +63,7 @@ def render_task_list(
         if len(name_display) > 60:
             name_display = name_display[:57] + '…'
 
-        lines.append(f"  {dot}  [dim]{name_display}[/{name_style}]{progress_str}")
+        lines.append(f"  {dot}  [{name_style}]{name_display}[/{name_style}]{progress_str}")
 
     if len(tasks) > 8:
         lines.append(f"  [dim]... {len(tasks) - 8} more tasks[/dim]")

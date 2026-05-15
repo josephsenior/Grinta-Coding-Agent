@@ -94,7 +94,7 @@ class StatusFields:
 def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
     """Build fields from :class:`~backend.cli.hud.HUDState` and bundled skill count."""
     provider, model = HUDBar.describe_model(hud.model)
-    model_display = model
+    model_display = f'{provider}/{model}' if provider and model else model
 
     ctx = HUDBar._format_tokens(hud.context_tokens)
     lim_tok = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
