@@ -45,6 +45,7 @@ class ErrorObservation(Observation):
     agent_only: bool = False
     timeout_kind: str | None = None
     error_category: str | None = None
+    fallback_tool: str | None = None
     observation: ClassVar[str] = ObservationType.ERROR
 
     @property

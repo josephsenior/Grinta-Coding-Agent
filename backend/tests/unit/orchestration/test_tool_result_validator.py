@@ -157,8 +157,9 @@ class TestToolResultValidatorInit:
         # Check for specific built-in rules
         rule_names = {rule.name for rule in validator._global_rules}
         assert 'output_size' in rule_names
-        assert 'error_observation' in rule_names
         assert 'empty_result' in rule_names
+        assert 'wrong_shell' in rule_names
+        assert 'background_detach' in rule_names
 
 
 class TestAddRule:
@@ -408,45 +409,6 @@ class TestObserve:
         # Should either have no warnings or no truncation warnings
         truncation_warnings = [w for w in result.warnings if 'truncated' in w.lower()]
         assert not truncation_warnings
-
-    @pytest.mark.asyncio
-    async def test_error_observation_rule_warns_on_error(self):
-        """error_observation rule should warn when obs is ErrorObservation."""
-        validator = ToolResultValidator()
-
-        action = CmdRunAction(command='test')
-        obs = ErrorObservation(content='Command failed')
-        controller = MagicMock()
-        state = MagicMock()
-        ctx = ToolInvocationContext(controller=controller, action=action, state=state)
-
-        await validator.observe(ctx, obs)
-
-        result = ctx.metadata['validation_result']
-        assert result.warnings
-        # Check for error warning
-        warning_text = ' '.join(result.warnings)
-        assert 'error' in warning_text.lower()
-
-    @pytest.mark.asyncio
-    async def test_error_observation_rule_passes_on_normal_obs(self):
-        """error_observation rule should pass for non-error observations."""
-        validator = ToolResultValidator()
-
-        action = CmdRunAction(command='test')
-        obs = CmdOutputObservation(content='Success', command='test')
-        controller = MagicMock()
-        state = MagicMock()
-        ctx = ToolInvocationContext(controller=controller, action=action, state=state)
-
-        await validator.observe(ctx, obs)
-
-        result = ctx.metadata['validation_result']
-        # Should not have error observation warnings
-        error_warnings = [
-            w for w in result.warnings if 'tool returned error' in w.lower()
-        ]
-        assert not error_warnings
 
     @pytest.mark.asyncio
     async def test_empty_result_rule_warns_on_empty_content(self):

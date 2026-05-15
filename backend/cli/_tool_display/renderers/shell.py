@@ -1,22 +1,128 @@
 """Shell command renderer.
 
-Badge + command label + first lines of output, uniform for all commands.
+Terminal-style panel with prompt, command, and output preview.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.cli._tool_display.renderers.badge import badge_for_tool_name
+from rich.console import Group
+from rich.panel import Panel
+from rich.text import Text
+
 from backend.cli.theme import (
+    CLR_CARD_BORDER,
     CLR_SECONDARY,
     CLR_STATUS_ERR,
     CLR_STATUS_OK,
+    CLR_STATUS_WARN,
+    NAVY_TEXT_DIM,
+    NAVY_TEXT_MUTED,
+    NAVY_TEXT_PRIMARY,
 )
-from backend.cli.transcript import format_activity_primary
 
 if TYPE_CHECKING:
     from rich.console import Console
+
+
+def _build_command_text(command: str) -> Text:
+    """Build styled command text with syntax-aware highlighting."""
+    text = Text()
+    text.append('PS> ', style='bold #91abec')
+
+    cmd = command.strip()
+    if len(cmd) > 120:
+        cmd = cmd[:117] + '…'
+
+    # Highlight common PowerShell/Shell patterns
+    parts = []
+    current = ''
+    in_string = False
+    string_char = ''
+    i = 0
+    while i < len(cmd):
+        ch = cmd[i]
+        if not in_string and ch in ('"', "'"):
+            if current:
+                parts.append(('cmd', current))
+                current = ''
+            in_string = True
+            string_char = ch
+            current = ch
+        elif in_string and ch == string_char:
+            current += ch
+            parts.append(('string', current))
+            current = ''
+            in_string = False
+        elif in_string:
+            current += ch
+        elif ch == ' ' and current:
+            # Check if it's a known command
+            lower = current.lower()
+            if lower in ('cd', 'ls', 'dir', 'pwd', 'cat', 'echo', 'type',
+                         'mkdir', 'rm', 'del', 'copy', 'move', 'ren',
+                         'git', 'npm', 'pip', 'python', 'node', 'cargo',
+                         'go', 'rustc', 'make', 'cmake', 'docker', 'kubectl',
+                         'curl', 'wget', 'ssh', 'scp', 'rsync', 'tar', 'zip',
+                         'unzip', 'grep', 'find', 'awk', 'sed', 'head', 'tail',
+                         'sort', 'uniq', 'wc', 'tee', 'xargs', 'env', 'export',
+                         'source', 'bash', 'sh', 'zsh', 'fish', 'pwsh',
+                         'powershell', 'cmd', 'set', 'if', 'for', 'while',
+                         'foreach', 'switch', 'function', 'param', 'return',
+                         'exit', 'break', 'continue', 'throw', 'try', 'catch',
+                         'finally', 'using', 'class', 'enum', 'workflow',
+                         'configuration', 'inlinescript', 'parallel', 'sequence'):
+                parts.append(('keyword', current))
+            elif lower.startswith('-') or lower.startswith('/'):
+                parts.append(('flag', current))
+            elif '=' in current and not current.startswith('$'):
+                parts.append(('assignment', current))
+            else:
+                parts.append(('arg', current))
+            current = ''
+            parts.append(('space', ' '))
+        else:
+            current += ch
+        i += 1
+
+    if current:
+        lower = current.lower()
+        if lower in ('cd', 'ls', 'dir', 'pwd', 'cat', 'echo', 'type',
+                     'mkdir', 'rm', 'del', 'copy', 'move', 'ren',
+                     'git', 'npm', 'pip', 'python', 'node', 'cargo',
+                     'go', 'rustc', 'make', 'cmake', 'docker', 'kubectl',
+                     'curl', 'wget', 'ssh', 'scp', 'rsync', 'tar', 'zip',
+                     'unzip', 'grep', 'find', 'awk', 'sed', 'head', 'tail',
+                     'sort', 'uniq', 'wc', 'tee', 'xargs', 'env', 'export',
+                     'source', 'bash', 'sh', 'zsh', 'fish', 'pwsh',
+                     'powershell', 'cmd', 'set', 'if', 'for', 'while',
+                     'foreach', 'switch', 'function', 'param', 'return',
+                     'exit', 'break', 'continue', 'throw', 'try', 'catch',
+                     'finally', 'using', 'class', 'enum', 'workflow',
+                     'configuration', 'inlinescript', 'parallel', 'sequence'):
+            parts.append(('keyword', current))
+        elif lower.startswith('-') or lower.startswith('/'):
+            parts.append(('flag', current))
+        elif '=' in current and not current.startswith('$'):
+            parts.append(('assignment', current))
+        else:
+            parts.append(('arg', current))
+
+    style_map = {
+        'keyword': 'bold #e9e9e9',
+        'string': '#54efae',
+        'flag': '#f6ff8f',
+        'assignment': '#91abec',
+        'arg': NAVY_TEXT_PRIMARY,
+        'space': '',
+        'cmd': NAVY_TEXT_PRIMARY,
+    }
+
+    for kind, value in parts:
+        text.append(value, style=style_map.get(kind, ''))
+
+    return text
 
 
 def render_shell_command(
@@ -26,39 +132,60 @@ def render_shell_command(
     duration: str = '',
     *,
     console: "Console | None" = None,
-) -> list[str]:
-    """Render a shell command with badge + command + output preview.
+) -> Panel:
+    """Render a shell command as a terminal-style panel.
 
-    Returns a list of lines suitable for console.print().
+    Returns a Rich Panel suitable for console.print().
     """
-    lines: list[str] = []
-    badge = badge_for_tool_name('execute_bash')
+    content_parts = []
 
-    cmd_display = command.strip()
-    if len(cmd_display) > 80:
-        cmd_display = cmd_display[:77] + '…'
-    cmd_label = f"$ [dim]{cmd_display}[/dim]"
+    # Command line with prompt
+    cmd_text = _build_command_text(command)
+    content_parts.append(cmd_text)
 
-    lines.append(badge.render())
-    lines.append(format_activity_primary('Ran', cmd_label))
-
+    # Duration and exit code on same line
+    meta_parts = []
     if duration:
-        lines.append(f"  [dim]{duration}[/dim]")
-
+        meta_parts.append(Text(duration, style=NAVY_TEXT_DIM))
     if exit_code is not None:
         if exit_code == 0:
-            lines.append(f"  [{CLR_STATUS_OK}]✓ exit 0[/]")
+            meta_parts.append(Text(f'  exit {exit_code}', style=CLR_STATUS_OK))
         else:
-            lines.append(f"  [{CLR_STATUS_ERR}]✗ exit {exit_code}[/]")
+            meta_parts.append(Text(f'  exit {exit_code}', style=CLR_STATUS_ERR))
 
+    if meta_parts:
+        meta_line = Text()
+        for i, part in enumerate(meta_parts):
+            if i > 0:
+                meta_line.append('  ')
+            meta_line.append(part)
+        content_parts.append(meta_line)
+
+    # Output preview
     if output:
-        raw_lines = [ln.strip() for ln in output.splitlines() if ln.strip()]
+        raw_lines = [ln for ln in output.splitlines()]
         preview = raw_lines[:8]
-        for line in preview:
-            if len(line) > 120:
-                line = line[:117] + '…'
-            lines.append(f"  {line}")
-        if len(raw_lines) > 8:
-            lines.append(f"  [dim]... {len(raw_lines) - 8} more lines[/dim]")
 
-    return lines
+        if preview:
+            content_parts.append(Text(''))  # spacer
+            for line in preview:
+                if len(line) > 120:
+                    line = line[:117] + '…'
+                content_parts.append(Text(line, style=NAVY_TEXT_MUTED))
+
+            if len(raw_lines) > 8:
+                content_parts.append(
+                    Text(f'... {len(raw_lines) - 8} more lines', style=NAVY_TEXT_DIM)
+                )
+
+    # Build panel
+    panel_title = Text('Shell', style='bold #f6ff8f')
+    panel = Panel(
+        Group(*content_parts),
+        title=panel_title,
+        title_align='left',
+        border_style=CLR_CARD_BORDER,
+        padding=(0, 2),
+    )
+
+    return panel
