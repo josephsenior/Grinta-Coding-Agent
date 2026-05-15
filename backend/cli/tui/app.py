@@ -1324,7 +1324,7 @@ class TUIRenderer:
                 end_str = str(end) if end != -1 else "end"
                 line_range = f"L{start}:{end_str}"
                 lines = render_file_create(event.path)
-                if line_range and lines:
+                if line_range and lines and len(lines) > 0:
                     lines[0] = lines[0].replace(event.path, f"{event.path}  [dim]·  {line_range}[/dim]")
             else:
                 lines = render_file_create(event.path, line_count=line_count)
@@ -1339,10 +1339,13 @@ class TUIRenderer:
                 self._tui._write_log(Text(f"  {summary}", style=NAVY_TEXT_DIM))
         elif isinstance(event, FileEditObservation):
             diff = event.visualize_diff()
-            added = getattr(event, 'added', 0) or 0
-            removed = getattr(event, 'removed', 0) or 0
+            added = event.added
+            removed = event.removed
             if diff:
-                lines = render_file_edit("Edited", event.path, diff_lines=diff.splitlines(), added=added, removed=removed)
+                diff_lines = diff.splitlines()
+                lines = render_file_edit("Edited", event.path, diff_lines=diff_lines, added=added, removed=removed)
+                if len(diff_lines) > 20:
+                    lines.append(f"  [dim]... {len(diff_lines) - 20} more diff lines (total {len(diff_lines)})[/dim]")
                 self._write_lines(lines)
             else:
                 summary = f"Edited {event.path}"

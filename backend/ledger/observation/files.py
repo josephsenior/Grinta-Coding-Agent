@@ -73,6 +73,32 @@ class FileEditObservation(Observation):
         """Get a human-readable message describing the file edit operation."""
         return f'I edited the file {self.path}.'
 
+    @property
+    def added(self) -> int:
+        """Count of lines added in this edit."""
+        if self.old_content is None or self.new_content is None:
+            return 0
+        old_lines = self.old_content.split('\n')
+        new_lines = self.new_content.split('\n')
+        added = 0
+        for tag, i1, i2, j1, j2 in SequenceMatcher(None, old_lines, new_lines).get_opcodes():
+            if tag in {'insert', 'replace'}:
+                added += j2 - j1
+        return added
+
+    @property
+    def removed(self) -> int:
+        """Count of lines removed in this edit."""
+        if self.old_content is None or self.new_content is None:
+            return 0
+        old_lines = self.old_content.split('\n')
+        new_lines = self.new_content.split('\n')
+        removed = 0
+        for tag, i1, i2, j1, j2 in SequenceMatcher(None, old_lines, new_lines).get_opcodes():
+            if tag in {'delete', 'replace'}:
+                removed += i2 - i1
+        return removed
+
     def _calculate_indent_pad_size(self, group: list) -> int:
         """Calculate the padding size for line numbers."""
         return len(str(group[-1][3])) + 1
