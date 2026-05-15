@@ -50,6 +50,10 @@ InfoSidebar {
     overflow-x: hidden;
 }
 
+InfoSidebar.-hidden {
+    display: none;
+}
+
 #sidebar-display {
     width: 100%;
 }
