@@ -113,21 +113,12 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "allowed inside the workspace, e.g. ['curl', 'invoke-webrequest']."
         ),
     )
-    require_editor_for_shell_file_writes: bool = Field(
-        default=True,
-        description=(
-            'When True, shell commands cannot create or overwrite project files via '
-            'redirection, tee/dd, or PowerShell file-writing cmdlets; agents must use '
-            'text_editor / symbol_editor. Set False only if you rely on shell '
-            'scripts to generate files.'
-        ),
-    )
     allow_shell_file_writes: bool = Field(
         default=True,
         description=(
-            'Override to allow shell file writes regardless of require_editor_for_shell_file_writes. '
-            'Convenience flag that bypasses the editor-only policy. Set True to allow shell '
-            'commands to write files directly.'
+            'When True, shell commands can create or overwrite project files via '
+            'redirection, tee/dd, or PowerShell file-writing cmdlets. When False, '
+            'agents must use text_editor / symbol_editor for file modifications.'
         ),
     )
     file_state_guard: bool = Field(
