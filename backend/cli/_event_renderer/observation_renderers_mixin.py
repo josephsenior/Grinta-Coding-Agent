@@ -328,27 +328,17 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
     @staticmethod
     def _cmd_observation_failure_extras(content: str) -> list[Any] | None:
         """Return extra lines for a failed command's error output."""
+        from backend.cli.transcript import format_shell_output_block
+
         raw_lines = (
-            [ln.strip() for ln in content.split('\n') if ln.strip()] if content else []
+            [ln.rstrip() for ln in content.split('\n')] if content else []
         )
         if not raw_lines:
             return None
-        preview_lines = [ln for ln in raw_lines if not _looks_like_command_echo(ln)][:3]
+        preview_lines = [ln for ln in raw_lines if not _looks_like_command_echo(ln)][:5]
         if not preview_lines:
             return None
-        extra = []
-        for line in preview_lines:
-            if len(line) > 180:
-                line = line[:177] + '...'
-            extra.append(format_activity_secondary(line, kind='err'))
-        if len(raw_lines) > 3:
-            extra.append(
-                format_activity_secondary(
-                    f'... {len(raw_lines) - 3} more line{"s" if len(raw_lines) - 3 != 1 else ""}',
-                    kind='err',
-                )
-            )
-        return extra or None
+        return [format_shell_output_block(preview_lines, kind='err')]
 
     @staticmethod
     def _cmd_observation_success(
@@ -357,7 +347,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         command: str = '',
     ) -> tuple[str | None, str, list[Any] | None]:
         raw_lines = (
-            [ln.strip() for ln in content.split('\n') if ln.strip()] if content else []
+            [ln.rstrip() for ln in content.split('\n')] if content else []
         )
         result_kind = 'ok' if exit_code == 0 else 'neutral'
 
@@ -366,22 +356,8 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             msg: str | None = None
             return msg, result_kind, syntax_extras
 
-        if raw_lines:
-            preview_lines = raw_lines[:8]
-            preview = '\n'.join(preview_lines)
-            if len(preview) > 400:
-                preview = preview[:397] + '...'
-            msg = f'exit {exit_code}' if exit_code is not None else 'done'
-            extra = [format_activity_secondary(preview, kind='neutral')]
-            if len(raw_lines) > 8:
-                extra.append(
-                    format_activity_secondary(
-                        f'... {len(raw_lines) - 8} more line{"s" if len(raw_lines) - 8 != 1 else ""}',
-                        kind='neutral',
-                    )
-                )
-            return msg, result_kind, extra
-
+        # Successful commands: suppress stdout to keep transcript scan-able.
+        # Only show exit code.
         if exit_code is not None:
             return f'exit {exit_code}', result_kind, None
         return None, result_kind, None
