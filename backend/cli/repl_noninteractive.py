@@ -6,7 +6,6 @@ no Textual — just simple Rich prints and blocking reads.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import sys
 from typing import TYPE_CHECKING
@@ -32,16 +31,16 @@ async def run_noninteractive(
 ) -> None:
     """Run non-interactive REPL: bootstrap agent, read lines, dispatch, print."""
     import time
+
     from backend.cli.event_renderer import CLIEventRenderer
     from backend.core.bootstrap.main import (
         run_controller,
     )
-    from backend.core.enums import AgentState, EventSource
     from backend.ledger.action import MessageAction
 
     hud = HUDBar()
     reasoning = ReasoningDisplay()
-    renderer = CLIEventRenderer(console=console, hud=hud, reasoning=reasoning)
+    CLIEventRenderer(console=console, hud=hud, reasoning=reasoning)
 
     console.print('[dim]Initializing engine...[/dim]')
 
@@ -66,7 +65,7 @@ async def run_noninteractive(
             console.print(f'[bold #2dd4bf]>[+] [dim]you[/dim][/] {text}')
 
             start_time = time.time()
-            console.print(f'[dim]Starting agent...[/dim]')
+            console.print('[dim]Starting agent...[/dim]')
 
             initial_action = MessageAction(content=text)
 

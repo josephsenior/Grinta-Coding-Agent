@@ -40,7 +40,7 @@ def render_think(thought: str, source_tool: str = '') -> list[str]:
             if text:
                 # Escape text to prevent MarkupError from unescaped brackets
                 escaped_text = markup_escape(text)
-                lines.append(f"  [{CLR_THOUGHT_BODY}]{escaped_text}[/{CLR_THOUGHT_BODY}]")
+                lines.append(f'  [{CLR_THOUGHT_BODY}]{escaped_text}[/{CLR_THOUGHT_BODY}]')
 
     return lines
 
@@ -72,6 +72,6 @@ def render_message(content: str) -> list[str]:
             if text:
                 # Escape text to prevent MarkupError from unescaped brackets
                 escaped_text = markup_escape(text)
-                lines.append(f"  [{CLR_SECONDARY}]{escaped_text}[/{CLR_SECONDARY}]")
+                lines.append(f'  [{CLR_SECONDARY}]{escaped_text}[/{CLR_SECONDARY}]')
 
     return lines

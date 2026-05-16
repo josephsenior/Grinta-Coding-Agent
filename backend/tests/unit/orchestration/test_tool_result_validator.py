@@ -17,7 +17,6 @@ import pytest
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation import (
     CmdOutputObservation,
-    ErrorObservation,
     Observation,
 )
 from backend.ledger.observation.terminal import TerminalObservation

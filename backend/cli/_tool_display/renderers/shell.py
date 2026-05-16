@@ -13,10 +13,8 @@ from rich.text import Text
 
 from backend.cli.theme import (
     CLR_CARD_BORDER,
-    CLR_SECONDARY,
     CLR_STATUS_ERR,
     CLR_STATUS_OK,
-    CLR_STATUS_WARN,
     NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
     NAVY_TEXT_PRIMARY,

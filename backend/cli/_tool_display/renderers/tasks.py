@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
-    CLR_SECONDARY,
-    CLR_STATUS_OK,
-    CLR_STATUS_WARN,
-    CLR_STATUS_ERR,
     CLR_BRAND_HUE,
     CLR_DETAIL,
+    CLR_SECONDARY,
+    CLR_STATUS_ERR,
+    CLR_STATUS_OK,
 )
 from backend.cli.transcript import format_activity_primary
 
@@ -27,11 +25,11 @@ def render_task_list(
 
     status_parts = []
     if active:
-        status_parts.append(f"[{CLR_BRAND_HUE}]{active} active[/]")
+        status_parts.append(f'[{CLR_BRAND_HUE}]{active} active[/]')
     if done:
-        status_parts.append(f"[{CLR_STATUS_OK}]{done} done[/]")
+        status_parts.append(f'[{CLR_STATUS_OK}]{done} done[/]')
     if blocked:
-        status_parts.append(f"[{CLR_STATUS_ERR}]{blocked} blocked[/]")
+        status_parts.append(f'[{CLR_STATUS_ERR}]{blocked} blocked[/]')
 
     status_str = '  '.join(status_parts) if status_parts else f'{len(tasks)} tasks'
 
@@ -45,28 +43,28 @@ def render_task_list(
         progress = task.get('progress', task.get('pct', ''))
 
         if status in ('done', 'completed', 'finished'):
-            dot = f"[{CLR_STATUS_OK}]✓[/{CLR_STATUS_OK}]"
+            dot = f'[{CLR_STATUS_OK}]✓[/{CLR_STATUS_OK}]'
             name_style = CLR_SECONDARY
         elif status in ('blocked', 'waiting'):
-            dot = f"[{CLR_STATUS_ERR}]□[/{CLR_STATUS_ERR}]"
+            dot = f'[{CLR_STATUS_ERR}]□[/{CLR_STATUS_ERR}]'
             name_style = CLR_STATUS_ERR
         elif status in ('active', 'in_progress', 'running'):
-            dot = f"[{CLR_BRAND_HUE}]●[/{CLR_BRAND_HUE}]"
+            dot = f'[{CLR_BRAND_HUE}]●[/{CLR_BRAND_HUE}]'
             name_style = CLR_DETAIL
         else:
-            dot = f"[{CLR_SECONDARY}]○[/{CLR_SECONDARY}]"
+            dot = f'[{CLR_SECONDARY}]○[/{CLR_SECONDARY}]'
             name_style = CLR_SECONDARY
 
-        progress_str = f"  [dim]{progress}[/dim]" if progress else ''
+        progress_str = f'  [dim]{progress}[/dim]' if progress else ''
 
         name_display = name
         if len(name_display) > 60:
             name_display = name_display[:57] + '…'
 
-        lines.append(f"  {dot}  [{name_style}]{name_display}[/{name_style}]{progress_str}")
+        lines.append(f'  {dot}  [{name_style}]{name_display}[/{name_style}]{progress_str}')
 
     if len(tasks) > 8:
-        lines.append(f"  [dim]... {len(tasks) - 8} more tasks[/dim]")
+        lines.append(f'  [dim]... {len(tasks) - 8} more tasks[/dim]')
 
     return lines
 
@@ -79,11 +77,11 @@ def render_task_summary(
     """Render just the task summary line."""
     parts = []
     if active:
-        parts.append(f"[{CLR_BRAND_HUE}]{active} active[/]")
+        parts.append(f'[{CLR_BRAND_HUE}]{active} active[/]')
     if completed:
-        parts.append(f"[{CLR_STATUS_OK}]{completed} done[/]")
+        parts.append(f'[{CLR_STATUS_OK}]{completed} done[/]')
     if blocked:
-        parts.append(f"[{CLR_STATUS_ERR}]{blocked} blocked[/]")
+        parts.append(f'[{CLR_STATUS_ERR}]{blocked} blocked[/]')
 
     if parts:
         return [format_activity_primary('Tracked', '  '.join(parts))]

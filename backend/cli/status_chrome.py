@@ -157,8 +157,8 @@ def _shorten_home(path: str) -> str:
 
 def autonomy_chrome_suffix(level: str) -> str:
     """``Autonomy: Balanced`` style string for GRINTA row / PT."""
-    l = (level or 'balanced').strip()
-    return f'Autonomy: {l.title()}'
+    level_stripped = (level or 'balanced').strip()
+    return f'Autonomy: {level_stripped.title()}'
 
 
 def ledger_icon(ledger_status: str) -> str:

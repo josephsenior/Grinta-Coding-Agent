@@ -11,28 +11,6 @@ from backend.cli._tool_display.renderers.badge import (
     badge_for_tool_name,
     get_tool_badge,
 )
-from backend.cli._tool_display.renderers.file_editor import (
-    render_file_edit,
-    render_file_read,
-    render_file_create,
-)
-
-from backend.cli._tool_display.renderers.search import (
-    render_search_results,
-    render_search_summary,
-)
-from backend.cli._tool_display.renderers.shell import (
-    render_shell_command,
-)
-from backend.cli._tool_display.renderers.finish import (
-    render_finish_summary,
-)
-from backend.cli._tool_display.renderers.mcp import (
-    render_mcp_tool,
-)
-from backend.cli._tool_display.renderers.lsp import (
-    render_lsp_query,
-)
 from backend.cli._tool_display.renderers.browser import (
     render_browser_navigation,
     render_browser_page,
@@ -40,8 +18,29 @@ from backend.cli._tool_display.renderers.browser import (
 from backend.cli._tool_display.renderers.delegation import (
     render_delegation,
 )
+from backend.cli._tool_display.renderers.file_editor import (
+    render_file_create,
+    render_file_edit,
+    render_file_read,
+)
+from backend.cli._tool_display.renderers.finish import (
+    render_finish_summary,
+)
+from backend.cli._tool_display.renderers.lsp import (
+    render_lsp_query,
+)
+from backend.cli._tool_display.renderers.mcp import (
+    render_mcp_tool,
+)
 from backend.cli._tool_display.renderers.memory import (
     render_memory_update,
+)
+from backend.cli._tool_display.renderers.search import (
+    render_search_results,
+    render_search_summary,
+)
+from backend.cli._tool_display.renderers.shell import (
+    render_shell_command,
 )
 from backend.cli._tool_display.renderers.tasks import (
     render_task_list,

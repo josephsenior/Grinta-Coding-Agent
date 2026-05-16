@@ -343,7 +343,7 @@ def _preview_str_replace_edit(
     path: str, command: str, kwargs: Mapping[str, Any]
 ) -> AgentThinkAction:
     """Generate a unified diff preview of what an edit would produce.
-    
+
     Supports all edit modes: insert_text, edit (range/patch/section/format).
     Returns AgentThinkAction with diff preview (no file writes).
     """
@@ -372,17 +372,17 @@ def _preview_str_replace_edit(
         start_line = int(kwargs.get('start_line', 1))
         end_line = int(kwargs.get('end_line', len(original_lines)))
         new_str = cast(str, kwargs.get('new_str', ''))
-        
+
         # Normalize newlines in replacement
         new_str_normalized = new_str.replace('\r\n', '\n').replace('\r', '\n')
         replacement_lines = new_str_normalized.splitlines(keepends=True)
         if not replacement_lines:
             replacement_lines = [new_str_normalized + '\n']
-        
+
         # Convert to 0-based indexing
         start_idx = max(0, start_line - 1)
         end_idx = min(len(original_lines), end_line)
-        
+
         new_lines = original_lines[:start_idx] + replacement_lines + original_lines[end_idx:]
 
     elif command == 'edit' and edit_mode == 'patch':
@@ -436,15 +436,15 @@ def _preview_str_replace_edit(
 
 def _apply_patch_to_lines(original_lines: list[str], patch_text: str) -> list[str]:
     """Apply a unified patch to a list of lines.
-    
+
     Simplified patch application for preview purposes.
     """
     import re
-    
+
     new_lines = list(original_lines)
     hunks = []
     current_hunk = None
-    
+
     for line in patch_text.splitlines():
         if line.startswith('@@'):
             if current_hunk:
@@ -467,26 +467,26 @@ def _apply_patch_to_lines(original_lines: list[str], patch_text: str) -> list[st
                 current_hunk['additions'].append(line[1:])
             elif line.startswith(' '):
                 pass  # Context line, no action needed
-    
+
     if current_hunk:
         hunks.append(current_hunk)
-    
+
     # Apply hunks in reverse order to maintain line numbers
     for hunk in reversed(hunks):
         old_start = hunk['old_start'] - 1  # Convert to 0-based
         old_count = hunk['old_count']
-        
+
         # Verify the context matches
         if old_start + old_count <= len(new_lines):
             # Remove old lines and insert new ones
             new_lines[old_start:old_start + old_count] = hunk['additions']
-    
+
     return new_lines
 
 
 def _apply_confidence_preview_override(kwargs: dict[str, Any], path: str, command: str = '', edit_mode: str = '') -> None:
     """Force preview mode for high-risk edits or low confidence. Mutates kwargs.
-    
+
     Preview is enabled by default for:
     - edit_mode=range (line range replacements)
     - edit_mode=patch (unified patch applications)
@@ -494,7 +494,7 @@ def _apply_confidence_preview_override(kwargs: dict[str, Any], path: str, comman
     - Any edit with confidence < 0.7
     """
     confidence = kwargs.pop('confidence', None)
-    
+
     # Always enable preview for high-risk edit modes
     if command == 'edit' and edit_mode in ('range', 'patch', 'section'):
         logger.info(
@@ -504,7 +504,7 @@ def _apply_confidence_preview_override(kwargs: dict[str, Any], path: str, comman
         )
         kwargs.setdefault('preview', True)
         return
-    
+
     # Confidence-based override for other edits
     if confidence is None or not isinstance(confidence, (int, float)):
         return

@@ -491,7 +491,7 @@ async def drain_background_tasks(
     *,
     max_rounds: int = 20,
     task_set: set[asyncio.Task[Any]] | None = None,
-    timeout: float | None = None,
+    timeout: float | None = None,  # noqa: ASYNC109
 ) -> None:
     """Await all in-flight background tasks spawned via ``run_or_schedule``.
 

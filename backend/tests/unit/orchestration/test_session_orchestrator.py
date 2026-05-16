@@ -824,6 +824,7 @@ class TestFirstUserMessage(unittest.TestCase):
 
     def test_with_events_list(self):
         import builtins
+
         from backend.ledger.action import MessageAction
 
         msg = MagicMock(spec=MessageAction)

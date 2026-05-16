@@ -5,7 +5,7 @@ Shows file edits with badge, path info, and syntax-highlighted diff.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from rich.markup import escape as markup_escape
 
@@ -13,12 +13,14 @@ from backend.cli.theme import (
     CLR_DETAIL,
     CLR_SECONDARY,
     CLR_STATUS_OK,
-    CLR_VERB,
 )
-from backend.cli.transcript import format_activity_primary, format_activity_delta_secondary
+from backend.cli.transcript import (
+    format_activity_delta_secondary,
+    format_activity_primary,
+)
 
 if TYPE_CHECKING:
-    from rich.console import Console
+    pass
 
 
 def render_file_edit(
@@ -39,15 +41,15 @@ def render_file_edit(
     # Build detail with inline stats for new files
     detail = path
     if new_file and added:
-        detail += f"  [{CLR_STATUS_OK}]+{added}[/{CLR_STATUS_OK}]"
+        detail += f'  [{CLR_STATUS_OK}]+{added}[/{CLR_STATUS_OK}]'
     elif line_range:
-        detail = f"{path}  [dim]·  {line_range}[/dim]"
+        detail = f'{path}  [dim]·  {line_range}[/dim]'
 
     # For edits (not new files), show delta as secondary line
     if not new_file and (added or removed):
         delta = format_activity_delta_secondary(added=added, removed=removed)
         if delta:
-            lines.append(f"  {delta}")
+            lines.append(f'  {delta}')
 
     lines.append(format_activity_primary(verb, detail))
 
@@ -57,20 +59,20 @@ def render_file_edit(
             if stripped.startswith('+') and not stripped.startswith('+++'):
                 # Escape content after the + sign to prevent MarkupError
                 content = markup_escape(stripped[1:])
-                lines.append(f"[{CLR_STATUS_OK}]+{content}[/{CLR_STATUS_OK}]")
+                lines.append(f'[{CLR_STATUS_OK}]+{content}[/{CLR_STATUS_OK}]')
             elif stripped.startswith('-') and not stripped.startswith('---'):
                 # Escape content after the - sign to prevent MarkupError
                 content = markup_escape(stripped[1:])
-                lines.append(f"[{CLR_DETAIL}]-{content}[/{CLR_DETAIL}]")
+                lines.append(f'[{CLR_DETAIL}]-{content}[/{CLR_DETAIL}]')
             elif stripped.startswith('@@'):
-                lines.append(f"[{CLR_SECONDARY}]{stripped}[/{CLR_SECONDARY}]")
+                lines.append(f'[{CLR_SECONDARY}]{stripped}[/{CLR_SECONDARY}]')
             else:
                 # Escape context lines to prevent MarkupError
                 escaped = markup_escape(stripped)
-                lines.append(f"[dim]{escaped}[/dim]")
+                lines.append(f'[dim]{escaped}[/dim]')
 
         if len(diff_lines) > 20:
-            lines.append(f"  [dim]... {len(diff_lines) - 20} more diff lines[/dim]")
+            lines.append(f'  [dim]... {len(diff_lines) - 20} more diff lines[/dim]')
 
     return lines
 
@@ -82,9 +84,9 @@ def render_file_read(
 ) -> list[str]:
     """Render a file read event."""
     if line_range:
-        detail = f"{path}  [dim]·  {line_range}[/dim]"
+        detail = f'{path}  [dim]·  {line_range}[/dim]'
     elif line_count:
-        detail = f"{path}  [dim]({line_count} lines)[/dim]"
+        detail = f'{path}  [dim]({line_count} lines)[/dim]'
     else:
         detail = path
 
@@ -98,6 +100,6 @@ def render_file_create(
     """Render a new file creation."""
     detail = path
     if line_count:
-        detail += f"  [{CLR_STATUS_OK}]+{line_count}[/{CLR_STATUS_OK}]"
+        detail += f'  [{CLR_STATUS_OK}]+{line_count}[/{CLR_STATUS_OK}]'
 
     return [format_activity_primary('Created', detail)]

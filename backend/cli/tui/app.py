@@ -29,27 +29,9 @@ from textual.widgets import Button, Label, Static, TextArea
 _tui_logger = logging.getLogger('grinta.tui')
 _tui_logger.setLevel(logging.DEBUG)
 
-from backend.cli._event_renderer.unified_renderer import ActivityCard, ActivityLine, ActivityRenderer
-from backend.cli._tool_display.renderers import (
-    render_browser_navigation,
-    render_browser_screenshot,
-    render_condensation_action,
-    render_condensation_complete,
-    render_delegation_action,
-    render_delegation_result,
-    render_file_create,
-    render_file_download,
-    render_file_edit,
-    render_file_read,
-    render_lsp_query,
-    render_lsp_result,
-    render_mcp_tool,
-    render_memory_update,
-    render_server_ready,
-    render_shell_command,
-    render_terminal_output,
-    render_terminal_read,
-    render_user_reject,
+from backend.cli._event_renderer.unified_renderer import (
+    ActivityCard,
+    ActivityRenderer,
 )
 from backend.cli.config_manager import AppConfig
 from backend.cli.hud import HUDBar
@@ -627,7 +609,7 @@ class GrintaScreen(Screen):
         """Extract plain text from Rich history for copying."""
         if not self._renderer or not self._renderer._history:
             return ''
-        
+
         lines = []
         for item in self._renderer._history:
             if hasattr(item, 'plain'):
@@ -639,14 +621,13 @@ class GrintaScreen(Screen):
                 # Rich renderable - try to extract text
                 try:
                     from rich.console import Console
-                    from rich.text import Text
                     console = Console(force_terminal=True, width=200)
                     with console.capture() as capture:
                         console.print(item)
                     lines.append(capture.get())
                 except Exception:
                     pass
-        
+
         return '\n'.join(line for line in lines if line.strip())
 
     def action_interrupt_agent(self) -> None:
@@ -1518,7 +1499,7 @@ class TUIRenderer:
             from backend.cli.transcript import strip_indentation_warnings
             if hasattr(event, 'content') and event.content:
                 event.content = strip_indentation_warnings(event.content)
-            
+
             diff = self._extract_file_edit_diff(event)
             added = event.added
             removed = event.removed

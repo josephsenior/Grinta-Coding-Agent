@@ -9,12 +9,9 @@ import re
 
 from rich.markup import escape as markup_escape
 
-from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     CLR_BRAND_HUE,
     CLR_SECONDARY,
-    CLR_STATUS_OK,
-    CLR_DETAIL,
 )
 from backend.cli.transcript import format_activity_primary
 
@@ -34,7 +31,7 @@ def render_search_results(
     """
     lines: list[str] = []
 
-    raw_lines = [l for l in output.splitlines() if l.strip() and not l.startswith('Error running')]
+    raw_lines = [line for line in output.splitlines() if line.strip() and not line.startswith('Error running')]
 
     if not raw_lines:
         return []
@@ -58,7 +55,7 @@ def render_search_results(
         for _, content in grouped['output'][:5]:
             # Escape content to prevent MarkupError
             escaped = markup_escape(content)
-            lines.append(f"  [dim]{escaped}[/dim]")
+            lines.append(f'  [dim]{escaped}[/dim]')
         return lines
 
     sorted_files = sorted(grouped.items(), key=lambda x: len(x[1]), reverse=True)
@@ -67,7 +64,7 @@ def render_search_results(
         match_count = len(matches)
         # Escape filepath to prevent MarkupError
         escaped_path = markup_escape(filepath)
-        lines.append(f"  [{CLR_BRAND_HUE} bold]{escaped_path}[/{CLR_BRAND_HUE} bold]  [dim]{match_count} matches[/dim]")
+        lines.append(f'  [{CLR_BRAND_HUE} bold]{escaped_path}[/{CLR_BRAND_HUE} bold]  [dim]{match_count} matches[/dim]')
 
         for lineno, content in matches[:max_lines_per_file]:
             content = content.strip()
@@ -76,15 +73,15 @@ def render_search_results(
 
             if content:
                 highlighted = _highlight_query(content, query)
-                lines.append(f"    [{CLR_SECONDARY}]{lineno:>4}[/{CLR_SECONDARY}]  {highlighted}")
+                lines.append(f'    [{CLR_SECONDARY}]{lineno:>4}[/{CLR_SECONDARY}]  {highlighted}')
 
         if match_count > max_lines_per_file:
-            lines.append(f"    [dim]... {match_count - max_lines_per_file} more[/dim]")
+            lines.append(f'    [dim]... {match_count - max_lines_per_file} more[/dim]')
 
     if len(grouped) > max_files:
         remaining_files = len(grouped) - max_files
         remaining_matches = sum(len(m) for _, m in list(grouped.items())[max_files:])
-        lines.append(f"  [dim]... {remaining_files} more files, {remaining_matches} matches[/dim]")
+        lines.append(f'  [dim]... {remaining_files} more files, {remaining_matches} matches[/dim]')
 
     return lines
 
@@ -107,17 +104,17 @@ def render_search_summary(
     """Render just the summary line for search results."""
     lines: list[str] = []
 
-    detail = f"{match_count} matches"
+    detail = f'{match_count} matches'
     if file_count > 0:
-        detail += f" in {file_count} files"
+        detail += f' in {file_count} files'
     if query:
         # Escape query to prevent MarkupError
         escaped_query = markup_escape(query)
-        detail += f"  [dim]·  \"{escaped_query}\"[/dim]"
+        detail += f'  [dim]·  "{escaped_query}"[/dim]'
 
     lines.append(format_activity_primary('Searched', detail))
 
     if duration:
-        lines.append(f"  [dim]{duration}[/dim]")
+        lines.append(f'  [dim]{duration}[/dim]')
 
     return lines

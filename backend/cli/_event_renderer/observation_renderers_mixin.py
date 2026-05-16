@@ -24,7 +24,6 @@ from rich import box
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.syntax import Syntax
-from rich.table import Table
 from rich.text import Text
 
 from backend.cli._event_renderer.apply_patch import (
@@ -60,17 +59,12 @@ from backend.cli._event_renderer.text_utils import (
 from backend.cli._tool_display.preview import (
     file_read_syntax_highlight as _file_read_syntax_highlight,
 )
-
 from backend.cli._typing import ObservationRenderersHost
 from backend.cli.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
 from backend.cli.theme import (
-    CLR_DETAIL,
     CLR_OUTPUT_PANEL_BORDER,
     CLR_OUTPUT_PANEL_TITLE,
     CLR_QUESTION_TEXT,
-    CLR_SECONDARY,
-    CLR_STATUS_ERR,
-    CLR_STATUS_OK,
     CLR_STATUS_WARN,
 )
 from backend.cli.tool_call_display import (
@@ -80,7 +74,6 @@ from backend.cli.tool_call_display import (
 from backend.cli.transcript import (
     format_activity_delta_secondary,
     format_activity_result_secondary,
-    format_activity_secondary,
     format_activity_shell_block,
     format_callout_panel,
     strip_tool_result_validation_annotations,
@@ -346,9 +339,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         content: str,
         command: str = '',
     ) -> tuple[str | None, str, list[Any] | None]:
-        raw_lines = (
-            [ln.rstrip() for ln in content.split('\n')] if content else []
-        )
+        [ln.rstrip() for ln in content.split('\n')] if content else []
         result_kind = 'ok' if exit_code == 0 else 'neutral'
 
         syntax_extras = _cmd_stdout_syntax_extras(content)

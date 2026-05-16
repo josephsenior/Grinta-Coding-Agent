@@ -23,7 +23,7 @@ from rich.text import Text
 from backend.cli.layout_tokens import (
     CALLOUT_PANEL_CHROME_WIDTH,
 )
-from backend.cli.theme import CLR_META, CLR_THOUGHT_BODY, NAVY_TEXT_DIM
+from backend.cli.theme import CLR_META, NAVY_TEXT_DIM
 from backend.engine import prompt_role_debug as _prompt_role_debug
 
 # Panel chrome overhead: live ``MINIMAL`` frame + horizontal padding from

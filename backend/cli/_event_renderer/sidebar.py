@@ -5,40 +5,37 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from rich import box
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
 import backend
 from backend.cli.layout_tokens import (
-    LIVE_PANEL_ACCENT_STYLE,
     SIDEBAR_VISIBLE_MIN_WIDTH,
     SIDEBAR_WIDTH_RATIO,
 )
 from backend.cli.theme import (
-    CLR_INFO_ICON,
     STYLE_DEFAULT,
     STYLE_DIM,
 )
-from backend.cli.transcript import format_live_panel
 from backend.core.task_status import (
     TASK_STATUS_PANEL_STYLES,
     TASK_STATUS_TODO,
     normalize_task_status,
 )
 
-from rich import box
 
 def _create_sidebar_panel(title: str, content: Any, count: int | None = None) -> Panel:
-    title_text = Text(f"{title}", style="bold #91abec")
+    title_text = Text(f'{title}', style='bold #91abec')
     if count is not None:
-        title_text.append(f" ({count})", style="bold #54597b")
-    
+        title_text.append(f' ({count})', style='bold #54597b')
+
     return Panel(
         content,
         title=title_text,
-        title_align="left",
-        border_style="#1b233a",
+        title_align='left',
+        border_style='#1b233a',
         box=box.ROUNDED,
         padding=(0, 1)
     )
@@ -124,12 +121,12 @@ def build_mcp_servers_panel(
             name = server.get('name', 'unknown')
             server_type = server.get('type', 'stdio')
 
-            bullet = Text('⚡ ', style=f'bold #eacb8a')
+            bullet = Text('⚡ ', style='bold #eacb8a')
 
             type_badge = f'({server_type})'
             server_info = Text()
-            server_info.append(name, style="#c8d4e8")
-            server_info.append(f' {type_badge}', style="#54597b")
+            server_info.append(name, style='#c8d4e8')
+            server_info.append(f' {type_badge}', style='#54597b')
 
             table.add_row(bullet, server_info)
             displayed_count += 1
@@ -161,8 +158,8 @@ def build_skills_panel(
         for skill in sorted(skills):
             if displayed_count >= SIDEBAR_MAX_ROWS:
                 break
-            bullet = Text('📚 ', style=f'bold #7a849c')
-            skill_name = Text(skill, style="#a1acc2")
+            bullet = Text('📚 ', style='bold #7a849c')
+            skill_name = Text(skill, style='#a1acc2')
             table.add_row(bullet, skill_name)
             displayed_count += 1
     else:
@@ -204,19 +201,19 @@ def build_sidebar(
         return None
 
     sidebar_width = compute_sidebar_width(terminal_width)
-    
+
     sections: list[Any] = []
-    
+
     # 1. Tasks Panel
     sections.append(build_task_list_panel(task_list, width=sidebar_width))
-    
+
     # 2. MCP Servers Panel
     sections.append(build_mcp_servers_panel(mcp_servers, width=sidebar_width))
-    
+
     # 3. Skills Panel (using total count if list not available)
     # For simplicity, we just show the count or a few skills
     sections.append(build_skills_panel(width=sidebar_width))
-    
+
     from rich.console import Group
     return Group(*sections)
 

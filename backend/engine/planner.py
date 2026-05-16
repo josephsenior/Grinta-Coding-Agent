@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
+from backend.core.logger import app_logger as logger
 from backend.inference.catalog_loader import supports_tool_choice
 from backend.inference.llm_utils import check_tools
 
@@ -24,8 +25,6 @@ _INJECTED_MSG_MARKERS = (
     '<CONVERSATION_INSTRUCTIONS>',
     '<EXTRA_INFO>',
 )
-
-from backend.core.logger import app_logger as logger
 
 
 def _maybe_log_prompt_metrics(messages: list) -> None:

@@ -304,9 +304,9 @@ def _truncate_diff_smart(content: str, max_chars: int) -> str:
     budget_per_hunk = max(200, remaining // len(hunk_starts)) if hunk_starts else 200
     lines_per_hunk = max(10, budget_per_hunk // 80)  # ~80 chars per line avg
 
-    for hunk_idx, (start, end) in enumerate(zip(hunk_starts, hunk_ends)):
+    for hunk_idx, (start, end) in enumerate(zip(hunk_starts, hunk_ends, strict=False)):
         hunk_lines = lines[start:end + 1]
-        hunk_size = sum(len(l) + 1 for l in hunk_lines)
+        hunk_size = sum(len(line) + 1 for line in hunk_lines)
 
         if hunk_size <= budget_per_hunk:
             # Entire hunk fits — keep it all
@@ -316,18 +316,18 @@ def _truncate_diff_smart(content: str, max_chars: int) -> str:
             # Hunk is too large — keep header, first N lines, last N lines
             header_lines = []
             body_lines = []
-            for l in hunk_lines:
-                if l.startswith('[begin of') or l.startswith('(content before'):
-                    header_lines.append(l)
-                elif l.startswith('(content after') or l.startswith('[end of'):
-                    body_lines.append(l)
+            for line in hunk_lines:
+                if line.startswith('[begin of') or line.startswith('(content before'):
+                    header_lines.append(line)
+                elif line.startswith('(content after') or line.startswith('[end of'):
+                    body_lines.append(line)
                 else:
-                    body_lines.append(l)
+                    body_lines.append(line)
 
             # Split body into before/after sections around the "(content after" marker
             after_idx = None
-            for i, l in enumerate(body_lines):
-                if l.startswith('(content after'):
+            for i, line in enumerate(body_lines):
+                if line.startswith('(content after'):
                     after_idx = i
                     break
 

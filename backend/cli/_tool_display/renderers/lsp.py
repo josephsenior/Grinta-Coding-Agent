@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     CLR_BRAND_HUE,
     CLR_SECONDARY,
@@ -23,18 +22,18 @@ def render_lsp_query(
     lines.append(format_activity_primary(command.title(), target))
 
     if location:
-        lines.append(f"  [dim]{location}[/dim]")
+        lines.append(f'  [dim]{location}[/dim]')
 
     if definition:
         lines.append('')
-        lines.append(f"  [{CLR_BRAND_HUE}]{definition}[/{CLR_BRAND_HUE}]")
+        lines.append(f'  [{CLR_BRAND_HUE}]{definition}[/{CLR_BRAND_HUE}]')
 
     if references:
         lines.append('')
-        lines.append(f"  [{CLR_SECONDARY}]References ({len(references)}):[/]")
+        lines.append(f'  [{CLR_SECONDARY}]References ({len(references)}):[/]')
         for ref in references[:5]:
-            lines.append(f"    [dim]· {ref}[/dim]")
+            lines.append(f'    [dim]· {ref}[/dim]')
         if len(references) > 5:
-            lines.append(f"    [dim]... {len(references) - 5} more[/dim]")
+            lines.append(f'    [dim]... {len(references) - 5} more[/dim]')
 
     return lines

@@ -160,7 +160,7 @@ def _check_settings_directory_writable(settings_path: Path) -> tuple[bool, str]:
 
     if parent.exists():
         if not os.access(parent, os.W_OK):
-            return False, f"Settings directory exists but is not writable: {parent}"
+            return False, f'Settings directory exists but is not writable: {parent}'
         return True, ''
 
     try:
@@ -170,9 +170,9 @@ def _check_settings_directory_writable(settings_path: Path) -> tuple[bool, str]:
         test_file.unlink()
         return True, ''
     except PermissionError:
-        return False, f"Cannot create settings directory (permission denied): {parent}"
+        return False, f'Cannot create settings directory (permission denied): {parent}'
     except OSError as e:
-        return False, f"Cannot create settings directory: {parent} ({e})"
+        return False, f'Cannot create settings directory: {parent} ({e})'
 
 
 def _atomic_json_write(path: Path, data: dict[str, Any]) -> None:
