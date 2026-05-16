@@ -438,12 +438,8 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self.refresh()
 
     def _render_recall_action(self, action: RecallAction) -> None:
-        self._flush_pending_tool_cards()
-        query = getattr(action, 'query', '')
-        detail = query or 'workspace context'
-        if len(detail) > 100:
-            detail = detail[:97] + '…'
-        self._print_activity('Recalled', detail, None, title=ACTIVITY_CARD_TITLE_MEMORY, badge_label='recall')
+        # Memory recall is an internal operation - don't show as visible activity
+        # It's already indicated in the reasoning display if needed
         self.refresh()
 
     def _render_file_read_action(self, action: FileReadAction) -> None:
