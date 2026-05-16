@@ -1264,6 +1264,7 @@ class TUIRenderer:
         self._turn_count: int = 0
         self._in_agent_turn: bool = False
         self._tools_in_turn: int = 0
+        self._turn_start_time: float = 0.0
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
@@ -1394,6 +1395,7 @@ class TUIRenderer:
             self._in_agent_turn = True
             self._turn_count += 1
             self._tools_in_turn = 0
+            self._turn_start_time = time.monotonic()
 
 
         # Count tools in current turn
@@ -1680,7 +1682,9 @@ class TUIRenderer:
         if self._in_agent_turn and state in (AgentState.AWAITING_USER_INPUT, AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED):
             self._in_agent_turn = False
             if self._tools_in_turn > 0:
-                self._tui._write_log(Text(f'\n[dim #969aad]  ({self._tools_in_turn} tool{"s" if self._tools_in_turn != 1 else ""} executed)[/dim]\n'))
+                elapsed = time.monotonic() - self._turn_start_time
+                duration_str = f'{elapsed:.1f}s'
+                self._tui._write_log(Text.from_markup(f'\n[dim #969aad]  ({self._tools_in_turn} tool{"s" if self._tools_in_turn != 1 else ""} executed · {duration_str})[/dim]\n'))
 
         # Ensure thinking UI is cleared on any idle/terminal state
         if state in (AgentState.AWAITING_USER_INPUT, AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED):
