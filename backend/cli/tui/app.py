@@ -493,9 +493,7 @@ class GrintaScreen(Screen):
         with Horizontal(id='main-layout'):
             yield Transcript(id='transcript-container')
             yield InfoSidebar(id='sidebar-container')
-        with InputBar(id='input-bar'):
-            yield Static(id='spinner', classes='-hidden')
-            yield TextArea(id='input', show_line_numbers=False)
+        yield InputBar(id='input-bar')
         yield HUD(id='hud-bar')
 
     def on_mount(self) -> None:
