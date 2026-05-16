@@ -123,12 +123,46 @@ class FileStateTracker:
             self._read_snapshots.pop(key, None)
 
     def check_read_stale(self, path_str: str) -> str | None:
-        """Return error message if disk changed since snapshot; else None.
-
-        DISABLED: File state guard is turned off — edits proceed regardless
-        of disk staleness.
-        """
-        return None
+        """Return error message if disk changed since snapshot; else None."""
+        if not _file_state_guard_enabled():
+            return None
+        if os.environ.get('GRINTA_SKIP_READ_STALE_CHECK', '').lower() in (
+            '1',
+            'true',
+            'yes',
+        ):
+            return None
+        key = _normalize_path_key(path_str)
+        if not key:
+            return None
+        snap = self._read_snapshots.get(key)
+        if snap is None:
+            return None
+        try:
+            p = Path(key)
+            if not p.is_file():
+                return None
+            st = p.stat()
+            digest = hashlib.sha256(p.read_bytes()).hexdigest()
+            logger.debug(
+                'File read stale check compare',
+                extra={
+                    'msg_type': 'FILE_STALE_CHECK',
+                    'path': path_str,
+                    'current_mtime': st.st_mtime,
+                    'snapshot_mtime': snap.mtime,
+                    'mtime_advanced': st.st_mtime > snap.mtime,
+                    'digest_equal': digest == snap.content_sha256,
+                },
+            )
+            if digest == snap.content_sha256:
+                return None
+        except OSError:
+            return None
+        return (
+            f'[FILE_STATE_GUARD] File changed on disk since it was read '
+            f'(path {path_str!r}). Read it again before editing.'
+        )
 
     def get_summary(self) -> str:
         """Return a compact summary of tracked files for injection into context."""
@@ -164,6 +198,18 @@ class FileStateTracker:
                     action=info.get('action', 'read'),
                     timestamp=info.get('timestamp', 0),
                 )
+
+
+def _file_state_guard_enabled() -> bool:
+    """Single gate for all file-state-guard checks.
+
+    Set ``GRINTA_FILE_STATE_GUARD=1`` to enable; disabled by default.
+    """
+    return os.environ.get('GRINTA_FILE_STATE_GUARD', '').lower() in (
+        '1',
+        'true',
+        'yes',
+    )
 
 
 _READ_BEFORE_EDIT_COMMANDS: frozenset[str] = frozenset(
@@ -261,8 +307,8 @@ def _find_symbol_references(
 
 
 def _read_before_edit_enforced() -> bool:
-    """Read-before-edit guard. DISABLED by default."""
-    return False
+    """Read-before-edit guard. Controlled by GRINTA_FILE_STATE_GUARD."""
+    return _file_state_guard_enabled()
 
 
 class FileStateMiddleware(ToolInvocationMiddleware):
