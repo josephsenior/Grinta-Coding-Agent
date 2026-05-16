@@ -7,8 +7,6 @@ implemented as native Textual widgets for incremental updates.
 
 from __future__ import annotations
 
-from typing import Any
-
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
@@ -18,9 +16,7 @@ from backend.cli.theme import (
     NAVY_BRAND,
     NAVY_ERROR,
     NAVY_READY,
-    NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
-    NAVY_TEXT_PRIMARY,
     NAVY_WAITING,
 )
 

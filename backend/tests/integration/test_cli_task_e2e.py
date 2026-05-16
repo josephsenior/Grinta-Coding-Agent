@@ -92,7 +92,7 @@ def _sitecustomize_source() -> str:
     )
 
 
-@pytest.mark.skip(reason="Integration test requires full runtime environment")
+@pytest.mark.skip(reason='Integration test requires full runtime environment')
 @pytest.mark.integration
 def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
     project_root = tmp_path / 'project'

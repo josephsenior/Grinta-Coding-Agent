@@ -65,7 +65,7 @@ class TestInitWizardCrossPlatform:
 
         is_writable, error = _check_settings_directory_writable(settings_file)
 
-        assert is_writable, f"Should be writable: {error}"
+        assert is_writable, f'Should be writable: {error}'
         assert settings_dir.exists()
 
     @pytest.mark.integration
@@ -175,7 +175,7 @@ class TestProviderPresets:
         cloud_providers = ['openai', 'anthropic', 'google', 'openrouter']
         for provider in cloud_providers:
             preset = _PROVIDER_PRESETS[provider]
-            assert preset['env'], f"{provider} should have env var defined"
+            assert preset['env'], f'{provider} should have env var defined'
 
     @pytest.mark.integration
     def test_local_providers_have_localhost_urls(self) -> None:
@@ -185,7 +185,7 @@ class TestProviderPresets:
         local_providers = ['ollama', 'lmstudio']
         for provider in local_providers:
             preset = _PROVIDER_PRESETS[provider]
-            assert 'localhost' in preset['base_url'], f"{provider} should have localhost URL"
+            assert 'localhost' in preset['base_url'], f'{provider} should have localhost URL'
 
     @pytest.mark.integration
     def test_all_providers_have_default_model(self) -> None:
@@ -193,8 +193,8 @@ class TestProviderPresets:
         from backend.cli.init_wizard import _PROVIDER_PRESETS
 
         for provider, preset in _PROVIDER_PRESETS.items():
-            assert preset['default_model'], f"{provider} should have default model"
-            assert '/' in preset['default_model'], f"{provider} default should have provider prefix"
+            assert preset['default_model'], f'{provider} should have default model'
+            assert '/' in preset['default_model'], f'{provider} default should have provider prefix'
 
 
 class TestExitCodes:
@@ -203,8 +203,9 @@ class TestExitCodes:
     @pytest.mark.integration
     def test_run_init_returns_zero_on_success(self, tmp_path: Path) -> None:
         """Verify run_init returns 0 on success."""
-        from backend.cli.init_wizard import run_init
         from unittest.mock import MagicMock
+
+        from backend.cli.init_wizard import run_init
 
         app_root = tmp_path / 'app'
         app_root.mkdir()

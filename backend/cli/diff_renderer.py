@@ -50,7 +50,7 @@ def _is_validation_secondary(text: str) -> bool:
 
 def _extract_indentation_warnings(content: str) -> tuple[str, list[str] | None]:
     """Extract indentation warnings from content string.
-    
+
     Returns (content_without_warnings, warnings_list) where warnings_list
     is None if no warnings found.
     """
@@ -58,14 +58,14 @@ def _extract_indentation_warnings(content: str) -> tuple[str, list[str] | None]:
     idx = content.find(marker)
     if idx == -1:
         return content, None
-    
+
     # Split content into main part and warnings
     main_content = content[:idx].rstrip()
     warnings_str = content[idx + len(marker):].strip()
-    
+
     # Parse warnings into structured list
-    warnings = []
-    current_warning = []
+    warnings: list[str] = []
+    current_warning: list[str] = []
     for line in warnings_str.split('\n'):
         line = line.strip()
         if line.startswith('[INDENTATION MISMATCH]') or line.startswith('[INDENTATION ERROR]'):
@@ -76,7 +76,7 @@ def _extract_indentation_warnings(content: str) -> tuple[str, list[str] | None]:
             current_warning.append(line)
     if current_warning:
         warnings.append('\n'.join(current_warning))
-    
+
     return main_content, warnings if warnings else None
 
 
@@ -158,18 +158,18 @@ class DiffPanel:
         content = getattr(obs, 'content', None) or getattr(obs, 'output', '')
         if not content:
             return
-        
+
         main_content, warnings = _extract_indentation_warnings(content)
         if not warnings:
             return
-        
+
         # Add a separator
         parts.append(Text(''))
-        
+
         # Add warning header
         parts.append(Text('⚠ Indentation Warnings', style=f'bold {CLR_STATUS_WARN}'))
         parts.append(Text(''))
-        
+
         # Add each warning with styling
         for warning in warnings:
             # Parse warning components
@@ -191,7 +191,7 @@ class DiffPanel:
                     # Style suggested fix
                     text = line.replace('[SUGGESTED FIX] ', '')
                     parts.append(Text(f'    💡 {text}', style=CLR_WARN_BODY))
-        
+
         # Add a separator
         parts.append(Text(''))
 

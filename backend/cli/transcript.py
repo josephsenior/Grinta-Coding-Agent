@@ -33,7 +33,6 @@ from backend.cli.theme import (
     CLR_SHELL_BORDER,
     CLR_SHELL_OUTPUT,
     CLR_STATUS_WARN,
-    CLR_THOUGHT_BODY,
     CLR_TURN_RULE,
     CLR_VERB,
     CLR_WARN_BODY,
@@ -79,8 +78,6 @@ _ACTIVITY_RESULT_INDENT = '      '
 
 def format_activity_primary(verb: str, detail: str | Text) -> Text:
     """Bold verb + detail on one line."""
-    from backend.cli.theme import CLR_VERB
-
     line = Text()
     line.append((verb or 'Did').strip(), style=CLR_VERB)
     if isinstance(detail, Text):
@@ -186,7 +183,7 @@ def format_activity_validation_callout(message: str) -> Panel:
     )
 
 
-def format_shell_output_block(lines: list[str], *, kind: str = 'neutral') -> Panel:
+def format_shell_output_block(lines: list[str], *, kind: str = 'neutral') -> Panel | Group:
     """Shell command output wrapped in a subtle panel with left border.
 
     Uses a minimal box with a dim left border to distinguish shell output

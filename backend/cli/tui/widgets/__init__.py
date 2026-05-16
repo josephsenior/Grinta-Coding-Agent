@@ -6,7 +6,7 @@ Proper widget implementations replacing the empty shell classes.
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Label, Static, TextArea
 
 

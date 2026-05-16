@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 from rich.console import Console as RichConsole
+from textual.widgets import Label, TextArea
 
-from textual.widgets import Input, Label, Static, TextArea
-from backend.cli.tui.app import GrintaScreen, InputBar, HUD
+from backend.cli.tui.app import HUD, GrintaScreen, InputBar
 from backend.cli.tui.main import GrintaTUIApp
 
 

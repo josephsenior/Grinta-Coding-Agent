@@ -11,7 +11,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -50,8 +49,8 @@ class TestCLIEntrypointE2E:
             text=True,
             timeout=30,
         )
-        assert result.returncode == 0, f"Import failed: {result.stderr}"
-        assert "ok" in result.stdout
+        assert result.returncode == 0, f'Import failed: {result.stderr}'
+        assert 'ok' in result.stdout
 
     @pytest.mark.e2e
     def test_cli_module_imports_without_errors(self) -> None:
@@ -67,7 +66,7 @@ class TestCLIEntrypointE2E:
             text=True,
             timeout=30,
         )
-        assert result.returncode == 0, f"Import failed: {result.stderr}"
+        assert result.returncode == 0, f'Import failed: {result.stderr}'
 
     @pytest.mark.e2e
     def test_cli_main_module_imports(self) -> None:
@@ -100,7 +99,7 @@ class TestCLIEntrypointE2E:
             text=True,
             timeout=120,
         )
-        assert result.returncode == 0, f"Compile failed: {result.stderr}"
+        assert result.returncode == 0, f'Compile failed: {result.stderr}'
 
     @pytest.mark.e2e
     def test_entrypoint_help_flag_works(self) -> None:

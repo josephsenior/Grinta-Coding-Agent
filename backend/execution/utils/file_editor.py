@@ -623,11 +623,11 @@ class FileEditor(FileEditorEditOpsMixin):
         self._write_file(file_path, new_content)
 
         output = 'File updated successfully'
-        
+
         # Include indentation warnings if any
         if self._last_indent_warnings:
             output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(self._last_indent_warnings)
-        
+
         if msg and msg.startswith('WARNING:'):
             output = f'{output}\n{msg}'
         return ToolResult(
@@ -942,12 +942,12 @@ class FileEditor(FileEditorEditOpsMixin):
         new_lines_to_insert = new_text_normalized.splitlines(keepends=True)
 
         result_lines = lines[:start_idx] + new_lines_to_insert + lines[end_idx:]
-        
+
         # Detect indentation mismatches and store warnings
         self._last_indent_warnings = self._detect_indentation_mismatch(
             lines, new_lines_to_insert, start_idx, end_idx
         )
-        
+
         return ''.join(result_lines)
 
     def _detect_indentation_mismatch(
@@ -958,34 +958,34 @@ class FileEditor(FileEditorEditOpsMixin):
         end_idx: int,
     ) -> list[str]:
         """Detect indentation mismatches and generate structured warnings.
-        
+
         Returns a list of warning messages describing:
         1. The mismatch (expected vs actual indentation)
         2. The resulting broken line
         3. A suggested fix
         """
         warnings = []
-        
+
         if not original_lines or not new_lines:
             return warnings
-        
+
         # Get the indentation of the first line being replaced
         if start_idx >= len(original_lines):
             return warnings
-            
+
         first_original_line = original_lines[start_idx]
         original_indent = len(first_original_line) - len(first_original_line.lstrip())
-        
+
         # Check new content's first line indentation
         if new_lines:
             first_new_line = new_lines[0]
             new_indent = len(first_new_line) - len(first_new_line.lstrip())
-            
+
             # Detect significant indentation changes on first line
             if new_indent != original_indent:
                 line_num = start_idx + 1
                 stripped_content = first_new_line.strip()
-                
+
                 # Only warn if there's a meaningful mismatch (not just whitespace-only lines)
                 if stripped_content:
                     warnings.append(
@@ -999,13 +999,13 @@ class FileEditor(FileEditorEditOpsMixin):
                         f'[SUGGESTED FIX] Did you mean to indent with {original_indent} spaces? '
                         f'Try: "{" " * original_indent}{stripped_content}"'
                     )
-        
+
         # Check for lines that should be indented after ":" but aren't
         for i, line in enumerate(new_lines):
             if i > 0 and line.strip() and not line.strip().startswith('#'):
                 line_indent = len(line) - len(line.lstrip())
                 prev_line = new_lines[i-1] if i > 0 else ''
-                
+
                 # Check if previous line ends with ":" (suggests block start)
                 if prev_line.rstrip().endswith(':') and line_indent == 0:
                     line_num = start_idx + 1 + i
@@ -1022,7 +1022,7 @@ class FileEditor(FileEditorEditOpsMixin):
                         f'[SUGGESTED FIX] Did you mean to indent with {suggested_indent} spaces? '
                         f'Try: "{" " * suggested_indent}{line.strip()}"'
                     )
-        
+
         return warnings
 
     def _backup_file(self, file_path: Path, content: str | None) -> None:

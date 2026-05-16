@@ -8,7 +8,6 @@ and structured content instead of heavy bordered panels.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
@@ -17,7 +16,6 @@ from backend.cli.theme import (
     NAVY_READY,
     NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
-    NAVY_TEXT_PRIMARY,
     NAVY_WAITING,
 )
 

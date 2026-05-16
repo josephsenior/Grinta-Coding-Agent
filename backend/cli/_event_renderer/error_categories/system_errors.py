@@ -20,7 +20,7 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ),
     ),
     _GuidanceRule(
-        _has("edit_mode=range requires"),
+        _has('edit_mode=range requires'),
         ErrorGuidance(
             summary="text_editor 'edit' with edit_mode=range needs start_line and end_line.",
             steps=(
@@ -35,7 +35,7 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
     _GuidanceRule(
         _has("text_editor command 'edit' requires 'edit_mode'"),
         ErrorGuidance(
-            summary="text_editor edit command is missing an edit_mode.",
+            summary='text_editor edit command is missing an edit_mode.',
             steps=(
                 'Add edit_mode with one of: format, section, range, patch.',
                 'For line-range edits: edit_mode=range with start_line, end_line, and new_str.',

@@ -43,7 +43,6 @@ from backend.cli.status_chrome import rich_fake_prompt_group, status_fields_from
 from backend.cli.theme import (
     CLR_ERR_BODY,
     CLR_ERR_ICON,
-    CLR_SEP,
     CLR_STATUS_ERR,
     CLR_STATUS_WARN,
     CLR_USER_BORDER,

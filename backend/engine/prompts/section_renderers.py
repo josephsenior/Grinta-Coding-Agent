@@ -454,7 +454,6 @@ def _render_autonomy(
     shell_is_powershell: bool,
 ) -> str:
     checkpoints = getattr(config, 'enable_checkpoints', False)
-    lsp_available = _lsp_available(config)
     cp_line = (
         " Auto-save occurs before large writes; use 'checkpoint' tool to manually save logically safe states."
         if checkpoints

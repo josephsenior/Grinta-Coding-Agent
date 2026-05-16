@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 # Respect the user's DEBUG setting; do not override it.
-
 from rich.console import Console as RichConsole
 from rich.theme import Theme as RichTheme
 from textual.app import App

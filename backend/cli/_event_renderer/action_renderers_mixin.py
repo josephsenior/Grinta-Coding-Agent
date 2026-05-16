@@ -40,6 +40,7 @@ from backend.cli._event_renderer.text_utils import (
 from backend.cli._event_renderer.text_utils import (
     sync_reasoning_after_tool_line as _sync_reasoning_after_tool_line,
 )
+from backend.cli._tool_display.renderers.think import render_message, render_think
 from backend.cli._typing import ActionRenderersHost
 from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
@@ -49,7 +50,6 @@ from backend.cli.layout_tokens import (
     ACTIVITY_CARD_TITLE_DELEGATION,
     ACTIVITY_CARD_TITLE_FILES,
     ACTIVITY_CARD_TITLE_MCP,
-    ACTIVITY_CARD_TITLE_MEMORY,
     ACTIVITY_CARD_TITLE_SEARCH,
     ACTIVITY_CARD_TITLE_SHELL,
     ACTIVITY_CARD_TITLE_TERMINAL,
@@ -66,10 +66,8 @@ from backend.cli.theme import (
 )
 from backend.cli.tool_call_display import (
     friendly_verb_for_tool,
-    format_tool_activity_rows,
     tool_headline,
 )
-from backend.cli._tool_display.renderers.think import render_message, render_think
 from backend.cli.transcript import (
     format_activity_block,
     format_activity_secondary,
@@ -215,7 +213,6 @@ class ActionRenderersMixin(_ActionRenderersBase):
         display_parts: list[Any] = []
 
         extra_lines = render_message(thought)
-        first_line = thought.replace('\n', ' ').strip()[:100]
         display_parts.append(
             Text.from_markup(
                 '\n'.join(extra_lines[1:]),

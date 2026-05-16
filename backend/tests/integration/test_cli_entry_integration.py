@@ -22,7 +22,7 @@ def _make_console() -> Console:
     return Console(file=io.StringIO(), force_terminal=False, width=100)
 
 
-@pytest.mark.skip(reason="Integration test requires full runtime environment")
+@pytest.mark.skip(reason='Integration test requires full runtime environment')
 @pytest.mark.integration
 def test_entry_main_launches_cli_repl_with_project_and_piped_input(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -76,7 +76,7 @@ def test_entry_main_launches_cli_repl_with_project_and_piped_input(
     assert config.get_agent_config(config.default_agent).cli_mode is True
 
 
-@pytest.mark.skip(reason="Integration test requires full runtime environment")
+@pytest.mark.skip(reason='Integration test requires full runtime environment')
 @pytest.mark.integration
 def test_launch_entry_runs_real_cli_session_via_subprocess(tmp_path: Path) -> None:
     project_root = tmp_path / 'project'
