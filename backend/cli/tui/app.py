@@ -127,6 +127,49 @@ def _strip_ansi(text: str) -> str:
     return _rich_text(text).plain
 
 
+def _render_thinking_with_diff(text: str) -> Text:
+    """Render thinking text with diff-aware styling.
+
+    Detects unified diff blocks within thinking text and applies
+    colored backgrounds to additions/deletions while keeping
+    regular thinking text muted.
+    """
+    result = Text()
+    in_diff_block = False
+    diff_marker = '```diff'
+
+    for line in text.split('\n'):
+        stripped = line.strip()
+
+        # Detect diff block start
+        if stripped.startswith('```diff') or stripped.startswith('``` diff'):
+            in_diff_block = True
+            result.append(line + '\n', style=NAVY_TEXT_MUTED)
+            continue
+
+        # Detect diff block end
+        if in_diff_block and stripped == '```':
+            in_diff_block = False
+            result.append(line + '\n', style=NAVY_TEXT_MUTED)
+            continue
+
+        if in_diff_block:
+            # Style diff lines
+            if stripped.startswith('+') and not stripped.startswith('+++'):
+                result.append(line + '\n', style='#54efae on #0d2e1a')
+            elif stripped.startswith('-') and not stripped.startswith('---'):
+                result.append(line + '\n', style='#fd8383 on #2e0d0d')
+            elif stripped.startswith('@@') or stripped.startswith('---') or stripped.startswith('+++'):
+                result.append(line + '\n', style=NAVY_TEXT_MUTED)
+            else:
+                result.append(line + '\n', style=NAVY_TEXT_DIM)
+        else:
+            # Regular thinking text
+            result.append(line + '\n', style=NAVY_TEXT_MUTED)
+
+    return result
+
+
 # ── Widget classes ────────────────────────────────────────────────────────
 
 
@@ -1310,17 +1353,13 @@ class TUIRenderer:
         self._live_thinking = text
 
         if is_first_chunk:
-            # First thinking chunk - prepend "Thinking:" prefix with teal color (not bold)
             prefix = Text('Thinking: ', style='#5eead4')
-            body = _rich_text(text)
-            body.stylize(NAVY_TEXT_MUTED)
+            body = _render_thinking_with_diff(text)
             self._history.append(Text.assemble(prefix, body, '\n'))
         else:
-            # Subsequent chunks - replace the last item, preserving prefix
             if self._history:
                 prefix = Text('Thinking: ', style='#5eead4')
-                body = _rich_text(text)
-                body.stylize(NAVY_TEXT_MUTED)
+                body = _render_thinking_with_diff(text)
                 self._history[-1] = Text.assemble(prefix, body, '\n')
 
         self._refresh_display()
