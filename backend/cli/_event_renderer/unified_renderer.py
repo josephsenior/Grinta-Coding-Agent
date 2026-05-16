@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from rich.text import Text
+
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     NAVY_BRAND,
@@ -18,6 +20,13 @@ from backend.cli.theme import (
     NAVY_TEXT_MUTED,
     NAVY_WAITING,
 )
+
+
+def _strip_ansi(text: str) -> str:
+    """Strip ANSI escape sequences using Rich's parser (handles all ECMA-48 sequences)."""
+    if not text:
+        return text
+    return Text.from_ansi(text).plain
 
 
 @dataclass
@@ -285,6 +294,10 @@ class ActivityRenderer:
     @staticmethod
     def terminal_output(content: str, session_id: str = '', exit_code: int | None = None) -> ActivityCard:
         """Create an activity card for terminal output."""
+        # Strip ANSI escape sequences from PTY/interactive terminal output
+        if content:
+            content = _strip_ansi(content)
+
         extra_lines: list[ActivityLine] = []
         if session_id:
             extra_lines.append(ActivityLine(f'Session: {session_id}', style=NAVY_TEXT_DIM, indent=1))
