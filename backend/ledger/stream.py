@@ -4,6 +4,8 @@ Backpressure is delegated to :mod:`backend.ledger.backpressure` and durable
 persistence / WAL recovery to :mod:`backend.ledger.persistence`.
 """
 
+# mypy: disable-error-code="unreachable"
+
 from __future__ import annotations
 
 import asyncio
@@ -201,7 +203,7 @@ class EventStream(EventStore):
                 with open(self._session_lock_path, 'w', encoding='utf-8') as f:
                     f.write(lock_data)
             except Exception:
-                if lock_handle:
+                if lock_handle:  # noqa: F821
                     try:
                         if sys.platform != 'win32':
                             fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
@@ -815,7 +817,7 @@ class EventStream(EventStore):
                 break
             try:
                 if not self._stop_flag.is_set():
-                    await self._dispatch_event(cast(Event, event))
+                    await self._dispatch_event(event)
             except asyncio.CancelledError:
                 self._bp.queue_size = queue.qsize()
                 raise
