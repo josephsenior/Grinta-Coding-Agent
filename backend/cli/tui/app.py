@@ -397,7 +397,7 @@ class GrintaScreen(Screen):
         """User message — left accent panel."""
         self._hide_thinking()
         body = _rich_text(text)
-        panel = Panel(body, box=SIMPLE, border_style="#91abec", padding=(0, 1))
+        panel = Panel(body, box=SIMPLE, border_style="#91abec", padding=(0, 1), expand=True)
         self._write_log(Group(panel, Text('\n')))
 
     def add_agent_message(self, text: str) -> None:
@@ -1315,11 +1315,12 @@ class TUIRenderer:
             body.stylize(NAVY_TEXT_MUTED)
             self._history.append(Text.assemble(prefix, body, '\n'))
         else:
-            # Subsequent chunks - replace the last item (which is the thinking text)
+            # Subsequent chunks - replace the last item, preserving prefix
             if self._history:
+                prefix = Text('Thinking: ', style='#5eead4')
                 body = _rich_text(text)
                 body.stylize(NAVY_TEXT_MUTED)
-                self._history[-1] = Text.assemble(body, '\n')
+                self._history[-1] = Text.assemble(prefix, body, '\n')
 
         self._refresh_display()
 
