@@ -384,14 +384,13 @@ class FileEditor(FileEditorEditOpsMixin):
                 return content
 
             lines = content.splitlines(keepends=True)
-            header = f"Here's the result of running `cat -n` on {display_path}:"
 
             if view_range and len(view_range) >= 2:
-                return self._apply_view_range(content, lines, view_range, header)
+                return self._apply_view_range(content, lines, view_range)
 
             formatted_output = self._format_view_output(lines)
             return ToolResult(
-                output=f'{header}\n{formatted_output}',
+                output=formatted_output,
                 old_content=content,
                 new_content=content,
             )
@@ -456,7 +455,7 @@ class FileEditor(FileEditorEditOpsMixin):
         return formatted_output
 
     def _apply_view_range(
-        self, content: str, lines: list[str], view_range: list[int], header: str
+        self, content: str, lines: list[str], view_range: list[int]
     ) -> ToolResult:
         """Apply a line range filter to the view output."""
         start, end = view_range[0], view_range[1]
@@ -479,7 +478,7 @@ class FileEditor(FileEditorEditOpsMixin):
             selected_output += '\n'
 
         return ToolResult(
-            output=f'{header}\n{selected_output}',
+            output=selected_output,
             old_content=content,
             new_content=content,
         )

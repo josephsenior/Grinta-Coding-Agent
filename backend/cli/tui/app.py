@@ -1470,13 +1470,7 @@ class TUIRenderer:
             card = ActivityRenderer.file_create(event.path, line_count=line_count)
             self._write_card(card)
         elif isinstance(event, FileReadObservation):
-            summary = f'Read {event.path}'
-            if hasattr(event, 'content') and event.content:
-                text = (event.content or '')[:300]
-                self._tui._write_log(Text(f'  {summary}', style=NAVY_TEXT_DIM))
-                self._tui._write_log(Text(f'  {text}', style=NAVY_TEXT_MUTED))
-            else:
-                self._tui._write_log(Text(f'  {summary}', style=NAVY_TEXT_DIM))
+            pass
         elif isinstance(event, FileEditObservation):
             diff = event.visualize_diff()
             added = event.added
