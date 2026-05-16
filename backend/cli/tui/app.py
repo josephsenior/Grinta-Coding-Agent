@@ -148,220 +148,17 @@ def _strip_ansi(text: str) -> str:
 class InfoSidebar(VerticalScroll):
     """Sidebar for Mission Control info (Tasks, MCPs, Skills)."""
 
-    DEFAULT_CSS = """
-    InfoSidebar {
-        width: 100%;
-        height: 100%;
-        background: #080c18;
-        padding: 1 1;
-        scrollbar-size: 0 0;
-        overflow-y: auto;
-        overflow-x: hidden;
-    }
-    InfoSidebar.-hidden {
-        display: none;
-    }
-    """
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self._tasks: list[dict[str, str]] = []
-        self._mcp_servers: list[dict[str, str]] = []
-        self._skill_count: int = 0
-        self._is_mounted = False
-
-    def on_mount(self) -> None:
-        self._is_mounted = True
-        self._render()
-
-    def compose(self) -> ComposeResult:
-        yield Static('[dim #969aad]Loading…[/]', id='sidebar-display')
-
-    def update_tasks(self, tasks: list[dict[str, str]]) -> None:
-        self._tasks = tasks
-        if self._is_mounted:
-            self._render()
-
-    def update_mcp_servers(self, servers: list[dict[str, str]]) -> None:
-        self._mcp_servers = servers
-        if self._is_mounted:
-            self._render()
-
-    def update_skills(self, count: int) -> None:
-        self._skill_count = count
-        if self._is_mounted:
-            self._render()
-
-    def _render(self) -> None:
-        if not self._is_mounted:
-            return
-        try:
-            display = self.query_one('#sidebar-display', Static)
-        except Exception:
-            return
-        parts: list[str] = []
-
-        parts.append('[bold #91abec]Tasks[/]')
-        if self._tasks:
-            for task in self._tasks[:10]:
-                status = task.get('status', 'pending')
-                icon = {'done': '[bold #54efae]✓[/]', 'failed': '[bold #fd8383]✗[/]',
-                        'running': '[bold #91abec]⟳[/]', 'pending': '[dim #969aad]○[/]'}.get(status, '○')
-                title = task.get('title', task.get('description', 'Untitled'))[:50]
-                parts.append(f'  {icon} {title}')
-        else:
-            parts.append('  [dim #969aad]No tasks[/]')
-
-        parts.append('')
-        parts.append('[bold #91abec]MCP Servers[/]')
-        if self._mcp_servers:
-            for srv in self._mcp_servers:
-                name = srv.get('name', 'Unknown')[:30]
-                active = srv.get('type', '') == 'active'
-                icon = '[bold #54efae]●[/]' if active else '[dim #969aad]○[/]'
-                parts.append(f'  {icon} {name}')
-        else:
-            parts.append('  [dim #969aad]None configured[/]')
-
-        parts.append('')
-        parts.append('[bold #91abec]Skills[/]')
-        parts.append(f'  [dim #969aad]{self._skill_count} available[/]')
-
-        display.update('\n'.join(parts))
-
 
 class Transcript(VerticalScroll):
-    """Scrollable conversation transcript with incremental widget updates."""
+    """Scrollable conversation transcript container."""
 
-    DEFAULT_CSS = """
-    Transcript {
-        width: 100%;
-        height: 100%;
-        background: #060a14;
-        scrollbar-color: #33405d #161e31;
-        scrollbar-color-hover: #404f71 #161e31;
-        scrollbar-color-active: #4f608a #161e31;
-        scrollbar-size: 1 0;
-        padding: 1 2;
-        overflow-x: hidden;
-    }
-    """
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self._widget_count = 0
-        self._is_mounted = False
-
-    def on_mount(self) -> None:
-        self._is_mounted = True
-
-    def compose(self) -> ComposeResult:
-        yield Static('', id='main-display')
-
-    def append_markup(self, markup: str) -> None:
-        """Append markup text to the transcript incrementally."""
-        if not self._is_mounted:
-            return
-        try:
-            display = self.query_one('#main-display', Static)
-        except Exception:
-            return
-        current = display.renderable.plain if hasattr(display.renderable, 'plain') else ''
-        if current and not current.endswith('\n'):
-            current += '\n'
-        display.update(current + markup)
-        self.scroll_end(animate=True)
-
-    def append_rich(self, renderable: Any) -> None:
-        """Append a Rich renderable to the transcript."""
-        if not self._is_mounted:
-            return
-        try:
-            display = self.query_one('#main-display', Static)
-        except Exception:
-            return
-        if isinstance(display.renderable, Text):
-            current = display.renderable
-            from rich.console import Group
-            display.update(Group(current, Text('\n'), renderable))
-        else:
-            display.update(renderable)
-        self.scroll_end(animate=True)
-
-    def clear(self) -> None:
-        """Clear the transcript."""
-        display = self.query_one('#main-display', Static)
-        display.update('')
 
 class InputBar(Horizontal):
-    """Bottom input row with spinner and TextArea."""
-
-    DEFAULT_CSS = """
-    InputBar {
-        height: 4;
-        background: #0d1a2d;
-        border-top: solid #1b233a;
-        padding: 0 2;
-        layout: horizontal;
-    }
-    InputBar.processing {
-        border-top: solid #91abec;
-    }
-    InputBar TextArea {
-        background: #16263d;
-        color: #c8d4e8;
-        border: none;
-        padding: 0 1;
-        width: 100%;
-        height: 3;
-    }
-    #spinner {
-        width: 3;
-        height: 3;
-        content-align: center middle;
-        color: #91abec;
-        margin-right: 1;
-    }
-    #spinner.-hidden {
-        display: none;
-    }
-    """
-
-    def compose(self) -> ComposeResult:
-        yield Static(id='spinner', classes='-hidden')
-        yield TextArea(id='input', show_line_numbers=False)
-
-    def set_processing(self, processing: bool) -> None:
-        spinner = self.query_one('#spinner', Static)
-        if processing:
-            spinner.remove_class('-hidden')
-            spinner.update('⟳')
-            self.add_class('processing')
-        else:
-            spinner.add_class('-hidden')
-            self.remove_class('processing')
+    """Bottom input row with border and prompt."""
 
 
 class HUD(Vertical):
     """Multi-line status bar at the very bottom."""
-
-    DEFAULT_CSS = """
-    HUD {
-        height: auto;
-        background: #0a1525;
-        color: #969aad;
-        padding: 1 2 0 2;
-    }
-    #hud-line-1 {
-        height: 1;
-        text-style: bold;
-    }
-    #hud-line-2 {
-        height: 1;
-        margin-top: 1;
-    }
-    """
-
     def compose(self) -> ComposeResult:
         yield Label(id='hud-line-1')
         yield Label(id='hud-line-2')
@@ -491,9 +288,13 @@ class GrintaScreen(Screen):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id='main-layout'):
-            yield Transcript(id='transcript-container')
-            yield InfoSidebar(id='sidebar-container')
-        yield InputBar(id='input-bar')
+            with Transcript(id='transcript-container'):
+                yield Static(id='main-display')
+            with InfoSidebar(id='sidebar-container'):
+                yield Static(id='sidebar-display')
+        with InputBar(id='input-bar'):
+            yield Static(id='spinner', classes='-hidden')
+            yield TextArea(id='input', show_line_numbers=False)
         yield HUD(id='hud-bar')
 
     def on_mount(self) -> None:
@@ -856,8 +657,9 @@ class GrintaScreen(Screen):
                 )
 
             self.finalize_thinking()
-            input_bar = self.query_one('#input-bar', InputBar)
-            input_bar.set_processing(False)
+            spinner = self.query_one('#spinner', Static)
+            spinner.add_class('-hidden')
+            self.query_one('#input-bar', InputBar).remove_class('processing')
 
         asyncio.create_task(_do_interrupt())
 
