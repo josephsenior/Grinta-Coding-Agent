@@ -197,13 +197,16 @@ class FileStateTracker:
 def _file_state_guard_enabled() -> bool:
     """Single gate for all file-state-guard checks.
 
-    Set ``GRINTA_FILE_STATE_GUARD=1`` to enable; disabled by default.
+    Enabled by default. Disable with ``GRINTA_FILE_STATE_GUARD=0`` or
+    ``SECURITY_FILE_STATE_GUARD=false`` in config.
     """
-    return os.environ.get('GRINTA_FILE_STATE_GUARD', '').lower() in (
-        '1',
-        'true',
-        'yes',
-    )
+    for var in ('GRINTA_FILE_STATE_GUARD', 'SECURITY_FILE_STATE_GUARD'):
+        raw = os.environ.get(var, '').strip().lower()
+        if raw in ('0', 'false', 'no', 'off'):
+            return False
+        if raw in ('1', 'true', 'yes', 'on'):
+            return True
+    return True
 
 
 _READ_BEFORE_EDIT_COMMANDS: frozenset[str] = frozenset(

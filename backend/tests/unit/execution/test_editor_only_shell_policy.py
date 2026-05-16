@@ -9,7 +9,10 @@ from backend.execution.editor_only_shell_policy import evaluate_editor_only_shel
 
 
 def _cfg(**kwargs) -> SecurityConfig:
-    base: dict = {'require_editor_for_shell_file_writes': True}
+    base: dict = {
+        'require_editor_for_shell_file_writes': True,
+        'allow_shell_file_writes': False,
+    }
     base.update(kwargs)
     return SecurityConfig.model_validate(base)
 

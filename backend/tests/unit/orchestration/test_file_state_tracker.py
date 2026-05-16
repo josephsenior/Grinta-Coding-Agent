@@ -43,24 +43,12 @@ def test_load_from_dict_restores_entries() -> None:
     assert 'created: src/app.py' in summary
 
 
-def test_read_snapshot_stale_guard_disabled_by_default(
+def test_read_snapshot_stale_guard_enabled_by_default(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """File state guard is disabled by default — stale check returns None."""
+    """File state guard is enabled by default — stale check detects disk changes."""
     monkeypatch.delenv('GRINTA_FILE_STATE_GUARD', raising=False)
-    monkeypatch.chdir(tmp_path)
-    f = tmp_path / 'stale.txt'
-    f.write_text('version-one\n', encoding='utf-8')
-    tracker = FileStateTracker()
-    tracker.record_read_snapshot_from_disk('stale.txt')
-    f.write_text('version-two\n', encoding='utf-8')
-    msg = tracker.check_read_stale('stale.txt')
-    assert msg is None
-
-
-def test_read_snapshot_stale_guard_enabled(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """When GRINTA_FILE_STATE_GUARD=1, stale check detects disk changes."""
-    monkeypatch.setenv('GRINTA_FILE_STATE_GUARD', '1')
+    monkeypatch.delenv('SECURITY_FILE_STATE_GUARD', raising=False)
     monkeypatch.chdir(tmp_path)
     f = tmp_path / 'stale.txt'
     f.write_text('version-one\n', encoding='utf-8')
@@ -70,6 +58,21 @@ def test_read_snapshot_stale_guard_enabled(tmp_path, monkeypatch: pytest.MonkeyP
     msg = tracker.check_read_stale('stale.txt')
     assert msg is not None
     assert 'changed on disk' in (msg or '')
+
+
+def test_read_snapshot_stale_guard_disabled_via_env(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """File state guard can be disabled via GRINTA_FILE_STATE_GUARD=0."""
+    monkeypatch.setenv('GRINTA_FILE_STATE_GUARD', '0')
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / 'stale.txt'
+    f.write_text('version-one\n', encoding='utf-8')
+    tracker = FileStateTracker()
+    tracker.record_read_snapshot_from_disk('stale.txt')
+    f.write_text('version-two\n', encoding='utf-8')
+    msg = tracker.check_read_stale('stale.txt')
+    assert msg is None
 
 
 def test_read_snapshot_not_stale_when_content_matches(
@@ -127,11 +130,12 @@ def _file_edit_action(path: str, command: str):
 
 
 @pytest.mark.asyncio
-async def test_middleware_blocks_str_replace_without_prior_read_when_guard_enabled(
+async def test_middleware_blocks_str_replace_without_prior_read(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """When GRINTA_FILE_STATE_GUARD=1, editing without prior read is blocked."""
-    monkeypatch.setenv('GRINTA_FILE_STATE_GUARD', '1')
+    """File state guard is enabled by default — editing without prior read is blocked."""
+    monkeypatch.delenv('GRINTA_FILE_STATE_GUARD', raising=False)
+    monkeypatch.delenv('SECURITY_FILE_STATE_GUARD', raising=False)
     monkeypatch.chdir(tmp_path)
     f = tmp_path / 'target.py'
     f.write_text('x = 1\n', encoding='utf-8')
@@ -147,10 +151,11 @@ async def test_middleware_blocks_str_replace_without_prior_read_when_guard_enabl
 
 
 @pytest.mark.asyncio
-async def test_middleware_allows_str_replace_without_prior_read(
+async def test_middleware_allows_str_replace_without_prior_read_when_guard_disabled(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Read-before-edit guard is disabled — editing without prior read is allowed."""
+    """When guard is disabled, editing without prior read is allowed."""
+    monkeypatch.setenv('GRINTA_FILE_STATE_GUARD', '0')
     monkeypatch.chdir(tmp_path)
     f = tmp_path / 'target.py'
     f.write_text('x = 1\n', encoding='utf-8')
@@ -201,11 +206,11 @@ async def test_middleware_allows_edit_on_new_nonexistent_file(
 
 
 @pytest.mark.asyncio
-async def test_middleware_allows_mutating_edit_on_stale_file(
+async def test_middleware_allows_mutating_edit_on_stale_file_when_guard_disabled(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """File state guard is disabled by default — stale files are not blocked."""
-    monkeypatch.delenv('GRINTA_FILE_STATE_GUARD', raising=False)
+    """When guard is disabled, stale files are not blocked."""
+    monkeypatch.setenv('GRINTA_FILE_STATE_GUARD', '0')
     monkeypatch.chdir(tmp_path)
     f = tmp_path / 'stale.py'
     f.write_text('v1\n', encoding='utf-8')
@@ -231,11 +236,12 @@ async def test_middleware_allows_mutating_edit_on_stale_file(
 
 
 @pytest.mark.asyncio
-async def test_middleware_blocks_mutating_edit_on_stale_file_when_guard_enabled(
+async def test_middleware_blocks_mutating_edit_on_stale_file(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """When GRINTA_FILE_STATE_GUARD=1, editing a stale file is blocked."""
-    monkeypatch.setenv('GRINTA_FILE_STATE_GUARD', '1')
+    """File state guard is enabled by default — editing a stale file is blocked."""
+    monkeypatch.delenv('GRINTA_FILE_STATE_GUARD', raising=False)
+    monkeypatch.delenv('SECURITY_FILE_STATE_GUARD', raising=False)
     monkeypatch.chdir(tmp_path)
     f = tmp_path / 'stale.py'
     f.write_text('v1\n', encoding='utf-8')
