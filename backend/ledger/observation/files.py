@@ -67,6 +67,9 @@ class FileEditObservation(Observation):
     preview: bool = False
     _diff_cache: str | None = None
     observation: ClassVar[str] = ObservationType.EDIT
+    #: SHA-256 hash of new_content for edit verification. Included in __str__ output
+    #: so the LLM can self-correct if the observed diff looks truncated or corrupted.
+    new_content_hash: str | None = None
 
     @property
     def message(self) -> str:
@@ -247,3 +250,16 @@ class FileEditObservation(Observation):
             )
             return f'[New file {self.path} is created with the provided content.]\n'
         return self.visualize_diff().rstrip() + '\n'
+
+    def content_with_hash(self) -> str:
+        """Return the observation content with the new_content_hash prepended.
+
+        The hash is included as a verification token so the LLM can detect
+        if the edit observation was truncated or corrupted. Format:
+
+            [EDIT_HASH sha256:<hash>]
+            <content>
+        """
+        if not self.new_content_hash:
+            return str(self)
+        return f'[EDIT_HASH sha256:{self.new_content_hash}]\n{str(self)}'
