@@ -126,12 +126,6 @@ class FileStateTracker:
         """Return error message if disk changed since snapshot; else None."""
         if not _file_state_guard_enabled():
             return None
-        if os.environ.get('GRINTA_SKIP_READ_STALE_CHECK', '').lower() in (
-            '1',
-            'true',
-            'yes',
-        ):
-            return None
         key = _normalize_path_key(path_str)
         if not key:
             return None
