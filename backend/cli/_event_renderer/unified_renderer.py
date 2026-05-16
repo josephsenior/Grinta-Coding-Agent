@@ -183,9 +183,11 @@ class ActivityRenderer:
             for line in diff_lines[:20]:
                 stripped = line.rstrip()
                 if stripped.startswith('+') and not stripped.startswith('+++'):
-                    extra_lines.append(ActivityLine(stripped, style=NAVY_READY, indent=1))
+                    # Green background for additions (subtle, less opaque)
+                    extra_lines.append(ActivityLine(stripped, style='#54efae on #0d2e1a', indent=1))
                 elif stripped.startswith('-') and not stripped.startswith('---'):
-                    extra_lines.append(ActivityLine(stripped, style=NAVY_TEXT_DIM, indent=1))
+                    # Red background for deletions (subtle, less opaque)
+                    extra_lines.append(ActivityLine(stripped, style='#fd8383 on #2e0d0d', indent=1))
                 elif stripped.startswith('@@'):
                     extra_lines.append(ActivityLine(stripped, style=NAVY_TEXT_MUTED, indent=1))
                 else:
