@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from rich.markup import escape as markup_escape
+
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     CLR_SECONDARY,
@@ -30,15 +32,16 @@ def render_memory_update(
         pct = int((tokens_used / context_limit) * 100)
         bar = '█' * min(pct // 5, 20) + '░' * max(0, 20 - pct // 5)
         usage_str = f"[{CLR_BRAND_HUE if pct < 80 else CLR_STATUS_WARN}]{tokens_used:,}[/{CLR_BRAND_HUE if pct < 80 else CLR_STATUS_WARN}] / {context_limit:,} tokens"
-        lines.append(f"  Context  {usage_str}  [dim]{bar} {pct}%[/dim]")
+        # Make memory section less prominent with dim styling
+        lines.append(f"  [dim]Context  {usage_str}  {bar} {pct}%[/dim]")
 
     if entries_added or entries_removed:
         parts = []
         if entries_added:
             parts.append(f"[{CLR_STATUS_OK}]+{entries_added}[/{CLR_STATUS_OK}]")
         if entries_removed:
-            parts.append(f"[{CLR_DETAIL}]-{entries_removed}[/{CLR_DETAIL}]")
-        lines.append('  ' + '  '.join(parts))
+            parts.append(f"[{CLR_SECONDARY}]-{entries_removed}[/{CLR_SECONDARY}]")
+        lines.append('  [dim]' + '  '.join(parts) + '[/dim]')
 
     if compression_ratio > 0:
         lines.append(f"  [dim]Compression: {compression_ratio:.1f}× ratio[/dim]")

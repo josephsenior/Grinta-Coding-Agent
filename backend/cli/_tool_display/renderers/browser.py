@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from rich.markup import escape as markup_escape
+
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     CLR_DETAIL,
@@ -28,12 +30,16 @@ def render_browser_navigation(
     lines.append(format_activity_primary(action_verb, url or 'Browser'))
 
     if title:
-        lines.append(f"  [dim]{title}[/dim]")
+        # Escape title to prevent MarkupError
+        escaped_title = markup_escape(title)
+        lines.append(f"  [dim]{escaped_title}[/dim]")
 
     if steps:
         lines.append('')
         for i, step in enumerate(steps[:5], 1):
-            lines.append(f"  [dim]{i}. {step}[/dim]")
+            # Escape step to prevent MarkupError
+            escaped_step = markup_escape(step)
+            lines.append(f"  [dim]{i}. {escaped_step}[/dim]")
         if len(steps) > 5:
             lines.append(f"  [dim]... {len(steps) - 5} more steps[/dim]")
 
@@ -51,7 +57,9 @@ def render_browser_page(
     lines.append(format_activity_primary('Loaded', url))
 
     if title:
-        lines.append(f"  [dim]{title}[/dim]")
+        # Escape title to prevent MarkupError
+        escaped_title = markup_escape(title)
+        lines.append(f"  [dim]{escaped_title}[/dim]")
 
     if content_preview:
         lines.append('')
@@ -61,6 +69,8 @@ def render_browser_page(
             if stripped:
                 if len(stripped) > 100:
                     stripped = stripped[:97] + '…'
-                lines.append(f"  [dim]{stripped}[/dim]")
+                # Escape content to prevent MarkupError
+                escaped = markup_escape(stripped)
+                lines.append(f"  [dim]{escaped}[/dim]")
 
     return lines

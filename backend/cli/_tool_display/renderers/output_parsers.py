@@ -172,23 +172,32 @@ def format_pytest_panel(result: ParsedTestResult) -> list[str]:
                 icon = f"[{CLR_SECONDARY}]·[/{CLR_SECONDARY}]"
 
             if file_part:
-                output.append(f"  {icon} {file_part}")
+                # Escape file_part to prevent MarkupError
+                from rich.markup import escape as markup_escape
+                escaped_file = markup_escape(file_part)
+                output.append(f"  {icon} {escaped_file}")
             if test_part:
-                output.append(f"     {test_part}")
+                # Escape test_part to prevent MarkupError
+                from rich.markup import escape as markup_escape
+                escaped_test = markup_escape(test_part)
+                output.append(f"     {escaped_test}")
 
         if len(result.lines) > 15:
-            output.append(f"  [dim]... {len(result.lines) - 15} more[/]")
+            output.append(f"  [dim]... {len(result.lines) - 15} more[/dim]")
 
     if result.summary:
         parts = []
         if result.passed:
-            parts.append(f"[{CLR_STATUS_OK}]{result.passed} passed[/]")
+            parts.append(f"[{CLR_STATUS_OK}]{result.passed} passed[/{CLR_STATUS_OK}]")
         if result.failed:
-            parts.append(f"[{CLR_STATUS_ERR}]{result.failed} failed[/]")
+            parts.append(f"[{CLR_STATUS_ERR}]{result.failed} failed[/{CLR_STATUS_ERR}]")
         if result.skipped:
-            parts.append(f"[{CLR_SECONDARY}]{result.skipped} skipped[/]")
+            parts.append(f"[{CLR_SECONDARY}]{result.skipped} skipped[/{CLR_SECONDARY}]")
         if result.duration:
-            parts.append(f"[dim]{result.duration}[/]")
+            # Escape duration to prevent MarkupError
+            from rich.markup import escape as markup_escape
+            escaped_duration = markup_escape(result.duration)
+            parts.append(f"[dim]{escaped_duration}[/dim]")
         if parts:
             output.append(f"  {' · '.join(parts)}")
 
@@ -231,35 +240,43 @@ def parse_git_status(output: str) -> ParsedGitStatus:
 
 def format_git_status_panel(result: ParsedGitStatus) -> list[str]:
     """Format git status as lines."""
+    from rich.markup import escape as markup_escape
+    
     output: list[str] = []
 
     if result.staged:
-        output.append(f"[{CLR_STATUS_OK}]Staged ({len(result.staged)}):[/]")
+        output.append(f"[{CLR_STATUS_OK}]Staged ({len(result.staged)}):[/{CLR_STATUS_OK}]")
         for item in result.staged[:5]:
-            output.append(f"  [green]+ {item}[/]")
+            # Escape item to prevent MarkupError
+            escaped_item = markup_escape(item)
+            output.append(f"  [green]+ {escaped_item}[/green]")
         if len(result.staged) > 5:
-            output.append(f"  [dim]... {len(result.staged) - 5} more[/]")
+            output.append(f"  [dim]... {len(result.staged) - 5} more[/dim]")
 
     if result.unstaged:
         if output:
             output.append('')
-        output.append(f"[{CLR_STATUS_WARN}]Changed ({len(result.unstaged)}):[/]")
+        output.append(f"[{CLR_STATUS_WARN}]Changed ({len(result.unstaged)}):[/{CLR_STATUS_WARN}]")
         for item in result.unstaged[:5]:
-            output.append(f"  [yellow]~ {item}[/]")
+            # Escape item to prevent MarkupError
+            escaped_item = markup_escape(item)
+            output.append(f"  [yellow]~ {escaped_item}[/yellow]")
         if len(result.unstaged) > 5:
-            output.append(f"  [dim]... {len(result.unstaged) - 5} more[/]")
+            output.append(f"  [dim]... {len(result.unstaged) - 5} more[/dim]")
 
     if result.untracked:
         if output:
             output.append('')
-        output.append(f"[{CLR_SECONDARY}]Untracked ({len(result.untracked)}):[/]")
+        output.append(f"[{CLR_SECONDARY}]Untracked ({len(result.untracked)}):[/{CLR_SECONDARY}]")
         for item in result.untracked[:5]:
-            output.append(f"  [dim]? {item}[/]")
+            # Escape item to prevent MarkupError
+            escaped_item = markup_escape(item)
+            output.append(f"  [dim]? {escaped_item}[/dim]")
 
     if result.clean:
         if output:
             output.append('')
-        output.append(f"[{CLR_STATUS_OK}]✓ Working tree clean[/]")
+        output.append(f"[{CLR_STATUS_OK}]✓ Working tree clean[/{CLR_STATUS_OK}]")
 
     return output
 

@@ -1472,7 +1472,7 @@ class TUIRenderer:
         elif isinstance(event, FileReadObservation):
             pass
         elif isinstance(event, FileEditObservation):
-            diff = event.visualize_diff()
+            diff = self._extract_file_edit_diff(event)
             added = event.added
             removed = event.removed
             if diff:
@@ -1520,11 +1520,11 @@ class TUIRenderer:
                 self._tui._write_log(Text(f'  {msg}', style=NAVY_TEXT_DIM))
         elif isinstance(event, AgentThinkAction):
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-            if thought:
+            if thought and thought.strip() != 'Your thought has been logged.':
                 self._tui.add_thinking(thought)
         elif isinstance(event, AgentThinkObservation):
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-            if thought:
+            if thought and thought.strip() != 'Your thought has been logged.':
                 self._tui.add_thinking(thought)
         elif isinstance(event, BrowserToolAction):
             action_name = getattr(event, 'action', 'browser') or 'browser'
@@ -1636,12 +1636,22 @@ class TUIRenderer:
             name = type(event).__name__
             self._tui._write_log(Text(f'  [{name}]', style=NAVY_TEXT_MUTED))
 
+    def _extract_file_edit_diff(self, event: FileEditObservation) -> str | None:
+        """Extract diff from a FileEditObservation for TUI display."""
+        try:
+            diff = event.visualize_diff()
+            if diff and '(no changes detected' not in diff:
+                return diff
+        except Exception:
+            pass
+        return None
+
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
         if action.is_tool_call:
             return
 
         thinking = (action.thinking_accumulated or '').strip()
-        if thinking:
+        if thinking and thinking != 'Your thought has been logged.':
             self._tui.add_thinking(thinking)
 
         if action.is_final:

@@ -271,8 +271,9 @@ class ActionRenderersMixin(_ActionRenderersBase):
         kind = 'neutral'
         first_line = thought.split('\n')[0].replace('\n', ' ').strip()[:100] if thought else 'Thinking'
 
+        # Use 'Thinking:' verb for consistency with TUI
         inner = format_activity_block(
-            'Thought',
+            'Thinking:',
             first_line[:100] or 'Thinking',
             secondary=None,
             secondary_kind=kind,

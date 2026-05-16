@@ -342,7 +342,11 @@ def _filter_valid_editor_kwargs(other_kwargs: Mapping[str, Any]) -> dict[str, An
 def _preview_str_replace_edit(
     path: str, command: str, kwargs: Mapping[str, Any]
 ) -> AgentThinkAction:
-    """Generate a unified diff preview of what an insert_text edit would produce."""
+    """Generate a unified diff preview of what an edit would produce.
+    
+    Supports all edit modes: insert_text, edit (range/patch/section/format).
+    Returns AgentThinkAction with diff preview (no file writes).
+    """
     import difflib
     import os
 
@@ -356,12 +360,60 @@ def _preview_str_replace_edit(
         return AgentThinkAction(thought=f'[PREVIEW] Cannot read {path}: {exc}')
 
     new_lines = list(original_lines)
+    edit_mode = kwargs.get('edit_mode')
 
     if command == 'insert_text':
         insert_line = int(kwargs.get('insert_line', 0))
         new_str = cast(str, kwargs.get('new_str', ''))
         insert_text = new_str if new_str.endswith('\n') else new_str + '\n'
         new_lines[insert_line:insert_line] = [insert_text]
+
+    elif command == 'edit' and edit_mode == 'range':
+        start_line = int(kwargs.get('start_line', 1))
+        end_line = int(kwargs.get('end_line', len(original_lines)))
+        new_str = cast(str, kwargs.get('new_str', ''))
+        
+        # Normalize newlines in replacement
+        new_str_normalized = new_str.replace('\r\n', '\n').replace('\r', '\n')
+        replacement_lines = new_str_normalized.splitlines(keepends=True)
+        if not replacement_lines:
+            replacement_lines = [new_str_normalized + '\n']
+        
+        # Convert to 0-based indexing
+        start_idx = max(0, start_line - 1)
+        end_idx = min(len(original_lines), end_line)
+        
+        new_lines = original_lines[:start_idx] + replacement_lines + original_lines[end_idx:]
+
+    elif command == 'edit' and edit_mode == 'patch':
+        patch_text = cast(str, kwargs.get('patch_text', ''))
+        if patch_text:
+            # Parse unified patch and apply
+            new_lines = _apply_patch_to_lines(original_lines, patch_text)
+
+    elif command == 'edit' and edit_mode == 'section':
+        # Section edits are complex to preview without full implementation
+        # Return a note that preview is limited for section mode
+        return AgentThinkAction(
+            thought=(
+                f'[PREVIEW] Section edit preview not available for {path}.\n'
+                f'Edit mode: section, anchor: {kwargs.get("anchor_value", "N/A")}\n'
+                f'Action: {kwargs.get("section_action", "replace")}\n'
+                f'Please verify the edit after applying.'
+            )
+        )
+
+    elif command == 'edit' and edit_mode == 'format':
+        # Format edits modify structured data, hard to preview without parsing
+        return AgentThinkAction(
+            thought=(
+                f'[PREVIEW] Format edit preview not available for {path}.\n'
+                f'Edit mode: format, kind: {kwargs.get("format_kind", "N/A")}\n'
+                f'Operation: {kwargs.get("format_op", "set")}\n'
+                f'Path: {kwargs.get("format_path", "N/A")}\n'
+                f'Please verify the edit after applying.'
+            )
+        )
 
     diff = difflib.unified_diff(
         original_lines,
@@ -382,9 +434,78 @@ def _preview_str_replace_edit(
     )
 
 
-def _apply_confidence_preview_override(kwargs: dict[str, Any], path: str) -> None:
-    """If confidence < 0.7, force preview mode. Mutates kwargs."""
+def _apply_patch_to_lines(original_lines: list[str], patch_text: str) -> list[str]:
+    """Apply a unified patch to a list of lines.
+    
+    Simplified patch application for preview purposes.
+    """
+    import re
+    
+    new_lines = list(original_lines)
+    hunks = []
+    current_hunk = None
+    
+    for line in patch_text.splitlines():
+        if line.startswith('@@'):
+            if current_hunk:
+                hunks.append(current_hunk)
+            # Parse @@ -start,count +start,count @@
+            match = re.match(r'@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@', line)
+            if match:
+                old_start = int(match.group(1))
+                old_count = int(match.group(2)) if match.group(2) else 1
+                current_hunk = {
+                    'old_start': old_start,
+                    'old_count': old_count,
+                    'deletions': [],
+                    'additions': [],
+                }
+        elif current_hunk:
+            if line.startswith('-'):
+                current_hunk['deletions'].append(line[1:])
+            elif line.startswith('+'):
+                current_hunk['additions'].append(line[1:])
+            elif line.startswith(' '):
+                pass  # Context line, no action needed
+    
+    if current_hunk:
+        hunks.append(current_hunk)
+    
+    # Apply hunks in reverse order to maintain line numbers
+    for hunk in reversed(hunks):
+        old_start = hunk['old_start'] - 1  # Convert to 0-based
+        old_count = hunk['old_count']
+        
+        # Verify the context matches
+        if old_start + old_count <= len(new_lines):
+            # Remove old lines and insert new ones
+            new_lines[old_start:old_start + old_count] = hunk['additions']
+    
+    return new_lines
+
+
+def _apply_confidence_preview_override(kwargs: dict[str, Any], path: str, command: str = '', edit_mode: str = '') -> None:
+    """Force preview mode for high-risk edits or low confidence. Mutates kwargs.
+    
+    Preview is enabled by default for:
+    - edit_mode=range (line range replacements)
+    - edit_mode=patch (unified patch applications)
+    - edit_mode=section (section-based edits)
+    - Any edit with confidence < 0.7
+    """
     confidence = kwargs.pop('confidence', None)
+    
+    # Always enable preview for high-risk edit modes
+    if command == 'edit' and edit_mode in ('range', 'patch', 'section'):
+        logger.info(
+            '[preview] Auto-enabled preview for %s edit on %s (high-risk operation)',
+            edit_mode,
+            path,
+        )
+        kwargs.setdefault('preview', True)
+        return
+    
+    # Confidence-based override for other edits
     if confidence is None or not isinstance(confidence, (int, float)):
         return
     if float(confidence) >= 0.7:
@@ -479,10 +600,11 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
         k: v for k, v in normalized_args.items() if k not in ['command', 'path']
     }
 
-    _apply_confidence_preview_override(other_kwargs, path)
+    edit_mode = normalized_args.get('edit_mode', '')
+    _apply_confidence_preview_override(other_kwargs, path, command, edit_mode)
 
     raw_preview = other_kwargs.pop('preview', False)
-    if _is_preview_enabled(raw_preview) and command == 'insert_text':
+    if _is_preview_enabled(raw_preview) and command in ('insert_text', 'edit'):
         return _preview_str_replace_edit(path, command, other_kwargs)
 
     if command == 'read_file':

@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import re
 
+from rich.markup import escape as markup_escape
+
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     CLR_BRAND_HUE,
@@ -54,14 +56,18 @@ def render_search_results(
 
     if 'output' in grouped:
         for _, content in grouped['output'][:5]:
-            lines.append(f"  [dim]{content}[/dim]")
+            # Escape content to prevent MarkupError
+            escaped = markup_escape(content)
+            lines.append(f"  [dim]{escaped}[/dim]")
         return lines
 
     sorted_files = sorted(grouped.items(), key=lambda x: len(x[1]), reverse=True)
 
     for filepath, matches in sorted_files[:max_files]:
         match_count = len(matches)
-        lines.append(f"  [{CLR_BRAND_HUE} bold]{filepath}[/{CLR_BRAND_HUE} bold]  [dim]{match_count} matches[/dim]")
+        # Escape filepath to prevent MarkupError
+        escaped_path = markup_escape(filepath)
+        lines.append(f"  [{CLR_BRAND_HUE} bold]{escaped_path}[/{CLR_BRAND_HUE} bold]  [dim]{match_count} matches[/dim]")
 
         for lineno, content in matches[:max_lines_per_file]:
             content = content.strip()
@@ -105,7 +111,9 @@ def render_search_summary(
     if file_count > 0:
         detail += f" in {file_count} files"
     if query:
-        detail += f"  [dim]·  \"{query}\"[/dim]"
+        # Escape query to prevent MarkupError
+        escaped_query = markup_escape(query)
+        detail += f"  [dim]·  \"{escaped_query}\"[/dim]"
 
     lines.append(format_activity_primary('Searched', detail))
 
