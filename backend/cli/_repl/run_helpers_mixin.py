@@ -448,7 +448,7 @@ class RunHelpersMixin:
             return ''
         except EOFError:
             self._consecutive_input_failures = 0
-            self._console.print(f'[{STYLE_DIM}]Input closed. Exiting.[/]')
+            self._console.print(f'[{STYLE_DIM}]Input closed. Exiting.[/{STYLE_DIM}]')
             return None
         except asyncio.CancelledError:
             # CancelledError inherits from BaseException, not Exception,

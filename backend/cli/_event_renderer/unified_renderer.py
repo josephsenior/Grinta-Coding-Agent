@@ -60,7 +60,7 @@ class ActivityCard:
         header = f'{badge_render} [{verb_style}]{self.verb}[/] {self.detail}'
 
         if self.title:
-            lines.append(f'[dim]{self.title}[/]')
+            lines.append(f'[dim]{self.title}[/dim]')
 
         lines.append(header)
 
@@ -136,7 +136,7 @@ class ActivityRenderer:
     @staticmethod
     def file_read(path: str, line_range: str = '') -> ActivityCard:
         """Create an activity card for a file read."""
-        detail = f'{path}  [dim]·  {line_range}[/]' if line_range else path
+        detail = f'{path}  [dim]·  {line_range}[/dim]' if line_range else path
         return ActivityCard(
             verb='Read',
             detail=detail,
@@ -158,7 +158,7 @@ class ActivityRenderer:
         if new_file and added:
             detail += f'  [bold #54efae]+{added}[/]'
         elif line_range:
-            detail = f'{path}  [dim]·  {line_range}[/]'
+            detail = f'{path}  [dim]·  {line_range}[/dim]'
 
         secondary = None
         if not new_file and (added or removed):
