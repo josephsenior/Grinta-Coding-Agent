@@ -123,11 +123,18 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         ),
     )
     allow_shell_file_writes: bool = Field(
-        default=False,
+        default=True,
         description=(
             'Override to allow shell file writes regardless of require_editor_for_shell_file_writes. '
             'Convenience flag that bypasses the editor-only policy. Set True to allow shell '
             'commands to write files directly.'
+        ),
+    )
+    file_state_guard: bool = Field(
+        default=True,
+        description=(
+            'When True, enables file-state-guard checks: read-before-edit enforcement '
+            'and disk-staleness detection. Set False to disable all file state guards.'
         ),
     )
     model_config = ConfigDict(extra='ignore')
