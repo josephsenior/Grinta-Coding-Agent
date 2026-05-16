@@ -279,12 +279,12 @@ class ThinkingIndicator(Static):
         elapsed = int(time.monotonic() - self._start_time) if self._start_time else 0
 
         lines: list[str] = []
-        lines.append(f'[bold #91abec]⟳ {self._current_action}[/] [dim]({elapsed}s)[/]')
+        lines.append(f'[bold #5eead4]Thinking:[/] [dim]({elapsed}s)[/]')
 
         if self._thoughts:
             for thought in self._thoughts[-5:]:
                 truncated = thought[:120] + ('...' if len(thought) > 120 else '')
-                lines.append(f'  [dim #8f9fc1]┃ {truncated}[/]')
+                lines.append(f'  [dim #6b7280]┃ {truncated}[/]')
 
         if self._step_count >= 3:
             avg_step = elapsed / self._step_count if self._step_count > 0 else 0

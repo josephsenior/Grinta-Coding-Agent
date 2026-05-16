@@ -23,7 +23,7 @@ from rich.text import Text
 from backend.cli.layout_tokens import (
     CALLOUT_PANEL_CHROME_WIDTH,
 )
-from backend.cli.theme import CLR_META, NAVY_TEXT_MUTED
+from backend.cli.theme import CLR_META, CLR_THOUGHT_BODY, NAVY_TEXT_DIM
 from backend.engine import prompt_role_debug as _prompt_role_debug
 
 # Panel chrome overhead: live ``MINIMAL`` frame + horizontal padding from
@@ -287,6 +287,9 @@ class ReasoningDisplay:
     ) -> Any:
         rows: list[Any] = []
 
+        # "Thinking:" header with distinct teal color
+        rows.append(Text('Thinking:', style='bold #5eead4'))
+
         if self.live_panel_shows_thought_rows():
             self._append_thought_rows(rows, max_width, max_lines)
 
@@ -348,9 +351,9 @@ class ReasoningDisplay:
         for i, row in enumerate(wrapped_rows):
             # First row of each entry gets the gutter marker
             if i in entry_starts:
-                rows.append(Text(f'{_GUTTER_MARKER} {row}', style=NAVY_TEXT_MUTED))
+                rows.append(Text(f'{_GUTTER_MARKER} {row}', style=NAVY_TEXT_DIM))
             else:
-                rows.append(Text(f'  {row}', style=NAVY_TEXT_MUTED))
+                rows.append(Text(f'  {row}', style=NAVY_TEXT_DIM))
 
         if clipped:
             rows.append(
