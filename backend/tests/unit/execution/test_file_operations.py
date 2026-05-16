@@ -92,7 +92,7 @@ class TestGetMaxEditObservationChars:
     def test_default(self):
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop('APP_MAX_EDIT_OBS_CHARS', None)
-            assert get_max_edit_observation_chars() == 200000
+            assert get_max_edit_observation_chars() == 500000
 
     def test_custom_value(self):
         with patch.dict(os.environ, {'APP_MAX_EDIT_OBS_CHARS': '5000'}):
@@ -100,11 +100,11 @@ class TestGetMaxEditObservationChars:
 
     def test_invalid_value(self):
         with patch.dict(os.environ, {'APP_MAX_EDIT_OBS_CHARS': 'abc'}):
-            assert get_max_edit_observation_chars() == 200000
+            assert get_max_edit_observation_chars() == 500000
 
     def test_negative_value(self):
         with patch.dict(os.environ, {'APP_MAX_EDIT_OBS_CHARS': '-1'}):
-            assert get_max_edit_observation_chars() == 200000
+            assert get_max_edit_observation_chars() == 500000
 
 
 # ---------------------------------------------------------------------------

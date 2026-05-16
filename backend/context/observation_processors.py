@@ -263,12 +263,131 @@ def _handle_file_read_observation(
     return Message(role='user', content=[TextContent(text=text)])
 
 
+def _truncate_diff_smart(content: str, max_chars: int) -> str:
+    """Truncate a file edit observation while preserving diff hunk structure.
+
+    Unlike blind head/tail truncation, this function:
+    1. Keeps the summary line and hash marker untruncated at the top
+    2. Parses diff hunks and keeps all hunk headers intact
+    3. Truncates only within oversized hunks (keeps first/last N lines)
+    4. Always includes the truncation banner between preserved sections
+
+    This prevents mid-hunk cuts that cause merged lines and indentation corruption.
+    """
+    if len(content) <= max_chars:
+        return content
+
+    lines = content.split('\n')
+    result_lines: list[str] = []
+    remaining = max_chars
+
+    # Always keep the first line (summary/hash) — it's critical
+    if lines:
+        first_line = lines[0]
+        result_lines.append(first_line)
+        remaining -= len(first_line) + 1  # +1 for newline
+
+    # Find diff hunk boundaries
+    hunk_starts: list[int] = []
+    hunk_ends: list[int] = []
+    for i, line in enumerate(lines):
+        if line.startswith('[begin of edit') or line.startswith('[begin of ATTEMPTED'):
+            hunk_starts.append(i)
+        elif line.startswith('[end of edit') or line.startswith('[end of ATTEMPTED'):
+            hunk_ends.append(i)
+
+    if not hunk_starts:
+        # No structured hunks found — fall back to head_heavy truncation
+        return truncate_content(content, max_chars, strategy='head_heavy')
+
+    # Budget per hunk: divide remaining budget across hunks
+    budget_per_hunk = max(200, remaining // len(hunk_starts)) if hunk_starts else 200
+    lines_per_hunk = max(10, budget_per_hunk // 80)  # ~80 chars per line avg
+
+    for hunk_idx, (start, end) in enumerate(zip(hunk_starts, hunk_ends)):
+        hunk_lines = lines[start:end + 1]
+        hunk_size = sum(len(l) + 1 for l in hunk_lines)
+
+        if hunk_size <= budget_per_hunk:
+            # Entire hunk fits — keep it all
+            result_lines.extend(hunk_lines)
+            remaining -= hunk_size
+        else:
+            # Hunk is too large — keep header, first N lines, last N lines
+            header_lines = []
+            body_lines = []
+            for l in hunk_lines:
+                if l.startswith('[begin of') or l.startswith('(content before'):
+                    header_lines.append(l)
+                elif l.startswith('(content after') or l.startswith('[end of'):
+                    body_lines.append(l)
+                else:
+                    body_lines.append(l)
+
+            # Split body into before/after sections around the "(content after" marker
+            after_idx = None
+            for i, l in enumerate(body_lines):
+                if l.startswith('(content after'):
+                    after_idx = i
+                    break
+
+            if after_idx is not None:
+                before_section = body_lines[:after_idx]
+                after_section = body_lines[after_idx:]
+
+                # Keep first/last N lines of each section
+                half = lines_per_hunk // 4
+                kept_before = before_section[:half] + (
+                    ['  [... truncated ...]'] if len(before_section) > half * 2 else []
+                ) + before_section[-half:] if len(before_section) > half * 2 else before_section
+                kept_after = after_section[:half] + (
+                    ['  [... truncated ...]'] if len(after_section) > half * 2 else []
+                ) + after_section[-half:] if len(after_section) > half * 2 else after_section
+
+                result_lines.extend(header_lines)
+                result_lines.extend(kept_before)
+                result_lines.extend(kept_after)
+            else:
+                # No clear before/after split — keep first/last N lines
+                half = lines_per_hunk // 2
+                kept = hunk_lines[:half] + (
+                    ['  [... truncated ...]'] if len(hunk_lines) > half * 2 else []
+                ) + hunk_lines[-half:] if len(hunk_lines) > half * 2 else hunk_lines
+                result_lines.extend(kept)
+
+            remaining -= budget_per_hunk
+
+        # Add separator between hunks
+        if hunk_idx < len(hunk_starts) - 1:
+            result_lines.append('-------------------------')
+            remaining -= 26
+
+    return '\n'.join(result_lines)
+
+
 def _handle_file_edit_observation(
     obs: FileEditObservation, max_message_chars: int | None
 ) -> Message:
-    content_str = str(obs)
-    text = truncate_content(content_str, max_message_chars, strategy='balanced')
+    # Use content_with_hash() to include the SHA-256 verification token
+    # so the LLM can self-correct if the observation looks truncated.
+    content_str = obs.content_with_hash()
     path = getattr(obs, 'path', 'unknown')
+
+    # For edit_mode=range edits (detected by hash presence), skip truncation.
+    # Range edits produce diffs proportional to the change, not the file size.
+    # Truncation here causes mid-hunk cuts, merged lines, and file corruption.
+    if max_message_chars and len(content_str) > max_message_chars:
+        if obs.new_content_hash:
+            # Hash-verified range edit — use smart truncation that preserves
+            # hunk structure, keeping all hunk headers and first/last lines.
+            text = _truncate_diff_smart(content_str, max_message_chars)
+        else:
+            # For non-range edits, use head_heavy strategy (88% head / 12% tail)
+            # to keep the beginning of edits intact where most changes occur.
+            text = truncate_content(content_str, max_message_chars, strategy='head_heavy')
+    else:
+        text = content_str
+
     text = f'[FILE_EDIT path={path}]\n{text}'
     return Message(role='user', content=[TextContent(text=text)])
 

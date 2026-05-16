@@ -371,21 +371,21 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
 
 def get_max_edit_observation_chars() -> int:
     """Read and validate max edit observation payload size from environment."""
-    raw_value = os.environ.get('APP_MAX_EDIT_OBS_CHARS', '200000')
+    raw_value = os.environ.get('APP_MAX_EDIT_OBS_CHARS', '500000')
     try:
         parsed = int(raw_value)
     except (TypeError, ValueError):
         logger.warning(
-            'Invalid APP_MAX_EDIT_OBS_CHARS=%r; using default 200000',
+            'Invalid APP_MAX_EDIT_OBS_CHARS=%r; using default 500000',
             raw_value,
         )
-        return 200000
+        return 500000
     if parsed <= 0:
         logger.warning(
-            'Non-positive APP_MAX_EDIT_OBS_CHARS=%s; using default 200000',
+            'Non-positive APP_MAX_EDIT_OBS_CHARS=%s; using default 500000',
             parsed,
         )
-        return 200000
+        return 500000
     return parsed
 
 

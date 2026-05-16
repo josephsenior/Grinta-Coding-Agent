@@ -663,6 +663,8 @@ def edit_try_directory_view(
 
 
 def edit_via_file_editor(executor: Any, action: Any) -> Any:
+    import hashlib
+
     from backend.execution.file_operations import (
         execute_file_editor,
         get_max_edit_observation_chars,
@@ -671,6 +673,9 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
 
     command = action.command or 'write'
     enable_lint = executor._is_auto_lint_enabled()
+    edit_mode = getattr(action, 'edit_mode', None) or ''
+    is_range_edit = edit_mode.strip().lower() == 'range'
+
     result_str, (old_content, new_content) = execute_file_editor(
         executor.file_editor,
         command=command,
@@ -682,7 +687,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         start_line=getattr(action, 'start_line', None),
         end_line=getattr(action, 'end_line', None),
         enable_linting=enable_lint,
-        edit_mode=getattr(action, 'edit_mode', None),
+        edit_mode=edit_mode,
         format_kind=getattr(action, 'format_kind', None),
         format_op=getattr(action, 'format_op', None),
         format_path=getattr(action, 'format_path', None),
@@ -698,8 +703,19 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
     )
     if result_str.startswith('ERROR:'):
         return ErrorObservation(result_str)
-    max_chars = get_max_edit_observation_chars()
-    result_str = truncate_large_text(result_str, max_chars, label='edit')
+
+    # Compute SHA-256 hash of new_content for verification
+    new_content_hash = None
+    if new_content is not None:
+        new_content_hash = hashlib.sha256(new_content.encode('utf-8')).hexdigest()
+
+    # For edit_mode=range, skip truncation entirely — range edits produce
+    # small, structured diffs proportional to the change size, not the file size.
+    # Truncation here only causes corruption (mid-hunk cuts, merged lines).
+    if not is_range_edit:
+        max_chars = get_max_edit_observation_chars()
+        result_str = truncate_large_text(result_str, max_chars, label='edit')
+
     if old_content is not None and new_content is not None and command != 'read_file':
         try:
             diff = get_diff(old_content, new_content, action.path)
@@ -721,6 +737,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         old_content=old_content,
         new_content=new_content,
         impl_source=FileEditSource.FILE_EDITOR,
+        new_content_hash=new_content_hash,
     )
 
 
