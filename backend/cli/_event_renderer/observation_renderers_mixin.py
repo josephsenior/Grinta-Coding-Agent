@@ -673,6 +673,9 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         raw = getattr(obs, 'content', '') or ''
         display = strip_tool_result_validation_annotations(raw)
         content = display.strip()
+        # Strip ANSI escape sequences from PTY/interactive terminal output
+        if content:
+            content = Text.from_ansi(content).plain
         has_new = getattr(obs, 'has_new_output', None)
         # Suppress entirely when there's nothing new — these are just polling
         # reads and the "no new text" caption is noise for the human user.
