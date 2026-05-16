@@ -212,6 +212,7 @@ class GrintaScreen(Screen):
 
     BINDINGS = [
         Binding('ctrl+c', 'copy_or_interrupt', 'Copy/Interrupt', show=True),
+        Binding('ctrl+shift+c', 'copy_transcript', 'Copy Transcript', show=True),
         Binding('escape', 'interrupt_agent', 'Interrupt', show=False),
         Binding('ctrl+l', 'clear_transcript', 'Clear', show=True),
         Binding('ctrl+z', 'suspend', 'Suspend', show=False),
@@ -608,6 +609,45 @@ class GrintaScreen(Screen):
             return
         if self._is_agent_running():
             self._interrupt_agent()
+
+    def action_copy_transcript(self) -> None:
+        """Copy the entire transcript content to clipboard."""
+        if self._renderer and self._renderer._history:
+            # Extract plain text from Rich history
+            plain_text = self._extract_plain_text_from_history()
+            if plain_text:
+                self.app.copy_to_clipboard(plain_text)
+                self._write_log(Text('  [dim]Transcript copied to clipboard[/dim]'))
+            else:
+                self._write_log(Text('  [dim]No content to copy[/dim]'))
+        else:
+            self._write_log(Text('  [dim]No transcript content[/dim]'))
+
+    def _extract_plain_text_from_history(self) -> str:
+        """Extract plain text from Rich history for copying."""
+        if not self._renderer or not self._renderer._history:
+            return ''
+        
+        lines = []
+        for item in self._renderer._history:
+            if hasattr(item, 'plain'):
+                # Rich Text object
+                lines.append(item.plain)
+            elif isinstance(item, str):
+                lines.append(item)
+            elif hasattr(item, '__rich_console__'):
+                # Rich renderable - try to extract text
+                try:
+                    from rich.console import Console
+                    from rich.text import Text
+                    console = Console(force_terminal=True, width=200)
+                    with console.capture() as capture:
+                        console.print(item)
+                    lines.append(capture.get())
+                except Exception:
+                    pass
+        
+        return '\n'.join(line for line in lines if line.strip())
 
     def action_interrupt_agent(self) -> None:
         """Interrupt the running agent."""
@@ -1569,8 +1609,8 @@ class TUIRenderer:
                 card = ActivityRenderer.terminal_output(content, session_id, exit_code)
                 self._write_card(card)
         elif isinstance(event, RecallAction):
-            card = ActivityRenderer.memory_update('active context')
-            self._write_card(card)
+            # Don't show memory recall as a visible card - it's an internal operation
+            pass
         elif isinstance(event, RecallObservation):
             pass
         elif isinstance(event, RecallFailureObservation):
