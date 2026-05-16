@@ -18,7 +18,9 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
+from rich import box
 from rich.console import Group
+from rich.panel import Panel
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -1387,19 +1389,48 @@ class TUIRenderer:
 
     def _write_card(self, card: ActivityCard) -> None:
         """Write an activity card to the transcript."""
-        # Rebuild from individual Rich Text objects instead of
-        # string-concatenating markup and calling Text.from_markup()
-        # on the result: the multiline string triggers Rich's
-        # position-counter to drift when a middle dot (U+00B7) lands
-        # exactly at an offset that Rich mis-counts, producing the
-        # spurious MarkupError at position 40.
-        for segment in card.to_rich_lines():
-            if isinstance(segment, str):
-                self._tui._write_log(
-                    Text.from_markup(segment) if segment.strip() else Text('')
-                )
-            else:
-                self._tui._write_log(segment)
+        # Cards that need visual containers (borders) in the TUI
+        _BORDERED_CATEGORIES = {'shell', 'terminal', 'files', 'mcp', 'browser', 'code', 'search', 'workers'}
+
+        if card.badge_category in _BORDERED_CATEGORIES:
+            # Build Rich Text lines from markup
+            rich_lines: list[Text] = []
+            for segment in card.to_rich_lines():
+                if isinstance(segment, str):
+                    rich_lines.append(Text.from_markup(segment) if segment.strip() else Text(''))
+                else:
+                    rich_lines.append(segment)
+
+            # Wrap in a subtle panel with category-colored border
+            border_color = {
+                'shell': '#91abec',
+                'terminal': '#5eead4',
+                'files': '#54efae',
+                'mcp': '#5eead4',
+                'browser': '#f6ff8f',
+                'code': '#91abec',
+                'search': '#c084fc',
+                'workers': '#f6ff8f',
+            }.get(card.badge_category, NAVY_BRAND)
+
+            panel = Panel(
+                Group(*rich_lines),
+                box=box.SQUARE,
+                border_style=border_color,
+                padding=(0, 1),
+                expand=True,
+            )
+            self._tui._write_log(panel)
+            self._tui._write_log(Text(''))  # spacing after card
+        else:
+            # Fallback: render as flat text (legacy behavior)
+            for segment in card.to_rich_lines():
+                if isinstance(segment, str):
+                    self._tui._write_log(
+                        Text.from_markup(segment) if segment.strip() else Text('')
+                    )
+                else:
+                    self._tui._write_log(segment)
 
     def drain_events(self) -> None:
         if not self._pending_events:
