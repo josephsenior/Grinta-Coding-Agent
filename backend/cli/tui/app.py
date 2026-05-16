@@ -18,6 +18,9 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
+from rich.console import Group
+from rich.panel import Panel
+from rich.box import SIMPLE
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -391,11 +394,11 @@ class GrintaScreen(Screen):
             self._renderer.add_to_history(renderable)
 
     def add_user_message(self, text: str) -> None:
-        """User message — clear bold header."""
+        """User message — left accent panel."""
         self._hide_thinking()
-        header = Text('\nYOU\n', style='bold #91abec')
         body = _rich_text(text)
-        self._write_log(Text.assemble(header, body, '\n'))
+        panel = Panel(body, box=SIMPLE, border_style="#91abec", padding=(0, 1))
+        self._write_log(Group(panel, Text('\n')))
 
     def add_agent_message(self, text: str) -> None:
         """Agent response — clear bold header."""
@@ -1307,7 +1310,6 @@ class TUIRenderer:
 
         if is_first_chunk:
             # First thinking chunk - prepend "Thinking:" prefix with teal color (not bold)
-            from rich.text import Text
             prefix = Text('Thinking: ', style='#5eead4')
             body = _rich_text(text)
             body.stylize(NAVY_TEXT_MUTED)
@@ -1384,9 +1386,20 @@ class TUIRenderer:
         self._tui._write_log(Group(*items))
 
     def _write_card(self, card: ActivityCard) -> None:
-        """Write an activity card to the transcript using unified markup."""
-        markup = card.to_tui_markup()
-        self._tui._write_log(Text.from_markup(markup))
+        """Write an activity card to the transcript."""
+        # Rebuild from individual Rich Text objects instead of
+        # string-concatenating markup and calling Text.from_markup()
+        # on the result: the multiline string triggers Rich's
+        # position-counter to drift when a middle dot (U+00B7) lands
+        # exactly at an offset that Rich mis-counts, producing the
+        # spurious MarkupError at position 40.
+        for segment in card.to_rich_lines():
+            if isinstance(segment, str):
+                self._tui._write_log(
+                    Text.from_markup(segment) if segment.strip() else Text('')
+                )
+            else:
+                self._tui._write_log(segment)
 
     def drain_events(self) -> None:
         if not self._pending_events:
@@ -1716,7 +1729,11 @@ class TUIRenderer:
             if self._tools_in_turn > 0:
                 elapsed = time.monotonic() - self._turn_start_time
                 duration_str = f'{elapsed:.1f}s'
-                self._tui._write_log(Text.from_markup(f'\n[dim #969aad]  ({self._tools_in_turn} tool{"s" if self._tools_in_turn != 1 else ""} executed · {duration_str})[/dim]\n'))
+                plural = '' if self._tools_in_turn == 1 else 's'
+                body_text = f'  ({self._tools_in_turn} tool{plural} executed \u00b7 {duration_str})'
+                line = Text.assemble('\n', body_text)
+                line.stylize(NAVY_TEXT_DIM)
+                self._tui._write_log(line)
 
         # Ensure thinking UI is cleared on any idle/terminal state
         if state in (AgentState.AWAITING_USER_INPUT, AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED):
