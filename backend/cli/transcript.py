@@ -30,8 +30,12 @@ from backend.cli.theme import (
     CLR_OK_BODY,
     CLR_OK_ICON,
     CLR_REASONING_COMMITTED,
+    CLR_SHELL_BORDER,
+    CLR_SHELL_OUTPUT,
     CLR_STATUS_WARN,
+    CLR_THOUGHT_BODY,
     CLR_TURN_RULE,
+    CLR_VERB,
     CLR_WARN_BODY,
     CLR_WARN_ICON,
     MARK_WARN,
@@ -168,6 +172,30 @@ def format_activity_validation_callout(message: str) -> Panel:
         border_style=CLR_STATUS_WARN,
         box=box.ROUNDED,
         padding=(0, 1),
+    )
+
+
+def format_shell_output_block(lines: list[str], *, kind: str = 'neutral') -> Panel:
+    """Shell command output wrapped in a subtle panel with left border.
+
+    Uses a minimal box with a dim left border to distinguish shell output
+    from other transcript content without being overwhelming.
+    """
+    if not lines:
+        return Group()
+
+    body_lines: list[Text] = []
+    for line in lines:
+        row = Text()
+        row.append('│ ', style=CLR_SHELL_BORDER)
+        row.append(line, style=CLR_SHELL_OUTPUT)
+        body_lines.append(row)
+
+    return Panel(
+        Group(*body_lines),
+        border_style=CLR_SHELL_BORDER,
+        box=box.MINIMAL,
+        padding=(0, 0),
     )
 
 

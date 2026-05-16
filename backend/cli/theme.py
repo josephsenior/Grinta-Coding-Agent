@@ -410,6 +410,10 @@ CLR_WARN_ICON = 'bold #f6ff8f'  # warning icon / accent
 CLR_INFO_BODY = '#91abec'  # info body text
 CLR_INFO_ICON = 'bold #91abec'  # info icon / accent
 
+# ── Shell output chrome ────────────────────────────────────────────────────────
+CLR_SHELL_OUTPUT = '#6b7280'  # shell command output text (dim gray)
+CLR_SHELL_BORDER = '#374151'  # shell output left border line
+
 # ── Shared UI markers (keep iconography consistent) ───────────────────────────
 MARK_OK = '✓'
 MARK_ERR = '✗'
