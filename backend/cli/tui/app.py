@@ -158,6 +158,9 @@ class InfoSidebar(VerticalScroll):
         overflow-y: auto;
         overflow-x: hidden;
     }
+    InfoSidebar.-hidden {
+        display: none;
+    }
     """
 
     def __init__(self) -> None:
@@ -165,24 +168,37 @@ class InfoSidebar(VerticalScroll):
         self._tasks: list[dict[str, str]] = []
         self._mcp_servers: list[dict[str, str]] = []
         self._skill_count: int = 0
+        self._is_mounted = False
+
+    def on_mount(self) -> None:
+        self._is_mounted = True
+        self._render()
 
     def compose(self) -> ComposeResult:
-        yield Static(id='sidebar-display')
+        yield Static('[dim #969aad]Loading…[/]', id='sidebar-display')
 
     def update_tasks(self, tasks: list[dict[str, str]]) -> None:
         self._tasks = tasks
-        self._render()
+        if self._is_mounted:
+            self._render()
 
     def update_mcp_servers(self, servers: list[dict[str, str]]) -> None:
         self._mcp_servers = servers
-        self._render()
+        if self._is_mounted:
+            self._render()
 
     def update_skills(self, count: int) -> None:
         self._skill_count = count
-        self._render()
+        if self._is_mounted:
+            self._render()
 
     def _render(self) -> None:
-        display = self.query_one('#sidebar-display', Static)
+        if not self._is_mounted:
+            return
+        try:
+            display = self.query_one('#sidebar-display', Static)
+        except Exception:
+            return
         parts: list[str] = []
 
         parts.append('[bold #91abec]Tasks[/]')
@@ -234,13 +250,22 @@ class Transcript(VerticalScroll):
     def __init__(self) -> None:
         super().__init__()
         self._widget_count = 0
+        self._is_mounted = False
+
+    def on_mount(self) -> None:
+        self._is_mounted = True
 
     def compose(self) -> ComposeResult:
-        yield Static(id='main-display')
+        yield Static('', id='main-display')
 
     def append_markup(self, markup: str) -> None:
         """Append markup text to the transcript incrementally."""
-        display = self.query_one('#main-display', Static)
+        if not self._is_mounted:
+            return
+        try:
+            display = self.query_one('#main-display', Static)
+        except Exception:
+            return
         current = display.renderable.plain if hasattr(display.renderable, 'plain') else ''
         if current and not current.endswith('\n'):
             current += '\n'
@@ -249,7 +274,12 @@ class Transcript(VerticalScroll):
 
     def append_rich(self, renderable: Any) -> None:
         """Append a Rich renderable to the transcript."""
-        display = self.query_one('#main-display', Static)
+        if not self._is_mounted:
+            return
+        try:
+            display = self.query_one('#main-display', Static)
+        except Exception:
+            return
         if isinstance(display.renderable, Text):
             current = display.renderable
             from rich.console import Group
@@ -461,10 +491,8 @@ class GrintaScreen(Screen):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id='main-layout'):
-            with Transcript(id='transcript-container'):
-                yield Static(id='main-display')
-            with InfoSidebar(id='sidebar-container'):
-                yield Static(id='sidebar-display')
+            yield Transcript(id='transcript-container')
+            yield InfoSidebar(id='sidebar-container')
         with InputBar(id='input-bar'):
             yield Static(id='spinner', classes='-hidden')
             yield TextArea(id='input', show_line_numbers=False)
