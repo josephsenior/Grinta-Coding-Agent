@@ -350,8 +350,8 @@ class ToolResultValidator(ToolInvocationMiddleware):
         if not isinstance(content, str):
             return
 
-        if len(content) > 3000:
-            content = truncate_content(content, 3000, strategy='tail_heavy')
+        if len(content) > 10000:
+            content = truncate_content(content, 10000, strategy='tail_heavy')
 
         if not (result.warnings or result.errors or result.blocked):
             observation.content = content
