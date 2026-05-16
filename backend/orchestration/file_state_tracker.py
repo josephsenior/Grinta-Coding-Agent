@@ -125,47 +125,10 @@ class FileStateTracker:
     def check_read_stale(self, path_str: str) -> str | None:
         """Return error message if disk changed since snapshot; else None.
 
-        If mtime is newer but bytes hash matches (e.g. Windows noise), allow.
-        If bytes changed but mtime did not advance (coarse FS timestamp), still
-        treat as stale.
+        DISABLED: File state guard is turned off — edits proceed regardless
+        of disk staleness.
         """
-        if os.environ.get('GRINTA_SKIP_READ_STALE_CHECK', '').lower() in (
-            '1',
-            'true',
-            'yes',
-        ):
-            return None
-        key = _normalize_path_key(path_str)
-        if not key:
-            return None
-        snap = self._read_snapshots.get(key)
-        if snap is None:
-            return None
-        try:
-            p = Path(key)
-            if not p.is_file():
-                return None
-            st = p.stat()
-            digest = hashlib.sha256(p.read_bytes()).hexdigest()
-            logger.debug(
-                'File read stale check compare',
-                extra={
-                    'msg_type': 'FILE_STALE_CHECK',
-                    'path': path_str,
-                    'current_mtime': st.st_mtime,
-                    'snapshot_mtime': snap.mtime,
-                    'mtime_advanced': st.st_mtime > snap.mtime,
-                    'digest_equal': digest == snap.content_sha256,
-                },
-            )
-            if digest == snap.content_sha256:
-                return None
-        except OSError:
-            return None
-        return (
-            f'[FILE_STATE_GUARD] File changed on disk since it was read '
-            f'(path {path_str!r}). Read it again before editing.'
-        )
+        return None
 
     def get_summary(self) -> str:
         """Return a compact summary of tracked files for injection into context."""
@@ -298,17 +261,8 @@ def _find_symbol_references(
 
 
 def _read_before_edit_enforced() -> bool:
-    """Read-before-edit is on by default; opt out with GRINTA_SKIP_READ_BEFORE_EDIT=1.
-
-    Claude Code enforces this unconditionally and it is their single most
-    effective guard against "string not found" / context drift errors. We
-    allow opt-out for legacy replay scenarios and power users.
-    """
-    return os.environ.get('GRINTA_SKIP_READ_BEFORE_EDIT', '').lower() not in (
-        '1',
-        'true',
-        'yes',
-    )
+    """Read-before-edit guard. DISABLED by default."""
+    return False
 
 
 class FileStateMiddleware(ToolInvocationMiddleware):

@@ -43,9 +43,10 @@ def test_load_from_dict_restores_entries() -> None:
     assert 'created: src/app.py' in summary
 
 
-def test_read_snapshot_stale_after_disk_change(
+def test_read_snapshot_stale_guard_disabled(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """File state guard is disabled — stale check always returns None."""
     monkeypatch.chdir(tmp_path)
     f = tmp_path / 'stale.txt'
     f.write_text('version-one\n', encoding='utf-8')
@@ -53,8 +54,7 @@ def test_read_snapshot_stale_after_disk_change(
     tracker.record_read_snapshot_from_disk('stale.txt')
     f.write_text('version-two\n', encoding='utf-8')
     msg = tracker.check_read_stale('stale.txt')
-    assert msg is not None
-    assert 'changed on disk' in (msg or '')
+    assert msg is None
 
 
 def test_read_snapshot_not_stale_when_content_matches(
@@ -112,10 +112,10 @@ def _file_edit_action(path: str, command: str):
 
 
 @pytest.mark.asyncio
-async def test_middleware_blocks_str_replace_without_prior_read(
+async def test_middleware_allows_str_replace_without_prior_read(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Editing a file that has never been read in this session must be blocked."""
+    """Read-before-edit guard is disabled — editing without prior read is allowed."""
     monkeypatch.chdir(tmp_path)
     f = tmp_path / 'target.py'
     f.write_text('x = 1\n', encoding='utf-8')
@@ -126,9 +126,7 @@ async def test_middleware_blocks_str_replace_without_prior_read(
 
     await mw.execute(ctx)
 
-    assert ctx.blocked is True
-    assert 'FILE_STATE_GUARD' in (ctx.block_reason or '')
-    assert ctx.metadata.get('block_agent_only') is True
+    assert ctx.blocked is False
 
 
 @pytest.mark.asyncio
@@ -168,26 +166,23 @@ async def test_middleware_allows_edit_on_new_nonexistent_file(
 
 
 @pytest.mark.asyncio
-async def test_middleware_blocks_mutating_edit_on_stale_file(
+async def test_middleware_allows_mutating_edit_on_stale_file(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Editing a file that changed on disk since the last read must be blocked."""
+    """File state guard is disabled — stale files are not blocked."""
     monkeypatch.chdir(tmp_path)
     f = tmp_path / 'stale.py'
     f.write_text('v1\n', encoding='utf-8')
 
     mw = FileStateMiddleware()
-    # Simulate: file was read, snapshot taken.
     mw.tracker.record(str(f), 'read')
     mw.tracker.record_read_snapshot_from_disk(str(f))
 
-    # Advance mtime so the staleness check sees a newer mtime.
     key = _normalize_path_key(str(f))
     assert key is not None
     snap = mw.tracker._read_snapshots[key]
     future_mtime = snap.mtime + 10
     os.utime(f, (future_mtime, future_mtime))
-    # Overwrite content so hash also changes.
     f.write_text('v2\n', encoding='utf-8')
     os.utime(f, (future_mtime, future_mtime))
 
@@ -196,9 +191,7 @@ async def test_middleware_blocks_mutating_edit_on_stale_file(
 
     await mw.execute(ctx)
 
-    assert ctx.blocked is True
-    assert 'FILE_STATE_GUARD' in (ctx.block_reason or '')
-    assert ctx.metadata.get('block_agent_only') is True
+    assert ctx.blocked is False
 
 
 # ---------------------------------------------------------------------------
