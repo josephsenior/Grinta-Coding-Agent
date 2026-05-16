@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from rich.markup import escape as markup_escape
+
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     CLR_SECONDARY,
+    CLR_THOUGHT_BODY,
 )
 from backend.cli.transcript import format_activity_primary
 
@@ -12,7 +15,7 @@ from backend.cli.transcript import format_activity_primary
 def render_think(thought: str, source_tool: str = '') -> list[str]:
     """Render internal agent reasoning as structured extra lines.
 
-    Returns badge + primary line + continuation lines (no extra formatting).
+    Returns badge + primary line with 'Thinking:' prefix + continuation lines.
     """
     lines: list[str] = []
 
@@ -26,7 +29,8 @@ def render_think(thought: str, source_tool: str = '') -> list[str]:
     if len(first_para) > 100:
         first_para = first_para[:97] + '…'
 
-    lines.append(format_activity_primary('Thought', first_para))
+    # Use 'Thinking:' prefix instead of 'Thought' for consistency with TUI
+    lines.append(format_activity_primary('Thinking:', first_para))
 
     if len(paragraphs) > 1:
         for para in paragraphs[1:4]:
@@ -34,7 +38,9 @@ def render_think(thought: str, source_tool: str = '') -> list[str]:
             if len(text) > 100:
                 text = text[:97] + '…'
             if text:
-                lines.append(f"  [dim]{text}[/dim]")
+                # Escape text to prevent MarkupError from unescaped brackets
+                escaped_text = markup_escape(text)
+                lines.append(f"  [{CLR_THOUGHT_BODY}]{escaped_text}[/{CLR_THOUGHT_BODY}]")
 
     return lines
 
@@ -64,6 +70,8 @@ def render_message(content: str) -> list[str]:
             if len(text) > 100:
                 text = text[:97] + '…'
             if text:
-                lines.append(f"  [{CLR_SECONDARY}]{text}[/{CLR_SECONDARY}]")
+                # Escape text to prevent MarkupError from unescaped brackets
+                escaped_text = markup_escape(text)
+                lines.append(f"  [{CLR_SECONDARY}]{escaped_text}[/{CLR_SECONDARY}]")
 
     return lines

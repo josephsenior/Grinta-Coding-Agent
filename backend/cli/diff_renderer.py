@@ -13,6 +13,8 @@ from rich.text import Text
 from backend.cli.theme import (
     CLR_CARD_BORDER,
     CLR_CARD_TITLE,
+    CLR_STATUS_WARN,
+    CLR_WARN_BODY,
 )
 from backend.cli.transcript import (
     format_activity_delta_secondary,
@@ -46,6 +48,38 @@ def _is_validation_secondary(text: str) -> bool:
     )
 
 
+def _extract_indentation_warnings(content: str) -> tuple[str, list[str] | None]:
+    """Extract indentation warnings from content string.
+    
+    Returns (content_without_warnings, warnings_list) where warnings_list
+    is None if no warnings found.
+    """
+    marker = '[INDENTATION WARNINGS]'
+    idx = content.find(marker)
+    if idx == -1:
+        return content, None
+    
+    # Split content into main part and warnings
+    main_content = content[:idx].rstrip()
+    warnings_str = content[idx + len(marker):].strip()
+    
+    # Parse warnings into structured list
+    warnings = []
+    current_warning = []
+    for line in warnings_str.split('\n'):
+        line = line.strip()
+        if line.startswith('[INDENTATION MISMATCH]') or line.startswith('[INDENTATION ERROR]'):
+            if current_warning:
+                warnings.append('\n'.join(current_warning))
+                current_warning = []
+        if line:
+            current_warning.append(line)
+    if current_warning:
+        warnings.append('\n'.join(current_warning))
+    
+    return main_content, warnings if warnings else None
+
+
 class DiffPanel:
     """Rich renderable that shows a unified diff for a file edit."""
 
@@ -75,12 +109,16 @@ class DiffPanel:
         # New file creation — no diff, just show creation note
         if not prev_exist:
             self._append_new_file_delta(parts)
+            # Check for indentation warnings in content
+            self._append_indentation_warnings(parts, obs)
             yield self._build_panel(parts)
             return
 
         # GRINTA_SHOW_DIFF=0: hide full diff output
         if os.environ.get('GRINTA_SHOW_DIFF', '1') == '0':
             parts.append(format_activity_result_secondary('updated', kind='ok'))
+            # Check for indentation warnings in content
+            self._append_indentation_warnings(parts, obs)
             yield self._build_panel(parts)
             return
 
@@ -88,6 +126,8 @@ class DiffPanel:
         groups = self._extract_edit_groups()
         if groups:
             self._append_groups_diff(parts, groups)
+            # Check for indentation warnings in content
+            self._append_indentation_warnings(parts, obs)
             yield self._build_panel(parts)
             return
 
@@ -95,17 +135,65 @@ class DiffPanel:
         diff_str = self._extract_visualize_diff()
         if diff_str:
             parts.append(Text(diff_str[:3000]))
+            # Check for indentation warnings in content
+            self._append_indentation_warnings(parts, obs)
             yield self._build_panel(parts)
             return
 
         embedded = self._extract_embedded_diff()
         if embedded:
             parts.append(Text(embedded[:3000]))
+            # Check for indentation warnings in content
+            self._append_indentation_warnings(parts, obs)
             yield self._build_panel(parts)
             return
 
         parts.append(format_activity_result_secondary('updated', kind='ok'))
+        # Check for indentation warnings in content
+        self._append_indentation_warnings(parts, obs)
         yield self._build_panel(parts)
+
+    def _append_indentation_warnings(self, parts: list[Any], obs: Any) -> None:
+        """Append styled indentation warnings if present in observation content."""
+        content = getattr(obs, 'content', None) or getattr(obs, 'output', '')
+        if not content:
+            return
+        
+        main_content, warnings = _extract_indentation_warnings(content)
+        if not warnings:
+            return
+        
+        # Add a separator
+        parts.append(Text(''))
+        
+        # Add warning header
+        parts.append(Text('⚠ Indentation Warnings', style=f'bold {CLR_STATUS_WARN}'))
+        parts.append(Text(''))
+        
+        # Add each warning with styling
+        for warning in warnings:
+            # Parse warning components
+            lines = warning.split('\n')
+            for line in lines:
+                if line.startswith('[INDENTATION MISMATCH]'):
+                    # Style mismatch warnings
+                    text = line.replace('[INDENTATION MISMATCH] ', '')
+                    parts.append(Text(f'  ⚠ {text}', style=CLR_STATUS_WARN))
+                elif line.startswith('[INDENTATION ERROR]'):
+                    # Style error warnings
+                    text = line.replace('[INDENTATION ERROR] ', '')
+                    parts.append(Text(f'  ✗ {text}', style=CLR_STATUS_WARN))
+                elif line.startswith('[BROKEN LINE]'):
+                    # Style broken line
+                    text = line.replace('[BROKEN LINE] ', '')
+                    parts.append(Text(f'    → {text}', style=CLR_WARN_BODY))
+                elif line.startswith('[SUGGESTED FIX]'):
+                    # Style suggested fix
+                    text = line.replace('[SUGGESTED FIX] ', '')
+                    parts.append(Text(f'    💡 {text}', style=CLR_WARN_BODY))
+        
+        # Add a separator
+        parts.append(Text(''))
 
     def _append_secondary(self, parts: list[Any]) -> None:
         if not self._secondary:

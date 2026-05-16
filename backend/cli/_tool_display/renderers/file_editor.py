@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from rich.markup import escape as markup_escape
+
 from backend.cli.theme import (
     CLR_DETAIL,
     CLR_SECONDARY,
@@ -53,13 +55,19 @@ def render_file_edit(
         for line in diff_lines[:20]:
             stripped = line.rstrip()
             if stripped.startswith('+') and not stripped.startswith('+++'):
-                lines.append(f"[{CLR_STATUS_OK}]{stripped}[/{CLR_STATUS_OK}]")
+                # Escape content after the + sign to prevent MarkupError
+                content = markup_escape(stripped[1:])
+                lines.append(f"[{CLR_STATUS_OK}]+{content}[/{CLR_STATUS_OK}]")
             elif stripped.startswith('-') and not stripped.startswith('---'):
-                lines.append(f"[{CLR_DETAIL}]{stripped}[/{CLR_DETAIL}]")
+                # Escape content after the - sign to prevent MarkupError
+                content = markup_escape(stripped[1:])
+                lines.append(f"[{CLR_DETAIL}]-{content}[/{CLR_DETAIL}]")
             elif stripped.startswith('@@'):
                 lines.append(f"[{CLR_SECONDARY}]{stripped}[/{CLR_SECONDARY}]")
             else:
-                lines.append(f"[dim]{stripped}[/dim]")
+                # Escape context lines to prevent MarkupError
+                escaped = markup_escape(stripped)
+                lines.append(f"[dim]{escaped}[/dim]")
 
         if len(diff_lines) > 20:
             lines.append(f"  [dim]... {len(diff_lines) - 20} more diff lines[/dim]")
