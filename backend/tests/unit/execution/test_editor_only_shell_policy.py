@@ -8,10 +8,8 @@ from backend.core.config.security_config import SecurityConfig
 from backend.execution.editor_only_shell_policy import evaluate_editor_only_shell_block
 
 
-def _cfg(**kwargs) -> SecurityConfig:
-    base: dict = {'allow_shell_file_writes': True}
-    base.update(kwargs)
-    return SecurityConfig.model_validate(base)
+def _cfg() -> SecurityConfig:
+    return SecurityConfig.model_validate({})
 
 
 @pytest.mark.parametrize(
@@ -26,10 +24,11 @@ def _cfg(**kwargs) -> SecurityConfig:
         ('dd if=/dev/zero of=image.img bs=1 count=1',),
     ],
 )
-def test_blocks_obvious_shell_writes(command: str) -> None:
+def test_blocks_obvious_shell_writes(monkeypatch: pytest.MonkeyPatch, command: str) -> None:
+    monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
     msg = evaluate_editor_only_shell_block(
         command=command,
-        security_config=_cfg(allow_shell_file_writes=False),
+        security_config=_cfg(),
         workspace_root='/workspace',
     )
     assert msg is not None
@@ -45,22 +44,24 @@ def test_blocks_obvious_shell_writes(command: str) -> None:
         ('npm run build > output.log',),
     ],
 )
-def test_allows_log_and_tmp_redirections(command: str) -> None:
+def test_allows_log_and_tmp_redirections(monkeypatch: pytest.MonkeyPatch, command: str) -> None:
+    monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
     assert (
         evaluate_editor_only_shell_block(
             command=command,
-            security_config=_cfg(allow_shell_file_writes=False),
+            security_config=_cfg(),
             workspace_root='/workspace',
         )
         is None
     )
 
 
-def test_allows_toolchain_commands() -> None:
+def test_allows_toolchain_commands(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
     assert (
         evaluate_editor_only_shell_block(
             command='git checkout -b feature',
-            security_config=_cfg(allow_shell_file_writes=False),
+            security_config=_cfg(),
             workspace_root='/workspace',
         )
         is None
@@ -68,29 +69,31 @@ def test_allows_toolchain_commands() -> None:
     assert (
         evaluate_editor_only_shell_block(
             command='cd pkg && npm install && npm run build',
-            security_config=_cfg(allow_shell_file_writes=False),
+            security_config=_cfg(),
             workspace_root='/workspace',
         )
         is None
     )
 
 
-def test_allows_when_config_enabled() -> None:
+def test_allows_when_env_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('GRINTA_ALLOW_SHELL_WRITES', '1')
     assert (
         evaluate_editor_only_shell_block(
             command='Set-Content -Path x.html -Value z',
-            security_config=_cfg(allow_shell_file_writes=True),
+            security_config=_cfg(),
             workspace_root='/workspace',
         )
         is None
     )
 
 
-def test_allows_powershell_to_temp() -> None:
+def test_allows_powershell_to_temp(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
     assert (
         evaluate_editor_only_shell_block(
             command='Set-Content -Path $env:TEMP\\scratch.txt -Value x',
-            security_config=_cfg(allow_shell_file_writes=False),
+            security_config=_cfg(),
             workspace_root='/workspace',
         )
         is None
@@ -105,7 +108,7 @@ def test_env_override_allows_shell_writes(
     assert (
         evaluate_editor_only_shell_block(
             command='Set-Content -Path index.html -Value "<html>"',
-            security_config=_cfg(allow_shell_file_writes=False),
+            security_config=_cfg(),
             workspace_root='/workspace',
         )
         is None
@@ -116,7 +119,7 @@ def test_env_override_off_preserves_block(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv('GRINTA_ALLOW_SHELL_WRITES', '0')
     msg = evaluate_editor_only_shell_block(
         command='Set-Content -Path index.html -Value "<html>"',
-        security_config=_cfg(allow_shell_file_writes=False),
+        security_config=_cfg(),
         workspace_root='/workspace',
     )
     assert msg is not None
@@ -126,7 +129,7 @@ def test_block_message_mentions_env_var(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
     msg = evaluate_editor_only_shell_block(
         command='Set-Content -Path index.html -Value z',
-        security_config=_cfg(allow_shell_file_writes=False),
+        security_config=_cfg(),
         workspace_root='/workspace',
     )
     assert msg is not None

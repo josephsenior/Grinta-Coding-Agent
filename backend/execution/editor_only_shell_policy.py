@@ -108,12 +108,10 @@ def _likely_toolchain_command(command: str) -> bool:
 
 
 def _env_allow_shell_writes() -> bool:
-    """``GRINTA_ALLOW_SHELL_WRITES`` global override.
+    """``GRINTA_ALLOW_SHELL_WRITES`` single source of truth.
 
-    Setting this to ``1/true/yes/on`` force-allows shell writes regardless
-    of the security config — matching OpenCode and Claude Code, which
-    expose a full shell tool without blanket file-write bans. Useful for
-    one-off scripted scaffolding sessions.
+    Setting this to ``1/true/yes/on`` allows shell writes.
+    When unset or ``0/false/no/off``, shell writes to source files are blocked.
     """
     raw = os.environ.get('GRINTA_ALLOW_SHELL_WRITES', '').strip().lower()
     return raw in {'1', 'true', 'yes', 'on'}
@@ -128,20 +126,13 @@ def evaluate_editor_only_shell_block(
 ) -> str | None:
     """Return an error message if this shell command must not run, else None.
 
-    Precedence:
+    Single gate: ``GRINTA_ALLOW_SHELL_WRITES=1`` allows shell writes.
+    When unset or ``0``, shell writes to source files are blocked.
 
-    1. ``security_config.allow_shell_file_writes=True`` → always allow.
-    2. ``GRINTA_ALLOW_SHELL_WRITES=1`` env var → always allow (backward compat).
-    3. Otherwise run the pattern checks and block Set-Content/Out-File/
-       redirection/tee/dd when they target non-log files.
-
-    workspace_root and cwd are reserved for future path-precision checks
-    (e.g. only block writes outside the workspace).
+    workspace_root and cwd are reserved for future path-precision checks.
     """
     _ = Path(workspace_root)
     _ = cwd
-    if getattr(security_config, 'allow_shell_file_writes', True):
-        return None
     if _env_allow_shell_writes():
         return None
 
@@ -174,6 +165,5 @@ _BLOCK_MSG = (
     '- `symbol_editor` (create_file, replace_range, …) for structured code modifications.\n'
     'Direct shell commands like `Set-Content`, `Out-File`, `tee`, or `>` / `>>` are only allowed for '
     '`.log` / `.tmp` files or files in temporary directories. To allow shell-level writes, set '
-    '`allow_shell_file_writes = true` in SecurityConfig or set env var '
-    '`GRINTA_ALLOW_SHELL_WRITES=1`.'
+    'env var `GRINTA_ALLOW_SHELL_WRITES=1`.'
 )

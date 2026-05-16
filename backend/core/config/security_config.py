@@ -113,14 +113,6 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "allowed inside the workspace, e.g. ['curl', 'invoke-webrequest']."
         ),
     )
-    allow_shell_file_writes: bool = Field(
-        default=True,
-        description=(
-            'When True, shell commands can create or overwrite project files via '
-            'redirection, tee/dd, or PowerShell file-writing cmdlets. When False, '
-            'agents must use text_editor / symbol_editor for file modifications.'
-        ),
-    )
     file_state_guard: bool = Field(
         default=True,
         description=(
