@@ -216,8 +216,6 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._turn_start_cost: float = 0.0
         self._turn_start_tokens: int = 0
         self._turn_start_calls: int = 0
-        # User-facing turn counter for visual round grouping
-        self._user_turn_count: int = 0
         self._task_panel: Any | None = None
         self._task_panel_signature: tuple[tuple[str, str, str], ...] | None = None
         self._last_printed_task_panel_signature: (
@@ -485,22 +483,12 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._delegate_panel_signature = None
         self._last_printed_delegate_panel_signature = None
         self._last_committed_reasoning_lines = None
-        self._user_turn_count = 0
         self._clear_streaming_preview()
         self._reasoning.stop()
         self.refresh()
 
     async def add_user_message(self, text: str) -> None:
         """Print a user turn — rounded panel, high-contrast label."""
-        self._user_turn_count += 1
-
-        # Turn separator with round number
-        from rich.rule import Rule
-
-        turn_label = f' #{self._user_turn_count} '
-        turn_sep = Rule(turn_label, style=f'dim {CLR_SEP}')
-        turn_sep_framed = frame_transcript_body(turn_sep)
-
         body = Text((text or '').rstrip(), style=STYLE_DEFAULT)
         panel = Panel(
             Padding(body, CALLOUT_PANEL_PADDING),
@@ -512,9 +500,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             style=STYLE_DEFAULT,
         )
         framed = frame_transcript_body(panel)
-        spacer = frame_transcript_body(Text(''))
-        extra_spacer = frame_transcript_body(Text(''))
-        group = Group(turn_sep_framed, spacer, framed, spacer, extra_spacer)
+        group = Group(framed)
 
         if self._live is not None:
             # Same path as committed transcript lines during a turn: print into

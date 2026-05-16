@@ -1394,8 +1394,7 @@ class TUIRenderer:
             self._in_agent_turn = True
             self._turn_count += 1
             self._tools_in_turn = 0
-            # Insert turn divider
-            self._tui._write_log(Text(f'\n[dim #32416a]── Turn {self._turn_count} ──────────────────────────────[/dim]\n'))
+
 
         # Count tools in current turn
         if self._in_agent_turn and isinstance(event, (FileReadAction, FileEditAction, FileWriteAction,
