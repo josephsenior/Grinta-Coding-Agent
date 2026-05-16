@@ -270,8 +270,15 @@ class StructureEditor:
         # Detect language
         language = self.universal.detect_language(path)
         if not language:
+            ext = Path(path).suffix.lower() or '(no extension)'
+            supported = ', '.join(sorted({'.py', '.js', '.ts', '.go', '.rs', '.java', '.c', '.cpp', '.rb', '.php', '.swift', '.kt', '.cs', '.html', '.css', '.json', '.yaml', '.sh'}))
             return EditResult(
-                success=False, message=f'Cannot detect language for {path}'
+                success=False,
+                message=(
+                    f"Structure Editor doesn't support {ext} files. "
+                    f"It requires source code files with tree-sitter parsers. "
+                    f'Supported: {supported}'
+                ),
             )
 
         # Skip auto-indent: the tree-sitter _replace_node_content already
