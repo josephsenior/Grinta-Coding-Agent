@@ -127,7 +127,7 @@ class ActivityCard(Container):
         parts: list[str] = []
 
         if self._title:
-            parts.append(f'[dim]{self._title}[/]')
+            parts.append(f'[dim]{self._title}[/dim]')
 
         parts.append(self._build_header_markup())
 
@@ -275,7 +275,7 @@ class ThinkingIndicator(Static):
         elapsed = int(time.monotonic() - self._start_time) if self._start_time else 0
 
         lines: list[str] = []
-        lines.append(f'[bold #5eead4]Thinking:[/] [dim]({elapsed}s)[/]')
+        lines.append(f'[bold #5eead4]Thinking:[/] [dim]({elapsed}s)[/dim]')
 
         if self._thoughts:
             for thought in self._thoughts[-5:]:

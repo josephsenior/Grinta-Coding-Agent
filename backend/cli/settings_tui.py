@@ -81,7 +81,7 @@ def _print_provider_menu(
         idx += 1
     custom_idx = idx
     console.print(
-        f'  [{CLR_BRAND}]{custom_idx:>2}[/]  Custom [dim](OpenAI-compatible endpoint)[/]'
+        f'  [{CLR_BRAND}]{custom_idx:>2}[/]  Custom [dim](OpenAI-compatible endpoint)[/dim]'
     )
     console.print()
     return provider_map, custom_idx

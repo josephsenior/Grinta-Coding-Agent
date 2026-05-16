@@ -92,7 +92,7 @@ def _highlight_query(text: str, query: str) -> str:
         return text
 
     escaped = re.escape(query)
-    return re.sub(f'({escaped})', r'[/][bold #f6ff8f]\1[/][dim]', text, flags=re.IGNORECASE)
+    return re.sub(f'({escaped})', r'[bold #f6ff8f]\1[/bold #f6ff8f]', text, flags=re.IGNORECASE)
 
 
 def render_search_summary(
