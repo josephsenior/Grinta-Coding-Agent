@@ -19,8 +19,6 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Group
-from rich.panel import Panel
-from rich.box import SIMPLE
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -394,11 +392,12 @@ class GrintaScreen(Screen):
             self._renderer.add_to_history(renderable)
 
     def add_user_message(self, text: str) -> None:
-        """User message — left accent panel."""
+        """User message — left accent indicator."""
         self._hide_thinking()
         body = _rich_text(text)
-        panel = Panel(body, box=SIMPLE, border_style="#91abec", padding=(0, 1), expand=True)
-        self._write_log(Group(panel, Text('\n')))
+        # Left accent line using box drawing characters
+        accent = Text('▌', style='bold #91abec')
+        self._write_log(Text.assemble(accent, ' ', body, '\n'))
 
     def add_agent_message(self, text: str) -> None:
         """Agent response — clear bold header."""
