@@ -163,8 +163,8 @@ class InfoSidebar(VerticalScroll):
     }
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self._tasks: list[dict[str, str]] = []
         self._mcp_servers: list[dict[str, str]] = []
         self._skill_count: int = 0
@@ -247,8 +247,8 @@ class Transcript(VerticalScroll):
     }
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self._widget_count = 0
         self._is_mounted = False
 
