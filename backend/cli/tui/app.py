@@ -1325,10 +1325,12 @@ class TUIRenderer:
         self._live_thinking = text
 
         if is_first_chunk:
-            # First thinking chunk - append to history at its correct position
+            # First thinking chunk - prepend "Thinking:" prefix with teal color (not bold)
+            from rich.text import Text
+            prefix = Text('Thinking: ', style='#5eead4')
             body = _rich_text(text)
             body.stylize(NAVY_TEXT_MUTED)
-            self._history.append(Text.assemble(body, '\n'))
+            self._history.append(Text.assemble(prefix, body, '\n'))
         else:
             # Subsequent chunks - replace the last item (which is the thinking text)
             if self._history:
@@ -1512,6 +1514,11 @@ class TUIRenderer:
         elif isinstance(event, FileReadObservation):
             pass
         elif isinstance(event, FileEditObservation):
+            # Strip agent-facing indentation warnings from user-visible content
+            from backend.cli.transcript import strip_indentation_warnings
+            if hasattr(event, 'content') and event.content:
+                event.content = strip_indentation_warnings(event.content)
+            
             diff = self._extract_file_edit_diff(event)
             added = event.added
             removed = event.removed

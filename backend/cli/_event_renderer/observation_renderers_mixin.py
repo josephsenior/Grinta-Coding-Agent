@@ -365,6 +365,11 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
     def _render_file_edit_observation(self, obs: FileEditObservation) -> None:
         self._stop_reasoning()
         from backend.cli.diff_renderer import DiffPanel
+        from backend.cli.transcript import strip_indentation_warnings
+
+        # Strip agent-facing indentation warnings from user-visible content
+        if hasattr(obs, 'content') and obs.content:
+            obs.content = strip_indentation_warnings(obs.content)
 
         path = getattr(obs, 'path', '')
         pending = cast(Any, self._take_pending_activity_card('file_edit'))

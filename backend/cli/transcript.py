@@ -52,10 +52,21 @@ _APP_RESULT_VALIDATION_RE = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 
+# Indentation warnings are agent-facing guidance — hide from user transcript.
+_INDENTATION_WARNINGS_RE = re.compile(
+    r'\n\n\[INDENTATION WARNINGS\].*?(?=\n\n|\Z)',
+    re.DOTALL,
+)
+
 
 def strip_tool_result_validation_annotations(text: str) -> str:
     """Remove internal tool-validation tags; keeps scrollback readable."""
     return _APP_RESULT_VALIDATION_RE.sub('', text or '').strip()
+
+
+def strip_indentation_warnings(text: str) -> str:
+    """Remove agent-facing indentation warnings from user-visible output."""
+    return _INDENTATION_WARNINGS_RE.sub('', text or '')
 
 
 _GROUND_PREFIX = '    > '
