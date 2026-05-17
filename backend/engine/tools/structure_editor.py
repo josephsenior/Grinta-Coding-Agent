@@ -275,7 +275,7 @@ class StructureEditor:
             return EditResult(
                 success=False,
                 message=(
-                    f"Structure Editor doesn't support {ext} files. "
+                    f"Symbol Editor doesn't support {ext} files. "
                     f"It requires source code files with tree-sitter parsers. "
                     f'Supported: {supported}'
                 ),

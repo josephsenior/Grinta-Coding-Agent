@@ -437,12 +437,35 @@ class GrintaScreen(Screen):
             self._renderer.add_to_history(renderable)
 
     def add_user_message(self, text: str) -> None:
-        """User message — left accent indicator."""
+        """User message — left accent indicator on every line."""
+        import textwrap
+
         self._hide_thinking()
         body = _rich_text(text)
-        # Left accent line using box drawing characters
+        plain = body.plain
+        # Wrap text at terminal width and apply accent to each visual line
+        width = self.size.width - 4 if self.size.width > 10 else 80
+        wrapped_lines: list[str] = []
+        for line in plain.split('\n'):
+            if not line:
+                wrapped_lines.append('')
+            else:
+                wrapped_lines.extend(
+                    textwrap.wrap(line, width=width, break_long_words=True, break_on_hyphens=False)
+                )
         accent = Text('▌', style='bold #91abec')
-        self._write_log(Text.assemble(accent, ' ', body, '\n'))
+        result = Text()
+        for i, line in enumerate(wrapped_lines):
+            if i > 0:
+                result.append('\n')
+            result.append(Text.assemble(accent, ' ', line))
+        result.append('\n')
+        # Append directly to renderer history to avoid extra blank spacers
+        # between lines (add_to_history adds a Text('') after each call).
+        if self._renderer:
+            self._renderer._history.append(result)
+            self._renderer._history.append(Text(''))  # spacer after message
+            self._renderer._refresh_display()
 
     def add_agent_message(self, text: str) -> None:
         """Agent response — clear bold header."""
@@ -1800,10 +1823,18 @@ class TUIRenderer:
                 elapsed = time.monotonic() - self._turn_start_time
                 duration_str = f'{elapsed:.1f}s'
                 plural = '' if self._tools_in_turn == 1 else 's'
-                body_text = f'  ({self._tools_in_turn} tool{plural} executed \u00b7 {duration_str})'
-                line = Text.assemble('\n', body_text)
-                line.stylize(NAVY_TEXT_DIM)
-                self._tui._write_log(line)
+                summary_text = f'{self._tools_in_turn} tool{plural}  ·  {duration_str}'
+                # Aligned divider + content — same left padding so the line
+                # and the stats share a common left edge in cyan.
+                self._tui._write_log(
+                    Text.assemble(
+                        '\n',
+                        Text(f'  {"═" * 42}', style='bold #5eead4'),
+                        '\n',
+                        Text(f'  {summary_text}', style='bold #5eead4'),
+                        '\n',
+                    )
+                )
 
         # Ensure thinking UI is cleared on any idle/terminal state
         if state in (AgentState.AWAITING_USER_INPUT, AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED):
