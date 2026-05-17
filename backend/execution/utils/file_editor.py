@@ -6,6 +6,7 @@ validation, and atomic operations. Designed for production agent environments.
 
 from __future__ import annotations
 
+import difflib
 import os
 from collections import defaultdict, deque
 from contextlib import contextmanager
@@ -29,6 +30,78 @@ class ToolResult:
     error: str | None = None
     old_content: str | None = None
     new_content: str | None = None
+
+
+def _format_context_window(
+    old_content: str,
+    new_content: str,
+    context_lines: int = 5,
+) -> str:
+    """Generate a context window showing the edited region with line numbers.
+
+    Uses difflib to find changed lines, then shows a window of context_lines
+    before and after each change region. Edited lines are marked with '>>> '.
+
+    Args:
+        old_content: Original file content.
+        new_content: Updated file content.
+        context_lines: Number of context lines before/after changes.
+
+    Returns:
+        Formatted string with line numbers and context window.
+    """
+    old_lines = old_content.splitlines() if old_content else []
+    new_lines = new_content.splitlines() if new_content else []
+
+    # Find changed line ranges using difflib
+    matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
+    changed_ranges: list[tuple[int, int]] = []
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag != 'equal':
+            # Track the range in the NEW content (j1, j2)
+            if j2 > j1:
+                changed_ranges.append((j1, j2))
+
+    if not changed_ranges:
+        return ''
+
+    # Merge overlapping ranges and add context
+    merged_ranges: list[tuple[int, int]] = []
+    for start, end in changed_ranges:
+        ctx_start = max(0, start - context_lines)
+        ctx_end = min(len(new_lines), end + context_lines)
+        if merged_ranges and ctx_start <= merged_ranges[-1][1]:
+            # Merge with previous range
+            merged_ranges[-1] = (merged_ranges[-1][0], max(merged_ranges[-1][1], ctx_end))
+        else:
+            merged_ranges.append((ctx_start, ctx_end))
+
+    # Format output
+    total_lines = len(new_lines)
+    output_lines: list[str] = []
+
+    for range_idx, (ctx_start, ctx_end) in enumerate(merged_ranges):
+        if range_idx > 0:
+            output_lines.append('...')
+
+        # Show context header
+        if ctx_start > 0 or ctx_end < total_lines:
+            header = f'Updated file view (lines {ctx_start + 1}-{ctx_end} of {total_lines}):'
+        else:
+            header = f'Updated file view ({total_lines} lines):'
+        output_lines.append(header)
+
+        # Format each line with number and marker
+        for i in range(ctx_start, ctx_end):
+            line_num = i + 1
+            # Check if this line is in a changed region
+            is_changed = any(start <= i < end for start, end in changed_ranges)
+            marker = '>>> ' if is_changed else '    '
+            line_content = new_lines[i] if i < len(new_lines) else ''
+            output_lines.append(f'{marker}{line_num}\t{line_content}')
+
+    return '\n'.join(output_lines)
 
 
 @dataclass(frozen=True)
@@ -624,6 +697,12 @@ class FileEditor(FileEditorEditOpsMixin):
 
         output = 'File updated successfully'
 
+        # Add context window showing the edited region with line numbers
+        if old_content is not None:
+            context_window = _format_context_window(old_content, new_content)
+            if context_window:
+                output += '\n\n' + context_window
+
         # Include indentation warnings if any
         if self._last_indent_warnings:
             output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(self._last_indent_warnings)
@@ -704,6 +783,12 @@ class FileEditor(FileEditorEditOpsMixin):
             content=content,
             soft_warning=soft_warning,
         )
+
+        # Add context window for overwrites (not new files, which already have preview)
+        if not is_create and old_content is not None:
+            context_window = _format_context_window(old_content, content)
+            if context_window:
+                output_msg += '\n\n' + context_window
 
         return ToolResult(
             output=output_msg,

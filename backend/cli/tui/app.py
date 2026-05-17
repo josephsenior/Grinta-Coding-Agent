@@ -20,6 +20,7 @@ from typing import Any
 
 from rich import box
 from rich.console import Group
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 from textual.app import App, ComposeResult
@@ -437,35 +438,21 @@ class GrintaScreen(Screen):
             self._renderer.add_to_history(renderable)
 
     def add_user_message(self, text: str) -> None:
-        """User message — left accent indicator on every line."""
-        import textwrap
-
+        """User message — subtle left accent on first line only."""
         self._hide_thinking()
         body = _rich_text(text)
         plain = body.plain
-        # Wrap text at terminal width and apply accent to each visual line
-        width = self.size.width - 4 if self.size.width > 10 else 80
-        wrapped_lines: list[str] = []
-        for line in plain.split('\n'):
-            if not line:
-                wrapped_lines.append('')
-            else:
-                wrapped_lines.extend(
-                    textwrap.wrap(line, width=width, break_long_words=True, break_on_hyphens=False)
-                )
-        accent = Text('▌', style='bold #91abec')
+        lines = plain.split('\n')
         result = Text()
-        for i, line in enumerate(wrapped_lines):
+        for i, line in enumerate(lines):
             if i > 0:
                 result.append('\n')
-            result.append(Text.assemble(accent, ' ', line))
+            if i == 0:
+                result.append(Text.assemble(Text('▌', style='#91abec'), ' ', line))
+            else:
+                result.append(line)
         result.append('\n')
-        # Append directly to renderer history to avoid extra blank spacers
-        # between lines (add_to_history adds a Text('') after each call).
-        if self._renderer:
-            self._renderer._history.append(result)
-            self._renderer._history.append(Text(''))  # spacer after message
-            self._renderer._refresh_display()
+        self._write_log(result)
 
     def add_agent_message(self, text: str) -> None:
         """Agent response — clear bold header."""
@@ -1737,7 +1724,7 @@ class TUIRenderer:
         elif isinstance(event, PlaybookFinishAction):
             summary = getattr(event, 'final_thought', '') or getattr(event, 'thought', '') or ''
             if summary:
-                self._tui._write_log(Text(f'{summary}'))
+                self._tui._write_log(Markdown(summary))
         elif isinstance(event, UserRejectObservation):
             card = ActivityRenderer.user_reject()
             self._write_card(card)
@@ -1771,10 +1758,17 @@ class TUIRenderer:
             self._tui._write_log(Text(f'  [{name}]', style=NAVY_TEXT_MUTED))
 
     def _extract_file_edit_diff(self, event: FileEditObservation) -> str | None:
-        """Extract diff from a FileEditObservation for TUI display."""
+        """Extract unified diff from a FileEditObservation for TUI display."""
         try:
-            diff = event.visualize_diff()
-            if diff and '(no changes detected' not in diff:
+            from backend.execution.utils.diff import get_diff
+
+            old_content = getattr(event, 'old_content', None)
+            new_content = getattr(event, 'new_content', None)
+            if old_content is None or new_content is None:
+                return None
+
+            diff = get_diff(old_content, new_content, path=event.path)
+            if diff:
                 return diff
         except Exception:
             pass
@@ -1792,7 +1786,7 @@ class TUIRenderer:
             # Add the actual response text to history (after thinking)
             content = (action.accumulated or '').strip()
             if content and self._tui._renderer:
-                body = _rich_text(content)
+                body = Markdown(content)
                 self._tui._renderer.add_to_history(body)
             self._tui.finalize_thinking()
 
@@ -1824,14 +1818,14 @@ class TUIRenderer:
                 duration_str = f'{elapsed:.1f}s'
                 plural = '' if self._tools_in_turn == 1 else 's'
                 summary_text = f'{self._tools_in_turn} tool{plural}  ·  {duration_str}'
-                # Aligned divider + content — same left padding so the line
-                # and the stats share a common left edge in cyan.
+                # Use simple dash for guaranteed visual alignment with text
+                divider = '-' * len(summary_text)
                 self._tui._write_log(
                     Text.assemble(
                         '\n',
-                        Text(f'  {"═" * 42}', style='bold #5eead4'),
+                        Text(f'  {divider}', style='dim #5eead4'),
                         '\n',
-                        Text(f'  {summary_text}', style='bold #5eead4'),
+                        Text(f'  {summary_text}', style='dim #5eead4'),
                         '\n',
                     )
                 )
