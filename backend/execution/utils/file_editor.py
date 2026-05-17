@@ -1169,9 +1169,7 @@ class FileEditor(FileEditorEditOpsMixin):
             return None
         return self._read_file(file_path)
 
-    def _validate_rollback_restore_content(
-        self, file_path: Path, content: str
-    ) -> str:
+    def _validate_rollback_restore_content(self, file_path: Path, content: str) -> str:
         """Apply the same syntax validation used by normal write/edit restores."""
         is_valid, msg = self._maybe_validate_syntax_for_file(file_path, content)
         if not is_valid:
@@ -1241,9 +1239,7 @@ class FileEditor(FileEditorEditOpsMixin):
             self._transaction_stack.pop()
             raise
 
-    def _rollback_transaction(
-        self, backup: dict[str, str | None]
-    ) -> list[ToolResult]:
+    def _rollback_transaction(self, backup: dict[str, str | None]) -> list[ToolResult]:
         """Rollback all file changes in a transaction.
 
         Args:
