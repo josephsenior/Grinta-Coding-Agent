@@ -296,7 +296,7 @@ class TestRecoveryInspection:
 
 
 class TestExecutorRecoveryBlock:
-    def test_executor_blocks_once_after_recent_uncommitted_checkpoint(
+    def test_executor_discards_uncommitted_checkpoint_and_proceeds(
         self, tmp_path, monkeypatch
     ):
         monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
@@ -310,19 +310,27 @@ class TestExecutorRecoveryBlock:
         )
 
         llm = MagicMock()
+        llm.completion.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content='ok'))],
+            id='resp-1',
+        )
+        safety = MagicMock()
+        safety.apply.return_value = (True, [])
         executor = OrchestratorExecutor(
             llm=llm,
-            safety_manager=MagicMock(),
+            safety_manager=safety,
             planner=MagicMock(),
             mcp_tools_provider=lambda: {},
         )
 
-        with pytest.raises(ModelProviderError, match='manual confirmation'):
-            executor.execute({}, event_stream=None)
+        # Should NOT raise — uncommitted checkpoints are discarded and the
+        # LLM call proceeds normally to avoid trapping the agent.
+        result = executor.execute({}, event_stream=None)
 
-        llm.completion.assert_not_called()
+        llm.completion.assert_called_once()
+        assert not ckpt._wal_path.exists()
 
-    def test_executor_blocks_only_the_session_with_uncommitted_checkpoint(
+    def test_executor_discards_session_checkpoint_and_allows_other_sessions(
         self, tmp_path, monkeypatch
     ):
         import sys
@@ -365,12 +373,13 @@ class TestExecutorRecoveryBlock:
         session_b_stream = MagicMock()
         session_b_stream.sid = 'session-b'
 
-        with pytest.raises(ModelProviderError, match='manual confirmation'):
-            executor.execute({}, event_stream=session_a_stream)
+        # Session A: uncommitted checkpoint is discarded, LLM call proceeds
+        executor.execute({}, event_stream=session_a_stream)
 
+        # Session B: no checkpoint, LLM call proceeds normally
         executor.execute({}, event_stream=session_b_stream)
 
-        assert llm.completion.call_count == 1
+        assert llm.completion.call_count == 2
 
 
 # ---------------------------------------------------------------------------
