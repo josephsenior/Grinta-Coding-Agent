@@ -16,7 +16,9 @@ async def test_tui_renderer_pending_events_are_bounded(monkeypatch):
     loop = MagicMock()
     renderer = tui_app.TUIRenderer(
         console=SimpleNamespace(width=100),
-        hud=SimpleNamespace(state=SimpleNamespace(mcp_servers=0), bundled_skill_count=0),
+        hud=SimpleNamespace(
+            state=SimpleNamespace(mcp_servers=0), bundled_skill_count=0
+        ),
         reasoning=SimpleNamespace(),
         tui=SimpleNamespace(),
         loop=loop,
@@ -43,7 +45,9 @@ async def test_tui_renderer_history_is_bounded(monkeypatch):
     )
     renderer = tui_app.TUIRenderer(
         console=SimpleNamespace(width=100),
-        hud=SimpleNamespace(state=SimpleNamespace(mcp_servers=0), bundled_skill_count=0),
+        hud=SimpleNamespace(
+            state=SimpleNamespace(mcp_servers=0), bundled_skill_count=0
+        ),
         reasoning=SimpleNamespace(),
         tui=fake_tui,
         loop=asyncio.get_running_loop(),
