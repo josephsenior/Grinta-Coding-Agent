@@ -69,6 +69,28 @@ def _drain(
             pass
 
 
+def _feed_stdin(process: subprocess.Popen, stdin_data: bytes | str | None) -> None:
+    """Write optional stdin to a child process and close the pipe.
+
+    ``subprocess.communicate(input=...)`` cannot be used here because it reads
+    stdout/stderr into unbounded in-memory buffers. Feeding stdin from a small
+    helper thread preserves the important ``communicate`` behavior without
+    losing the bounded-reader guarantees.
+    """
+    if stdin_data is None or process.stdin is None:
+        return
+    try:
+        process.stdin.write(stdin_data)  # type: ignore[arg-type]
+        process.stdin.flush()
+    except (BrokenPipeError, OSError, TypeError, ValueError):
+        return
+    finally:
+        try:
+            process.stdin.close()
+        except Exception:
+            pass
+
+
 def _wait_for_bounded_process(
     process: subprocess.Popen,
     over: threading.Event,
@@ -113,6 +135,7 @@ def bounded_communicate(
     timeout: float | None = None,
     max_bytes_per_stream: int = DEFAULT_MAX_BYTES_PER_STREAM,
     encoding: str = 'utf-8',
+    stdin_data: bytes | str | None = None,
 ) -> BoundedResult:
     """Drop-in safer replacement for ``process.communicate(timeout=...)``.
 
@@ -121,7 +144,9 @@ def bounded_communicate(
     handled here so we can count bytes precisely.
 
     On overflow either stream the process is terminated; on timeout the
-    process is terminated and ``timed_out=True`` is set.
+    process is terminated and ``timed_out=True`` is set. If ``stdin_data`` is
+    provided and the process was started with ``stdin=PIPE``, it is written and
+    the pipe is closed from a helper thread.
     """
     stdout_buf = bytearray()
     stderr_buf = bytearray()
@@ -139,6 +164,14 @@ def bounded_communicate(
     )
     t_out.start()
     t_err.start()
+    t_in: threading.Thread | None = None
+    if stdin_data is not None and process.stdin is not None:
+        t_in = threading.Thread(
+            target=_feed_stdin,
+            args=(process, stdin_data),
+            daemon=True,
+        )
+        t_in.start()
 
     try:
         rc, timed_out = _wait_for_bounded_process(process, over, timeout=timeout)
@@ -146,6 +179,8 @@ def bounded_communicate(
         # Ensure threads exit even if something went wrong.
         t_out.join(timeout=1.0)
         t_err.join(timeout=1.0)
+        if t_in is not None:
+            t_in.join(timeout=1.0)
 
     truncated = over.is_set()
     out_text = _decoded_bounded_stream_text(

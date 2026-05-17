@@ -30,6 +30,7 @@ from threading import RLock
 from typing import TYPE_CHECKING
 
 from backend.core.logger import app_logger as logger
+from backend.execution.utils.bounded_io import bounded_communicate
 from backend.execution.utils.process_registry import TaskCancellationService
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import (
@@ -280,7 +281,9 @@ class WindowsPowershellSession(BaseShellSession):
             child_env = os.environ.copy()
             child_env.setdefault('PYTHONIOENCODING', 'utf-8')
             child_env.setdefault('PYTHONUTF8', '1')
-            # Use Popen instead of run to capture PID for cancellation service
+            # Use Popen instead of run to capture PID for cancellation service.
+            # Keep pipes in binary mode so bounded_communicate can enforce byte
+            # caps before decoding.
             process = subprocess.Popen(
                 ps_command,
                 cwd=work_dir,
@@ -288,9 +291,6 @@ class WindowsPowershellSession(BaseShellSession):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 stdin=subprocess.PIPE if input_text is not None else None,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
             )
 
             # Register for cancellation
@@ -300,9 +300,7 @@ class WindowsPowershellSession(BaseShellSession):
             # idle-output–aware monitoring path (text-mode pipe).
             pending_bg_id = self._pending_bg_id
             if pending_bg_id is not None:
-                out, err, code = self._run_backgroundable(
-                    process, timeout, pending_bg_id, is_text=True
-                )
+                out, err, code = self._run_backgroundable(process, timeout, pending_bg_id)
                 if code != -2:
                     # Command completed normally — still do CWD tracking.
                     self._cancellation.unregister_process(process.pid)
@@ -317,8 +315,15 @@ class WindowsPowershellSession(BaseShellSession):
                         )
                 return out, err, code
 
-            stdout, stderr = process.communicate(input=input_text, timeout=timeout)
-            return_code = process.returncode
+            stdin_data = input_text.encode('utf-8') if input_text is not None else None
+            bounded = bounded_communicate(
+                process,
+                timeout=timeout,
+                stdin_data=stdin_data,
+                encoding='utf-8',
+            )
+            stdout, stderr = bounded.stdout, bounded.stderr
+            return_code = bounded.returncode
 
             # Update CWD if command changed directory
             if self._command_changes_cwd(command, powershell=True):

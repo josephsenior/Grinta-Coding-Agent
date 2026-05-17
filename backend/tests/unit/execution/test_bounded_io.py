@@ -71,5 +71,21 @@ def test_bounded_communicate_windows_cmd_echo() -> None:
     assert 'ok' in result.stdout.lower()
 
 
+def test_bounded_communicate_supports_stdin() -> None:
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            '-c',
+            'import sys; data = sys.stdin.read(); print(data.upper())',
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    result = bounded_communicate(proc, timeout=10.0, stdin_data=b'hello')
+    assert result.returncode == 0
+    assert result.stdout.strip() == 'HELLO'
+
+
 def test_default_cap_constant() -> None:
     assert DEFAULT_MAX_BYTES_PER_STREAM > 1024 * 1024
