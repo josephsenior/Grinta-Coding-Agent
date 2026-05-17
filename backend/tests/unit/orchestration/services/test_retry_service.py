@@ -219,9 +219,9 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
 
         await self.service.schedule_retry_after_failure(exc)
 
-        # Should schedule with increased delay
+        # Should schedule with increased delay (base_delay * jitter, where jitter is 0.5-1.5)
         call_kwargs = mock_queue.schedule.call_args[1]
-        self.assertGreaterEqual(call_kwargs['initial_delay'], 10.0)
+        self.assertGreaterEqual(call_kwargs['initial_delay'], 5.0)
 
     @patch('backend.orchestration.services.retry_service.get_retry_queue')
     async def test_schedule_retry_increments_attempt_monotonically(
