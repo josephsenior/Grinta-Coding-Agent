@@ -457,7 +457,7 @@ class TestRollbackManager:
                 return Result()
             if 'commit' in cmd:
                 return Result()
-            if 'reset' in cmd and 'hard' in cmd:
+            if 'reset' in cmd and '--hard' in cmd:
                 seen_reset = True
                 return Result()
             if 'rev-parse' in cmd:
@@ -490,7 +490,7 @@ class TestRollbackManager:
                 return Result()
             if 'commit' in cmd:
                 return Result()
-            if 'reset' in cmd and 'hard' in cmd:
+            if 'reset' in cmd and '--hard' in cmd:
                 seen_reset = True
                 return Result()
             if 'rev-parse' in cmd:
