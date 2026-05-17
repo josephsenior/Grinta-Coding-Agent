@@ -481,6 +481,7 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=False)
         self.ctrl._sync_budget_flag_with_metrics = MagicMock()
         self.ctrl.services.action_execution.get_next_action = AsyncMock()
+        self.ctrl.services.action_execution.execute_action = AsyncMock()
         self.ctrl.iteration_guard.run_control_flags = AsyncMock()
         self.ctrl.services.retry.retry_count = 0
 
