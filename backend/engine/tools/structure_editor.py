@@ -6,6 +6,7 @@ Provides simple, powerful API for all code editing operations.
 
 from __future__ import annotations
 
+import difflib
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -20,6 +21,78 @@ from backend.engine.tools.atomic_refactor import (
 from backend.engine.tools.smart_errors import SmartErrorHandler
 from backend.engine.tools.whitespace_handler import WhitespaceHandler
 from backend.utils.treesitter_editor import EditResult, SymbolLocation, TreeSitterEditor
+
+
+def _format_context_window(
+    old_content: str,
+    new_content: str,
+    context_lines: int = 5,
+) -> str:
+    """Generate a context window showing the edited region with line numbers.
+
+    Uses difflib to find changed lines, then shows a window of context_lines
+    before and after each change region. Edited lines are marked with '>>> '.
+
+    Args:
+        old_content: Original file content.
+        new_content: Updated file content.
+        context_lines: Number of context lines before/after changes.
+
+    Returns:
+        Formatted string with line numbers and context window.
+    """
+    old_lines = old_content.splitlines() if old_content else []
+    new_lines = new_content.splitlines() if new_content else []
+
+    # Find changed line ranges using difflib
+    matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
+    changed_ranges: list[tuple[int, int]] = []
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag != 'equal':
+            # Track the range in the NEW content (j1, j2)
+            if j2 > j1:
+                changed_ranges.append((j1, j2))
+
+    if not changed_ranges:
+        return ''
+
+    # Merge overlapping ranges and add context
+    merged_ranges: list[tuple[int, int]] = []
+    for start, end in changed_ranges:
+        ctx_start = max(0, start - context_lines)
+        ctx_end = min(len(new_lines), end + context_lines)
+        if merged_ranges and ctx_start <= merged_ranges[-1][1]:
+            # Merge with previous range
+            merged_ranges[-1] = (merged_ranges[-1][0], max(merged_ranges[-1][1], ctx_end))
+        else:
+            merged_ranges.append((ctx_start, ctx_end))
+
+    # Format output
+    total_lines = len(new_lines)
+    output_lines: list[str] = []
+
+    for range_idx, (ctx_start, ctx_end) in enumerate(merged_ranges):
+        if range_idx > 0:
+            output_lines.append('...')
+
+        # Show context header
+        if ctx_start > 0 or ctx_end < total_lines:
+            header = f'Updated file view (lines {ctx_start + 1}-{ctx_end} of {total_lines}):'
+        else:
+            header = f'Updated file view ({total_lines} lines):'
+        output_lines.append(header)
+
+        # Format each line with number and marker
+        for i in range(ctx_start, ctx_end):
+            line_num = i + 1
+            # Check if this line is in a changed region
+            is_changed = any(start <= i < end for start, end in changed_ranges)
+            marker = '>>> ' if is_changed else '    '
+            line_content = new_lines[i] if i < len(new_lines) else ''
+            output_lines.append(f'{marker}{line_num}\t{line_content}')
+
+    return '\n'.join(output_lines)
 
 
 @dataclass
@@ -281,6 +354,14 @@ class StructureEditor:
                 ),
             )
 
+        # Read old content before edit for context window
+        old_content = None
+        try:
+            with open(path, encoding='utf-8') as f:
+                old_content = f.read()
+        except Exception:
+            pass
+
         # Skip auto-indent: the tree-sitter _replace_node_content already
         # handles indentation via preserve_indentation=True, so adding
         # auto-indent here would double-indent the result.
@@ -293,6 +374,17 @@ class StructureEditor:
             validate=self.config.validate_syntax,
             line_number=line_number,
         )
+
+        # Add context window on success
+        if result.success and old_content is not None:
+            try:
+                with open(path, encoding='utf-8') as f:
+                    new_content = f.read()
+                context_window = _format_context_window(old_content, new_content)
+                if context_window:
+                    result.message += '\n\n' + context_window
+            except Exception:
+                pass
 
         # Clean whitespace if successful and requested
         self._handle_whitespace_cleanup(path, language, result.success)
@@ -323,7 +415,26 @@ class StructureEditor:
         """
         logger.info("Renaming '%s' → '%s' in %s", old_name, new_name, path)
 
+        # Read old content before edit for context window
+        old_content = None
+        try:
+            with open(path, encoding='utf-8') as f:
+                old_content = f.read()
+        except Exception:
+            pass
+
         result = self.universal.rename_symbol(path, old_name, new_name)
+
+        # Add context window on success
+        if result.success and old_content is not None:
+            try:
+                with open(path, encoding='utf-8') as f:
+                    new_content = f.read()
+                context_window = _format_context_window(old_content, new_content)
+                if context_window:
+                    result.message += '\n\n' + context_window
+            except Exception:
+                pass
 
         # Clean whitespace if successful
         if result.success and self.config.clean_whitespace:
@@ -528,6 +639,12 @@ class StructureEditor:
                 lines_changed=end_line - start_line + 1,
                 original_code=''.join(lines),
             )
+
+            # Add context window showing the edited region with line numbers
+            old_content = ''.join(lines)
+            context_window = _format_context_window(old_content, new_content)
+            if context_window:
+                result.message += '\n\n' + context_window
 
             from backend.utils.blast_radius import check_blast_radius_from_code
 
