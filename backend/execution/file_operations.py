@@ -187,6 +187,34 @@ def truncate_large_text(value: str, max_chars: int, *, label: str) -> str:
     return value[:half] + '\n[... Truncated by app due to size ...]\n' + value[-half:]
 
 
+# Smart diff truncation constants.
+_DIFF_TRUNC_HARD_CAP = 20_000
+_DIFF_TRUNC_HEAD_BUDGET = 5_000
+_DIFF_TRUNC_TAIL_BUDGET = 2_000
+
+
+def truncate_diff(value: str) -> str:
+    """Truncate diff output to a reasonable size.
+
+    Preserves the head (5k chars) and tail (2k chars) of the diff
+    with a hard cap of 20k chars. This ensures the agent sees the
+    beginning of changes and the end summary while preventing
+    context window overflow from massive diffs.
+    """
+    if len(value) <= _DIFF_TRUNC_HARD_CAP:
+        return value
+    head = value[:_DIFF_TRUNC_HEAD_BUDGET]
+    tail = value[-_DIFF_TRUNC_TAIL_BUDGET:]
+    logger.warning(
+        'Truncating diff from %s chars to %s chars (head %s + tail %s)',
+        len(value),
+        _DIFF_TRUNC_HEAD_BUDGET + _DIFF_TRUNC_TAIL_BUDGET,
+        _DIFF_TRUNC_HEAD_BUDGET,
+        _DIFF_TRUNC_TAIL_BUDGET,
+    )
+    return head + '\n[... Diff truncated by app due to size ...]\n' + tail
+
+
 # Default max chars for bash command output (configurable via env var).
 _DEFAULT_MAX_CMD_OUTPUT_CHARS = 40_000
 

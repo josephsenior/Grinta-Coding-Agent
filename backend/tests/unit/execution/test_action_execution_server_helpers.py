@@ -184,7 +184,7 @@ def test_terminal_read_modes_and_resize() -> None:
     )
 
 
-def test_file_read_edit_and_blast_warning_helpers() -> None:
+def test_file_read_edit_helpers() -> None:
     ex = _executor()
     ex.file_editor = object()
     out = h.handle_aci_file_read(ex, SimpleNamespace(path='a.py', view_range=None))
@@ -201,10 +201,3 @@ def test_file_read_edit_and_blast_warning_helpers() -> None:
             ex, 'C:/ws/dir', 'dir', SimpleNamespace(command='read_file')
         )
     assert isinstance(dir_obs, FileReadObservation)
-
-    with patch(
-        'backend.utils.blast_radius.check_blast_radius_from_code', return_value='\nwarn'
-    ):
-        assert h.append_blast_radius_warning(
-            ex, 'base', command='write', action_path='a.py', new_content='def x(): pass'
-        ).endswith('warn')

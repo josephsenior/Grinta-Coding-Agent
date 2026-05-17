@@ -414,12 +414,6 @@ class StructureEditor:
         if not result.success and 'not found' in result.message.lower():
             self._enrich_error_with_symbol_suggestions(path, function_name, result)
 
-        from backend.utils.blast_radius import check_blast_radius
-
-        # Blast Radius Hook: if successful, checking symbol references
-        if result.success:
-            check_blast_radius(path, function_name, 10)
-
         return result
 
     def rename_symbol(self, path: str, old_name: str, new_name: str) -> EditResult:
@@ -666,11 +660,6 @@ class StructureEditor:
             context_window = _format_context_window(old_content, new_content)
             if context_window:
                 result.message += '\n\n' + context_window
-
-            from backend.utils.blast_radius import check_blast_radius_from_code
-
-            # Blast Radius Hook: best-effort check using the first few symbols found in the new code
-            check_blast_radius_from_code(path, new_code, 10)
 
             return result
 
