@@ -402,11 +402,137 @@ class RollbackManager:
             logger.error('Checkpoint snapshot directory not found: %s', snapshot_dir)
             return False
 
-        self._clear_workspace()
+        snapshot_files = self._snapshot_relative_files(snapshot_dir)
+        quarantine_dir = self._quarantine_workspace_extras(
+            checkpoint_id,
+            snapshot_files,
+        )
         self._restore_snapshot(snapshot_dir)
 
-        logger.info('File-based rollback successful')
+        if quarantine_dir is not None:
+            logger.info(
+                'File-based rollback successful; extra workspace files quarantined in %s',
+                quarantine_dir,
+            )
+        else:
+            logger.info('File-based rollback successful')
         return True
+
+    def _snapshot_relative_files(self, snapshot_dir: Path) -> set[Path]:
+        """Return validated relative file paths present in a snapshot."""
+        rel_paths: set[Path] = set()
+        workspace_root = self.workspace_path.resolve()
+        for file_path in snapshot_dir.rglob('*'):
+            if not file_path.is_file():
+                continue
+            rel_path = file_path.relative_to(snapshot_dir)
+            try:
+                (workspace_root / rel_path).resolve().relative_to(workspace_root)
+            except ValueError:
+                logger.warning(
+                    'Skipping unsafe snapshot path during rollback: %s', rel_path
+                )
+                continue
+            rel_paths.add(rel_path)
+        return rel_paths
+
+    def _is_reserved_workspace_path(self, path: Path) -> bool:
+        """Return True for workspace metadata paths that rollback must not move."""
+        workspace_root = self.workspace_path.resolve()
+        try:
+            rel_path = path.resolve().relative_to(workspace_root)
+        except ValueError:
+            return True
+        if not rel_path.parts:
+            return True
+        if rel_path.parts[0] in {'.grinta', '.git'}:
+            return True
+
+        try:
+            checkpoints_root = self.checkpoints_dir.resolve()
+        except OSError:
+            checkpoints_root = self.checkpoints_dir
+        resolved = path.resolve()
+        try:
+            resolved.relative_to(checkpoints_root)
+            return True
+        except ValueError:
+            pass
+        try:
+            checkpoints_root.relative_to(resolved)
+            return True
+        except ValueError:
+            return False
+
+    def _quarantine_workspace_extras(
+        self,
+        checkpoint_id: str,
+        snapshot_files: set[Path],
+    ) -> Path | None:
+        """Move files not present in the snapshot aside instead of deleting them."""
+        quarantine_dir: Path | None = None
+
+        for item in sorted(
+            self.workspace_path.rglob('*'),
+            key=lambda p: len(p.parts),
+            reverse=True,
+        ):
+            if not item.exists() or self._is_reserved_workspace_path(item):
+                continue
+            rel_path = item.relative_to(self.workspace_path)
+
+            if item.is_dir():
+                if rel_path in snapshot_files:
+                    quarantine_dir = self._move_to_restore_quarantine(
+                        item,
+                        rel_path,
+                        checkpoint_id,
+                        quarantine_dir,
+                    )
+                    continue
+                has_snapshot_child = any(
+                    rel_path in saved.parents for saved in snapshot_files
+                )
+                if has_snapshot_child:
+                    continue
+                quarantine_dir = self._move_to_restore_quarantine(
+                    item,
+                    rel_path,
+                    checkpoint_id,
+                    quarantine_dir,
+                )
+                continue
+
+            if rel_path not in snapshot_files:
+                quarantine_dir = self._move_to_restore_quarantine(
+                    item,
+                    rel_path,
+                    checkpoint_id,
+                    quarantine_dir,
+                )
+
+        return quarantine_dir
+
+    def _move_to_restore_quarantine(
+        self,
+        path: Path,
+        rel_path: Path,
+        checkpoint_id: str,
+        quarantine_dir: Path | None,
+    ) -> Path:
+        """Move a rollback extra/conflict into a checkpoint-local quarantine."""
+        if quarantine_dir is None:
+            quarantine_dir = (
+                self.checkpoints_dir
+                / f'{checkpoint_id}_restore_quarantine_{int(time.time())}'
+            )
+            quarantine_dir.mkdir(parents=True, exist_ok=True)
+        target = quarantine_dir / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            target = target.with_name(f'{target.name}.{int(time.time() * 1000)}')
+        shutil.move(str(path), str(target))
+        return quarantine_dir
 
     def _clear_workspace(self) -> None:
         """Clear workspace directory (except .grinta and .git)."""

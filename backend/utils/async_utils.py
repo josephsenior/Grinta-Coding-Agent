@@ -78,6 +78,33 @@ _MAX_WORKERS = _get_max_workers()
 EXECUTOR: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=_MAX_WORKERS)
 
 
+def _get_sync_from_async_workers() -> int:
+    """Dedicated capacity for sync functions awaited from the main event loop."""
+    raw = os.getenv('GRINTA_SYNC_FROM_ASYNC_POOL_WORKERS')
+    default = max(4, min(_MAX_WORKERS, 16))
+    if raw is None:
+        return default
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        _logger.warning(
+            'Invalid GRINTA_SYNC_FROM_ASYNC_POOL_WORKERS=%r; using default %d',
+            raw,
+            default,
+        )
+        return default
+    return max(1, min(n, 64))
+
+
+# Keep sync work awaited by the event loop off asyncio's implicit default
+# executor. This bounds worker growth and keeps nested call_async_from_sync work
+# from starving on the shared EXECUTOR.
+SYNC_FROM_ASYNC_EXECUTOR: ThreadPoolExecutor = ThreadPoolExecutor(
+    max_workers=_get_sync_from_async_workers(),
+    thread_name_prefix='grinta-sync-from-async',
+)
+
+
 def _debugger_sync_pool_workers() -> int:
     """Dedicated capacity for :class:`~backend.ledger.action.DebuggerAction` sync bridges."""
     raw = os.getenv('GRINTA_DEBUGGER_SYNC_POOL_WORKERS', '6')
@@ -112,7 +139,7 @@ def _shutdown_executor_atexit() -> None:
     ``cancel_futures=True`` drops queued tasks; running tasks are not
     interrupted but are bounded by their own timeouts.
     """
-    for ex in (EXECUTOR, DEBUGGER_SYNC_EXECUTOR):
+    for ex in (EXECUTOR, SYNC_FROM_ASYNC_EXECUTOR, DEBUGGER_SYNC_EXECUTOR):
         try:
             ex.shutdown(wait=True, cancel_futures=True)
         except Exception:
@@ -163,7 +190,10 @@ async def call_sync_from_async(
     be interrupted once scheduled.
     """
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: fn(*args, **kwargs))
+    return await loop.run_in_executor(
+        SYNC_FROM_ASYNC_EXECUTOR,
+        lambda: fn(*args, **kwargs),
+    )
 
 
 def call_async_from_sync(
