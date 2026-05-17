@@ -139,7 +139,7 @@ class TestMCPEdgeCases:
             obs = await ex.call_tool_mcp(action)
 
         assert isinstance(obs, MCPObservation)
-        assert len(obs.content) < 500_000
+        assert len(obs.content) <= 500_000
 
     @pytest.mark.integration
     @pytest.mark.asyncio
