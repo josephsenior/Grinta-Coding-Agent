@@ -272,7 +272,6 @@ exclude_dirs = [ "backend/tests", "tests" ]
 # Find dead code: `uv run vulture` (optionally: `--min-confidence 100`).
 paths = [ "backend", "launch", "packaging/vulture_whitelist.py" ]
 exclude = [
-  "backend/tests",
   "backend/evaluation",
   "backend/conftest.py",
   "**/__pycache__",
