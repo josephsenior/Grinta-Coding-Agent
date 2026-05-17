@@ -484,6 +484,9 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
         self.ctrl.services.action_execution.execute_action = AsyncMock()
         self.ctrl.iteration_guard.run_control_flags = AsyncMock()
         self.ctrl.services.retry.retry_count = 0
+        self.ctrl.rate_governor.check_and_wait = AsyncMock()
+        self.ctrl._handle_post_execution = AsyncMock()
+        self.ctrl._try_parallel_read_batch = AsyncMock(return_value=False)
 
         await self.ctrl._step()
 
