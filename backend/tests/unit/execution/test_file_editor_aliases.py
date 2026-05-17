@@ -74,6 +74,8 @@ def test_file_editor_undo_after_edit_range(tmp_path: Path) -> None:
 
     undo = editor(command='undo_last_edit', path='sample.txt')
     assert undo.error is None
+    assert (undo.old_content or '').replace('\r\n', '\n') == 'hello new world\n'
+    assert (undo.new_content or '').replace('\r\n', '\n') == 'hello old world\n'
     assert p.read_text(encoding='utf-8') == 'hello old world\n'
 
 
@@ -94,4 +96,36 @@ def test_file_editor_undo_after_create_file_removes_file(tmp_path: Path) -> None
 
     undo = editor(command='undo_last_edit', path='new.txt')
     assert undo.error is None
+    assert undo.old_content == 'only'
+    assert undo.new_content is None
     assert not p.exists()
+
+
+def test_file_editor_undo_restore_runs_validation(tmp_path: Path, monkeypatch) -> None:
+    editor = FileEditor(workspace_root=str(tmp_path))
+    p = tmp_path / 'sample.txt'
+    p.write_text('before\n', encoding='utf-8')
+
+    assert (
+        editor(
+            command='edit',
+            path='sample.txt',
+            edit_mode='range',
+            start_line=1,
+            end_line=1,
+            new_str='after\n',
+        ).error
+        is None
+    )
+
+    monkeypatch.setattr(
+        editor,
+        '_maybe_validate_syntax_for_file',
+        lambda *_args: (False, 'blocked by test policy'),
+    )
+
+    undo = editor(command='undo_last_edit', path='sample.txt')
+
+    assert undo.error is not None
+    assert 'Syntax validation failed' in undo.error
+    assert p.read_text(encoding='utf-8') == 'after\n'

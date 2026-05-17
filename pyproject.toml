@@ -273,6 +273,7 @@ exclude_dirs = [ "backend/tests", "tests" ]
 paths = [ "backend", "launch", "packaging/vulture_whitelist.py" ]
 exclude = [
   "backend/evaluation",
+  "backend/tests",
   "backend/conftest.py",
   "**/__pycache__",
 ]
