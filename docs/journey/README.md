@@ -69,6 +69,7 @@ The file names stay stable for repository sanity, but the strongest reading arc 
 - **Act VIII — Operational Reality & Production:** [26](27-the-observability-black-hole.md), [27](28-token-economics-and-the-finops-trap.md), [28](29-the-latency-veil-and-human-trust.md), [29](30-the-weight-divide-local-vs-hosted.md), [30](31-the-myth-of-the-committee.md)
 - **Act IX — Addendum (The Terminal, Revisited):** [31](32-the-two-lives-of-the-terminal.md)
 - **Act X — Reliability Receipts and Editor Honesty:** [32](33-the-small-async-wars.md), [33](34-the-fuzzy-match-heresy.md), [34](35-the-self-knowing-agent.md), [35](36-the-required-risk.md), [36](37-the-verbose-status.md), [37](38-the-vendor-neutral-bench.md)
+- **Act XI — Memory and Retrieval Honesty:** [38](39-the-semantic-memory-that-survived.md)
 - **Epilogue:** [07](07-the-road-ahead.md)
 
 Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
@@ -113,6 +114,7 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [35](36-the-required-risk.md) | **The Required Risk** | Why optional security parameters are not security parameters, the autonomy-mode collapse to a single honest knob, and the per-session “always allow” memory that turned a confirmation gate from noise back into signal. |
 | [36](37-the-verbose-status.md) | **The Verbose Status** | `/status verbose` diagnostics, `DO_NOT_TRACK` and `GRINTA_DISABLE_METRICS` as honest opt-outs, and the in-band disconnect probe that catches provider proxies pretending to be the model. |
 | [37](38-the-vendor-neutral-bench.md) | **The Vendor-Neutral Bench** | The internal eval pack: why the scorer refuses to drive other agents, how the five 0–5 metrics compose, why failure caps the score at 49, and what vendor-neutral honestly does (and does not) mean. |
+| [38](39-the-semantic-memory-that-survived.md) | **The Semantic Memory That Survived** | The RAG stack that survived deletion: ChromaDB + FastEmbed ONNX, SQLite FTS5 BM25, parent-child chunking, LRU cache, optional flashrank reranking, and why the 15,000-line graph memory had to die. |
 | [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
 
 ### Short reading paths
@@ -122,6 +124,7 @@ If you will not read linearly, three curated arcs:
 - **Reliability and proof:** [19 · Surviving the Crash](19-surviving-the-crash.md) → [20 · Circuit Breakers](20-circuit-breakers-and-hallucinations.md) → [21 · Safety Sandbox](21-the-safety-sandbox-is-not-optional.md) → [22 · Who Grades the Agent](22-who-grades-the-agent.md) → [23 · Middleware Contract](23-the-middleware-contract.md).
 - **Pivot and subtraction:** [02 · Killed Darlings](02-the-killed-darlings.md) → [12 · Open Source Was the Better Business](12-open-source-was-the-better-business.md) → [31 · Myth of the Committee](31-the-myth-of-the-committee.md).
 - **Terminal and execution:** [11 · Console Wars](11-the-console-wars.md) → [31 · Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) → [32 · Small Async Wars](33-the-small-async-wars.md) → [33 · Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md).
+- **Memory and retrieval:** [04 · Context War](04-the-context-war.md) → [18 · Mind of the Agent](18-the-mind-of-the-agent.md) → [38 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md).
 
 ### Reference companion
 
@@ -134,6 +137,7 @@ Use these when a chapter names a subsystem and you want current behavior in pros
 | Repo layout, tests, contribution | [Developer Guide](../DEVELOPER.md), [CI](../CI.md) |
 | Terms and symbols | [Vocabulary](../VOCABULARY.md) |
 | Security posture | [Security checklist](../SECURITY_CHECKLIST.md), [Reliability](../RELIABILITY.md) |
+| Memory and RAG stack | [38 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md); implementation under `backend/context/` |
 
 ---
 
