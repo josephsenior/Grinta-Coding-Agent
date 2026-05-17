@@ -23,6 +23,37 @@ def _ensure_parent_dir(file_path: str) -> None:
         os.makedirs(parent, exist_ok=True)
 
 
+def _write_text_atomically(file_path: str, content: str) -> None:
+    """Write text via a same-directory temp file and atomic replace."""
+    _ensure_parent_dir(file_path)
+    directory = os.path.dirname(os.path.abspath(file_path)) or '.'
+    basename = os.path.basename(file_path) or 'file'
+    fd: int | None = None
+    tmp_path: str | None = None
+    try:
+        fd, tmp_path = tempfile.mkstemp(
+            prefix=f'.{basename}.',
+            suffix='.tmp',
+            dir=directory,
+            text=True,
+        )
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            fd = None
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, file_path)
+        tmp_path = None
+    finally:
+        if fd is not None:
+            os.close(fd)
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                logger.warning('Failed to remove temp file %s', tmp_path)
+
+
 def _backup_relative_slug(full_path: str) -> str:
     """Stable relative path for backup filenames; handles cross-volume ``relpath``."""
     try:
@@ -296,10 +327,7 @@ class AtomicRefactor:
             validator: Validation function
 
         """
-        _ensure_parent_dir(edit.path)
-
-        with open(edit.path, 'w', encoding='utf-8') as f:
-            f.write(edit.new_content or '')
+        _write_text_atomically(edit.path, edit.new_content or '')
 
         # Validation is now done separately in _apply_all_edits
         # This allows proper rollback if validation fails
@@ -330,9 +358,7 @@ class AtomicRefactor:
 
     def _write_edit_content(self, edit: RefactorEdit) -> None:
         """Write file content for modify/create."""
-        _ensure_parent_dir(edit.path)
-        with open(edit.path, 'w', encoding='utf-8') as f:
-            f.write(edit.new_content or '')
+        _write_text_atomically(edit.path, edit.new_content or '')
 
     def _apply_modify_create_impl(self, edit: RefactorEdit) -> None:
         """Apply modify/create: write content to file."""

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import difflib
 import os
+import threading
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -249,6 +250,25 @@ class ToolError(Exception):
 _GLOBAL_UNDO_HISTORY: dict[str, deque[str | None]] = defaultdict(
     lambda: deque(maxlen=32)
 )
+_GLOBAL_FILE_LOCKS: dict[str, threading.RLock] = {}
+_GLOBAL_FILE_LOCKS_GUARD = threading.Lock()
+
+
+def _canonical_lock_key(file_path: Path) -> str:
+    try:
+        return str(file_path.resolve())
+    except OSError:
+        return str(file_path)
+
+
+def _file_lock_for_path(file_path: Path) -> threading.RLock:
+    key = _canonical_lock_key(file_path)
+    with _GLOBAL_FILE_LOCKS_GUARD:
+        lock = _GLOBAL_FILE_LOCKS.get(key)
+        if lock is None:
+            lock = threading.RLock()
+            _GLOBAL_FILE_LOCKS[key] = lock
+        return lock
 
 
 class FileEditor(FileEditorEditOpsMixin):
@@ -412,6 +432,67 @@ class FileEditor(FileEditorEditOpsMixin):
             safe_path = self._resolve_path_safe(path)
             file_path = safe_path.path
 
+            with _file_lock_for_path(file_path):
+                return self._dispatch_locked(
+                    command=command,
+                    path=path,
+                    file_path=file_path,
+                    file_text=file_text,
+                    view_range=view_range,
+                    new_str=new_str,
+                    insert_line=insert_line,
+                    start_line=start_line,
+                    end_line=end_line,
+                    dry_run=dry_run,
+                    edit_mode=edit_mode,
+                    format_kind=format_kind,
+                    format_op=format_op,
+                    format_path=format_path,
+                    format_value=format_value,
+                    anchor_type=anchor_type,
+                    anchor_value=anchor_value,
+                    anchor_occurrence=anchor_occurrence,
+                    section_action=section_action,
+                    section_content=section_content,
+                    patch_text=patch_text,
+                    expected_hash=expected_hash,
+                    expected_file_hash=expected_file_hash,
+                )
+
+        except PathValidationError as e:
+            return ToolResult(output='', error=f'Path validation error: {e.message}')
+        except Exception as e:
+            return ToolResult(output='', error=str(e))
+
+    def _dispatch_locked(
+        self,
+        *,
+        command: str,
+        path: str,
+        file_path: Path,
+        file_text: str | Sentinel | None,
+        view_range: list[int] | None,
+        new_str: str | Sentinel | None,
+        insert_line: int | None,
+        start_line: int | None,
+        end_line: int | None,
+        dry_run: bool,
+        edit_mode: str | None,
+        format_kind: str | None,
+        format_op: str | None,
+        format_path: str | None,
+        format_value: Any,
+        anchor_type: str | None,
+        anchor_value: str | None,
+        anchor_occurrence: int | None,
+        section_action: str | None,
+        section_content: str | None,
+        patch_text: str | None,
+        expected_hash: str | None,
+        expected_file_hash: str | None,
+    ) -> ToolResult:
+        """Dispatch a validated editor command while the target file lock is held."""
+        try:
             if command == 'read_file':
                 return self._handle_view(file_path, view_range, path)
             if command in (

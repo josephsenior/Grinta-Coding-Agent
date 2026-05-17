@@ -6,6 +6,8 @@ This is similar to the functionality of `OrchestratorResponseParser`.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import ExitStack
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import backend.engine.tools.analyze_project_structure as analyze_project_structure_tools
@@ -988,6 +990,25 @@ def _structure_editor_supports_multi_edit() -> bool:
     return True
 
 
+def _resolve_multi_edit_path(raw_path: str, item_index: int) -> tuple[str, str]:
+    """Resolve a multi_edit target to a workspace-scoped absolute path."""
+    from backend.core.type_safety.path_validation import PathValidationError, SafePath
+    from backend.core.workspace_resolution import require_effective_workspace_root
+
+    try:
+        workspace_root = require_effective_workspace_root()
+        safe_path = SafePath.validate(
+            raw_path,
+            workspace_root=str(workspace_root),
+            must_be_relative=True,
+        )
+    except (PathValidationError, ValueError) as exc:
+        raise FunctionCallValidationError(
+            f'multi_edit item {item_index}: invalid path {raw_path!r}: {exc}'
+        ) from exc
+    return str(safe_path.path), safe_path.relative_to_workspace()
+
+
 def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Action:
     """Apply an atomic multi-file batch edit via :class:`AtomicRefactor`.
 
@@ -1007,7 +1028,7 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             f'(got {len(raw_edits)}). Split the batch.'
         )
 
-    parsed: list[tuple[str, str]] = []
+    parsed: list[tuple[str, str, str]] = []
     seen_paths: set[str] = set()
     for idx, item in enumerate(raw_edits):
         if not isinstance(item, Mapping):
@@ -1024,14 +1045,15 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             raise FunctionCallValidationError(
                 f"multi_edit item {idx} is missing required 'new_content' (string)."
             )
-        canonical = item_path.strip()
-        if canonical in seen_paths:
+        requested_path = item_path.strip()
+        canonical_path, display_path = _resolve_multi_edit_path(requested_path, idx)
+        if canonical_path in seen_paths:
             raise FunctionCallValidationError(
-                f'multi_edit item {idx}: duplicate path {canonical!r} in batch. '
+                f'multi_edit item {idx}: duplicate path {display_path!r} in batch. '
                 'Combine edits to the same file before submitting.'
             )
-        seen_paths.add(canonical)
-        parsed.append((canonical, new_content))
+        seen_paths.add(canonical_path)
+        parsed.append((canonical_path, display_path, new_content))
 
     try:
         from backend.engine.tools.atomic_refactor import AtomicRefactor
@@ -1043,17 +1065,24 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     refactor = AtomicRefactor()
     transaction = refactor.begin_transaction()
     try:
-        for item_path, new_content in parsed:
-            import os as _os
+        from backend.execution.utils.file_editor import _file_lock_for_path
 
-            operation = 'modify' if _os.path.exists(item_path) else 'create'
-            refactor.add_file_edit(
-                transaction,
-                item_path,
-                new_content,
-                operation=operation,
-            )
-        result = refactor.commit(transaction, validate=False)
+        with ExitStack() as stack:
+            for item_path in sorted(seen_paths):
+                stack.enter_context(_file_lock_for_path(Path(item_path)))
+            for item_path, _display_path, new_content in parsed:
+                import os as _os
+
+                operation = 'modify' if _os.path.exists(item_path) else 'create'
+                refactor.add_file_edit(
+                    transaction,
+                    item_path,
+                    new_content,
+                    operation=operation,
+                )
+            result = refactor.commit(transaction, validate=False)
+    except FunctionCallValidationError:
+        raise
     except Exception as e:
         # Best-effort rollback if commit raised before completion.
         try:
@@ -1065,7 +1094,7 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
         )
 
     if result.success:
-        paths = [p for p, _ in parsed]
+        paths = [display_path for _item_path, display_path, _new_content in parsed]
         if len(paths) == 1:
             file_lines = f'  • {paths[0]}'
         else:
