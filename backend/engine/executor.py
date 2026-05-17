@@ -151,7 +151,6 @@ class OrchestratorExecutor:
             'streaming_checkpoints',
         )
         self._checkpoint_cache: OrderedDict[str, StreamingCheckpoint] = OrderedDict()
-        self._recovery_blocked_reasons: dict[str, str] = {}
         self._step_cancelled = False
 
     def cancel_step(self) -> None:
@@ -167,7 +166,6 @@ class OrchestratorExecutor:
         event_stream: EventStream | None,
     ) -> ExecutionResult:
         checkpoint = self._get_checkpoint(event_stream)
-        self._raise_if_recovery_blocked(event_stream)
         start_time = time.time()
         error_message: str | None = None
         self._step_cancelled = False
@@ -881,7 +879,6 @@ class OrchestratorExecutor:
     ) -> ExecutionResult:
         """Execute LLM call with async interface natively streaming tokens."""
         checkpoint = self._get_checkpoint(event_stream)
-        self._raise_if_recovery_blocked(event_stream)
 
         start_time = time.time()
         error_message: str | None = None
@@ -979,15 +976,6 @@ class OrchestratorExecutor:
         )
         return ExecutionResult(actions, response, execution_time, error_message)
 
-    def _raise_if_recovery_blocked(self, event_stream: EventStream | None) -> None:
-        session_key = self._checkpoint_session_key(event_stream)
-        if reason := self._recovery_blocked_reasons.pop(session_key, None):
-            raise ModelProviderError(
-                'Streaming checkpoint recovery requires manual confirmation before continuing.',
-                context={'recovery_reason': reason},
-            )
-        return
-
     def _get_checkpoint(self, event_stream: EventStream | None) -> StreamingCheckpoint:
         session_key = self._checkpoint_session_key(event_stream)
         checkpoint = self._checkpoint_cache.get(session_key)
@@ -1024,12 +1012,16 @@ class OrchestratorExecutor:
                     session_key,
                 )
             else:
-                self._recovery_blocked_reasons[session_key] = inspection.reason
+                # Discard the uncommitted checkpoint and allow the next LLM call
+                # to proceed normally. The WAL is removed, so there's nothing
+                # left to recover from — blocking would trap the agent in an
+                # infinite error loop with no user-visible recovery path.
                 checkpoint.discard()
-                logger.error(
-                    'Discarded uncommitted streaming checkpoint for %s and blocked next LLM call: %s',
+                logger.warning(
+                    'Discarded uncommitted streaming checkpoint for %s (age=%.1fs, attempt=%d); continuing with fresh LLM call',
                     session_key,
-                    inspection.reason,
+                    getattr(inspection.record, 'created_at', 0),
+                    getattr(inspection.record, 'attempt', 0),
                 )
         self._checkpoint_cache[session_key] = checkpoint
         self._checkpoint_cache.move_to_end(session_key)

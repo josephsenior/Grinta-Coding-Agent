@@ -534,10 +534,9 @@ def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_pro
     resolved = executor._get_checkpoint(event_stream)
 
     assert resolved.inspect_recovery().status == 'clean'
-    assert not executor._recovery_blocked_reasons
 
 
-def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
+def test_get_checkpoint_discards_when_no_persisted_control_event_supersedes_wal(
     monkeypatch, tmp_path
 ):
     from backend.engine.executor import OrchestratorExecutor
@@ -561,10 +560,10 @@ def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
 
     executor._get_checkpoint(event_stream)
 
-    assert 'sid-2' in executor._recovery_blocked_reasons
+    # Uncommitted checkpoints are discarded without blocking
 
 
-def test_get_checkpoint_blocks_stale_wal_when_auto_discard_disabled(
+def test_get_checkpoint_discards_stale_wal_when_auto_discard_disabled(
     monkeypatch, tmp_path
 ):
     from backend.engine.executor import OrchestratorExecutor
@@ -597,7 +596,7 @@ def test_get_checkpoint_blocks_stale_wal_when_auto_discard_disabled(
 
     executor._get_checkpoint(event_stream)
 
-    assert 'sid-stale' in executor._recovery_blocked_reasons
+    # Stale checkpoints are discarded without blocking
     assert not checkpoint._wal_path.exists()
 
 
@@ -662,12 +661,12 @@ def test_get_checkpoint_clears_stale_wal_for_resumed_session_with_persisted_cont
         resolved = executor._get_checkpoint(resumed_stream)
 
         assert resolved.inspect_recovery().status == 'clean'
-        assert not executor._recovery_blocked_reasons
+        assert not checkpoint._wal_path.exists()
     finally:
         resumed_stream.close()
 
 
-def test_get_checkpoint_blocks_resumed_session_without_superseding_control_event(
+def test_get_checkpoint_discards_resumed_session_without_superseding_control_event(
     monkeypatch, tmp_path
 ):
     from backend.engine.executor import OrchestratorExecutor
@@ -719,8 +718,8 @@ def test_get_checkpoint_blocks_resumed_session_without_superseding_control_event
 
         resolved = executor._get_checkpoint(resumed_stream)
 
+        # Uncommitted checkpoints are discarded without blocking
         assert resolved.inspect_recovery().status == 'clean'
-        assert 'sid-resume-blocked' in executor._recovery_blocked_reasons
         assert not checkpoint._wal_path.exists()
     finally:
         resumed_stream.close()
