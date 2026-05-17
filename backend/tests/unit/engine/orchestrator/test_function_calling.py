@@ -251,23 +251,6 @@ class TestHandleStrReplaceEditorTool:
                 }
             )
 
-    def test_insert_text_preview_is_read_only_think_action(self, tmp_path):
-        target = tmp_path / 'sample.txt'
-        target.write_text('alpha\nbeta\n', encoding='utf-8')
-        action = _handle_text_editor_tool(
-            {
-                'command': 'insert_text',
-                'path': str(target),
-                'new_str': 'gamma',
-                'insert_line': 0,
-                'preview': True,
-                'security_risk': 'LOW',
-            }
-        )
-        assert isinstance(action, AgentThinkAction)
-        assert 'dry-run' in action.thought
-        assert target.read_text(encoding='utf-8') == 'alpha\nbeta\n'
-
     def test_range_missing_start_line_raises(self):
         with pytest.raises(
             FunctionCallValidationError,

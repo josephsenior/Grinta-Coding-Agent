@@ -106,16 +106,6 @@ def create_text_editor_tool(
                 'type': 'array',
             },
             'security_risk': get_security_risk_param(),
-            'preview': {
-                'description': 'If true, dry-run the edit without modifying the file.',
-                'type': 'boolean',
-            },
-            'confidence': {
-                'description': '0.0–1.0 certainty. Below 0.7 auto-runs in preview mode.',
-                'type': 'number',
-                'minimum': 0.0,
-                'maximum': 1.0,
-            },
             'edit_mode': {
                 'description': 'Optional edit strategy for write commands: format, section, range, patch.',
                 'type': 'string',
