@@ -379,9 +379,19 @@ class ActivityRenderer:
         )
 
     @staticmethod
-    def search_results(query: str, match_count: int = 0) -> ActivityCard:
+    def search_results(
+        query: str,
+        match_count: int = 0,
+        result_lines: list[str] | None = None,
+    ) -> ActivityCard:
         """Create an activity card for search results."""
         secondary = f'{match_count} matches' if match_count else 'No matches'
+        extra_lines: list[ActivityLine] = []
+
+        if result_lines:
+            for line in result_lines:
+                extra_lines.append(ActivityLine(line, style=NAVY_TEXT_MUTED, indent=1))
+
         return ActivityCard(
             verb='Searched',
             detail=query,
@@ -389,4 +399,6 @@ class ActivityRenderer:
             title='Search',
             secondary=secondary,
             secondary_kind='ok' if match_count else 'neutral',
+            extra_lines=extra_lines,
+            is_collapsible=bool(result_lines),
         )

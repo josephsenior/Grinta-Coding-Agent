@@ -22,6 +22,7 @@ from rich import box
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.rule import Rule
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -1640,8 +1641,12 @@ class TUIRenderer:
             if msg:
                 self._tui._write_log(Text(f'  {msg}', style=NAVY_TEXT_DIM))
         elif isinstance(event, AgentThinkAction):
+            source_tool = getattr(event, 'source_tool', '') or ''
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-            if thought and thought.strip() != 'Your thought has been logged.':
+
+            if source_tool == 'search_code' and thought:
+                self._handle_search_code_action(thought)
+            elif thought and thought.strip() != 'Your thought has been logged.':
                 self._tui.add_thinking(thought)
         elif isinstance(event, AgentThinkObservation):
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
@@ -1774,6 +1779,37 @@ class TUIRenderer:
             pass
         return None
 
+    def _handle_search_code_action(self, thought: str) -> None:
+        """Handle search_code action and render as a card."""
+        import re
+
+        # Strip <search_results> tags
+        content = re.sub(r'</?search_results>', '', thought).strip()
+        if not content:
+            return
+
+        # Parse results using existing CLI renderer
+        from backend.cli._tool_display.renderers.search import render_search_results
+
+        # Extract query from first line if it looks like a query
+        lines = content.splitlines()
+        query = ''
+        result_content = content
+
+        # Check if first line is a query line (doesn't match file:line:content pattern)
+        if lines and not re.match(r'^.*:\d+:', lines[0]):
+            query = lines[0]
+            result_content = '\n'.join(lines[1:]) if len(lines) > 1 else ''
+
+        # Parse and render results
+        result_lines = render_search_results(result_content, query=query)
+
+        # Count matches
+        match_count = sum(1 for line in content.splitlines() if re.match(r'^.*:\d+:', line))
+
+        card = ActivityRenderer.search_results(query or 'code search', match_count, result_lines)
+        self._write_card(card)
+
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
         if action.is_tool_call:
             return
@@ -1818,17 +1854,11 @@ class TUIRenderer:
                 duration_str = f'{elapsed:.1f}s'
                 plural = '' if self._tools_in_turn == 1 else 's'
                 summary_text = f'{self._tools_in_turn} tool{plural}  ·  {duration_str}'
-                # Use simple dash for guaranteed visual alignment with text
-                divider = '-' * len(summary_text)
-                self._tui._write_log(
-                    Text.assemble(
-                        '\n',
-                        Text(f'  {divider}', style='dim #5eead4'),
-                        '\n',
-                        Text(f'  {summary_text}', style='dim #5eead4'),
-                        '\n',
-                    )
-                )
+                # Full-width divider with bright cyan
+                self._tui._write_log(Text('\n'))
+                self._tui._write_log(Rule(style='#5eead4'))
+                self._tui._write_log(Text(f'  {summary_text}', style='#5eead4'))
+                self._tui._write_log(Text('\n'))
 
         # Ensure thinking UI is cleared on any idle/terminal state
         if state in (AgentState.AWAITING_USER_INPUT, AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED):
