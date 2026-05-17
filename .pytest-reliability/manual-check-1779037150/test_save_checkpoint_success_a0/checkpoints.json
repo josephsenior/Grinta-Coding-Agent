@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "label": "phase 1",
+    "timestamp": "2026-05-18 00:44:34",
+    "files": [
+      "a.txt",
+      "b.txt"
+    ],
+    "rollback_id": "cp_1779057874904_bd3890f8"
+  }
+]
