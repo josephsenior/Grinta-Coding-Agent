@@ -8,12 +8,16 @@ Gracefully degrades — all public methods return empty results when
 from __future__ import annotations
 
 import json
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from backend.core.logger import app_logger as logger
+from backend.execution.utils.bounded_io import (
+    BoundedResult,
+    async_bounded_subprocess_exec,
+)
+from backend.utils.async_utils import call_async_from_sync
 from backend.utils.stdio_json_rpc import parse_content_length_json_messages
 
 # ── Soft pylsp detection — delegates to the unified runtime detector ──────
@@ -22,6 +26,22 @@ from backend.utils.stdio_json_rpc import parse_content_length_json_messages
 # detector so other languages (gopls, typescript-language-server, …) are
 # discovered through the same mechanism.
 _PYLSP_AVAILABLE: bool | None = None  # None = not yet detected
+
+
+def _run_lsp_subprocess(
+    args: list[str],
+    *,
+    process_timeout: float,
+    stdin_data: bytes | str | None = None,
+) -> BoundedResult:
+    return call_async_from_sync(
+        async_bounded_subprocess_exec,
+        process_timeout + 5.0,
+        args,
+        process_timeout=process_timeout,
+        max_bytes_per_stream=4 * 1024 * 1024,
+        stdin_data=stdin_data,
+    )
 
 
 def _agent_debug_log(
@@ -54,7 +74,9 @@ def _detect_pylsp() -> bool:
             # execution still fails in this process environment.
             try:
                 probe_cmd = list(detected.resolved_command) + ['--version']
-                subprocess.run(probe_cmd, capture_output=True, timeout=3)
+                result = _run_lsp_subprocess(probe_cmd, process_timeout=3.0)
+                if result.returncode != 0:
+                    _PYLSP_AVAILABLE = False
             except Exception:
                 _PYLSP_AVAILABLE = False
         # #region agent log
@@ -351,17 +373,20 @@ class LspClient:
             for m in messages
         )
         try:
-            proc = subprocess.run(
+            result = _run_lsp_subprocess(
                 server_cmd,
-                input=payload.encode(),
-                capture_output=True,
-                timeout=15,
+                stdin_data=payload.encode(),
+                process_timeout=15.0,
             )
-            return parse_content_length_json_messages(
-                proc.stdout.decode(errors='replace')
-            )
-        except subprocess.TimeoutExpired:
+            if result.timed_out:
+                logger.warning('%s subprocess timed out', server_cmd[0])
+                return []
+            return parse_content_length_json_messages(result.stdout)
+        except TimeoutError:
             logger.warning('%s subprocess timed out', server_cmd[0])
+            return []
+        except Exception as exc:
+            logger.warning('%s subprocess failed: %s', server_cmd[0], exc)
             return []
 
     def _parse_lsp_responses(self, raw: str) -> list[dict[str, Any]]:

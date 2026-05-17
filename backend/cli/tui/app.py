@@ -28,8 +28,9 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.css.query import NoMatches
+from textual.message import Message
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, Label, Static, TextArea
+from textual.widgets import Button, Label, RichLog, Static, TextArea
 
 _tui_logger = logging.getLogger('grinta.tui')
 _tui_logger.setLevel(logging.DEBUG)
@@ -221,6 +222,10 @@ class HUD(Vertical):
         yield Label(id='hud-line-2')
 
 
+class RendererDrainRequested(Message):
+    """Message requesting the screen to drain queued renderer events."""
+
+
 class GrintaConfirmDialog(ModalScreen[str | None]):
     """Confirmation dialog shown when the agent needs user input."""
 
@@ -309,6 +314,8 @@ class GrintaScreen(Screen):
         self._confirm_result: str | None = None
         self._input_lock = asyncio.Lock()
         self._bootstrapping: asyncio.Event | None = None
+        self._bootstrap_task: asyncio.Task[Any] | None = None
+        self._is_unmounted = False
 
     _STATE_LABELS = {
         'starting': 'Starting…',
@@ -345,7 +352,14 @@ class GrintaScreen(Screen):
     def compose(self) -> ComposeResult:
         with Horizontal(id='main-layout'):
             with Transcript(id='transcript-container'):
-                yield Static(id='main-display')
+                yield Static(id='thinking-preview', classes='-hidden')
+                yield RichLog(
+                    id='main-display',
+                    max_lines=_TUI_HISTORY_RENDER_LIMIT,
+                    wrap=True,
+                    highlight=False,
+                    markup=False,
+                )
             with InfoSidebar(id='sidebar-container'):
                 yield Static(id='sidebar-display')
         with InputBar(id='input-bar'):
@@ -355,27 +369,36 @@ class GrintaScreen(Screen):
 
     def on_mount(self) -> None:
         _tui_logger.debug('on_mount: GrintaScreen mounted')
+        self._is_unmounted = False
 
         self._render_hud_bar()
         ta = self.query_one('#input', TextArea)
         ta.text = ''
         ta.focus()
-        transcript = self.query_one('#transcript-container', Transcript)
-        transcript.scroll_home(animate=False)
+        self._get_display().scroll_home(animate=False)
         _tui_logger.debug('on_mount: done')
         self._start_background_bootstrap()
+
+    def on_renderer_drain_requested(self, _message: RendererDrainRequested) -> None:
+        if self._renderer is not None:
+            self._renderer.drain_events()
 
     def _start_background_bootstrap(self) -> None:
         async def _bg():
             try:
                 await self._bootstrap()
+            except asyncio.CancelledError:
+                _tui_logger.debug('background bootstrap cancelled')
             except Exception as exc:
                 _tui_logger.debug(f'background bootstrap failed: {exc}')
 
-        asyncio.create_task(_bg())
+        self._bootstrap_task = asyncio.create_task(_bg(), name='grinta-tui-bootstrap')
 
     def on_unmount(self) -> None:
         _tui_logger.debug('on_unmount: GrintaScreen unmounting')
+        self._is_unmounted = True
+        if self._bootstrap_task and not self._bootstrap_task.done():
+            self._bootstrap_task.cancel()
         if self._renderer:
             if self._renderer._event_stream:
                 self._renderer._event_stream.unsubscribe(
@@ -391,6 +414,8 @@ class GrintaScreen(Screen):
                     _tui_logger.debug('on_unmount: event_stream closed')
             except Exception as exc:
                 _tui_logger.debug(f'on_unmount: event_stream close failed: {exc}')
+            finally:
+                self._event_stream = None
         _tui_logger.debug('on_unmount: done')
 
     # ── HUD Bar ─────────────────────────────────────────────
@@ -441,8 +466,11 @@ class GrintaScreen(Screen):
 
     # ── Transcript helpers ──────────────────────────────────────────────────
 
-    def _get_display(self) -> Static:
-        return self.query_one('#main-display', Static)
+    def _get_display(self) -> RichLog:
+        return self.query_one('#main-display', RichLog)
+
+    def _get_thinking_preview(self) -> Static:
+        return self.query_one('#thinking-preview', Static)
 
     def _get_sidebar(self) -> Static:
         return self.query_one('#sidebar-display', Static)
@@ -471,7 +499,7 @@ class GrintaScreen(Screen):
 
     def add_user_message(self, text: str) -> None:
         """User message — subtle left accent on first line only."""
-        self._hide_thinking()
+        self.finalize_thinking()
         body = _rich_text(text)
         plain = body.plain
         lines = plain.split('\n')
@@ -777,18 +805,15 @@ class GrintaScreen(Screen):
 
     def action_scroll_up(self) -> None:
         """Scroll transcript up by one page."""
-        transcript = self.query_one('#transcript-container', Transcript)
-        transcript.scroll_page_up(animate=True)
+        self._get_display().scroll_page_up(animate=True)
 
     def action_scroll_down(self) -> None:
         """Scroll transcript down by one page."""
-        transcript = self.query_one('#transcript-container', Transcript)
-        transcript.scroll_page_down(animate=True)
+        self._get_display().scroll_page_down(animate=True)
 
     def action_scroll_home(self) -> None:
         """Scroll transcript to top."""
-        transcript = self.query_one('#transcript-container', Transcript)
-        transcript.scroll_home(animate=True)
+        self._get_display().scroll_home(animate=True)
 
     def action_scroll_end(self) -> None:
         """Scroll transcript to bottom."""
@@ -811,7 +836,7 @@ class GrintaScreen(Screen):
         self.show_help()
 
     def _scroll_to_bottom(self) -> None:
-        self.query_one('#transcript-container', Transcript).scroll_end(animate=False)
+        self._get_display().scroll_end(animate=False)
 
     # ── Input handling ──────────────────────────────────────────────────────
 
@@ -1010,9 +1035,12 @@ class GrintaScreen(Screen):
 
         event_stream = None
         try:
+            file_store = get_file_store(config)
+            event_stream = EventStream(sid='grinta-tui', file_store=file_store)
+            self._event_stream = event_stream
             try:
-                agent, event_stream, runtime = await asyncio.to_thread(
-                    self._bootstrap_sync_phase1, config
+                agent, runtime = await asyncio.to_thread(
+                    self._bootstrap_sync_phase1, config, event_stream
                 )
             except Exception as exc:
                 _tui_logger.debug(
@@ -1020,6 +1048,14 @@ class GrintaScreen(Screen):
                 )
                 logger.exception('TUI _bootstrap: failed in phase1')
                 raise
+            if self._is_unmounted:
+                _tui_logger.debug('_bootstrap: screen already unmounted, aborting')
+                if event_stream is not None:
+                    close_fn = getattr(event_stream, 'close', None)
+                    if callable(close_fn):
+                        close_fn()
+                self._event_stream = None
+                return
 
             _tui_logger.debug(
                 f'_bootstrap: runtime created, type={type(runtime).__name__}'
@@ -1056,8 +1092,16 @@ class GrintaScreen(Screen):
                 controller.get_agent_state(),
                 type(controller.get_agent_state()),
             )
-
-            self._event_stream = event_stream
+            if self._is_unmounted:
+                _tui_logger.debug(
+                    '_bootstrap: screen unmounted after init, skipping subscribe'
+                )
+                if event_stream is not None:
+                    close_fn = getattr(event_stream, 'close', None)
+                    if callable(close_fn):
+                        close_fn()
+                self._event_stream = None
+                return
             self._runtime_stub = runtime
             self._memory_stub = memory
             self._controller = controller
@@ -1099,6 +1143,8 @@ class GrintaScreen(Screen):
                         close_fn()
                     except Exception:
                         pass
+            if self._event_stream is event_stream:
+                self._event_stream = None
             raise
         finally:
             _bootstrapping.set()
@@ -1106,11 +1152,8 @@ class GrintaScreen(Screen):
     def _bootstrap_sync_phase1(
         self,
         config: Any,
-    ) -> tuple[Any, Any, Any]:
-        _tui_logger.debug('_bootstrap_sync_phase1: get_file_store')
-        file_store = get_file_store(config)
-        _tui_logger.debug('_bootstrap_sync_phase1: EventStream')
-        event_stream = EventStream(sid='grinta-tui', file_store=file_store)
+        event_stream: Any,
+    ) -> tuple[Any, Any]:
         _tui_logger.debug(
             '_bootstrap_sync_phase1: create_registry_and_conversation_stats'
         )
@@ -1129,7 +1172,7 @@ class GrintaScreen(Screen):
         _tui_logger.debug('_bootstrap_sync_phase1: create_agent')
         agent = create_agent(config, llm_registry)
         _tui_logger.debug('_bootstrap_sync_phase1: done')
-        return agent, event_stream, runtime
+        return agent, runtime
 
     def _bootstrap_sync_phase2(
         self,
@@ -1315,7 +1358,10 @@ class GrintaScreen(Screen):
         _tui_logger.debug('_dispatch_to_agent: entering poll loop')
         while True:
             try:
-                await asyncio.sleep(0.1)
+                if self._renderer is not None:
+                    await self._renderer.wait_for_activity(wait_timeout_sec=0.5)
+                else:
+                    await asyncio.sleep(0.5)
                 loop_count += 1
                 state = self._controller.get_agent_state()
                 if loop_count == 1 or loop_count % 20 == 0:
@@ -1327,8 +1373,6 @@ class GrintaScreen(Screen):
                         loop_count,
                         state,
                     )
-                if self._renderer:
-                    self._renderer.drain_events()
                 if state in end_states:
                     _tui_logger.debug(f'_dispatch_to_agent: reached end state {state}')
                     logger.info('[TUI] _dispatch_to_agent: reached end state %s', state)
@@ -1406,12 +1450,14 @@ class TUIRenderer:
         self._current_state: Any = None
         self._pending_events: deque[Any] = deque()
         self._pending_lock = threading.Lock()
+        self._drain_scheduled = False
         self._pending_events_dropped = 0
 
         # History & Live state
         self._history: list[Any] = []
         self._history_items_dropped = 0
         self._live_thinking: str = ''
+        self._live_thinking_dirty = False
         self._task_list: list[dict[str, Any]] = []
         self._last_sidebar_state: Any = None
 
@@ -1426,43 +1472,81 @@ class TUIRenderer:
         event_stream.subscribe(EventStreamSubscriber.MAIN, self._on_event, sid)
 
     def add_to_history(self, renderable: Any) -> None:
-        """Add a finalized renderable to history and refresh display."""
+        """Add a finalized renderable to history and append it to RichLog."""
         if isinstance(renderable, str):
             renderable = Text.from_markup(renderable)
-        self._history.append(renderable)
-        # Add margin after tool result
-        self._history.append(Text(''))
-        self._trim_history()
+        self._append_history_item(renderable)
+        self._append_history_item(Text(''))
+        self._write_transcript(renderable)
+        self._write_transcript(Text(''))
         self._refresh_display()
+
+    def _append_history_item(self, renderable: Any) -> None:
+        self._history.append(renderable)
+        self._trim_history()
+
+    def _write_transcript(self, renderable: Any) -> None:
+        try:
+            self._tui._get_display().write(
+                renderable,
+                expand=True,
+                scroll_end=True,
+                animate=False,
+            )
+        except NoMatches:
+            return
+        except AttributeError:
+            # Unit tests often provide a minimal display double.
+            try:
+                self._tui._get_display().update(renderable)
+            except Exception:
+                return
 
     def update_live_thinking(self, text: str) -> None:
-        """Update the real-time reasoning buffer."""
-        is_first_chunk = not self._live_thinking
+        """Update the real-time reasoning preview without rewriting history."""
         self._live_thinking = text
-
-        if is_first_chunk:
-            prefix = Text('Thinking: ', style='#5eead4')
-            body = _render_thinking_with_diff(text)
-            self._history.append(Text.assemble(prefix, body, '\n'))
-            self._trim_history()
-        else:
-            if self._history:
-                prefix = Text('Thinking: ', style='#5eead4')
-                body = _render_thinking_with_diff(text)
-                self._history[-1] = Text.assemble(prefix, body, '\n')
-
-        self._refresh_display()
+        self._live_thinking_dirty = bool(text.strip())
+        preview = Text.assemble(
+            Text('Thinking: ', style='#5eead4'),
+            _render_thinking_with_diff(text),
+        )
+        try:
+            widget = self._tui._get_thinking_preview()
+            widget.remove_class('-hidden')
+            widget.update(preview)
+        except (AttributeError, NoMatches):
+            pass
 
     def commit_live_thinking(self) -> None:
-        """Commit live thinking to history and clear buffer."""
-        # Thinking is already in history at the correct position - just clear the buffer
+        """Commit the latest reasoning preview once and clear the live buffer."""
+        if self._live_thinking_dirty and self._live_thinking.strip():
+            self.add_to_history(
+                Text.assemble(
+                    Text('Thinking: ', style='#5eead4'),
+                    _render_thinking_with_diff(self._live_thinking),
+                )
+            )
         self._live_thinking = ''
-        self._refresh_display()
+        self._live_thinking_dirty = False
+        try:
+            widget = self._tui._get_thinking_preview()
+            widget.update('')
+            widget.add_class('-hidden')
+        except (AttributeError, NoMatches):
+            pass
 
     def clear_history(self) -> None:
         self._history = []
         self._history_items_dropped = 0
         self._live_thinking = ''
+        self._live_thinking_dirty = False
+        try:
+            self._tui._get_display().clear()
+            preview = self._tui._get_thinking_preview()
+            preview.update('')
+            preview.add_class('-hidden')
+        except (AttributeError, NoMatches):
+            pass
         self._refresh_display()
 
     def _trim_history(self) -> None:
@@ -1473,30 +1557,9 @@ class TUIRenderer:
         self._history_items_dropped += overflow
 
     def _refresh_display(self) -> None:
-        """Build the full Rich Group and update the Textual Static widgets."""
-        from rich.console import Group
-
+        """Refresh derived sidebar state; transcript writes are incremental."""
         from backend.cli._event_renderer.sidebar import build_sidebar
 
-        # 1. Main Display
-        # Thinking is now stored directly in _history - just render it as-is
-        items = list(self._history)
-        if self._history_items_dropped:
-            items.insert(
-                0,
-                Text(
-                    f'... {self._history_items_dropped} older transcript item(s) omitted from the live view ...',
-                    style=NAVY_TEXT_DIM,
-                ),
-            )
-
-        try:
-            self._tui._get_display().update(Group(*items))
-        except NoMatches:
-            return
-        self._tui._scroll_to_bottom()
-
-        # 2. Sidebar (Optimized: only update if state changed)
         mcp_count = self._hud.state.mcp_servers
         skill_count = self._hud.bundled_skill_count
 
@@ -1597,6 +1660,7 @@ class TUIRenderer:
         with self._pending_lock:
             events = list(self._pending_events)
             self._pending_events.clear()
+            self._drain_scheduled = False
             dropped = self._pending_events_dropped
             self._pending_events_dropped = 0
         if not events:
@@ -1615,16 +1679,49 @@ class TUIRenderer:
             self._process_event(event)
         self._refresh_display()
 
+    async def wait_for_activity(self, wait_timeout_sec: float = 0.5) -> Any:
+        with self._pending_lock:
+            has_pending = bool(self._pending_events)
+        if has_pending:
+            self.drain_events()
+            self._state_event.clear()
+            return self._current_state
+        try:
+            await asyncio.wait_for(self._state_event.wait(), timeout=wait_timeout_sec)
+        except TimeoutError:
+            return None
+        finally:
+            self._state_event.clear()
+        self.drain_events()
+        return self._current_state
+
     def _on_event(self, event: Any) -> None:
+        should_schedule_drain = False
         with self._pending_lock:
             if len(self._pending_events) >= _TUI_PENDING_EVENT_LIMIT:
                 self._pending_events.popleft()
                 self._pending_events_dropped += 1
             self._pending_events.append(event)
+            if not self._drain_scheduled:
+                self._drain_scheduled = True
+                should_schedule_drain = True
         try:
-            self._loop.call_soon_threadsafe(self._state_event.set)
+            self._loop.call_soon_threadsafe(
+                self._signal_activity,
+                should_schedule_drain,
+            )
         except RuntimeError:
             pass
+
+    def _signal_activity(self, should_schedule_drain: bool) -> None:
+        self._state_event.set()
+        if not should_schedule_drain:
+            return
+        try:
+            self._tui.post_message(RendererDrainRequested())
+        except Exception:
+            with self._pending_lock:
+                self._drain_scheduled = False
 
     def _process_event(self, event: Any) -> None:
         self._update_metrics(event)
@@ -1985,12 +2082,12 @@ class TUIRenderer:
             self._tui.add_thinking(thinking)
 
         if action.is_final:
-            # Add the actual response text to history (after thinking)
+            # Add the actual response text to history after committing thinking.
+            self._tui.finalize_thinking()
             content = (action.accumulated or '').strip()
             if content and self._tui._renderer:
                 body = Markdown(content)
                 self._tui._renderer.add_to_history(body)
-            self._tui.finalize_thinking()
 
     def _update_metrics(self, event: Any) -> None:
         if hasattr(event, 'model') and event.model:

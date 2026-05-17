@@ -11,7 +11,6 @@ import ast
 import os
 import re
 import shutil
-import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -21,9 +20,31 @@ from backend.engine.tools.ignore_filter import (
     is_ignored_file,
     prune_ignored_dirs,
 )
+from backend.execution.utils.bounded_io import (
+    BoundedResult,
+    async_bounded_subprocess_exec,
+)
 from backend.ledger.action import AgentThinkAction
+from backend.utils.async_utils import call_async_from_sync
 
 ANALYZE_PROJECT_STRUCTURE_TOOL_NAME = 'analyze_project_structure'
+
+
+def _run_command(
+    args: list[str],
+    *,
+    cwd: str | None = None,
+    process_timeout: float = 30.0,
+    max_bytes_per_stream: int = 2 * 1024 * 1024,
+) -> BoundedResult:
+    return call_async_from_sync(
+        async_bounded_subprocess_exec,
+        process_timeout + 5.0,
+        args,
+        cwd=cwd,
+        process_timeout=process_timeout,
+        max_bytes_per_stream=max_bytes_per_stream,
+    )
 
 
 def create_analyze_project_structure_tool() -> dict:
@@ -274,7 +295,7 @@ def _imports_reverse_via_rg(basename: str) -> list[str] | None:
     if not rg:
         return None
     try:
-        res = subprocess.run(
+        res = _run_command(
             [
                 rg,
                 '-l',
@@ -284,9 +305,6 @@ def _imports_reverse_via_rg(basename: str) -> list[str] | None:
                 '--glob',
                 '!__pycache__',
             ],
-            capture_output=True,
-            text=True,
-            check=False,
         )
         if res.stdout.strip():
             return res.stdout.splitlines()[:30]
@@ -414,7 +432,7 @@ def _callers_lines_via_rg(symbol: str, safe_scope: str) -> list[str] | None:
     if not rg:
         return None
     try:
-        res = subprocess.run(
+        res = _run_command(
             [
                 rg,
                 '-n',
@@ -434,9 +452,6 @@ def _callers_lines_via_rg(symbol: str, safe_scope: str) -> list[str] | None:
                 '!.git',
                 safe_scope,
             ],
-            capture_output=True,
-            text=True,
-            check=False,
         )
         if res.stdout.strip():
             return res.stdout.splitlines()[:50]
@@ -525,16 +540,16 @@ def _extract_ast_summary(filepath: str) -> list[str]:
 
 def _git_files_for_tree(cwd: str) -> set[str]:
     try:
-        result = subprocess.run(
+        result = _run_command(
             ['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
             cwd=cwd,
-            capture_output=True,
-            text=False,
-            check=True,
+            process_timeout=10.0,
         )
+        if result.returncode != 0:
+            return set()
         return {
-            item.decode('utf-8', errors='ignore')
-            for item in result.stdout.split(b'\0')
+            item
+            for item in result.stdout.split('\0')
             if item
         }
     except Exception:
@@ -866,11 +881,9 @@ def _build_recent_action() -> AgentThinkAction:
     """Recently modified files via git log."""
     out = ['=== RECENTLY MODIFIED FILES (last 20 commits) ===']
     try:
-        res = subprocess.run(
+        res = _run_command(
             ['git', 'log', '--oneline', '--name-only', '-20', '--pretty=format:%h %s'],
-            capture_output=True,
-            text=True,
-            check=False,
+            process_timeout=10.0,
         )
         if res.stdout.strip():
             out.extend(res.stdout.splitlines()[:100])
@@ -993,11 +1006,9 @@ def _build_semantic_search_action(symbol: str, path: str) -> AgentThinkAction:
 
     script_path = sa.__file__
     try:
-        res = subprocess.run(
+        res = _run_command(
             [sys.executable, script_path, 'find_references', symbol, path],
-            capture_output=True,
-            text=True,
-            check=False,
+            process_timeout=30.0,
         )
         return AgentThinkAction(
             thought=res.stdout
