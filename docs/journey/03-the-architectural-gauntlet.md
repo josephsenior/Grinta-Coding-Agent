@@ -140,6 +140,33 @@ The hot path reads almost like a sentence: check prerequisites, check guards, ge
 
 And once the code gets sharper, the system becomes easier to trust.
 
+### The Shape of the Hot Path
+
+The decomposition is not abstract. It produces a concrete execution flow that you can trace from user input to task completion:
+
+```mermaid
+flowchart TD
+    User([User Input]) --> StepPrereq[StepPrerequisiteService\n"should I step?"]
+    StepPrereq -->|yes| StepGuard[StepGuardService\n"am I safe to step?"]
+    StepPrereq -->|no| Wait[Wait for next event]
+    StepGuard -->|trip| Recovery[RecoveryService\nclassify & route exception]
+    StepGuard -->|warn| ActionExec[ActionExecutionService\nget next action]
+    StepGuard -->|pass| ActionExec
+    ActionExec --> Safety[SafetyService\nrisk classification + confirmation gate]
+    Safety -->|blocked| UserConfirm[User confirmation]
+    Safety -->|approved| Execute[Execute action]
+    Execute --> Obs[ObservationService\nmatch observation to action]
+    Obs --> State[StateTransitionService\nenforce state machine]
+    State --> Finish{TaskValidationService\n"all steps done?"}
+    Finish -->|no| StepPrereq
+    Finish -->|yes| Done([Session complete])
+    Recovery -->|retry| RetryService[RetryService\nexponential backoff queue]
+    RetryService --> StepPrereq
+    Recovery -->|hard-stop| Done
+```
+
+Each box is a service file. Each arrow is a decision boundary. The point is not that this diagram is pretty — it is that every failure mode has a named home.
+
 ---
 
 ## Why Event Sourcing Entered the Picture
