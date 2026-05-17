@@ -181,7 +181,7 @@ That probably means continuing the same pattern the code already uses: explicit 
 
 The context system is already much better than where it began, but it remains one of the highest leverage and highest fragility parts of the architecture.
 
-The conversation memory layer has hooks for optional vector and graph-backed memory stores. The vector store would enable semantic retrieval of relevant past context — not just recency-based windowing but actual similarity-based recall. The graph store would enable structured relationship tracking between code entities, files, and decisions. Neither is deployed in the current architecture, but the interfaces exist because I designed the memory system knowing that pure event-list memory has a ceiling.
+The conversation memory layer has an active hybrid vector store (ChromaDB with FastEmbed ONNX for semantic search, SQLite FTS5 for BM25 lexical search) with parent-child chunking, an LRU query cache, and optional flashrank re-ranking. The graph-backed memory store was stripped during the SaaS-to-CLI pivot, but the vector store is deployed, optional via the `[rag]` extra, and integrated into the condensation pipeline for semantic recall across long sessions.
 
 This is still a place where carefully chosen improvements could unlock much better long-session behavior.
 
