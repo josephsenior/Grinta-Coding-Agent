@@ -469,7 +469,7 @@ def _render_autonomy(
     autonomy = (
         '<AUTONOMY>\n'
         "Plan, execute, and verify the user's task end-to-end. The runtime may "
-        'Interrupt a tool call to surface a user decision; treat that decision as '
+        'interrupt a tool call to surface a user decision; treat that decision as '
         'authoritative and continue from where you stopped. On tool failure, pivot '
         'to an alternative tool in the same turn (e.g. symbol_editor \u2192 text_editor) '
         'and auto-retry recoverable errors before reporting back.'
