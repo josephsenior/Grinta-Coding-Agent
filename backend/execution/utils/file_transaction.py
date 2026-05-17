@@ -9,14 +9,68 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from backend.core.logger import app_logger as logger
+from backend.utils.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
     from backend.execution.base import Runtime
+
+
+_FILE_LOCKS: dict[str, threading.RLock] = {}
+_FILE_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_key(file_path: str) -> str:
+    try:
+        return str(Path(file_path).resolve())
+    except OSError:
+        return os.path.abspath(file_path)
+
+
+def _file_lock_for_path(file_path: str) -> threading.RLock:
+    key = _lock_key(file_path)
+    with _FILE_LOCKS_GUARD:
+        lock = _FILE_LOCKS.get(key)
+        if lock is None:
+            lock = threading.RLock()
+            _FILE_LOCKS[key] = lock
+        return lock
+
+
+def _atomic_write_text(file_path: str, content: str) -> None:
+    parent = os.path.dirname(os.path.abspath(file_path))
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    fd: int | None = None
+    tmp_path: str | None = None
+    try:
+        fd, tmp_path = tempfile.mkstemp(
+            prefix=f'.{os.path.basename(file_path)}.',
+            suffix='.tmp',
+            dir=parent or None,
+            text=True,
+        )
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            fd = None
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, file_path)
+        tmp_path = None
+    finally:
+        if fd is not None:
+            os.close(fd)
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                logger.warning('Failed to remove transaction temp file: %s', tmp_path)
 
 
 class FileOperationType(Enum):
@@ -82,7 +136,7 @@ class FileTransaction:
         # Cleanup backup directory
         if self.backup_dir and os.path.exists(self.backup_dir):
             try:
-                shutil.rmtree(self.backup_dir)
+                await call_sync_from_async(shutil.rmtree, self.backup_dir)
                 logger.debug('Cleaned up transaction backup dir: %s', self.backup_dir)
             except Exception as e:
                 logger.warning('Failed to cleanup transaction backup: %s', e)
@@ -95,13 +149,21 @@ class FileTransaction:
             content: File content to write
 
         """
+        await call_sync_from_async(self._write_file_sync, file_path, content)
+
+    def _write_file_sync(self, file_path: str, content: str) -> None:
+        """Synchronous write implementation guarded by a per-file lock."""
+        with _file_lock_for_path(file_path):
+            self._write_file_locked(file_path, content)
+
+    def _write_file_locked(self, file_path: str, content: str) -> None:
         # Check if file exists and backup current content
         existed_before = os.path.exists(file_path)
         old_content = None
 
         if existed_before:
             try:
-                with open(file_path, encoding='utf-8') as f:  # noqa: ASYNC230
+                with open(file_path, encoding='utf-8') as f:
                     old_content = f.read()
 
                 # Create backup
@@ -109,8 +171,7 @@ class FileTransaction:
                     backup_path = os.path.join(
                         self.backup_dir, os.path.basename(file_path)
                     )
-                    with open(backup_path, 'w', encoding='utf-8') as f:  # noqa: ASYNC230
-                        f.write(old_content)
+                    _atomic_write_text(backup_path, old_content)
             except Exception as e:
                 logger.warning('Failed to backup file %s: %s', file_path, e)
 
@@ -126,9 +187,7 @@ class FileTransaction:
 
         # Execute write
         try:
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, 'w', encoding='utf-8') as f:  # noqa: ASYNC230
-                f.write(content)
+            _atomic_write_text(file_path, content)
             logger.debug('Wrote file in transaction: %s', file_path)
         except Exception as e:
             logger.error('Failed to write file %s: %s', file_path, e)
@@ -142,19 +201,26 @@ class FileTransaction:
             new_content: New file content
 
         """
+        await call_sync_from_async(self._edit_file_sync, file_path, new_content)
+
+    def _edit_file_sync(self, file_path: str, new_content: str) -> None:
+        """Synchronous edit implementation guarded by a per-file lock."""
+        with _file_lock_for_path(file_path):
+            self._edit_file_locked(file_path, new_content)
+
+    def _edit_file_locked(self, file_path: str, new_content: str) -> None:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f'Cannot edit non-existent file: {file_path}')
 
         # Backup current content
         try:
-            with open(file_path, encoding='utf-8') as f:  # noqa: ASYNC230
+            with open(file_path, encoding='utf-8') as f:
                 old_content = f.read()
 
             # Create backup
             if self.backup_dir:
                 backup_path = os.path.join(self.backup_dir, os.path.basename(file_path))
-                with open(backup_path, 'w', encoding='utf-8') as f:  # noqa: ASYNC230
-                    f.write(old_content)
+                _atomic_write_text(backup_path, old_content)
         except Exception as e:
             logger.error('Failed to backup file for edit %s: %s', file_path, e)
             raise
@@ -171,8 +237,7 @@ class FileTransaction:
 
         # Execute edit
         try:
-            with open(file_path, 'w', encoding='utf-8') as f:  # noqa: ASYNC230
-                f.write(new_content)
+            _atomic_write_text(file_path, new_content)
             logger.debug('Edited file in transaction: %s', file_path)
         except Exception as e:
             logger.error('Failed to edit file %s: %s', file_path, e)
@@ -185,20 +250,28 @@ class FileTransaction:
             file_path: Absolute path to the file
 
         """
+        await call_sync_from_async(self._delete_file_sync, file_path)
+
+    def _delete_file_sync(self, file_path: str) -> None:
+        """Synchronous delete implementation guarded by a per-file lock."""
+        with _file_lock_for_path(file_path):
+            self._delete_file_locked(file_path)
+
+    def _delete_file_locked(self, file_path: str) -> None:
         if not os.path.exists(file_path):
             logger.warning('Cannot delete non-existent file: %s', file_path)
             return
 
         # Backup current content before deletion
+        old_content = None
         try:
-            with open(file_path, encoding='utf-8') as f:  # noqa: ASYNC230
+            with open(file_path, encoding='utf-8') as f:
                 old_content = f.read()
 
             # Create backup
             if self.backup_dir:
                 backup_path = os.path.join(self.backup_dir, os.path.basename(file_path))
-                with open(backup_path, 'w', encoding='utf-8') as f:  # noqa: ASYNC230
-                    f.write(old_content)
+                _atomic_write_text(backup_path, old_content)
         except Exception as e:
             logger.warning('Failed to backup file for deletion %s: %s', file_path, e)
 
@@ -236,12 +309,11 @@ class FileTransaction:
             operation: File operation to rollback
 
         """
-        if operation.existed_before and operation.old_content is not None:
-            with open(operation.file_path, 'w', encoding='utf-8') as f:
-                f.write(operation.old_content)
-            logger.debug('Restored original content: %s', operation.file_path)
-        else:
-            if os.path.exists(operation.file_path):
+        with _file_lock_for_path(operation.file_path):
+            if operation.existed_before and operation.old_content is not None:
+                _atomic_write_text(operation.file_path, operation.old_content)
+                logger.debug('Restored original content: %s', operation.file_path)
+            elif os.path.exists(operation.file_path):
                 os.remove(operation.file_path)
                 logger.debug('Deleted newly created file: %s', operation.file_path)
 
@@ -252,10 +324,10 @@ class FileTransaction:
             operation: File operation to rollback
 
         """
-        if operation.old_content is not None:
-            with open(operation.file_path, 'w', encoding='utf-8') as f:
-                f.write(operation.old_content)
-            logger.debug('Restored edited file: %s', operation.file_path)
+        with _file_lock_for_path(operation.file_path):
+            if operation.old_content is not None:
+                _atomic_write_text(operation.file_path, operation.old_content)
+                logger.debug('Restored edited file: %s', operation.file_path)
 
     def _rollback_delete_operation(self, operation) -> None:
         """Rollback a DELETE operation.
@@ -264,16 +336,18 @@ class FileTransaction:
             operation: File operation to rollback
 
         """
-        if operation.old_content is not None:
-            os.makedirs(os.path.dirname(operation.file_path), exist_ok=True)
-            with open(operation.file_path, 'w', encoding='utf-8') as f:
-                f.write(operation.old_content)
-            logger.debug('Restored deleted file: %s', operation.file_path)
+        with _file_lock_for_path(operation.file_path):
+            if operation.old_content is not None:
+                _atomic_write_text(operation.file_path, operation.old_content)
+                logger.debug('Restored deleted file: %s', operation.file_path)
 
     async def rollback(self) -> None:
         """Rollback all file operations in reverse order."""
         logger.warning('Rolling back %s file operations', len(self.operations))
 
+        await call_sync_from_async(self._rollback_sync)
+
+    def _rollback_sync(self) -> None:
         for operation in reversed(self.operations):
             try:
                 if operation.operation_type == FileOperationType.WRITE:

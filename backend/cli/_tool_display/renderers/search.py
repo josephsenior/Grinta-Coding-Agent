@@ -52,7 +52,7 @@ def render_search_results(
                 grouped[filepath] = []
             grouped[filepath].append((lineno, content))
         else:
-            grouped['output'] = grouped.get('output', [])
+            grouped['output'] = grouped.get('output', [])  # type: ignore[unreachable]
             grouped['output'].append((0, line))
 
     if 'output' in grouped:
