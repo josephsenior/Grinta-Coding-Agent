@@ -28,6 +28,15 @@ class TestFileEditorCoverageGaps:
         p = self.test_dir / name
         return p.read_text(encoding='utf-8')
 
+    def test_transaction_stack_initialized_on_new_editor(self) -> None:
+        """Fresh editors can enter a transaction without AttributeError."""
+        assert self.editor._transaction_stack == []
+
+        with self.editor.transaction():
+            assert len(self.editor._transaction_stack) == 1
+
+        assert self.editor._transaction_stack == []
+
     def test_path_validation_error(self) -> None:
         """Covers line 126 (PathValidationError in __call__)."""
         result = self.editor(command='read_file', path='../outside.txt')
@@ -127,6 +136,45 @@ class TestFileEditorCoverageGaps:
             # Hit lines 568-572
             self.editor._rollback_transaction(backup)
             # No crash!
+
+    def test_rollback_transaction_rejects_outside_workspace(self) -> None:
+        outside = self.test_dir.parent / f'{self.test_dir.name}_outside.txt'
+        outside.write_text('current', encoding='utf-8')
+        backup: dict[str, str | None] = {str(outside): 'rollback'}
+
+        results = self.editor._rollback_transaction(backup)
+
+        assert outside.read_text(encoding='utf-8') == 'current'
+        assert len(results) == 1
+        assert results[0].error is not None
+        assert 'outside workspace' in results[0].error
+
+    def test_rollback_transaction_restore_runs_validation(self) -> None:
+        file_path = self._write('restore_policy.txt', 'current')
+        backup: dict[str, str | None] = {str(file_path): 'original'}
+
+        with patch.object(
+            self.editor,
+            '_maybe_validate_syntax_for_file',
+            return_value=(False, 'blocked by test policy'),
+        ):
+            results = self.editor._rollback_transaction(backup)
+
+        assert self._read('restore_policy.txt') == 'current'
+        assert len(results) == 1
+        assert results[0].error is not None
+        assert 'Syntax validation failed' in results[0].error
+
+    def test_rollback_transaction_records_before_after_payload(self) -> None:
+        file_path = self._write('restore_payload.txt', 'current')
+        backup: dict[str, str | None] = {str(file_path): 'original'}
+
+        results = self.editor._rollback_transaction(backup)
+
+        assert self._read('restore_payload.txt') == 'original'
+        assert len(results) == 1
+        assert results[0].old_content == 'current'
+        assert results[0].new_content == 'original'
 
     def test_unicode_decode_fallback(self) -> None:
         """Covers line 440-449 (UnicodeDecodeError fallback)."""
