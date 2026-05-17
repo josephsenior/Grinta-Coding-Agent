@@ -146,7 +146,9 @@ class ActivityCard(Container):
         self._secondary = text
         self._secondary_kind = kind
         header = self.query_one('#header', Static)
-        header.update(self._build_header_markup() + '\n' + self._build_secondary_markup())
+        header.update(
+            self._build_header_markup() + '\n' + self._build_secondary_markup()
+        )
 
     def append_extra(self, text: str) -> None:
         """Append content to the extra section."""
@@ -248,6 +250,7 @@ class ThinkingIndicator(Static):
     def start(self, action: str = 'Thinking') -> None:
         """Start the thinking indicator."""
         import time
+
         self._start_time = time.monotonic()
         self._current_action = action
         self._thoughts = []
@@ -272,6 +275,7 @@ class ThinkingIndicator(Static):
 
     def _render(self) -> None:
         import time
+
         elapsed = int(time.monotonic() - self._start_time) if self._start_time else 0
 
         lines: list[str] = []
@@ -286,7 +290,13 @@ class ThinkingIndicator(Static):
             avg_step = elapsed / self._step_count if self._step_count > 0 else 0
             estimated_remaining = max(0, int((10 - self._step_count) * avg_step))
             if estimated_remaining > 0:
-                eta = f'~{estimated_remaining}s' if estimated_remaining < 60 else f'~{estimated_remaining // 60}m'
-                lines.append(f'  [dim #969aad]step {self._step_count} · {eta} remaining[/]')
+                eta = (
+                    f'~{estimated_remaining}s'
+                    if estimated_remaining < 60
+                    else f'~{estimated_remaining // 60}m'
+                )
+                lines.append(
+                    f'  [dim #969aad]step {self._step_count} · {eta} remaining[/]'
+                )
 
         self.update('\n'.join(lines))

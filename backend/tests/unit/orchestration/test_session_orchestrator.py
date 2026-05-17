@@ -481,7 +481,9 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
         self.ctrl.services.step_prerequisites.can_step.return_value = True
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=False)
         self.ctrl._sync_budget_flag_with_metrics = MagicMock()
-        self.ctrl.services.action_execution.get_next_action = AsyncMock(return_value=None)
+        self.ctrl.services.action_execution.get_next_action = AsyncMock(
+            return_value=None
+        )
         self.ctrl.iteration_guard.run_control_flags = AsyncMock()
         self.ctrl.services.retry.retry_count = 0
         self.ctrl.rate_governor.check_and_wait = AsyncMock()
@@ -837,7 +839,9 @@ class TestFirstUserMessage(unittest.TestCase):
         msg = MagicMock(spec=MessageAction)
         msg.source = EventSource.USER
         orig_isinstance = builtins.isinstance
-        builtins.isinstance = lambda o, c: (c is MessageAction and o is msg) or orig_isinstance(o, c)
+        builtins.isinstance = lambda o, c: (
+            c is MessageAction and o is msg
+        ) or orig_isinstance(o, c)
         try:
             result = self.ctrl._first_user_message([msg])
         finally:

@@ -20,14 +20,16 @@ from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
 
 # ── Rich theme for consistent markup in RichLog/Static widgets ─────────────
-_RICH_THEME = RichTheme({
-    'repr.number': '#e9e9e9',
-    'repr.string': '#54efae',
-    'repr.bool': '#91abec',
-    'repr.none': '#969aad',
-    'repr.url': '#91abec',
-    'repr.uuid': '#969aad',
-})
+_RICH_THEME = RichTheme(
+    {
+        'repr.number': '#e9e9e9',
+        'repr.string': '#54efae',
+        'repr.bool': '#91abec',
+        'repr.none': '#969aad',
+        'repr.url': '#91abec',
+        'repr.uuid': '#969aad',
+    }
+)
 
 if TYPE_CHECKING:
     from backend.cli.config_manager import AppConfig
@@ -70,14 +72,17 @@ class GrintaTUIApp(App):
 
     async def on_mount(self) -> None:
         from backend.cli.tui.app import GrintaScreen
-        self._screen = await self.push_screen(GrintaScreen(
-            config=self._config,
-            console=self._console,
-            loop=self._loop,
-            hud=self._hud,
-            reasoning=self._reasoning,
-            app=self,
-        ))
+
+        self._screen = await self.push_screen(
+            GrintaScreen(
+                config=self._config,
+                console=self._console,
+                loop=self._loop,
+                hud=self._hud,
+                reasoning=self._reasoning,
+                app=self,
+            )
+        )
 
     def on_unmount(self) -> None:
         self._console.pop_theme()
@@ -145,6 +150,7 @@ async def _async_main_tui(
 ) -> None:
     if model:
         from backend.cli.config_manager import update_model
+
         update_model(model)
 
     await run_tui(config, console, verbose=verbose)

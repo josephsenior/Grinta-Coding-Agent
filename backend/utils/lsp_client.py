@@ -492,7 +492,11 @@ class LspClient:
         return []
 
     def _build_code_action_range_and_diags(
-        self, source: str, diagnostics_payload: list[dict[str, Any]], lsp_line: int, lsp_col: int
+        self,
+        source: str,
+        diagnostics_payload: list[dict[str, Any]],
+        lsp_line: int,
+        lsp_col: int,
     ) -> tuple[dict, list[dict[str, Any]]]:
         if lsp_line == 0 and lsp_col == 0:
             line_count = source.count('\n') + 1
@@ -516,8 +520,13 @@ class LspClient:
         return req_range, relevant_diags
 
     def _execute_code_action_request(
-        self, server_cmd: list[str], uri: str, abs_path: str, source: str,
-        req_range: dict, relevant_diags: list[dict[str, Any]]
+        self,
+        server_cmd: list[str],
+        uri: str,
+        abs_path: str,
+        source: str,
+        req_range: dict,
+        relevant_diags: list[dict[str, Any]],
     ) -> LspResult:
         msgs = self._build_init_msgs(uri, abs_path)
         msgs[2]['params']['textDocument']['text'] = source
@@ -619,7 +628,9 @@ class LspClient:
 
         return LspResult(available=True, hover_text='No hover info')
 
-    def _build_hover_request_message(self, uri: str, lsp_line: int, lsp_col: int) -> dict[str, Any]:
+    def _build_hover_request_message(
+        self, uri: str, lsp_line: int, lsp_col: int
+    ) -> dict[str, Any]:
         return {
             'jsonrpc': '2.0',
             'id': 10,
@@ -671,14 +682,26 @@ class LspClient:
         )
 
     def _try_lsp_locations(
-        self, server_cmd: list[str], command: str, uri: str, abs_path: str,
-        source: str, lsp_line: int, lsp_col: int
+        self,
+        server_cmd: list[str],
+        command: str,
+        uri: str,
+        abs_path: str,
+        source: str,
+        lsp_line: int,
+        lsp_col: int,
     ) -> LspResult:
         msg_id = 10
         msgs = self._build_init_msgs(uri, abs_path)
         msgs[2]['params']['textDocument']['text'] = source
-        msgs.append(self._build_location_request_message(command, msg_id, uri, lsp_line, lsp_col))
-        msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': msg_id + 1, 'params': {}})
+        msgs.append(
+            self._build_location_request_message(
+                command, msg_id, uri, lsp_line, lsp_col
+            )
+        )
+        msgs.append(
+            {'jsonrpc': '2.0', 'method': 'shutdown', 'id': msg_id + 1, 'params': {}}
+        )
 
         responses = self._rpc(msgs, server_cmd)
         for resp in responses:

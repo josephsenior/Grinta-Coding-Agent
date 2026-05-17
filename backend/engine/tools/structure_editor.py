@@ -110,7 +110,9 @@ def _format_context_window(
         if idx > 0:
             output_parts.append('...')
         output_parts.extend(
-            _format_range_lines(new_lines, changed_ranges, ctx_start, ctx_end, total_lines)
+            _format_range_lines(
+                new_lines, changed_ranges, ctx_start, ctx_end, total_lines
+            )
         )
 
     return '\n'.join(output_parts)
@@ -365,12 +367,35 @@ class StructureEditor:
         language = self.universal.detect_language(path)
         if not language:
             ext = Path(path).suffix.lower() or '(no extension)'
-            supported = ', '.join(sorted({'.py', '.js', '.ts', '.go', '.rs', '.java', '.c', '.cpp', '.rb', '.php', '.swift', '.kt', '.cs', '.html', '.css', '.json', '.yaml', '.sh'}))
+            supported = ', '.join(
+                sorted(
+                    {
+                        '.py',
+                        '.js',
+                        '.ts',
+                        '.go',
+                        '.rs',
+                        '.java',
+                        '.c',
+                        '.cpp',
+                        '.rb',
+                        '.php',
+                        '.swift',
+                        '.kt',
+                        '.cs',
+                        '.html',
+                        '.css',
+                        '.json',
+                        '.yaml',
+                        '.sh',
+                    }
+                )
+            )
             return EditResult(
                 success=False,
                 message=(
                     f"Symbol Editor doesn't support {ext} files. "
-                    f"It requires source code files with tree-sitter parsers. "
+                    f'It requires source code files with tree-sitter parsers. '
                     f'Supported: {supported}'
                 ),
             )

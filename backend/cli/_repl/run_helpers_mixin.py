@@ -175,9 +175,7 @@ class RunHelpersMixin:
                 engine_init_exc,
             )
             if not init_ok:
-                engine_init_exc.append(
-                    RuntimeError('Session initialization failed')
-                )
+                engine_init_exc.append(RuntimeError('Session initialization failed'))
                 return
 
             self._bootstrap_status('Setting up runtime…', session, renderer)
@@ -189,9 +187,7 @@ class RunHelpersMixin:
                 engine_init_exc,
             )
             if not runtime_ok:
-                engine_init_exc.append(
-                    RuntimeError('Runtime setup failed')
-                )
+                engine_init_exc.append(RuntimeError('Runtime setup failed'))
                 return
             engine_init_done.set()
 
@@ -721,7 +717,9 @@ class RunHelpersMixin:
                 runtime.close()
                 logger.debug('REPL: _finalize_repl_run: closed runtime')
             except Exception as exc:
-                logger.warning('REPL: _finalize_repl_run: runtime.close() failed: %s', exc)
+                logger.warning(
+                    'REPL: _finalize_repl_run: runtime.close() failed: %s', exc
+                )
             logger.debug('REPL: _finalize_repl_run: releasing acquire result')
             runtime_orchestrator.release(self._acquire_result)
         self._close_event_stream()

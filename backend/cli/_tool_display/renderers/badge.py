@@ -47,21 +47,16 @@ _BADGES: dict[str, ToolBadge] = {
     # Execution: shell commands, terminal operations
     'shell': ToolBadge('Shell', CLR_STATUS_WARN, CLR_STATUS_WARN, '├'),
     'terminal': ToolBadge('Terminal', CLR_STATUS_WARN, CLR_STATUS_WARN, '├'),
-
     # Files: read, edit, create operations
     'files': ToolBadge('Files', CLR_BRAND_HUE, CLR_BRAND_HUE, '├'),
-
     # Search: code search, grep
     'search': ToolBadge('Search', '#b87eff', '#b87eff', '├'),
-
     # Code: LSP, analysis, symbols
     'code': ToolBadge('Code', '#60a5fa', '#60a5fa', '├'),
     'lsp': ToolBadge('LSP', '#60a5fa', '#60a5fa', '├'),
-
     # External: browser, MCP servers
     'browser': ToolBadge('Browser', '#48b8c8', '#48b8c8', '├'),
     'mcp': ToolBadge('MCP', '#48b8c8', '#48b8c8', '├'),
-
     # System: workers, memory, tasks, thinking
     'workers': ToolBadge('Workers', CLR_STATUS_OK, CLR_STATUS_OK, '├'),
     'memory': ToolBadge('Memory', CLR_STATUS_OK, CLR_STATUS_OK, '├'),

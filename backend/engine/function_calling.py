@@ -380,17 +380,17 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
         if not edit_mode:
             raise FunctionCallValidationError(
                 "[ERROR] text_editor command 'edit' requires 'edit_mode'. "
-                "[CAUSE] edit_mode was omitted from the tool call arguments. "
+                '[CAUSE] edit_mode was omitted from the tool call arguments. '
                 "[SUGGESTION] Provide one of: 'format', 'section', 'range', 'patch'. "
-                "Example: {\"command\": \"edit\", \"edit_mode\": \"range\", "
-                "\"start_line\": 1, \"end_line\": 10, \"new_str\": \"...\"}"
+                'Example: {"command": "edit", "edit_mode": "range", '
+                '"start_line": 1, "end_line": 10, "new_str": "..."}'
             )
         valid_edit_modes = {'format', 'section', 'range', 'patch'}
         if edit_mode not in valid_edit_modes:
             raise FunctionCallValidationError(
                 f"[ERROR] Unknown edit_mode '{edit_mode}'. "
                 f"[CAUSE] '{edit_mode}' is not a recognised edit_mode value. "
-                f"[SUGGESTION] Valid values: {sorted(valid_edit_modes)}. "
+                f'[SUGGESTION] Valid values: {sorted(valid_edit_modes)}. '
                 f"Example: {{'command': 'edit', 'edit_mode': 'range', 'start_line': 1, 'end_line': 10, 'new_str': '...'}}"
             )
         # Early validation for edit_mode=range required parameters
@@ -398,18 +398,18 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
             if normalized_args.get('start_line') is None:
                 raise FunctionCallValidationError(
                     "[ERROR] edit_mode=range requires 'start_line'. "
-                    "[CAUSE] start_line was omitted from the tool call arguments. "
-                    "[SUGGESTION] Add start_line: <int> (1-based line number). "
-                    "Example: {\"command\": \"edit\", \"edit_mode\": \"range\", "
-                    "\"start_line\": 1, \"end_line\": 10, \"new_str\": \"...\"}"
+                    '[CAUSE] start_line was omitted from the tool call arguments. '
+                    '[SUGGESTION] Add start_line: <int> (1-based line number). '
+                    'Example: {"command": "edit", "edit_mode": "range", '
+                    '"start_line": 1, "end_line": 10, "new_str": "..."}'
                 )
             if normalized_args.get('end_line') is None:
                 raise FunctionCallValidationError(
                     "[ERROR] edit_mode=range requires 'end_line'. "
-                    "[CAUSE] end_line was omitted from the tool call arguments. "
-                    "[SUGGESTION] Add end_line: <int> (1-based inclusive end line). "
-                    "Example: {\"command\": \"edit\", \"edit_mode\": \"range\", "
-                    "\"start_line\": 1, \"end_line\": 10, \"new_str\": \"...\"}"
+                    '[CAUSE] end_line was omitted from the tool call arguments. '
+                    '[SUGGESTION] Add end_line: <int> (1-based inclusive end line). '
+                    'Example: {"command": "edit", "edit_mode": "range", '
+                    '"start_line": 1, "end_line": 10, "new_str": "..."}'
                 )
     path = str(normalized_args.get('path', path))
     other_kwargs = {

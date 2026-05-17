@@ -47,7 +47,9 @@ class TestInitWizardCrossPlatform:
         settings_file = tmp_path / 'settings.json'
         settings_file.write_text('corrupted', encoding='utf-8')
 
-        with patch('backend.cli.init_wizard.json.dumps', side_effect=ValueError('test')):
+        with patch(
+            'backend.cli.init_wizard.json.dumps', side_effect=ValueError('test')
+        ):
             with pytest.raises(ValueError):
                 _atomic_json_write(settings_file, {'test': 'data'})
 
@@ -98,14 +100,16 @@ class TestInitWizardCrossPlatform:
     def test_init_command_runs_without_crash(self, tmp_path: Path) -> None:
         """Verify 'grinta init' can be invoked without crash (any valid exit code)."""
         env = os.environ.copy()
-        env.update({
-            'LLM_API_KEY': 'sk-test-key',
-            'GRINTA_NO_SPLASH': '1',
-            'PYTHONUTF8': '1',
-            'HOME': str(tmp_path),
-            'USERPROFILE': str(tmp_path),
-            'APP_ROOT': str(tmp_path / 'app'),
-        })
+        env.update(
+            {
+                'LLM_API_KEY': 'sk-test-key',
+                'GRINTA_NO_SPLASH': '1',
+                'PYTHONUTF8': '1',
+                'HOME': str(tmp_path),
+                'USERPROFILE': str(tmp_path),
+                'APP_ROOT': str(tmp_path / 'app'),
+            }
+        )
 
         app_root = tmp_path / 'app'
         app_root.mkdir()
@@ -185,7 +189,9 @@ class TestProviderPresets:
         local_providers = ['ollama', 'lmstudio']
         for provider in local_providers:
             preset = _PROVIDER_PRESETS[provider]
-            assert 'localhost' in preset['base_url'], f'{provider} should have localhost URL'
+            assert 'localhost' in preset['base_url'], (
+                f'{provider} should have localhost URL'
+            )
 
     @pytest.mark.integration
     def test_all_providers_have_default_model(self) -> None:
@@ -194,7 +200,9 @@ class TestProviderPresets:
 
         for provider, preset in _PROVIDER_PRESETS.items():
             assert preset['default_model'], f'{provider} should have default model'
-            assert '/' in preset['default_model'], f'{provider} default should have provider prefix'
+            assert '/' in preset['default_model'], (
+                f'{provider} default should have provider prefix'
+            )
 
 
 class TestExitCodes:
@@ -215,10 +223,18 @@ class TestExitCodes:
             mock_console.print = MagicMock()
             mock_console.no_color = False
 
-            with patch('backend.cli.init_wizard._check_settings_directory_writable', return_value=(True, '')):
+            with patch(
+                'backend.cli.init_wizard._check_settings_directory_writable',
+                return_value=(True, ''),
+            ):
                 with patch('backend.cli.init_wizard._load_existing', return_value={}):
-                    with patch('backend.cli.init_wizard._detect_local', return_value=[]):
-                        with patch('backend.cli.init_wizard.Prompt.ask', side_effect=['openai', 'test-model', '', '']):
+                    with patch(
+                        'backend.cli.init_wizard._detect_local', return_value=[]
+                    ):
+                        with patch(
+                            'backend.cli.init_wizard.Prompt.ask',
+                            side_effect=['openai', 'test-model', '', ''],
+                        ):
                             with patch('backend.cli.init_wizard._atomic_json_write'):
                                 result = run_init(console=mock_console)
 

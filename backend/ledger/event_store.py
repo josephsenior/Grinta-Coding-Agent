@@ -408,7 +408,9 @@ class EventStore(EventStoreABC):
                 self.file_store.delete(f'{events_dir}{entry}')
                 pruned += 1
             except Exception:
-                logger.debug('prune_old_events: could not delete %s', entry, exc_info=True)
+                logger.debug(
+                    'prune_old_events: could not delete %s', entry, exc_info=True
+                )
         # Also prune stale cache pages.
         try:
             cache_dir = f'{events_dir}event_cache/'

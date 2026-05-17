@@ -55,15 +55,15 @@ def _do_notify(title: str, body: str, *, urgency: str) -> None:
 def _notify_windows(title: str, body: str) -> None:
     # Try PowerShell BurntToast first (Windows 10+ toast notifications).
     ps_cmd = (
-        f"[Windows.UI.Notifications.ToastNotificationManager, "
-        f"Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null; "
-        f"$template = [Windows.UI.Notifications.ToastNotificationManager]::"
-        f"GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); "
+        f'[Windows.UI.Notifications.ToastNotificationManager, '
+        f'Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null; '
+        f'$template = [Windows.UI.Notifications.ToastNotificationManager]::'
+        f'GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); '
         f"$textNodes = $template.GetElementsByTagName('text'); "
         f"$textNodes.Item(0).AppendChild($template.CreateTextNode('{_ps_escape(title)}')) | Out-Null; "
         f"$textNodes.Item(1).AppendChild($template.CreateTextNode('{_ps_escape(body)}')) | Out-Null; "
-        f"$toast = [Windows.UI.Notifications.ToastNotification]::new($template); "
-        f"[Windows.UI.Notifications.ToastNotificationManager]::"
+        f'$toast = [Windows.UI.Notifications.ToastNotification]::new($template); '
+        f'[Windows.UI.Notifications.ToastNotificationManager]::'
         f"CreateToastNotifier('Grinta').Show($toast);"
     )
     try:
@@ -117,9 +117,17 @@ def _applescript_escape(s: str) -> str:
 def notify_agent_idle(*, needs_input: bool = False) -> None:
     """Convenience: notify when the agent finishes a turn or needs input."""
     if needs_input:
-        notify('Grinta — Input Needed', 'The agent is waiting for your response.', urgency='normal')
+        notify(
+            'Grinta — Input Needed',
+            'The agent is waiting for your response.',
+            urgency='normal',
+        )
     else:
-        notify('Grinta — Task Complete', 'The agent has finished processing.', urgency='low')
+        notify(
+            'Grinta — Task Complete',
+            'The agent has finished processing.',
+            urgency='low',
+        )
 
 
 def notify_agent_error(summary: str = 'An error occurred during processing.') -> None:

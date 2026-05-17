@@ -129,7 +129,11 @@ class InfoSidebarWidget(VerticalScroll):
             for server in self._mcp_servers:
                 name = server.get('name', 'Unknown')
                 server_type = server.get('type', 'active')
-                status_icon = '[bold #54efae]●[/]' if server_type == 'active' else '[dim #969aad]○[/]'
+                status_icon = (
+                    '[bold #54efae]●[/]'
+                    if server_type == 'active'
+                    else '[dim #969aad]○[/]'
+                )
                 parts.append(f'  {status_icon} {name}')
         else:
             parts.append('  [dim #969aad]None configured[/]')

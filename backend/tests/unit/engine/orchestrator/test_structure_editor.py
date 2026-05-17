@@ -293,7 +293,8 @@ class TestEditFunction:
         result = editor.edit_function(str(f), 'func', 'body')
         assert result.success is False
         assert (
-            'tree-sitter' in result.message.lower() or 'source code' in result.message.lower()
+            'tree-sitter' in result.message.lower()
+            or 'source code' in result.message.lower()
         )
 
 

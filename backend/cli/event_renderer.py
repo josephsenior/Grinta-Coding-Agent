@@ -708,6 +708,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
         if sidebar is not None:
             from rich.columns import Columns
+
             content_with_hud = Group(main_content, fake_prompt)
             yield Columns([content_with_hud, sidebar])
         else:
@@ -1220,7 +1221,12 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             )
         else:
             inner = format_activity_block(
-                verb, detail, secondary=stats, secondary_kind='neutral', title=title, badge_label=badge_label
+                verb,
+                detail,
+                secondary=stats,
+                secondary_kind='neutral',
+                title=title,
+                badge_label=badge_label,
             )
         self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
 

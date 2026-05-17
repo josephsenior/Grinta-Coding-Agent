@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.core.errors import ModelProviderError
 from backend.engine.executor import OrchestratorExecutor
 from backend.engine.streaming_checkpoint import (
     CheckpointRecord,

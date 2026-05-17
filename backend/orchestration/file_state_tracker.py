@@ -93,9 +93,7 @@ class FileStateTracker:
             self._read_snapshots.pop(oldest_key, None)
         # Independently evict stale read snapshots to prevent unbounded growth
         if len(self._read_snapshots) > _MAX_READ_SNAPSHOTS:
-            stale_keys = [
-                k for k in self._read_snapshots if k not in self._files
-            ]
+            stale_keys = [k for k in self._read_snapshots if k not in self._files]
             for k in stale_keys:
                 del self._read_snapshots[k]
 

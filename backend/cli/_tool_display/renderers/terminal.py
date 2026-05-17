@@ -34,7 +34,9 @@ def render_terminal_read(session_id: str = '') -> Panel:
     )
 
 
-def render_terminal_output(content: str, session_id: str = '', exit_code: int | None = None) -> Panel:
+def render_terminal_output(
+    content: str, session_id: str = '', exit_code: int | None = None
+) -> Panel:
     """Render terminal output with session info."""
     content_parts = []
 
@@ -50,7 +52,10 @@ def render_terminal_output(content: str, session_id: str = '', exit_code: int | 
 
         if len(content.splitlines()) > 15:
             content_parts.append(
-                Text(f'... {len(content.splitlines()) - 15} more lines', style=NAVY_TEXT_DIM)
+                Text(
+                    f'... {len(content.splitlines()) - 15} more lines',
+                    style=NAVY_TEXT_DIM,
+                )
             )
 
     meta_parts = []
@@ -71,7 +76,9 @@ def render_terminal_output(content: str, session_id: str = '', exit_code: int | 
 
     panel_title = Text('Terminal', style='bold #f6ff8f')
     return Panel(
-        Group(*content_parts) if content_parts else Text('(no output)', style=NAVY_TEXT_DIM),
+        Group(*content_parts)
+        if content_parts
+        else Text('(no output)', style=NAVY_TEXT_DIM),
         title=panel_title,
         title_align='left',
         border_style=CLR_CARD_BORDER,
@@ -111,12 +118,17 @@ def render_lsp_result(content: str, symbol: str = '') -> Panel:
 
         if len(content.splitlines()) > 10:
             content_parts.append(
-                Text(f'... {len(content.splitlines()) - 10} more lines', style=NAVY_TEXT_DIM)
+                Text(
+                    f'... {len(content.splitlines()) - 10} more lines',
+                    style=NAVY_TEXT_DIM,
+                )
             )
 
     panel_title = Text('LSP', style='bold #60a5fa')
     return Panel(
-        Group(*content_parts) if content_parts else Text('(no results)', style=NAVY_TEXT_DIM),
+        Group(*content_parts)
+        if content_parts
+        else Text('(no results)', style=NAVY_TEXT_DIM),
         title=panel_title,
         title_align='left',
         border_style=CLR_CARD_BORDER,
@@ -153,12 +165,17 @@ def render_delegation_result(content: str) -> Panel:
 
         if len(content.splitlines()) > 8:
             content_parts.append(
-                Text(f'... {len(content.splitlines()) - 8} more lines', style=NAVY_TEXT_DIM)
+                Text(
+                    f'... {len(content.splitlines()) - 8} more lines',
+                    style=NAVY_TEXT_DIM,
+                )
             )
 
     panel_title = Text('Delegation Result', style='bold #4ade80')
     return Panel(
-        Group(*content_parts) if content_parts else Text('(no output)', style=NAVY_TEXT_DIM),
+        Group(*content_parts)
+        if content_parts
+        else Text('(no output)', style=NAVY_TEXT_DIM),
         title=panel_title,
         title_align='left',
         border_style=CLR_CARD_BORDER,
@@ -168,7 +185,9 @@ def render_delegation_result(content: str) -> Panel:
 
 def render_condensation_action() -> Panel:
     """Render context condensation action."""
-    content_parts = [Text('Compressing conversation history...', style=NAVY_TEXT_PRIMARY)]
+    content_parts = [
+        Text('Compressing conversation history...', style=NAVY_TEXT_PRIMARY)
+    ]
 
     panel_title = Text('Condensing', style='bold #91abec')
     return Panel(
@@ -210,7 +229,9 @@ def render_user_reject() -> Panel:
 
 def render_server_ready() -> Panel:
     """Render server ready status."""
-    content_parts = [Text('Server is ready and accepting connections', style=NAVY_TEXT_PRIMARY)]
+    content_parts = [
+        Text('Server is ready and accepting connections', style=NAVY_TEXT_PRIMARY)
+    ]
 
     panel_title = Text('Server Ready', style='bold #54efae')
     return Panel(

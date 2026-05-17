@@ -32,6 +32,7 @@ def _strip_ansi(text: str) -> str:
 @dataclass
 class ActivityLine:
     """A single line in an activity card."""
+
     text: str
     style: str = ''
     indent: int = 0
@@ -43,6 +44,7 @@ class ActivityCard:
 
     This data structure can be rendered to both Rich (CLI) and Textual (TUI).
     """
+
     verb: str
     detail: str
     badge_category: str = 'tool'
@@ -118,17 +120,27 @@ class ActivityRenderer:
             secondary_parts.append(duration)
 
         secondary = ' · '.join(secondary_parts) if secondary_parts else None
-        kind = 'ok' if exit_code == 0 else ('err' if exit_code is not None and exit_code != 0 else 'neutral')
+        kind = (
+            'ok'
+            if exit_code == 0
+            else ('err' if exit_code is not None and exit_code != 0 else 'neutral')
+        )
 
         extra_lines: list[ActivityLine] = []
         if output:
             preview_lines = output.splitlines()[:8]
             for line in preview_lines:
                 truncated = line[:120] + ('...' if len(line) > 120 else '')
-                extra_lines.append(ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1))
+                extra_lines.append(
+                    ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
+                )
             if len(output.splitlines()) > 8:
                 extra_lines.append(
-                    ActivityLine(f'... {len(output.splitlines()) - 8} more lines', style=NAVY_TEXT_DIM, indent=1)
+                    ActivityLine(
+                        f'... {len(output.splitlines()) - 8} more lines',
+                        style=NAVY_TEXT_DIM,
+                        indent=1,
+                    )
                 )
 
         return ActivityCard(
@@ -184,18 +196,30 @@ class ActivityRenderer:
                 stripped = line.rstrip()
                 if stripped.startswith('+') and not stripped.startswith('+++'):
                     # Green background for additions (subtle, less opaque)
-                    extra_lines.append(ActivityLine(stripped, style='#54efae on #0d2e1a', indent=1))
+                    extra_lines.append(
+                        ActivityLine(stripped, style='#54efae on #0d2e1a', indent=1)
+                    )
                 elif stripped.startswith('-') and not stripped.startswith('---'):
                     # Red background for deletions (subtle, less opaque)
-                    extra_lines.append(ActivityLine(stripped, style='#fd8383 on #2e0d0d', indent=1))
+                    extra_lines.append(
+                        ActivityLine(stripped, style='#fd8383 on #2e0d0d', indent=1)
+                    )
                 elif stripped.startswith('@@'):
-                    extra_lines.append(ActivityLine(stripped, style=NAVY_TEXT_MUTED, indent=1))
+                    extra_lines.append(
+                        ActivityLine(stripped, style=NAVY_TEXT_MUTED, indent=1)
+                    )
                 else:
-                    extra_lines.append(ActivityLine(stripped, style=NAVY_TEXT_DIM, indent=1))
+                    extra_lines.append(
+                        ActivityLine(stripped, style=NAVY_TEXT_DIM, indent=1)
+                    )
 
             if len(diff_lines) > 20:
                 extra_lines.append(
-                    ActivityLine(f'... {len(diff_lines) - 20} more diff lines', style=NAVY_TEXT_DIM, indent=1)
+                    ActivityLine(
+                        f'... {len(diff_lines) - 20} more diff lines',
+                        style=NAVY_TEXT_DIM,
+                        indent=1,
+                    )
                 )
 
         return ActivityCard(
@@ -221,11 +245,15 @@ class ActivityRenderer:
         )
 
     @staticmethod
-    def mcp_tool(name: str, arguments: dict | None = None, result: str | None = None) -> ActivityCard:
+    def mcp_tool(
+        name: str, arguments: dict | None = None, result: str | None = None
+    ) -> ActivityCard:
         """Create an activity card for an MCP tool call."""
         args_str = ''
         if arguments:
-            args_preview = ', '.join(f'{k}={repr(v)[:30]}' for k, v in list(arguments.items())[:2])
+            args_preview = ', '.join(
+                f'{k}={repr(v)[:30]}' for k, v in list(arguments.items())[:2]
+            )
             if len(args_preview) > 60:
                 args_preview = args_preview[:57] + '...'
             args_str = f'({args_preview})' if args_preview else ''
@@ -273,13 +301,17 @@ class ActivityRenderer:
         )
 
     @staticmethod
-    def delegation(task: str, worker: str = '', result: str | None = None) -> ActivityCard:
+    def delegation(
+        task: str, worker: str = '', result: str | None = None
+    ) -> ActivityCard:
         """Create an activity card for task delegation."""
         task_preview = task[:100] + ('...' if len(task) > 100 else '')
 
         extra_lines: list[ActivityLine] = []
         if worker:
-            extra_lines.append(ActivityLine(f'Worker: {worker}', style=NAVY_TEXT_DIM, indent=1))
+            extra_lines.append(
+                ActivityLine(f'Worker: {worker}', style=NAVY_TEXT_DIM, indent=1)
+            )
         if result:
             preview = result[:200] + ('...' if len(result) > 200 else '')
             extra_lines.append(ActivityLine(preview, style=NAVY_TEXT_MUTED, indent=1))
@@ -294,7 +326,9 @@ class ActivityRenderer:
         )
 
     @staticmethod
-    def terminal_output(content: str, session_id: str = '', exit_code: int | None = None) -> ActivityCard:
+    def terminal_output(
+        content: str, session_id: str = '', exit_code: int | None = None
+    ) -> ActivityCard:
         """Create an activity card for terminal output."""
         # Strip ANSI escape sequences from PTY/interactive terminal output
         if content:
@@ -302,16 +336,24 @@ class ActivityRenderer:
 
         extra_lines: list[ActivityLine] = []
         if session_id:
-            extra_lines.append(ActivityLine(f'Session: {session_id}', style=NAVY_TEXT_DIM, indent=1))
+            extra_lines.append(
+                ActivityLine(f'Session: {session_id}', style=NAVY_TEXT_DIM, indent=1)
+            )
 
         if content:
             lines = content.splitlines()[:15]
             for line in lines:
                 truncated = line[:120] + ('...' if len(line) > 120 else '')
-                extra_lines.append(ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1))
+                extra_lines.append(
+                    ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
+                )
             if len(content.splitlines()) > 15:
                 extra_lines.append(
-                    ActivityLine(f'... {len(content.splitlines()) - 15} more lines', style=NAVY_TEXT_DIM, indent=1)
+                    ActivityLine(
+                        f'... {len(content.splitlines()) - 15} more lines',
+                        style=NAVY_TEXT_DIM,
+                        indent=1,
+                    )
                 )
 
         secondary = None
@@ -335,9 +377,12 @@ class ActivityRenderer:
     def condensation(pruned_count: int = 0, count: int = 1) -> ActivityCard:
         """Create an activity card for context condensation."""
         suffix = (
-            'st' if count % 10 == 1 and count % 11 != 1
-            else 'nd' if count % 10 == 2 and count % 11 != 2
-            else 'rd' if count % 10 == 3 and count % 11 != 3
+            'st'
+            if count % 10 == 1 and count % 11 != 1
+            else 'nd'
+            if count % 10 == 2 and count % 11 != 2
+            else 'rd'
+            if count % 10 == 3 and count % 11 != 3
             else 'th'
         )
         detail = f'{pruned_count} events' if pruned_count else 'context'

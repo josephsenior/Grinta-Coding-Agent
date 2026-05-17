@@ -164,7 +164,9 @@ def _format_mcp_result(result: Any) -> list[str]:
         output = [f'[{CLR_STATUS_OK}]Items ({len(result)}):[/]']
         for item in result[:5]:
             if isinstance(item, dict):
-                name = item.get('name', item.get('title', item.get('path', str(item)[:40])))
+                name = item.get(
+                    'name', item.get('title', item.get('path', str(item)[:40]))
+                )
                 output.append(f'  [dim]· {name}[/dim]')
             elif isinstance(item, str):
                 output.append(f'  [dim]· {item[:60]}[/dim]')

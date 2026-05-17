@@ -458,9 +458,7 @@ class CircuitBreaker:
         """
         self.stuck_detection_count = 0
         self.high_risk_action_count = 0
-        logger.debug(
-            'Circuit breaker task counters reset (stuck=0, high_risk=0)'
-        )
+        logger.debug('Circuit breaker task counters reset (stuck=0, high_risk=0)')
 
     def _update_metrics(self, state: State) -> None:
         """Update metrics from state.

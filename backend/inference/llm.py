@@ -304,7 +304,9 @@ async def _stream_with_chunk_timeout(
 
     while True:
         try:
-            chunk = await _asyncio.wait_for(stream_iter.__anext__(), timeout=timeout_sec)
+            chunk = await _asyncio.wait_for(
+                stream_iter.__anext__(), timeout=timeout_sec
+            )
         except StopAsyncIteration:
             return
         except _asyncio.TimeoutError:

@@ -211,9 +211,14 @@ class StateTransitionService:
                 self._context.headless_mode
             )
 
-        if old_state == AgentState.AWAITING_USER_INPUT and new_state == AgentState.RUNNING:
+        if (
+            old_state == AgentState.AWAITING_USER_INPUT
+            and new_state == AgentState.RUNNING
+        ):
             circuit_breaker = getattr(self._context, 'circuit_breaker', None)
-            if circuit_breaker is not None and hasattr(circuit_breaker, 'reset_task_counters'):
+            if circuit_breaker is not None and hasattr(
+                circuit_breaker, 'reset_task_counters'
+            ):
                 circuit_breaker.reset_task_counters()
 
     def _handle_pending_action_confirmation(self, new_state: AgentState) -> None:

@@ -157,6 +157,7 @@ class TestStateTransitionServiceUnit:
         svc = StateTransitionService(ctx)
         # Monkey-patch reset_controller to track call
         reset_called = []
+
         async def _reset():
             reset_called.append(True)
 
@@ -168,6 +169,7 @@ class TestStateTransitionServiceUnit:
         ctx.state = _FakeState(AgentState.RUNNING)
         svc = StateTransitionService(ctx)
         reset_called = []
+
         async def _reset():
             reset_called.append(True)
 

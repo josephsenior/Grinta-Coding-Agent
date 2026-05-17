@@ -20,15 +20,17 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 def _get_base_env(tmp_path: Path) -> dict[str, str]:
     """Create a minimal test environment."""
     env = os.environ.copy()
-    env.update({
-        'LLM_API_KEY': 'sk-test-e2e-key',
-        'LLM_MODEL': 'openai/gpt-4.1',
-        'GRINTA_NO_SPLASH': '1',
-        'LOG_TO_FILE': 'false',
-        'PYTHONUTF8': '1',
-        'HOME': str(tmp_path),
-        'USERPROFILE': str(tmp_path),
-    })
+    env.update(
+        {
+            'LLM_API_KEY': 'sk-test-e2e-key',
+            'LLM_MODEL': 'openai/gpt-4.1',
+            'GRINTA_NO_SPLASH': '1',
+            'LOG_TO_FILE': 'false',
+            'PYTHONUTF8': '1',
+            'HOME': str(tmp_path),
+            'USERPROFILE': str(tmp_path),
+        }
+    )
     return env
 
 

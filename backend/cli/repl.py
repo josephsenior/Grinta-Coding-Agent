@@ -939,12 +939,14 @@ def _build_bindings() -> Any:
                 result = await input_dialog(
                     title='Search Transcript',
                     text='Enter search query:',
-                    style=Style.from_dict({
-                        'dialog': 'bg:#1b233a',
-                        'dialog.body': 'bg:#0f1525 #e9e9e9',
-                        'dialog.title': 'bg:#0f1525 #91abec bold',
-                        'dialog.body text-area': 'bg:#0a0e1b #e9e9e9',
-                    }),
+                    style=Style.from_dict(
+                        {
+                            'dialog': 'bg:#1b233a',
+                            'dialog.body': 'bg:#0f1525 #e9e9e9',
+                            'dialog.title': 'bg:#0f1525 #91abec bold',
+                            'dialog.body text-area': 'bg:#0a0e1b #e9e9e9',
+                        }
+                    ),
                 ).run_async()
                 if result and result.strip():
                     # Insert the search command into the buffer
@@ -1203,6 +1205,7 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
         # Build token display with inline progress bar.
         from backend.cli.status_chrome import _token_bar
+
         has_limit = '/' in fields.token_display_compact
         if has_limit and fields.token_usage_pct > 0:
             token_with_bar = f'{_token_bar(fields.token_usage_pct, 4)} {fields.token_display_compact}'

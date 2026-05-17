@@ -181,9 +181,7 @@ def _atomic_json_write(path: Path, data: dict[str, Any]) -> None:
 
     content = json.dumps(data, indent=2) + '\n'
     tmp_fd, tmp_path = tempfile.mkstemp(
-        dir=path.parent,
-        prefix='.settings_',
-        suffix='.tmp'
+        dir=path.parent, prefix='.settings_', suffix='.tmp'
     )
     try:
         with os.fdopen(tmp_fd, 'w', encoding='utf-8') as f:
@@ -298,8 +296,7 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     can_write, write_error = _check_settings_directory_writable(settings_file)
     if not can_write:
         console.print(
-            f'[{CLR_STATUS_WARN}]Warning:[/] {write_error}',
-            style=CLR_STATUS_WARN
+            f'[{CLR_STATUS_WARN}]Warning:[/] {write_error}', style=CLR_STATUS_WARN
         )
         console.print(
             f'[{CLR_META}]Tip: Set APP_ROOT environment variable to a writable directory.\n'
@@ -314,9 +311,7 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     detected = _detect_local()
     console.print(' done.')
     if detected:
-        console.print(
-            f'[{CLR_STATUS_OK}]Found local:[/] {", ".join(detected)}'
-        )
+        console.print(f'[{CLR_STATUS_OK}]Found local:[/] {", ".join(detected)}')
 
     _print_provider_table(console, detected)
 
@@ -334,7 +329,7 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     if not model or not model.strip():
         console.print(
             f'[{CLR_STATUS_WARN}]Error:[/] Model cannot be empty.',
-            style=CLR_STATUS_WARN
+            style=CLR_STATUS_WARN,
         )
         return 3
 
@@ -356,13 +351,13 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     except PermissionError:
         console.print(
             f'[{CLR_STATUS_WARN}]Error:[/] Cannot write to {settings_file}',
-            style=CLR_STATUS_WARN
+            style=CLR_STATUS_WARN,
         )
         return 2
     except Exception as e:
         console.print(
             f'[{CLR_STATUS_WARN}]Error:[/] Failed to write settings: {e}',
-            style=CLR_STATUS_WARN
+            style=CLR_STATUS_WARN,
         )
         return 1
 
@@ -373,12 +368,12 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
             console.print(
                 f'[{CLR_STATUS_WARN}]Warning:[/] Could not write .env file. '
                 'API key will need to be set via environment variable.',
-                style=CLR_STATUS_WARN
+                style=CLR_STATUS_WARN,
             )
         except Exception as e:
             console.print(
                 f'[{CLR_STATUS_WARN}]Warning:[/] Could not persist API key: {e}',
-                style=CLR_STATUS_WARN
+                style=CLR_STATUS_WARN,
             )
 
     console.print(

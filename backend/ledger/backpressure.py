@@ -244,7 +244,9 @@ class BackpressureManager:
                 self.stats['dropped_oldest'] -= 1
             self.stats['dropped_newest'] += 1
             self._record_recent(self._recent_drops)
-            logger.warning('EventStream full; dropped newest (race in drop-oldest path)')
+            logger.warning(
+                'EventStream full; dropped newest (race in drop-oldest path)'
+            )
         self.queue_size = queue.qsize()
 
     async def _try_block_and_put(self, event: Event, queue: asyncio.Queue[Any]) -> None:

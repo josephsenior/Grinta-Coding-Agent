@@ -222,7 +222,9 @@ class InMemoryRetryBackend(BaseRetryBackend):
                 if task.next_attempt_at <= time.time():
                     self._dead_letter.append(task)
                     self._remove_sidecar(task.id)
-                    logger.info('Retry sidecar expired, moved to dead letter: %s', task.id)
+                    logger.info(
+                        'Retry sidecar expired, moved to dead letter: %s', task.id
+                    )
                 else:
                     self._tasks[task.id] = task
                     heapq.heappush(self._heap, (task.next_attempt_at, task.id))

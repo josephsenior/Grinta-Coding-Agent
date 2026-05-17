@@ -19,7 +19,9 @@ def render_task_list(
     """Render a task list with status indicators."""
     lines: list[str] = []
 
-    active = sum(1 for t in tasks if t.get('status') in ('active', 'in_progress', 'running'))
+    active = sum(
+        1 for t in tasks if t.get('status') in ('active', 'in_progress', 'running')
+    )
     done = sum(1 for t in tasks if t.get('status') in ('done', 'completed', 'finished'))
     blocked = sum(1 for t in tasks if t.get('status') in ('blocked', 'waiting'))
 
@@ -38,7 +40,9 @@ def render_task_list(
     lines.append('')
 
     for task in tasks[:8]:
-        name = task.get('description', task.get('name', task.get('title', 'Unknown task')))
+        name = task.get(
+            'description', task.get('name', task.get('title', 'Unknown task'))
+        )
         status = task.get('status', 'pending')
         progress = task.get('progress', task.get('pct', ''))
 
@@ -61,7 +65,9 @@ def render_task_list(
         if len(name_display) > 60:
             name_display = name_display[:57] + '…'
 
-        lines.append(f'  {dot}  [{name_style}]{name_display}[/{name_style}]{progress_str}')
+        lines.append(
+            f'  {dot}  [{name_style}]{name_display}[/{name_style}]{progress_str}'
+        )
 
     if len(tasks) > 8:
         lines.append(f'  [dim]... {len(tasks) - 8} more tasks[/dim]')

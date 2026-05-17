@@ -47,64 +47,64 @@ from backend.cli.theme import (
 
 # Stripped from user-visible transcripts (still present on stored observations for the LLM).
 _APP_RESULT_VALIDATION_RE = re.compile(
-    r"\s*<APP_RESULT_VALIDATION\b[^>]*>.*?(?:</APP_RESULT_VALIDATION>|\Z)",
+    r'\s*<APP_RESULT_VALIDATION\b[^>]*>.*?(?:</APP_RESULT_VALIDATION>|\Z)',
     re.DOTALL | re.IGNORECASE,
 )
 
 # Indentation warnings are agent-facing guidance — hide from user transcript.
 _INDENTATION_WARNINGS_RE = re.compile(
-    r"\n\n\[INDENTATION WARNINGS\].*?(?=\n\n|\Z)",
+    r'\n\n\[INDENTATION WARNINGS\].*?(?=\n\n|\Z)',
     re.DOTALL,
 )
 
 
 def strip_tool_result_validation_annotations(text: str) -> str:
     """Remove internal tool-validation tags; keeps scrollback readable."""
-    return _APP_RESULT_VALIDATION_RE.sub("", text or "").strip()
+    return _APP_RESULT_VALIDATION_RE.sub('', text or '').strip()
 
 
 def strip_indentation_warnings(text: str) -> str:
     """Remove agent-facing indentation warnings from user-visible output."""
-    return _INDENTATION_WARNINGS_RE.sub("", text or "")
+    return _INDENTATION_WARNINGS_RE.sub('', text or '')
 
 
-_GROUND_PREFIX = "    > "
+_GROUND_PREFIX = '    > '
 # Primary row layout with tighter indent and better visual hierarchy.
-_ACTIVITY_PRIMARY_INDENT = " "
-_ACTIVITY_GAP = "  "
-_ACTIVITY_SECONDARY_INDENT = "    "
-_ACTIVITY_RESULT_INDENT = "      "
+_ACTIVITY_PRIMARY_INDENT = ' '
+_ACTIVITY_GAP = '  '
+_ACTIVITY_SECONDARY_INDENT = '    '
+_ACTIVITY_RESULT_INDENT = '      '
 
 
 def format_activity_primary(verb: str, detail: str | Text) -> Text:
     """Bold verb + detail on one line."""
     line = Text()
-    line.append((verb or "Did").strip(), style=CLR_VERB)
+    line.append((verb or 'Did').strip(), style=CLR_VERB)
     if isinstance(detail, Text):
         if detail.plain.strip():
             line.append(_ACTIVITY_GAP, style=STYLE_EMPTY)
             line.append(detail)
         return line
-    d = (detail or "").strip()
+    d = (detail or '').strip()
     if d:
         line.append(_ACTIVITY_GAP, style=STYLE_EMPTY)
         line.append_text(linkify_plain(d, link_files=True, link_urls=False))
     return line
 
 
-def format_activity_secondary(message: str, *, kind: str = "neutral") -> Text:
+def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
     """Continuation row for inline stats and previews inside activity cards."""
     styles = {
-        "ok": CLR_OK_BODY,
-        "err": CLR_ERR_BODY,
-        "warn": CLR_WARN_BODY,
-        "neutral": CLR_INFO_BODY,
+        'ok': CLR_OK_BODY,
+        'err': CLR_ERR_BODY,
+        'warn': CLR_WARN_BODY,
+        'neutral': CLR_INFO_BODY,
     }
-    body_style = styles.get(kind, styles["neutral"])
+    body_style = styles.get(kind, styles['neutral'])
     line = Text(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)
     line.append_text(
         linkify_plain(
-            (message or "").strip(),
+            (message or '').strip(),
             plain_style=body_style,
             link_files=True,
             link_urls=False,
@@ -113,22 +113,22 @@ def format_activity_secondary(message: str, *, kind: str = "neutral") -> Text:
     return line
 
 
-def format_activity_result_secondary(message: str, *, kind: str = "neutral") -> Text:
+def format_activity_result_secondary(message: str, *, kind: str = 'neutral') -> Text:
     """Continuation row for user-visible results within an activity card.
 
     Prefixed with a colored status icon: ``✓`` (ok), ``✗`` (err), ``•`` (neutral).
     """
     styles: dict[str, tuple[str, str, str]] = {
-        "ok": (mark_ok(), CLR_OK_ICON, CLR_OK_BODY),
-        "err": (mark_err(), CLR_ERR_ICON, CLR_ERR_BODY),
-        "neutral": (mark_info(), CLR_INFO_ICON, CLR_INFO_BODY),
+        'ok': (mark_ok(), CLR_OK_ICON, CLR_OK_BODY),
+        'err': (mark_err(), CLR_ERR_ICON, CLR_ERR_BODY),
+        'neutral': (mark_info(), CLR_INFO_ICON, CLR_INFO_BODY),
     }
-    icon, icon_style, text_style = styles.get(kind, styles["neutral"])
+    icon, icon_style, text_style = styles.get(kind, styles['neutral'])
     line = Text(_ACTIVITY_RESULT_INDENT, style=STYLE_EMPTY)
-    line.append(f"{icon} ", style=icon_style)
+    line.append(f'{icon} ', style=icon_style)
     line.append_text(
         linkify_plain(
-            (message or "").strip(),
+            (message or '').strip(),
             plain_style=text_style,
             link_files=True,
             link_urls=False,
@@ -141,8 +141,8 @@ def format_activity_delta_secondary(
     *,
     added: int | None = None,
     removed: int | None = None,
-    added_label: str = "lines",
-    removed_label: str = "lines",
+    added_label: str = 'lines',
+    removed_label: str = 'lines',
 ) -> Text | None:
     """Compact colored +/- summary line for file and edit results."""
     if not added and not removed:
@@ -151,12 +151,12 @@ def format_activity_delta_secondary(
     line = Text(_ACTIVITY_RESULT_INDENT, style=STYLE_EMPTY)
     wrote = False
     if added:
-        line.append(f"+{added:,} {added_label}", style=f"dim {CLR_DIFF_ADD}")
+        line.append(f'+{added:,} {added_label}', style=f'dim {CLR_DIFF_ADD}')
         wrote = True
     if removed:
         if wrote:
-            line.append("  ", style=STYLE_DIM)
-        line.append(f"-{removed:,} {removed_label}", style=f"dim {CLR_DIFF_REM}")
+            line.append('  ', style=STYLE_DIM)
+        line.append(f'-{removed:,} {removed_label}', style=f'dim {CLR_DIFF_REM}')
     return line
 
 
@@ -164,12 +164,12 @@ def format_activity_validation_callout(message: str) -> Panel:
     """Bordered callout for post-edit syntax / lint feedback (distinct from shell errors)."""
     body = Text()
     body.append(_ACTIVITY_RESULT_INDENT, style=STYLE_EMPTY)
-    body.append(f"{MARK_WARN} ", style=CLR_WARN_ICON)
-    body.append("Validation", style=f"bold {CLR_WARN_BODY}")
-    body.append(" — ", style=STYLE_DIM)
+    body.append(f'{MARK_WARN} ', style=CLR_WARN_ICON)
+    body.append('Validation', style=f'bold {CLR_WARN_BODY}')
+    body.append(' — ', style=STYLE_DIM)
     body.append_text(
         linkify_plain(
-            (message or "").strip(),
+            (message or '').strip(),
             plain_style=CLR_WARN_BODY,
             link_files=True,
             link_urls=False,
@@ -184,7 +184,7 @@ def format_activity_validation_callout(message: str) -> Panel:
 
 
 def format_shell_output_block(
-    lines: list[str], *, kind: str = "neutral"
+    lines: list[str], *, kind: str = 'neutral'
 ) -> Panel | Group:
     """Shell command output wrapped in a subtle panel with left border.
 
@@ -197,7 +197,7 @@ def format_shell_output_block(
     body_lines: list[Text] = []
     for line in lines:
         row = Text()
-        row.append("│ ", style=CLR_SHELL_BORDER)
+        row.append('│ ', style=CLR_SHELL_BORDER)
         row.append(line, style=CLR_SHELL_OUTPUT)
         body_lines.append(row)
 
@@ -214,9 +214,9 @@ def format_activity_block(
     detail: str | Text,
     *,
     secondary: str | None = None,
-    secondary_kind: str = "neutral",
+    secondary_kind: str = 'neutral',
     result_message: str | None = None,
-    result_kind: str = "neutral",
+    result_kind: str = 'neutral',
     extra_lines: list[Any] | None = None,
     title: str | None = None,
     badge_label: str | None = None,
@@ -241,7 +241,7 @@ def format_activity_block(
         if title:
             title_line = Text()
             title_line.append(_ACTIVITY_PRIMARY_INDENT, style=STYLE_EMPTY)
-            title_line.append((title or "").strip(), style=ACTIVITY_CARD_TITLE_STYLE)
+            title_line.append((title or '').strip(), style=ACTIVITY_CARD_TITLE_STYLE)
             title_parts.append(title_line)
         return Group(Group(*title_parts), content)
     return content
@@ -251,23 +251,23 @@ def format_activity_turn_header() -> RenderableType:
     """Section heading before the first tool/shell row each agent turn."""
     from rich.rule import Rule
 
-    return Rule(style=f"dim {CLR_TURN_RULE}")
+    return Rule(style=f'dim {CLR_TURN_RULE}')
 
 
-_REASONING_SENTENCE_ENDERS = (".", "!", "?", ":", ";", '"', "'", ")", "]", "…")
+_REASONING_SENTENCE_ENDERS = ('.', '!', '?', ':', ';', '"', "'", ')', ']', '…')
 
 
 def format_reasoning_snapshot(lines: list[str]) -> Group:
     """Transcript block for reasoning that finished (after the live panel closes)."""
-    cleaned = [ln.strip() for ln in lines if (ln or "").strip()]
+    cleaned = [ln.strip() for ln in lines if (ln or '').strip()]
     if not cleaned:
         return Group()
     last = cleaned[-1]
     if last and not last.endswith(_REASONING_SENTENCE_ENDERS):
-        cleaned[-1] = f"{last}…"
+        cleaned[-1] = f'{last}…'
     return Group(
         *[
-            Text(f"{_ACTIVITY_RESULT_INDENT}{line}", style=CLR_REASONING_COMMITTED)
+            Text(f'{_ACTIVITY_RESULT_INDENT}{line}', style=CLR_REASONING_COMMITTED)
             for line in cleaned
         ]
     )
@@ -278,9 +278,9 @@ def format_activity_shell_block(
     detail: str | Text,
     *,
     secondary: str | None = None,
-    secondary_kind: str = "neutral",
+    secondary_kind: str = 'neutral',
     result_message: str | None = None,
-    result_kind: str = "ok",
+    result_kind: str = 'ok',
     extra_lines: list[Any] | None = None,
     title: str | None = None,
     badge_label: str | None = None,
@@ -291,7 +291,7 @@ def format_activity_shell_block(
         from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 
         badge = badge_for_tool_name(badge_label)
-        extra_lines.insert(0, format_activity_secondary(badge.render(), kind="neutral"))
+        extra_lines.insert(0, format_activity_secondary(badge.render(), kind='neutral'))
     return format_activity_block(
         verb,
         detail,
@@ -304,24 +304,24 @@ def format_activity_shell_block(
     )
 
 
-def format_shell_result_secondary(message: str, *, kind: str = "ok") -> Text:
+def format_shell_result_secondary(message: str, *, kind: str = 'ok') -> Text:
     """Alias for format_activity_result_secondary — kept for backward compatibility."""
-    return format_activity_result_secondary(message or "done", kind=kind)
+    return format_activity_result_secondary(message or 'done', kind=kind)
 
 
 def format_callout_panel(
     title: str,
     body: Any,
     *,
-    accent_style: str = "dim",
+    accent_style: str = 'dim',
     padding: tuple[int, int] | None = None,
 ) -> Panel:
     """Reusable compact panel for CLI callouts, questions, and live sections."""
-    panel_title = Text((title or "Notice").strip(), style=f"{accent_style} bold")
+    panel_title = Text((title or 'Notice').strip(), style=f'{accent_style} bold')
     return Panel(
         body,
         title=panel_title,
-        title_align="left",
+        title_align='left',
         border_style=accent_style,
         box=box.ROUNDED,
         padding=padding if padding is not None else CALLOUT_PANEL_PADDING,
@@ -336,11 +336,11 @@ def format_live_panel(
     padding: tuple[int, int] | None = None,
 ) -> Panel:
     """Chrome for the Rich ``Live`` block: minimal frame, subdued border."""
-    panel_title = Text((title or "").strip(), style=f"bold {accent_style}")
+    panel_title = Text((title or '').strip(), style=f'bold {accent_style}')
     return Panel(
         body,
         title=panel_title,
-        title_align="left",
+        title_align='left',
         border_style=CLR_LIVE_PANEL_BORDER,
         box=box.MINIMAL,
         padding=padding if padding is not None else (0, 1),
@@ -351,5 +351,5 @@ def format_ground_truth_tool_line(label: str) -> Text:
     """One structured transcript row for a tool invocation (ASCII prefix, no emoji)."""
     line = Text()
     line.append(_GROUND_PREFIX, style=STYLE_DIM)
-    line.append((label or "").strip(), style=STYLE_EMPTY)
+    line.append((label or '').strip(), style=STYLE_EMPTY)
     return line

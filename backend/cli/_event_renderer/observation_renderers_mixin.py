@@ -156,7 +156,11 @@ def _looks_like_command_echo(line: str) -> bool:
     stripped_line = line.strip()
     if not stripped_line:
         return True
-    if stripped_line.startswith('$ ') or stripped_line.startswith('❯ ') or stripped_line.startswith('> '):
+    if (
+        stripped_line.startswith('$ ')
+        or stripped_line.startswith('❯ ')
+        or stripped_line.startswith('> ')
+    ):
         return True
     return False
 
@@ -323,9 +327,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         """Return extra lines for a failed command's error output."""
         from backend.cli.transcript import format_shell_output_block
 
-        raw_lines = (
-            [ln.rstrip() for ln in content.split('\n')] if content else []
-        )
+        raw_lines = [ln.rstrip() for ln in content.split('\n')] if content else []
         if not raw_lines:
             return None
         preview_lines = [ln for ln in raw_lines if not _looks_like_command_echo(ln)][:5]

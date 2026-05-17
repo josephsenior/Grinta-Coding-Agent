@@ -235,9 +235,7 @@ class Runtime(
         # 3. During interpreter shutdown, pending finalizers still run.
         # 4. Old instances that have been GC'd don't leave stale atexit handlers
         #    that could clean up resources owned by newer instances.
-        self._finalizer = weakref.finalize(
-            self, _run_runtime_close, weakref.ref(self)
-        )
+        self._finalizer = weakref.finalize(self, _run_runtime_close, weakref.ref(self))
         self.initial_env_vars = _default_env_vars(config.runtime_config)
         if env_vars is not None:
             self.initial_env_vars.update(env_vars)

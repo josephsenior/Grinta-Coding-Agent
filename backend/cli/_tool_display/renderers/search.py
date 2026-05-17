@@ -31,7 +31,11 @@ def render_search_results(
     """
     lines: list[str] = []
 
-    raw_lines = [line for line in output.splitlines() if line.strip() and not line.startswith('Error running')]
+    raw_lines = [
+        line
+        for line in output.splitlines()
+        if line.strip() and not line.startswith('Error running')
+    ]
 
     if not raw_lines:
         return []
@@ -64,7 +68,9 @@ def render_search_results(
         match_count = len(matches)
         # Escape filepath to prevent MarkupError
         escaped_path = markup_escape(filepath)
-        lines.append(f'  [{CLR_BRAND_HUE} bold]{escaped_path}[/{CLR_BRAND_HUE} bold]  [dim]{match_count} matches[/dim]')
+        lines.append(
+            f'  [{CLR_BRAND_HUE} bold]{escaped_path}[/{CLR_BRAND_HUE} bold]  [dim]{match_count} matches[/dim]'
+        )
 
         for lineno, content in matches[:max_lines_per_file]:
             content = content.strip()
@@ -73,7 +79,9 @@ def render_search_results(
 
             if content:
                 highlighted = _highlight_query(content, query)
-                lines.append(f'    [{CLR_SECONDARY}]{lineno:>4}[/{CLR_SECONDARY}]  {highlighted}')
+                lines.append(
+                    f'    [{CLR_SECONDARY}]{lineno:>4}[/{CLR_SECONDARY}]  {highlighted}'
+                )
 
         if match_count > max_lines_per_file:
             lines.append(f'    [dim]... {match_count - max_lines_per_file} more[/dim]')
@@ -81,7 +89,9 @@ def render_search_results(
     if len(grouped) > max_files:
         remaining_files = len(grouped) - max_files
         remaining_matches = sum(len(m) for _, m in list(grouped.items())[max_files:])
-        lines.append(f'  [dim]... {remaining_files} more files, {remaining_matches} matches[/dim]')
+        lines.append(
+            f'  [dim]... {remaining_files} more files, {remaining_matches} matches[/dim]'
+        )
 
     return lines
 
@@ -92,7 +102,9 @@ def _highlight_query(text: str, query: str) -> str:
         return text
 
     escaped = re.escape(query)
-    return re.sub(f'({escaped})', r'[bold #f6ff8f]\1[/bold #f6ff8f]', text, flags=re.IGNORECASE)
+    return re.sub(
+        f'({escaped})', r'[bold #f6ff8f]\1[/bold #f6ff8f]', text, flags=re.IGNORECASE
+    )
 
 
 def render_search_summary(
