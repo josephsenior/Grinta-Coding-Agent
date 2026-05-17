@@ -617,6 +617,54 @@ class TestEditSymbolsBatch:
             )
 
 
+class TestMultiEditCommand:
+    def test_multi_edit_writes_workspace_scoped_paths(self, tmp_path):
+        from backend.engine.function_calling import _handle_multi_edit_command
+
+        action = _handle_multi_edit_command(
+            '',
+            {
+                'file_edits': [
+                    {'path': 'src/a.py', 'new_content': 'A = 1\n'},
+                    {'path': '/workspace/src/b.py', 'new_content': 'B = 2\n'},
+                ]
+            },
+        )
+
+        assert isinstance(action, MessageAction)
+        assert (tmp_path / 'src' / 'a.py').read_text(encoding='utf-8') == 'A = 1\n'
+        assert (tmp_path / 'src' / 'b.py').read_text(encoding='utf-8') == 'B = 2\n'
+
+    def test_multi_edit_rejects_path_traversal(self, tmp_path):
+        from backend.engine.function_calling import _handle_multi_edit_command
+
+        with pytest.raises(FunctionCallValidationError, match='invalid path'):
+            _handle_multi_edit_command(
+                '',
+                {
+                    'file_edits': [
+                        {'path': '../outside.py', 'new_content': 'print(1)\n'}
+                    ]
+                },
+            )
+
+        assert not (tmp_path.parent / 'outside.py').exists()
+
+    def test_multi_edit_rejects_duplicate_paths_after_workspace_resolution(self):
+        from backend.engine.function_calling import _handle_multi_edit_command
+
+        with pytest.raises(FunctionCallValidationError, match='duplicate path'):
+            _handle_multi_edit_command(
+                '',
+                {
+                    'file_edits': [
+                        {'path': 'src/a.py', 'new_content': 'A = 1\n'},
+                        {'path': '/workspace/src/a.py', 'new_content': 'A = 2\n'},
+                    ]
+                },
+            )
+
+
 # ---------------------------------------------------------------------------
 # _handle_edit_symbol_body_command (imported directly)
 # ---------------------------------------------------------------------------
