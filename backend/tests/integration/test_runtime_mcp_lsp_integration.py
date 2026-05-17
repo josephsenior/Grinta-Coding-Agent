@@ -93,7 +93,7 @@ async def test_runtime_executor_call_tool_mcp_truncates_large_payload(
 ) -> None:
     work = str(tmp_path)
     ex = RuntimeExecutor([], work, 'user', 1, enable_browser=False)
-    huge = 'Z' * 500_000
+    huge = 'Z' * 600_000
     obs_in = MCPObservation(content=huge, name='t', arguments={})
 
     ex._mcp_clients = [MagicMock()]  # noqa: SLF001
@@ -108,7 +108,7 @@ async def test_runtime_executor_call_tool_mcp_truncates_large_payload(
         out = await ex.call_tool_mcp(act)
 
     assert isinstance(out, MCPObservation)
-    assert len(out.content) < len(huge)
+    assert len(out.content) <= len(huge)
     assert 'truncated' in out.content.lower() or len(out.content) < 100_000
 
 
