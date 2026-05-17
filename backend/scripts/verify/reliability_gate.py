@@ -36,7 +36,7 @@ def _phase_commands(
     release1 = [
         (
             'release1_orchestrator_units',
-            py + ['backend/tests/unit/engines/orchestrator'],
+            py + ['backend/tests/unit/engine/orchestrator'],
         ),
         (
             'release1_knowledge_base_units',
