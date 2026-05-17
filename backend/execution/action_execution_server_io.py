@@ -26,9 +26,6 @@ from backend.execution.action_execution_server_helpers import (
     annotate_environment_errors as _annotate_environment_errors_impl,
 )
 from backend.execution.action_execution_server_helpers import (
-    append_blast_radius_warning as _append_blast_radius_warning_impl,
-)
-from backend.execution.action_execution_server_helpers import (
     apply_grep_filter as _apply_grep_filter_impl,
 )
 from backend.execution.action_execution_server_helpers import (
@@ -1098,22 +1095,6 @@ class RuntimeExecutorIOAndTerminalMixin:
 
     def _edit_via_file_editor(self, action: FileEditAction) -> Observation:
         return _edit_via_file_editor_impl(self, action)
-
-    def _append_blast_radius_warning(
-        self,
-        base_content: str,
-        *,
-        command: str,
-        action_path: str,
-        new_content: str | None,
-    ) -> str:
-        return _append_blast_radius_warning_impl(
-            self,
-            base_content,
-            command=command,
-            action_path=action_path,
-            new_content=new_content,
-        )
 
     def _is_auto_lint_enabled(self) -> bool:
         return _is_auto_lint_enabled_impl(self)

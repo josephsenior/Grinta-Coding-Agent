@@ -668,6 +668,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
     from backend.execution.file_operations import (
         execute_file_editor,
         get_max_edit_observation_chars,
+        truncate_diff,
         truncate_large_text,
     )
 
@@ -720,15 +721,10 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         try:
             diff = get_diff(old_content, new_content, action.path)
             if diff:
+                diff = truncate_diff(diff)
                 result_str = result_str + '\n\n[EDIT_DIFF]\n' + diff
         except Exception:
             pass
-    result_str = executor._append_blast_radius_warning(
-        result_str,
-        command=command,
-        action_path=action.path,
-        new_content=new_content,
-    )
 
     return FileEditObservation(
         content=result_str,
@@ -739,27 +735,6 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         impl_source=FileEditSource.FILE_EDITOR,
         new_content_hash=new_content_hash,
     )
-
-
-def append_blast_radius_warning(
-    executor: Any,
-    base_content: str,
-    *,
-    command: str,
-    action_path: str,
-    new_content: str | None,
-) -> str:
-    if command == 'read_file' or new_content is None:
-        return base_content
-    try:
-        from backend.utils.blast_radius import check_blast_radius_from_code
-
-        warning = check_blast_radius_from_code(action_path, new_content)
-        if warning:
-            return base_content + warning
-    except Exception as exc:
-        logger.debug('Failed to check blast radius: %s', exc)
-    return base_content
 
 
 def is_auto_lint_enabled(executor: Any) -> bool:

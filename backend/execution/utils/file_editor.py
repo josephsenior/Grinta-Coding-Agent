@@ -1092,6 +1092,13 @@ class FileEditor(FileEditorEditOpsMixin):
         new_text_normalized = new_text.replace('\r\n', '\n').replace('\r', '\n')
         if original_newline == '\r\n':
             new_text_normalized = new_text_normalized.replace('\n', '\r\n')
+
+        # Auto-append trailing newline to prevent line merging bugs.
+        # Only skip if replacement deliberately targets the last line (EOF edge case).
+        is_eof_replacement = end_idx >= len(lines)
+        if not is_eof_replacement and new_text_normalized and not new_text_normalized.endswith(original_newline):
+            new_text_normalized += original_newline
+
         new_lines_to_insert = new_text_normalized.splitlines(keepends=True)
 
         result_lines = lines[:start_idx] + new_lines_to_insert + lines[end_idx:]
