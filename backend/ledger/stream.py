@@ -21,7 +21,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from backend.core.logger import app_logger as logger
 from backend.ledger.backpressure import BackpressureManager
@@ -408,9 +408,9 @@ class EventStream(EventStore):
         recent_failures = [
             ts for ts in self._persist._recent_persist_failures if now - ts < window
         ]
-        snapshot['persist_failures_per_minute'] = int(
-            round(len(recent_failures) * 60 / max(window, 1))
-        ) if window > 0 else 0
+        snapshot['persist_failures_per_minute'] = (
+            int(round(len(recent_failures) * 60 / max(window, 1))) if window > 0 else 0
+        )
         dw = self._persist.durable_writer
         if dw:
             snapshot['durable_writer_drops'] = int(dw.drop_count)
@@ -483,7 +483,9 @@ class EventStream(EventStore):
         """
         with self._lock:
             if subscriber_id not in self._subscribers:
-                logger.debug('Subscriber not found during unsubscribe: %s', subscriber_id)
+                logger.debug(
+                    'Subscriber not found during unsubscribe: %s', subscriber_id
+                )
                 return
             if callback_id not in self._subscribers[subscriber_id]:
                 logger.debug('Callback not found during unsubscribe: %s', callback_id)
@@ -678,7 +680,9 @@ class EventStream(EventStore):
             try:
                 self._persist.file_store.write(cache_payload[0], cache_payload[1])
             except Exception:
-                logger.debug('Failed to flush partial write page cache on close', exc_info=True)
+                logger.debug(
+                    'Failed to flush partial write page cache on close', exc_info=True
+                )
 
     def _dispatch_coalesced_flushed(self, event: Event) -> None:
         """Dispatch a coalescer-flushed event through the normal delivery path."""

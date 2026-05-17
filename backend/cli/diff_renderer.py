@@ -61,14 +61,16 @@ def _extract_indentation_warnings(content: str) -> tuple[str, list[str] | None]:
 
     # Split content into main part and warnings
     main_content = content[:idx].rstrip()
-    warnings_str = content[idx + len(marker):].strip()
+    warnings_str = content[idx + len(marker) :].strip()
 
     # Parse warnings into structured list
     warnings: list[str] = []
     current_warning: list[str] = []
     for line in warnings_str.split('\n'):
         line = line.strip()
-        if line.startswith('[INDENTATION MISMATCH]') or line.startswith('[INDENTATION ERROR]'):
+        if line.startswith('[INDENTATION MISMATCH]') or line.startswith(
+            '[INDENTATION ERROR]'
+        ):
             if current_warning:
                 warnings.append('\n'.join(current_warning))
                 current_warning = []

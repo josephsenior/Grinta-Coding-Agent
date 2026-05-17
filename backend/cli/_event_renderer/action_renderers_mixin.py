@@ -266,7 +266,11 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
         extra_lines = render_think(thought)
         kind = 'neutral'
-        first_line = thought.split('\n')[0].replace('\n', ' ').strip()[:100] if thought else 'Thinking'
+        first_line = (
+            thought.split('\n')[0].replace('\n', ' ').strip()[:100]
+            if thought
+            else 'Thinking'
+        )
 
         # Use 'Thinking:' verb for consistency with TUI
         inner = format_activity_block(
@@ -291,7 +295,12 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
         if source_tool == 'search_code':
             from backend.cli._tool_display.renderers.search import render_search_results
-            raw_lines = [ln for ln in human_msg.splitlines() if ln.strip() and not ln.startswith('Error running')]
+
+            raw_lines = [
+                ln
+                for ln in human_msg.splitlines()
+                if ln.strip() and not ln.startswith('Error running')
+            ]
             if raw_lines and any(re.match(r'^.*:\d+:', ln) for ln in raw_lines[:5]):
                 extra_lines = render_search_results(human_msg)
                 kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
@@ -468,7 +477,9 @@ class ActionRenderersMixin(_ActionRenderersBase):
         name = getattr(action, 'name', 'tool')
         raw_args = getattr(action, 'arguments', None) or {}
         verb = friendly_verb_for_tool(name, raw_args)
-        args_str = ', '.join(f'{k}={repr(v)[:40]}' for k, v in list(raw_args.items())[:2])
+        args_str = ', '.join(
+            f'{k}={repr(v)[:40]}' for k, v in list(raw_args.items())[:2]
+        )
         if len(args_str) > 80:
             args_str = args_str[:77] + '…'
         detail = f'{name}({args_str})' if args_str else name
@@ -496,7 +507,13 @@ class ActionRenderersMixin(_ActionRenderersBase):
         else:
             detail = str(cmd)
             reasoning_detail = detail
-        self._print_activity(str(cmd), detail, None, title=ACTIVITY_CARD_TITLE_BROWSER, badge_label='browser')
+        self._print_activity(
+            str(cmd),
+            detail,
+            None,
+            title=ACTIVITY_CARD_TITLE_BROWSER,
+            badge_label='browser',
+        )
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(self._reasoning, reasoning_detail, thought)
         self.refresh()
@@ -514,7 +531,13 @@ class ActionRenderersMixin(_ActionRenderersBase):
         else:
             detail = 'interactive session'  # type: ignore[unreachable]
             reasoning_detail = detail
-        self._print_activity('Opened', detail, None, title=ACTIVITY_CARD_TITLE_BROWSER, badge_label='browser')
+        self._print_activity(
+            'Opened',
+            detail,
+            None,
+            title=ACTIVITY_CARD_TITLE_BROWSER,
+            badge_label='browser',
+        )
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(self._reasoning, reasoning_detail, thought)
         self.refresh()
@@ -612,7 +635,11 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self._last_terminal_input_sent = sent_for_echo
         cmd_detail = f'[{sess}]  $ {inp_display}' if sess else f'$ {inp_display}'
         self._print_activity(
-            'Run', cmd_detail, None, title=ACTIVITY_CARD_TITLE_TERMINAL, badge_label='terminal'
+            'Run',
+            cmd_detail,
+            None,
+            title=ACTIVITY_CARD_TITLE_TERMINAL,
+            badge_label='terminal',
         )
         self._ensure_reasoning()
         line = self._terminal_input_reasoning_line(sess=sess, inp_display=inp_display)

@@ -29,11 +29,11 @@ This report consolidates deep architectural findings of bugs, leaks, race condit
 ## 3. CLI & Middleware Pipeline Flaws
 
 ### A. Environment Race Conditions (`backend/cli/main.py`)
-1. **The "Too-Late" Override Bug**: 
+1. **The "Too-Late" Override Bug**:
    `_load_dotenv_early()` strictly evaluates based on CLI triggers via `sys.argv`. In headless testing or dynamic SDK consumption of `main(project='folder')`, core singletons load first. `LOG_TO_FILE` / LLM flags statically snapshot before the configuration payload reads the explicitly provided `.env` path rendering project properties ineffective over global scopes.
 
 ### B. Rollback Checkpoint Eviction (`backend/orchestration/session_orchestrator.py`)
-1. **`active_to_closing` & `init_to_active` GC Sweeps**: 
+1. **`active_to_closing` & `init_to_active` GC Sweeps**:
    The Orchestrator injects `_create_phase_boundary_checkpoint` to anchor core transitions (like initial starts and closing snapshots). However, underneath, `RollbackManager` strictly caps at `max_checkpoints=30` accompanied by generic `auto_cleanup=True`. Over a prolonged sequence of normal IDE agent shell interactions, regular checkpoints consume the stack limits, violently vacuuming the underlying crucial `init_to_active` backup data out of existence. Consequently, "Restarting" a long running session becomes mathematically impossible as the bedrock gets routinely scavenged mapping.
 
 ### C. Worker Controller Memory Leaker (`backend/orchestration/services/event_router_service.py`)

@@ -80,9 +80,7 @@ class SQLiteEventStore:
 
     @staticmethod
     def _max_payload_bytes() -> int:
-        raw = str(
-            os.getenv('GRINTA_SQLITE_EVENT_MAX_PAYLOAD_BYTES', '')
-        ).strip()
+        raw = str(os.getenv('GRINTA_SQLITE_EVENT_MAX_PAYLOAD_BYTES', '')).strip()
         if raw:
             try:
                 v = int(raw)
@@ -289,7 +287,9 @@ class SQLiteEventStore:
             return None
         size = int(row['sz'] or 0)
         if size > limit:
-            raise ValueError(f'Event payload too large ({size} bytes) for id={event_id}')
+            raise ValueError(
+                f'Event payload too large ({size} bytes) for id={event_id}'
+            )
         row2 = conn.execute(
             'SELECT payload FROM events WHERE id = ?', (event_id,)
         ).fetchone()

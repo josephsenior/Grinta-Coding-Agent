@@ -869,7 +869,9 @@ class SlashCommandsMixin:
         table.add_column('Preview', style=CLR_CARD_BORDER, overflow='fold')
 
         for evt in events:
-            evt_type = type(evt).__name__.replace('Action', '').replace('Observation', '')
+            evt_type = (
+                type(evt).__name__.replace('Action', '').replace('Observation', '')
+            )
             content = getattr(evt, 'content', '') or getattr(evt, 'message', '') or ''
             preview = content.strip()[:120].replace('\n', ' ')
             table.add_row(str(getattr(evt, 'id', '?')), evt_type, preview)

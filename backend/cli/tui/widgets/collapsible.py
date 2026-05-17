@@ -74,8 +74,12 @@ class CollapsibleSection(Container):
         header_style = 'collapsed' if self._collapsed else 'expanded'
         icon = '[bold]+[/]' if self._collapsed else '[bold]−[/]'
         header_text = f'[{self._accent_color}]{icon}[/] {self._section_title}'
-        yield Static(header_text, classes=f'collapsible-header {header_style}', id='header')
-        body_classes = 'collapsible-body -hidden' if self._collapsed else 'collapsible-body'
+        yield Static(
+            header_text, classes=f'collapsible-header {header_style}', id='header'
+        )
+        body_classes = (
+            'collapsible-body -hidden' if self._collapsed else 'collapsible-body'
+        )
         yield Static(self._content or '', classes=body_classes, id='body')
 
     def toggle(self) -> None:

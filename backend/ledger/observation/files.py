@@ -84,7 +84,9 @@ class FileEditObservation(Observation):
         old_lines = self.old_content.split('\n')
         new_lines = self.new_content.split('\n')
         added = 0
-        for tag, i1, i2, j1, j2 in SequenceMatcher(None, old_lines, new_lines).get_opcodes():
+        for tag, i1, i2, j1, j2 in SequenceMatcher(
+            None, old_lines, new_lines
+        ).get_opcodes():
             if tag in {'insert', 'replace'}:
                 added += j2 - j1
         return added
@@ -97,7 +99,9 @@ class FileEditObservation(Observation):
         old_lines = self.old_content.split('\n')
         new_lines = self.new_content.split('\n')
         removed = 0
-        for tag, i1, i2, j1, j2 in SequenceMatcher(None, old_lines, new_lines).get_opcodes():
+        for tag, i1, i2, j1, j2 in SequenceMatcher(
+            None, old_lines, new_lines
+        ).get_opcodes():
             if tag in {'delete', 'replace'}:
                 removed += i2 - i1
         return removed

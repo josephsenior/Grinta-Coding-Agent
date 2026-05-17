@@ -1339,7 +1339,8 @@ async def test_async_main_defaults_workspace_to_cwd(
             with patch('backend.cli.main.Console', return_value=_make_console()):
                 with patch('backend.cli.tui.main._async_main_tui', return_value=None):
                     with patch(
-                        'backend.cli.config_manager.needs_onboarding', return_value=False
+                        'backend.cli.config_manager.needs_onboarding',
+                        return_value=False,
                     ):
                         with patch(
                             'backend.cli.config_manager.ensure_default_model',
@@ -1409,7 +1410,8 @@ async def test_async_main_keeps_explicit_project_override(
             with patch('backend.cli.main.Console', return_value=_make_console()):
                 with patch('backend.cli.tui.main._async_main_tui', return_value=None):
                     with patch(
-                        'backend.cli.config_manager.needs_onboarding', return_value=False
+                        'backend.cli.config_manager.needs_onboarding',
+                        return_value=False,
                     ):
                         with patch(
                             'backend.cli.config_manager.ensure_default_model',

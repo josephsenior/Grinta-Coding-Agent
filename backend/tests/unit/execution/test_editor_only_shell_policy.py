@@ -24,7 +24,9 @@ def _cfg() -> SecurityConfig:
         ('dd if=/dev/zero of=image.img bs=1 count=1',),
     ],
 )
-def test_blocks_obvious_shell_writes(monkeypatch: pytest.MonkeyPatch, command: str) -> None:
+def test_blocks_obvious_shell_writes(
+    monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
     monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
     msg = evaluate_editor_only_shell_block(
         command=command,
@@ -44,7 +46,9 @@ def test_blocks_obvious_shell_writes(monkeypatch: pytest.MonkeyPatch, command: s
         ('npm run build > output.log',),
     ],
 )
-def test_allows_log_and_tmp_redirections(monkeypatch: pytest.MonkeyPatch, command: str) -> None:
+def test_allows_log_and_tmp_redirections(
+    monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
     monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
     assert (
         evaluate_editor_only_shell_block(

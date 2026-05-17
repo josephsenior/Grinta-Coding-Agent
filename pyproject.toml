@@ -53,11 +53,11 @@ dependencies = [
   "rapidfuzz>=3.9,<4",
   "requests>=2.32.4,<3",
   "rich>=14,<16",
-  "textual>=1.0,<2",
   "ripgrep==14.1",                             # binary provider for search_code (shutil.which('rg'))
   "starlette>=0.49.1,<2",
   "tenacity>=8.5,<10",
   "termcolor>=3.1,<4",
+  "textual>=1,<2",
   "tree-sitter>=0.24,<0.25",
   "tree-sitter-language-pack>=0.7.3,<0.8",
   "urllib3>=1.21.1,<3",

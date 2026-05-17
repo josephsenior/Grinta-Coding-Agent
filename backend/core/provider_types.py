@@ -180,6 +180,7 @@ class CreatePlaybook(BaseModel):
         if v is None:
             return None
         from backend.core.type_safety.type_safety import validate_non_empty_string
+
         return validate_non_empty_string(v, name='title')
 
 

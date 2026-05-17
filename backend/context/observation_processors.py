@@ -305,7 +305,7 @@ def _truncate_diff_smart(content: str, max_chars: int) -> str:
     lines_per_hunk = max(10, budget_per_hunk // 80)  # ~80 chars per line avg
 
     for hunk_idx, (start, end) in enumerate(zip(hunk_starts, hunk_ends, strict=False)):
-        hunk_lines = lines[start:end + 1]
+        hunk_lines = lines[start : end + 1]
         hunk_size = sum(len(line) + 1 for line in hunk_lines)
 
         if hunk_size <= budget_per_hunk:
@@ -337,12 +337,28 @@ def _truncate_diff_smart(content: str, max_chars: int) -> str:
 
                 # Keep first/last N lines of each section
                 half = lines_per_hunk // 4
-                kept_before = before_section[:half] + (
-                    ['  [... truncated ...]'] if len(before_section) > half * 2 else []
-                ) + before_section[-half:] if len(before_section) > half * 2 else before_section
-                kept_after = after_section[:half] + (
-                    ['  [... truncated ...]'] if len(after_section) > half * 2 else []
-                ) + after_section[-half:] if len(after_section) > half * 2 else after_section
+                kept_before = (
+                    before_section[:half]
+                    + (
+                        ['  [... truncated ...]']
+                        if len(before_section) > half * 2
+                        else []
+                    )
+                    + before_section[-half:]
+                    if len(before_section) > half * 2
+                    else before_section
+                )
+                kept_after = (
+                    after_section[:half]
+                    + (
+                        ['  [... truncated ...]']
+                        if len(after_section) > half * 2
+                        else []
+                    )
+                    + after_section[-half:]
+                    if len(after_section) > half * 2
+                    else after_section
+                )
 
                 result_lines.extend(header_lines)
                 result_lines.extend(kept_before)
@@ -350,9 +366,13 @@ def _truncate_diff_smart(content: str, max_chars: int) -> str:
             else:
                 # No clear before/after split — keep first/last N lines
                 half = lines_per_hunk // 2
-                kept = hunk_lines[:half] + (
-                    ['  [... truncated ...]'] if len(hunk_lines) > half * 2 else []
-                ) + hunk_lines[-half:] if len(hunk_lines) > half * 2 else hunk_lines
+                kept = (
+                    hunk_lines[:half]
+                    + (['  [... truncated ...]'] if len(hunk_lines) > half * 2 else [])
+                    + hunk_lines[-half:]
+                    if len(hunk_lines) > half * 2
+                    else hunk_lines
+                )
                 result_lines.extend(kept)
 
             remaining -= budget_per_hunk
@@ -384,7 +404,9 @@ def _handle_file_edit_observation(
         else:
             # For non-range edits, use head_heavy strategy (88% head / 12% tail)
             # to keep the beginning of edits intact where most changes occur.
-            text = truncate_content(content_str, max_message_chars, strategy='head_heavy')
+            text = truncate_content(
+                content_str, max_message_chars, strategy='head_heavy'
+            )
     else:
         text = content_str
 

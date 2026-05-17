@@ -749,13 +749,10 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         current_loop = None
         with contextlib.suppress(RuntimeError):
             current_loop = asyncio.get_running_loop()
-        if (
-            self._step_lock_instance is None
-            or (
-                current_loop is not None
-                and self._step_lock_loop is not None
-                and current_loop is not self._step_lock_loop
-            )
+        if self._step_lock_instance is None or (
+            current_loop is not None
+            and self._step_lock_loop is not None
+            and current_loop is not self._step_lock_loop
         ):
             self._step_lock_instance = asyncio.Lock()
             self._step_lock_loop = current_loop
@@ -966,6 +963,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             decision.reason,
             len(decision.overflow),
         )
+
         def _prepend_action(queue: object, action: Action) -> None:
             appendleft = getattr(queue, 'appendleft', None)
             if callable(appendleft):

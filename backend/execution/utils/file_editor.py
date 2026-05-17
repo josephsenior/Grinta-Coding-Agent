@@ -133,7 +133,9 @@ def _format_context_window(
         if idx > 0:
             output_parts.append('...')
         output_parts.extend(
-            _format_range_lines(new_lines, changed_ranges, ctx_start, ctx_end, total_lines)
+            _format_range_lines(
+                new_lines, changed_ranges, ctx_start, ctx_end, total_lines
+            )
         )
 
     return '\n'.join(output_parts)
@@ -719,7 +721,9 @@ class FileEditor(FileEditorEditOpsMixin):
         """Build result for dry-run preview."""
         output = 'Preview generated (no changes applied)'
         if self._last_indent_warnings:
-            output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(self._last_indent_warnings)
+            output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(
+                self._last_indent_warnings
+            )
         return ToolResult(
             output=output,
             old_content=old_content,
@@ -773,7 +777,9 @@ class FileEditor(FileEditorEditOpsMixin):
 
         # Include indentation warnings if any
         if self._last_indent_warnings:
-            output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(self._last_indent_warnings)
+            output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(
+                self._last_indent_warnings
+            )
 
         if msg and msg.startswith('WARNING:'):
             output = f'{output}\n{msg}'
@@ -1096,7 +1102,11 @@ class FileEditor(FileEditorEditOpsMixin):
         # Auto-append trailing newline to prevent line merging bugs.
         # Only skip if replacement deliberately targets the last line (EOF edge case).
         is_eof_replacement = end_idx >= len(lines)
-        if not is_eof_replacement and new_text_normalized and not new_text_normalized.endswith(original_newline):
+        if (
+            not is_eof_replacement
+            and new_text_normalized
+            and not new_text_normalized.endswith(original_newline)
+        ):
             new_text_normalized += original_newline
 
         new_lines_to_insert = new_text_normalized.splitlines(keepends=True)
@@ -1264,9 +1274,7 @@ def _check_block_indent_after_colon(
             f'[INDENTATION ERROR] Line {line_num}: '
             f'Expected indentation after ":" on line {line_num - 1}, but found 0 spaces.'
         )
-        warnings.append(
-            f'[BROKEN LINE] Line {line_num} would be: "{line.rstrip()}"'
-        )
+        warnings.append(f'[BROKEN LINE] Line {line_num} would be: "{line.rstrip()}"')
         warnings.append(
             f'[SUGGESTED FIX] Did you mean to indent with {suggested_indent} spaces? '
             f'Try: "{" " * suggested_indent}{line.strip()}"'

@@ -83,16 +83,20 @@ async def run_noninteractive(
             elif state.agent_state == AgentState.ERROR:
                 console.print(f'[red]Agent ended with error in {elapsed:.1f}s[/red]')
             else:
-                console.print(f'[yellow]Agent stopped at {state.agent_state} after {elapsed:.1f}s[/yellow]')
+                console.print(
+                    f'[yellow]Agent stopped at {state.agent_state} after {elapsed:.1f}s[/yellow]'
+                )
 
     except KeyboardInterrupt:
         console.print('[yellow]Interrupted by user[/yellow]')
     except Exception as e:
         console.print(f'[red]Error: {type(e).__name__}: {e}[/red]')
         import traceback
+
         traceback.print_exc()
     finally:
         from backend.inference.direct_clients import aclose_shared_http_clients
+
         await aclose_shared_http_clients()
 
 

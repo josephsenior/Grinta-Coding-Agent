@@ -113,7 +113,12 @@ def parse_pytest_output(output: str) -> ParsedTestResult:
         if not stripped:
             continue
 
-        if ' passed' in stripped or ' failed' in stripped or ' error' in stripped or ' skipped' in stripped:
+        if (
+            ' passed' in stripped
+            or ' failed' in stripped
+            or ' error' in stripped
+            or ' skipped' in stripped
+        ):
             m = re.search(r'(\d+) passed', stripped)
             if m:
                 result.passed = int(m.group(1))
@@ -172,11 +177,13 @@ def format_pytest_panel(result: ParsedTestResult) -> list[str]:
             if file_part:
                 # Escape file_part to prevent MarkupError
                 from rich.markup import escape as markup_escape
+
                 escaped_file = markup_escape(file_part)
                 output.append(f'  {icon} {escaped_file}')
             if test_part:
                 # Escape test_part to prevent MarkupError
                 from rich.markup import escape as markup_escape
+
                 escaped_test = markup_escape(test_part)
                 output.append(f'     {escaped_test}')
 
@@ -194,10 +201,11 @@ def format_pytest_panel(result: ParsedTestResult) -> list[str]:
         if result.duration:
             # Escape duration to prevent MarkupError
             from rich.markup import escape as markup_escape
+
             escaped_duration = markup_escape(result.duration)
             parts.append(f'[dim]{escaped_duration}[/dim]')
         if parts:
-            output.append(f"  {' · '.join(parts)}")
+            output.append(f'  {" · ".join(parts)}')
 
     return output
 
@@ -217,7 +225,9 @@ def parse_git_status(output: str) -> ParsedGitStatus:
             result.unstaged.append(stripped)
         elif stripped.startswith('Untracked files'):
             continue
-        elif 'new file:' in stripped or 'modified:' in stripped or 'deleted:' in stripped:
+        elif (
+            'new file:' in stripped or 'modified:' in stripped or 'deleted:' in stripped
+        ):
             result.staged.append(stripped)
         elif stripped.startswith('??'):
             result.untracked.append(stripped[2:].strip())
@@ -243,7 +253,9 @@ def format_git_status_panel(result: ParsedGitStatus) -> list[str]:
     output: list[str] = []
 
     if result.staged:
-        output.append(f'[{CLR_STATUS_OK}]Staged ({len(result.staged)}):[/{CLR_STATUS_OK}]')
+        output.append(
+            f'[{CLR_STATUS_OK}]Staged ({len(result.staged)}):[/{CLR_STATUS_OK}]'
+        )
         for item in result.staged[:5]:
             # Escape item to prevent MarkupError
             escaped_item = markup_escape(item)
@@ -254,7 +266,9 @@ def format_git_status_panel(result: ParsedGitStatus) -> list[str]:
     if result.unstaged:
         if output:
             output.append('')
-        output.append(f'[{CLR_STATUS_WARN}]Changed ({len(result.unstaged)}):[/{CLR_STATUS_WARN}]')
+        output.append(
+            f'[{CLR_STATUS_WARN}]Changed ({len(result.unstaged)}):[/{CLR_STATUS_WARN}]'
+        )
         for item in result.unstaged[:5]:
             # Escape item to prevent MarkupError
             escaped_item = markup_escape(item)
@@ -265,7 +279,9 @@ def format_git_status_panel(result: ParsedGitStatus) -> list[str]:
     if result.untracked:
         if output:
             output.append('')
-        output.append(f'[{CLR_SECONDARY}]Untracked ({len(result.untracked)}):[/{CLR_SECONDARY}]')
+        output.append(
+            f'[{CLR_SECONDARY}]Untracked ({len(result.untracked)}):[/{CLR_SECONDARY}]'
+        )
         for item in result.untracked[:5]:
             # Escape item to prevent MarkupError
             escaped_item = markup_escape(item)
@@ -279,7 +295,9 @@ def format_git_status_panel(result: ParsedGitStatus) -> list[str]:
     return output
 
 
-def parse_shell_output(command: str, output: str, *, max_lines: int = 50) -> ShellOutput:
+def parse_shell_output(
+    command: str, output: str, *, max_lines: int = 50
+) -> ShellOutput:
     """Parse shell output into structured format."""
     kind = detect_output_type(command, output)
     lines = output.splitlines()[:max_lines]

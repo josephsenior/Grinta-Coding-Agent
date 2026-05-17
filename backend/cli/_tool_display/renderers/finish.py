@@ -46,7 +46,12 @@ def render_finish_summary(
         meta_parts.append(f'{tool_calls} calls')
 
     if meta_parts:
-        lines.append('  ' + '  ·  '.join(f'[{CLR_SECONDARY}]{p}[/{CLR_SECONDARY}]' for p in meta_parts))
+        lines.append(
+            '  '
+            + '  ·  '.join(
+                f'[{CLR_SECONDARY}]{p}[/{CLR_SECONDARY}]' for p in meta_parts
+            )
+        )
 
     if files:
         lines.append('')

@@ -82,11 +82,7 @@ class ActionScheduler:
 
         capped = tuple(actions[: self.max_parallel_batch_size])
         overflow = tuple(actions[self.max_parallel_batch_size :])
-        reason = (
-            'parallel_safe_batch'
-            if not overflow
-            else 'parallel_safe_batch_capped'
-        )
+        reason = 'parallel_safe_batch' if not overflow else 'parallel_safe_batch_capped'
         return ParallelBatchDecision(
             should_execute_parallel=True,
             actions=capped,

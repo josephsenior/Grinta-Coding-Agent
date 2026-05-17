@@ -24,7 +24,6 @@ from backend.engine.function_calling import (
     set_security_risk,
 )
 from backend.ledger.action import (
-    AgentThinkAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,

@@ -147,7 +147,10 @@ async def run_agent_until_done(
         while controller.state.agent_state not in end_states:  # noqa: ASYNC110
             _ran_loop = True
             await asyncio.sleep(0.5)
-            if _max_poll_seconds > 0 and _time.monotonic() - _started > _max_poll_seconds:
+            if (
+                _max_poll_seconds > 0
+                and _time.monotonic() - _started > _max_poll_seconds
+            ):
                 logger.error(
                     'run_agent_until_done: timeout after %.0fs in state=%s',
                     _max_poll_seconds,

@@ -136,7 +136,9 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
             if agent_task and agent_task.done():
                 if renderer is not None:
                     # Final settle after task completion to catch late events.
-                    await self._drain_renderer_until_settled(renderer, settle_delay=0.05)
+                    await self._drain_renderer_until_settled(
+                        renderer, settle_delay=0.05
+                    )
                 break
 
             # Yield to the event loop.  wait_for_state_change will return
@@ -474,7 +476,9 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
                 agent,
             )
         except Exception as exc:
-            logger.error('Resume failed during memory/MCP setup: %s', exc, exc_info=True)
+            logger.error(
+                'Resume failed during memory/MCP setup: %s', exc, exc_info=True
+            )
             if self._renderer is not None:
                 self._renderer.add_system_message(
                     f'Resume failed during memory/MCP setup: {exc}',

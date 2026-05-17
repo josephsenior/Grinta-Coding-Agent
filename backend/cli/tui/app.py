@@ -138,7 +138,6 @@ def _render_thinking_with_diff(text: str) -> Text:
     """
     result = Text()
     in_diff_block = False
-    diff_marker = '```diff'
 
     for line in text.split('\n'):
         stripped = line.strip()
@@ -161,7 +160,11 @@ def _render_thinking_with_diff(text: str) -> Text:
                 result.append(line + '\n', style='#54efae on #0d2e1a')
             elif stripped.startswith('-') and not stripped.startswith('---'):
                 result.append(line + '\n', style='#fd8383 on #2e0d0d')
-            elif stripped.startswith('@@') or stripped.startswith('---') or stripped.startswith('+++'):
+            elif (
+                stripped.startswith('@@')
+                or stripped.startswith('---')
+                or stripped.startswith('+++')
+            ):
                 result.append(line + '\n', style=NAVY_TEXT_MUTED)
             else:
                 result.append(line + '\n', style=NAVY_TEXT_DIM)
@@ -189,6 +192,7 @@ class InputBar(Horizontal):
 
 class HUD(Vertical):
     """Multi-line status bar at the very bottom."""
+
     def compose(self) -> ComposeResult:
         yield Label(id='hud-line-1')
         yield Label(id='hud-line-2')
@@ -340,20 +344,22 @@ class GrintaScreen(Screen):
         _tui_logger.debug('on_mount: done')
         self._start_background_bootstrap()
 
-
     def _start_background_bootstrap(self) -> None:
         async def _bg():
             try:
                 await self._bootstrap()
             except Exception as exc:
                 _tui_logger.debug(f'background bootstrap failed: {exc}')
+
         asyncio.create_task(_bg())
 
     def on_unmount(self) -> None:
         _tui_logger.debug('on_unmount: GrintaScreen unmounting')
         if self._renderer:
             if self._renderer._event_stream:
-                self._renderer._event_stream.unsubscribe(EventStreamSubscriber.MAIN, 'grinta-tui')
+                self._renderer._event_stream.unsubscribe(
+                    EventStreamSubscriber.MAIN, 'grinta-tui'
+                )
             self._renderer._event_stream = None
         if self._event_stream is not None:
             try:
@@ -423,10 +429,14 @@ class GrintaScreen(Screen):
     @staticmethod
     def _break_long_runs(text: str, max_len: int = 80) -> str:
         """Insert zero-width spaces in long continuous runs, preserving Rich markup tags."""
+
         def _break_word(w: str) -> str:
             if len(w) > max_len and not w.isspace():
-                return '\u200b'.join(w[i:i+max_len] for i in range(0, len(w), max_len))
+                return '\u200b'.join(
+                    w[i : i + max_len] for i in range(0, len(w), max_len)
+                )
             return w
+
         parts = re.split(r'(\[[^\[\]]*\])', text)
         for i, part in enumerate(parts):
             if not (part.startswith('[') and part.endswith(']')):
@@ -506,7 +516,9 @@ class GrintaScreen(Screen):
 
         if command:
             cmd_text = _rich_text(command)
-            self._write_log(Text.assemble(icon, name, ' (', cmd_text, ')', style='#969aad'))
+            self._write_log(
+                Text.assemble(icon, name, ' (', cmd_text, ')', style='#969aad')
+            )
         else:
             self._write_log(Text.assemble(icon, name))
 
@@ -543,9 +555,7 @@ class GrintaScreen(Screen):
             clarify_parts.append(line)
 
         panel = format_callout_panel(
-            'Question',
-            Group(*clarify_parts),
-            accent_style=DECISION_PANEL_ACCENT_STYLE
+            'Question', Group(*clarify_parts), accent_style=DECISION_PANEL_ACCENT_STYLE
         )
         self._write_log(panel)
 
@@ -572,9 +582,7 @@ class GrintaScreen(Screen):
             parts.append(t_req)
 
         panel = format_callout_panel(
-            'Needs Context',
-            Group(*parts),
-            accent_style=DECISION_PANEL_ACCENT_STYLE
+            'Needs Context', Group(*parts), accent_style=DECISION_PANEL_ACCENT_STYLE
         )
         self._write_log(panel)
 
@@ -593,20 +601,23 @@ class GrintaScreen(Screen):
             t_rat.stylize(STYLE_DIM)
             parts.append(t_rat)
         for i, opt in enumerate(action.options or []):
-            label = opt.get('name', opt.get('title', f'Option {i+1}'))
+            label = opt.get('name', opt.get('title', f'Option {i + 1}'))
             marker = ' (recommended)' if i == action.recommended else ''
             line = Text()
-            line.append(f'{i+1}. ', style=f'bold {DECISION_PANEL_ACCENT_STYLE}')
-            line.append(f'{label}{marker}', style=f'bold {CLR_OPTION_RECOMMENDED}' if i == action.recommended else f'bold {CLR_OPTION_TEXT}')
+            line.append(f'{i + 1}. ', style=f'bold {DECISION_PANEL_ACCENT_STYLE}')
+            line.append(
+                f'{label}{marker}',
+                style=f'bold {CLR_OPTION_RECOMMENDED}'
+                if i == action.recommended
+                else f'bold {CLR_OPTION_TEXT}',
+            )
             parts.append(line)
             desc = opt.get('description', '')
             if desc:
                 parts.append(Text(f'   {desc}', style=STYLE_DIM))
 
         panel = format_callout_panel(
-            'Options',
-            Group(*parts),
-            accent_style=DECISION_PANEL_ACCENT_STYLE
+            'Options', Group(*parts), accent_style=DECISION_PANEL_ACCENT_STYLE
         )
         self._write_log(panel)
 
@@ -616,18 +627,19 @@ class GrintaScreen(Screen):
         from backend.cli.theme import CLR_QUESTION_TEXT
         from backend.cli.transcript import format_callout_panel
 
-        t_reason = _rich_text(action.reason or 'The agent needs your input to continue.')
+        t_reason = _rich_text(
+            action.reason or 'The agent needs your input to continue.'
+        )
         t_reason.stylize(CLR_QUESTION_TEXT)
 
         panel = format_callout_panel(
-            'Need Your Input',
-            t_reason,
-            accent_style=DECISION_PANEL_ACCENT_STYLE
+            'Need Your Input', t_reason, accent_style=DECISION_PANEL_ACCENT_STYLE
         )
         self._write_log(panel)
 
     def add_divider(self) -> None:
         from rich.rule import Rule
+
         self._write_log(Rule(style=NAVY_BORDER))
 
     def clear_transcript(self) -> None:
@@ -679,6 +691,7 @@ class GrintaScreen(Screen):
                 # Rich renderable - try to extract text
                 try:
                     from rich.console import Console
+
                     console = Console(force_terminal=True, width=200)
                     with console.capture() as capture:
                         console.print(item)
@@ -720,6 +733,7 @@ class GrintaScreen(Screen):
                 from backend.execution.action_execution_server import (
                     client as runtime_client,
                 )
+
                 if runtime_client is not None:
                     await runtime_client.hard_kill()
 
@@ -783,7 +797,9 @@ class GrintaScreen(Screen):
     # ── Input handling ──────────────────────────────────────────────────────
 
     def action_submit_input(self) -> None:
-        _tui_logger.debug(f'action_submit_input: lock_locked={self._input_lock.locked()}')
+        _tui_logger.debug(
+            f'action_submit_input: lock_locked={self._input_lock.locked()}'
+        )
         if self._input_lock.locked():
             _tui_logger.debug('action_submit_input: lock held, ignoring')
             return
@@ -801,7 +817,9 @@ class GrintaScreen(Screen):
             def _on_done(t: asyncio.Task[Any]) -> None:
                 exc = t.exception()
                 if exc:
-                    _tui_logger.debug(f'_handle_input task FAILED: {type(exc).__name__}: {exc}')
+                    _tui_logger.debug(
+                        f'_handle_input task FAILED: {type(exc).__name__}: {exc}'
+                    )
                 else:
                     _tui_logger.debug('_handle_input task completed OK')
 
@@ -815,7 +833,9 @@ class GrintaScreen(Screen):
         try:
             _tui_logger.debug(f'_handle_input ENTER text={text[:80]}')
         except Exception as exc:
-            _tui_logger.debug(f'_handle_input: _trace FAILED: {type(exc).__name__}: {exc}')
+            _tui_logger.debug(
+                f'_handle_input: _trace FAILED: {type(exc).__name__}: {exc}'
+            )
         async with self._input_lock:
             # Drain any stale events from previous turn before starting new one
             if self._renderer:
@@ -835,15 +855,26 @@ class GrintaScreen(Screen):
             self.query_one('#input-bar', InputBar).add_class('processing')
 
             try:
-                _tui_logger.debug(f'_handle_input: controller={self._controller is not None}')
+                _tui_logger.debug(
+                    f'_handle_input: controller={self._controller is not None}'
+                )
                 if self._controller is None:
-                    if self._bootstrapping is not None and not self._bootstrapping.is_set():
-                        _tui_logger.debug('_handle_input: waiting for background bootstrap')
-                        logger.info('[TUI] _handle_input: waiting for background bootstrap')
+                    if (
+                        self._bootstrapping is not None
+                        and not self._bootstrapping.is_set()
+                    ):
+                        _tui_logger.debug(
+                            '_handle_input: waiting for background bootstrap'
+                        )
+                        logger.info(
+                            '[TUI] _handle_input: waiting for background bootstrap'
+                        )
                         await self._bootstrapping.wait()
                     if self._controller is None:
                         _tui_logger.debug('_handle_input: calling _bootstrap()')
-                        logger.info('[TUI] _handle_input: bootstrapping (no controller)')
+                        logger.info(
+                            '[TUI] _handle_input: bootstrapping (no controller)'
+                        )
                     # Internal bootstrap - no user-facing message
                     await self._bootstrap()
                     if self._controller is None:
@@ -862,7 +893,9 @@ class GrintaScreen(Screen):
                     )
                     logger.info('[TUI] _handle_input: controller exists, ensuring task')
                     await self._ensure_agent_task()
-                assert self._controller is not None, 'Controller must be initialized after agent task setup'
+                assert self._controller is not None, (
+                    'Controller must be initialized after agent task setup'
+                )
                 _tui_logger.debug('_handle_input: calling _dispatch_to_agent()')
                 logger.info('[TUI] _handle_input: dispatching to agent')
                 await self._dispatch_to_agent(text)
@@ -894,7 +927,9 @@ class GrintaScreen(Screen):
                 self.query_one('#input-bar', InputBar).remove_class('processing')
                 if self._renderer:
                     self._renderer.drain_events()
-                actual_state = str(self._controller.get_agent_state()) if self._controller else ''
+                actual_state = (
+                    str(self._controller.get_agent_state()) if self._controller else ''
+                )
                 self._hud.update_agent_state(actual_state or 'Ready')
                 self._render_hud_bar()
                 self._render_hud_bar()
@@ -926,6 +961,7 @@ class GrintaScreen(Screen):
         )
         self.add_divider()
         from rich.text import Text
+
         help_text = Text.from_markup(
             f'  [{NAVY_TEXT_SECONDARY}]/help[/]      [{NAVY_TEXT_TERTIARY}]Show this help[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]/clear[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
@@ -960,11 +996,15 @@ class GrintaScreen(Screen):
                     self._bootstrap_sync_phase1, config
                 )
             except Exception as exc:
-                _tui_logger.debug(f'_bootstrap: EXCEPTION phase1 {type(exc).__name__}: {exc}')
+                _tui_logger.debug(
+                    f'_bootstrap: EXCEPTION phase1 {type(exc).__name__}: {exc}'
+                )
                 logger.exception('TUI _bootstrap: failed in phase1')
                 raise
 
-            _tui_logger.debug(f'_bootstrap: runtime created, type={type(runtime).__name__}')
+            _tui_logger.debug(
+                f'_bootstrap: runtime created, type={type(runtime).__name__}'
+            )
 
             connect_fn = getattr(runtime, 'connect', None)
             if callable(connect_fn):
@@ -983,11 +1023,15 @@ class GrintaScreen(Screen):
                     self._bootstrap_sync_phase2, agent, runtime, event_stream, config
                 )
             except Exception as exc:
-                _tui_logger.debug(f'_bootstrap: EXCEPTION phase2 {type(exc).__name__}: {exc}')
+                _tui_logger.debug(
+                    f'_bootstrap: EXCEPTION phase2 {type(exc).__name__}: {exc}'
+                )
                 logger.exception('TUI _bootstrap: failed in phase2')
                 raise
 
-            _tui_logger.debug(f'_bootstrap: controller created, state={controller.get_agent_state()}')
+            _tui_logger.debug(
+                f'_bootstrap: controller created, state={controller.get_agent_state()}'
+            )
             logger.info(
                 'TUI _bootstrap: controller created, initial state=%s (type=%s)',
                 controller.get_agent_state(),
@@ -1006,6 +1050,7 @@ class GrintaScreen(Screen):
 
             if self._renderer is None:
                 import sys
+
                 sys.stdin.isatty()
                 self._renderer = TUIRenderer(
                     console=self._rich_console,
@@ -1047,7 +1092,9 @@ class GrintaScreen(Screen):
         file_store = get_file_store(config)
         _tui_logger.debug('_bootstrap_sync_phase1: EventStream')
         event_stream = EventStream(sid='grinta-tui', file_store=file_store)
-        _tui_logger.debug('_bootstrap_sync_phase1: create_registry_and_conversation_stats')
+        _tui_logger.debug(
+            '_bootstrap_sync_phase1: create_registry_and_conversation_stats'
+        )
         llm_registry, _conv_stats, _app_cfg = create_registry_and_conversation_stats(
             config,
             sid=event_stream.sid,
@@ -1181,7 +1228,9 @@ class GrintaScreen(Screen):
             def _on_agent_done(t: asyncio.Task[Any]) -> None:
                 exc = t.exception()
                 if exc:
-                    _tui_logger.debug(f'_agent_task FAILED: {type(exc).__name__}: {exc}')
+                    _tui_logger.debug(
+                        f'_agent_task FAILED: {type(exc).__name__}: {exc}'
+                    )
                     logger.exception('TUI _agent_task failed')
                 else:
                     _tui_logger.debug('_agent_task completed OK')
@@ -1199,7 +1248,9 @@ class GrintaScreen(Screen):
     async def _dispatch_to_agent(self, text: str) -> None:
         _tui_logger.debug('_dispatch_to_agent: ENTER')
         if self._controller is None or self._event_stream is None:
-            _tui_logger.debug('_dispatch_to_agent: missing controller or event_stream, returning')
+            _tui_logger.debug(
+                '_dispatch_to_agent: missing controller or event_stream, returning'
+            )
             return
 
         try:
@@ -1249,7 +1300,9 @@ class GrintaScreen(Screen):
                 loop_count += 1
                 state = self._controller.get_agent_state()
                 if loop_count == 1 or loop_count % 20 == 0:
-                    _tui_logger.debug(f'_dispatch_to_agent: poll #{loop_count}, state={state}')
+                    _tui_logger.debug(
+                        f'_dispatch_to_agent: poll #{loop_count}, state={state}'
+                    )
                     logger.info(
                         '[TUI] _dispatch_to_agent: poll #%d, state=%s',
                         loop_count,
@@ -1262,7 +1315,9 @@ class GrintaScreen(Screen):
                     logger.info('[TUI] _dispatch_to_agent: reached end state %s', state)
                     break
                 if self._agent_task and self._agent_task.done():
-                    _tui_logger.debug(f'_dispatch_to_agent: agent task done, state={state}')
+                    _tui_logger.debug(
+                        f'_dispatch_to_agent: agent task done, state={state}'
+                    )
                     logger.info(
                         '[TUI] _dispatch_to_agent: agent task done, state=%s', state
                     )
@@ -1408,11 +1463,22 @@ class TUIRenderer:
 
         # Build actual MCP server list from config
         mcp_servers = None
-        if self._tui._config and getattr(self._tui._config, 'mcp', None) and getattr(self._tui._config.mcp, 'servers', None):
-            mcp_servers = [{'name': s.name, 'type': s.type} for s in self._tui._config.mcp.servers if s.name != 'app-mcp']
+        if (
+            self._tui._config
+            and getattr(self._tui._config, 'mcp', None)
+            and getattr(self._tui._config.mcp, 'servers', None)
+        ):
+            mcp_servers = [
+                {'name': s.name, 'type': s.type}
+                for s in self._tui._config.mcp.servers
+                if s.name != 'app-mcp'
+            ]
 
         if not mcp_servers and mcp_count:
-            mcp_servers = [{'name': f'MCP Server {i+1}', 'type': 'active'} for i in range(mcp_count)]
+            mcp_servers = [
+                {'name': f'MCP Server {i + 1}', 'type': 'active'}
+                for i in range(mcp_count)
+            ]
 
         current_state = (self._task_list, mcp_servers, skill_count)
         if current_state != self._last_sidebar_state:
@@ -1420,7 +1486,7 @@ class TUIRenderer:
                 task_list=self._task_list,
                 mcp_servers=mcp_servers,
                 skill_count=skill_count,
-                terminal_width=self._console.width
+                terminal_width=self._console.width,
             )
             if sidebar:
                 self._tui._get_sidebar().update(sidebar)
@@ -1429,6 +1495,7 @@ class TUIRenderer:
     def _write_lines(self, lines: list[Any]) -> None:
         from rich.console import Group
         from rich.text import Text
+
         items = []
         for line in lines:
             if isinstance(line, str):
@@ -1440,14 +1507,25 @@ class TUIRenderer:
     def _write_card(self, card: ActivityCard) -> None:
         """Write an activity card to the transcript."""
         # Cards that need visual containers (borders) in the TUI
-        _BORDERED_CATEGORIES = {'shell', 'terminal', 'files', 'mcp', 'browser', 'code', 'search', 'workers'}
+        _BORDERED_CATEGORIES = {
+            'shell',
+            'terminal',
+            'files',
+            'mcp',
+            'browser',
+            'code',
+            'search',
+            'workers',
+        }
 
         if card.badge_category in _BORDERED_CATEGORIES:
             # Build Rich Text lines from markup
             rich_lines: list[Text] = []
             for segment in card.to_rich_lines():
                 if isinstance(segment, str):
-                    rich_lines.append(Text.from_markup(segment) if segment.strip() else Text(''))
+                    rich_lines.append(
+                        Text.from_markup(segment) if segment.strip() else Text('')
+                    )
                 else:
                     rich_lines.append(segment)
 
@@ -1484,7 +1562,7 @@ class TUIRenderer:
 
     def drain_events(self) -> None:
         if not self._pending_events:
-            self._refresh_display() # Keep sidebar/HUD in sync
+            self._refresh_display()  # Keep sidebar/HUD in sync
             return
         with self._pending_lock:
             while self._pending_events:
@@ -1508,18 +1586,33 @@ class TUIRenderer:
         source = getattr(event, 'source', None)
 
         # Detect start of agent turn (first tool action after user input)
-        if not self._in_agent_turn and not isinstance(event, (MessageAction, StreamingChunkAction, AgentStateChangedObservation)):
+        if not self._in_agent_turn and not isinstance(
+            event, (MessageAction, StreamingChunkAction, AgentStateChangedObservation)
+        ):
             self._in_agent_turn = True
             self._turn_count += 1
             self._tools_in_turn = 0
             self._turn_start_time = time.monotonic()
 
-
         # Count tools in current turn
-        if self._in_agent_turn and isinstance(event, (FileReadAction, FileEditAction, FileWriteAction,
-            CmdRunAction, MCPAction, BrowserToolAction, BrowseInteractiveAction,
-            LspQueryAction, TerminalRunAction, TerminalInputAction, TerminalReadAction,
-            RecallAction, DelegateTaskAction)):
+        if self._in_agent_turn and isinstance(
+            event,
+            (
+                FileReadAction,
+                FileEditAction,
+                FileWriteAction,
+                CmdRunAction,
+                MCPAction,
+                BrowserToolAction,
+                BrowseInteractiveAction,
+                LspQueryAction,
+                TerminalRunAction,
+                TerminalInputAction,
+                TerminalReadAction,
+                RecallAction,
+                DelegateTaskAction,
+            ),
+        ):
             self._tools_in_turn += 1
 
         if isinstance(event, MessageAction):
@@ -1562,7 +1655,11 @@ class TUIRenderer:
                 line_range = f'L{start}:{end_str}'
             elif cmd == 'edit':
                 edit_mode = getattr(event, 'edit_mode', '')
-                if edit_mode == 'range' and start_line is not None and end_line is not None:
+                if (
+                    edit_mode == 'range'
+                    and start_line is not None
+                    and end_line is not None
+                ):
                     verb = 'Edited'
                     line_range = f'L{start_line}:L{end_line}'
                 else:
@@ -1579,7 +1676,9 @@ class TUIRenderer:
                 added_lines = file_text.count('\n') + 1 if file_text else 0
                 is_new_file = True
 
-            card = ActivityRenderer.file_edit(verb, path, line_range, added=added_lines, new_file=is_new_file)
+            card = ActivityRenderer.file_edit(
+                verb, path, line_range, added=added_lines, new_file=is_new_file
+            )
             self._write_card(card)
         elif isinstance(event, FileWriteAction):
             content = getattr(event, 'content', '') or ''
@@ -1591,6 +1690,7 @@ class TUIRenderer:
         elif isinstance(event, FileEditObservation):
             # Strip agent-facing indentation warnings from user-visible content
             from backend.cli.transcript import strip_indentation_warnings
+
             if hasattr(event, 'content') and event.content:
                 event.content = strip_indentation_warnings(event.content)
 
@@ -1599,7 +1699,13 @@ class TUIRenderer:
             removed = event.removed
             if diff:
                 diff_lines = diff.splitlines()
-                card = ActivityRenderer.file_edit('Edited', event.path, diff_lines=diff_lines, added=added, removed=removed)
+                card = ActivityRenderer.file_edit(
+                    'Edited',
+                    event.path,
+                    diff_lines=diff_lines,
+                    added=added,
+                    removed=removed,
+                )
                 self._write_card(card)
             else:
                 summary = f'Edited {event.path}'
@@ -1609,7 +1715,7 @@ class TUIRenderer:
                         delta_parts.append(f'+{added} lines')
                     if removed:
                         delta_parts.append(f'-{removed} lines')
-                    summary += f"  ({', '.join(delta_parts)})"
+                    summary += f'  ({", ".join(delta_parts)})'
                 self._tui._write_log(Text(f'  {summary}', style=NAVY_TEXT_DIM))
         elif isinstance(event, FileWriteObservation):
             pass
@@ -1630,7 +1736,9 @@ class TUIRenderer:
                 output = strip_tool_result_validation_annotations(output)
                 exit_code = getattr(event, 'exit_code', None)
                 cmd = getattr(event, 'command', '') or ''
-                card = ActivityRenderer.shell_command(cmd, output=output[:500], exit_code=exit_code)
+                card = ActivityRenderer.shell_command(
+                    cmd, output=output[:500], exit_code=exit_code
+                )
                 self._write_card(card)
         elif isinstance(event, ErrorObservation):
             self._tui.add_error(event.content or 'An unknown error occurred')
@@ -1727,7 +1835,11 @@ class TUIRenderer:
             card = ActivityRenderer.delegation('Result', result=content)
             self._write_card(card)
         elif isinstance(event, PlaybookFinishAction):
-            summary = getattr(event, 'final_thought', '') or getattr(event, 'thought', '') or ''
+            summary = (
+                getattr(event, 'final_thought', '')
+                or getattr(event, 'thought', '')
+                or ''
+            )
             if summary:
                 self._tui._write_log(Markdown(summary))
         elif isinstance(event, UserRejectObservation):
@@ -1740,7 +1852,9 @@ class TUIRenderer:
             self._write_card(card)
         elif isinstance(event, FileDownloadObservation):
             url = getattr(event, 'url', '') or ''
-            self._tui._write_log(Text(f'  [bold #91abec]Downloaded[/] {url}', style=NAVY_TEXT_PRIMARY))
+            self._tui._write_log(
+                Text(f'  [bold #91abec]Downloaded[/] {url}', style=NAVY_TEXT_PRIMARY)
+            )
         elif isinstance(event, TaskTrackingObservation):
             pass
         elif isinstance(event, StreamingChunkAction):
@@ -1805,9 +1919,13 @@ class TUIRenderer:
         result_lines = render_search_results(result_content, query=query)
 
         # Count matches
-        match_count = sum(1 for line in content.splitlines() if re.match(r'^.*:\d+:', line))
+        match_count = sum(
+            1 for line in content.splitlines() if re.match(r'^.*:\d+:', line)
+        )
 
-        card = ActivityRenderer.search_results(query or 'code search', match_count, result_lines)
+        card = ActivityRenderer.search_results(
+            query or 'code search', match_count, result_lines
+        )
         self._write_card(card)
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
@@ -1847,7 +1965,12 @@ class TUIRenderer:
         self._hud.update_agent_state(str(state))
 
         # End agent turn when reaching idle/terminal state
-        if self._in_agent_turn and state in (AgentState.AWAITING_USER_INPUT, AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED):
+        if self._in_agent_turn and state in (
+            AgentState.AWAITING_USER_INPUT,
+            AgentState.FINISHED,
+            AgentState.ERROR,
+            AgentState.STOPPED,
+        ):
             self._in_agent_turn = False
             if self._tools_in_turn > 0:
                 elapsed = time.monotonic() - self._turn_start_time
@@ -1861,7 +1984,12 @@ class TUIRenderer:
                 self._tui._write_log(Text('\n'))
 
         # Ensure thinking UI is cleared on any idle/terminal state
-        if state in (AgentState.AWAITING_USER_INPUT, AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED):
+        if state in (
+            AgentState.AWAITING_USER_INPUT,
+            AgentState.FINISHED,
+            AgentState.ERROR,
+            AgentState.STOPPED,
+        ):
             self._tui.finalize_thinking()
 
         self._state_event.set()

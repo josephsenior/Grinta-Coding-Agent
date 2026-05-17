@@ -275,7 +275,9 @@ class TestToolingCrossCutting:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_file_operation_with_invalid_path_returns_error(self, tmp_path) -> None:
+    async def test_file_operation_with_invalid_path_returns_error(
+        self, tmp_path
+    ) -> None:
         ex = RuntimeExecutor([], str(tmp_path), 'user', 1, enable_browser=False)
         action = FileReadAction(path='C:\\outside\\workspace\\file.py')
 

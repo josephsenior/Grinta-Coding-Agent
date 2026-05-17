@@ -37,8 +37,9 @@ def _create_sidebar_panel(title: str, content: Any, count: int | None = None) ->
         title_align='left',
         border_style='#1b233a',
         box=box.ROUNDED,
-        padding=(0, 1)
+        padding=(0, 1),
     )
+
 
 # Maximum rows to show in each scrollable panel
 SIDEBAR_MAX_ROWS = 30
@@ -75,9 +76,7 @@ def build_task_list_panel(
         if displayed_count >= SIDEBAR_MAX_ROWS:
             break
         try:
-            status = normalize_task_status(
-                item.get('status'), default=TASK_STATUS_TODO
-            )
+            status = normalize_task_status(item.get('status'), default=TASK_STATUS_TODO)
         except ValueError:
             status = TASK_STATUS_TODO
         desc = str(item.get('description') or '…')
@@ -215,6 +214,7 @@ def build_sidebar(
     sections.append(build_skills_panel(width=sidebar_width))
 
     from rich.console import Group
+
     return Group(*sections)
 
 

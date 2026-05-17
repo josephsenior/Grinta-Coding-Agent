@@ -105,7 +105,9 @@ class CircuitBreakerMiddleware(ToolInvocationMiddleware):
         tool_name = _tool_name_for_action(ctx.action)
 
         if isinstance(observation, ErrorObservation):
-            effective_tool = _effective_error_tool_name(tool_name, observation.content or '')
+            effective_tool = _effective_error_tool_name(
+                tool_name, observation.content or ''
+            )
             _set_fallback_hint(observation, tool_name)
             service.record_error(
                 RuntimeError(observation.content), tool_name=effective_tool
