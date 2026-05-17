@@ -172,7 +172,7 @@ def load_checkpoint_manifest(
 
 
 def _iter_workspace_files(workspace_root: Path):
-    for file_path in workspace_root.rglob('*'):
+    for file_path in sorted(workspace_root.rglob('*')):
         if not file_path.is_file() or file_path.is_symlink():
             continue
         rel_path = file_path.relative_to(workspace_root)

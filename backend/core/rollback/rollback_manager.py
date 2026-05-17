@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -167,8 +168,20 @@ class RollbackManager:
                 'checkpoints': [cp.to_dict() for cp in self.checkpoints],
                 'last_updated': time.time(),
             }
-            with open(manifest_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2)
+            fd, temp_name = tempfile.mkstemp(
+                prefix=f'.{manifest_file.name}.',
+                suffix='.tmp',
+                dir=str(manifest_file.parent),
+            )
+            os.close(fd)
+            temp_path = Path(temp_name)
+            try:
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2)
+                os.replace(temp_path, manifest_file)
+            finally:
+                if temp_path.exists():
+                    temp_path.unlink(missing_ok=True)
         except Exception as e:
             logger.error('Failed to save checkpoints manifest: %s', e)
 
