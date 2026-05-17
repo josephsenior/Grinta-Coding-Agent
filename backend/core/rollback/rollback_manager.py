@@ -18,6 +18,12 @@ from typing import Any
 
 from backend.core.logger import app_logger as logger
 from backend.core.workspace_resolution import workspace_agent_state_dir
+from backend.core.rollback.workspace_checkpoint import (
+    restore_checkpoint as restore_workspace_checkpoint,
+)
+from backend.core.rollback.workspace_checkpoint import (
+    save_checkpoint as save_workspace_checkpoint,
+)
 
 
 @dataclass
@@ -79,6 +85,7 @@ class RollbackManager:
         checkpoints_dir: str | None = None,
         max_checkpoints: int = 20,
         auto_cleanup: bool = True,
+        allow_destructive_git_rollback: bool | None = None,
     ) -> None:
         """Initialize rollback manager.
 
@@ -97,6 +104,11 @@ class RollbackManager:
         )
         self.max_checkpoints = max_checkpoints
         self.auto_cleanup = auto_cleanup
+        if allow_destructive_git_rollback is None:
+            allow_destructive_git_rollback = os.getenv(
+                'GRINTA_ENABLE_DESTRUCTIVE_GIT_ROLLBACK', ''
+            ).strip().lower() in {'1', 'true', 'yes', 'on'}
+        self.allow_destructive_git_rollback = allow_destructive_git_rollback
 
         # Create checkpoints directory
         self.checkpoints_dir.mkdir(parents=True, exist_ok=True)
@@ -226,28 +238,16 @@ class RollbackManager:
 
         """
         snapshot_dir = self.checkpoints_dir / checkpoint_id
-        snapshot_dir.mkdir(exist_ok=True)
-
-        file_snapshots = {}
-
         try:
-            # Copy workspace files to checkpoint directory
-            for file_path in self.workspace_path.rglob('*'):
-                if file_path.is_file():
-                    # Skip .grinta directory and .git
-                    if '.grinta' in file_path.parts or '.git' in file_path.parts:
-                        continue
-
-                    rel_path = file_path.relative_to(self.workspace_path)
-                    dest_path = snapshot_dir / rel_path
-                    dest_path.parent.mkdir(parents=True, exist_ok=True)
-
-                    shutil.copy2(file_path, dest_path)
-                    file_snapshots[str(rel_path)] = 'saved'
+            manifest = save_workspace_checkpoint(
+                self.workspace_path,
+                snapshot_dir,
+                label=checkpoint_id,
+            )
+            return {entry.path: 'saved' for entry in manifest.files}
         except Exception as e:
             logger.error('Failed to create file snapshot: %s', e)
-
-        return file_snapshots
+            return {}
 
     def create_checkpoint(
         self,
@@ -370,6 +370,13 @@ class RollbackManager:
         """
         if not (checkpoint.git_commit_sha and self.vcs_available):
             return False
+        if not self.allow_destructive_git_rollback:
+            logger.warning(
+                'Skipping git rollback for checkpoint %s because '
+                'allow_destructive_git_rollback is disabled',
+                checkpoint.id,
+            )
+            return False
 
         result = subprocess.run(
             ['git', 'reset', '--hard', checkpoint.git_commit_sha],
@@ -402,12 +409,18 @@ class RollbackManager:
             logger.error('Checkpoint snapshot directory not found: %s', snapshot_dir)
             return False
 
-        snapshot_files = self._snapshot_relative_files(snapshot_dir)
-        quarantine_dir = self._quarantine_workspace_extras(
-            checkpoint_id,
-            snapshot_files,
-        )
-        self._restore_snapshot(snapshot_dir)
+        try:
+            quarantine_dir = restore_workspace_checkpoint(
+                self.workspace_path,
+                snapshot_dir,
+                quarantine_dir=(
+                    self.checkpoints_dir
+                    / f'{checkpoint_id}_restore_quarantine_{int(time.time())}'
+                ),
+            )
+        except Exception as exc:
+            logger.error('File-based rollback failed while restoring snapshot: %s', exc)
+            return False
 
         if quarantine_dir is not None:
             logger.info(

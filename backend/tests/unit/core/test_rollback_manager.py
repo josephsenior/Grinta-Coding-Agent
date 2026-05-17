@@ -150,7 +150,8 @@ class TestRollbackManager:
         cp_id = rm.create_checkpoint('snapshot')
         snapshot_dir = rm.checkpoints_dir / cp_id
         assert snapshot_dir.exists()
-        assert (snapshot_dir / 'hello.py').exists()
+        assert (snapshot_dir / 'manifest.json').exists()
+        assert (snapshot_dir / 'files' / 'hello.py').exists()
 
     def test_file_based_rollback(self, workspace):
         rm = RollbackManager(str(workspace))
@@ -438,10 +439,15 @@ class TestRollbackManager:
         # Should keep all 5
         assert len(rm.checkpoints) == 5
 
-    def test_git_rollback_success(self, workspace, monkeypatch):
-        """Test successful git-based rollback."""
+    def test_git_rollback_disabled_by_default_falls_back_to_file(
+        self, workspace, monkeypatch
+    ):
+        """Git rollback stays disabled unless explicitly enabled."""
+        seen_reset = False
 
         def mock_subprocess_run(cmd, *args, **kwargs):
+            nonlocal seen_reset
+
             class Result:
                 returncode = 0
                 stdout = 'abc123\n'
@@ -452,6 +458,7 @@ class TestRollbackManager:
             if 'commit' in cmd:
                 return Result()
             if 'reset' in cmd and 'hard' in cmd:
+                seen_reset = True
                 return Result()
             if 'rev-parse' in cmd:
                 return Result()
@@ -461,8 +468,45 @@ class TestRollbackManager:
         rm = RollbackManager(str(workspace))
 
         cp_id = rm.create_checkpoint('before')
+        (workspace / 'hello.py').write_text("print('changed')")
         success = rm.rollback_to(cp_id)
         assert success is True
+        assert seen_reset is False
+        assert (workspace / 'hello.py').read_text() == "print('hello')"
+
+    def test_git_rollback_success_when_explicitly_enabled(self, workspace, monkeypatch):
+        """Test successful git-based rollback when explicitly enabled."""
+        seen_reset = False
+
+        def mock_subprocess_run(cmd, *args, **kwargs):
+            nonlocal seen_reset
+
+            class Result:
+                returncode = 0
+                stdout = 'abc123\n'
+                stderr = ''
+
+            if 'rev-parse' in cmd and '--git-dir' in cmd:
+                return Result()
+            if 'commit' in cmd:
+                return Result()
+            if 'reset' in cmd and 'hard' in cmd:
+                seen_reset = True
+                return Result()
+            if 'rev-parse' in cmd:
+                return Result()
+            return Result()
+
+        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
+        rm = RollbackManager(
+            str(workspace),
+            allow_destructive_git_rollback=True,
+        )
+
+        cp_id = rm.create_checkpoint('before')
+        success = rm.rollback_to(cp_id)
+        assert success is True
+        assert seen_reset is True
 
     def test_git_rollback_failure_fallback_to_file(self, workspace):
         """Test that file rollback is used when git rollback fails."""
