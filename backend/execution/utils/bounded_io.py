@@ -13,9 +13,11 @@ on either stream. The returned buffers are guaranteed to be at most
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
 import threading
 from dataclasses import dataclass
+from pathlib import Path
 
 # Default per-stream cap. 8 MiB is large enough for almost any real command
 # output and small enough to keep peak agent RSS bounded even under abuse.
@@ -200,6 +202,131 @@ def bounded_communicate(
         stdout=out_text,
         stderr=err_text,
         returncode=rc if rc is not None else process.returncode or 0,
+        truncated=truncated,
+        timed_out=timed_out,
+    )
+
+
+async def _read_async_stream_bounded(
+    stream: asyncio.StreamReader | None,
+    process: asyncio.subprocess.Process,
+    cap: int,
+) -> tuple[bytearray, bool]:
+    """Read an asyncio subprocess stream until EOF or cap; kill on overflow."""
+    buf = bytearray()
+    truncated = False
+    if stream is None:
+        return buf, truncated
+
+    while True:
+        chunk = await stream.read(64 * 1024)
+        if not chunk:
+            return buf, truncated
+        remaining = cap - len(buf)
+        if remaining <= 0:
+            truncated = True
+            break
+        buf.extend(chunk[:remaining])
+        if len(chunk) > remaining or len(buf) >= cap:
+            truncated = True
+            break
+
+    try:
+        process.kill()
+    except ProcessLookupError:
+        pass
+    return buf, truncated
+
+
+async def _write_async_stdin(
+    process: asyncio.subprocess.Process,
+    stdin_data: bytes | str | None,
+    encoding: str,
+) -> None:
+    if stdin_data is None or process.stdin is None:
+        return
+    data = stdin_data.encode(encoding) if isinstance(stdin_data, str) else stdin_data
+    try:
+        process.stdin.write(data)
+        await process.stdin.drain()
+    except (BrokenPipeError, ConnectionResetError, OSError):
+        return
+    finally:
+        try:
+            process.stdin.close()
+            await process.stdin.wait_closed()
+        except Exception:
+            pass
+
+
+async def async_bounded_subprocess_exec(
+    args: list[str],
+    *,
+    cwd: str | Path | None = None,
+    process_timeout: float | None = None,
+    max_bytes_per_stream: int = DEFAULT_MAX_BYTES_PER_STREAM,
+    encoding: str = 'utf-8',
+    stdin_data: bytes | str | None = None,
+) -> BoundedResult:
+    """Run a subprocess with asyncio and bounded stdout/stderr buffers."""
+    process = await asyncio.create_subprocess_exec(
+        *args,
+        stdin=asyncio.subprocess.PIPE if stdin_data is not None else None,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=str(cwd) if cwd is not None else None,
+    )
+    stdout_task = asyncio.create_task(
+        _read_async_stream_bounded(
+            process.stdout,
+            process,
+            max_bytes_per_stream,
+        )
+    )
+    stderr_task = asyncio.create_task(
+        _read_async_stream_bounded(
+            process.stderr,
+            process,
+            max_bytes_per_stream,
+        )
+    )
+    stdin_task = asyncio.create_task(_write_async_stdin(process, stdin_data, encoding))
+
+    timed_out = False
+    try:
+        returncode = await asyncio.wait_for(process.wait(), timeout=process_timeout)
+    except TimeoutError:
+        timed_out = True
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        returncode = await process.wait()
+
+    stdout_buf, stdout_truncated = await stdout_task
+    stderr_buf, stderr_truncated = await stderr_task
+    await stdin_task
+    # Give Proactor pipe transports on Windows a chance to finish close callbacks
+    # before callers using short-lived event loops tear the loop down.
+    transport = getattr(process, '_transport', None)
+    if transport is not None:
+        transport.close()
+    await asyncio.sleep(0.05)
+    truncated = stdout_truncated or stderr_truncated
+    return BoundedResult(
+        stdout=_decoded_bounded_stream_text(
+            stdout_buf,
+            cap=max_bytes_per_stream,
+            encoding=encoding,
+            truncated=stdout_truncated,
+        ),
+        stderr=_decoded_bounded_stream_text(
+            stderr_buf,
+            cap=max_bytes_per_stream,
+            encoding=encoding,
+            truncated=stderr_truncated,
+        ),
+        returncode=returncode if returncode is not None else process.returncode or 0,
         truncated=truncated,
         timed_out=timed_out,
     )

@@ -13,7 +13,9 @@ from backend.engine.tools.ignore_filter import (
     is_ignored_file,
     prune_ignored_dirs,
 )
+from backend.execution.utils.bounded_io import async_bounded_subprocess_exec
 from backend.ledger.action import AgentThinkAction
+from backend.utils.async_utils import call_async_from_sync
 
 _SEARCH_EXCLUDED_DIRS = (
     '.git',
@@ -309,15 +311,12 @@ def build_search_code_action(
 
 
 def _run_ripgrep_command(args: list[str]):
-    import subprocess
-
-    return subprocess.run(
+    return call_async_from_sync(
+        async_bounded_subprocess_exec,
+        35.0,
         args,
-        capture_output=True,
-        text=True,
-        encoding='utf-8',
-        errors='replace',
-        check=False,
+        process_timeout=30.0,
+        max_bytes_per_stream=2 * 1024 * 1024,
     )
 
 

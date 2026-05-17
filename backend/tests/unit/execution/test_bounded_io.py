@@ -12,6 +12,7 @@ from backend.execution.utils.bounded_io import (
     BoundedResult,
     _decoded_bounded_stream_text,
     _drain,
+    async_bounded_subprocess_exec,
     bounded_communicate,
 )
 
@@ -89,3 +90,35 @@ def test_bounded_communicate_supports_stdin() -> None:
 
 def test_default_cap_constant() -> None:
     assert DEFAULT_MAX_BYTES_PER_STREAM > 1024 * 1024
+
+
+@pytest.mark.asyncio
+async def test_async_bounded_subprocess_exec_supports_stdin() -> None:
+    result = await async_bounded_subprocess_exec(
+        [
+            sys.executable,
+            '-c',
+            'import sys; data = sys.stdin.read(); print(data.upper())',
+        ],
+        stdin_data='hello',
+        process_timeout=10.0,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout.strip() == 'HELLO'
+
+
+@pytest.mark.asyncio
+async def test_async_bounded_subprocess_exec_truncates_and_kills() -> None:
+    result = await async_bounded_subprocess_exec(
+        [
+            sys.executable,
+            '-c',
+            "import sys; sys.stdout.write('x' * 1000000); sys.stdout.flush()",
+        ],
+        process_timeout=10.0,
+        max_bytes_per_stream=1024,
+    )
+
+    assert result.truncated is True
+    assert 'OUTPUT TRUNCATED' in result.stdout
