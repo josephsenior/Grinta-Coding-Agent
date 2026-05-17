@@ -58,6 +58,7 @@ _TUI_HISTORY_RENDER_LIMIT = _bounded_int_env(
     minimum=200,
 )
 
+from backend import __version__ as GRINTA_VERSION
 from backend.cli._event_renderer.unified_renderer import (
     ActivityCard,
     ActivityRenderer,
@@ -449,7 +450,11 @@ class GrintaScreen(Screen):
                 workspace = workspace.replace(home, '~', 1)
         except Exception:
             pass
-        line1 = f'[#91abec bold]GRINTA[/]  |  [#bbc8e8 bold]Workspace: {workspace}[/]  |  [#8f9fc1]Version: 1.0 rc[/]'
+        line1 = (
+            f'[#91abec bold]GRINTA[/]  |  '
+            f'[#bbc8e8 bold]Workspace: {workspace}[/]  |  '
+            f'[#8f9fc1]Version: {GRINTA_VERSION}[/]'
+        )
 
         # Build second-line HUD
         line2_parts = []
@@ -991,10 +996,11 @@ class GrintaScreen(Screen):
         elif cmd in ('/quit', '/q', '/exit'):
             self._agent_running = False
             self.app.exit()
-        elif cmd == '/settings':
-            self.add_system_message('/settings opens settings TUI (coming soon)')
-        elif cmd == '/sessions':
-            self.add_system_message('/sessions opens sessions manager (coming soon)')
+        elif cmd in ('/settings', '/sessions'):
+            self.add_error(
+                f'{cmd} is not available in the full-screen TUI. '
+                'Exit with /quit and use the standard REPL or shell command.'
+            )
         else:
             self.add_error(f'Unknown command: {text}')
 
@@ -1009,8 +1015,6 @@ class GrintaScreen(Screen):
         help_text = Text.from_markup(
             f'  [{NAVY_TEXT_SECONDARY}]/help[/]      [{NAVY_TEXT_TERTIARY}]Show this help[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]/clear[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
-            f'  [{NAVY_TEXT_SECONDARY}]/settings[/]  [{NAVY_TEXT_TERTIARY}]Open settings[/]\n'
-            f'  [{NAVY_TEXT_SECONDARY}]/sessions[/]  [{NAVY_TEXT_TERTIARY}]Manage sessions[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]/quit[/]      [{NAVY_TEXT_TERTIARY}]Exit Grinta[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]Ctrl+C[/]     [{NAVY_TEXT_TERTIARY}]Stop agent[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]Tab[/]        [{NAVY_TEXT_TERTIARY}]Newline in input[/]'

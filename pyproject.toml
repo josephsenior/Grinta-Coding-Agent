@@ -6,14 +6,14 @@ requires = [
 
 [project]
 name = "grinta-ai"
-version = "1.0.0rc1"
+version = "1.0.0"
 description = "Grinta: Your AI-Powered Development Platform"
 readme = "README.md"
 license = "MIT"
 authors = [ { name = "Youssef Mejdi" } ]
 requires-python = ">=3.12,<3.14"
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",

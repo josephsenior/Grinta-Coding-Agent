@@ -16,7 +16,8 @@ warnings.filterwarnings(
 from importlib.metadata import PackageNotFoundError, version  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-__version__ = '1.0.0rc1'
+_DEFAULT_VERSION = '1.0.0'
+__version__ = _DEFAULT_VERSION
 __package_name__ = 'grinta-ai'
 
 
@@ -28,7 +29,7 @@ def get_version() -> str:
     from_pyproject = _version_from_pyproject()
     if from_pyproject:
         return from_pyproject
-    return '1.0.0rc1'
+    return _DEFAULT_VERSION
 
 
 def _version_from_metadata() -> str | None:
@@ -46,7 +47,7 @@ def _version_from_pyproject() -> str | None:
         pyproject_path = root_dir / 'pyproject.toml'
         if not pyproject_path.exists():
             return None
-        with open(pyproject_path, 'r', encoding='utf-8') as f:
+        with pyproject_path.open('r', encoding='utf-8') as f:
             for line in f:
                 if line.strip().startswith('version ='):
                     return line.split('=', 1)[1].strip().strip('"').strip("'")
@@ -59,10 +60,11 @@ try:
     __version__ = get_version()
 except Exception as _exc:
     warnings.warn(
-        f"Grinta: could not determine package version ({_exc!r}); reporting '1.0.0rc1'.",
+        f'Grinta: could not determine package version ({_exc!r}); reporting '
+        f'{_DEFAULT_VERSION!r}.',
         stacklevel=1,
     )
-__version__ = '1.0.0rc1'
+    __version__ = _DEFAULT_VERSION
 
 
 __all__ = ['__version__', '__package_name__', 'get_version']
