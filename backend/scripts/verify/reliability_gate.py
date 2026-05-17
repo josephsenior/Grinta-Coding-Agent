@@ -9,12 +9,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+
+_RUN_ID = f'{int(time.time() * 1000)}-{os.getpid()}'
 
 
 @dataclass
@@ -75,7 +79,7 @@ def _phase_commands(
 
 def _run_command(name: str, command: list[str], cwd: Path) -> GateCommandResult:
     start = time.perf_counter()
-    basetemp_root = cwd / '.pytest-reliability'
+    basetemp_root = cwd / '.pytest-reliability' / _RUN_ID
     basetemp_root.mkdir(parents=True, exist_ok=True)
     slug = re.sub(r'[^A-Za-z0-9_.-]+', '-', name).strip('-') or 'gate'
     basetemp = basetemp_root / slug
