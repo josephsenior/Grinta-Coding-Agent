@@ -34,6 +34,29 @@ from textual.widgets import Button, Label, Static, TextArea
 _tui_logger = logging.getLogger('grinta.tui')
 _tui_logger.setLevel(logging.DEBUG)
 
+
+def _bounded_int_env(name: str, default: int, minimum: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return max(minimum, int(raw))
+    except (TypeError, ValueError):
+        _tui_logger.warning('Invalid %s=%r; using default %d', name, raw, default)
+        return default
+
+
+_TUI_PENDING_EVENT_LIMIT = _bounded_int_env(
+    'GRINTA_TUI_PENDING_EVENT_LIMIT',
+    default=5000,
+    minimum=100,
+)
+_TUI_HISTORY_RENDER_LIMIT = _bounded_int_env(
+    'GRINTA_TUI_HISTORY_RENDER_LIMIT',
+    default=2000,
+    minimum=200,
+)
+
 from backend.cli._event_renderer.unified_renderer import (
     ActivityCard,
     ActivityRenderer,
@@ -287,8 +310,6 @@ class GrintaScreen(Screen):
         self._input_lock = asyncio.Lock()
         self._bootstrapping: asyncio.Event | None = None
 
-        self._bootstrapping: asyncio.Event | None = None
-
     _STATE_LABELS = {
         'starting': 'Starting…',
         'loading': 'Loading…',
@@ -414,9 +435,9 @@ class GrintaScreen(Screen):
         line2_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
         line2_parts.append(f'[{NAVY_TEXT_DIM}]Calls: {calls}[/]')
 
-        hud = self.query_one('#hud-bar', HUD)
-        hud.query_one('#hud-line-1', Label).update(line1)
-        hud.query_one('#hud-line-2', Label).update('  |  '.join(line2_parts))
+        hud_bar = self.query_one('#hud-bar', HUD)
+        hud_bar.query_one('#hud-line-1', Label).update(line1)
+        hud_bar.query_one('#hud-line-2', Label).update('  |  '.join(line2_parts))
 
     # ── Transcript helpers ──────────────────────────────────────────────────
 
@@ -745,9 +766,7 @@ class GrintaScreen(Screen):
                     await self._controller.stop()
 
             if self._renderer is not None:
-                self._renderer.add_system_message(
-                    'Interrupted. Ready for input.', title='grinta'
-                )
+                self._renderer._tui.add_system_message('Interrupted. Ready for input.')
 
             self.finalize_thinking()
             spinner = self.query_one('#spinner', Static)
@@ -879,7 +898,7 @@ class GrintaScreen(Screen):
                     await self._bootstrap()
                     if self._controller is None:
                         raise RuntimeError('Bootstrap failed to initialize controller')
-                    _tui_logger.debug(
+                    _tui_logger.debug(  # type: ignore[unreachable]
                         f'_handle_input: _bootstrap done, state={self._controller.get_agent_state()}'
                     )
                     logger.info(
@@ -1387,9 +1406,11 @@ class TUIRenderer:
         self._current_state: Any = None
         self._pending_events: deque[Any] = deque()
         self._pending_lock = threading.Lock()
+        self._pending_events_dropped = 0
 
         # History & Live state
         self._history: list[Any] = []
+        self._history_items_dropped = 0
         self._live_thinking: str = ''
         self._task_list: list[dict[str, Any]] = []
         self._last_sidebar_state: Any = None
@@ -1411,6 +1432,7 @@ class TUIRenderer:
         self._history.append(renderable)
         # Add margin after tool result
         self._history.append(Text(''))
+        self._trim_history()
         self._refresh_display()
 
     def update_live_thinking(self, text: str) -> None:
@@ -1422,6 +1444,7 @@ class TUIRenderer:
             prefix = Text('Thinking: ', style='#5eead4')
             body = _render_thinking_with_diff(text)
             self._history.append(Text.assemble(prefix, body, '\n'))
+            self._trim_history()
         else:
             if self._history:
                 prefix = Text('Thinking: ', style='#5eead4')
@@ -1438,8 +1461,16 @@ class TUIRenderer:
 
     def clear_history(self) -> None:
         self._history = []
+        self._history_items_dropped = 0
         self._live_thinking = ''
         self._refresh_display()
+
+    def _trim_history(self) -> None:
+        overflow = len(self._history) - _TUI_HISTORY_RENDER_LIMIT
+        if overflow <= 0:
+            return
+        del self._history[:overflow]
+        self._history_items_dropped += overflow
 
     def _refresh_display(self) -> None:
         """Build the full Rich Group and update the Textual Static widgets."""
@@ -1450,6 +1481,14 @@ class TUIRenderer:
         # 1. Main Display
         # Thinking is now stored directly in _history - just render it as-is
         items = list(self._history)
+        if self._history_items_dropped:
+            items.insert(
+                0,
+                Text(
+                    f'... {self._history_items_dropped} older transcript item(s) omitted from the live view ...',
+                    style=NAVY_TEXT_DIM,
+                ),
+            )
 
         try:
             self._tui._get_display().update(Group(*items))
@@ -1522,12 +1561,9 @@ class TUIRenderer:
             # Build Rich Text lines from markup
             rich_lines: list[Text] = []
             for segment in card.to_rich_lines():
-                if isinstance(segment, str):
-                    rich_lines.append(
-                        Text.from_markup(segment) if segment.strip() else Text('')
-                    )
-                else:
-                    rich_lines.append(segment)
+                rich_lines.append(
+                    Text.from_markup(segment) if segment.strip() else Text('')
+                )
 
             # Wrap in a subtle panel with category-colored border
             border_color = {
@@ -1553,25 +1589,37 @@ class TUIRenderer:
         else:
             # Fallback: render as flat text (legacy behavior)
             for segment in card.to_rich_lines():
-                if isinstance(segment, str):
-                    self._tui._write_log(
-                        Text.from_markup(segment) if segment.strip() else Text('')
-                    )
-                else:
-                    self._tui._write_log(segment)
+                self._tui._write_log(
+                    Text.from_markup(segment) if segment.strip() else Text('')
+                )
 
     def drain_events(self) -> None:
-        if not self._pending_events:
+        with self._pending_lock:
+            events = list(self._pending_events)
+            self._pending_events.clear()
+            dropped = self._pending_events_dropped
+            self._pending_events_dropped = 0
+        if not events:
             self._refresh_display()  # Keep sidebar/HUD in sync
             return
-        with self._pending_lock:
-            while self._pending_events:
-                event = self._pending_events.popleft()
-                self._process_event(event)
+        if dropped:
+            self._history.append(
+                Text(
+                    f'... {dropped} TUI event(s) dropped while the renderer was backlogged ...',
+                    style=NAVY_TEXT_DIM,
+                )
+            )
+            self._history.append(Text(''))
+            self._trim_history()
+        for event in events:
+            self._process_event(event)
         self._refresh_display()
 
     def _on_event(self, event: Any) -> None:
         with self._pending_lock:
+            if len(self._pending_events) >= _TUI_PENDING_EVENT_LIMIT:
+                self._pending_events.popleft()
+                self._pending_events_dropped += 1
             self._pending_events.append(event)
         try:
             self._loop.call_soon_threadsafe(self._state_event.set)

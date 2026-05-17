@@ -300,7 +300,9 @@ class WindowsPowershellSession(BaseShellSession):
             # idle-output–aware monitoring path (text-mode pipe).
             pending_bg_id = self._pending_bg_id
             if pending_bg_id is not None:
-                out, err, code = self._run_backgroundable(process, timeout, pending_bg_id)
+                out, err, code = self._run_backgroundable(
+                    process, timeout, pending_bg_id
+                )
                 if code != -2:
                     # Command completed normally — still do CWD tracking.
                     self._cancellation.unregister_process(process.pid)

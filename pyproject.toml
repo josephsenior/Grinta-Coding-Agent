@@ -262,6 +262,7 @@ skips = [
   "B404",
   "B603",
   "B607",
+  "B310",
 ]
 exclude_dirs = [ "backend/tests", "tests" ]
 

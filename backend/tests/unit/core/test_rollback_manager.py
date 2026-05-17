@@ -486,6 +486,22 @@ class TestRollbackManager:
         # File-based rollback should have restored original state
         assert not (workspace / 'new.txt').exists()
 
+    def test_file_based_rollback_quarantines_extra_files(self, workspace):
+        """File rollback moves non-checkpoint files aside instead of deleting them."""
+        rm = RollbackManager(str(workspace))
+        cp_id = rm.create_checkpoint('before extras', use_git=False)
+
+        extra = workspace / 'new.txt'
+        extra.write_text('new data', encoding='utf-8')
+
+        success = rm.rollback_to(cp_id)
+
+        assert success is True
+        assert not extra.exists()
+        quarantines = list(rm.checkpoints_dir.glob(f'{cp_id}_restore_quarantine_*'))
+        assert quarantines
+        assert (quarantines[0] / 'new.txt').read_text(encoding='utf-8') == 'new data'
+
     def test_git_rollback_without_sha(self, workspace, monkeypatch):
         """Test git rollback when commit sha is None."""
 
