@@ -481,6 +481,7 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=False)
         self.ctrl._sync_budget_flag_with_metrics = MagicMock()
         self.ctrl.services.action_execution.get_next_action = AsyncMock()
+        self.ctrl.iteration_guard.run_control_flags = AsyncMock()
 
         await self.ctrl._step()
 
@@ -1408,38 +1409,47 @@ class TestStepDispatch(unittest.TestCase):
         self.ctrl = _make_controller()
 
     def test_step_uses_call_soon_threadsafe_when_main_loop_running(self):
-        """step() should use call_soon_threadsafe when _main_loop is set and running."""
+        """step() should use call_soon_threadsafe when main loop is running."""
         mock_loop = MagicMock()
         mock_loop.is_running.return_value = True
-        self.ctrl._main_loop = mock_loop
         self.ctrl._step_task = None
 
-        self.ctrl.step()
+        with patch(
+            'backend.orchestration.session_orchestrator.get_main_event_loop',
+            return_value=mock_loop,
+        ):
+            self.ctrl.step()
 
         mock_loop.call_soon_threadsafe.assert_called_once_with(
             self.ctrl._create_step_task
         )
 
     def test_step_falls_back_to_direct_call_when_no_main_loop(self):
-        """step() should call _create_step_task directly when _main_loop is None."""
-        self.ctrl._main_loop = None
+        """step() should call _create_step_task directly when no main loop."""
         self.ctrl._step_task = None
 
-        with patch.object(self.ctrl, '_create_step_task') as mock_create:
-            self.ctrl.step()
-            mock_create.assert_called_once()
+        with patch(
+            'backend.orchestration.session_orchestrator.get_main_event_loop',
+            return_value=None,
+        ):
+            with patch.object(self.ctrl, '_create_step_task') as mock_create:
+                self.ctrl.step()
+                mock_create.assert_called_once()
 
     def test_step_falls_back_when_main_loop_not_running(self):
-        """step() should call _create_step_task directly when _main_loop is stopped."""
+        """step() should call _create_step_task directly when main loop is stopped."""
         mock_loop = MagicMock()
         mock_loop.is_running.return_value = False
-        self.ctrl._main_loop = mock_loop
         self.ctrl._step_task = None
 
-        with patch.object(self.ctrl, '_create_step_task') as mock_create:
-            self.ctrl.step()
-            mock_create.assert_called_once()
-        mock_loop.call_soon_threadsafe.assert_not_called()
+        with patch(
+            'backend.orchestration.session_orchestrator.get_main_event_loop',
+            return_value=mock_loop,
+        ):
+            with patch.object(self.ctrl, '_create_step_task') as mock_create:
+                self.ctrl.step()
+                mock_create.assert_called_once()
+            mock_loop.call_soon_threadsafe.assert_not_called()
 
     def test_step_sets_pending_when_task_already_running(self):
         """step() should set _step_pending when a step task is in-flight."""
@@ -1459,9 +1469,12 @@ class TestStepDispatch(unittest.TestCase):
         self.ctrl._step_task = mock_task
         mock_loop = MagicMock()
         mock_loop.is_running.return_value = True
-        self.ctrl._main_loop = mock_loop
 
-        self.ctrl.step()
+        with patch(
+            'backend.orchestration.session_orchestrator.get_main_event_loop',
+            return_value=mock_loop,
+        ):
+            self.ctrl.step()
 
         self.assertFalse(self.ctrl._step_pending)
         mock_loop.call_soon_threadsafe.assert_called_once()
@@ -1472,12 +1485,15 @@ class TestStepDispatch(unittest.TestCase):
 
         mock_loop = MagicMock()
         mock_loop.is_running.return_value = True
-        self.ctrl._main_loop = mock_loop
         self.ctrl._step_task = None
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(self.ctrl.step)
-            future.result(timeout=5)
+        with patch(
+            'backend.orchestration.session_orchestrator.get_main_event_loop',
+            return_value=mock_loop,
+        ):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(self.ctrl.step)
+                future.result(timeout=5)
 
         mock_loop.call_soon_threadsafe.assert_called_once_with(
             self.ctrl._create_step_task

@@ -1110,6 +1110,70 @@ class FileEditor(FileEditorEditOpsMixin):
 
         return ''.join(result_lines)
 
+    def _backup_file(self, file_path: Path, content: str | None) -> None:
+        """Backup file content for transaction rollback.
+
+        Args:
+            file_path: Path to file being modified
+            content: Current content (None if file doesn't exist)
+        """
+        if self._transaction_stack:
+            file_str = str(file_path)
+            # Only backup once per transaction
+            if file_str not in self._transaction_stack[-1]:
+                self._transaction_stack[-1][file_str] = content
+
+    @contextmanager
+    def transaction(self):
+        """Context manager for atomic multi-file operations.
+
+        All file operations within this context are atomic - if any operation
+        fails, all changes are automatically rolled back.
+
+        Example:
+            >>> editor = FileEditor()
+            >>> with editor.transaction():
+            ...     editor(command="write", path="file1.txt", new_str="content1")
+            ...     editor(command="write", path="file2.txt", new_str="content2")
+            ...     # If any operation fails, both files are restored
+        """
+        # Create new backup layer
+        backup: dict[str, str | None] = {}
+        self._transaction_stack.append(backup)
+
+        try:
+            yield self
+            # All operations succeeded, commit (just remove backup layer)
+            self._transaction_stack.pop()
+        except Exception:
+            # Rollback all changes in this transaction
+            self._rollback_transaction(backup)
+            self._transaction_stack.pop()
+            raise
+
+    def _rollback_transaction(self, backup: dict[str, str | None]) -> None:
+        """Rollback all file changes in a transaction.
+
+        Args:
+            backup: Dictionary mapping file paths to their original content
+        """
+        for file_path_str, original_content in backup.items():
+            file_path = Path(file_path_str)
+            try:
+                if original_content is None:
+                    # File was created, delete it
+                    if file_path.exists():
+                        file_path.unlink()
+                else:
+                    # Restore original content
+                    self._write_file(file_path, original_content)
+            except Exception as e:
+                # Log but continue rollback for other files
+                from backend.core.logger import app_logger as logger
+
+                logger.warning('Failed to rollback %s: %s', file_path, e)
+
+
 def _detect_indentation_mismatch(
     original_lines: list[str],
     new_lines: list[str],
@@ -1207,66 +1271,3 @@ def _check_block_indent_after_colon(
             f'[SUGGESTED FIX] Did you mean to indent with {suggested_indent} spaces? '
             f'Try: "{" " * suggested_indent}{line.strip()}"'
         )
-
-    def _backup_file(self, file_path: Path, content: str | None) -> None:
-        """Backup file content for transaction rollback.
-
-        Args:
-            file_path: Path to file being modified
-            content: Current content (None if file doesn't exist)
-        """
-        if self._transaction_stack:
-            file_str = str(file_path)
-            # Only backup once per transaction
-            if file_str not in self._transaction_stack[-1]:
-                self._transaction_stack[-1][file_str] = content
-
-    @contextmanager
-    def transaction(self):
-        """Context manager for atomic multi-file operations.
-
-        All file operations within this context are atomic - if any operation
-        fails, all changes are automatically rolled back.
-
-        Example:
-            >>> editor = FileEditor()
-            >>> with editor.transaction():
-            ...     editor(command="write", path="file1.txt", new_str="content1")
-            ...     editor(command="write", path="file2.txt", new_str="content2")
-            ...     # If any operation fails, both files are restored
-        """
-        # Create new backup layer
-        backup: dict[str, str | None] = {}
-        self._transaction_stack.append(backup)
-
-        try:
-            yield self
-            # All operations succeeded, commit (just remove backup layer)
-            self._transaction_stack.pop()
-        except Exception:
-            # Rollback all changes in this transaction
-            self._rollback_transaction(backup)
-            self._transaction_stack.pop()
-            raise
-
-    def _rollback_transaction(self, backup: dict[str, str | None]) -> None:
-        """Rollback all file changes in a transaction.
-
-        Args:
-            backup: Dictionary mapping file paths to their original content
-        """
-        for file_path_str, original_content in backup.items():
-            file_path = Path(file_path_str)
-            try:
-                if original_content is None:
-                    # File was created, delete it
-                    if file_path.exists():
-                        file_path.unlink()
-                else:
-                    # Restore original content
-                    self._write_file(file_path, original_content)
-            except Exception as e:
-                # Log but continue rollback for other files
-                from backend.core.logger import app_logger as logger
-
-                logger.warning('Failed to rollback %s: %s', file_path, e)
