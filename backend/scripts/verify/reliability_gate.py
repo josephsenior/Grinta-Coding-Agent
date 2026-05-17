@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -74,11 +75,18 @@ def _phase_commands(
 
 def _run_command(name: str, command: list[str], cwd: Path) -> GateCommandResult:
     start = time.perf_counter()
-    completed = subprocess.run(command, cwd=str(cwd), check=False)
+    basetemp_root = cwd / '.pytest-reliability'
+    basetemp_root.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r'[^A-Za-z0-9_.-]+', '-', name).strip('-') or 'gate'
+    basetemp = basetemp_root / slug
+    full_command = list(command)
+    if '-m' in full_command and 'pytest' in full_command:
+        full_command.extend(['--basetemp', str(basetemp)])
+    completed = subprocess.run(full_command, cwd=str(cwd), check=False)
     duration = time.perf_counter() - start
     return GateCommandResult(
         name=name,
-        command=command,
+        command=full_command,
         return_code=completed.returncode,
         duration_seconds=round(duration, 3),
     )
