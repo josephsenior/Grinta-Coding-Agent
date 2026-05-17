@@ -33,6 +33,17 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def _basetemp_root(cwd: Path) -> Path:
+    override = os.getenv('GRINTA_RELIABILITY_BASETEMP_ROOT')
+    if override:
+        return Path(override)
+    if os.name == 'nt':
+        candidate = Path('C:/tmp')
+        if candidate.exists():
+            return candidate / 'grinta-pytest'
+    return cwd / '.pytest-reliability'
+
+
 def _phase_commands(
     phase: str, include_integration: bool
 ) -> list[tuple[str, list[str]]]:
@@ -79,7 +90,7 @@ def _phase_commands(
 
 def _run_command(name: str, command: list[str], cwd: Path) -> GateCommandResult:
     start = time.perf_counter()
-    basetemp_root = cwd / '.pytest-reliability' / _RUN_ID
+    basetemp_root = _basetemp_root(cwd) / _RUN_ID
     basetemp_root.mkdir(parents=True, exist_ok=True)
     slug = re.sub(r'[^A-Za-z0-9_.-]+', '-', name).strip('-') or 'gate'
     basetemp = basetemp_root / slug
