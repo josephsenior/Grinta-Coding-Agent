@@ -9,6 +9,7 @@ from __future__ import annotations
 import difflib
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from backend.core.file_history import global_undo_manager
@@ -23,76 +24,96 @@ from backend.engine.tools.whitespace_handler import WhitespaceHandler
 from backend.utils.treesitter_editor import EditResult, SymbolLocation, TreeSitterEditor
 
 
+def _find_changed_ranges(
+    old_lines: list[str],
+    new_lines: list[str],
+) -> list[tuple[int, int]]:
+    """Find ranges of changed lines in the new content."""
+    matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
+    changed: list[tuple[int, int]] = []
+
+    for tag, _, _, j1, j2 in matcher.get_opcodes():
+        if tag != 'equal' and j2 > j1:
+            changed.append((j1, j2))
+
+    return changed
+
+
+def _merge_ranges_with_context(
+    changed_ranges: list[tuple[int, int]],
+    total_lines: int,
+    context_lines: int,
+) -> list[tuple[int, int]]:
+    """Merge overlapping changed ranges and add context padding."""
+    merged: list[tuple[int, int]] = []
+
+    for start, end in changed_ranges:
+        ctx_start = max(0, start - context_lines)
+        ctx_end = min(total_lines, end + context_lines)
+
+        if merged and ctx_start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], ctx_end))
+        else:
+            merged.append((ctx_start, ctx_end))
+
+    return merged
+
+
+def _format_range_lines(
+    new_lines: list[str],
+    changed_ranges: list[tuple[int, int]],
+    ctx_start: int,
+    ctx_end: int,
+    total_lines: int,
+) -> list[str]:
+    """Format lines for a single context range with line numbers and markers."""
+    output: list[str] = []
+
+    header = (
+        f'Updated file view (lines {ctx_start + 1}-{ctx_end} of {total_lines}):'
+        if ctx_start > 0 or ctx_end < total_lines
+        else f'Updated file view ({total_lines} lines):'
+    )
+    output.append(header)
+
+    for i in range(ctx_start, ctx_end):
+        line_num = i + 1
+        is_changed = any(start <= i < end for start, end in changed_ranges)
+        marker = '>>> ' if is_changed else '    '
+        line_content = new_lines[i] if i < len(new_lines) else ''
+        output.append(f'{marker}{line_num}\t{line_content}')
+
+    return output
+
+
 def _format_context_window(
     old_content: str,
     new_content: str,
     context_lines: int = 5,
 ) -> str:
-    """Generate a context window showing the edited region with line numbers.
-
-    Uses difflib to find changed lines, then shows a window of context_lines
-    before and after each change region. Edited lines are marked with '>>> '.
-
-    Args:
-        old_content: Original file content.
-        new_content: Updated file content.
-        context_lines: Number of context lines before/after changes.
-
-    Returns:
-        Formatted string with line numbers and context window.
-    """
+    """Generate a context window showing the edited region with line numbers."""
     old_lines = old_content.splitlines() if old_content else []
     new_lines = new_content.splitlines() if new_content else []
 
-    # Find changed line ranges using difflib
-    matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
-    changed_ranges: list[tuple[int, int]] = []
-
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag != 'equal':
-            # Track the range in the NEW content (j1, j2)
-            if j2 > j1:
-                changed_ranges.append((j1, j2))
-
+    changed_ranges = _find_changed_ranges(old_lines, new_lines)
     if not changed_ranges:
         return ''
 
-    # Merge overlapping ranges and add context
-    merged_ranges: list[tuple[int, int]] = []
-    for start, end in changed_ranges:
-        ctx_start = max(0, start - context_lines)
-        ctx_end = min(len(new_lines), end + context_lines)
-        if merged_ranges and ctx_start <= merged_ranges[-1][1]:
-            # Merge with previous range
-            merged_ranges[-1] = (merged_ranges[-1][0], max(merged_ranges[-1][1], ctx_end))
-        else:
-            merged_ranges.append((ctx_start, ctx_end))
+    merged_ranges = _merge_ranges_with_context(
+        changed_ranges, len(new_lines), context_lines
+    )
 
-    # Format output
+    output_parts: list[str] = []
     total_lines = len(new_lines)
-    output_lines: list[str] = []
 
-    for range_idx, (ctx_start, ctx_end) in enumerate(merged_ranges):
-        if range_idx > 0:
-            output_lines.append('...')
+    for idx, (ctx_start, ctx_end) in enumerate(merged_ranges):
+        if idx > 0:
+            output_parts.append('...')
+        output_parts.extend(
+            _format_range_lines(new_lines, changed_ranges, ctx_start, ctx_end, total_lines)
+        )
 
-        # Show context header
-        if ctx_start > 0 or ctx_end < total_lines:
-            header = f'Updated file view (lines {ctx_start + 1}-{ctx_end} of {total_lines}):'
-        else:
-            header = f'Updated file view ({total_lines} lines):'
-        output_lines.append(header)
-
-        # Format each line with number and marker
-        for i in range(ctx_start, ctx_end):
-            line_num = i + 1
-            # Check if this line is in a changed region
-            is_changed = any(start <= i < end for start, end in changed_ranges)
-            marker = '>>> ' if is_changed else '    '
-            line_content = new_lines[i] if i < len(new_lines) else ''
-            output_lines.append(f'{marker}{line_num}\t{line_content}')
-
-    return '\n'.join(output_lines)
+    return '\n'.join(output_parts)
 
 
 @dataclass

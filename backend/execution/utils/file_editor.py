@@ -32,6 +32,71 @@ class ToolResult:
     new_content: str | None = None
 
 
+def _find_changed_ranges(
+    old_lines: list[str],
+    new_lines: list[str],
+) -> list[tuple[int, int]]:
+    """Find ranges of changed lines in the new content.
+
+    Returns list of (start, end) tuples for changed regions.
+    """
+    matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
+    changed: list[tuple[int, int]] = []
+
+    for tag, _, _, j1, j2 in matcher.get_opcodes():
+        if tag != 'equal' and j2 > j1:
+            changed.append((j1, j2))
+
+    return changed
+
+
+def _merge_ranges_with_context(
+    changed_ranges: list[tuple[int, int]],
+    total_lines: int,
+    context_lines: int,
+) -> list[tuple[int, int]]:
+    """Merge overlapping changed ranges and add context padding."""
+    merged: list[tuple[int, int]] = []
+
+    for start, end in changed_ranges:
+        ctx_start = max(0, start - context_lines)
+        ctx_end = min(total_lines, end + context_lines)
+
+        if merged and ctx_start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], ctx_end))
+        else:
+            merged.append((ctx_start, ctx_end))
+
+    return merged
+
+
+def _format_range_lines(
+    new_lines: list[str],
+    changed_ranges: list[tuple[int, int]],
+    ctx_start: int,
+    ctx_end: int,
+    total_lines: int,
+) -> list[str]:
+    """Format lines for a single context range with line numbers and markers."""
+    output: list[str] = []
+
+    header = (
+        f'Updated file view (lines {ctx_start + 1}-{ctx_end} of {total_lines}):'
+        if ctx_start > 0 or ctx_end < total_lines
+        else f'Updated file view ({total_lines} lines):'
+    )
+    output.append(header)
+
+    for i in range(ctx_start, ctx_end):
+        line_num = i + 1
+        is_changed = any(start <= i < end for start, end in changed_ranges)
+        marker = '>>> ' if is_changed else '    '
+        line_content = new_lines[i] if i < len(new_lines) else ''
+        output.append(f'{marker}{line_num}\t{line_content}')
+
+    return output
+
+
 def _format_context_window(
     old_content: str,
     new_content: str,
@@ -53,55 +118,25 @@ def _format_context_window(
     old_lines = old_content.splitlines() if old_content else []
     new_lines = new_content.splitlines() if new_content else []
 
-    # Find changed line ranges using difflib
-    matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
-    changed_ranges: list[tuple[int, int]] = []
-
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag != 'equal':
-            # Track the range in the NEW content (j1, j2)
-            if j2 > j1:
-                changed_ranges.append((j1, j2))
-
+    changed_ranges = _find_changed_ranges(old_lines, new_lines)
     if not changed_ranges:
         return ''
 
-    # Merge overlapping ranges and add context
-    merged_ranges: list[tuple[int, int]] = []
-    for start, end in changed_ranges:
-        ctx_start = max(0, start - context_lines)
-        ctx_end = min(len(new_lines), end + context_lines)
-        if merged_ranges and ctx_start <= merged_ranges[-1][1]:
-            # Merge with previous range
-            merged_ranges[-1] = (merged_ranges[-1][0], max(merged_ranges[-1][1], ctx_end))
-        else:
-            merged_ranges.append((ctx_start, ctx_end))
+    merged_ranges = _merge_ranges_with_context(
+        changed_ranges, len(new_lines), context_lines
+    )
 
-    # Format output
+    output_parts: list[str] = []
     total_lines = len(new_lines)
-    output_lines: list[str] = []
 
-    for range_idx, (ctx_start, ctx_end) in enumerate(merged_ranges):
-        if range_idx > 0:
-            output_lines.append('...')
+    for idx, (ctx_start, ctx_end) in enumerate(merged_ranges):
+        if idx > 0:
+            output_parts.append('...')
+        output_parts.extend(
+            _format_range_lines(new_lines, changed_ranges, ctx_start, ctx_end, total_lines)
+        )
 
-        # Show context header
-        if ctx_start > 0 or ctx_end < total_lines:
-            header = f'Updated file view (lines {ctx_start + 1}-{ctx_end} of {total_lines}):'
-        else:
-            header = f'Updated file view ({total_lines} lines):'
-        output_lines.append(header)
-
-        # Format each line with number and marker
-        for i in range(ctx_start, ctx_end):
-            line_num = i + 1
-            # Check if this line is in a changed region
-            is_changed = any(start <= i < end for start, end in changed_ranges)
-            marker = '>>> ' if is_changed else '    '
-            line_content = new_lines[i] if i < len(new_lines) else ''
-            output_lines.append(f'{marker}{line_num}\t{line_content}')
-
-    return '\n'.join(output_lines)
+    return '\n'.join(output_parts)
 
 
 @dataclass(frozen=True)
@@ -584,27 +619,17 @@ class FileEditor(FileEditorEditOpsMixin):
     ) -> ToolResult:
         """Handle edit command - modify file content."""
         try:
-            # Read existing content
             old_content = self._read_file(file_path) if file_path.exists() else None
             old_content_str = old_content or ''
 
-            if expected_file_hash and file_path.exists():
-                digest = self._sha256_text(old_content_str)
-                if digest != expected_file_hash:
-                    return ToolResult(
-                        output='',
-                        error=(
-                            'File hash guard failed: expected_file_hash does not match '
-                            'current file contents (re-read the file and refresh the hash).'
-                        ),
-                        old_content=old_content,
-                        new_content=old_content,
-                    )
+            hash_error = self._check_file_hash_guard(
+                file_path, old_content_str, expected_file_hash
+            )
+            if hash_error:
+                return hash_error
 
-            # Extract params
             file_text_val, new_str_val = self._extract_edit_params(file_text, new_str)
 
-            # Apply edit logic
             new_content = self._apply_edit_logic(
                 old_content_str,
                 file_text_val,
@@ -630,25 +655,9 @@ class FileEditor(FileEditorEditOpsMixin):
                 new_content.old_content = old_content
                 return new_content
 
-            if dry_run:
-                output = 'Preview generated (no changes applied)'
-                if self._last_indent_warnings:
-                    output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(self._last_indent_warnings)
-                return ToolResult(
-                    output=output,
-                    old_content=old_content,
-                    new_content=new_content,
-                )
-
-            if old_content == new_content:
-                return ToolResult(
-                    output='No changes applied (content unchanged).',
-                    old_content=old_content,
-                    new_content=new_content,
-                )
-
-            # Write results
-            return self._write_edit_result(file_path, old_content, new_content)
+            return self._finalize_edit_result(
+                file_path, old_content, new_content, dry_run
+            )
 
         except Exception as e:
             return ToolResult(
@@ -657,6 +666,65 @@ class FileEditor(FileEditorEditOpsMixin):
                 old_content=None,
                 new_content=None,
             )
+
+    def _check_file_hash_guard(
+        self,
+        file_path: Path,
+        old_content_str: str,
+        expected_file_hash: str | None,
+    ) -> ToolResult | None:
+        """Check if file hash matches expected value. Returns error result if mismatch."""
+        if not expected_file_hash or not file_path.exists():
+            return None
+
+        digest = self._sha256_text(old_content_str)
+        if digest == expected_file_hash:
+            return None
+
+        return ToolResult(
+            output='',
+            error=(
+                'File hash guard failed: expected_file_hash does not match '
+                'current file contents (re-read the file and refresh the hash).'
+            ),
+            old_content=None,
+            new_content=None,
+        )
+
+    def _finalize_edit_result(
+        self,
+        file_path: Path,
+        old_content: str | None,
+        new_content: str,
+        dry_run: bool,
+    ) -> ToolResult:
+        """Finalize edit result with dry-run, no-change, or write handling."""
+        if dry_run:
+            return self._build_dry_run_result(old_content, new_content)
+
+        if old_content == new_content:
+            return ToolResult(
+                output='No changes applied (content unchanged).',
+                old_content=old_content,
+                new_content=new_content,
+            )
+
+        return self._write_edit_result(file_path, old_content, new_content)
+
+    def _build_dry_run_result(
+        self,
+        old_content: str | None,
+        new_content: str,
+    ) -> ToolResult:
+        """Build result for dry-run preview."""
+        output = 'Preview generated (no changes applied)'
+        if self._last_indent_warnings:
+            output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(self._last_indent_warnings)
+        return ToolResult(
+            output=output,
+            old_content=old_content,
+            new_content=new_content,
+        )
 
     def _write_edit_result(
         self, file_path: Path, old_content: str | None, new_content: str
@@ -1029,86 +1097,109 @@ class FileEditor(FileEditorEditOpsMixin):
         result_lines = lines[:start_idx] + new_lines_to_insert + lines[end_idx:]
 
         # Detect indentation mismatches and store warnings
-        self._last_indent_warnings = self._detect_indentation_mismatch(
-            lines, new_lines_to_insert, start_idx, end_idx
+        self._last_indent_warnings = _detect_indentation_mismatch(
+            lines, new_lines_to_insert, start_idx
         )
 
         return ''.join(result_lines)
 
-    def _detect_indentation_mismatch(
-        self,
-        original_lines: list[str],
-        new_lines: list[str],
-        start_idx: int,
-        end_idx: int,
-    ) -> list[str]:
-        """Detect indentation mismatches and generate structured warnings.
+def _detect_indentation_mismatch(
+    original_lines: list[str],
+    new_lines: list[str],
+    start_idx: int,
+) -> list[str]:
+    """Detect indentation mismatches and generate structured warnings.
 
-        Returns a list of warning messages describing:
-        1. The mismatch (expected vs actual indentation)
-        2. The resulting broken line
-        3. A suggested fix
-        """
-        warnings = []
+    Returns a list of warning messages describing:
+    1. The mismatch (expected vs actual indentation)
+    2. The resulting broken line
+    3. A suggested fix
+    """
+    warnings: list[str] = []
 
-        if not original_lines or not new_lines:
-            return warnings
-
-        # Get the indentation of the first line being replaced
-        if start_idx >= len(original_lines):
-            return warnings
-
-        first_original_line = original_lines[start_idx]
-        original_indent = len(first_original_line) - len(first_original_line.lstrip())
-
-        # Check new content's first line indentation
-        if new_lines:
-            first_new_line = new_lines[0]
-            new_indent = len(first_new_line) - len(first_new_line.lstrip())
-
-            # Detect significant indentation changes on first line
-            if new_indent != original_indent:
-                line_num = start_idx + 1
-                stripped_content = first_new_line.strip()
-
-                # Only warn if there's a meaningful mismatch (not just whitespace-only lines)
-                if stripped_content:
-                    warnings.append(
-                        f'[INDENTATION MISMATCH] Line {line_num}: '
-                        f'First line has {new_indent} spaces, but target block indent starts at {original_indent} spaces.'
-                    )
-                    warnings.append(
-                        f'[BROKEN LINE] Line {line_num} would be: "{first_new_line.rstrip()}"'
-                    )
-                    warnings.append(
-                        f'[SUGGESTED FIX] Did you mean to indent with {original_indent} spaces? '
-                        f'Try: "{" " * original_indent}{stripped_content}"'
-                    )
-
-        # Check for lines that should be indented after ":" but aren't
-        for i, line in enumerate(new_lines):
-            if i > 0 and line.strip() and not line.strip().startswith('#'):
-                line_indent = len(line) - len(line.lstrip())
-                prev_line = new_lines[i-1] if i > 0 else ''
-
-                # Check if previous line ends with ":" (suggests block start)
-                if prev_line.rstrip().endswith(':') and line_indent == 0:
-                    line_num = start_idx + 1 + i
-                    warnings.append(
-                        f'[INDENTATION ERROR] Line {line_num}: '
-                        f'Expected indentation after ":" on line {line_num - 1}, but found 0 spaces.'
-                    )
-                    warnings.append(
-                        f'[BROKEN LINE] Line {line_num} would be: "{line.rstrip()}"'
-                    )
-                    # Suggest 4-space indent (standard Python)
-                    suggested_indent = 4
-                    warnings.append(
-                        f'[SUGGESTED FIX] Did you mean to indent with {suggested_indent} spaces? '
-                        f'Try: "{" " * suggested_indent}{line.strip()}"'
-                    )
-
+    if not original_lines or not new_lines or start_idx >= len(original_lines):
         return warnings
+
+    original_indent = _get_line_indent(original_lines[start_idx])
+    if original_indent is None:
+        return warnings
+
+    _check_first_line_indent(warnings, new_lines, original_indent, start_idx)
+    _check_block_indent_after_colon(warnings, new_lines, start_idx)
+
+    return warnings
+
+
+def _get_line_indent(line: str) -> int | None:
+    """Get indentation level of a line, or None if line is empty/whitespace."""
+    stripped = line.strip()
+    if not stripped:
+        return None
+    return len(line) - len(line.lstrip())
+
+
+def _check_first_line_indent(
+    warnings: list[str],
+    new_lines: list[str],
+    original_indent: int,
+    start_idx: int,
+) -> None:
+    """Check if first new line's indentation matches the original."""
+    if not new_lines:
+        return
+
+    new_indent = _get_line_indent(new_lines[0])
+    if new_indent is None or new_indent == original_indent:
+        return
+
+    line_num = start_idx + 1
+    stripped_content = new_lines[0].strip()
+
+    warnings.append(
+        f'[INDENTATION MISMATCH] Line {line_num}: '
+        f'First line has {new_indent} spaces, but target block indent starts at {original_indent} spaces.'
+    )
+    warnings.append(
+        f'[BROKEN LINE] Line {line_num} would be: "{new_lines[0].rstrip()}"'
+    )
+    warnings.append(
+        f'[SUGGESTED FIX] Did you mean to indent with {original_indent} spaces? '
+        f'Try: "{" " * original_indent}{stripped_content}"'
+    )
+
+
+def _check_block_indent_after_colon(
+    warnings: list[str],
+    new_lines: list[str],
+    start_idx: int,
+) -> None:
+    """Check for missing indentation after lines ending with ':'."""
+    for i in range(1, len(new_lines)):
+        line = new_lines[i]
+        if not line.strip() or line.strip().startswith('#'):
+            continue
+
+        prev_line = new_lines[i - 1]
+        if not prev_line.rstrip().endswith(':'):
+            continue
+
+        if _get_line_indent(line) != 0:
+            continue
+
+        line_num = start_idx + 1 + i
+        suggested_indent = 4
+
+        warnings.append(
+            f'[INDENTATION ERROR] Line {line_num}: '
+            f'Expected indentation after ":" on line {line_num - 1}, but found 0 spaces.'
+        )
+        warnings.append(
+            f'[BROKEN LINE] Line {line_num} would be: "{line.rstrip()}"'
+        )
+        warnings.append(
+            f'[SUGGESTED FIX] Did you mean to indent with {suggested_indent} spaces? '
+            f'Try: "{" " * suggested_indent}{line.strip()}"'
+        )
 
     def _backup_file(self, file_path: Path, content: str | None) -> None:
         """Backup file content for transaction rollback.
