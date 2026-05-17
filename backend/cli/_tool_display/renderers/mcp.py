@@ -93,7 +93,7 @@ def _summarize_mcp_args(tool_name: str, args: dict[str, Any]) -> str:
     if path_match:
         return f'[dim]path: {path_match.group(1)}[/dim]'
 
-    keys = list(args.keys())
+    keys = list(args.keys())  # type: ignore[unreachable]
     if keys:
         first_key = keys[0]
         first_val = args[first_key]

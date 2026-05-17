@@ -1960,7 +1960,7 @@ class TUIRenderer:
 
         # Check if first line is a query line (doesn't match file:line:content pattern)
         if lines and not re.match(r'^.*:\d+:', lines[0]):
-            query = lines[0]
+            query = lines[0]  # type: ignore[unreachable]
             result_content = '\n'.join(lines[1:]) if len(lines) > 1 else ''
 
         # Parse and render results

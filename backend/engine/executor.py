@@ -640,7 +640,7 @@ class OrchestratorExecutor:
             return False
 
         if self._step_cancelled:
-            return False
+            return False  # type: ignore[unreachable]
 
         first_chunk = chunk
 
@@ -702,7 +702,7 @@ class OrchestratorExecutor:
 
             if not self._step_cancelled:
                 continue
-            return
+            return  # type: ignore[unreachable]
 
     async def _consume_async_stream(
         self,

@@ -184,7 +184,7 @@ def _summarize_delegate_browser_action(
         if url_match:
             url = _truncate_delegate_progress(url_match.group(0), 60)
             return 'running', f'Browsing {url}'
-        return 'running', 'Browsing…'
+        return 'running', 'Browsing…'  # type: ignore[unreachable]
     return None
 
 

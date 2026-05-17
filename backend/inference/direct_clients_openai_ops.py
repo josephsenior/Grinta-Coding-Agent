@@ -46,7 +46,7 @@ def _extract_oai_error_message(raw: str) -> str | None:
 
     m = re.search(r'\{.*\}', raw, re.DOTALL)
     if not m:
-        return None
+        return None  # type: ignore[unreachable]
     body_str = m.group(0)
     body: dict | None = None
     # Try JSON first (spec-compliant providers)
