@@ -698,7 +698,6 @@ class GrintaScreen(Screen):
     def compose(self) -> ComposeResult:
         with Horizontal(id='main-layout'):
             with Transcript(id='transcript-container'):
-                yield Static(id='thinking-preview', classes='-hidden')
                 yield RichLog(
                     id='main-display',
                     max_lines=_TUI_HISTORY_RENDER_LIMIT,
@@ -706,6 +705,7 @@ class GrintaScreen(Screen):
                     highlight=False,
                     markup=False,
                 )
+                yield Static(id='thinking-preview', classes='-hidden')
             with InfoSidebar(id='sidebar-container'):
                 yield Static(id='sidebar-display')
         with InputBar(id='input-bar'):
@@ -936,9 +936,11 @@ class GrintaScreen(Screen):
             if i > 0:
                 result.append('\n')
             if i == 0:
-                result.append(Text.assemble(Text('▌', style='#91abec'), ' ', line))
+                line_body = _rich_text(line)
+                result.append(Text.assemble(Text('▌', style='#91abec'), ' ', line_body))
             else:
-                result.append(line)
+                line_body = _rich_text(line)
+                result.append(line_body)
         result.append('\n')
         self._write_log(result)
 
@@ -975,10 +977,18 @@ class GrintaScreen(Screen):
         self.set_last_tool_status(text)
 
     def add_error(self, text: str) -> None:
-        icon = Text('✗ ', style=f'bold {NAVY_ERROR}')
-        body = _rich_text(text)
-        body.stylize(f'bold {NAVY_ERROR}')
-        self._write_log(Text.assemble(icon, body))
+        import textwrap
+
+        wrapped = textwrap.fill(text, width=80)
+        lines = wrapped.split('\n')
+        result = Text()
+        for i, line in enumerate(lines):
+            if i > 0:
+                result.append('\n   ')
+            if i == 0:
+                result.append(Text('✗ ', style=f'bold {NAVY_ERROR}'))
+            result.append(Text(line, style=f'bold {NAVY_ERROR}'))
+        self._write_log(result)
         self.set_last_tool_status(f'Error: {text}')
 
     def add_success(self, text: str) -> None:
@@ -2187,6 +2197,7 @@ class TUIRenderer:
                 scroll_end=True,
                 animate=False,
             )
+            self._tui._get_display().scroll_end(animate=False)
         except NoMatches:
             return
         except AttributeError:
