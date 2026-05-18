@@ -201,6 +201,22 @@ def test_list_files_rejects_absolute_path_outside_workspace(tmp_path) -> None:
         runtime.list_files(str(outside))
 
 
+def test_list_files_allows_workspace_grinta_root_playbooks(tmp_path) -> None:
+    from backend.core.workspace_resolution import workspace_grinta_root
+
+    runtime = _make_runtime()
+    workspace = tmp_path / 'workspace'
+    workspace.mkdir()
+    playbooks_dir = workspace_grinta_root(workspace) / 'playbooks'
+    playbooks_dir.mkdir(parents=True)
+    (playbooks_dir / 'starter.md').write_text('# starter', encoding='utf-8')
+    executor = MagicMock()
+    executor.initial_cwd = str(workspace)
+    runtime._executor = executor
+
+    assert runtime.list_files(str(playbooks_dir)) == ['starter.md']
+
+
 def test_cmd_run_bridge_timeout_aligns_with_default_cmd_floor() -> None:
     """Sync bridge must match CMD_PENDING_ACTION_TIMEOUT_FLOOR + buffer when unset."""
     runtime = _make_runtime()

@@ -521,9 +521,11 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             PathValidationError,
             SafePath,
         )
+        from backend.core.workspace_resolution import workspace_grinta_root
         from backend.execution.security_enforcement import path_is_within_workspace
 
         workspace = Path(self._executor.initial_cwd).resolve()
+        app_workspace_root = workspace_grinta_root(workspace).resolve()
         try:
             safe_path = SafePath.validate(
                 path,
@@ -537,7 +539,10 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         except (OSError, ValueError) as exc:
             raise PathValidationError(f'Invalid list_files path: {exc}', path) from exc
 
-        if not path_is_within_workspace(resolved, workspace):
+        if not (
+            path_is_within_workspace(resolved, workspace)
+            or path_is_within_workspace(resolved, app_workspace_root)
+        ):
             raise PathValidationError(
                 f'Path outside workspace boundary: {path}',
                 path,
