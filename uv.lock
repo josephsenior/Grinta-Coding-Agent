@@ -1135,7 +1135,7 @@ wheels = [
 
 [[package]]
 name = "grinta-ai"
-version = "1.0.0rc1"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1281,7 +1281,7 @@ requires-dist = [
     { name = "starlette", specifier = ">=0.49.1,<2" },
     { name = "tenacity", specifier = ">=8.5,<10" },
     { name = "termcolor", specifier = ">=3.1,<4" },
-    { name = "textual", specifier = ">=1.0,<2" },
+    { name = "textual", specifier = ">=1,<2" },
     { name = "tree-sitter", specifier = ">=0.24,<0.25" },
     { name = "tree-sitter-language-pack", specifier = ">=0.7.3,<0.8" },
     { name = "urllib3", specifier = ">=1.21.1,<3" },
