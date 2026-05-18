@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
+_DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
 _ANTHROPIC_INCOMPATIBLE_REQUEST_KEYS = frozenset(
     {
         'tool_choice',
@@ -34,6 +35,32 @@ def _sanitize_anthropic_request_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]
     return request_kwargs
 
 
+def _resolve_anthropic_max_tokens(client: Any, kwargs: dict[str, Any]) -> int:
+    """Return the max_tokens value required by Anthropic's messages API."""
+    raw_max_tokens = kwargs.get('max_tokens')
+    if raw_max_tokens is None:
+        raw_max_tokens = kwargs.pop('max_completion_tokens', None)
+    if raw_max_tokens is not None:
+        return max(int(raw_max_tokens), 1)
+
+    from backend.inference.catalog_loader import lookup
+
+    entry = lookup(client.model_name)
+    if entry and entry.max_output_tokens is not None:
+        return max(int(entry.max_output_tokens), 1)
+
+    return _DEFAULT_ANTHROPIC_MAX_TOKENS
+
+
+def _apply_required_anthropic_request_defaults(
+    client: Any, kwargs: dict[str, Any]
+) -> dict[str, Any]:
+    """Ensure the Anthropic SDK request contains required arguments."""
+    request_kwargs = _sanitize_anthropic_request_kwargs(kwargs)
+    request_kwargs['max_tokens'] = _resolve_anthropic_max_tokens(client, request_kwargs)
+    return request_kwargs
+
+
 def extract_anthropic_tool_calls(
     content_blocks: list,
 ) -> tuple[str, list[dict[str, Any]] | None]:
@@ -49,7 +76,7 @@ def prepare_anthropic_kwargs(
 
     return prepare_kwargs(
         messages,
-        _sanitize_anthropic_request_kwargs(kwargs),
+        _apply_required_anthropic_request_defaults(client, kwargs),
         client.model_name,
     )
 
@@ -183,7 +210,7 @@ def _prepare_anthropic_stream_request(
 
     system_raw = next((m['content'] for m in messages if m['role'] == 'system'), None)
     filtered_messages = [message for message in messages if message['role'] != 'system']
-    request_kwargs = _sanitize_anthropic_request_kwargs(kwargs)
+    request_kwargs = _apply_required_anthropic_request_defaults(client, kwargs)
     request_kwargs.setdefault('model', client.model_name)
     system_msg = _apply_system_cache_control(
         system_raw,

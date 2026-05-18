@@ -313,6 +313,7 @@ class TestAnthropicClientHelpers:
         assert filtered == [{'role': 'user', 'content': 'Hi'}]
         assert system_msg == 'Be helpful'
         assert request_kwargs == {
+            'max_tokens': 131072,
             'model': 'minimax-m2.7',
             'temperature': 0.2,
         }
@@ -320,6 +321,37 @@ class TestAnthropicClientHelpers:
         assert 'stream_options' not in request_kwargs
         assert 'extra_body' not in request_kwargs
         assert original_kwargs['stream'] is True
+
+    def test_prepare_kwargs_adds_required_max_tokens_default(self):
+        from backend.inference.direct_clients_anthropic_ops import (
+            prepare_anthropic_kwargs,
+        )
+
+        client = MagicMock(model_name='minimax-m2.7')
+        messages = [{'role': 'user', 'content': 'Hi'}]
+
+        filtered, request_kwargs = prepare_anthropic_kwargs(client, messages, {})
+
+        assert filtered == messages
+        assert request_kwargs['model'] == 'minimax-m2.7'
+        assert request_kwargs['max_tokens'] == 131072
+
+    def test_prepare_kwargs_maps_max_completion_tokens_to_max_tokens(self):
+        from backend.inference.direct_clients_anthropic_ops import (
+            prepare_anthropic_kwargs,
+        )
+
+        client = MagicMock(model_name='minimax-m2.7')
+        messages = [{'role': 'user', 'content': 'Hi'}]
+
+        _, request_kwargs = prepare_anthropic_kwargs(
+            client,
+            messages,
+            {'max_completion_tokens': 321},
+        )
+
+        assert request_kwargs['max_tokens'] == 321
+        assert 'max_completion_tokens' not in request_kwargs
 
 
 # ---------------------------------------------------------------------------
