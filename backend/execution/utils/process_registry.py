@@ -130,7 +130,7 @@ class TaskCancellationService:
         for pid, process in processes.items():
             try:
                 logger.warning('[TaskCancellationService] Terminating pid=%s', pid)
-                process.terminate()
+                self._kill_pid_best_effort(pid)
                 try:
                     process.wait(timeout=1.0 if not OS_CAPS.is_windows else 0.1)
                 except subprocess.TimeoutExpired:
@@ -190,7 +190,13 @@ class TaskCancellationService:
                 )
                 return
 
-            os.kill(pid, signal.SIGTERM)
+            killpg = getattr(os, 'killpg', None)
+            try:
+                if killpg is None:
+                    raise AttributeError('os.killpg is unavailable on this platform')
+                killpg(pid, signal.SIGTERM)
+            except Exception:
+                os.kill(pid, signal.SIGTERM)
             logger.warning(
                 '[TaskCancellationService:%s] SIGTERM pid=%s', self._label, pid
             )
@@ -200,7 +206,14 @@ class TaskCancellationService:
                 return
             sigkill = getattr(signal, 'SIGKILL', None)
             if sigkill is not None:
-                os.kill(pid, sigkill)
+                try:
+                    if killpg is None:
+                        raise AttributeError(
+                            'os.killpg is unavailable on this platform'
+                        )
+                    killpg(pid, sigkill)
+                except Exception:
+                    os.kill(pid, sigkill)
             logger.warning(
                 '[TaskCancellationService:%s] SIGKILL pid=%s', self._label, pid
             )

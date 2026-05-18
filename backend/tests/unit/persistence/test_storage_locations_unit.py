@@ -69,7 +69,7 @@ class TestGetConversationInitDataFilename:
 class TestGetConversationAgentStateFilename:
     def test_agent_state(self):
         result = get_conversation_agent_state_filename('s1')
-        assert result.endswith('agent_state.pkl')
+        assert result.endswith('agent_state.json')
 
 
 class TestGetConversationLLMRegistryFilename:

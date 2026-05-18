@@ -46,9 +46,9 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         ),
     )
     execution_profile: Literal['standard', 'hardened_local', 'sandboxed_local'] = Field(
-        default='standard',
+        default='hardened_local',
         description=(
-            "Runtime execution profile. 'standard' preserves current local behavior. "
+            "Runtime execution profile. 'standard' preserves permissive local behavior. "
             "'hardened_local' adds stricter local policy gates for commands and file access. "
             "'sandboxed_local' adds those same policy gates plus OS-native process isolation "
             '(bubblewrap on Linux, sandbox-exec on macOS, AppContainer on Windows) '

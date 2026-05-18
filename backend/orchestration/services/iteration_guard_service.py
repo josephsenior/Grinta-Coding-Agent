@@ -6,6 +6,7 @@ import asyncio
 import os
 from typing import TYPE_CHECKING
 
+from backend.core.errors import AgentLimitExceededError
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
@@ -36,20 +37,32 @@ class IterationGuardService:
                 'AGENT_CTRL: after run_control_flags, iteration=%s',
                 controller.state.iteration_flag.current_value,
             )
+        except AgentLimitExceededError as exc:
+            logger.warning('Control flag limit hit: %s', type(exc).__name__)
+            if self._graceful_shutdown_enabled():
+                self._schedule_graceful_shutdown(reason=str(exc))
+            raise
         except Exception as exc:
-            error_str = str(exc).lower()
-            if self._is_limit_error(error_str):
+            if self._is_limit_error(str(exc)):
                 logger.warning('Control flag limit hit: %s', type(exc).__name__)
                 if self._graceful_shutdown_enabled():
                     self._schedule_graceful_shutdown(reason=str(exc))
-            else:
-                logger.warning('Control flag error (non-limit)')
+                raise
+            logger.warning('Control flag error (non-limit)')
             raise
 
-    def _is_limit_error(self, error_str: str) -> bool:
-        return any(
-            key in error_str for key in ('limit', 'maximum', 'budget', 'iteration')
+    def _is_limit_error(self, message: str) -> bool:
+        """Return true for budget/iteration limit errors from legacy guards."""
+        normalized = message.lower()
+        limit_terms = (
+            'iteration limit',
+            'budget limit',
+            'maximum budget',
+            'budget exceeded',
+            'limit exceeded',
+            'limit hit',
         )
+        return any(term in normalized for term in limit_terms)
 
     def _graceful_shutdown_enabled(self) -> bool:
         # Check agent config first, then fall back to env var (default: ON)

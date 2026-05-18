@@ -132,6 +132,28 @@ class TestValidateAndSanitizePath:
         )
         assert result.exists()
 
+    def test_absolute_path_inside_workspace_allowed_under_workspace_boundary(
+        self, workspace: Path
+    ):
+        target = workspace / 'New Folder (2)' / 'app.py'
+        result = validate_and_sanitize_path(
+            str(target),
+            workspace_root=str(workspace),
+            must_be_relative=True,
+        )
+        assert result == target.resolve()
+
+    def test_absolute_path_outside_workspace_rejected_under_workspace_boundary(
+        self, workspace: Path
+    ):
+        outside = workspace.parent / f'{workspace.name}-outside.py'
+        with pytest.raises(PathValidationError, match='outside workspace boundary'):
+            validate_and_sanitize_path(
+                str(outside),
+                workspace_root=str(workspace),
+                must_be_relative=True,
+            )
+
     def test_relative_needs_workspace(self):
         with pytest.raises(PathValidationError, match='workspace_root required'):
             validate_and_sanitize_path(
@@ -149,6 +171,17 @@ class TestValidateAndSanitizePath:
             'my%20file.py', workspace_root=str(workspace)
         )
         assert 'my file' in str(result)
+
+    def test_valid_path_with_spaces_parentheses_and_shell_metachars(
+        self, workspace: Path
+    ):
+        result = validate_and_sanitize_path(
+            'New Folder (2)/build&test;$cache`name.py',
+            workspace_root=str(workspace),
+        )
+        assert result == (
+            workspace / 'New Folder (2)' / 'build&test;$cache`name.py'
+        ).resolve()
 
     def test_very_deep_path(self, workspace: Path):
         """Test path depth limit (>100 levels)."""

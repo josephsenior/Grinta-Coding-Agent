@@ -138,10 +138,6 @@ class SmartCompactor(BaseLLMCompactor):
         if first_user:
             essential.add(first_user.id)
 
-        for event in events:
-            if isinstance(event, TaskTrackingAction):
-                essential.add(event.id)
-
         self._anchor_active_plan_events(events, essential)
         self._add_critical_error_ids(events[-50:], essential)
         return essential
@@ -215,7 +211,7 @@ class SmartCompactor(BaseLLMCompactor):
         """Anchor the most recent TaskTrackingAction that references a doing task."""
         for event in reversed(events):
             if isinstance(event, TaskTrackingAction):
-                content = getattr(event, 'content', '') or ''
+                content = self._task_tracking_search_text(event)
                 if any(tid in content for tid in doing_task_ids):
                     essential.add(event.id)
                     logger.debug(
@@ -224,6 +220,15 @@ class SmartCompactor(BaseLLMCompactor):
                     )
                     return
         self._anchor_last_task_tracker(events, essential)
+
+    def _task_tracking_search_text(self, event: TaskTrackingAction) -> str:
+        """Return searchable text for task IDs/descriptions in a tracker action."""
+        try:
+            task_json = json.dumps(event.task_list, sort_keys=True)
+        except TypeError:
+            task_json = str(event.task_list)
+        legacy_content = getattr(event, 'content', '') or ''
+        return f'{task_json}\n{event.thought or ""}\n{legacy_content}'
 
     def _score_event_importance(
         self,

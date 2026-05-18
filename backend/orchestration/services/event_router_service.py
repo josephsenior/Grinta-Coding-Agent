@@ -825,6 +825,30 @@ class EventRouterService:
 
                     _worker_stream_ref = worker_stream  # capture for closure
 
+                    async def _ensure_worker_pipeline_allowed(event: Action) -> bool:
+                        """Ensure manually bridged worker actions pass middleware."""
+                        mapping = getattr(
+                            worker_controller,
+                            '_action_contexts_by_event_id',
+                            {},
+                        )
+                        if getattr(event, 'id', None) in mapping:
+                            return True
+                        pipeline = getattr(worker_controller, 'operation_pipeline', None)
+                        if pipeline is None:
+                            pipeline = getattr(worker_controller, 'tool_pipeline', None)
+                        if pipeline is None:
+                            return True
+                        ctx = pipeline.create_context(event, worker_controller.state)
+                        ctx.action_id = event.id
+                        if hasattr(worker_controller, '_action_contexts_by_event_id'):
+                            worker_controller._action_contexts_by_event_id[event.id] = ctx
+                        await pipeline.run_execute(ctx)
+                        if getattr(ctx, 'blocked', False):
+                            worker_controller.handle_blocked_invocation(event, ctx)
+                            return False
+                        return True
+
                     def _worker_runtime_bridge(event):
                         if not isinstance(event, Action):
                             return
@@ -833,6 +857,8 @@ class EventRouterService:
 
                         async def _execute():
                             try:
+                                if not await _ensure_worker_pipeline_allowed(event):
+                                    return
                                 parent_runtime._set_action_timeout(event)
                                 observation = await parent_runtime._execute_action(
                                     event
@@ -849,10 +875,21 @@ class EventRouterService:
                                         f'{type(exc).__name__}: {exc}'
                                     )
                                 )
-                            attach_observation_cause(
-                                observation, event, context='worker_runtime_bridge'
+                            process_observation = getattr(
+                                parent_runtime, '_process_observation', None
                             )
-                            observation.tool_call_metadata = event.tool_call_metadata
+                            should_emit = True
+                            if callable(process_observation):
+                                should_emit = bool(process_observation(observation, event))
+                            else:
+                                attach_observation_cause(
+                                    observation,
+                                    event,
+                                    context='worker_runtime_bridge',
+                                )
+                                observation.tool_call_metadata = event.tool_call_metadata
+                            if not should_emit:
+                                return
                             source = event.source or EventSource.AGENT
                             _worker_stream_ref.add_event(observation, source)
 
@@ -879,16 +916,28 @@ class EventRouterService:
                 # so the AgentStateChangedObservation is processed.
                 from backend.utils.async_utils import _background_tasks
 
+                worker_task_baseline = set(_background_tasks)
+
+                async def _drain_new_worker_tasks(
+                    baseline: set[asyncio.Task],
+                    *,
+                    max_rounds: int,
+                ) -> None:
+                    for _drain in range(max_rounds):
+                        pending = {
+                            t
+                            for t in _background_tasks
+                            if t not in baseline and not t.done()
+                        }
+                        if not pending:
+                            break
+                        await asyncio.gather(*pending, return_exceptions=True)
+
                 init_msg = MessageAction(content='\n'.join(parent_context_lines))
                 worker_controller.event_stream.add_event(init_msg, EventSource.USER)
                 await worker_controller.set_agent_state_to(AgentState.RUNNING)
 
-                # Drain all background tasks from bootstrap events.
-                for _drain in range(50):
-                    pending = {t for t in _background_tasks if not t.done()}
-                    if not pending:
-                        break
-                    await asyncio.gather(*pending, return_exceptions=True)
+                await _drain_new_worker_tasks(worker_task_baseline, max_rounds=50)
 
                 # Drive the worker step loop directly.
                 #
@@ -926,20 +975,11 @@ class EventRouterService:
                     # draining until no new tasks appear, because each task
                     # may itself schedule further tasks (e.g. the state-change
                     # observation triggers another on_event cycle).
-                    for _drain in range(50):
-                        new_tasks = _background_tasks - pre_tasks
-                        pending = {t for t in new_tasks if not t.done()}
-                        if not pending:
-                            break
-                        await asyncio.gather(*pending, return_exceptions=True)
+                    await _drain_new_worker_tasks(pre_tasks, max_rounds=50)
 
                 # Final settle: give any remaining scheduled callbacks a
                 # chance to complete.
-                for _ in range(20):
-                    pending = {t for t in _background_tasks if not t.done()}
-                    if not pending:
-                        break
-                    await asyncio.gather(*pending, return_exceptions=True)
+                await _drain_new_worker_tasks(worker_task_baseline, max_rounds=20)
 
                 final_state = worker_controller.get_agent_state()
                 self._ctrl.log(
@@ -1020,11 +1060,23 @@ class EventRouterService:
                         )
                         for i, t in enumerate(parallel_tasks)
                     ],
-                    return_exceptions=False,
+                    return_exceptions=True,
                 )
-                all_success = all(r[0] for r in results)
+                normalized_results: list[tuple[bool, str, str]] = []
+                for result in results:
+                    if isinstance(result, BaseException):
+                        normalized_results.append(
+                            (
+                                False,
+                                '',
+                                f'Worker execution crashed: {type(result).__name__}: {result}',
+                            )
+                        )
+                    else:
+                        normalized_results.append(result)
+                all_success = all(r[0] for r in normalized_results)
                 parts = []
-                for i, (s, c, e) in enumerate(results):
+                for i, (s, c, e) in enumerate(normalized_results):
                     label = parallel_tasks[i].get('task_description', f'Task {i + 1}')[
                         :40
                     ]
@@ -1065,40 +1117,33 @@ class EventRouterService:
                     error_message=error_message,
                 )
 
-            # Final delegate result: omit cause when background (early obs already cleared pending).
             attach_observation_cause(
                 obs,
-                None if getattr(action, 'run_in_background', False) else action,
+                action,
                 context='event_router.delegate_task',
             )
             obs.tool_call_metadata = action.tool_call_metadata
             self._ctrl.event_stream.add_event(obs, EventSource.ENVIRONMENT)
 
         if getattr(action, 'run_in_background', False):
-            early_obs = DelegateTaskObservation(
-                success=True,
-                content='Worker(s) started in background. Use the blackboard to coordinate.',
-                error_message='',
+            self._ctrl.log(
+                'warning',
+                'delegate_task run_in_background requested; executing as foreground '
+                'to preserve middleware, rollback, and pending-action consistency.',
+                extra={'msg_type': 'DELEGATE_BACKGROUND_DISABLED'},
             )
-            attach_observation_cause(
-                early_obs, action, context='event_router.delegate_task_early'
-            )
-            early_obs.tool_call_metadata = action.tool_call_metadata
-            self._ctrl.event_stream.add_event(early_obs, EventSource.ENVIRONMENT)
+
+        # Register the action as pending so the parent agent blocks (can_step →
+        # False) until _run_subagent() emits a DelegateTaskObservation with
+        # cause=action.id that clears the pending slot. Background delegation is
+        # intentionally serialized for local workspace safety.
+        pending_service = getattr(
+            getattr(self._ctrl, 'services', None), 'pending_action', None
+        )
+        if pending_service is not None:
+            pending_service.set(action)
         else:
-            # Foreground delegation: register the action as pending so the
-            # parent agent blocks (can_step → False) until _run_subagent()
-            # emits a DelegateTaskObservation with cause=action.id that
-            # clears the pending slot.  Without this, _step_inner() sees no
-            # pending action and immediately calls the LLM again — before
-            # workers have finished — producing a hallucinated response.
-            pending_service = getattr(
-                getattr(self._ctrl, 'services', None), 'pending_action', None
-            )
-            if pending_service is not None:
-                pending_service.set(action)
-            else:
-                self._ctrl._pending_action = action
+            self._ctrl._pending_action = action
 
         # Run the subagent without blocking
         run_or_schedule(_run_subagent())

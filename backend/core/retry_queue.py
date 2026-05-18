@@ -140,17 +140,18 @@ class InMemoryRetryBackend(BaseRetryBackend):
         ready: list[RetryTask] = []
         now = time.time()
         async with self._lock:
-            while self._heap and len(ready) < limit:
+            iterations = 0
+            max_iterations = len(self._heap) * 2 + 10
+            while self._heap and len(ready) < limit and iterations < max_iterations:
+                iterations += 1
                 next_time, task_id = heapq.heappop(self._heap)
                 task = self._tasks.get(task_id)
                 if task is None:
                     continue
                 if task.controller_id != controller_id:
-                    # Not for this controller, push back
                     heapq.heappush(self._heap, (next_time, task_id))
-                    break
+                    continue
                 if next_time > now:
-                    # Not ready yet, requeue and break
                     heapq.heappush(self._heap, (next_time, task_id))
                     break
                 task.attempts += 1

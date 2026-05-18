@@ -19,8 +19,10 @@ Usage::
 from __future__ import annotations
 
 import json
+import os
 import time
 import uuid
+from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -51,6 +53,10 @@ class RecoveryInspection:
     status: str
     record: CheckpointRecord | None = None
     reason: str = ''
+
+
+class StreamingCheckpointRecoveryError(RuntimeError):
+    """Raised when an uncommitted streaming WAL requires explicit recovery."""
 
 
 class StreamingCheckpoint:
@@ -230,17 +236,19 @@ class StreamingCheckpoint:
     def _write(self, record: CheckpointRecord) -> None:
         temp_path = self._wal_path.with_suffix('.tmp')
         try:
-            temp_path.write_text(
-                json.dumps(asdict(record), default=str),
-                encoding='utf-8',
-            )
+            with open(temp_path, 'w', encoding='utf-8') as handle:
+                handle.write(json.dumps(asdict(record), default=str))
+                handle.flush()
+                os.fsync(handle.fileno())
             temp_path.replace(self._wal_path)
+            self._fsync_parent_dir(self._wal_path)
         except OSError:
             logger.exception('Failed to write streaming WAL')
             try:
                 temp_path.unlink(missing_ok=True)
             except OSError:
                 pass
+            raise
 
     def _preserve_crash_evidence(self, record: CheckpointRecord) -> None:
         if not self._discard_stale_on_recovery:
@@ -257,7 +265,11 @@ class StreamingCheckpoint:
                 'anchor_event_id': record.anchor_event_id,
                 'preserved_at': time.time(),
             }
-            crash_file.write_text(json.dumps(crash_data, default=str), encoding='utf-8')
+            with open(crash_file, 'w', encoding='utf-8') as handle:
+                handle.write(json.dumps(crash_data, default=str))
+                handle.flush()
+                os.fsync(handle.fileno())
+            self._fsync_parent_dir(crash_file)
             logger.info(
                 'Preserved crash evidence for checkpoint %s at %s',
                 record.token,
@@ -276,7 +288,19 @@ class StreamingCheckpoint:
                 pass
         try:
             self._wal_path.unlink(missing_ok=True)
+            self._fsync_parent_dir(self._wal_path)
         except OSError:
             logger.exception('Failed to remove streaming WAL')
         if record is not None:
             self._preserve_crash_evidence(record)
+
+    @staticmethod
+    def _fsync_parent_dir(path: Path) -> None:
+        if os.name == 'nt':
+            return
+        with suppress(OSError, AttributeError):
+            dir_fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)

@@ -9,10 +9,12 @@ and incremental transcript updates.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import re
 import shlex
+import shutil
 import threading
 import time
 from collections import deque
@@ -31,7 +33,17 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.css.query import NoMatches
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, Label, RichLog, Static, TextArea
+from textual.widgets import (
+    Button,
+    Checkbox,
+    DataTable,
+    Input,
+    Label,
+    RichLog,
+    Select,
+    Static,
+    TextArea,
+)
 
 _tui_logger = logging.getLogger('grinta.tui')
 _tui_logger.setLevel(logging.DEBUG)
@@ -85,7 +97,11 @@ from backend.core.bootstrap.main import (
     create_agent,
     create_registry_and_conversation_stats,
 )
-from backend.core.bootstrap.setup import create_memory, create_runtime
+from backend.core.bootstrap.setup import (
+    create_controller,
+    create_memory,
+    create_runtime,
+)
 from backend.core.enums import AgentState, EventSource
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventStream, EventStreamSubscriber
@@ -139,9 +155,6 @@ from backend.ledger.observation import (
     TerminalObservation,
     UserRejectObservation,
 )
-from backend.orchestration.conversation_stats import ConversationStats  # noqa: E402
-from backend.orchestration.orchestration_config import OrchestrationConfig  # noqa: E402
-from backend.orchestration.session_orchestrator import SessionOrchestrator  # noqa: E402
 from backend.persistence import get_file_store  # noqa: E402
 
 
@@ -222,6 +235,7 @@ class HUD(Vertical):
     def compose(self) -> ComposeResult:
         yield Label(id='hud-line-1')
         yield Label(id='hud-line-2')
+        yield Label(id='hud-line-3')
 
 
 class RendererDrainRequested(Message):
@@ -266,6 +280,321 @@ class GrintaConfirmDialog(ModalScreen[str | None]):
                 return
 
 
+class GrintaSettingsDialog(ModalScreen[dict[str, Any] | None]):
+    """Native settings modal for full-screen TUI."""
+
+    BINDINGS = [
+        Binding('escape', 'dismiss(None)', 'Cancel', show=False),
+        Binding('ctrl+s', 'save', 'Save', show=False),
+    ]
+
+    def __init__(self, config: AppConfig) -> None:
+        super().__init__()
+        self._config = config
+
+    def compose(self) -> ComposeResult:
+        from backend.cli.config_manager import get_current_model, get_masked_api_key
+
+        current_model = get_current_model(self._config)
+        masked_key = get_masked_api_key(self._config)
+        raw_budget = getattr(self._config, 'max_budget_per_task', None)
+        budget_value = '' if raw_budget is None else f'{float(raw_budget):g}'
+        icons_enabled = bool(getattr(self._config, 'cli_tool_icons', True))
+
+        with Vertical(id='settings-dialog'):
+            yield Label('[bold]Settings[/]', classes='title')
+            yield Label(f'Current API key: {masked_key}', id='settings-current-key')
+            yield Label('Model', classes='field-label')
+            yield Input(value=current_model, id='settings-model')
+            yield Label('API key (leave blank to keep current key)', classes='field-label')
+            yield Input(password=True, id='settings-api-key')
+            yield Label(
+                'Budget per task (blank/unlimited to keep unlimited)', classes='field-label'
+            )
+            yield Input(value=budget_value, id='settings-budget')
+            yield Checkbox(
+                'Show tool icons in activity cards',
+                value=icons_enabled,
+                id='settings-icons',
+            )
+            yield Label('', id='settings-feedback')
+            with Horizontal(id='settings-buttons'):
+                yield Button('Save', id='settings-save', variant='primary')
+                yield Button('Cancel', id='settings-cancel')
+
+    def on_mount(self) -> None:
+        self.query_one('#settings-model', Input).focus()
+
+    def action_save(self) -> None:
+        self._submit()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == 'settings-save':
+            self._submit()
+            return
+        if event.button.id == 'settings-cancel':
+            self.dismiss(None)
+
+    def _set_feedback(self, message: str, *, error: bool = False) -> None:
+        style = NAVY_ERROR if error else NAVY_READY
+        self.query_one('#settings-feedback', Label).update(f'[{style}]{message}[/]')
+
+    def _submit(self) -> None:
+        model = self.query_one('#settings-model', Input).value.strip()
+        api_key = self.query_one('#settings-api-key', Input).value.strip()
+        budget_raw = self.query_one('#settings-budget', Input).value.strip()
+        icons_enabled = self.query_one('#settings-icons', Checkbox).value
+
+        if not model:
+            self._set_feedback('Model is required.', error=True)
+            return
+
+        budget_value: float | None = None
+        if budget_raw and budget_raw.lower() not in {'unlimited', 'none'}:
+            try:
+                budget_value = float(budget_raw)
+            except ValueError:
+                self._set_feedback('Budget must be numeric, unlimited, or empty.', error=True)
+                return
+            if budget_value < 0:
+                self._set_feedback('Budget cannot be negative.', error=True)
+                return
+
+        self.dismiss(
+            {
+                'model': model,
+                'api_key': api_key,
+                'budget': budget_value,
+                'icons': bool(icons_enabled),
+            }
+        )
+
+
+class GrintaSessionsDialog(ModalScreen[str | None]):
+    """Native sessions manager for full-screen TUI."""
+
+    BINDINGS = [
+        Binding('escape', 'dismiss(None)', 'Close', show=False),
+        Binding('f5', 'refresh', 'Refresh', show=False),
+        Binding('delete', 'delete_selected', 'Delete', show=False),
+    ]
+
+    def __init__(
+        self,
+        config: AppConfig,
+        *,
+        search: str | None = None,
+        sort_by: str = 'updated',
+        limit: int = 20,
+        preview_target: str | None = None,
+        delete_targets: list[str] | None = None,
+    ) -> None:
+        super().__init__()
+        self._config = config
+        self._search = search or ''
+        self._sort_by = sort_by
+        self._limit = max(1, int(limit))
+        self._preview_target = preview_target
+        self._delete_targets = delete_targets or []
+        self._all_entries: list[tuple[str, dict[str, Any], int]] = []
+        self._visible_entries: list[tuple[str, dict[str, Any], int]] = []
+        self._sessions_root: Path | None = None
+
+    def compose(self) -> ComposeResult:
+        options = [
+            ('Updated', 'updated'),
+            ('Created', 'created'),
+            ('Events', 'events'),
+            ('Cost', 'cost'),
+            ('Model', 'model'),
+        ]
+        with Vertical(id='sessions-dialog'):
+            yield Label('[bold]Sessions[/]', classes='title')
+            with Horizontal(id='sessions-filters'):
+                yield Input(value=self._search, placeholder='Search…', id='sessions-search')
+                yield Select(
+                    options=options,
+                    value=self._sort_by,
+                    allow_blank=False,
+                    id='sessions-sort',
+                )
+                yield Input(value=str(self._limit), restrict=r'\d*', id='sessions-limit')
+                yield Button('Refresh', id='sessions-refresh')
+            yield DataTable(id='sessions-table')
+            yield Static('', id='sessions-preview')
+            yield Label('', id='sessions-feedback')
+            with Horizontal(id='sessions-buttons'):
+                yield Button('Resume', id='sessions-resume', variant='primary')
+                yield Button('Delete', id='sessions-delete', variant='error')
+                yield Button('Close', id='sessions-close')
+
+    def on_mount(self) -> None:
+        table = self.query_one('#sessions-table', DataTable)
+        table.cursor_type = 'row'
+        table.add_columns('#', 'Session ID', 'Title', 'Model', 'Events', 'Updated')
+        self._refresh_table()
+        if self._delete_targets:
+            deleted, errors = self._delete_sessions(self._delete_targets)
+            self._set_feedback(f'Deleted {deleted} session(s). {" ".join(errors)}'.strip())
+            self._refresh_table()
+        if self._preview_target:
+            self._select_target(self._preview_target)
+        self.query_one('#sessions-search', Input).focus()
+
+    def action_refresh(self) -> None:
+        self._refresh_table()
+
+    def action_delete_selected(self) -> None:
+        sid = self._current_session_id()
+        if not sid:
+            self._set_feedback('No session selected.', error=True)
+            return
+        deleted, errors = self._delete_sessions([sid])
+        if deleted:
+            self._set_feedback(f'Deleted session {sid[:12]}.')
+        elif errors:
+            self._set_feedback(errors[0], error=True)
+        self._refresh_table()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        bid = event.button.id
+        if bid == 'sessions-refresh':
+            self._refresh_table()
+            return
+        if bid == 'sessions-delete':
+            self.action_delete_selected()
+            return
+        if bid == 'sessions-resume':
+            sid = self._current_session_id()
+            if sid:
+                self.dismiss(sid)
+            else:
+                self._set_feedback('No session selected.', error=True)
+            return
+        if bid == 'sessions-close':
+            self.dismiss(None)
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        self._update_preview(event.cursor_row)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == 'sessions-search':
+            self._search = event.value.strip()
+            self._refresh_table()
+            return
+        if event.input.id == 'sessions-limit':
+            value = event.value.strip()
+            self._limit = int(value) if value.isdigit() and int(value) > 0 else 20
+            self._refresh_table()
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == 'sessions-sort' and isinstance(event.value, str):
+            self._sort_by = event.value
+            self._refresh_table()
+
+    def _set_feedback(self, message: str, *, error: bool = False) -> None:
+        style = NAVY_ERROR if error else NAVY_READY
+        self.query_one('#sessions-feedback', Label).update(f'[{style}]{message}[/]')
+
+    def _refresh_table(self) -> None:
+        from backend.cli.session_manager import (
+            _filter_sessions_fuzzy,
+            _find_sessions_root,
+            _list_session_entries,
+        )
+
+        self._sessions_root = _find_sessions_root(self._config)
+        table = self.query_one('#sessions-table', DataTable)
+        table.clear()
+        if self._sessions_root is None:
+            self._all_entries = []
+            self._visible_entries = []
+            self._set_feedback('No session storage found.', error=True)
+            self.query_one('#sessions-preview', Static).update('')
+            return
+
+        entries = _list_session_entries(self._sessions_root, sort_by=self._sort_by)
+        self._all_entries = entries
+        if self._search:
+            entries = _filter_sessions_fuzzy(entries, self._search)
+        self._visible_entries = entries[: self._limit]
+        for i, (sid, meta, event_count) in enumerate(self._visible_entries, 1):
+            title = str(meta.get('title') or meta.get('name') or '—')
+            model = str(meta.get('llm_model') or '—')[:24]
+            updated = str(meta.get('last_updated_at') or meta.get('created_at') or '—')[:19]
+            table.add_row(str(i), sid[:12], title, model, str(event_count), updated, key=sid)
+
+        if self._visible_entries:
+            table.move_cursor(row=0, column=0, animate=False, scroll=False)
+            self._update_preview(0)
+            self._set_feedback(f'{len(self._visible_entries)} session(s) loaded.')
+        else:
+            self.query_one('#sessions-preview', Static).update('')
+            if self._search:
+                self._set_feedback(f'No sessions matching "{self._search}".', error=True)
+            else:
+                self._set_feedback('No sessions found.', error=True)
+
+    def _select_target(self, target: str) -> None:
+        from backend.cli.session_manager import _resolve_target
+
+        resolved = _resolve_target(self._visible_entries, target)
+        if resolved is None:
+            self._set_feedback(f"No session at '{target}'", error=True)
+            return
+        sid = resolved[0]
+        for idx, item in enumerate(self._visible_entries):
+            if item[0] == sid:
+                table = self.query_one('#sessions-table', DataTable)
+                table.move_cursor(row=idx, column=0, animate=False, scroll=True)
+                self._update_preview(idx)
+                break
+
+    def _current_session_id(self) -> str | None:
+        table = self.query_one('#sessions-table', DataTable)
+        row_index = table.cursor_row
+        if row_index < 0 or row_index >= len(self._visible_entries):
+            return None
+        return self._visible_entries[row_index][0]
+
+    def _update_preview(self, row_index: int) -> None:
+        if row_index < 0 or row_index >= len(self._visible_entries):
+            self.query_one('#sessions-preview', Static).update('')
+            return
+        sid, meta, event_count = self._visible_entries[row_index]
+        cost = meta.get('accumulated_cost') or 0
+        preview = Text.from_markup(
+            f'[bold]ID:[/] {sid}\n'
+            f'[bold]Title:[/] {str(meta.get("title") or meta.get("name") or "—")}\n'
+            f'[bold]Model:[/] {str(meta.get("llm_model") or "—")}\n'
+            f'[bold]Events:[/] {event_count}\n'
+            f'[bold]Cost:[/] {f"${float(cost):.4f}" if cost else "—"}\n'
+            f'[bold]Updated:[/] {str(meta.get("last_updated_at") or meta.get("created_at") or "—")[:19]}'
+        )
+        self.query_one('#sessions-preview', Static).update(preview)
+
+    def _delete_sessions(self, targets: list[str]) -> tuple[int, list[str]]:
+        from backend.cli.session_manager import _resolve_target
+
+        if self._sessions_root is None:
+            return 0, ['No session storage found.']
+
+        deleted = 0
+        errors: list[str] = []
+        for target in targets:
+            resolved = _resolve_target(self._all_entries, target)
+            if resolved is None:
+                errors.append(f"No session at '{target}'.")
+                continue
+            sid = resolved[0]
+            try:
+                shutil.rmtree(self._sessions_root / sid, ignore_errors=False)
+                deleted += 1
+            except Exception as exc:
+                errors.append(f'{sid[:12]}: {exc}')
+        return deleted, errors
+
+
 # ── Main screen ───────────────────────────────────────────────────────────
 
 
@@ -279,6 +608,7 @@ class GrintaScreen(Screen):
         Binding('ctrl+shift+c', 'copy_transcript', 'Copy Transcript', show=True),
         Binding('escape', 'interrupt_agent', 'Interrupt', show=False),
         Binding('ctrl+l', 'clear_transcript', 'Clear', show=True),
+        Binding('ctrl+space', 'complete_command', 'Complete', show=False),
         Binding('ctrl+z', 'suspend', 'Suspend', show=False),
         Binding('enter', 'submit_input', 'Send', show=False, priority=True),
         Binding('pageup', 'scroll_up', 'Scroll Up', show=False),
@@ -318,6 +648,11 @@ class GrintaScreen(Screen):
         self._bootstrapping: asyncio.Event | None = None
         self._bootstrap_task: asyncio.Task[Any] | None = None
         self._is_unmounted = False
+        self._command_hint = ''
+        self._phase_label = 'Ready'
+        self._phase_started_at = time.monotonic()
+        self._last_tool_status = 'No tool activity yet'
+        self._hud_tick = None
 
     _STATE_LABELS = {
         'starting': 'Starting…',
@@ -351,6 +686,15 @@ class GrintaScreen(Screen):
         'rate_limited': NAVY_WAITING,
     }
 
+    _SLASH_HINTS = {
+        '/help': '/help [--all|--search <term>|<command>]',
+        '/clear': '/clear',
+        '/settings': '/settings',
+        '/sessions': '/sessions [list] [--limit N] [--search TERM] [--sort updated|created|events|cost|model] [--preview N|ID] [--delete N|ID ...]',
+        '/resume': '/resume <N|session_id>',
+        '/quit': '/quit',
+    }
+
     def compose(self) -> ComposeResult:
         with Horizontal(id='main-layout'):
             with Transcript(id='transcript-container'):
@@ -374,6 +718,7 @@ class GrintaScreen(Screen):
         self._is_unmounted = False
 
         self._render_hud_bar()
+        self._hud_tick = self.set_interval(1.0, self._refresh_runtime_feedback)
         ta = self.query_one('#input', TextArea)
         ta.text = ''
         ta.focus()
@@ -399,6 +744,9 @@ class GrintaScreen(Screen):
     def on_unmount(self) -> None:
         _tui_logger.debug('on_unmount: GrintaScreen unmounting')
         self._is_unmounted = True
+        if self._hud_tick is not None:
+            self._hud_tick.stop()
+            self._hud_tick = None
         if self._bootstrap_task and not self._bootstrap_task.done():
             self._bootstrap_task.cancel()
         if self._renderer:
@@ -466,9 +814,83 @@ class GrintaScreen(Screen):
         line2_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
         line2_parts.append(f'[{NAVY_TEXT_DIM}]Calls: {calls}[/]')
 
+        elapsed = max(0, int(time.monotonic() - self._phase_started_at))
+        runtime_line = (
+            f'[{NAVY_TEXT_DIM}]Phase: {self._phase_label}  |  '
+            f'Elapsed: {elapsed}s  |  '
+            f'Last: {self._last_tool_status}[/]'
+        )
+        hint_line = (
+            f'[{NAVY_TEXT_SECONDARY}]Hint: {self._command_hint}[/]'
+            if self._command_hint
+            else runtime_line
+        )
+
         hud_bar = self.query_one('#hud-bar', HUD)
         hud_bar.query_one('#hud-line-1', Label).update(line1)
         hud_bar.query_one('#hud-line-2', Label).update('  |  '.join(line2_parts))
+        hud_bar.query_one('#hud-line-3', Label).update(hint_line)
+
+    def _refresh_runtime_feedback(self) -> None:
+        if not self._is_unmounted:
+            self._render_hud_bar()
+
+    def set_agent_phase(self, state_value: str) -> None:
+        key = state_value.lower().strip()
+        if key.startswith('agentstate.'):
+            key = key[len('agentstate.') :]
+        if '.' in key:
+            key = key.split('.')[-1]
+        label = self._STATE_LABELS.get(key, state_value)
+        if label != self._phase_label:
+            self._phase_label = label
+            self._phase_started_at = time.monotonic()
+            self._render_hud_bar()
+
+    def set_last_tool_status(self, status: str) -> None:
+        compact = re.sub(r'\s+', ' ', (status or '').strip())
+        if not compact:
+            return
+        if len(compact) > 96:
+            compact = compact[:93] + '...'
+        self._last_tool_status = compact
+        self._render_hud_bar()
+
+    def _update_command_hint(self, text: str) -> None:
+        stripped = _strip_ansi(text).strip()
+        if not stripped.startswith('/'):
+            if self._command_hint:
+                self._command_hint = ''
+                self._render_hud_bar()
+            return
+
+        try:
+            parts = shlex.split(stripped)
+        except ValueError:
+            hint = 'Command syntax error: check quotes.'
+        else:
+            if not parts:
+                hint = ''
+            else:
+                cmd = parts[0].lower()
+                if cmd in self._SLASH_HINTS:
+                    if cmd == '/sessions' and len(parts) > 1 and parts[-1].startswith('--'):
+                        hint = 'Sessions flags: --limit --search --sort --preview --delete'
+                    elif cmd == '/help' and len(parts) > 1 and parts[-1].startswith('--'):
+                        hint = 'Help flags: --all or --search <term>'
+                    else:
+                        hint = self._SLASH_HINTS[cmd]
+                else:
+                    candidates = [c for c in self._SLASH_HINTS if c.startswith(cmd)]
+                    hint = (
+                        'Commands: ' + ', '.join(candidates[:5])
+                        if candidates
+                        else 'Commands: /help, /clear, /settings, /sessions, /resume, /quit'
+                    )
+
+        if hint != self._command_hint:
+            self._command_hint = hint
+            self._render_hud_bar()
 
     # ── Transcript helpers ──────────────────────────────────────────────────
 
@@ -550,18 +972,21 @@ class GrintaScreen(Screen):
         body = _rich_text(text)
         body.stylize(NAVY_TEXT_MUTED)
         self._write_log(body)
+        self.set_last_tool_status(text)
 
     def add_error(self, text: str) -> None:
         icon = Text('✗ ', style=f'bold {NAVY_ERROR}')
         body = _rich_text(text)
         body.stylize(f'bold {NAVY_ERROR}')
         self._write_log(Text.assemble(icon, body))
+        self.set_last_tool_status(f'Error: {text}')
 
     def add_success(self, text: str) -> None:
         icon = Text('✓ ', style=f'bold {NAVY_READY}')
         body = _rich_text(text)
         body.stylize(f'bold {NAVY_READY}')
         self._write_log(Text.assemble(icon, body))
+        self.set_last_tool_status(text)
 
     def add_tool_start(self, tool_name: str, *, command: str = '') -> None:
         """Tool call — show in transcript."""
@@ -574,14 +999,17 @@ class GrintaScreen(Screen):
             self._write_log(
                 Text.assemble(icon, name, ' (', cmd_text, ')', style='#969aad')
             )
+            self.set_last_tool_status(f'{tool_name}: {command}')
         else:
             self._write_log(Text.assemble(icon, name))
+            self.set_last_tool_status(str(tool_name))
 
     def add_tool_result(self, text: str) -> None:
         """Tool result — muted text."""
         body = _rich_text(text)
         body.stylize(NAVY_TEXT_MUTED)
         self._write_log(Text.assemble('  ', body))
+        self.set_last_tool_status(text)
 
     def add_communicate_clarification(self, action: ClarificationRequestAction) -> None:
         """Agent asks a question — show question and options in a callout panel."""
@@ -844,7 +1272,52 @@ class GrintaScreen(Screen):
     def _scroll_to_bottom(self) -> None:
         self._get_display().scroll_end(animate=False)
 
+    def on_text_area_changed(self, event: TextArea.Changed) -> None:
+        if event.text_area.id == 'input':
+            self._update_command_hint(event.text_area.text)
+
     # ── Input handling ──────────────────────────────────────────────────────
+
+    def action_complete_command(self) -> None:
+        ta = self.query_one('#input', TextArea)
+        raw = _strip_ansi(ta.text)
+        if not raw.strip().startswith('/'):
+            return
+        try:
+            parts = shlex.split(raw.strip())
+        except ValueError:
+            self.add_error('Cannot autocomplete: malformed command.')
+            return
+        if not parts:
+            return
+
+        cmd = parts[0].lower()
+        if len(parts) == 1:
+            matches = [name for name in self._SLASH_HINTS if name.startswith(cmd)]
+            if not matches:
+                return
+            if len(matches) == 1:
+                ta.text = matches[0] + ' '
+            else:
+                self.add_system_message('Suggestions: ' + ', '.join(matches))
+            return
+
+        if cmd == '/sessions' and parts[-1].startswith('--'):
+            flags = ['--limit', '--search', '--sort', '--preview', '--delete']
+            matches = [flag for flag in flags if flag.startswith(parts[-1])]
+            if len(matches) == 1:
+                prefix = raw.rstrip()
+                ta.text = prefix[: -len(parts[-1])] + matches[0] + ' '
+            elif matches:
+                self.add_system_message('Sessions flags: ' + ', '.join(matches))
+        elif cmd == '/help' and parts[-1].startswith('--'):
+            flags = ['--all', '--search']
+            matches = [flag for flag in flags if flag.startswith(parts[-1])]
+            if len(matches) == 1:
+                prefix = raw.rstrip()
+                ta.text = prefix[: -len(parts[-1])] + matches[0] + ' '
+            elif matches:
+                self.add_system_message('Help flags: ' + ', '.join(matches))
 
     def action_submit_input(self) -> None:
         _tui_logger.debug(
@@ -893,6 +1366,7 @@ class GrintaScreen(Screen):
 
             ta = self.query_one('#input', TextArea)
             ta.clear()
+            self._update_command_hint('')
             ta.focus()
             self._scroll_to_bottom()
 
@@ -1009,45 +1483,52 @@ class GrintaScreen(Screen):
             self._agent_running = False
             self.app.exit()
         elif cmd == '/settings':
-            self._open_settings_tui()
+            await self._open_settings_tui()
         elif cmd == '/sessions':
-            self._run_sessions_tui(args)
+            await self._run_sessions_tui(args)
+        elif cmd == '/resume':
+            await self._run_resume_tui(args)
         else:
             self.add_error(f'Unknown command: {text}')
 
-    def _run_in_suspended_terminal(self, callback: Any, action_label: str) -> bool:
-        self.finalize_thinking()
-        if self._renderer is not None:
-            self._renderer.drain_events()
-        try:
-            with self.app.suspend():
-                callback()
-            return True
-        except Exception as exc:
-            logger.exception('[TUI] %s failed', action_label)
-            self.add_error(f'{action_label} failed: {type(exc).__name__}: {exc}')
-            return False
-
-    def _open_settings_tui(self) -> None:
-        from backend.cli.config_manager import get_current_model
-        from backend.cli.settings_tui import open_settings
+    async def _open_settings_tui(self) -> None:
+        from backend.cli.config_manager import (
+            get_current_model,
+            update_api_key,
+            update_budget,
+            update_cli_tool_icons,
+            update_model,
+        )
         from backend.core.config import load_app_config
 
-        if not self._run_in_suspended_terminal(
-            lambda: open_settings(self._rich_console), '/settings'
-        ):
+        result = await self.app.push_screen_wait(GrintaSettingsDialog(self._config))
+        if not result:
+            return
+        try:
+            update_model(str(result.get('model', '')).strip())
+            api_key = str(result.get('api_key', '')).strip()
+            if api_key:
+                update_api_key(api_key)
+            budget = result.get('budget')
+            if budget is not None:
+                update_budget(float(budget))
+            update_cli_tool_icons(bool(result.get('icons', True)))
+        except Exception as exc:
+            logger.exception('[TUI] /settings failed to persist')
+            self.add_error(f'/settings failed: {type(exc).__name__}: {exc}')
             return
 
         self._config = load_app_config()
         self._hud.update_model(get_current_model(self._config))
         mcp_servers = getattr(getattr(self._config, 'mcp', None), 'servers', []) or []
-        mcp_count = sum(1 for server in mcp_servers if getattr(server, 'name', '') != 'app-mcp')
+        mcp_count = sum(
+            1 for server in mcp_servers if getattr(server, 'name', '') != 'app-mcp'
+        )
         self._hud.update_mcp_servers(mcp_count)
         self._render_hud_bar()
+        self.add_success('Settings updated.')
 
-    def _run_sessions_tui(self, args: list[str]) -> None:
-        from backend.cli.session_manager import delete_sessions, list_sessions, show_session
-
+    async def _run_sessions_tui(self, args: list[str]) -> None:
         remaining = list(args)
         if remaining and remaining[0].lower() == 'list':
             remaining.pop(0)
@@ -1105,37 +1586,105 @@ class GrintaScreen(Screen):
             limit = parsed_limit
             i += 1
 
-        if delete_targets:
-            self._run_in_suspended_terminal(
-                lambda: delete_sessions(self._rich_console, delete_targets, config=self._config),
-                '/sessions --delete',
-            )
-            return
-
-        if preview_idx is not None:
-            result: dict[str, bool] = {'found': True}
-
-            def _preview() -> None:
-                result['found'] = bool(
-                    show_session(self._rich_console, config=self._config, target=preview_idx)
-                )
-
-            if not self._run_in_suspended_terminal(_preview, '/sessions --preview'):
-                return
-            if not result['found']:
-                self.add_error(f"No session at '{preview_idx}'")
-            return
-
-        self._run_in_suspended_terminal(
-            lambda: list_sessions(
-                self._rich_console,
-                limit=limit,
-                config=self._config,
-                sort_by=sort_by,
+        sid_to_resume = await self.app.push_screen_wait(
+            GrintaSessionsDialog(
+                self._config,
                 search=search,
-            ),
-            '/sessions',
+                sort_by=sort_by,
+                limit=limit,
+                preview_target=preview_idx,
+                delete_targets=delete_targets,
+            )
         )
+        if sid_to_resume:
+            await self._resume_session_target(sid_to_resume)
+
+    async def _run_resume_tui(self, args: list[str]) -> None:
+        if len(args) != 1:
+            self.add_error('Usage: /resume <N|session_id>')
+            return
+        await self._resume_session_target(args[0])
+
+    async def _resume_session_target(self, target: str) -> None:
+        from backend.cli.session_manager import resolve_session_id
+
+        cleaned_target = (target or '').strip()
+        if not cleaned_target:
+            self.add_error('Usage: /resume <N|session_id>')
+            return
+
+        resolved_id, resolve_error = resolve_session_id(cleaned_target, self._config)
+        if resolve_error or resolved_id is None:
+            self.add_error(resolve_error or f'No session matches: {cleaned_target}')
+            return
+
+        self.add_system_message(f'Resuming session: {resolved_id}')
+        self._phase_label = 'Loading…'
+        self._phase_started_at = time.monotonic()
+        self._render_hud_bar()
+        input_bar = self.query_one('#input-bar', InputBar)
+        input_bar.add_class('processing')
+        try:
+            if self._bootstrapping is not None and not self._bootstrapping.is_set():
+                await self._bootstrapping.wait()
+            await self._teardown_active_session()
+            await self._bootstrap(session_id=resolved_id)
+            if self._controller is None:
+                raise RuntimeError('Resume bootstrap did not initialize controller.')
+        except Exception as exc:
+            logger.exception('[TUI] /resume failed')
+            self.add_error(f'Resume failed: {type(exc).__name__}: {exc}')
+        else:
+            self.add_success(
+                f'Session {resolved_id[:12]} resumed. Send a message to continue.'
+            )
+        finally:
+            input_bar.remove_class('processing')
+            self.finalize_thinking()
+            self._render_hud_bar()
+
+    async def _teardown_active_session(self) -> None:
+        old_task = self._agent_task
+        self._agent_task = None
+        if old_task is not None and not old_task.done():
+            old_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                await asyncio.wait_for(old_task, timeout=5.0)
+
+        old_controller = self._controller
+        self._controller = None
+        if old_controller is not None:
+            mark_interrupt = getattr(old_controller, 'mark_user_interrupt_stop', None)
+            if callable(mark_interrupt):
+                with contextlib.suppress(Exception):
+                    mark_interrupt()
+            stop_fn = getattr(old_controller, 'stop', None)
+            if callable(stop_fn):
+                with contextlib.suppress(asyncio.TimeoutError, Exception):
+                    await asyncio.wait_for(stop_fn(), timeout=5.0)
+
+        old_runtime = self._runtime_stub
+        self._runtime_stub = None
+        if old_runtime is not None:
+            rebind = getattr(old_runtime, 'rebind_event_stream', None)
+            if callable(rebind):
+                with contextlib.suppress(Exception):
+                    rebind(None)
+            close_runtime = getattr(old_runtime, 'close', None)
+            if callable(close_runtime):
+                with contextlib.suppress(Exception):
+                    close_runtime()
+
+        old_stream = self._event_stream
+        self._event_stream = None
+        if old_stream is not None:
+            with contextlib.suppress(Exception):
+                old_stream.unsubscribe(EventStreamSubscriber.MAIN, old_stream.sid)
+            close_fn = getattr(old_stream, 'close', None)
+            if callable(close_fn):
+                with contextlib.suppress(Exception):
+                    close_fn()
+        self._memory_stub = None
 
     def show_help(self) -> None:
         self.add_divider()
@@ -1150,9 +1699,11 @@ class GrintaScreen(Screen):
             f'  [{NAVY_TEXT_SECONDARY}]/clear[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]/settings[/]  [{NAVY_TEXT_TERTIARY}]Open settings[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]/sessions[/]  [{NAVY_TEXT_TERTIARY}]Manage sessions[/]\n'
+            f'  [{NAVY_TEXT_SECONDARY}]/resume[/]    [{NAVY_TEXT_TERTIARY}]Resume a session[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]/quit[/]      [{NAVY_TEXT_TERTIARY}]Exit Grinta[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]Ctrl+C[/]     [{NAVY_TEXT_TERTIARY}]Stop agent[/]\n'
-            f'  [{NAVY_TEXT_SECONDARY}]Tab[/]        [{NAVY_TEXT_TERTIARY}]Newline in input[/]'
+            f'  [{NAVY_TEXT_SECONDARY}]Tab[/]        [{NAVY_TEXT_TERTIARY}]Newline in input[/]\n'
+            f'  [{NAVY_TEXT_SECONDARY}]Ctrl+Space[/] [{NAVY_TEXT_TERTIARY}]Command autocomplete[/]'
         )
         self._write_log(help_text)
         self.add_divider()
@@ -1160,7 +1711,7 @@ class GrintaScreen(Screen):
 
     # ── Bootstrap (preserved agent logic) ───────────────────────────────────
 
-    async def _bootstrap(self) -> None:
+    async def _bootstrap(self, session_id: str | None = None) -> None:
         _tui_logger.debug('_bootstrap: start')
         logger.info('TUI _bootstrap: starting')
         self._hud.update_agent_state('Initializing')
@@ -1175,10 +1726,11 @@ class GrintaScreen(Screen):
         event_stream = None
         try:
             file_store = get_file_store(config)
-            event_stream = EventStream(sid='grinta-tui', file_store=file_store)
+            sid = (session_id or 'grinta-tui').strip() or 'grinta-tui'
+            event_stream = EventStream(sid=sid, file_store=file_store)
             self._event_stream = event_stream
             try:
-                agent, runtime = await asyncio.to_thread(
+                agent, runtime, conversation_stats = await asyncio.to_thread(
                     self._bootstrap_sync_phase1, config, event_stream
                 )
             except Exception as exc:
@@ -1214,7 +1766,12 @@ class GrintaScreen(Screen):
 
             try:
                 memory, controller = await asyncio.to_thread(
-                    self._bootstrap_sync_phase2, agent, runtime, event_stream, config
+                    self._bootstrap_sync_phase2,
+                    agent,
+                    runtime,
+                    event_stream,
+                    config,
+                    conversation_stats,
                 )
             except Exception as exc:
                 _tui_logger.debug(
@@ -1292,11 +1849,11 @@ class GrintaScreen(Screen):
         self,
         config: Any,
         event_stream: Any,
-    ) -> tuple[Any, Any]:
+    ) -> tuple[Any, Any, Any]:
         _tui_logger.debug(
             '_bootstrap_sync_phase1: create_registry_and_conversation_stats'
         )
-        llm_registry, _conv_stats, _app_cfg = create_registry_and_conversation_stats(
+        llm_registry, conv_stats, _app_cfg = create_registry_and_conversation_stats(
             config,
             sid=event_stream.sid,
             user_id='tui',
@@ -1311,7 +1868,7 @@ class GrintaScreen(Screen):
         _tui_logger.debug('_bootstrap_sync_phase1: create_agent')
         agent = create_agent(config, llm_registry)
         _tui_logger.debug('_bootstrap_sync_phase1: done')
-        return agent, runtime
+        return agent, runtime, conv_stats
 
     def _bootstrap_sync_phase2(
         self,
@@ -1319,6 +1876,7 @@ class GrintaScreen(Screen):
         runtime: Any,
         event_stream: Any,
         config: Any,
+        conversation_stats: Any,
     ) -> tuple[Any, Any]:
         _tui_logger.debug('_bootstrap_sync_phase2: create_memory')
         memory = create_memory(runtime, event_stream, sid=event_stream.sid)
@@ -1330,6 +1888,7 @@ class GrintaScreen(Screen):
             memory,
             event_stream,
             config,
+            conversation_stats,
         )
         _tui_logger.debug('_bootstrap_sync_phase2: controller done')
         return memory, controller
@@ -1341,20 +1900,16 @@ class GrintaScreen(Screen):
         memory: Any,
         event_stream: Any,
         config: Any,
+        conversation_stats: Any,
     ) -> Any:
-        return SessionOrchestrator(
-            config=OrchestrationConfig(
-                agent=agent,
-                event_stream=event_stream,
-                conversation_stats=ConversationStats(
-                    file_store=event_stream.file_store,
-                    conversation_id=event_stream.sid,
-                    user_id=None,
-                ),
-                iteration_delta=config.max_iterations,
-                headless_mode=True,
-            )
+        controller, _initial_state = create_controller(
+            agent=agent,
+            runtime=runtime,
+            config=config,
+            conversation_stats=conversation_stats,
+            headless_mode=True,
         )
+        return controller
 
     async def _run_agent_loop(self) -> None:
         if self._controller is None:
@@ -1747,6 +2302,7 @@ class TUIRenderer:
 
     def _write_card(self, card: ActivityCard) -> None:
         """Write an activity card to the transcript."""
+        self._tui.set_last_tool_status(f'{card.verb} {card.detail}'.strip())
         # Cards that need visual containers (borders) in the TUI
         _BORDERED_CATEGORIES = {
             'shell',
@@ -2247,6 +2803,7 @@ class TUIRenderer:
 
         self._current_state = state
         self._hud.update_agent_state(str(state))
+        self._tui.set_agent_phase(str(state))
 
         # End agent turn when reaching idle/terminal state
         if self._in_agent_turn and state in (

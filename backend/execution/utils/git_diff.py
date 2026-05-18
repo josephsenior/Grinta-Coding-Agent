@@ -11,7 +11,7 @@ import os
 import sys
 from pathlib import Path
 
-from backend.execution.utils.git_common import get_valid_git_ref, run_git_cmd
+from backend.execution.utils.git_common import get_valid_git_ref, run_git_args
 
 try:
     from backend.core.constants import (
@@ -65,9 +65,13 @@ def get_git_diff(relative_file_path: str) -> dict[str, str]:
         msg = 'no_repository'
         raise ValueError(msg)
     current_rev = get_valid_git_ref(str(closest_git_repo))
+    if not current_rev:
+        msg = 'no_valid_git_ref'
+        raise ValueError(msg)
+    git_object_path = path.relative_to(closest_git_repo).as_posix()
     try:
-        original = run_git_cmd(
-            f'git show "{current_rev}:{path.relative_to(closest_git_repo)}"',
+        original = run_git_args(
+            ['git', 'show', f'{current_rev}:{git_object_path}'],
             str(closest_git_repo),
         )
     except RuntimeError:

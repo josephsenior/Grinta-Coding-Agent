@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import shlex
 import subprocess  # nosec B404
+from collections.abc import Sequence
 
 EMPTY_TREE_REF = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 DISALLOWED_GIT_ARG_FRAGMENTS = ('|', '&&', ';', '>', '<', '$(')
@@ -27,6 +28,35 @@ def _split_git_cmd(cmd: str) -> list[str]:
     return args
 
 
+def _validate_git_args(args: Sequence[str]) -> list[str]:
+    """Validate a pre-tokenized git argv vector."""
+    argv = [str(arg) for arg in args]
+    if not argv or argv[0] != 'git':
+        msg = 'unsafe_git_cmd'
+        raise RuntimeError(msg)
+    return argv
+
+
+def run_git_args(args: Sequence[str], cwd: str) -> str:
+    """Run a pre-tokenized git command and return stdout.
+
+    Use this for paths and revision specs. It avoids POSIX ``shlex`` semantics
+    corrupting Windows backslashes while still keeping ``shell=False``.
+    """
+    result = subprocess.run(  # nosec B603
+        check=False,
+        args=_validate_git_args(args),
+        shell=False,
+        capture_output=True,
+        cwd=cwd,
+    )
+    if result.returncode != 0:
+        byte_content = result.stderr or result.stdout or b''
+        msg = f'error_running_cmd:{result.returncode}:{byte_content.decode(errors="replace")}'
+        raise RuntimeError(msg)
+    return result.stdout.decode(errors='replace').strip()
+
+
 def run_git_cmd(cmd: str, cwd: str) -> str:
     """Run a git command and return its output.
 
@@ -42,20 +72,7 @@ def run_git_cmd(cmd: str, cwd: str) -> str:
 
     """
     # Use shlex.split() to safely parse the command and avoid shell=True
-    result = subprocess.run(  # nosec B603
-        check=False,
-        args=_split_git_cmd(cmd),
-        shell=False,
-        capture_output=True,
-        cwd=cwd,
-    )
-    byte_content = result.stderr or result.stdout or b''
-    if result.returncode != 0:
-        msg = f'error_running_cmd:{result.returncode}:{byte_content.decode()}'
-        raise RuntimeError(
-            msg,
-        )
-    return byte_content.decode().strip()
+    return run_git_args(_split_git_cmd(cmd), cwd)
 
 
 def get_valid_git_ref(repo_dir: str) -> str | None:

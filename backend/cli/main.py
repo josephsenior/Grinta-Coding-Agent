@@ -101,7 +101,7 @@ def _load_dotenv_early(*, explicit_project: str | None = None) -> None:
     """Load ``.env`` into ``os.environ`` before backend imports.
 
     1. **Grinta install** ``<repo>/.env`` — optional keys and overrides (e.g. ``LOG_TO_FILE=false``).
-       Logging defaults (``LOG_TO_FILE``, ``DEBUG_LLM``) are on in ``backend.core.constants``.
+       Logging defaults are defined in ``backend.core.constants``; raw LLM debug logging is off by default.
     2. Optional **``-p`` / explicit project** ``.env`` with ``override=True`` so a
        client repo can override API keys without duplicating logging flags.
 

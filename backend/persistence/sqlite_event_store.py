@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core import json_compat as json
+from backend.ledger.integrity import embed_checksum, verify_event_integrity
 
 _SCHEMA_VERSION = 1
 
@@ -51,6 +52,10 @@ CREATE TABLE IF NOT EXISTS metadata (
     value TEXT NOT NULL
 );
 """
+
+
+class SQLiteAppendOnlyViolation(RuntimeError):
+    """Raised when a write would violate append-only ledger semantics."""
 
 
 class SQLiteEventStore:
@@ -156,26 +161,72 @@ class SQLiteEventStore:
             pass
 
     def check_integrity(self) -> bool:
-        """Run PRAGMA integrity_check and return True if the database is healthy.
+        """Run SQLite and application-level integrity checks.
 
-        Called once on startup.  A corrupted database returns a list of error
-        strings from SQLite; an empty DB or a healthy one returns ``['ok']``.
+        SQLite's ``integrity_check`` validates database pages and indexes. It
+        does not know whether event payloads match their row IDs or embedded
+        Grinta checksums, so this method validates both layers.
         """
         try:
             conn = self._get_read_conn()
             rows = conn.execute('PRAGMA integrity_check').fetchall()
             results = [r[0] for r in rows]
-            if results == ['ok']:
-                return True
-            logger.error(
-                'SQLite integrity check FAILED for %s: %s',
-                self._db_path,
-                '; '.join(results[:5]),  # cap output length
-            )
-            return False
+            if results != ['ok']:
+                logger.error(
+                    'SQLite integrity check FAILED for %s: %s',
+                    self._db_path,
+                    '; '.join(results[:5]),  # cap output length
+                )
+                return False
         except Exception as exc:
             logger.error(
                 'SQLite integrity check raised an exception for %s: %s',
+                self._db_path,
+                exc,
+            )
+            return False
+        return self.check_application_integrity()
+
+    def check_application_integrity(self) -> bool:
+        """Validate persisted event payload IDs and checksums."""
+        try:
+            conn = self._get_read_conn()
+            rows = conn.execute(
+                'SELECT id, payload FROM events ORDER BY id'
+            ).fetchall()
+            previous_id = -1
+            for row in rows:
+                event_id = int(row['id'])
+                if event_id <= previous_id:
+                    logger.error(
+                        'SQLite event order violation for %s: id=%s after id=%s',
+                        self._db_path,
+                        event_id,
+                        previous_id,
+                    )
+                    return False
+                previous_id = event_id
+                data = json.loads(row['payload'])
+                payload_id = data.get('id')
+                if payload_id is not None and payload_id != event_id:
+                    logger.error(
+                        'SQLite event id mismatch for %s: row id=%s payload id=%r',
+                        self._db_path,
+                        event_id,
+                        payload_id,
+                    )
+                    return False
+                if not verify_event_integrity(data, event_id):
+                    logger.error(
+                        'SQLite event checksum mismatch for %s event id=%s',
+                        self._db_path,
+                        event_id,
+                    )
+                    return False
+            return True
+        except Exception as exc:
+            logger.error(
+                'SQLite application integrity check failed for %s: %s',
                 self._db_path,
                 exc,
             )
@@ -207,6 +258,17 @@ class SQLiteEventStore:
     # Write
     # ------------------------------------------------------------------
 
+    def _prepare_payload(self, event_id: int, event_dict: dict[str, Any]) -> str:
+        """Return canonical JSON payload with event ID and checksum embedded."""
+        payload_dict = dict(event_dict)
+        payload_id = payload_dict.get('id')
+        if payload_id is not None and payload_id != event_id:
+            raise ValueError(
+                f'Event payload id mismatch: row id={event_id}, payload id={payload_id!r}'
+            )
+        payload_dict['id'] = event_id
+        return json.dumps(embed_checksum(payload_dict), ensure_ascii=False, default=str)
+
     def write_event(self, event_id: int, event_dict: dict[str, Any]) -> None:
         """Persist a single event.
 
@@ -216,19 +278,32 @@ class SQLiteEventStore:
         """
         import time as _time
 
-        payload = json.dumps(event_dict, ensure_ascii=False)
+        payload = self._prepare_payload(event_id, event_dict)
         timestamp = event_dict.get('timestamp', _time.time())
+        if not isinstance(timestamp, (int, float)):
+            timestamp_attr = getattr(timestamp, 'timestamp', None)
+            timestamp = (
+                float(timestamp_attr())
+                if callable(timestamp_attr)
+                else _time.time()
+            )
         event_type = event_dict.get('action', event_dict.get('observation', 'unknown'))
         source = event_dict.get('source')
 
         with self._write_lock:
             conn = self._get_conn()
             try:
+                conn.execute('BEGIN IMMEDIATE')
                 conn.execute(
-                    'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
+                    'INSERT INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
                     (event_id, timestamp, event_type, source, payload),
                 )
                 conn.commit()
+            except sqlite3.IntegrityError as exc:
+                conn.rollback()
+                raise SQLiteAppendOnlyViolation(
+                    f'Event id {event_id} already exists in append-only ledger {self._db_path}'
+                ) from exc
             except Exception:
                 conn.rollback()
                 raise
@@ -243,10 +318,23 @@ class SQLiteEventStore:
         """
         import time as _time
 
+        if not events:
+            return
+        ids = [event_id for event_id, _ in events]
+        if len(ids) != len(set(ids)):
+            raise SQLiteAppendOnlyViolation('Batch contains duplicate event IDs')
+
         rows: list[tuple[int, float, str, str | None, str]] = []
         for event_id, event_dict in events:
-            payload = json.dumps(event_dict, ensure_ascii=False)
+            payload = self._prepare_payload(event_id, event_dict)
             timestamp = event_dict.get('timestamp', _time.time())
+            if not isinstance(timestamp, (int, float)):
+                timestamp_attr = getattr(timestamp, 'timestamp', None)
+                timestamp = (
+                    float(timestamp_attr())
+                    if callable(timestamp_attr)
+                    else _time.time()
+                )
             event_type = event_dict.get(
                 'action', event_dict.get('observation', 'unknown')
             )
@@ -258,10 +346,15 @@ class SQLiteEventStore:
             try:
                 conn.execute('BEGIN IMMEDIATE')
                 conn.executemany(
-                    'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
+                    'INSERT INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
                     rows,
                 )
                 conn.commit()
+            except sqlite3.IntegrityError as exc:
+                conn.rollback()
+                raise SQLiteAppendOnlyViolation(
+                    f'Batch would overwrite existing event(s) in append-only ledger {self._db_path}'
+                ) from exc
             except Exception:
                 conn.rollback()
                 raise
@@ -280,8 +373,10 @@ class SQLiteEventStore:
         """
         conn = self._get_read_conn()
         limit = self._max_payload_bytes()
+        # Single query to avoid TOCTOU race between size check and payload fetch.
         row = conn.execute(
-            'SELECT length(payload) AS sz FROM events WHERE id = ?', (event_id,)
+            'SELECT length(payload) AS sz, payload FROM events WHERE id = ?',
+            (event_id,),
         ).fetchone()
         if row is None:
             return None
@@ -290,12 +385,17 @@ class SQLiteEventStore:
             raise ValueError(
                 f'Event payload too large ({size} bytes) for id={event_id}'
             )
-        row2 = conn.execute(
-            'SELECT payload FROM events WHERE id = ?', (event_id,)
-        ).fetchone()
-        if row2 is None:
-            return None
-        return json.loads(row2['payload'])
+        data = json.loads(row['payload'])
+        payload_id = data.get('id')
+        if payload_id is not None and payload_id != event_id:
+            raise ValueError(
+                f'Event {event_id}: payload id mismatch ({payload_id!r})'
+            )
+        if not verify_event_integrity(data, event_id):
+            raise ValueError(
+                f'Event {event_id}: integrity checksum mismatch in SQLite ledger'
+            )
+        return data
 
     def list_events(
         self,
@@ -319,8 +419,6 @@ class SQLiteEventStore:
         """
         clauses: list[str] = ['id >= ?']
         params: list[Any] = [start_id]
-        clauses.append('length(payload) <= ?')
-        params.append(self._max_payload_bytes())
 
         if end_id is not None:
             clauses.append('id < ?')
@@ -332,7 +430,7 @@ class SQLiteEventStore:
             clauses.append('source = ?')
             params.append(source)
 
-        sql = f'SELECT payload FROM events WHERE {" AND ".join(clauses)} ORDER BY id'  # nosec B608
+        sql = f'SELECT id, length(payload) AS sz, payload FROM events WHERE {" AND ".join(clauses)} ORDER BY id'  # nosec B608
         if limit is not None:
             sql += ' LIMIT ?'
             params.append(limit)
@@ -340,7 +438,27 @@ class SQLiteEventStore:
         conn = self._get_read_conn()
         rows = conn.execute(sql, params).fetchall()
 
-        return [json.loads(r['payload']) for r in rows]
+        results: list[dict[str, Any]] = []
+        max_payload_bytes = self._max_payload_bytes()
+        for r in rows:
+            row_id = int(r['id'])
+            size = int(r['sz'] or 0)
+            if size > max_payload_bytes:
+                raise ValueError(
+                    f'Event payload too large ({size} bytes) for id={row_id}'
+                )
+            data = json.loads(r['payload'])
+            event_id = data.get('id')
+            if event_id is not None and event_id != row_id:
+                raise ValueError(
+                    f'Event {row_id}: payload id mismatch ({event_id!r})'
+                )
+            if not verify_event_integrity(data, row_id):
+                raise ValueError(
+                    f'Event {row_id}: integrity checksum mismatch in SQLite ledger'
+                )
+            results.append(data)
+        return results
 
     def count(self) -> int:
         """Return the total number of persisted events."""
@@ -359,8 +477,18 @@ class SQLiteEventStore:
     # Delete
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _destructive_delete_enabled() -> bool:
+        return str(
+            os.getenv('GRINTA_SQLITE_LEDGER_ALLOW_DESTRUCTIVE_DELETE', '')
+        ).lower() in ('1', 'true', 'yes')
+
     def delete_event(self, event_id: int) -> None:
         """Delete a single event."""
+        if not self._destructive_delete_enabled():
+            raise SQLiteAppendOnlyViolation(
+                'delete_event is disabled for the append-only SQLite ledger'
+            )
         with self._write_lock:
             conn = self._get_conn()
             try:
@@ -376,6 +504,10 @@ class SQLiteEventStore:
         Returns:
             Number of deleted rows.
         """
+        if not self._destructive_delete_enabled():
+            raise SQLiteAppendOnlyViolation(
+                'delete_from is disabled for the append-only SQLite ledger'
+            )
         with self._write_lock:
             conn = self._get_conn()
             try:
@@ -394,4 +526,4 @@ class SQLiteEventStore:
         return f'SQLiteEventStore(db_path={self._db_path!r})'
 
 
-__all__ = ['SQLiteEventStore']
+__all__ = ['SQLiteAppendOnlyViolation', 'SQLiteEventStore']

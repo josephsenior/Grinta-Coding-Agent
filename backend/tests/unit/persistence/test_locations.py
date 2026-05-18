@@ -129,17 +129,17 @@ class TestGetConversationAgentStateFilename:
     def test_without_user_id(self):
         """Test agent state filename without user_id."""
         result = get_conversation_agent_state_filename('session123')
-        assert result == 'sessions/session123/agent_state.pkl'
+        assert result == 'sessions/session123/agent_state.json'
 
     def test_with_user_id(self):
         """Test agent state filename with user_id."""
         result = get_conversation_agent_state_filename('session123', user_id='user456')
-        assert result == 'users/user456/conversations/session123/agent_state.pkl'
+        assert result == 'users/user456/conversations/session123/agent_state.json'
 
-    def test_ends_with_pkl(self):
-        """Test result ends with .pkl."""
+    def test_ends_with_json(self):
+        """Test result ends with .json."""
         result = get_conversation_agent_state_filename('test')
-        assert result.endswith('agent_state.pkl')
+        assert result.endswith('agent_state.json')
 
 
 class TestGetConversationLlmRegistryFilename:

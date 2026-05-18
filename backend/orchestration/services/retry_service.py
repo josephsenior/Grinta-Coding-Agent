@@ -33,10 +33,15 @@ class RetryService:
     # Public API
     # ------------------------------------------------------------------ #
     def initialize(self) -> None:
-        """Start background retry worker if retry queue is enabled."""
+        """Start background retry worker if retry queue is enabled.
+
+        Recovers any retry tasks that were persisted to sidecar files
+        during a previous crash so they are not silently lost.
+        """
         self._retry_queue = get_retry_queue()
         if not self._retry_queue:
             return
+        self._recover_crashed_retries()
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -68,6 +73,30 @@ class RetryService:
         self._retry_count = 0
         self._retry_pending = False
         self._last_retry_status_signature = None
+
+    def _recover_crashed_retries(self) -> None:
+        """Restore retry tasks persisted to sidecar files from a previous crash.
+
+        Without this call, tasks that were in-flight at crash time are
+        silently lost and never re-scheduled.
+        """
+        if self._retry_queue is None:
+            return
+        try:
+            recovered = self._retry_queue.recover_pending()
+            if recovered:
+                logger.info(
+                    'Recovered %d retry task(s) from crash-sidecar persistence for controller %s',
+                    len(recovered),
+                    self.controller.id,
+                )
+                self._retry_pending = True
+        except Exception:
+            logger.debug(
+                'Retry sidecar recovery scan failed for controller %s (non-fatal)',
+                self.controller.id,
+                exc_info=True,
+            )
 
     def increment_retry_count(self) -> int:
         """Increment retry counter, returning the updated value."""
@@ -320,7 +349,7 @@ class RetryService:
                     tasks = await self._fetch_ready_tasks(controller, poll_interval)
                     if not tasks:
                         continue
-                    await self._process_tasks(tasks)
+                    await self._process_tasks(tasks, poll_interval)
                 except asyncio.CancelledError:
                     raise
                 except Exception as loop_exc:
@@ -342,11 +371,13 @@ class RetryService:
         except Exception as exc:
             if self._is_retry_backend_failure(exc):
                 logger.warning(
-                    'Retry queue backend connection lost for controller %s; worker exiting: %s',
+                    'Retry queue backend connection lost for controller %s; will retry: %s',
                     controller.id,
                     exc,
                 )
-                raise asyncio.CancelledError from exc
+                self._retry_pending = False
+                await asyncio.sleep(poll_interval)
+                return []
             raise
 
         if not tasks:
@@ -385,7 +416,7 @@ class RetryService:
         except Exception as budget_exc:  # pragma: no cover - defensive
             logger.debug('Could not compensate iteration budget: %s', budget_exc)
 
-    async def _process_tasks(self, tasks: list[RetryTask]) -> None:
+    async def _process_tasks(self, tasks: list[RetryTask], poll_interval: float) -> None:
         queue = self._retry_queue
         if queue is None:
             logger.debug('Retry queue no longer available; stopping task processing.')
@@ -396,8 +427,18 @@ class RetryService:
                 await self._process_retry_task(task)
                 await queue.mark_success(task)
                 self._retry_pending = False
+                self.reset_retry_metrics()
             except Exception as exc:
-                # CancelledError propagates; only handle Exception
+                if self._is_retry_backend_failure(exc):
+                    logger.warning(
+                        'Retry queue backend error for task %s on controller %s; will retry: %s',
+                        task.id,
+                        self.controller.id,
+                        exc,
+                    )
+                    self._retry_pending = False
+                    await asyncio.sleep(poll_interval)
+                    return
                 logger.exception(
                     'Retry task %s failed for controller %s: %s',
                     task.id,

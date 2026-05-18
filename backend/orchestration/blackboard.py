@@ -8,7 +8,19 @@ blackboard tool to read/write shared state (e.g. schema contracts, status).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import os
+import tempfile
+
+MAX_BLACKBOARD_KEYS = 256
+MAX_BLACKBOARD_KEY_BYTES = 512
+MAX_BLACKBOARD_VALUE_BYTES = 16 * 1024
+MAX_BLACKBOARD_TOTAL_BYTES = 256 * 1024
+
+
+def _utf8_len(value: str) -> int:
+    return len(value.encode('utf-8'))
 
 
 class Blackboard:
@@ -21,11 +33,35 @@ class Blackboard:
 
     def _save(self) -> None:
         path = self._path()
-        import os
-
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(self._data, f)
+        dir_name = os.path.dirname(path)
+        fd, tmp_path = tempfile.mkstemp(
+            prefix='.blackboard.tmp.',
+            dir=dir_name,
+            text=True,
+        )
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump(self._data, f, sort_keys=True)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, path)
+            self._fsync_dir(dir_name)
+        except Exception:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)
+            raise
+
+    @staticmethod
+    def _fsync_dir(path: str) -> None:
+        if os.name == 'nt':
+            return
+        with contextlib.suppress(OSError, AttributeError):
+            dir_fd = os.open(path, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
 
     def _load(self) -> None:
         import os
@@ -35,7 +71,15 @@ class Blackboard:
             try:
                 with open(path, 'r', encoding='utf-8') as f:
                     loaded_data = json.load(f)
-                    self._data.update(loaded_data)
+                    if isinstance(loaded_data, dict):
+                        for key, value in loaded_data.items():
+                            if not isinstance(key, str) or not isinstance(value, str):
+                                continue
+                            try:
+                                self._validate_limits(key, value)
+                            except ValueError:
+                                continue
+                            self._data[key] = value
             except Exception:
                 pass
 
@@ -43,24 +87,39 @@ class Blackboard:
         self._data: dict[str, str] = {}
         self._load()
         self._lock = asyncio.Lock()
-        self._dirty = False
-        self._flush_task: asyncio.Task[None] | None = None
 
-    async def _flush_loop(self) -> None:
-        """Debounced flush: wait for a quiet period then write once."""
-        try:
-            while self._dirty:
-                self._dirty = False
-                await asyncio.sleep(0.1)
-            self._save()
-        finally:
-            self._flush_task = None
+    def _current_total_bytes(self) -> int:
+        return sum(_utf8_len(key) + _utf8_len(value) for key, value in self._data.items())
 
-    def _schedule_flush(self) -> None:
-        """Mark data dirty and schedule a debounced flush."""
-        self._dirty = True
-        if self._flush_task is None or self._flush_task.done():
-            self._flush_task = asyncio.create_task(self._flush_loop())
+    def _validate_limits(self, key: str, value: str) -> None:
+        key_bytes = _utf8_len(key)
+        if key_bytes > MAX_BLACKBOARD_KEY_BYTES:
+            raise ValueError(
+                f'blackboard key too large ({key_bytes} bytes > {MAX_BLACKBOARD_KEY_BYTES})'
+            )
+
+        value_bytes = _utf8_len(value)
+        if value_bytes > MAX_BLACKBOARD_VALUE_BYTES:
+            raise ValueError(
+                f'blackboard value too large ({value_bytes} bytes > {MAX_BLACKBOARD_VALUE_BYTES})'
+            )
+
+        if key not in self._data and len(self._data) >= MAX_BLACKBOARD_KEYS:
+            raise ValueError(
+                f'blackboard key limit exceeded ({MAX_BLACKBOARD_KEYS} keys)'
+            )
+
+        previous_value = self._data.get(key, '')
+        projected_total = (
+            self._current_total_bytes()
+            - (_utf8_len(key) + _utf8_len(previous_value) if key in self._data else 0)
+            + key_bytes
+            + value_bytes
+        )
+        if projected_total > MAX_BLACKBOARD_TOTAL_BYTES:
+            raise ValueError(
+                f'blackboard total size limit exceeded ({projected_total} bytes > {MAX_BLACKBOARD_TOTAL_BYTES})'
+            )
 
     async def get(self, key: str | None = None) -> dict[str, str] | str:
         """Get one key's value, or all keys when key is None or 'all'."""
@@ -74,8 +133,9 @@ class Blackboard:
         if not key:
             return
         async with self._lock:
+            self._validate_limits(key, value)
             self._data[key] = value
-            self._schedule_flush()
+            self._save()
 
     async def keys(self) -> list[str]:
         """Return all keys."""
@@ -85,14 +145,7 @@ class Blackboard:
     async def flush(self) -> None:
         """Force an immediate flush of pending writes."""
         async with self._lock:
-            if self._flush_task and not self._flush_task.done():
-                self._flush_task.cancel()
-                try:
-                    await self._flush_task
-                except asyncio.CancelledError:
-                    pass
             self._save()
-            self._dirty = False
 
     def snapshot(self) -> dict[str, str]:
         """Synchronous snapshot for observation text (no lock; best-effort)."""

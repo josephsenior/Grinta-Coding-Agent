@@ -29,13 +29,54 @@ class ServiceHealth:
     event_stream_connected: bool = True
 
 
-async def get_circuit_breaker_stats() -> list[CircuitBreakerHealth]:
-    """Retrieve current state of all registered circuit breakers.
+async def get_circuit_breaker_stats(
+    controller: Any = None,
+) -> list[CircuitBreakerHealth]:
+    """Retrieve current state of the active circuit breaker(s).
+
+    When *controller* is provided the returned stats reflect the actual
+    agent circuit breaker (``agent_circuit_breaker.CircuitBreaker``) that
+    governs the agent loop.  Without a controller the function falls back
+    to the legacy utility breaker manager for backwards compatibility with
+    standalone health checks.
+
+    Args:
+        controller: Optional orchestrator reference for live agent circuit-breaker data.
 
     Returns:
         List of CircuitBreakerHealth objects.
-
     """
+    if controller is not None:
+        return _controller_circuit_breaker_stats(controller)
+    return _legacy_circuit_breaker_stats()
+
+
+def _controller_circuit_breaker_stats(controller: Any) -> list[CircuitBreakerHealth]:
+    """Read circuit breaker stats from the agent's actual CircuitBreakerService."""
+    try:
+        cb_service = getattr(controller, 'circuit_breaker_service', None)
+        if cb_service is None:
+            return []
+        cb = getattr(cb_service, 'circuit_breaker', None)
+        if cb is None:
+            return []
+        return [
+            CircuitBreakerHealth(
+                name='agent_circuit_breaker',
+                state='tripped' if getattr(cb, 'consecutive_errors', 0) >= getattr(
+                    getattr(cb, 'config', None), 'max_consecutive_errors', 5
+                ) else 'closed',
+                failure_count=getattr(cb, 'consecutive_errors', 0),
+                last_failure_time=getattr(cb, 'last_error_time', None),
+            )
+        ]
+    except Exception:
+        logger.debug('Failed to read controller circuit breaker stats', exc_info=True)
+        return []
+
+
+def _legacy_circuit_breaker_stats() -> list[CircuitBreakerHealth]:
+    """Fallback: read from the utility circuit breaker manager (deprecated)."""
     try:
         from backend.utils.circuit_breaker import get_circuit_breaker_manager
 
@@ -107,16 +148,59 @@ def get_mini_health_report() -> dict[str, Any]:
     }
 
 
-async def check_circuit_breaker_health(name: str) -> dict[str, Any]:
-    """Check the health of a specific circuit breaker by name.
+async def check_circuit_breaker_health(
+    name: str,
+    controller: Any = None,
+) -> dict[str, Any]:
+    """Check the health of the active circuit breaker.
+
+    When *controller* is provided the check reads from the actual agent
+    circuit breaker.  Without it the legacy utility breaker manager is
+    consulted for backwards compatibility.
 
     Args:
         name: Name of the circuit breaker to check.
+        controller: Optional orchestrator reference.
 
     Returns:
         Dictionary with the breaker's current health status.
-
     """
+    if controller is not None:
+        return _controller_circuit_breaker_health(name, controller)
+    return _legacy_circuit_breaker_health(name)
+
+
+def _controller_circuit_breaker_health(name: str, controller: Any) -> dict[str, Any]:
+    """Read circuit breaker health from the agent's CircuitBreakerService."""
+    try:
+        cb_service = getattr(controller, 'circuit_breaker_service', None)
+        if cb_service is None:
+            return {'status': 'no_circuit_breaker_service', 'name': name}
+        cb = getattr(cb_service, 'circuit_breaker', None)
+        if cb is None:
+            return {'status': 'circuit_breaker_disabled', 'name': name}
+        config = getattr(cb, 'config', None)
+        return {
+            'name': 'agent_circuit_breaker',
+            'state': (
+                'OPEN'
+                if getattr(cb, 'consecutive_errors', 0) >= getattr(config, 'max_consecutive_errors', 5)
+                else 'CLOSED'
+            ),
+            'failures': getattr(cb, 'consecutive_errors', 0),
+            'last_failure': (
+                lft.isoformat()
+                if (lft := getattr(cb, 'last_error_time', None)) is not None
+                else None
+            ),
+        }
+    except Exception:
+        logger.debug('Circuit breaker controller check failed', exc_info=True)
+    return {'name': name, 'state': 'UNKNOWN', 'failure_count': 0}
+
+
+def _legacy_circuit_breaker_health(name: str) -> dict[str, Any]:
+    """Fallback: read from the utility circuit breaker manager."""
     try:
         from backend.utils.circuit_breaker import get_circuit_breaker_manager
 
@@ -137,12 +221,7 @@ async def check_circuit_breaker_health(name: str) -> dict[str, Any]:
         return {'status': 'not_found', 'name': name}
     except Exception:
         logger.debug('Circuit breaker check failed', exc_info=True)
-
-    return {
-        'name': name,
-        'state': 'UNKNOWN',
-        'failure_count': 0,
-    }
+    return {'name': name, 'state': 'UNKNOWN', 'failure_count': 0}
 
 
 async def sync_state_metrics() -> bool:
@@ -196,29 +275,54 @@ def _collect_state_snapshot(state_obj: Any) -> dict[str, Any]:
     }
 
 
+def _as_real_number(value: Any) -> int | float | None:
+    """Return numeric values without accepting truthy mocks as numbers."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    return None
+
+
+def _as_state_name(value: Any) -> str | None:
+    """Normalize concrete circuit-breaker state values."""
+    if isinstance(value, str):
+        return value.upper()
+    name = getattr(value, 'name', None)
+    if isinstance(name, str):
+        return name.upper()
+    return None
+
+
 def _add_circuit_breaker_warnings(warnings: list[str], cb_service: Any) -> str | None:
-    """Add circuit breaker warnings. Returns cb_state_name for severity."""
-    cb_state = getattr(cb_service, 'state', None)
-    cb_state_name = getattr(cb_state, 'name', str(cb_state) if cb_state else None)
-    cb_failures = max(
-        x if isinstance(x, (int, float)) else 0
-        for x in (
-            getattr(cb_service, 'failure_count', None),
-            getattr(cb_service, 'consecutive_errors', None),
+    """Add circuit breaker warnings. Returns cb_state_name for severity.
+
+    Supports both the current ``CircuitBreakerService.circuit_breaker`` shape and
+    the older direct ``state``/``failure_count`` shape used by tests and adapters.
+    """
+    cb = getattr(cb_service, 'circuit_breaker', None)
+    consecutive = _as_real_number(getattr(cb, 'consecutive_errors', None))
+    max_errors = _as_real_number(
+        getattr(getattr(cb, 'config', None), 'max_consecutive_errors', None)
+    )
+    cb_state_name = _as_state_name(getattr(cb_service, 'state', None))
+    failure_count = _as_real_number(getattr(cb_service, 'failure_count', None))
+
+    is_open = (
+        cb_state_name in {'OPEN', 'TRIPPED'}
+        or (
+            consecutive is not None
+            and max_errors is not None
+            and max_errors > 0
+            and consecutive >= max_errors
         )
     )
-    cb_consecutive = getattr(cb_service, 'consecutive_errors', None)
-    cb_consecutive = cb_consecutive if isinstance(cb_consecutive, (int, float)) else 0
-    cb_max = getattr(
-        getattr(cb_service, 'config', None), 'max_consecutive_errors', None
-    )
-    max_int = int(cb_max) if isinstance(cb_max, (int, float)) else None
+    unhealthy_count = consecutive if consecutive is not None else failure_count
 
-    if cb_state_name == 'OPEN':
+    if is_open:
         warnings.append('circuit_breaker_open')
-    elif max_int is not None and cb_consecutive >= max_int:
-        warnings.append('circuit_breaker_consecutive_errors')
-    elif cb_failures >= 5:
+        return 'OPEN'
+    if unhealthy_count is not None and unhealthy_count >= 5:
         warnings.append('circuit_breaker_unhealthy')
     return cb_state_name
 
@@ -232,7 +336,11 @@ def _collect_health_warnings(controller: Any) -> tuple[list[str], str]:
     else:
         cb_state_name = None
 
-    if getattr(getattr(controller, 'retry_service', None), 'pending_retry', False):
+    retry_svc = getattr(controller, 'retry_service', None)
+    retry_pending = getattr(retry_svc, 'pending_retry', None)
+    if not isinstance(retry_pending, bool):
+        retry_pending = getattr(retry_svc, 'retry_pending', None)
+    if retry_pending is True:
         warnings.append('retry_pending')
 
     severity = 'red' if cb_state_name == 'OPEN' else ('yellow' if warnings else 'green')

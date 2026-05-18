@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from backend.context import ContextMemory
 from backend.context.compactor import Compactor
 from backend.context.pre_condensation_snapshot import (
+    commit_snapshot,
     delete_snapshot,
     extract_snapshot,
     format_snapshot_for_injection,
@@ -132,12 +133,12 @@ class ContextMemoryManager:
         return condensation_result
 
     def condense_history(self, state: State) -> CondensedHistory:
-        history = getattr(state, 'history', [])
+        history = list(getattr(state, 'history', []))
         if not self.compactor:
-            return CondensedHistory(list(history), None)
+            return CondensedHistory(history, None)
 
         # Auto-extract critical context before compaction may discard events
-        self._extract_pre_condensation_snapshot(list(history))
+        self._extract_pre_condensation_snapshot(history)
 
         # Check if we have a pre-warmed condensation from the background task
         turn_signals = getattr(state, 'turn_signals', None)
@@ -155,15 +156,18 @@ class ContextMemoryManager:
             condensation_result = self.compactor.compacted_history(state)
 
         condensation_result = self._maybe_force_compaction_under_memory_pressure(  # type: ignore[assignment]
-            state, list(history), condensation_result
+            state, history, condensation_result
         )
         memory_pressure = self._memory_pressure_signal(state)
 
         if isinstance(condensation_result, View):
-            # Compaction did not fire — remove the snapshot we eagerly wrote
-            # above so it cannot be injected stale on a future turn or session.
+            # Compaction did not fire — clean up the staged snapshot
+            # so it cannot be injected stale on a future turn or session.
             delete_snapshot()
             return CondensedHistory(condensation_result.events, None)
+
+        # Compaction fired — promote the staged snapshot so it survives.
+        commit_snapshot()
 
         action = condensation_result.action  # type: ignore[attr-defined]
         if self._is_noop_condensation_action(
@@ -172,7 +176,7 @@ class ContextMemoryManager:
             logger.info('Ignoring no-op condensation action without explicit request')
             if memory_pressure:
                 state.ack_memory_pressure(source='ContextMemoryManager')
-            return CondensedHistory(list(history), None)
+            return CondensedHistory(history, None)
 
         if memory_pressure:
             state.ack_memory_pressure(source='ContextMemoryManager')

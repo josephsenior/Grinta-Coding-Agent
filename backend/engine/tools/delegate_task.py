@@ -90,14 +90,10 @@ def build_delegate_task_action(arguments: dict) -> DelegateTaskAction:
             parallel_tasks=parallel_tasks, run_in_background=run_in_background
         )
 
-    # Single task mode
+    # Single task mode — files is optional (the worker can discover them).
     if 'task_description' not in arguments:
         raise FunctionCallValidationError(
             'Missing required argument "task_description" in tool call delegate_task'
-        )
-    if 'files' not in arguments:
-        raise FunctionCallValidationError(
-            'Missing required argument "files" in tool call delegate_task'
         )
 
     task_description = arguments['task_description']

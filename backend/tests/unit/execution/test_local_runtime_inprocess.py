@@ -9,6 +9,7 @@ from backend.core.constants import (
     TOOL_BRIDGE_TIMEOUT_BUFFER,
 )
 from backend.core.errors import AgentRuntimeDisconnectedError
+from backend.core.type_safety.path_validation import PathValidationError
 from backend.execution.drivers.local.local_runtime_inprocess import (
     LocalRuntimeInProcess,
 )
@@ -171,6 +172,33 @@ def test_run_after_hard_kill_requires_reconnect() -> None:
 
     with pytest.raises(AgentRuntimeDisconnectedError, match='Runtime not initialized'):
         runtime.run(CmdRunAction(command='pwd'))
+
+
+def test_list_files_allows_absolute_path_inside_workspace(tmp_path) -> None:
+    runtime = _make_runtime()
+    workspace = tmp_path / 'Workspace Root (2)'
+    nested = workspace / 'New Folder (2)'
+    nested.mkdir(parents=True)
+    (nested / 'a.txt').write_text('ok', encoding='utf-8')
+    executor = MagicMock()
+    executor.initial_cwd = str(workspace)
+    runtime._executor = executor
+
+    assert runtime.list_files(str(nested)) == ['a.txt']
+
+
+def test_list_files_rejects_absolute_path_outside_workspace(tmp_path) -> None:
+    runtime = _make_runtime()
+    workspace = tmp_path / 'workspace'
+    outside = tmp_path / 'outside'
+    workspace.mkdir()
+    outside.mkdir()
+    executor = MagicMock()
+    executor.initial_cwd = str(workspace)
+    runtime._executor = executor
+
+    with pytest.raises(PathValidationError, match='outside workspace boundary'):
+        runtime.list_files(str(outside))
 
 
 def test_cmd_run_bridge_timeout_aligns_with_default_cmd_floor() -> None:

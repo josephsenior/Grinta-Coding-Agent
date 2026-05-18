@@ -99,18 +99,30 @@ class TaskValidationService:
         )
 
     def _session_used_task_tracker(self) -> bool:
-        """True when the current session has used task tracking at least once."""
+        """True when the current session has used task tracking at least once.
+
+        Checks both in-memory event history AND the persisted plan file on disk.
+        Event history alone is unreliable because condensation can prune
+        ``TaskTrackingAction`` / ``TaskTrackingObservation`` events from the
+        in-memory history, making it appear as though task tracking was never
+        used.  The persisted plan file survives condensation.
+        """
         history = getattr(self._context.get_controller().state, 'history', None)
-        if not isinstance(history, list):
-            return False
+        if isinstance(history, list):
+            from backend.ledger.action import TaskTrackingAction
+            from backend.ledger.observation import TaskTrackingObservation
 
-        from backend.ledger.action import TaskTrackingAction
-        from backend.ledger.observation import TaskTrackingObservation
+            if any(
+                isinstance(event, (TaskTrackingAction, TaskTrackingObservation))
+                for event in history
+            ):
+                return True
 
-        return any(
-            isinstance(event, (TaskTrackingAction, TaskTrackingObservation))
-            for event in history
-        )
+        persisted = self._load_persisted_non_terminal_steps()
+        if persisted:
+            return True
+        persisted_empty = self._plan_file_exists()
+        return persisted_empty
 
     def _load_persisted_non_terminal_steps(self) -> list[tuple[str, str, str]]:
         """Load active steps from the persisted workspace plan when available."""
@@ -131,6 +143,21 @@ class TaskValidationService:
             return []
 
         return self._collect_non_terminal_steps(persisted_steps)
+
+    def _plan_file_exists(self) -> bool:
+        """True when the active plan JSON file exists on disk (even if empty)."""
+        controller = self._context.get_controller()
+        config = getattr(controller, 'config', None)
+        project_root = getattr(config, 'project_root', None)
+        if not isinstance(project_root, str) or not project_root.strip():
+            return False
+        try:
+            from backend.engine.tools.task_tracker import TaskTracker
+
+            tracker = TaskTracker(project_root.strip())
+            return tracker.path.exists() if hasattr(tracker, 'path') else False
+        except Exception:
+            return False
 
     @staticmethod
     def _dedupe_active_steps(

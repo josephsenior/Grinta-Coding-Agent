@@ -137,7 +137,11 @@ async def test_tui_settings_command_dispatches(mock_config):
 
         s = _get_screen(app)
         called = {'value': False}
-        s._open_settings_tui = lambda: called.__setitem__('value', True)  # type: ignore[method-assign]
+
+        async def _fake_settings() -> None:
+            called['value'] = True
+
+        s._open_settings_tui = _fake_settings  # type: ignore[method-assign]
 
         ta = s.query_one('#input', TextArea)
         ta.text = '/settings'
@@ -159,7 +163,11 @@ async def test_tui_sessions_command_dispatches_with_args(mock_config):
 
         s = _get_screen(app)
         captured: list[str] = []
-        s._run_sessions_tui = lambda args: captured.extend(args)  # type: ignore[method-assign]
+
+        async def _fake_sessions(args: list[str]) -> None:
+            captured.extend(args)
+
+        s._run_sessions_tui = _fake_sessions  # type: ignore[method-assign]
 
         ta = s.query_one('#input', TextArea)
         ta.text = '/sessions --limit 7'
@@ -167,6 +175,95 @@ async def test_tui_sessions_command_dispatches_with_args(mock_config):
         await pilot.pause()
 
         assert captured == ['--limit', '7']
+
+
+@pytest.mark.asyncio
+async def test_tui_resume_command_dispatches_with_args(mock_config):
+    """Verify /resume forwards parsed args to the resume handler."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        captured: list[str] = []
+
+        async def _fake_resume(args: list[str]) -> None:
+            captured.extend(args)
+
+        s._run_resume_tui = _fake_resume  # type: ignore[method-assign]
+
+        ta = s.query_one('#input', TextArea)
+        ta.text = '/resume 3'
+        await pilot.press('enter')
+        await pilot.pause()
+
+        assert captured == ['3']
+
+
+@pytest.mark.asyncio
+async def test_tui_sessions_modal_resume_handoff(mock_config):
+    """Verify sessions modal selection triggers direct resume flow."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        resumed: dict[str, str | None] = {'sid': None}
+
+        async def _fake_push_screen_wait(_dialog) -> str | None:
+            return 'session-abc123'
+
+        async def _fake_resume_target(target: str) -> None:
+            resumed['sid'] = target
+
+        app.push_screen_wait = _fake_push_screen_wait  # type: ignore[method-assign]
+        s._resume_session_target = _fake_resume_target  # type: ignore[method-assign]
+
+        await s._run_sessions_tui([])
+
+        assert resumed['sid'] == 'session-abc123'
+
+
+@pytest.mark.asyncio
+async def test_tui_inline_command_hint_updates(mock_config):
+    """Verify slash command typing updates HUD hint line."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        ta = s.query_one('#input', TextArea)
+        ta.text = '/sessions --s'
+        await pilot.pause()
+
+        hint = s.query_one('#hud-line-3', Label)
+        assert 'Hint:' in str(hint.renderable)
+
+
+@pytest.mark.asyncio
+async def test_tui_command_autocomplete_for_sessions(mock_config):
+    """Verify autocomplete expands slash command prefixes."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        ta = s.query_one('#input', TextArea)
+        ta.text = '/sess'
+        s.action_complete_command()
+        await pilot.pause()
+
+        assert ta.text == '/sessions '
 
 
 @pytest.mark.asyncio

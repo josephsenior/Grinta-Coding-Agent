@@ -147,6 +147,27 @@ class DurableEventWriter:
         if not self._thread or not self._thread.is_alive():
             return False
 
+        # Write WAL marker BEFORE enqueueing so that a crash between WAL write
+        # and enqueue is recoverable (the .pending file exists and will be
+        # replayed on restart).  If the WAL write fails we still attempt to
+        # enqueue — the event will be flushed but without crash-recovery
+        # coverage for this event.
+        serialized = json.dumps(persisted_event.payload)
+        pending_path = self._pending_path(persisted_event.filename)
+        wal_ok = False
+        try:
+            self._file_store.write(pending_path, serialized)
+            wal_ok = True
+        except Exception as exc:
+            logger.error(
+                'WAL: could not write .pending marker %s for event id=%d: %s. '
+                'Event will still be enqueued but crash-recovery coverage for '
+                'this event is reduced until flush completes.',
+                pending_path,
+                persisted_event.event_id,
+                exc,
+            )
+
         try:
             # Block up to _put_timeout before dropping — gives the writer
             # thread a chance to drain under transient load spikes.
@@ -160,29 +181,15 @@ class DurableEventWriter:
                 persisted_event.filename,
                 self._drops,
             )
+            # Clean up the WAL marker for the dropped event to prevent
+            # a phantom recovery on restart.
+            if wal_ok:
+                try:
+                    self._file_store.delete(pending_path)
+                except Exception:
+                    pass
             return False
 
-        # Write WAL marker AFTER successful enqueue so a crash between
-        # enqueue and flush is recoverable, but a dropped event never
-        # gets a WAL marker that could be resurrected on crash recovery.
-        # Failure here is non-fatal (event is already in the queue for the
-        # writer thread to flush), but we must propagate the error so the
-        # caller knows the crash-safety window is reduced.
-        serialized = json.dumps(persisted_event.payload)
-        pending_path = self._pending_path(persisted_event.filename)
-        wal_ok = False
-        try:
-            self._file_store.write(pending_path, serialized)
-            wal_ok = True
-        except Exception as exc:
-            logger.error(
-                'WAL: could not write .pending marker %s for event id=%d: %s. '
-                'Event is in queue and will be flushed, but crash-recovery '
-                'coverage for this event is reduced until flush completes.',
-                pending_path,
-                persisted_event.event_id,
-                exc,
-            )
         return wal_ok
 
     def _run(self) -> None:
@@ -265,9 +272,12 @@ class DurableEventWriter:
                         purge_exc,
                     )
             finally:
-                self._queue.task_done()
+                # Decrement _in_flight BEFORE task_done() so that if task_done()
+                # raises (e.g. from a double-call bug elsewhere), the counter is
+                # still updated and the drain loop won't stall.
                 if self._in_flight > 0:
                     self._in_flight -= 1
+                self._queue.task_done()
 
     def _flush_with_retry(self, persisted_event: PersistedEvent) -> None:
         """Attempt to flush an event with exponential-backoff retry on transient errors."""

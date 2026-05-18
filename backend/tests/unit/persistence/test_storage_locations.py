@@ -89,7 +89,7 @@ class TestOtherFilenames:
 
     def test_agent_state(self):
         result = get_conversation_agent_state_filename('s1')
-        assert result.endswith('agent_state.pkl')
+        assert result.endswith('agent_state.json')
 
     def test_llm_registry(self):
         result = get_conversation_llm_registry_filename('s1')

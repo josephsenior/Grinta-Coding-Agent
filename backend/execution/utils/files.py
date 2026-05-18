@@ -75,6 +75,20 @@ def read_lines(all_lines: list[str], start: int = 0, end: int = -1) -> list[str]
     return all_lines[start:end]
 
 
+def detect_line_ending(lines: list[str], default: str = '\n') -> str:
+    """Detect the dominant line ending from existing file lines."""
+    crlf = sum(1 for line in lines if line.endswith('\r\n'))
+    lf = sum(1 for line in lines if line.endswith('\n') and not line.endswith('\r\n'))
+    if crlf > lf:
+        return '\r\n'
+    return default
+
+
+def split_content_lines(content: str) -> list[str]:
+    """Split replacement content into logical lines without carrying CR chars."""
+    return content.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+
+
 async def read_file(
     path: str,
     workdir: str,
@@ -119,11 +133,16 @@ async def read_file(
 
 
 def insert_lines(
-    to_insert: list[str], original: list[str], start: int = 0, end: int = -1
+    to_insert: list[str],
+    original: list[str],
+    start: int = 0,
+    end: int = -1,
+    newline: str | None = None,
 ) -> list[str]:
     """Insert the new content to the original content based on start and end."""
+    line_ending = newline or detect_line_ending(original)
     new_lines = [''] if start == 0 else original[:start]
-    new_lines += [i + '\n' for i in to_insert]
+    new_lines += [i + line_ending for i in to_insert]
     new_lines += [''] if end == -1 else original[end:]
     return new_lines
 
@@ -152,7 +171,7 @@ async def write_file(
         FileWriteObservation on success or ErrorObservation on failure
 
     """
-    insert = content.split('\n')
+    insert = split_content_lines(content)
     try:
         whole_path = resolve_path(path, workdir, workspace_root)
         if not os.path.exists(os.path.dirname(whole_path)):
@@ -162,7 +181,13 @@ async def write_file(
             with open(whole_path, mode, encoding='utf-8') as file:  # noqa: ASYNC230
                 if mode != 'w':
                     all_lines = file.readlines()
-                    new_file = insert_lines(insert, all_lines, start, end)
+                    new_file = insert_lines(
+                        insert,
+                        all_lines,
+                        start,
+                        end,
+                        newline=detect_line_ending(all_lines),
+                    )
                 else:
                     new_file = [i + '\n' for i in insert]
                 file.seek(0)

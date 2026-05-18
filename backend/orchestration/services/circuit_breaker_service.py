@@ -133,6 +133,10 @@ class CircuitBreakerService:
         would immediately re-trip on the very first step of the new turn,
         causing the warning to re-render without any new high-risk action
         being taken.
+
+        Uses ``reset_task_counters`` instead of ``reset`` to preserve the
+        error-rate sliding window (``recent_errors`` / ``recent_actions_success``)
+        so that cross-turn error-rate anomalies are still detected.
         """
         if self._circuit_breaker is not None:
-            self._circuit_breaker.reset()
+            self._circuit_breaker.reset_task_counters()

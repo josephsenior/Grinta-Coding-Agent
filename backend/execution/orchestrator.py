@@ -12,8 +12,8 @@ from backend.core.logger import app_logger as logger
 from backend.execution.runtime_pool import (
     PooledRuntime,
     RuntimePool,
+    SingleUseRuntimePool,
     WarmPoolPolicy,
-    WarmRuntimePool,
 )
 from backend.execution.telemetry import RuntimeTelemetry, runtime_telemetry
 from backend.execution.watchdog import runtime_watchdog
@@ -41,7 +41,7 @@ class RuntimeOrchestrator:
         pool: RuntimePool | None = None,
         telemetry: RuntimeTelemetry | None = None,
     ) -> None:
-        self._pool = pool or WarmRuntimePool()
+        self._pool = pool or SingleUseRuntimePool()
         self._telemetry = telemetry or runtime_telemetry
         runtime_watchdog.set_idle_cleanup(self._pool)
         self._pool_policy_fingerprint: str | None = None

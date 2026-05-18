@@ -139,7 +139,7 @@ class StateTracker:
         self.state.history = self._fetch_events_from_stream(
             event_stream, start_id, end_id
         )
-        self.state.start_id = start_id
+        self.state.start_id = self._first_retained_event_id(self.state.history, start_id)
 
     def _get_history_range(self, event_stream: EventStream) -> tuple[int, int]:
         """Get the start and end ID range for history."""
@@ -167,7 +167,24 @@ class StateTracker:
         self, event_stream: EventStream, start_id: int, end_id: int
     ) -> list[Event]:
         """Fetch events from the event stream."""
-        return list(
+        if end_id - start_id + 1 > MAX_HISTORY_EVENTS:
+            events = list(
+                event_stream.search_events(
+                    start_id=start_id,
+                    end_id=end_id,
+                    reverse=True,
+                    filter=self.agent_history_filter,
+                    limit=MAX_HISTORY_EVENTS,
+                ),
+            )
+            events.reverse()
+            logger.info(
+                'Loaded last %d filtered events for state.history; older events remain durable in the ledger.',
+                len(events),
+            )
+            return self._trim_history_list(events, force_byte_check=True)
+
+        events = list(
             event_stream.search_events(
                 start_id=start_id,
                 end_id=end_id,
@@ -175,6 +192,7 @@ class StateTracker:
                 filter=self.agent_history_filter,
             ),
         )
+        return self._trim_history_list(events, force_byte_check=True)
 
     def set_conversation_stats(self, conversation_stats: ConversationStats) -> None:
         self.state.conversation_stats = conversation_stats
@@ -194,14 +212,12 @@ class StateTracker:
             if self.state.end_id >= 0
             else event_stream.get_latest_event_id()
         )
-        self.state.history = list(
-            event_stream.search_events(
-                start_id=start_id,
-                end_id=end_id,
-                reverse=False,
-                filter=self.agent_history_filter,
-            ),
+        self.state.history = self._fetch_events_from_stream(
+            event_stream,
+            start_id,
+            end_id,
         )
+        self.state.start_id = self._first_retained_event_id(self.state.history, start_id)
 
     def add_history(self, event: Event) -> None:
         """Add event to state history if it passes filter criteria.
@@ -225,38 +241,62 @@ class StateTracker:
 
     def _maybe_trim_history(self) -> None:
         """Trim history if count or estimated byte-size caps are exceeded."""
-        history = self.state.history
-        need_trim = False
-        reason = ''
+        trimmed = self._trim_history_list(self.state.history)
+        if trimmed is not self.state.history:
+            self.state.history = trimmed
 
-        if len(history) > MAX_HISTORY_EVENTS:
-            need_trim = True
-            reason = f'count {len(history)} > {MAX_HISTORY_EVENTS}'
-        else:
-            self._events_since_last_byte_estimate += 1
-            if (
-                len(history) > 100
-                and self._events_since_last_byte_estimate >= _BYTE_ESTIMATE_INTERVAL
-            ):
-                self._events_since_last_byte_estimate = 0
-                estimated_bytes = self._estimate_history_bytes(history)
-                if estimated_bytes > MAX_HISTORY_BYTES:
-                    need_trim = True
-                    reason = (
-                        f'estimated size {estimated_bytes // (1024 * 1024)}MB'
-                        f' > {MAX_HISTORY_BYTES // (1024 * 1024)}MB'
-                    )
-
-        if need_trim:
-            trim_count = max(len(history) // 4, 1)
-            self.state.history = history[trim_count:]
+    def _trim_history_list(
+        self, history: list[Event], *, force_byte_check: bool = False
+    ) -> list[Event]:
+        """Return a sliding-window history bounded by count and estimated bytes."""
+        trimmed = history
+        while True:
+            reason = self._history_trim_reason(
+                trimmed, force_byte_check=force_byte_check
+            )
+            if reason is None:
+                return trimmed
+            trim_count = max(len(trimmed) // 4, 1)
+            trimmed = list(trimmed[trim_count:])
             self._events_since_last_byte_estimate = 0
             logger.debug(
                 'Trimmed %d oldest events from state.history (%s, now %d)',
                 trim_count,
                 reason,
-                len(self.state.history),
+                len(trimmed),
             )
+
+    def _history_trim_reason(
+        self, history: list[Event], *, force_byte_check: bool = False
+    ) -> str | None:
+        if len(history) > MAX_HISTORY_EVENTS:
+            return f'count {len(history)} > {MAX_HISTORY_EVENTS}'
+
+        self._events_since_last_byte_estimate += 1
+        if (
+            not force_byte_check
+            and (
+                len(history) <= 100
+                or self._events_since_last_byte_estimate < _BYTE_ESTIMATE_INTERVAL
+            )
+        ):
+            return None
+
+        self._events_since_last_byte_estimate = 0
+        estimated_bytes = self._estimate_history_bytes(history)
+        if estimated_bytes <= MAX_HISTORY_BYTES:
+            return None
+        return (
+            f'estimated size {estimated_bytes // (1024 * 1024)}MB'
+            f' > {MAX_HISTORY_BYTES // (1024 * 1024)}MB'
+        )
+
+    @staticmethod
+    def _first_retained_event_id(history: list[Event], fallback: int) -> int:
+        if not history:
+            return fallback
+        event_id = getattr(history[0], 'id', fallback)
+        return event_id if isinstance(event_id, int) and event_id >= 0 else fallback
 
     @staticmethod
     def _estimate_history_bytes(history: list) -> int:

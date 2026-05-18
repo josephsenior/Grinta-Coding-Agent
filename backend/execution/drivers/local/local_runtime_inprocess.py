@@ -517,20 +517,32 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         if not path:
             return self._executor.initial_cwd
 
-        try:
-            from backend.core.type_safety.path_validation import SafePath
+        from backend.core.type_safety.path_validation import (
+            PathValidationError,
+            SafePath,
+        )
+        from backend.execution.security_enforcement import path_is_within_workspace
 
+        workspace = Path(self._executor.initial_cwd).resolve()
+        try:
             safe_path = SafePath.validate(
                 path,
-                workspace_root=self._executor.initial_cwd,
-                must_be_relative=True,
+                workspace_root=workspace,
+                must_be_relative=not os.path.isabs(path),
             )
-            return str(safe_path.path)
-        except Exception:
-            # Fallback
-            if os.path.isabs(path):
-                return path
-            return os.path.join(self._executor.initial_cwd, path)
+            resolved = safe_path.path.resolve()
+        except PathValidationError:
+            logger.warning('Rejected invalid list_files path: %s', path, exc_info=True)
+            raise
+        except (OSError, ValueError) as exc:
+            raise PathValidationError(f'Invalid list_files path: {exc}', path) from exc
+
+        if not path_is_within_workspace(resolved, workspace):
+            raise PathValidationError(
+                f'Path outside workspace boundary: {path}',
+                path,
+            )
+        return str(resolved)
 
     def _process_directory_entries(
         self, full_path: str, entries: list[str], path: str, recursive: bool

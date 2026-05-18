@@ -124,6 +124,7 @@ def register_routes(
         return response
 
     @app.post('/execute_action')
+    @app.post('/execute')
     async def execute_action_route(request: Request):
         client = get_client()
         assert client is not None
