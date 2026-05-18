@@ -136,6 +136,7 @@ class Message(BaseModel):
         force_string_serializer: Force string serialization format
         tool_ok: When role is tool, optional structured success/failure for
             learning and diagnostics (None = unknown / use legacy content heuristics).
+        reasoning_content: Reasoning/thinking content for models that support it (e.g., DeepSeek)
 
     """
 
@@ -150,6 +151,7 @@ class Message(BaseModel):
     name: str | None = None
     force_string_serializer: bool = False
     tool_ok: bool | None = None
+    reasoning_content: str | None = None
 
     # Rebuild the model to ensure all dependencies are properly resolved
     def __init_subclass__(cls, **kwargs):
@@ -190,6 +192,8 @@ class Message(BaseModel):
             item.text for item in self.content if isinstance(item, TextContent)
         )
         message_dict: dict[str, Any] = {'content': content, 'role': self.role}
+        if self.reasoning_content:
+            message_dict['reasoning_content'] = self.reasoning_content
         return self._add_tool_call_keys(message_dict)
 
     def _list_serializer(self) -> dict[str, Any]:
@@ -206,6 +210,8 @@ class Message(BaseModel):
         message_dict: dict[str, Any] = {'content': content, 'role': self.role}
         if role_tool_with_prompt_caching:
             message_dict['cache_control'] = {'type': 'ephemeral'}
+        if self.reasoning_content:
+            message_dict['reasoning_content'] = self.reasoning_content
         return self._add_tool_call_keys(message_dict)
 
     def _process_item_caching(

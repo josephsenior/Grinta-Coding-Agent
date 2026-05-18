@@ -464,7 +464,8 @@ def _handle_message_action(
         role=role,
         vision_is_active=vision_is_active,
     )
-    return [Message(role=role, content=content)]
+    reasoning_content = getattr(action, 'thought', None) or None
+    return [Message(role=role, content=content, reasoning_content=reasoning_content)]
 
 
 def _handle_user_cmd_action(action: CmdRunAction) -> list[Message]:

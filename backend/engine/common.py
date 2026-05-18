@@ -139,6 +139,9 @@ def extract_thought_from_message(assistant_msg: Any) -> str:
     Plain ``message.content`` without those tags is not treated as thinking — nothing
     is merged into ``action.thought`` (no duplicate command lines in the CLI).
     """
+    reasoning_content = getattr(assistant_msg, 'reasoning_content', None)
+    if reasoning_content:
+        return reasoning_content.strip()
     raw = _raw_message_content_text(getattr(assistant_msg, 'content', None))
     return extract_redacted_thinking_inner(raw).strip()
 
