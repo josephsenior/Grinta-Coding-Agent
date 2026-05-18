@@ -507,6 +507,50 @@ class TestLoadFromJson:
         assert llm_cfg.model == 'openai/meta-llama/llama-4-scout'
         assert llm_cfg.base_url == _PROVIDER_DEFAULT_URLS['lightning']
 
+    def test_load_from_json_sets_provider_default_base_url_for_opencode(
+        self, tmp_path
+    ) -> None:
+        from backend.inference.provider_resolver import _PROVIDER_DEFAULT_URLS
+
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'llm_model': 'deepseek-v4-flash-free',
+                    'llm_provider': 'opencode',
+                }
+            )
+        )
+        cfg = AppConfig()
+
+        load_from_json(cfg, str(json_file))
+
+        llm_cfg = cfg.get_llm_config()
+        assert llm_cfg.model == 'opencode/deepseek-v4-flash-free'
+        assert llm_cfg.base_url == _PROVIDER_DEFAULT_URLS['opencode']
+
+    def test_load_from_json_sets_provider_default_base_url_for_opencode_go(
+        self, tmp_path
+    ) -> None:
+        from backend.inference.provider_resolver import _PROVIDER_DEFAULT_URLS
+
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'llm_model': 'deepseek-v4-flash',
+                    'llm_provider': 'opencode-go',
+                }
+            )
+        )
+        cfg = AppConfig()
+
+        load_from_json(cfg, str(json_file))
+
+        llm_cfg = cfg.get_llm_config()
+        assert llm_cfg.model == 'opencode-go/deepseek-v4-flash'
+        assert llm_cfg.base_url == _PROVIDER_DEFAULT_URLS['opencode-go']
+
     def test_load_from_json_llm_api_key_warns_on_literal_uses_env(
         self, tmp_path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

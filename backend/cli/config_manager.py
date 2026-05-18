@@ -37,6 +37,8 @@ DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
     'google': 'google/gemini-3-flash-preview',
     'groq': 'groq/meta-llama/llama-4-scout',
     'lightning': 'lightning/meta-llama/Meta-Llama-3.1-8B-Instruct',
+    'opencode': 'opencode/deepseek-v4-flash-free',
+    'opencode-go': 'opencode-go/deepseek-v4-flash',
     'openai': DEFAULT_ONBOARDING_MODEL,
     'openrouter': 'openrouter/anthropic/claude-4.5-sonnet',
     'xai': 'xai/grok-4.1-fast',
@@ -56,6 +58,8 @@ _PROVIDERS: list[tuple[str, str, str]] = [
     # ── Aggregators / proxies ──
     ('openrouter', 'OpenRouter', 'aggregator'),
     ('lightning', 'Lightning AI', 'aggregator'),
+    ('opencode', 'OpenCode Zen', 'aggregator'),
+    ('opencode-go', 'OpenCode Go', 'aggregator'),
     ('nvidia', 'NVIDIA NIM', 'aggregator'),
     # ── Local providers ──
     ('ollama', 'Ollama', 'local'),
@@ -543,7 +547,16 @@ def _strip_provider_prefix(model: str) -> str:
         return model
     parts = model.split('/', 1)
     # Keep compound model names (e.g. meta-llama/Llama-3), strip simple provider prefix
-    if parts[0] in ('openai', 'anthropic', 'google', 'groq', 'xai', 'deepseek'):
+    if parts[0] in (
+        'openai',
+        'anthropic',
+        'google',
+        'groq',
+        'xai',
+        'deepseek',
+        'opencode',
+        'opencode-go',
+    ):
         return parts[1]
     return model
 
@@ -569,6 +582,8 @@ def _provider_base_url(provider: str) -> str | None:
         'deepseek': 'https://api.deepseek.com',
         'openrouter': 'https://openrouter.ai/api',
         'lightning': 'https://lightning.ai/api',
+        'opencode': 'https://opencode.ai/zen',
+        'opencode-go': 'https://opencode.ai/zen/go',
         'nvidia': 'https://integrate.api.nvidia.com',
     }
     return urls.get(provider)

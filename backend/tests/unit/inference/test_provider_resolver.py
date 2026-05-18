@@ -11,9 +11,12 @@ import httpx
 from backend.inference.provider_resolver import (
     LOCAL_ENDPOINTS,
     ProviderResolver,
+    canonicalize_model_selection,
     check_local_providers,
     discover_all_local_models,
     get_resolver,
+    opencode_go_required_endpoint,
+    opencode_required_endpoint,
 )
 
 
@@ -538,6 +541,60 @@ class TestLocalEndpoints(TestCase):
         """Test vLLM endpoints."""
         self.assertIsInstance(LOCAL_ENDPOINTS['vllm'], list)
         self.assertTrue(any('8000' in url for url in LOCAL_ENDPOINTS['vllm']))
+
+
+class TestCanonicalizeModelSelection(TestCase):
+    def test_opencode_keeps_provider_prefix(self):
+        model, provider = canonicalize_model_selection(
+            'deepseek-v4-flash-free', 'opencode'
+        )
+        self.assertEqual(model, 'opencode/deepseek-v4-flash-free')
+        self.assertEqual(provider, 'opencode')
+
+    def test_lightning_still_uses_openai_transport_prefix(self):
+        model, provider = canonicalize_model_selection('kimi-k2.5', 'lightning')
+        self.assertEqual(model, 'openai/kimi-k2.5')
+        self.assertEqual(provider, 'lightning')
+
+    def test_opencode_go_keeps_provider_prefix(self):
+        model, provider = canonicalize_model_selection('deepseek-v4-flash', 'opencode-go')
+        self.assertEqual(model, 'opencode-go/deepseek-v4-flash')
+        self.assertEqual(provider, 'opencode-go')
+
+
+class TestOpenCodeEndpointClassification(TestCase):
+    def test_opencode_endpoint_for_gpt5_family(self):
+        self.assertEqual(opencode_required_endpoint('opencode/gpt-5.5'), '/responses')
+
+    def test_opencode_endpoint_for_claude_family(self):
+        self.assertEqual(
+            opencode_required_endpoint('opencode/claude-sonnet-4-6'),
+            '/messages',
+        )
+
+    def test_opencode_endpoint_for_gemini_family(self):
+        self.assertEqual(
+            opencode_required_endpoint('opencode/gemini-3.1-pro'),
+            '/models',
+        )
+
+    def test_opencode_endpoint_for_chat_completions_family(self):
+        self.assertEqual(
+            opencode_required_endpoint('opencode/deepseek-v4-flash-free'),
+            '/chat/completions',
+        )
+
+    def test_opencode_go_endpoint_for_minimax_family(self):
+        self.assertEqual(
+            opencode_go_required_endpoint('opencode-go/minimax-m2.7'),
+            '/messages',
+        )
+
+    def test_opencode_go_endpoint_for_deepseek_family(self):
+        self.assertEqual(
+            opencode_go_required_endpoint('opencode-go/deepseek-v4-flash'),
+            '/chat/completions',
+        )
 
 
 if __name__ == '__main__':

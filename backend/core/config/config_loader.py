@@ -215,7 +215,10 @@ def _maybe_set_provider_default_base_url(
     )
 
     model_prefix = extract_provider_prefix(model_value or '')
-    if model_prefix == provider_value:
+    if model_prefix == provider_value and provider_value not in {
+        'opencode',
+        'opencode-go',
+    }:
         return
     provider_url = _PROVIDER_DEFAULT_URLS.get(provider_value)
     if provider_url:

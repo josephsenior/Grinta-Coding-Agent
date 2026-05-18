@@ -368,6 +368,8 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             'xai': ['xai/'],
             'groq': ['groq/'],
             'mistral': ['mistral/'],
+            'opencode': ['opencode/'],
+            'opencode-go': ['opencode-go/'],
             'openrouter': ['openrouter/'],
             'nvidia': ['nvidia/'],
             'ollama': ['ollama/'],

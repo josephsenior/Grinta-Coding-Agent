@@ -7,6 +7,45 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 
+def _ensure_opencode_chat_completions_model_supported(client: Any) -> None:
+    """Fail fast for OpenCode models that are not served via /chat/completions."""
+    provider_name = getattr(client, '_provider_name', 'openai')
+    if provider_name not in {'opencode', 'opencode-go'}:
+        return
+
+    from backend.inference.exceptions import BadRequestError
+    from backend.inference.provider_resolver import (
+        opencode_go_required_endpoint,
+        opencode_required_endpoint,
+    )
+
+    if provider_name == 'opencode-go':
+        required_endpoint = opencode_go_required_endpoint(client.model_name)
+    else:
+        required_endpoint = opencode_required_endpoint(client.model_name)
+    if required_endpoint == '/chat/completions':
+        return
+
+    llm_provider = 'opencode-go' if provider_name == 'opencode-go' else 'opencode'
+    example_models = (
+        "'opencode-go/deepseek-v4-flash', 'opencode-go/qwen3.6-plus'"
+        if provider_name == 'opencode-go'
+        else "'opencode/deepseek-v4-flash-free', 'opencode/minimax-m2.5-free', "
+        "'opencode/qwen3.6-plus'"
+    )
+    raise BadRequestError(
+        (
+            f'OpenCode model {client.model_name!r} is served via '
+            f"'{required_endpoint}', but this Grinta transport uses "
+            "'/chat/completions'. Select an OpenCode model served on "
+            f"'/chat/completions' (for example: {example_models}), or switch "
+            'provider/model route for non-chat families.'
+        ),
+        llm_provider=llm_provider,
+        model=client.model_name,
+    )
+
+
 def extract_openai_http_status(exc: Exception) -> int | None:
     """Best-effort HTTP status from an OpenAI SDK (or compatible) exception.
 
@@ -288,6 +327,7 @@ def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
     from backend.inference.exceptions import BadRequestError
     from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
 
+    _ensure_opencode_chat_completions_model_supported(client)
     messages = strip_prompt_cache_hints_from_messages(messages)
     messages = client._clean_messages(messages)
     kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)
@@ -347,6 +387,7 @@ async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> 
     from backend.inference.exceptions import BadRequestError
     from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
 
+    _ensure_opencode_chat_completions_model_supported(client)
     messages = strip_prompt_cache_hints_from_messages(messages)
     messages = client._clean_messages(messages)
     kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)
@@ -391,6 +432,7 @@ async def astream(
     from backend.inference import direct_clients as dc
     from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
 
+    _ensure_opencode_chat_completions_model_supported(client)
     messages = strip_prompt_cache_hints_from_messages(messages)
     messages = client._clean_messages(messages)
     kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)

@@ -117,6 +117,18 @@ class TestCheckPrefixMatch:
     def test_gemini_alias_prefix_no_longer_matches(self):
         assert self.mgr._check_prefix_match('gemini/1.5-pro', 'gemini/1.5-pro') is None
 
+    def test_opencode_prefix(self):
+        assert (
+            self.mgr._check_prefix_match('opencode/deepseek-v4-flash-free', '')
+            == 'opencode'
+        )
+
+    def test_opencode_go_prefix(self):
+        assert (
+            self.mgr._check_prefix_match('opencode-go/minimax-m2.7', '')
+            == 'opencode-go'
+        )
+
     def test_no_match(self):
         assert self.mgr._check_prefix_match('mistral-large', 'mistral-large') is None
 
