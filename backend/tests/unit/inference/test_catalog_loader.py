@@ -269,6 +269,12 @@ class TestGetTokenLimits:
                 assert input_limit == entry.max_input_tokens
                 break
 
+    def test_minimax_m2_7_output_limit_from_catalog(self):
+        """OpenCode Go MiniMax should expose its configured output token limit."""
+        input_limit, output_limit = get_token_limits('opencode-go/minimax-m2.7')
+        assert input_limit is None
+        assert output_limit == 131072
+
 
 class TestGetFeaturedModels:
     """Tests for get_featured_models function."""

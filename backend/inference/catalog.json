@@ -714,6 +714,13 @@
       "supports_reasoning_effort": true,
       "default_temperature": 0.7
     },
+    "minimax-m2.7": {
+      "provider": "opencode-go",
+      "aliases": [
+        "opencode-go/minimax-m2.7"
+      ],
+      "max_output_tokens": 131072
+    },
     "zai-glm-4.7": {
       "provider": "cerebras",
       "aliases": [
