@@ -18,6 +18,7 @@ _ANTHROPIC_INCOMPATIBLE_REQUEST_KEYS = frozenset(
         'extra_headers',
         'stream',
         'stream_options',
+        'reasoning_effort',
     }
 )
 
