@@ -2819,7 +2819,6 @@ class TUIRenderer:
                 plural = '' if self._tools_in_turn == 1 else 's'
                 summary_text = f'{self._tools_in_turn} tool{plural}  ·  {duration_str}'
                 # Full-width divider with bright cyan
-                self._tui._write_log(Text('\n'))
                 self._tui._write_log(Rule(style='#5eead4'))
                 self._tui._write_log(Text(f'  {summary_text}', style='#5eead4'))
                 self._tui._write_log(Text('\n'))
