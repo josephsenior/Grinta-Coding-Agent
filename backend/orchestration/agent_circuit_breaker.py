@@ -361,10 +361,16 @@ class CircuitBreaker:
         else:
             self.consecutive_errors = max(0, self.consecutive_errors - decay)
         self.recent_actions_success.append(True)
-        if tool_name in (
-            TEXT_EDITOR_TOOL_NAME,
-            TEXT_EDITOR_SYNTAX_TOOL_NAME,
-        ):
+        if tool_name and tool_name not in (TEXT_EDITOR_TOOL_NAME, TEXT_EDITOR_SYNTAX_TOOL_NAME):
+            if decay <= 0:
+                self._per_tool_errors.pop(tool_name, None)
+            else:
+                cur = self._per_tool_errors.get(tool_name, 0)
+                if cur <= decay:
+                    self._per_tool_errors.pop(tool_name, None)
+                else:
+                    self._per_tool_errors[tool_name] = cur - decay
+        elif tool_name in (TEXT_EDITOR_TOOL_NAME, TEXT_EDITOR_SYNTAX_TOOL_NAME):
             if decay <= 0:
                 self._per_tool_errors.pop(TEXT_EDITOR_TOOL_NAME, None)
                 self._per_tool_errors.pop(TEXT_EDITOR_SYNTAX_TOOL_NAME, None)
@@ -375,15 +381,6 @@ class CircuitBreaker:
                         self._per_tool_errors.pop(key, None)
                     else:
                         self._per_tool_errors[key] = cur - decay
-        elif tool_name:
-            if decay <= 0:
-                self._per_tool_errors.pop(tool_name, None)
-            else:
-                cur = self._per_tool_errors.get(tool_name, 0)
-                if cur <= decay:
-                    self._per_tool_errors.pop(tool_name, None)
-                else:
-                    self._per_tool_errors[tool_name] = cur - decay
 
     def get_tool_error_count(self, tool_name: str) -> int:
         """Return consecutive error count for a specific tool type."""
@@ -455,10 +452,19 @@ class CircuitBreaker:
         switch. This prevents false-positive breaker trips caused by
         accumulated ``stuck_detection_count`` or ``high_risk_action_count``
         from previous tasks.
+
+        Unlike :meth:`reset`, this preserves ``recent_errors`` and
+        ``recent_actions_success`` so that the error-rate sliding window
+        continues to provide signal across task boundaries.
         """
+        self.consecutive_errors = 0
         self.stuck_detection_count = 0
         self.high_risk_action_count = 0
-        logger.debug('Circuit breaker task counters reset (stuck=0, high_risk=0)')
+        self._per_tool_errors.clear()
+        logger.debug(
+            'Circuit breaker task counters reset '
+            '(consecutive_errors=0, stuck=0, high_risk=0, per_tool cleared)'
+        )
 
     def _update_metrics(self, state: State) -> None:
         """Update metrics from state.

@@ -16,7 +16,12 @@ from typing import TYPE_CHECKING, Any
 from backend.core.enums import FileEditSource
 from backend.core.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
-from backend.execution.utils.files import insert_lines, read_lines
+from backend.execution.utils.files import (
+    detect_line_ending,
+    insert_lines,
+    read_lines,
+    split_content_lines,
+)
 from backend.execution.utils.test_output_summary import extract_test_summary
 from backend.ledger.action import FileReadAction, FileWriteAction
 from backend.ledger.observation import (
@@ -553,13 +558,19 @@ def write_file_content(
             with open(filepath, encoding='utf-8') as f:
                 all_lines = f.readlines()
 
-            # Match backend/runtime/utils/files.py behavior for splitting
-            to_insert = action.content.split('\n')
+            # Preserve existing file newline style while normalizing inserted text.
+            to_insert = split_content_lines(action.content)
 
             start = (action.start or 1) - 1
             end = action.end if action.end is not None else -1
 
-            new_lines = insert_lines(to_insert, all_lines, start, end)
+            new_lines = insert_lines(
+                to_insert,
+                all_lines,
+                start,
+                end,
+                newline=detect_line_ending(all_lines),
+            )
 
             with open(filepath, 'w', encoding='utf-8') as f:
                 f.writelines(new_lines)

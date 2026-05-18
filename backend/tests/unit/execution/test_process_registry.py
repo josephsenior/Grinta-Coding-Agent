@@ -135,13 +135,13 @@ class TestSnapshot:
 
 
 class TestCancelAll:
-    def test_cancels_processes_via_terminate(self):
+    def test_cancels_processes_via_tree_kill_then_wait(self):
         svc = TaskCancellationService()
         proc = MagicMock(spec=subprocess.Popen)
         proc.pid = 10
         svc.register_process(proc)
         svc.cancel_all()
-        proc.terminate.assert_called_once()
+        proc.wait.assert_called_once()
         assert not svc._active_pids
 
     def test_kills_on_timeout(self):

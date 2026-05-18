@@ -50,6 +50,8 @@ DELETE_FROM_TRAJECTORY_EXTRAS_AND_SCREENSHOTS = DELETE_FROM_TRAJECTORY_EXTRAS | 
 
 def event_from_dict(data: dict[str, Any]) -> Event:
     """Convert dictionary to Event object."""
+    data = dict(data)
+    data.pop('_grinta_checksum', None)
     evt = _create_event_from_data(data)
     _process_underscore_keys(evt, data)
     return evt

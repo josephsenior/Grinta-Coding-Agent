@@ -277,7 +277,7 @@ class ActionExecutionClient(Runtime):
         from backend.ledger.serialization import event_to_dict, observation_from_dict
 
         data = event_to_dict(action)
-        resp = self._send_action_server_request('POST', '/execute', json=data)
+        resp = self._send_action_server_request('POST', '/execute_action', json=data)
         return observation_from_dict(resp.json())
 
     def _validate_action_type(self, action: Any) -> None:

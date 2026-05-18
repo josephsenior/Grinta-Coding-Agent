@@ -62,7 +62,7 @@ class TestConversationFilePaths:
         assert get_conversation_init_data_filename('s1').endswith('init.json')
 
     def test_agent_state(self):
-        assert get_conversation_agent_state_filename('s1').endswith('agent_state.pkl')
+        assert get_conversation_agent_state_filename('s1').endswith('agent_state.json')
 
     def test_llm_registry(self):
         assert get_conversation_llm_registry_filename('s1').endswith(

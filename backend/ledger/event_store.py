@@ -23,6 +23,16 @@ if TYPE_CHECKING:
     from backend.persistence.files import FileStore
 
 
+def _verify_event_checksum(data: dict, event_id: int) -> None:
+    """Verify integrity checksum if present; raise ValueError on mismatch."""
+    from backend.ledger.integrity import verify_event_integrity
+
+    if not verify_event_integrity(data, event_id):
+        raise ValueError(
+            f'Event {event_id}: integrity checksum mismatch — possible corruption'
+        )
+
+
 def _file_store_fs_root(file_store: FileStore) -> str | None:
     """Sync with :func:`backend.ledger.persistence._file_store_fs_root`."""
     from backend.ledger.persistence import _file_store_fs_root as _root
@@ -98,17 +108,15 @@ class EventStore(EventStoreABC):
                     if store.check_integrity():
                         self._sqlite_store = store
                     else:
-                        # DB is corrupt — close it and fall back to file-based path.
-                        # The corrupt DB stays on disk so the user can inspect it;
-                        # new events will be written as individual JSON files.
-                        logger.error(
-                            'SQLite event store for session %s failed integrity check '
-                            '— falling back to file-based event storage.',
-                            self.sid,
-                        )
                         store.close()
+                        raise RuntimeError(
+                            'Authoritative SQLite event store for session '
+                            f'{self.sid} failed integrity check'
+                        )
             except Exception as exc:
-                logger.warning('Failed to init SQLite store in EventStore: %s', exc)
+                raise RuntimeError(
+                    f'Failed to init authoritative SQLite store for session {self.sid}'
+                ) from exc
 
     def close(self) -> None:
         """Release the optional SQLite accelerator, if it is open."""
@@ -135,10 +143,10 @@ class EventStore(EventStoreABC):
 
     def _calculate_cur_id(self) -> int:
         """Calculate the current event ID based on file system content."""
-        max_id = -1
         if getattr(self, '_sqlite_store', None) is not None:
-            max_id = max(max_id, self._sqlite_store.max_id())
+            return self._sqlite_store.max_id() + 1
 
+        max_id = -1
         events = []
         try:
             events_dir = get_conversation_events_dir(self.sid, self.user_id)
@@ -278,6 +286,9 @@ class EventStore(EventStoreABC):
             data = self._sqlite_store.read_event(event_id)
             if data is not None:
                 return event_from_dict(data)
+            raise FileNotFoundError(
+                f'Event {event_id} missing from authoritative SQLite ledger'
+            )
 
         filename = self._get_filename_for_id(event_id, self.user_id)
         last_error: Exception | None = None
@@ -285,6 +296,7 @@ class EventStore(EventStoreABC):
             try:
                 content = self.file_store.read(filename)
                 data = json.loads(content)
+                _verify_event_checksum(data, event_id)
                 return event_from_dict(data)
             except (json.JSONDecodeError, ValueError) as exc:
                 last_error = exc
@@ -293,6 +305,7 @@ class EventStore(EventStoreABC):
             raise last_error
         content = self.file_store.read(filename)
         data = json.loads(content)
+        _verify_event_checksum(data, event_id)
         return event_from_dict(data)
 
     def get_latest_event(self) -> Event:

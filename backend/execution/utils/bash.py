@@ -5,6 +5,7 @@ from __future__ import annotations
 import getpass
 import os
 import re
+import shlex
 import time
 import uuid
 from enum import Enum
@@ -201,7 +202,7 @@ class BashSession(BaseShellSession):
             # Restore previous working directory
             new_pane = self.pane
             if old_cwd and old_cwd != self.work_dir and new_pane is not None:
-                new_pane.send_keys(f'cd {old_cwd}')
+                new_pane.send_keys(f'cd -- {shlex.quote(old_cwd)}')
                 time.sleep(0.2)
                 self._clear_screen()
             logger.info('Tmux session recovered (cwd=%s)', old_cwd)

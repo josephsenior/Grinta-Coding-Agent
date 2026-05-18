@@ -102,7 +102,7 @@ def get_conversation_agent_state_filename(sid: str, user_id: str | None = None) 
         str: The full path to the agent state file.
 
     """
-    return f'{get_conversation_dir(sid, user_id)}agent_state.pkl'
+    return f'{get_conversation_dir(sid, user_id)}agent_state.json'
 
 
 def get_conversation_llm_registry_filename(sid: str, user_id: str | None = None) -> str:

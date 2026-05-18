@@ -172,6 +172,11 @@ def _extract_spawned_pids(stdout: str) -> tuple[str, list[int]]:
     return cleaned.rstrip('\r\n') + ('\n' if stdout.endswith('\n') else ''), pids
 
 
+def _ps_single_quoted_literal(value: str) -> str:
+    """Return a PowerShell single-quoted string literal for arbitrary text."""
+    return "'" + value.replace("'", "''") + "'"
+
+
 class WindowsPowershellSession(BaseShellSession):
     """Manages PowerShell command execution using subprocess calls.
 
@@ -438,11 +443,12 @@ class WindowsPowershellSession(BaseShellSession):
         self, command: str
     ) -> CmdOutputObservation | ErrorObservation:
         """Start a background PowerShell process."""
-        escaped_cwd = self._cwd.replace('"', '`"')
-        child_script = f'Set-Location "{escaped_cwd}"; {command}'
+        literal_cwd = _ps_single_quoted_literal(self._cwd)
+        child_script = f'Set-Location -LiteralPath {literal_cwd}; {command}'
         child_script_escaped = child_script.replace("'", "''")
+        powershell_exe_literal = _ps_single_quoted_literal(self.powershell_exe)
         start_proc = (
-            f"$p = Start-Process -FilePath '{self.powershell_exe}' -NoNewWindow -PassThru "
+            f'$p = Start-Process -FilePath {powershell_exe_literal} -NoNewWindow -PassThru '
             f"-ArgumentList @('-NoProfile','-NonInteractive','-Command','{child_script_escaped}'); "
             'Write-Output $p.Id'
         )

@@ -1008,6 +1008,10 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             to_run = list(failed_actions)
             attempt += 1
 
+        # Mark only FAILED actions for serial retry. Successful actions must NOT
+        # be marked — once they succeed on retry, the flag would cause them to be
+        # returned serially on every subsequent get_next_action() call even though
+        # they already succeeded, creating an infinite re-execution loop.
         for failed_action in failed_actions:
             _mark_retry_serial_after_parallel_failure(failed_action)
 

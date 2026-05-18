@@ -208,7 +208,7 @@ class StuckDetector:
         ):
             return True
 
-        return self._check_advanced_stuck_patterns(filtered_history)
+        return False
 
     def _is_stuck_action_observation_pattern(
         self, filtered_history: list[Event]
@@ -601,7 +601,7 @@ class StuckDetector:
         # Check if the last N actions are ALL AgentThinkAction
         if all(isinstance(a, AgentThinkAction) for a in recent_actions[-10:]):
             logger.warning(
-                'Think-only loop detected: last 6+ actions are all AgentThinkAction '
+                'Think-only loop detected: last 10 actions are all AgentThinkAction '
                 'with no real tool use.'
             )
             return True

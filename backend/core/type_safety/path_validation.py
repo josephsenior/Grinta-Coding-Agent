@@ -19,7 +19,24 @@ from backend.core.os_capabilities import OS_CAPS
 from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
 
 # Security constants
-DANGEROUS_CHARS = ['<', '>', '|', '&', ';', '`', '$', '(', ')', '\n', '\r']
+#
+# File paths are not shell commands. Characters such as spaces, parentheses,
+# ampersands, semicolons, and dollar signs are valid filenames on common
+# filesystems and must be handled by command-layer quoting rather than rejected
+# here. Path validation only rejects characters that make the path unsafe or
+# invalid for filesystem use.
+DANGEROUS_CHARS = ['\n', '\r']
+WINDOWS_ILLEGAL_PATH_CHARS = ['<', '>', '"', '|', '?', '*']
+WINDOWS_RESERVED_NAMES = frozenset(
+    {
+        'CON',
+        'PRN',
+        'AUX',
+        'NUL',
+        *(f'COM{i}' for i in range(1, 10)),
+        *(f'LPT{i}' for i in range(1, 10)),
+    }
+)
 PATH_TRAVERSAL_PATTERNS = ['../', '..\\', '..%2F', '..%5C']
 # Regex to match ".." as a standalone path segment (not inside brackets like [...nextauth])
 _DOTDOT_SEGMENT_RE = re.compile(r'(^|/)\.\.(/|$)')
@@ -229,17 +246,77 @@ def _validate_path_length_and_nulls(path: str) -> None:
         )
 
 
-def _reject_dangerous_characters(path: str) -> None:
+def _reject_dangerous_characters(
+    path: str, *, must_be_relative: bool = True
+) -> None:
     dangerous_char = next((char for char in DANGEROUS_CHARS if char in path), None)
     if dangerous_char is None:
+        if OS_CAPS.is_windows:
+            _reject_windows_invalid_path(path, must_be_relative=must_be_relative)
         return
     raise PathValidationError(
         f'Path contains dangerous character: {repr(dangerous_char)}', path
     )
 
 
+def _reject_windows_invalid_path(path: str, *, must_be_relative: bool) -> None:
+    illegal_char = next(
+        (char for char in WINDOWS_ILLEGAL_PATH_CHARS if char in path),
+        None,
+    )
+    if illegal_char is not None:
+        raise PathValidationError(
+            f'Path contains invalid Windows path character: {repr(illegal_char)}',
+            path,
+        )
+
+    colon_indexes = [index for index, char in enumerate(path) if char == ':']
+    if colon_indexes:
+        drive_colon_allowed = (
+            not must_be_relative
+            and len(path) >= 3
+            and path[1] == ':'
+            and path[0].isalpha()
+            and path[2] in {'\\', '/'}
+        )
+        allowed_colons = {1} if drive_colon_allowed else set()
+        if any(index not in allowed_colons for index in colon_indexes):
+            raise PathValidationError(
+                "Path contains invalid Windows path character: ':'",
+                path,
+            )
+
+    for segment in _normalized_input_path(path).split('/'):
+        if not segment or segment.endswith(':'):
+            continue
+        if segment[-1:] in {' ', '.'}:
+            raise PathValidationError(
+                'Windows path segments may not end with a space or dot',
+                path,
+            )
+        stem = segment.split('.', maxsplit=1)[0].upper()
+        if stem in WINDOWS_RESERVED_NAMES:
+            raise PathValidationError(
+                f'Path uses reserved Windows device name: {segment}',
+                path,
+            )
+
+
 def _normalized_input_path(path: str) -> str:
     return path.replace('\\', '/')
+
+
+def _is_virtual_workspace_path(path: str) -> bool:
+    normalized = _normalized_input_path(path)
+    return normalized == '/workspace' or normalized.startswith('/workspace/')
+
+
+def _is_absolute_input_path(path: str) -> bool:
+    if _is_virtual_workspace_path(path):
+        return False
+    if OS_CAPS.is_windows and re.match(r'^[A-Za-z]:[\\/]', path):
+        return True
+    return Path(path).is_absolute()
 
 
 def _reject_path_traversal(path: str) -> None:
@@ -254,14 +331,14 @@ def _reject_path_traversal(path: str) -> None:
         raise PathValidationError('Path traversal detected: ..', path)
 
 
-def _validate_path_string(path: str) -> str:
+def _validate_path_string(path: str, *, must_be_relative: bool = True) -> str:
     """Validate path string: empty check, URL decode, null bytes, length, dangerous chars, traversal."""
     if not path:
         raise PathValidationError('Path must be a non-empty string', path)
     path = _decode_path_string(path)
     _validate_path_length_and_nulls(path)
-    _reject_dangerous_characters(path)
     _reject_path_traversal(path)
+    _reject_dangerous_characters(path, must_be_relative=must_be_relative)
     return path
 
 
@@ -385,12 +462,28 @@ def _resolve_workspace_relative_path(
     return full_path
 
 
+def _resolve_workspace_absolute_path(
+    path: str, workspace_root: str | Path | None
+) -> Path:
+    if workspace_root is None:
+        raise PathValidationError('workspace_root required for absolute paths', path)
+
+    workspace = Path(workspace_root).resolve()
+    full_path = Path(path).resolve()
+    rel_parts = _relative_parts_with_boundary_fallback(full_path, workspace, path)
+    _validate_path_depth(path, rel_parts)
+    _reject_unsafe_links(path, full_path, workspace)
+    return full_path
+
+
 def _resolve_path(
     path: str, workspace_root: str | Path | None, must_be_relative: bool
 ) -> Path:
     """Resolve path to absolute Path, enforcing workspace boundary if must_be_relative."""
     try:
         if must_be_relative:
+            if _is_absolute_input_path(path):
+                return _resolve_workspace_absolute_path(path, workspace_root)
             return _resolve_workspace_relative_path(path, workspace_root)
         return Path(path).resolve()
     except (OSError, ValueError) as exc:
@@ -408,7 +501,13 @@ def validate_and_sanitize_path(
     Prevents directory traversal, validates length, removes dangerous chars,
     enforces workspace boundaries, normalizes paths.
     """
-    sanitized = _validate_path_string(path)
+    if not path:
+        raise PathValidationError('Path must be a non-empty string', path)
+    validation_must_be_relative = must_be_relative and not _is_absolute_input_path(path)
+    sanitized = _validate_path_string(
+        path,
+        must_be_relative=validation_must_be_relative,
+    )
     validated_path = _resolve_path(sanitized, workspace_root, must_be_relative)
     if must_exist and not validated_path.exists():
         raise PathValidationError(f'Path does not exist: {path}', path)

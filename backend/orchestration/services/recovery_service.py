@@ -31,6 +31,7 @@ from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.agent import AgentThinkObservation
 from backend.ledger.observation.error import (
     ERROR_CATEGORY_AUTH,
+    ERROR_CATEGORY_CONTENT_POLICY,
     ERROR_CATEGORY_CONTEXT_WINDOW,
     ERROR_CATEGORY_MODEL_NOT_FOUND,
     ERROR_CATEGORY_NETWORK,
@@ -81,16 +82,18 @@ _TRANSIENT_LLM_INFRA_EXCEPTIONS = (
 
 
 def _is_limit_exceeded_error(exc: Exception) -> bool:
-    """Return True if this RuntimeError signals an agent budget or iteration hard limit.
+    """Return True if this exception signals an agent budget or iteration hard limit.
 
     These are terminal conditions the agent cannot self-recover from; they
     must be treated as hard stops that return control to the user rather than
     re-triggering the step loop.
+
+    Detection uses ``isinstance(AgentLimitExceededError)`` so the recovery
+    path is robust against upstream error-message format changes.
     """
-    if not isinstance(exc, RuntimeError):
-        return False
-    msg = str(exc).lower()
-    return 'maximum budget' in msg or 'maximum iteration' in msg
+    from backend.core.errors import AgentLimitExceededError
+
+    return isinstance(exc, AgentLimitExceededError)
 
 
 def _recovery_may_set_state(controller, new_state: AgentState) -> bool:
@@ -185,6 +188,7 @@ class RecoveryService:
         from backend.inference.exceptions import (
             APIConnectionError,
             AuthenticationError,
+            ContentPolicyViolationError,
             ContextWindowExceededError,
             InternalServerError,
             NotFoundError,
@@ -207,6 +211,8 @@ class RecoveryService:
             return ERROR_CATEGORY_MODEL_NOT_FOUND
         if isinstance(exc, AgentRuntimeDisconnectedError):
             return ERROR_CATEGORY_RUNTIME_DISCONNECTED
+        if isinstance(exc, ContentPolicyViolationError):
+            return ERROR_CATEGORY_CONTENT_POLICY
         return None
 
     async def _set_awaiting_user_input_if_allowed(self, controller) -> None:
@@ -390,7 +396,7 @@ class RecoveryService:
         if state is not None and hasattr(state, 'extra_data'):
             count = state.extra_data.get('__survivable_error_consecutive', 0) + 1
             state.extra_data['__survivable_error_consecutive'] = count
-            _MAX_SURVIVABLE = 20
+            _MAX_SURVIVABLE = 10
             if count > _MAX_SURVIVABLE:
                 logger.error(
                     'Survivable error loop detected: %d consecutive errors. '

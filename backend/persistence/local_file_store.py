@@ -7,6 +7,7 @@ import shutil
 import stat
 import tempfile
 import time
+from contextlib import suppress
 
 from backend.core.logger import app_logger as logger
 from backend.persistence.files import FileStore
@@ -101,6 +102,20 @@ class LocalFileStore(FileStore):
                 os.fsync(tmpf.fileno())
 
         os.replace(tmp_path, full_path)
+        if fsync:
+            self._fsync_directory(dir_name)
+
+    @staticmethod
+    def _fsync_directory(dir_name: str) -> None:
+        """Best-effort fsync of the parent directory after atomic replace."""
+        if os.name == 'nt':
+            return
+        with suppress(OSError, AttributeError):
+            dir_fd = os.open(dir_name, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
 
     def read(self, path: str) -> str:
         """Read file from local filesystem.

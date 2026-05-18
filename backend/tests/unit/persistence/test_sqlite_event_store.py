@@ -20,7 +20,10 @@ from typing import Any
 
 import pytest
 
-from backend.persistence.sqlite_event_store import SQLiteEventStore
+from backend.persistence.sqlite_event_store import (
+    SQLiteAppendOnlyViolation,
+    SQLiteEventStore,
+)
 
 
 @pytest.fixture
@@ -161,14 +164,15 @@ class TestWriteOperations:
 
         assert event_type == 'unknown'
 
-    def test_write_event_overwrites(self, store: SQLiteEventStore) -> None:
-        """Test that writing same ID overwrites previous event."""
+    def test_write_event_rejects_duplicate_id(self, store: SQLiteEventStore) -> None:
+        """Append-only ledger must reject duplicate event IDs."""
         store.write_event(0, {'id': 0, 'action': 'first'})
-        store.write_event(0, {'id': 0, 'action': 'second'})
+        with pytest.raises(SQLiteAppendOnlyViolation):
+            store.write_event(0, {'id': 0, 'action': 'second'})
 
         result = store.read_event(0)
         assert result is not None
-        assert result['action'] == 'second'
+        assert result['action'] == 'first'
 
     def test_write_event_with_complex_json(self, store: SQLiteEventStore) -> None:
         """Test writing event with complex nested structures."""
@@ -373,48 +377,48 @@ class TestReadOperations:
 class TestDeleteOperations:
     """Test event deletion functionality."""
 
-    def test_delete_single_event(self, store: SQLiteEventStore) -> None:
-        """Test deleting a single event."""
+    def test_delete_single_event_disabled(self, store: SQLiteEventStore) -> None:
+        """Append-only ledger rejects single-event deletes by default."""
         store.write_event(0, {'action': 'test'})
         store.write_event(1, {'action': 'test'})
 
-        store.delete_event(0)
-
-        assert store.read_event(0) is None
+        with pytest.raises(SQLiteAppendOnlyViolation):
+            store.delete_event(0)
+        assert store.read_event(0) is not None
         assert store.read_event(1) is not None
-        assert store.count() == 1
+        assert store.count() == 2
 
-    def test_delete_nonexistent_event(self, store: SQLiteEventStore) -> None:
-        """Test deleting nonexistent event doesn't error."""
-        store.delete_event(999)  # Should not raise
+    def test_delete_nonexistent_event_disabled(self, store: SQLiteEventStore) -> None:
+        """Delete APIs are disabled even for nonexistent rows."""
+        with pytest.raises(SQLiteAppendOnlyViolation):
+            store.delete_event(999)
         assert store.count() == 0
 
-    def test_delete_from(self, store: SQLiteEventStore) -> None:
-        """Test deleting events from start_id onwards."""
+    def test_delete_from_disabled(self, store: SQLiteEventStore) -> None:
+        """Append-only ledger rejects range truncation by default."""
         for i in range(10):
             store.write_event(i, {'action': f'event_{i}'})
 
-        deleted = store.delete_from(5)
-
-        assert deleted == 5
-        assert store.count() == 5
+        with pytest.raises(SQLiteAppendOnlyViolation):
+            store.delete_from(5)
+        assert store.count() == 10
         assert store.read_event(4) is not None
-        assert store.read_event(5) is None
-        assert store.read_event(9) is None
+        assert store.read_event(5) is not None
+        assert store.read_event(9) is not None
 
-    def test_delete_from_returns_count(self, store: SQLiteEventStore) -> None:
-        """Test delete_from returns number of deleted rows."""
+    def test_delete_from_returns_count_disabled(self, store: SQLiteEventStore) -> None:
+        """Disabled truncation does not report a misleading delete count."""
         for i in range(3):
             store.write_event(i, {'action': f'event_{i}'})
 
-        deleted = store.delete_from(1)
-        assert deleted == 2
+        with pytest.raises(SQLiteAppendOnlyViolation):
+            store.delete_from(1)
 
-    def test_delete_from_empty_range(self, store: SQLiteEventStore) -> None:
-        """Test delete_from on range with no events."""
+    def test_delete_from_empty_range_disabled(self, store: SQLiteEventStore) -> None:
+        """Range truncation remains disabled even when it would delete nothing."""
         store.write_event(0, {'action': 'test'})
-        deleted = store.delete_from(10)
-        assert deleted == 0
+        with pytest.raises(SQLiteAppendOnlyViolation):
+            store.delete_from(10)
 
 
 class TestConcurrency:

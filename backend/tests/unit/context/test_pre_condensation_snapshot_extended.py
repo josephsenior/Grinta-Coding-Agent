@@ -249,6 +249,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
 
     def test_save_load_and_delete_snapshot(self):
         snapshot_path = Path(self.id().replace('.', '_') + '.json')
+        staging_path = snapshot_path.with_name(f'.{snapshot_path.name}.staging')
         snapshot = {
             'files_touched': {'a.py': {'action': 'edit'}},
             'recent_errors': [],
@@ -258,8 +259,15 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         try:
             with patch.object(
                 snapshot_module, '_snapshot_path', return_value=snapshot_path
+            ), patch.object(
+                snapshot_module, '_snapshot_staging_path', return_value=staging_path
             ):
                 snapshot_module.save_snapshot(snapshot)
+                assert staging_path.exists()
+                assert not snapshot_path.exists()
+                assert snapshot_module.load_snapshot() == snapshot
+
+                snapshot_module.commit_snapshot()
                 assert snapshot_path.exists()
                 assert snapshot_module.load_snapshot() == snapshot
 
@@ -272,6 +280,8 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         finally:
             if snapshot_path.exists():
                 snapshot_path.unlink()
+            if staging_path.exists():
+                staging_path.unlink()
 
     def test_load_snapshot_returns_none_when_file_missing(self):
         missing = Path(self.id().replace('.', '_') + '_missing.json')

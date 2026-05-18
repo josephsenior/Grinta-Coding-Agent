@@ -215,7 +215,14 @@ class StateTransitionService:
             old_state == AgentState.AWAITING_USER_INPUT
             and new_state == AgentState.RUNNING
         ):
-            circuit_breaker = getattr(self._context, 'circuit_breaker', None)
+            circuit_breaker_service = getattr(
+                self._context.get_controller(), 'circuit_breaker_service', None
+            )
+            circuit_breaker = (
+                getattr(circuit_breaker_service, 'circuit_breaker', None)
+                if circuit_breaker_service
+                else None
+            )
             if circuit_breaker is not None and hasattr(
                 circuit_breaker, 'reset_task_counters'
             ):

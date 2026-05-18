@@ -55,7 +55,7 @@ class RecentEventsCompactor(Compactor):
         """Keep only the most recent events (up to `max_events`)."""
         head = view[: self.keep_first]
         tail_length = max(0, self.max_events - len(head))
-        tail = view[-tail_length:]
+        tail = [] if tail_length == 0 else view[-tail_length:]
         return View(events=head + tail)
 
     @classmethod

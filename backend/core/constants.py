@@ -339,7 +339,7 @@ ENFORCE_API_VERSIONING = os.getenv('APP_PERMISSIVE_API', '').strip().lower() not
 # ── Logging & Debug (env-var driven) ────────────────────────────────
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 DEBUG = _parse_bool_env('DEBUG')
-DEBUG_LLM = _parse_bool_env('DEBUG_LLM', default='true')
+DEBUG_LLM = _parse_bool_env('DEBUG_LLM', default='false')
 LOG_JSON = _parse_bool_env('LOG_JSON', default='true')  # Default to JSON for production
 LOG_JSON_LEVEL_KEY = os.getenv('LOG_JSON_LEVEL_KEY', 'level')
 # Enable OTEL log correlation when explicitly requested, defaulting to OTEL_ENABLED
@@ -495,7 +495,7 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     # Logging & debug
     'LOG_LEVEL': ('INFO', 'Root log level (DEBUG / INFO / WARNING / ERROR)'),
     'DEBUG': ('false', 'Enable general debug mode'),
-    'DEBUG_LLM': ('true', 'Log raw LLM request/response payloads'),
+    'DEBUG_LLM': ('false', 'Log raw LLM request/response payloads'),
     'APP_CLI_SHOW_REASONING_TEXT': (
         'true',
         'Render reasoning/thinking text in CLI panels; set false/0 to suppress provider reasoning leakage',

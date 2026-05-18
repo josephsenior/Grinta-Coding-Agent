@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from backend.core.io_adapters import json
 from backend.core.logger import app_logger as logger
 from backend.ledger.durable_writer import DurableEventWriter, PersistedEvent
+from backend.ledger.integrity import embed_checksum
 from backend.persistence.locations import get_conversation_events_dir
 
 if TYPE_CHECKING:
@@ -146,11 +147,12 @@ class EventPersistence:
                         sid,
                     )
             except Exception as exc:
-                logger.warning(
-                    'Failed to initialise SQLite event store, using file-based fallback: %s',
-                    exc,
-                )
-                self._sqlite_store = None
+                raise RuntimeError(
+                    f'Failed to initialise authoritative SQLite event store for session {sid}'
+                ) from exc
+
+        if self._sqlite_store is not None:
+            self._migrate_legacy_event_files_to_sqlite()
 
         # Async durable writer
         self._durable_writer: DurableEventWriter | None = None
@@ -175,19 +177,33 @@ class EventPersistence:
         event_id: int,
         cache_payload: tuple[str, str] | None,
     ) -> None:
-        """Persist a single event, choosing the fastest available path."""
-        # SQLite accelerator — fast single-write, bypass filesystem entirely
+        """Persist a single event.
+
+        When SQLite is available it is the authoritative ledger. File JSON/WAL
+        paths are retained only for explicit non-SQLite stores and legacy tests;
+        SQLite write failures are fatal because falling back would create two
+        divergent sources of truth.
+        """
         if self._sqlite_store is not None:
             try:
                 self._sqlite_store.write_event(event_id, payload)
-                self._record_persist_success(event_id, is_critical=False, mode='sqlite')
+                self._record_persist_success(
+                    event_id,
+                    is_critical=self._is_critical_payload(payload),
+                    mode='sqlite',
+                )
                 return
             except Exception as exc:
-                logger.warning(
-                    'SQLite write failed for event %d, falling back to file: %s',
+                self.stats['persist_failures'] += 1
+                self._last_persist_failure_at_monotonic = time.monotonic()
+                if self._recent_persist_failures is not None:
+                    self._recent_persist_failures.append(time.monotonic())
+                logger.error(
+                    'Authoritative SQLite write failed for event %d; refusing file fallback: %s',
                     event_id,
                     exc,
                 )
+                raise
 
         filename = self._get_filename_for_id(event_id, self.user_id)
         is_critical = self._is_critical_payload(payload)
@@ -248,8 +264,11 @@ class EventPersistence:
         self, pending_path: str, event_path: str, events_dir: str
     ) -> tuple[int, int]:
         """Process one .pending file. Returns (recovered_delta, cleaned_delta)."""
+        if self._sqlite_store is not None:
+            return self._process_pending_file_to_sqlite(pending_path, event_path)
         try:
             self.file_store.read(event_path)
+            # Canonical event file already exists — clean up the stale WAL marker.
             try:
                 self.file_store.delete(pending_path)
                 return (0, 1)
@@ -261,14 +280,26 @@ class EventPersistence:
                 )
                 return (0, 0)
         except FileNotFoundError:
+            # Canonical file missing — recover from WAL marker.
             try:
                 event_json = self.file_store.read(pending_path)
                 self.file_store.write(event_path, event_json)
                 self.file_store.delete(pending_path)
                 return (1, 0)
             except Exception as exc:
-                # Recovery failed — escalate to ERROR and preserve the orphan in
-                # a dedicated directory so it can be inspected without being lost.
+                # Recovery failed — check if the canonical file is corrupt
+                # (exists but unreadable) vs truly absent.
+                try:
+                    self.file_store.read(event_path)
+                    # Canonical exists now (race with another recovery) — clean WAL.
+                    try:
+                        self.file_store.delete(pending_path)
+                    except Exception:
+                        pass
+                    return (0, 1)
+                except FileNotFoundError:
+                    pass  # truly absent, proceed to quarantine
+
                 logger.error(
                     'WAL replay: UNRECOVERABLE pending file %s for session %s — '
                     'event may be lost. Error: %s. '
@@ -284,6 +315,92 @@ class EventPersistence:
                 'WAL replay: skipping %s (read error)', pending_path, exc_info=True
             )
             return (0, 0)
+
+    def _event_id_from_event_path(self, path: str) -> int:
+        """Extract an integer event ID from an event JSON or pending path."""
+        normalized = path.replace('\\', '/')
+        name = os.path.basename(normalized)
+        if name.endswith('.pending'):
+            name = name[: -len('.pending')]
+        if name.endswith('.json'):
+            name = name[: -len('.json')]
+        try:
+            return int(name)
+        except ValueError as exc:
+            raise ValueError(f'Cannot extract event id from {path!r}') from exc
+
+    def _process_pending_file_to_sqlite(
+        self, pending_path: str, event_path: str
+    ) -> tuple[int, int]:
+        """Recover a legacy file-WAL marker into authoritative SQLite."""
+        event_id = self._event_id_from_event_path(event_path)
+        try:
+            if self._sqlite_store.read_event(event_id) is not None:
+                self.file_store.delete(pending_path)
+                return (0, 1)
+            event_json = self.file_store.read(pending_path)
+            payload = json.loads(event_json)
+            if not isinstance(payload, dict):
+                raise ValueError('pending event payload is not a JSON object')
+            self._sqlite_store.write_event(event_id, payload)
+            self.file_store.delete(pending_path)
+            return (1, 0)
+        except Exception as exc:
+            logger.error(
+                'SQLite WAL replay failed for pending event %s in session %s: %s',
+                pending_path,
+                self.sid,
+                exc,
+            )
+            raise
+
+    def _migrate_legacy_event_files_to_sqlite(self) -> None:
+        """Import legacy per-event JSON files into the authoritative SQLite ledger."""
+        try:
+            events_dir = get_conversation_events_dir(self.sid, self.user_id)
+            all_files = self.file_store.list(events_dir)
+        except FileNotFoundError:
+            return
+        except Exception as exc:
+            logger.debug(
+                'SQLite migration: could not list legacy event dir for %s: %s',
+                self.sid,
+                exc,
+            )
+            return
+
+        legacy_files: list[tuple[int, str]] = []
+        for entry in all_files:
+            normalized = self._normalize_event_path(entry, events_dir)
+            if not normalized.endswith('.json'):
+                continue
+            if normalized.endswith('.pending') or '/event_cache/' in normalized:
+                continue
+            try:
+                legacy_files.append((self._event_id_from_event_path(normalized), normalized))
+            except ValueError:
+                continue
+
+        if not legacy_files:
+            return
+
+        migrated = 0
+        for event_id, path in sorted(legacy_files):
+            if self._sqlite_store.read_event(event_id) is not None:
+                continue
+            raw = self.file_store.read(path)
+            payload = json.loads(raw)
+            if not isinstance(payload, dict):
+                raise ValueError(f'Legacy event file {path} is not a JSON object')
+            self._sqlite_store.write_event(event_id, payload)
+            migrated += 1
+
+        if migrated:
+            logger.info(
+                'Migrated %d legacy JSON event(s) into SQLite ledger for session %s',
+                migrated,
+                self.sid,
+            )
 
     def _quarantine_pending_file(self, pending_path: str, events_dir: str) -> None:
         """Move an unrecoverable .pending file to a lost_events/ subdirectory.
@@ -446,6 +563,11 @@ class EventPersistence:
         payload: dict[str, Any],
         cache_payload: tuple[str, str] | None,
     ) -> None:
+        event_json = json.dumps(payload)
+        json_len = len(event_json)
+
+        # Embed an integrity checksum so corruption is detectable on read.
+        payload = embed_checksum(payload)
         event_json = json.dumps(payload)
         json_len = len(event_json)
 

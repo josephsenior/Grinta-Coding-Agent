@@ -54,6 +54,33 @@ def _snapshot_path() -> Path:
     return workspace_agent_state_dir() / 'pre_condensation_snapshot.json'
 
 
+def _snapshot_staging_path() -> Path:
+    from backend.core.workspace_resolution import workspace_agent_state_dir
+
+    return workspace_agent_state_dir() / '.pre_condensation_snapshot.staging.json'
+
+
+def save_snapshot(snapshot: dict[str, Any]) -> None:
+    """Persist the snapshot to a staging location.
+
+    The staging file is promoted to the canonical path via
+    ``commit_snapshot()`` only after compaction confirms it fired.
+    This prevents a stale snapshot from leaking when compaction
+    crashes or decides not to compact.
+
+    See ``commit_snapshot`` and ``delete_snapshot``.
+    """
+    p = _snapshot_staging_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding='utf-8')
+    logger.debug(
+        'Pre-condensation snapshot staged: %d files, %d errors, %d decisions',
+        len(snapshot.get('files_touched', {})),
+        len(snapshot.get('recent_errors', [])),
+        len(snapshot.get('decisions', [])),
+    )
+
+
 _MAX_ATTEMPTED_APPROACHES = 20
 
 
@@ -72,15 +99,28 @@ def _file_edit_observation_indicates_failure(content: str) -> bool:
     return False
 
 
-def extract_snapshot(events: list[Event]) -> dict[str, Any]:
-    """Extract critical context from events that are about to be condensed.
+def commit_snapshot() -> None:
+    """Promote the staging snapshot to the canonical path atomically.
 
-    Args:
-        events: The events that will be pruned during condensation.
-
-    Returns:
-        A structured dict containing the extracted context.
+    Only call after compaction successfully fires.  If this is never
+    called the staging file is cleaned up on next startup or by the
+    next ``save_snapshot`` call.
     """
+    import os as _os
+
+    staging = _snapshot_staging_path()
+    if not staging.exists():
+        return
+    final = _snapshot_path()
+    try:
+        _os.replace(staging, final)
+        logger.debug('Pre-condensation snapshot committed to %s', final)
+    except OSError:
+        logger.debug('Pre-condensation snapshot commit failed (non-fatal)', exc_info=True)
+
+
+def extract_snapshot(events: list[Event]) -> dict[str, Any]:
+    """Extract critical context from events that are about to be condensed."""
     snapshot: dict[str, Any] = {
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
         'events_condensed': len(events),
@@ -98,7 +138,6 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
         _extract_commands(event, snapshot)
 
     _extract_attempted_approaches(events, snapshot)
-
     return snapshot
 
 
@@ -118,7 +157,7 @@ def _extract_read_file_info(event: Event, files: dict) -> None:
 
 
 def _extract_cmd_run_file_paths(event: Event, files: dict) -> None:
-    """Extract file paths from CmdRunAction (cat/head/tail)."""
+    """Extract file paths from simple cat/head/tail command reads."""
     cmd = getattr(event, 'command', '')
     if 'cat ' not in cmd and 'head ' not in cmd and 'tail ' not in cmd:
         return
@@ -144,7 +183,7 @@ def _extract_file_info(event: Event, snapshot: dict) -> None:
 
 
 def _extract_errors(event: Event, snapshot: dict) -> None:
-    """Extract error messages from error observations."""
+    """Extract recent error messages from error-producing observations."""
     if len(snapshot['recent_errors']) >= _MAX_ERRORS:
         return
 
@@ -159,7 +198,6 @@ def _extract_errors(event: Event, snapshot: dict) -> None:
         exit_code = getattr(event, 'exit_code', 0)
         if exit_code != 0:
             content = str(getattr(event, 'content', ''))
-            # Extract just the last few lines as the error
             lines = content.strip().split('\n')
             error_tail = '\n'.join(lines[-5:])[:_MAX_CONTENT_LENGTH]
             if error_tail:
@@ -326,43 +364,38 @@ def _handle_file_edit_observation(
     return None
 
 
-def save_snapshot(snapshot: dict[str, Any]) -> None:
-    """Persist the snapshot to disk."""
-    p = _snapshot_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding='utf-8')
-    logger.debug(
-        'Pre-condensation snapshot saved: %d files, %d errors, %d decisions',
-        len(snapshot.get('files_touched', {})),
-        len(snapshot.get('recent_errors', [])),
-        len(snapshot.get('decisions', [])),
-    )
-
-
 def load_snapshot() -> dict[str, Any] | None:
-    """Load the most recent snapshot from disk."""
-    p = _snapshot_path()
-    if not p.exists():
-        return None
-    try:
-        return json.loads(p.read_text(encoding='utf-8'))
-    except (json.JSONDecodeError, OSError):
-        return None
+    """Load the most recent committed snapshot from disk.
+
+    Falls back to the staging path (written during a prior run that
+    crashed before commit).  The caller should call ``delete_snapshot()``
+    after consuming the result to prevent double-injection.
+    """
+    for getter in (_snapshot_path, _snapshot_staging_path):
+        p = getter()
+        if not p.exists():
+            continue
+        try:
+            return json.loads(p.read_text(encoding='utf-8'))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return None
 
 
 def delete_snapshot() -> None:
-    """Delete the on-disk snapshot if it exists.
+    """Delete the on-disk snapshot and staging file if they exist.
 
-    Called when compaction did NOT fire so the snapshot written eagerly before
-    the compactor ran is removed.  This prevents a stale snapshot from being
-    injected alongside a full history on the next session or turn.
+    Called when compaction did NOT fire so the eagerly-written staging
+    snapshot is removed.  Also called after the canonical snapshot has
+    been consumed via ``load_snapshot()``.
     """
-    try:
-        p = _snapshot_path()
-        if p.exists():
-            p.unlink()
-    except OSError:
-        pass
+    for getter in (_snapshot_path, _snapshot_staging_path):
+        try:
+            p = getter()
+            if p.exists():
+                p.unlink()
+        except OSError:
+            pass
 
 
 def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:

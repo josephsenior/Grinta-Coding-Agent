@@ -436,6 +436,24 @@ class TestWriteFile:
             assert written == 'New content\n'
 
     @pytest.mark.asyncio
+    async def test_write_existing_file_preserves_crlf_line_endings(self):
+        """Existing CRLF files should stay CRLF after range writes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace = Path(tmpdir)
+            test_file = workspace / 'existing.txt'
+            test_file.write_bytes(b'Old 1\r\nOld 2\r\n')
+
+            result = await write_file(
+                'existing.txt',
+                str(workspace),
+                str(workspace),
+                'New 1\nNew 2',
+            )
+
+            assert isinstance(result, FileWriteObservation)
+            assert test_file.read_bytes() == b'New 1\r\nNew 2\r\n'
+
+    @pytest.mark.asyncio
     async def test_write_file_with_line_range_insertion(self):
         """Test writing with line range inserts at specific position."""
         with tempfile.TemporaryDirectory() as tmpdir:

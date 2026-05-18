@@ -24,7 +24,7 @@ class TestSecurityConfigDefaults:
                 'enforce_security': True,
                 'block_high_risk': False,
                 'validation_mode': 'permissive',
-                'execution_profile': 'standard',
+                'execution_profile': 'hardened_local',
                 'allow_network_commands': False,
                 'allow_package_installs': False,
                 'allow_background_processes': False,

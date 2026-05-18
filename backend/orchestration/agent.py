@@ -51,10 +51,8 @@ class Agent(ABC):
     _registry: dict[str, type[Agent]] = {}
     runtime_plugins: list[PluginRequirement] = []
     config_model: type[AgentConfig] = AgentConfig
-    (
-        'Class field that specifies the config model to use for the agent. '
-        'Subclasses may override with a derived config model if needed.'
-    )
+    # Class field that specifies the config model to use for the agent.
+    # Subclasses may override with a derived config model if needed.
 
     def __init__(self, config: AgentConfig, llm_registry: LLMRegistry) -> None:
         """Initialize the agent with its configuration and LLM registry."""

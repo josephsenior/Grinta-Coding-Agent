@@ -9,6 +9,7 @@ persistence / WAL recovery to :mod:`backend.ledger.persistence`.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 import json
 import os
@@ -105,6 +106,44 @@ def _invoke_pre_dispatch_hook(hook: Callable[[Any], None], event: Event) -> None
     hook(event)
 
 
+def _acquire_session_lock(lock_path: str, lock_data: str) -> Any:
+    """Acquire an OS-level exclusive session lock or raise immediately."""
+    import sys
+
+    if sys.platform != 'win32':
+        import fcntl
+
+        handle = open(lock_path, 'w', encoding='utf-8')
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            handle.write(lock_data)
+            handle.flush()
+            os.fsync(handle.fileno())
+            return handle
+        except Exception:
+            with contextlib.suppress(Exception):
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
+            raise
+
+    import msvcrt
+
+    handle = open(lock_path, 'w+b')
+    try:
+        handle.write(lock_data.encode('utf-8'))
+        handle.flush()
+        os.fsync(handle.fileno())
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        return handle
+    except Exception:
+        with contextlib.suppress(Exception):
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        handle.close()
+        raise
+
+
 class EventStream(EventStore):
     """Thread-safe event stream with pub/sub functionality.
 
@@ -177,10 +216,15 @@ class EventStream(EventStore):
             from backend.persistence.locations import get_conversation_dir
 
             conv_dir = get_conversation_dir(sid, user_id)
-            lock_dir = os.path.join(
-                str(file_store.root) if hasattr(file_store, 'root') else conv_dir,
-                '.locks',
-            )
+            store_root = getattr(file_store, 'root', None)
+            if isinstance(store_root, str):
+                lock_base = store_root
+            elif isinstance(store_root, os.PathLike):
+                root_path = os.fspath(store_root)
+                lock_base = root_path if isinstance(root_path, str) else conv_dir
+            else:
+                lock_base = conv_dir
+            lock_dir = os.path.join(lock_base, '.locks')
             os.makedirs(lock_dir, exist_ok=True)
             self._session_lock_path = os.path.join(lock_dir, f'{sid}.lock')
             current_pid = os.getpid()
@@ -190,30 +234,15 @@ class EventStream(EventStore):
                 f'pid={current_pid};started={current_time:.0f};'
                 f'marker={session_marker};host={os.environ.get("COMPUTERNAME", "unknown")}'
             )
-            try:
-                import sys
-
-                lock_handle = None
-                if sys.platform != 'win32':
-                    import fcntl
-
-                    lock_handle = open(self._session_lock_path, 'w')
-                    fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                self._session_lock_handle = lock_handle
-                with open(self._session_lock_path, 'w', encoding='utf-8') as f:
-                    f.write(lock_data)
-            except Exception:
-                if lock_handle:  # noqa: F821
-                    try:
-                        if sys.platform != 'win32':
-                            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
-                        lock_handle.close()
-                    except Exception:
-                        pass
-                self._session_lock_handle = None
-                logger.debug('Could not acquire session lock', exc_info=True)
-        except Exception:
-            logger.debug('Session lock setup skipped', exc_info=True)
+            self._session_lock_handle = _acquire_session_lock(
+                self._session_lock_path,
+                lock_data,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Could not acquire exclusive session lock for '{sid}'. "
+                'Another Grinta process may already be using this session.'
+            ) from exc
         event_defaults = get_event_runtime_defaults()
 
         # ---- Composition: backpressure manager ----------------------------
@@ -363,6 +392,12 @@ class EventStream(EventStore):
         with self._lock:
             if getattr(self, '_closed', False):
                 return
+        if self._coalescer is not None:
+            for flushed in self._coalescer.flush_all():
+                self._dispatch_coalesced_flushed(flushed)
+        with self._lock:
+            if getattr(self, '_closed', False):
+                return
             self._closed = True
         if hasattr(self, '_finalizer'):
             self._finalizer.detach()
@@ -380,6 +415,14 @@ class EventStream(EventStore):
                     import fcntl
 
                     fcntl.flock(self._session_lock_handle.fileno(), fcntl.LOCK_UN)
+                else:
+                    import msvcrt
+
+                    try:
+                        self._session_lock_handle.seek(0)
+                        msvcrt.locking(self._session_lock_handle.fileno(), msvcrt.LK_UNLCK, 1)
+                    except OSError:
+                        pass
                 self._session_lock_handle.close()
             except Exception:
                 pass
@@ -685,13 +728,13 @@ class EventStream(EventStore):
                 )
 
     def _dispatch_coalesced_flushed(self, event: Event) -> None:
-        """Dispatch a coalescer-flushed event through the normal delivery path."""
-        if self._should_drop_due_to_shutdown(event, EventSource.ENVIRONMENT):
-            return
-        if self._inline_delivery:
-            self._dispatch_event_inline(event)
-        else:
-            self._enqueue_serialized_event(event)
+        """Persist and dispatch a coalescer-flushed event through normal flow."""
+        coalescer = self._coalescer
+        self._coalescer = None
+        try:
+            self.add_event(event, EventSource.ENVIRONMENT)
+        finally:
+            self._coalescer = coalescer
 
     def _enqueue_serialized_event(self, event: Event) -> None:
         if not self._queue_ready.wait(timeout=2):

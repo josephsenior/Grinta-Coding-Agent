@@ -8,9 +8,11 @@ Gracefully degrades — all public methods return empty results when
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 from backend.core.logger import app_logger as logger
 from backend.execution.utils.bounded_io import (
@@ -368,14 +370,16 @@ class LspClient:
 
     def _rpc(self, messages: list[dict], server_cmd: list[str]) -> list[dict]:
         """Send LSP messages and collect responses using a subprocess."""
-        payload = ''.join(
-            f'Content-Length: {len(json.dumps(m))}\r\n\r\n{json.dumps(m)}'
-            for m in messages
-        )
+        frames: list[bytes] = []
+        for message in messages:
+            body = json.dumps(message, ensure_ascii=False).encode('utf-8')
+            header = f'Content-Length: {len(body)}\r\n\r\n'.encode('ascii')
+            frames.append(header + body)
+        payload = b''.join(frames)
         try:
             result = _run_lsp_subprocess(
                 server_cmd,
-                stdin_data=payload.encode(),
+                stdin_data=payload,
                 process_timeout=15.0,
             )
             if result.timed_out:
@@ -763,7 +767,7 @@ class LspClient:
         locations = []
         for loc in result:
             start = loc.get('range', {}).get('start', {})
-            path = loc.get('uri', '').replace('file://', '')
+            path = self._path_from_file_uri(loc.get('uri', ''))
             locations.append(
                 LspLocation(
                     file=path,
@@ -772,6 +776,18 @@ class LspClient:
                 )
             )
         return LspResult(available=True, locations=locations)
+
+    @staticmethod
+    def _path_from_file_uri(uri: str) -> str:
+        parsed = urlparse(uri)
+        if parsed.scheme != 'file':
+            return uri
+        if parsed.netloc:
+            return unquote(f'//{parsed.netloc}{parsed.path}')
+        path = unquote(parsed.path)
+        if os.name == 'nt' and len(path) >= 3 and path[0] == '/' and path[2] == ':':
+            return path[1:]
+        return path
 
 
 # ── AST-based fallbacks (no pylsp needed) ─────────────────────────────────

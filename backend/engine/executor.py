@@ -46,6 +46,7 @@ from backend.engine.executor_response_helpers import (
 )
 from backend.engine.streaming_checkpoint import (
     StreamingCheckpoint,
+    StreamingCheckpointRecoveryError,
 )
 from backend.ledger.persistence import EventPersistence
 
@@ -210,13 +211,14 @@ class OrchestratorExecutor:
         except Exception as exc:  # pragma: no cover - streaming is best-effort
             logger.debug('Failed to emit streaming actions: %s', exc)
 
-        # Commit checkpoint after a successful completion call.
-        checkpoint.commit(ckpt_token)
-
         execution_time = time.time() - start_time
         actions = self._without_blank_agent_messages(
             self._response_to_actions(response)
         )
+        # Commit only after the model response has been converted into durable
+        # actions. If conversion fails, the WAL remains as an explicit recovery
+        # fence instead of making an incomplete turn look successful.
+        checkpoint.commit(ckpt_token)
         return ExecutionResult(actions, response, execution_time, error_message)
 
     # ------------------------------------------------------------------ #
@@ -968,12 +970,11 @@ class OrchestratorExecutor:
             'OrchestratorExecutor.async_execute done in %.3fs', time.time() - start_time
         )
 
-        checkpoint.commit(ckpt_token)
-
         execution_time = time.time() - start_time
         actions = self._without_blank_agent_messages(
             self._response_to_actions(response)
         )
+        checkpoint.commit(ckpt_token)
         return ExecutionResult(actions, response, execution_time, error_message)
 
     def _get_checkpoint(self, event_stream: EventStream | None) -> StreamingCheckpoint:
@@ -1012,16 +1013,10 @@ class OrchestratorExecutor:
                     session_key,
                 )
             else:
-                # Discard the uncommitted checkpoint and allow the next LLM call
-                # to proceed normally. The WAL is removed, so there's nothing
-                # left to recover from — blocking would trap the agent in an
-                # infinite error loop with no user-visible recovery path.
-                checkpoint.discard()
-                logger.warning(
-                    'Discarded uncommitted streaming checkpoint for %s (age=%.1fs, attempt=%d); continuing with fresh LLM call',
-                    session_key,
-                    getattr(inspection.record, 'created_at', 0),
-                    getattr(inspection.record, 'attempt', 0),
+                raise StreamingCheckpointRecoveryError(
+                    'Uncommitted streaming checkpoint blocks automatic continuation '
+                    f'for {session_key}: {inspection.reason}. '
+                    'Inspect the checkpoint or persisted ledger before retrying.'
                 )
         self._checkpoint_cache[session_key] = checkpoint
         self._checkpoint_cache.move_to_end(session_key)

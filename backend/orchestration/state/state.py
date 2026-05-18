@@ -618,18 +618,22 @@ class State:
             raise
         logger.debug('Saving state to session %s:%s', sid, self.agent_state)
         try:
-            primary = get_conversation_agent_state_filename(sid, user_id)
-            file_store.write(primary, encoded)
-
-            # Write a timestamped checkpoint and prune old ones
-            self._write_checkpoint(file_store, sid, user_id, encoded)
-
+            # Delete the legacy (user_id-less) state file BEFORE writing the new
+            # user-scoped file.  If the delete fails the new write still succeeds,
+            # and on the next restore the user-scoped primary path is tried first,
+            # so stale legacy data is never returned.
             if user_id:
                 filename = get_conversation_agent_state_filename(sid)
                 try:
                     file_store.delete(filename)
                 except Exception:
                     logger.debug('Failed to delete legacy state file %s', filename)
+
+            primary = get_conversation_agent_state_filename(sid, user_id)
+            file_store.write(primary, encoded)
+
+            # Write a timestamped checkpoint and prune old ones
+            self._write_checkpoint(file_store, sid, user_id, encoded)
         except Exception as e:
             logger.error('Failed to save state to session: %s', e)
             raise
@@ -673,10 +677,14 @@ class State:
                     file_store.delete(f'{ckpt_dir}{old_file}')
                 except Exception:
                     logger.debug('Failed to prune old checkpoint %s', old_file)
-        except Exception:
-            # list() may fail if directory doesn't exist yet — that's fine
-            logger.debug(
-                'Could not list checkpoint dir %s (may not exist yet)', ckpt_dir
+        except FileNotFoundError:
+            # Directory doesn't exist yet — that's fine, nothing to prune
+            pass
+        except Exception as exc:
+            logger.warning(
+                'Could not list checkpoint dir %s for pruning: %s',
+                ckpt_dir,
+                exc,
             )
 
     @staticmethod
@@ -902,7 +910,7 @@ class State:
         last_user_message_image_urls: list[str] | None = []
 
         for event in reversed(self.view):
-            if isinstance(event, MessageAction) and event.source == 'user':
+            if isinstance(event, MessageAction) and event.source == EventSource.USER:
                 last_user_message, last_user_message_image_urls = (
                     self._process_user_message_event(event)
                 )

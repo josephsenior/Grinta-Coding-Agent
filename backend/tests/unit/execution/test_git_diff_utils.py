@@ -52,11 +52,31 @@ def test_get_git_diff_success_reads_modified(
     with (
         patch.object(gd, 'get_closest_git_repo', return_value=repo.resolve()),
         patch.object(gd, 'get_valid_git_ref', return_value='HEAD'),
-        patch.object(gd, 'run_git_cmd', return_value='original\n'),
+        patch.object(gd, 'run_git_args', return_value='original\n'),
     ):
         out = gd.get_git_diff(str(rel))
     assert out['modified'] == 'modified'
     assert out['original'].strip() == 'original'
+
+
+def test_get_git_diff_uses_posix_git_object_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / 'r'
+    (repo / '.git').mkdir(parents=True)
+    rel = Path('src') / 'pkg' / 'f.txt'
+    full = repo / rel
+    full.parent.mkdir(parents=True)
+    full.write_text('modified\n', encoding='utf-8')
+    monkeypatch.chdir(repo)
+    with (
+        patch.object(gd, 'get_closest_git_repo', return_value=repo.resolve()),
+        patch.object(gd, 'get_valid_git_ref', return_value='HEAD'),
+        patch.object(gd, 'run_git_args', return_value='original\n') as run_git_args,
+    ):
+        gd.get_git_diff(str(rel))
+
+    assert run_git_args.call_args.args[0] == ['git', 'show', 'HEAD:src/pkg/f.txt']
 
 
 def test_fallback_print_writes_json(

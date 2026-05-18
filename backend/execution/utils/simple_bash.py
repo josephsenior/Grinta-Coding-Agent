@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 from backend.core.logger import app_logger as logger
@@ -196,6 +197,12 @@ class SimpleBashSession(BaseShellSession):
             cwd=self._cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            start_new_session=sys.platform != 'win32',
+            creationflags=(
+                subprocess.CREATE_NEW_PROCESS_GROUP
+                if sys.platform == 'win32'
+                else 0
+            ),
         )
         self._cancellation.register_process(process)
         return process

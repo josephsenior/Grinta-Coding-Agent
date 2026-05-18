@@ -14,6 +14,9 @@ on either stream. The returned buffers are guaranteed to be at most
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import os
+import signal
 import subprocess
 import threading
 from dataclasses import dataclass
@@ -107,16 +110,59 @@ def _wait_for_bounded_process(
             return process.wait(timeout=slice_s), timed_out
         except subprocess.TimeoutExpired:
             if over.is_set():
-                process.kill()
+                kill_process_tree(process)
                 return process.wait(timeout=5), timed_out
             if timeout is None:
                 continue
             elapsed += slice_s
             if elapsed < timeout:
                 continue
-            process.kill()
+            kill_process_tree(process)
             timed_out = True
             return process.wait(timeout=5), timed_out
+
+
+def kill_process_tree(process: subprocess.Popen) -> None:
+    """Best-effort termination of a subprocess and its children."""
+    pid = getattr(process, 'pid', None)
+    if not pid:
+        return
+    if os.name == 'nt':
+        try:
+            subprocess.run(
+                ['taskkill', '/PID', str(pid), '/T', '/F'],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            return
+        except Exception:
+            process.kill()
+            return
+
+    killpg = getattr(os, 'killpg', None)
+    try:
+        if killpg is None:
+            raise AttributeError('os.killpg is unavailable on this platform')
+        killpg(pid, signal.SIGTERM)
+    except Exception:
+        with contextlib.suppress(Exception):
+            process.terminate()
+    try:
+        process.wait(timeout=1.0)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    sigkill = getattr(signal, 'SIGKILL', None)
+    if sigkill is not None and killpg is not None:
+        try:
+            killpg(pid, sigkill)
+            return
+        except Exception:
+            pass
+    with contextlib.suppress(Exception):
+        process.kill()
 
 
 def _decoded_bounded_stream_text(

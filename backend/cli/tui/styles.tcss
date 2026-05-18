@@ -126,6 +126,12 @@ HUD,
     margin-top: 1;
 }
 
+#hud-line-3 {
+    height: 1;
+    margin-top: 1;
+    color: #8f9fc1;
+}
+
 /* ── Confirmation dialog ───────────────────────────── */
 GrintaConfirmDialog {
     background: #060a14 70%;
@@ -156,6 +162,86 @@ GrintaConfirmDialog Button {
     border-top: tall #54597b;
     border-bottom: tall #171922;
     margin: 0 1;
+}
+
+GrintaSettingsDialog,
+GrintaSessionsDialog {
+    background: #060a14 70%;
+}
+
+#settings-dialog,
+#sessions-dialog {
+    background: #0b1220;
+    border: tall #384673;
+    padding: 1 2;
+    width: 92;
+    max-height: 36;
+    align: center middle;
+}
+
+#settings-dialog .title,
+#sessions-dialog .title {
+    color: #91abec;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#settings-dialog .field-label {
+    color: #969aad;
+}
+
+#settings-current-key,
+#settings-feedback,
+#sessions-feedback {
+    color: #8f9fc1;
+    margin-top: 1;
+}
+
+#settings-model,
+#settings-api-key,
+#settings-budget {
+    margin-bottom: 1;
+}
+
+#settings-buttons,
+#sessions-buttons {
+    height: auto;
+    align-horizontal: right;
+    margin-top: 1;
+}
+
+#sessions-filters {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#sessions-search {
+    width: 1fr;
+}
+
+#sessions-sort {
+    width: 18;
+    margin-left: 1;
+}
+
+#sessions-limit {
+    width: 10;
+    margin-left: 1;
+}
+
+#sessions-refresh {
+    margin-left: 1;
+}
+
+#sessions-table {
+    height: 14;
+    margin-bottom: 1;
+}
+
+#sessions-preview {
+    height: 8;
+    border: round #1b233a;
+    padding: 0 1;
 }
 
 /* ── Toast notifications ──────────────────────────── */

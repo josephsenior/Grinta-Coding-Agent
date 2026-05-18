@@ -384,6 +384,15 @@ class ResourceLimitExceededError(AppError):
         super().__init__(message)
 
 
+class AgentLimitExceededError(RuntimeError):
+    """Raised when the agent's iteration or budget hard limit is reached.
+
+    This is a terminal condition the agent cannot self-recover from.
+    Detection should use ``isinstance()`` rather than string matching
+    so the recovery path is robust against message format changes.
+    """
+
+
 class PathValidationError(AppError):
     """Raised when path validation fails due to security concerns.
 

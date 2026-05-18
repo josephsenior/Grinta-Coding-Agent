@@ -118,10 +118,21 @@ class TestValidateAndSanitizePath:
         with pytest.raises(PathValidationError, match='too long'):
             validate_and_sanitize_path(long_path, workspace_root=self.tmpdir)
 
-    def test_dangerous_chars_rejected(self):
-        for char in ['<', '>', '|', '&', ';', '`', '$']:
+    def test_control_chars_rejected(self):
+        for char in ['\n', '\r']:
             with pytest.raises(PathValidationError, match='dangerous character'):
                 validate_and_sanitize_path(f'file{char}bad', workspace_root=self.tmpdir)
+
+    def test_shell_metacharacters_allowed_in_file_paths(self):
+        result = validate_and_sanitize_path(
+            'New Folder (2)/build&test;$cache`name.txt',
+            workspace_root=self.tmpdir,
+        )
+        assert result == (
+            Path(self.tmpdir).resolve()
+            / 'New Folder (2)'
+            / 'build&test;$cache`name.txt'
+        )
 
     def test_traversal_dot_dot_rejected(self):
         with pytest.raises(PathValidationError, match='traversal'):

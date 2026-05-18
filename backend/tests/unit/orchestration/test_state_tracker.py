@@ -39,6 +39,24 @@ class TestStateTrackerInitHistory:
         assert tracker.state.history == []
         event_stream.search_events.assert_not_called()
 
+    def test_init_history_loads_recent_window_for_large_ranges(self):
+        tracker = StateTracker(sid='sid-1', file_store=None, user_id='user-1')
+        tracker.state = State(start_id=0, end_id=MAX_HISTORY_EVENTS + 100)
+        recent_oldest = MessageAction(content='oldest retained')
+        recent_oldest.id = 101
+        recent_newest = MessageAction(content='newest retained')
+        recent_newest.id = 102
+        event_stream = MagicMock()
+        event_stream.search_events.return_value = [recent_newest, recent_oldest]
+
+        tracker._init_history(event_stream)
+
+        assert tracker.state.history == [recent_oldest, recent_newest]
+        assert tracker.state.start_id == 101
+        kwargs = event_stream.search_events.call_args.kwargs
+        assert kwargs['reverse'] is True
+        assert kwargs['limit'] == MAX_HISTORY_EVENTS
+
 
 # ---------------------------------------------------------------------------
 # Initialization

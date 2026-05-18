@@ -6,6 +6,7 @@ when multi-file operations fail mid-way.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import tempfile
@@ -62,6 +63,7 @@ def _atomic_write_text(file_path: str, content: str) -> None:
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp_path, file_path)
+        _fsync_parent_dir(parent)
         tmp_path = None
     finally:
         if fd is not None:
@@ -71,6 +73,17 @@ def _atomic_write_text(file_path: str, content: str) -> None:
                 os.remove(tmp_path)
             except OSError:
                 logger.warning('Failed to remove transaction temp file: %s', tmp_path)
+
+
+def _fsync_parent_dir(parent: str) -> None:
+    if os.name == 'nt' or not parent:
+        return
+    with contextlib.suppress(OSError, AttributeError):
+        dir_fd = os.open(parent, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
 
 
 class FileOperationType(Enum):
