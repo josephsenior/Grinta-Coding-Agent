@@ -579,20 +579,22 @@ class OpenAIClient(DirectLLMClient):
         base_url: str | None = None,
         profile: TransportProfile | None = None,
         timeout: float | int | None = None,
+        provider_name: str = 'openai',
     ):
         self._model_name = model_name
         self._api_base_url = base_url
         self._profile = profile or TransportProfile()
+        self._provider_name = provider_name
         self._request_timeout = _normalize_timeout_seconds(timeout)
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url,
-            http_client=get_shared_http_client('openai', base_url),
+            http_client=get_shared_http_client(provider_name, base_url),
         )
         self.async_client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
-            http_client=get_shared_async_http_client('openai', base_url),
+            http_client=get_shared_async_http_client(provider_name, base_url),
         )
 
     @staticmethod
@@ -630,17 +632,25 @@ class AnthropicClient(DirectLLMClient):
     """Client for Anthropic Claude."""
 
     def __init__(
-        self, model_name: str, api_key: str, timeout: float | int | None = None
+        self,
+        model_name: str,
+        api_key: str,
+        timeout: float | int | None = None,
+        base_url: str | None = None,
+        provider_name: str = 'anthropic',
     ):
         self._model_name = model_name
+        self._provider_name = provider_name
         self._request_timeout = _normalize_timeout_seconds(timeout)
         self.client = Anthropic(
             api_key=api_key,
-            http_client=get_shared_http_client('anthropic'),
+            base_url=base_url,
+            http_client=get_shared_http_client(provider_name, base_url),
         )
         self.async_client = AsyncAnthropic(
             api_key=api_key,
-            http_client=get_shared_async_http_client('anthropic'),
+            base_url=base_url,
+            http_client=get_shared_async_http_client(provider_name, base_url),
         )
 
     @staticmethod
@@ -1280,6 +1290,22 @@ def get_direct_client(
         stripped_model,
     )
 
+    if provider == 'opencode-go':
+        from backend.inference.provider_resolver import opencode_go_required_endpoint
+
+        required_endpoint = opencode_go_required_endpoint(stripped_model)
+        if required_endpoint == '/messages':
+            anthropic_base_url = resolved_base_url
+            if anthropic_base_url and anthropic_base_url.rstrip('/').endswith('/v1'):
+                anthropic_base_url = anthropic_base_url.rstrip('/')[:-3]
+            return AnthropicClient(
+                model_name=stripped_model,
+                api_key=api_key,
+                timeout=timeout,
+                base_url=anthropic_base_url,
+                provider_name='opencode-go',
+            )
+
     # When a custom base_url is provided that differs from the provider's own
     # native endpoint, the caller is routing the model through a third-party
     # proxy (e.g. Lightning AI, OpenRouter).  In that case we MUST use the
@@ -1307,12 +1333,16 @@ def get_direct_client(
                 base_url=resolved_base_url,
                 profile=profile,
                 timeout=timeout,
+                provider_name=provider,
             )
 
     # Route to appropriate client based on provider
     if provider == 'anthropic':
         return AnthropicClient(
-            model_name=stripped_model, api_key=api_key, timeout=timeout
+            model_name=stripped_model,
+            api_key=api_key,
+            timeout=timeout,
+            provider_name='anthropic',
         )
 
     if provider == 'google':
@@ -1340,4 +1370,5 @@ def get_direct_client(
         base_url=resolved_base_url,
         profile=profile,
         timeout=timeout,
+        provider_name=provider,
     )

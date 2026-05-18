@@ -40,45 +40,46 @@ def map_anthropic_error(client: Any, exc: Exception) -> Exception:
     from backend.inference.exceptions import (
         APIError as ProviderAPIError,
     )
+    provider_name = getattr(client, '_provider_name', 'anthropic')
 
     if isinstance(exc, (anthropic.APITimeoutError, httpx.TimeoutException)):
-        return Timeout(str(exc), llm_provider='anthropic', model=client.model_name)
+        return Timeout(str(exc), llm_provider=provider_name, model=client.model_name)
     if isinstance(exc, (anthropic.APIConnectionError, httpx.RequestError)):
         return APIConnectionError(
-            str(exc), llm_provider='anthropic', model=client.model_name
+            str(exc), llm_provider=provider_name, model=client.model_name
         )
     if isinstance(exc, anthropic.RateLimitError):
         from backend.inference.rate_limit_parser import enrich_rate_limit_exception
 
         mapped = RateLimitError(
-            str(exc), llm_provider='anthropic', model=client.model_name
+            str(exc), llm_provider=provider_name, model=client.model_name
         )
         return enrich_rate_limit_exception(exc, mapped)
     if isinstance(exc, anthropic.AuthenticationError):
         return AuthenticationError(
-            str(exc), llm_provider='anthropic', model=client.model_name
+            str(exc), llm_provider=provider_name, model=client.model_name
         )
     if isinstance(exc, anthropic.BadRequestError):
         error_str = str(exc).lower()
         if is_context_window_error(error_str, exc):
             return ContextWindowExceededError(
-                str(exc), llm_provider='anthropic', model=client.model_name
+                str(exc), llm_provider=provider_name, model=client.model_name
             )
         return BadRequestError(
-            str(exc), llm_provider='anthropic', model=client.model_name
+            str(exc), llm_provider=provider_name, model=client.model_name
         )
     if isinstance(exc, anthropic.NotFoundError):
         return NotFoundError(
-            str(exc), llm_provider='anthropic', model=client.model_name
+            str(exc), llm_provider=provider_name, model=client.model_name
         )
     if isinstance(exc, anthropic.InternalServerError):
         return InternalServerError(
-            str(exc), llm_provider='anthropic', model=client.model_name
+            str(exc), llm_provider=provider_name, model=client.model_name
         )
     if isinstance(exc, anthropic.APIStatusError):
         return ProviderAPIError(
             str(exc),
-            llm_provider='anthropic',
+            llm_provider=provider_name,
             model=client.model_name,
             status_code=exc.status_code,
         )

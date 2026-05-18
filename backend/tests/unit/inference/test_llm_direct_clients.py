@@ -18,6 +18,8 @@ from backend.inference.direct_clients import (
     get_shared_async_http_client,
     get_shared_http_client,
 )
+from backend.inference.direct_clients_openai_ops import completion as openai_completion
+from backend.inference.exceptions import BadRequestError
 
 
 # ---------------------------------------------------------------------------
@@ -336,6 +338,53 @@ class TestOpenAIClientHelpers:
         assert metadata['trace_version'] == '1'
         assert metadata['tags'] == 'model:gpt-4,agent:orchestrator'
         assert metadata['extra'] == '{"a":1}'
+
+    def test_opencode_non_chat_model_fails_fast(self):
+        client = MagicMock()
+        client._provider_name = 'opencode'
+        client.model_name = 'gpt-5.5'
+        client._clean_messages.return_value = [{'role': 'user', 'content': 'hi'}]
+        client._strip_unsupported_params.side_effect = lambda kwargs: kwargs
+        client._extract_openai_tool_calls.return_value = None
+
+        with pytest.raises(BadRequestError, match='/responses'):
+            openai_completion(client, [{'role': 'user', 'content': 'hi'}])
+
+        client.client.chat.completions.create.assert_not_called()
+
+    def test_opencode_chat_model_calls_chat_completions(self):
+        response = MagicMock()
+        response.choices = [
+            MagicMock(message=MagicMock(content='ok'), finish_reason='stop')
+        ]
+        response.model = 'deepseek-v4-flash-free'
+        response.usage = None
+        response.id = 'resp-1'
+
+        client = MagicMock()
+        client._provider_name = 'opencode'
+        client.model_name = 'deepseek-v4-flash-free'
+        client._clean_messages.return_value = [{'role': 'user', 'content': 'hi'}]
+        client._strip_unsupported_params.side_effect = lambda kwargs: kwargs
+        client._extract_openai_tool_calls.return_value = None
+        client.client.chat.completions.create.return_value = response
+
+        result = openai_completion(client, [{'role': 'user', 'content': 'hi'}])
+        assert result.content == 'ok'
+        client.client.chat.completions.create.assert_called_once()
+
+    def test_opencode_go_minimax_fails_fast_on_chat_completions(self):
+        client = MagicMock()
+        client._provider_name = 'opencode-go'
+        client.model_name = 'minimax-m2.7'
+        client._clean_messages.return_value = [{'role': 'user', 'content': 'hi'}]
+        client._strip_unsupported_params.side_effect = lambda kwargs: kwargs
+        client._extract_openai_tool_calls.return_value = None
+
+        with pytest.raises(BadRequestError, match='/messages'):
+            openai_completion(client, [{'role': 'user', 'content': 'hi'}])
+
+        client.client.chat.completions.create.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

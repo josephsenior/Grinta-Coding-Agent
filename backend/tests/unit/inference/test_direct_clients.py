@@ -301,6 +301,40 @@ class TestGetDirectClientRouting:
         )
         assert type(client).__name__ == 'OpenAIClient'
 
+    @patch('backend.inference.direct_clients.Anthropic')
+    @patch('backend.inference.direct_clients.AsyncAnthropic')
+    @patch(
+        'backend.inference.direct_clients.get_shared_async_http_client',
+        return_value=MagicMock(),
+    )
+    @patch(
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
+    )
+    def test_opencode_go_minimax_routes_to_anthropic_messages(
+        self, _h, _ah, _async_anth, _anth
+    ):
+        client = get_direct_client('opencode-go/minimax-m2.7', api_key='key')
+        assert type(client).__name__ == 'AnthropicClient'
+        assert client._model_name == 'minimax-m2.7'
+
+    @patch('backend.inference.direct_clients.AsyncOpenAI')
+    @patch('backend.inference.direct_clients.OpenAI')
+    @patch(
+        'backend.inference.direct_clients.get_shared_async_http_client',
+        return_value=MagicMock(),
+    )
+    @patch(
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
+    )
+    def test_opencode_go_qwen_routes_to_openai_compatible(
+        self, _h, _ah, _oai, _aoai
+    ):
+        client = get_direct_client('opencode-go/qwen3.6-plus', api_key='key')
+        assert type(client).__name__ == 'OpenAIClient'
+        assert client._model_name == 'qwen3.6-plus'
+
 
 # ---------------------------------------------------------------------------
 # DirectLLMClient.model_name validation

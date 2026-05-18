@@ -33,6 +33,8 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'mistral': 'https://api.mistral.ai/v1',
     # OpenCode Zen: OpenAI-compatible API for OpenCode's curated model catalog.
     'opencode': 'https://opencode.ai/zen/v1',
+    # OpenCode Go subscription models.
+    'opencode-go': 'https://opencode.ai/zen/go/v1',
 }
 
 KNOWN_PROVIDER_PREFIXES: set[str] = {
@@ -51,6 +53,7 @@ KNOWN_PROVIDER_PREFIXES: set[str] = {
     'ollama',
     'openai',
     'opencode',
+    'opencode-go',
     'openrouter',
     'perplexity',
     'replicate',
@@ -112,7 +115,7 @@ def canonicalize_model_selection(
     prefixed_provider = extract_provider_prefix(model)
 
     # Proxy providers that need openai/ prefix for correct routing.
-    _OPENAI_COMPAT_PROVIDERS = {'lightning', 'cerebras', 'opencode'}
+    _OPENAI_COMPAT_PROVIDERS = {'lightning', 'cerebras'}
 
     if normalized_provider:
         if normalized_provider in _OPENAI_COMPAT_PROVIDERS:
@@ -138,6 +141,43 @@ def canonicalize_model_selection(
         return model, prefixed_provider
 
     return model, None
+
+
+def _strip_known_transport_prefixes(model_name: str) -> str:
+    model = str(model_name or '').strip()
+    while True:
+        prefix = extract_provider_prefix(model)
+        if not prefix:
+            return model
+        parts = model.split('/', 1)
+        if len(parts) != 2:
+            return model
+        model = parts[1]
+
+
+def opencode_required_endpoint(model_name: str) -> str:
+    """Return the expected OpenCode Zen endpoint family for *model_name*.
+
+    OpenCode serves different model families on different API surfaces.
+    We classify by model id family so callers can fail fast when a request is
+    sent to the wrong surface (instead of surfacing opaque upstream 500s).
+    """
+    model = _strip_known_transport_prefixes(model_name).lower()
+    if model.startswith('gpt-5'):
+        return '/responses'
+    if model.startswith('claude-'):
+        return '/messages'
+    if model.startswith('gemini-'):
+        return '/models'
+    return '/chat/completions'
+
+
+def opencode_go_required_endpoint(model_name: str) -> str:
+    """Return expected OpenCode Go endpoint family for *model_name*."""
+    model = _strip_known_transport_prefixes(model_name).lower()
+    if model.startswith('minimax-m2.'):
+        return '/messages'
+    return '/chat/completions'
 
 
 def _resolve_ollama_env_url() -> str | None:
