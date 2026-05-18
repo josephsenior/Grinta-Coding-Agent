@@ -37,10 +37,6 @@ def _basetemp_root(cwd: Path) -> Path:
     override = os.getenv('GRINTA_RELIABILITY_BASETEMP_ROOT')
     if override:
         return Path(override)
-    if os.name == 'nt':
-        candidate = Path('C:/tmp')
-        if candidate.exists():
-            return candidate / 'grinta-pytest'
     return cwd / '.pytest-reliability'
 
 
