@@ -5,6 +5,34 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
+_ANTHROPIC_INCOMPATIBLE_REQUEST_KEYS = frozenset(
+    {
+        'tool_choice',
+        'response_format',
+        'frequency_penalty',
+        'presence_penalty',
+        'logit_bias',
+        'parallel_tool_calls',
+        'extra_body',
+        'extra_headers',
+        'stream',
+        'stream_options',
+    }
+)
+
+
+def _sanitize_anthropic_request_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Drop OpenAI-style kwargs that Anthropic's SDK does not accept.
+
+    This transport-level sanitization is required even when a non-Anthropic
+    provider prefix (for example ``opencode-go``) is routed through the native
+    Anthropic client. Provider-based sanitization alone cannot cover that case.
+    """
+    request_kwargs = dict(kwargs)
+    for key in _ANTHROPIC_INCOMPATIBLE_REQUEST_KEYS:
+        request_kwargs.pop(key, None)
+    return request_kwargs
+
 
 def extract_anthropic_tool_calls(
     content_blocks: list,
@@ -19,7 +47,11 @@ def prepare_anthropic_kwargs(
 ) -> tuple[list, dict[str, Any]]:
     from backend.inference.mappers.anthropic import prepare_kwargs
 
-    return prepare_kwargs(messages, kwargs, client.model_name)
+    return prepare_kwargs(
+        messages,
+        _sanitize_anthropic_request_kwargs(kwargs),
+        client.model_name,
+    )
 
 
 def map_anthropic_error(client: Any, exc: Exception) -> Exception:
@@ -151,7 +183,7 @@ def _prepare_anthropic_stream_request(
 
     system_raw = next((m['content'] for m in messages if m['role'] == 'system'), None)
     filtered_messages = [message for message in messages if message['role'] != 'system']
-    request_kwargs = dict(kwargs)
+    request_kwargs = _sanitize_anthropic_request_kwargs(kwargs)
     request_kwargs.setdefault('model', client.model_name)
     system_msg = _apply_system_cache_control(
         system_raw,

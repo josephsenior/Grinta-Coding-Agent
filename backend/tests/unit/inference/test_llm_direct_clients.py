@@ -287,6 +287,40 @@ class TestAnthropicClientHelpers:
         assert kwargs['system'] == 'Be helpful'
         assert kwargs['model'] == 'claude-3'
 
+    def test_prepare_stream_request_strips_openai_only_stream_kwargs(self):
+        from backend.inference.direct_clients_anthropic_ops import (
+            _prepare_anthropic_stream_request,
+        )
+
+        client = MagicMock(model_name='minimax-m2.7')
+        messages = [
+            {'role': 'system', 'content': 'Be helpful'},
+            {'role': 'user', 'content': 'Hi'},
+        ]
+        original_kwargs = {
+            'stream': True,
+            'stream_options': {'include_usage': True},
+            'extra_body': {'metadata': {'trace': '1'}},
+            'temperature': 0.2,
+        }
+
+        filtered, system_msg, request_kwargs = _prepare_anthropic_stream_request(
+            client,
+            messages,
+            original_kwargs,
+        )
+
+        assert filtered == [{'role': 'user', 'content': 'Hi'}]
+        assert system_msg == 'Be helpful'
+        assert request_kwargs == {
+            'model': 'minimax-m2.7',
+            'temperature': 0.2,
+        }
+        assert 'stream' not in request_kwargs
+        assert 'stream_options' not in request_kwargs
+        assert 'extra_body' not in request_kwargs
+        assert original_kwargs['stream'] is True
+
 
 # ---------------------------------------------------------------------------
 # OpenAIClient helpers
