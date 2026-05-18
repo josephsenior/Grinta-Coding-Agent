@@ -12,6 +12,7 @@ import asyncio
 import logging
 import os
 import re
+import shlex
 import threading
 import time
 from collections import deque
@@ -988,7 +989,18 @@ class GrintaScreen(Screen):
         self._render_hud_bar()
 
     async def _handle_slash_command(self, text: str) -> None:
-        cmd = text.lower().strip()
+        raw = text.strip()
+        if not raw:
+            return
+        try:
+            parts = shlex.split(raw)
+        except ValueError as exc:
+            self.add_error(f'Invalid command syntax: {exc}')
+            return
+        if not parts:
+            return
+        cmd = parts[0].lower()
+        args = parts[1:]
         if cmd in ('/help', '/h', '/?'):
             self.show_help()
         elif cmd in ('/clear', '/c'):
@@ -996,13 +1008,134 @@ class GrintaScreen(Screen):
         elif cmd in ('/quit', '/q', '/exit'):
             self._agent_running = False
             self.app.exit()
-        elif cmd in ('/settings', '/sessions'):
-            self.add_error(
-                f'{cmd} is not available in the full-screen TUI. '
-                'Exit with /quit and use the standard REPL or shell command.'
-            )
+        elif cmd == '/settings':
+            self._open_settings_tui()
+        elif cmd == '/sessions':
+            self._run_sessions_tui(args)
         else:
             self.add_error(f'Unknown command: {text}')
+
+    def _run_in_suspended_terminal(self, callback: Any, action_label: str) -> bool:
+        self.finalize_thinking()
+        if self._renderer is not None:
+            self._renderer.drain_events()
+        try:
+            with self.app.suspend():
+                callback()
+            return True
+        except Exception as exc:
+            logger.exception('[TUI] %s failed', action_label)
+            self.add_error(f'{action_label} failed: {type(exc).__name__}: {exc}')
+            return False
+
+    def _open_settings_tui(self) -> None:
+        from backend.cli.config_manager import get_current_model
+        from backend.cli.settings_tui import open_settings
+        from backend.core.config import load_app_config
+
+        if not self._run_in_suspended_terminal(
+            lambda: open_settings(self._rich_console), '/settings'
+        ):
+            return
+
+        self._config = load_app_config()
+        self._hud.update_model(get_current_model(self._config))
+        mcp_servers = getattr(getattr(self._config, 'mcp', None), 'servers', []) or []
+        mcp_count = sum(1 for server in mcp_servers if getattr(server, 'name', '') != 'app-mcp')
+        self._hud.update_mcp_servers(mcp_count)
+        self._render_hud_bar()
+
+    def _run_sessions_tui(self, args: list[str]) -> None:
+        from backend.cli.session_manager import delete_sessions, list_sessions, show_session
+
+        remaining = list(args)
+        if remaining and remaining[0].lower() == 'list':
+            remaining.pop(0)
+
+        search = None
+        sort_by = 'updated'
+        limit = 20
+        preview_idx = None
+        delete_targets: list[str] = []
+
+        i = 0
+        while i < len(remaining):
+            token = remaining[i]
+            if token in ('--search', '-s') and i + 1 < len(remaining):
+                search = remaining[i + 1]
+                i += 2
+                continue
+            if token == '--sort' and i + 1 < len(remaining):
+                allowed = ('updated', 'created', 'events', 'cost', 'model')
+                if remaining[i + 1] not in allowed:
+                    self.add_error(f'Sort must be one of: {", ".join(allowed)}')
+                    return
+                sort_by = remaining[i + 1]
+                i += 2
+                continue
+            if token in ('--delete', '-d') and i + 1 < len(remaining):
+                i += 1
+                while i < len(remaining) and not remaining[i].startswith('-'):
+                    delete_targets.append(remaining[i])
+                    i += 1
+                continue
+            if token in ('--limit', '-l') and i + 1 < len(remaining):
+                try:
+                    limit = int(remaining[i + 1])
+                except ValueError:
+                    self.add_error('Limit must be a number.')
+                    return
+                if limit < 1:
+                    self.add_error('Limit must be 1 or greater.')
+                    return
+                i += 2
+                continue
+            if token == '--preview' and i + 1 < len(remaining):
+                preview_idx = remaining[i + 1]
+                i += 2
+                continue
+            try:
+                parsed_limit = int(token)
+            except ValueError:
+                self.add_error(f'Unknown option: {token}')
+                return
+            if parsed_limit < 1:
+                self.add_error('Limit must be 1 or greater.')
+                return
+            limit = parsed_limit
+            i += 1
+
+        if delete_targets:
+            self._run_in_suspended_terminal(
+                lambda: delete_sessions(self._rich_console, delete_targets, config=self._config),
+                '/sessions --delete',
+            )
+            return
+
+        if preview_idx is not None:
+            result: dict[str, bool] = {'found': True}
+
+            def _preview() -> None:
+                result['found'] = bool(
+                    show_session(self._rich_console, config=self._config, target=preview_idx)
+                )
+
+            if not self._run_in_suspended_terminal(_preview, '/sessions --preview'):
+                return
+            if not result['found']:
+                self.add_error(f"No session at '{preview_idx}'")
+            return
+
+        self._run_in_suspended_terminal(
+            lambda: list_sessions(
+                self._rich_console,
+                limit=limit,
+                config=self._config,
+                sort_by=sort_by,
+                search=search,
+            ),
+            '/sessions',
+        )
 
     def show_help(self) -> None:
         self.add_divider()
@@ -1015,6 +1148,8 @@ class GrintaScreen(Screen):
         help_text = Text.from_markup(
             f'  [{NAVY_TEXT_SECONDARY}]/help[/]      [{NAVY_TEXT_TERTIARY}]Show this help[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]/clear[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
+            f'  [{NAVY_TEXT_SECONDARY}]/settings[/]  [{NAVY_TEXT_TERTIARY}]Open settings[/]\n'
+            f'  [{NAVY_TEXT_SECONDARY}]/sessions[/]  [{NAVY_TEXT_TERTIARY}]Manage sessions[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]/quit[/]      [{NAVY_TEXT_TERTIARY}]Exit Grinta[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]Ctrl+C[/]     [{NAVY_TEXT_TERTIARY}]Stop agent[/]\n'
             f'  [{NAVY_TEXT_SECONDARY}]Tab[/]        [{NAVY_TEXT_TERTIARY}]Newline in input[/]'

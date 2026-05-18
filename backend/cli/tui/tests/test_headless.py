@@ -126,6 +126,50 @@ async def test_tui_help_shows(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_settings_command_dispatches(mock_config):
+    """Verify /settings dispatches to the real TUI settings handler."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        called = {'value': False}
+        s._open_settings_tui = lambda: called.__setitem__('value', True)  # type: ignore[method-assign]
+
+        ta = s.query_one('#input', TextArea)
+        ta.text = '/settings'
+        await pilot.press('enter')
+        await pilot.pause()
+
+        assert called['value'] is True
+
+
+@pytest.mark.asyncio
+async def test_tui_sessions_command_dispatches_with_args(mock_config):
+    """Verify /sessions forwards parsed args to the session handler."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        captured: list[str] = []
+        s._run_sessions_tui = lambda args: captured.extend(args)  # type: ignore[method-assign]
+
+        ta = s.query_one('#input', TextArea)
+        ta.text = '/sessions --limit 7'
+        await pilot.press('enter')
+        await pilot.pause()
+
+        assert captured == ['--limit', '7']
+
+
+@pytest.mark.asyncio
 async def test_tui_unknown_command(mock_config):
     """Verify unknown slash command shows error without crashing."""
     console = RichConsole()
