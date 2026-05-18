@@ -719,7 +719,8 @@
       "aliases": [
         "opencode-go/minimax-m2.7"
       ],
-      "max_output_tokens": 131072
+      "max_output_tokens": 131072,
+      "thinking_mode": "enabled:8192:16384"
     },
     "zai-glm-4.7": {
       "provider": "cerebras",
