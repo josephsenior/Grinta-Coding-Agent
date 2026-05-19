@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import os
+import re
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
@@ -18,6 +19,10 @@ _BACKGROUND_OBSERVATION_NAMES = frozenset(
     {'RecallObservation', 'RecallFailureObservation'}
 )
 
+# XML-format tools that previously triggered FORMAT_ERROR recovery prompts.
+# After successful execution, stale FORMAT_ERROR observations should be cleaned up.
+_XML_FORMAT_TOOLS = frozenset({'text_editor', 'symbol_editor'})
+
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
         OrchestrationContext,
@@ -26,6 +31,62 @@ if TYPE_CHECKING:
         PendingActionService,
     )
     from backend.orchestration.tool_pipeline import ToolInvocationContext
+
+
+def _extract_tool_name_from_action(action: Any) -> str | None:
+    """Extract tool name from an action's metadata or attributes."""
+    meta = getattr(action, 'tool_call_metadata', None)
+    if meta:
+        name = getattr(meta, 'tool_name', None) or getattr(meta, 'name', None)
+        if name:
+            return str(name)
+    tool_name = getattr(action, 'tool_name', None)
+    if tool_name:
+        return str(tool_name)
+    return None
+
+
+def _cleanup_stale_format_error_observations(
+    history: list,
+    successful_tool_name: str,
+) -> int:
+    """Remove stale FORMAT_ERROR recovery observations for a tool after successful execution.
+
+    When the model successfully calls an XML-format tool (text_editor/symbol_editor),
+    any previous FORMAT_ERROR recovery observations for that same tool are removed
+    from history so the agent gets a clean slate.
+
+    Returns the number of observations removed.
+    """
+    if successful_tool_name not in _XML_FORMAT_TOOLS:
+        return 0
+
+    removed = 0
+    to_remove = []
+    for i, event in enumerate(history):
+        event_type = type(event).__name__
+        if event_type not in ('AgentThinkObservation', 'AgentThinkAction'):
+            continue
+        content = getattr(event, 'content', '') or ''
+        thought = getattr(event, 'thought', '') or ''
+        combined = f'{content} {thought}'
+        if '[FORMAT_ERROR]' not in combined:
+            continue
+        tool_match = re.search(r"Tool [`'](\w+)[`']?", combined)
+        if tool_match and tool_match.group(1) == successful_tool_name:
+            to_remove.append(i)
+
+    for i in reversed(to_remove):
+        history.pop(i)
+        removed += 1
+
+    if removed:
+        logger.info(
+            'Cleaned up %d stale FORMAT_ERROR observation(s) for %s after successful execution',
+            removed,
+            successful_tool_name,
+        )
+    return removed
 
 
 async def transition_agent_state_logic(
@@ -206,6 +267,14 @@ class ObservationService:
             )
             return
         await transition_agent_state_logic(controller, ctx, observation)
+
+        if not isinstance(observation, ErrorObservation):
+            tool_name = _extract_tool_name_from_action(pending_action)
+            if tool_name:
+                _cleanup_stale_format_error_observations(
+                    controller.state.history,
+                    tool_name,
+                )
 
     @staticmethod
     def _cause_coerces_to_stream_id(cause: object) -> bool:

@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import re
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
@@ -70,6 +71,29 @@ from backend.utils.prompt import OrchestratorPromptManager, PromptManager
 if TYPE_CHECKING:
     from backend.ledger.action import Action
     from backend.ledger.stream import EventStream
+
+
+def _normalize_recoverable_error_signature(e: Exception) -> str:
+    """Normalize error signature for reliable loop detection.
+
+    Extracts error type and key identifiers (tool name, error category)
+    while ignoring variable message content that would prevent matching.
+    """
+    error_type = type(e).__name__
+    msg = str(e).strip()
+
+    tool_match = re.search(r"Tool [`'](\w+)[`']?", msg)
+    tool_name = tool_match.group(1) if tool_match else ''
+
+    category_match = re.search(r'\[([A-Z_]+)\]', msg)
+    category = category_match.group(1) if category_match else ''
+
+    parts = [error_type]
+    if category:
+        parts.append(category)
+    if tool_name:
+        parts.append(tool_name)
+    return ':'.join(parts)
 
 
 def _graceful_shrink_large_cmd_outputs(history: list[Any]) -> int:
@@ -412,7 +436,7 @@ class Orchestrator(Agent):
         self._consecutive_context_errors = 0
         logger.warning('Recoverable LLM tool-call error: %s', e)
 
-        error_signature = f'{type(e).__name__}:{str(e).strip()}'
+        error_signature = _normalize_recoverable_error_signature(e)
         if error_signature == self._recoverable_tool_error_signature:
             self._recoverable_tool_error_count += 1
         else:
