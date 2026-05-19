@@ -792,6 +792,25 @@ def test_system_capabilities_skips_lsp_dap_discovery_hint_when_both_gated_off() 
     assert 'Get-Command' not in text
 
 
+def test_system_capabilities_mentions_both_atomic_batch_editors_when_available() -> None:
+    from backend.engine.prompts.section_renderers import _render_system_capabilities
+
+    cfg = SimpleNamespace(
+        enable_parallel_tool_scheduling=False,
+        enable_checkpoints=False,
+        enable_lsp_query=False,
+        enable_debugger=False,
+    )
+    text = _render_system_capabilities(
+        cfg,
+        function_calling_mode='native',
+        multi_edit_available=True,
+        parallel_tool_calls_provider_flag=False,
+    )
+    assert '`symbol_editor` `command=multi_edit`' in text
+    assert '`text_editor` `command=multi_edit`' in text
+
+
 class TestBuildSystemPromptRenders:
     """Integration-level tests: build_system_prompt must not raise PromptRenderError
     for any supported feature-flag combination, and must produce non-empty output.

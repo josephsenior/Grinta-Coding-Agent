@@ -291,9 +291,11 @@ def _render_system_capabilities(
 
     if multi_edit_available:
         multi_edit_line = (
-            '- **Atomic multi-file edits**: AVAILABLE via `symbol_editor` `command=multi_edit`. '
-            'Pass a list of `{path, new_content}` items; all files commit together or all roll back. '
-            'Use this instead of sequential `text_editor` edits when the changes must succeed as a unit.'
+            '- **Atomic multi-file edits**: AVAILABLE. '
+            '`symbol_editor` `command=multi_edit` is the preferred path for code-aware batch refactors. '
+            '`text_editor` `command=multi_edit` is also available for text-style batches '
+            '(`create_file`, `insert_text`, `edit_mode=range`). '
+            'Use these instead of sequential edits when the changes must succeed as a unit.'
         )
     else:
         multi_edit_line = (
