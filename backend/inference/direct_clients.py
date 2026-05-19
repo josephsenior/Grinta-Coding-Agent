@@ -244,9 +244,16 @@ class LLMResponse:
                 }
 
         class Message:
-            def __init__(self, content, role, tool_calls_dict=None):
+            def __init__(
+                self,
+                content,
+                role,
+                tool_calls_dict=None,
+                reasoning_content: str = '',
+            ):
                 self.content = content
                 self.role = role
+                self.reasoning_content = reasoning_content
                 self.tool_calls = (
                     [ToolCall(tc) for tc in tool_calls_dict]
                     if tool_calls_dict
@@ -254,12 +261,30 @@ class LLMResponse:
                 )
 
         class Choice:
-            def __init__(self, content, role, finish_reason, tool_calls_dict=None):
-                self.message = Message(content, role, tool_calls_dict)
+            def __init__(
+                self,
+                content,
+                role,
+                finish_reason,
+                tool_calls_dict=None,
+                reasoning_content: str = '',
+            ):
+                self.message = Message(
+                    content,
+                    role,
+                    tool_calls_dict,
+                    reasoning_content=reasoning_content,
+                )
                 self.finish_reason = finish_reason
 
         self.choices = [
-            Choice(self.content, 'assistant', self.finish_reason, self.tool_calls)
+            Choice(
+                self.content,
+                'assistant',
+                self.finish_reason,
+                self.tool_calls,
+                reasoning_content=self.reasoning_content,
+            )
         ]
 
     @staticmethod
@@ -305,16 +330,19 @@ class LLMResponse:
         return normalized
 
     def to_dict(self) -> dict[str, Any]:
+        message: dict[str, Any] = {
+            'content': self.content,
+            'role': 'assistant',
+            'tool_calls': self.tool_calls,
+        }
+        if self.reasoning_content:
+            message['reasoning_content'] = self.reasoning_content
         return {
             'id': self.id,
             'model': self.model,
             'choices': [
                 {
-                    'message': {
-                        'content': self.content,
-                        'role': 'assistant',
-                        'tool_calls': self.tool_calls,
-                    },
+                    'message': message,
                     'finish_reason': self.finish_reason,
                 }
             ],

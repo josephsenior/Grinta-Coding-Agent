@@ -64,15 +64,14 @@ async def test_tui_renderer_history_is_bounded(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_tui_renderer_live_thinking_uses_preview_until_commit():
+async def test_tui_renderer_live_thinking_renders_in_main_panel_until_commit():
     display = MagicMock()
-    preview = MagicMock()
     fake_tui = SimpleNamespace(
         _config=None,
         _get_display=lambda: display,
         _get_sidebar=lambda: MagicMock(),
-        _get_thinking_preview=lambda: preview,
-        _scroll_to_bottom=MagicMock(),
+        query_one=MagicMock(),
+        refresh=MagicMock(),
     )
     renderer = tui_app.TUIRenderer(
         console=SimpleNamespace(width=100),
@@ -86,14 +85,48 @@ async def test_tui_renderer_live_thinking_uses_preview_until_commit():
 
     renderer.update_live_thinking('step 1')
 
-    assert preview.update.called
-    assert display.write.called is False
+    assert display.clear.called
+    assert display.write.called
 
+    display.write.reset_mock()
     renderer.commit_live_thinking()
 
     assert display.write.called
     assert renderer._live_thinking_dirty is False
     assert renderer._live_thinking == ''
+
+
+@pytest.mark.asyncio
+async def test_tui_renderer_live_response_renders_in_main_panel_until_clear():
+    display = MagicMock()
+    fake_tui = SimpleNamespace(
+        _config=None,
+        _get_display=lambda: display,
+        _get_sidebar=lambda: MagicMock(),
+        query_one=MagicMock(),
+        refresh=MagicMock(),
+    )
+    renderer = tui_app.TUIRenderer(
+        console=SimpleNamespace(width=100),
+        hud=SimpleNamespace(
+            state=SimpleNamespace(mcp_servers=0), bundled_skill_count=0
+        ),
+        reasoning=SimpleNamespace(),
+        tui=fake_tui,
+        loop=asyncio.get_running_loop(),
+    )
+
+    renderer.update_live_response('partial answer')
+
+    assert display.clear.called
+    assert display.write.called
+    assert renderer._live_response_dirty is True
+
+    renderer.clear_live_response()
+
+    assert renderer._live_response == ''
+    assert renderer._live_response_dirty is False
+    assert display.clear.call_count >= 2
 
 
 @pytest.mark.asyncio

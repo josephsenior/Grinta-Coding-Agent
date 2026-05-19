@@ -705,7 +705,6 @@ class GrintaScreen(Screen):
                     highlight=False,
                     markup=False,
                 )
-                yield Static(id='thinking-preview', classes='-hidden')
             with InfoSidebar(id='sidebar-container'):
                 yield Static(id='sidebar-display')
         with InputBar(id='input-bar'):
@@ -896,9 +895,6 @@ class GrintaScreen(Screen):
 
     def _get_display(self) -> RichLog:
         return self.query_one('#main-display', RichLog)
-
-    def _get_thinking_preview(self) -> Static:
-        return self.query_one('#thinking-preview', Static)
 
     def _get_sidebar(self) -> Static:
         return self.query_one('#sidebar-display', Static)
@@ -2162,6 +2158,8 @@ class TUIRenderer:
         self._history_items_dropped = 0
         self._live_thinking: str = ''
         self._live_thinking_dirty = False
+        self._live_response: str = ''
+        self._live_response_dirty = False
         self._task_list: list[dict[str, Any]] = []
         self._last_sidebar_state: Any = None
 
@@ -2179,10 +2177,16 @@ class TUIRenderer:
         """Add a finalized renderable to history and append it to RichLog."""
         if isinstance(renderable, str):
             renderable = Text.from_markup(renderable)
+        had_live_content = self._has_live_content()
+        if had_live_content:
+            self._commit_live_buffers_to_history()
         self._append_history_item(renderable)
         self._append_history_item(Text(''))
-        self._write_transcript(renderable)
-        self._write_transcript(Text(''))
+        if had_live_content:
+            self._render_transcript_snapshot()
+        else:
+            self._write_transcript(renderable)
+            self._write_transcript(Text(''))
         self._refresh_display()
 
     def _append_history_item(self, renderable: Any) -> None:
@@ -2207,49 +2211,112 @@ class TUIRenderer:
             except Exception:
                 return
 
+    def _has_live_content(self) -> bool:
+        return self._live_thinking_dirty or self._live_response_dirty
+
+    def _live_transcript_items(self) -> list[Any]:
+        items: list[Any] = []
+        if self._live_thinking_dirty and self._live_thinking.strip():
+            items.extend(
+                [
+                    Text.assemble(
+                        Text('Thinking: ', style='#5eead4'),
+                        _render_thinking_with_diff(self._live_thinking),
+                    ),
+                    Text(''),
+                ]
+            )
+        if self._live_response_dirty and self._live_response.strip():
+            items.extend(
+                [
+                    Text.assemble(
+                        Text('GRINTA\n', style='bold #54efae'),
+                        _rich_text(self._live_response),
+                    ),
+                    Text(''),
+                ]
+            )
+        return items
+
+    def _commit_live_buffers_to_history(self) -> None:
+        for item in self._live_transcript_items():
+            self._append_history_item(item)
+        self._live_thinking = ''
+        self._live_thinking_dirty = False
+        self._live_response = ''
+        self._live_response_dirty = False
+
+    def _render_transcript_snapshot(self) -> None:
+        """Render committed history plus current streaming state in the main panel."""
+        try:
+            display = self._tui._get_display()
+            display.clear()
+            for item in [*self._history, *self._live_transcript_items()]:
+                display.write(
+                    item,
+                    expand=True,
+                    scroll_end=False,
+                    animate=False,
+                )
+            display.scroll_end(animate=False)
+        except (AttributeError, NoMatches):
+            return
+        self._refresh_live_preview()
+
+    def _refresh_live_preview(self) -> None:
+        try:
+            self._tui._get_display().scroll_end(animate=False)
+            self._tui.query_one('#transcript-container', Transcript).scroll_end(
+                animate=False
+            )
+            self._tui.refresh(layout=True)
+        except (AttributeError, NoMatches):
+            pass
+
     def update_live_thinking(self, text: str) -> None:
         """Update the real-time reasoning preview without rewriting history."""
         self._live_thinking = text
         self._live_thinking_dirty = bool(text.strip())
-        preview = Text.assemble(
-            Text('Thinking: ', style='#5eead4'),
-            _render_thinking_with_diff(text),
-        )
-        try:
-            widget = self._tui._get_thinking_preview()
-            widget.remove_class('-hidden')
-            widget.update(preview)
-        except (AttributeError, NoMatches):
-            pass
+        self._render_transcript_snapshot()
+
+    def update_live_response(self, text: str) -> None:
+        """Update the in-flight assistant response without committing history."""
+        self._live_response = text
+        self._live_response_dirty = bool(text.strip())
+        if not self._live_response_dirty:
+            self.clear_live_response()
+            return
+        self._render_transcript_snapshot()
+
+    def clear_live_response(self) -> None:
+        self._live_response = ''
+        self._live_response_dirty = False
+        self._render_transcript_snapshot()
 
     def commit_live_thinking(self) -> None:
-        """Commit the latest reasoning preview once and clear the live buffer."""
-        if self._live_thinking_dirty and self._live_thinking.strip():
-            self.add_to_history(
-                Text.assemble(
-                    Text('Thinking: ', style='#5eead4'),
-                    _render_thinking_with_diff(self._live_thinking),
+        """Commit live reasoning into transcript order and clear the buffer."""
+        if self._live_thinking_dirty:
+            if self._live_thinking.strip():
+                self._append_history_item(
+                    Text.assemble(
+                        Text('Thinking: ', style='#5eead4'),
+                        _render_thinking_with_diff(self._live_thinking),
+                    )
                 )
-            )
+                self._append_history_item(Text(''))
         self._live_thinking = ''
         self._live_thinking_dirty = False
-        try:
-            widget = self._tui._get_thinking_preview()
-            widget.update('')
-            widget.add_class('-hidden')
-        except (AttributeError, NoMatches):
-            pass
+        self._render_transcript_snapshot()
 
     def clear_history(self) -> None:
         self._history = []
         self._history_items_dropped = 0
         self._live_thinking = ''
         self._live_thinking_dirty = False
+        self._live_response = ''
+        self._live_response_dirty = False
         try:
             self._tui._get_display().clear()
-            preview = self._tui._get_thinking_preview()
-            preview.update('')
-            preview.add_class('-hidden')
         except (AttributeError, NoMatches):
             pass
         self._refresh_display()
@@ -2787,13 +2854,19 @@ class TUIRenderer:
         if thinking and thinking != 'Your thought has been logged.':
             self._tui.add_thinking(thinking)
 
+        content = (action.accumulated or '').strip()
         if action.is_final:
-            # Add the actual response text to history after committing thinking.
+            # Add the finalized response text to history and clear live previews.
             self._tui.finalize_thinking()
-            content = (action.accumulated or '').strip()
+            if self._tui._renderer:
+                self._tui._renderer.clear_live_response()
             if content and self._tui._renderer:
                 body = Markdown(content)
                 self._tui._renderer.add_to_history(body)
+            return
+
+        if content and self._tui._renderer:
+            self._tui._renderer.update_live_response(content)
 
     def _update_metrics(self, event: Any) -> None:
         if hasattr(event, 'model') and event.model:

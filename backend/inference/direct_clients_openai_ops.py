@@ -322,6 +322,93 @@ def clean_messages(
     return cleaned
 
 
+def _is_deepseek_thinking_replay_model(client: Any) -> bool:
+    provider_name = str(getattr(client, '_provider_name', '') or '').lower()
+    model_name = str(getattr(client, 'model_name', '') or '').lower()
+    if provider_name not in {'deepseek', 'opencode', 'opencode-go'}:
+        return False
+    return (
+        model_name.startswith('deepseek-v4')
+        or model_name.startswith('deepseek-reasoner')
+        or model_name.startswith('deepseek-r1')
+    )
+
+
+def _message_content_to_text(content: Any) -> str:
+    if content is None:
+        return ''
+    if isinstance(content, str):
+        return content
+    if isinstance(content, dict):
+        text = content.get('text')
+        return text if isinstance(text, str) else str(content)
+    if isinstance(content, list):
+        return ''.join(_message_content_to_text(item) for item in content)
+    return str(content)
+
+
+def _flatten_stale_deepseek_assistant_message(msg: dict[str, Any]) -> dict[str, Any]:
+    from backend.cli.tool_call_display import flatten_tool_call_for_history
+
+    text = _message_content_to_text(msg.get('content')).strip()
+    tool_lines: list[str] = []
+    for tool_call in msg.get('tool_calls') or []:
+        if not isinstance(tool_call, dict):
+            continue
+        function = tool_call.get('function') or {}
+        name = str(function.get('name') or 'tool')
+        arguments = str(function.get('arguments') or '{}')
+        tool_lines.append(flatten_tool_call_for_history(name, arguments))
+
+    content = '\n'.join(part for part in [text, *tool_lines] if part).strip()
+    return {
+        'role': 'user',
+        'content': content or '[Previous assistant response omitted missing reasoning trace.]',
+    }
+
+
+def _flatten_stale_deepseek_tool_message(msg: dict[str, Any]) -> dict[str, Any]:
+    name = str(msg.get('name') or 'tool')
+    content = _message_content_to_text(msg.get('content')).strip()
+    return {
+        'role': 'user',
+        'content': f'[Tool result from {name}]\n{content}'.strip(),
+    }
+
+
+def _recover_deepseek_thinking_history(
+    client: Any,
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Recover sessions created before reasoning_content replay was preserved."""
+    if not _is_deepseek_thinking_replay_model(client):
+        return messages
+
+    has_stale_assistant = any(
+        isinstance(msg, dict)
+        and msg.get('role') == 'assistant'
+        and not msg.get('reasoning_content')
+        for msg in messages
+    )
+    if not has_stale_assistant:
+        return messages
+
+    recovered: list[dict[str, Any]] = []
+    for msg in messages:
+        if not isinstance(msg, dict):
+            recovered.append(msg)
+            continue
+        role = msg.get('role')
+        if role == 'assistant' and not msg.get('reasoning_content'):
+            recovered.append(_flatten_stale_deepseek_assistant_message(msg))
+            continue
+        if role == 'tool':
+            recovered.append(_flatten_stale_deepseek_tool_message(msg))
+            continue
+        recovered.append(msg)
+    return recovered
+
+
 def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
     from backend.inference import direct_clients as dc
     from backend.inference.exceptions import BadRequestError
@@ -329,6 +416,7 @@ def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
 
     _ensure_opencode_chat_completions_model_supported(client)
     messages = strip_prompt_cache_hints_from_messages(messages)
+    messages = _recover_deepseek_thinking_history(client, messages)
     messages = client._clean_messages(messages)
     kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)
     kwargs = client._strip_unsupported_params(kwargs)
@@ -389,6 +477,7 @@ async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> 
 
     _ensure_opencode_chat_completions_model_supported(client)
     messages = strip_prompt_cache_hints_from_messages(messages)
+    messages = _recover_deepseek_thinking_history(client, messages)
     messages = client._clean_messages(messages)
     kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)
     kwargs = client._strip_unsupported_params(kwargs)
@@ -434,6 +523,7 @@ async def astream(
 
     _ensure_opencode_chat_completions_model_supported(client)
     messages = strip_prompt_cache_hints_from_messages(messages)
+    messages = _recover_deepseek_thinking_history(client, messages)
     messages = client._clean_messages(messages)
     kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)
     kwargs = client._strip_unsupported_params(kwargs)
