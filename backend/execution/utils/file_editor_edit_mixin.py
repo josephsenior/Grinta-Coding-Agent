@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +81,10 @@ class FileEditorEditOpsMixin:
     def _maybe_validate_syntax_for_file(
         self, file_path: Path, content: str
     ) -> tuple[bool, str]:
+        preflight = self._preflight_content_guard(file_path, content)
+        if preflight is not None:
+            return False, preflight
+
         try:
             from backend.utils.treesitter_editor import TreeSitterEditor
         except Exception as exc:
@@ -110,6 +115,19 @@ class FileEditorEditOpsMixin:
             return False, enriched_msg
 
         return True, f'WARNING: {enriched_msg}'
+
+    @staticmethod
+    def _preflight_content_guard(file_path: Path, content: str) -> str | None:
+        suffix = file_path.suffix.lower()
+        if suffix == '.py':
+            for idx, line in enumerate(content.splitlines(), start=1):
+                if re.match(r'^\s*//', line):
+                    return (
+                        f'Line {idx}: invalid Python comment prefix `//` detected. '
+                        'Python comments use `#`. Repair the affected lines with a '
+                        'targeted range edit instead of retrying the same full write.'
+                    )
+        return None
 
     @staticmethod
     def _attach_content_context(msg: str, content: str, *, radius: int = 2) -> str:

@@ -402,8 +402,8 @@ class ActionExecutionService:
         if isinstance(exc, LLMNoActionError):
             return (
                 'No tool call detected - the response contains text but no tool call.\n\n'
-                'Use tool calls: text_editor to edit files, terminal_manager to run commands, '
-                'think to reason, or send a message to the user.'
+                'Use tool calls: symbol_editor for code edits, text_editor for prose/config edits, '
+                'terminal_manager to run commands, think to reason, or send a message to the user.'
             )
         return str(exc)
 

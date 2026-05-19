@@ -20,7 +20,7 @@ _DETAILED_TEXT_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
   - `section`: anchor-bounded section edit.
   - `patch`: unified diff hunk apply with strict context.
 
-Default mental model: **`symbol_editor`** for most code edits (AST-based or line-based); **minimal valid `file_text` on create**, then **`edit_mode=range`** or **`insert_text`** to extend. Avoid brittle string replacement.
+Default mental model: **`symbol_editor` first for code edits** (symbols, ranges, atomic batches); **minimal valid `file_text` on create**, then **`edit_mode=range`** or **`insert_text`** to extend only when `symbol_editor` is the wrong fit. Avoid brittle string replacement.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
 

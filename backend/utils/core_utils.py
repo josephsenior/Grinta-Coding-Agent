@@ -40,6 +40,7 @@ def create_registry_and_conversation_stats(
     sid: str,
     user_id: str | None,
     user_settings: Settings | None = None,
+    retry_listener=None,
 ) -> tuple[LLMRegistry, ConversationStats, AppConfig]:
     """Create LLM registry and conversation stats for a session.
 
@@ -57,7 +58,11 @@ def create_registry_and_conversation_stats(
     if user_settings:
         user_config = setup_llm_config(config, user_settings)
     agent_cls = getattr(user_settings, 'agent', None) if user_settings else None
-    llm_registry = LLMRegistry(user_config, agent_cls)
+    llm_registry = LLMRegistry(
+        user_config,
+        agent_cls,
+        retry_listener=retry_listener,
+    )
     file_store = get_file_store(
         file_store_type=config.file_store,
         local_data_root=get_local_data_root(config),

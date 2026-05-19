@@ -159,6 +159,15 @@ class TestFileEditorWrite:
         assert 'Syntax validation failed' in result.error
         assert not (Path(self.tmpdir) / 'broken.css').exists()
 
+    def test_python_double_slash_comment_is_rejected_preflight(self):
+        bad_python = '// bad comment\nprint("ok")\n'
+        result = self.editor(
+            command='create_file', path='bad.py', file_text=bad_python
+        )
+        assert result.error is not None
+        assert 'invalid Python comment prefix' in result.error
+        assert not (Path(self.tmpdir) / 'bad.py').exists()
+
     def test_syntax_warning_includes_content_excerpt(self, monkeypatch):
         # Rich feedback: the WARNING text should carry a pointer-style excerpt
         # of the offending line so the model can patch without re-reading.

@@ -463,9 +463,21 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         if status_type == 'delegate_progress':
             if self._handle_delegate_progress_status(obs):
                 return
-        elif status_type in ('retry_pending', 'retry_resuming'):
+        elif status_type in (
+            'retry_pending',
+            'retry_resuming',
+            'llm_retry_pending',
+            'llm_retry_resuming',
+        ):
             self._handle_retry_status(obs, status_type=status_type)
-            retry_sig = (status_type, str(getattr(obs, 'content', '') or ''))
+            extras = getattr(obs, 'extras', None) or {}
+            retry_sig = (
+                status_type,
+                str(extras.get('attempt') or ''),
+                str(extras.get('max_attempts') or ''),
+                str(extras.get('reason') or ''),
+                str(extras.get('delay_seconds') or ''),
+            )
             if getattr(self, '_last_retry_status_signature', None) == retry_sig:
                 return
             setattr(self, '_last_retry_status_signature', retry_sig)
@@ -563,7 +575,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             floor=attempt,
         )
         self._hud.update_ledger('Backoff')
-        if status_type == 'retry_pending':
+        if status_type in ('retry_pending', 'llm_retry_pending'):
             delay_seconds = extras.get('delay_seconds')
             try:
                 delay = float(delay_seconds) if delay_seconds else 10.0

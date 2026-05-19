@@ -105,6 +105,7 @@ from backend.core.bootstrap.setup import (
 from backend.core.enums import AgentState, EventSource
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventStream, EventStreamSubscriber
+from backend.ledger.observation import StatusObservation
 from backend.ledger.action import (
     AgentThinkAction,
     BrowseInteractiveAction,
@@ -658,6 +659,8 @@ class GrintaScreen(Screen):
         'starting': 'Starting…',
         'loading': 'Loading…',
         'running': 'Running',
+        'retrying': 'Retrying',
+        'backoff': 'Backoff',
         'awaiting_user_input': 'Ready',
         'paused': 'Paused',
         'stopped': 'Stopped',
@@ -674,6 +677,8 @@ class GrintaScreen(Screen):
         'starting': NAVY_WAITING,
         'loading': NAVY_WAITING,
         'running': NAVY_BRAND,
+        'retrying': NAVY_WAITING,
+        'backoff': NAVY_WAITING,
         'awaiting_user_input': NAVY_READY,
         'paused': NAVY_WAITING,
         'stopped': NAVY_TEXT_MUTED,
@@ -685,6 +690,24 @@ class GrintaScreen(Screen):
         'user_rejected': NAVY_ERROR,
         'rate_limited': NAVY_WAITING,
     }
+
+    @classmethod
+    def _resolve_state_display(cls, raw_state: str | None) -> tuple[str, str]:
+        raw = (raw_state or 'Ready').strip()
+        lookup_key = raw.lower()
+        if lookup_key.startswith('agentstate.'):
+            lookup_key = lookup_key[len('agentstate.') :]
+        if '.' in lookup_key:
+            lookup_key = lookup_key.split('.')[-1]
+
+        for prefix in ('backoff', 'retrying'):
+            if lookup_key.startswith(prefix):
+                return raw, cls._STATE_COLORS[prefix]
+
+        return (
+            cls._STATE_LABELS.get(lookup_key, raw or 'Ready'),
+            cls._STATE_COLORS.get(lookup_key, NAVY_BRAND),
+        )
 
     _SLASH_HINTS = {
         '/help': '/help [--all|--search <term>|<command>]',
@@ -772,14 +795,7 @@ class GrintaScreen(Screen):
     def _render_hud_bar(self) -> None:
         hud = self._hud
         raw_state = hud.state.agent_state_label or 'Ready'
-        lookup_key = raw_state.lower()
-        if lookup_key.startswith('agentstate.'):
-            lookup_key = lookup_key[len('agentstate.') :]
-        if '.' in lookup_key:
-            lookup_key = lookup_key.split('.')[-1]
-
-        display_state = self._STATE_LABELS.get(lookup_key, 'Ready')
-        state_color = self._STATE_COLORS.get(lookup_key, NAVY_BRAND)
+        display_state, state_color = self._resolve_state_display(raw_state)
 
         cost = hud.state.cost_usd or 0
         used = hud.state.context_tokens
@@ -840,7 +856,12 @@ class GrintaScreen(Screen):
             key = key[len('agentstate.') :]
         if '.' in key:
             key = key.split('.')[-1]
-        label = self._STATE_LABELS.get(key, state_value)
+        if key.startswith('backoff'):
+            label = 'Backoff'
+        elif key.startswith('retrying'):
+            label = 'Retrying'
+        else:
+            label = self._STATE_LABELS.get(key, state_value)
         if label != self._phase_label:
             self._phase_label = label
             self._phase_started_at = time.monotonic()
@@ -1863,6 +1884,7 @@ class GrintaScreen(Screen):
             config,
             sid=event_stream.sid,
             user_id='tui',
+            retry_listener=self._make_llm_retry_listener(event_stream),
         )
         _tui_logger.debug('_bootstrap_sync_phase1: create_runtime')
         runtime = create_runtime(
@@ -1875,6 +1897,34 @@ class GrintaScreen(Screen):
         agent = create_agent(config, llm_registry)
         _tui_logger.debug('_bootstrap_sync_phase1: done')
         return agent, runtime, conv_stats
+
+    def _make_llm_retry_listener(self, event_stream: Any):
+        def _listener(attempt: int, max_attempts: int, **kwargs: Any) -> None:
+            status_type = str(kwargs.get('status_type') or 'llm_retry_pending')
+            reason = str(kwargs.get('reason') or 'transient failure')
+            wait_seconds = kwargs.get('wait_seconds')
+            extras = {
+                'attempt': attempt,
+                'max_attempts': max_attempts,
+                'reason': reason,
+                'source': kwargs.get('source') or 'llm',
+                'streaming': bool(kwargs.get('streaming', False)),
+            }
+            if wait_seconds is not None:
+                extras['delay_seconds'] = wait_seconds
+            try:
+                event_stream.add_event(
+                    StatusObservation(
+                        content='',
+                        status_type=status_type,
+                        extras=extras,
+                    ),
+                    EventSource.ENVIRONMENT,
+                )
+            except Exception:
+                logger.debug('Failed to emit LLM retry status event', exc_info=True)
+
+        return _listener
 
     def _bootstrap_sync_phase2(
         self,
@@ -2666,6 +2716,23 @@ class TUIRenderer:
         elif isinstance(event, SuccessObservation):
             self._tui.add_success(event.content or 'Done')
         elif isinstance(event, StatusObservation):
+            status_type = str(getattr(event, 'status_type', '') or '')
+            extras = getattr(event, 'extras', None) or {}
+            if status_type in (
+                'retry_pending',
+                'retry_resuming',
+                'llm_retry_pending',
+                'llm_retry_resuming',
+            ):
+                label, last_status, message = self._format_retry_status_message(
+                    status_type, extras
+                )
+                self._hud.update_ledger('Backoff')
+                self._hud.update_agent_state(label)
+                self._tui.set_agent_phase(label)
+                self._tui.set_last_tool_status(last_status)
+                self._tui._write_log(Text(f'  {message}', style=NAVY_TEXT_DIM))
+                return
             msg = (event.content or '').strip()
             if msg:
                 self._tui._write_log(Text(f'  {msg}', style=NAVY_TEXT_DIM))
@@ -2849,6 +2916,34 @@ class TUIRenderer:
         )
         self._write_card(card)
 
+    @staticmethod
+    def _format_retry_status_message(
+        status_type: str, extras: dict[str, Any]
+    ) -> tuple[str, str, str]:
+        attempt = max(1, int(extras.get('attempt') or 1))
+        max_attempts = max(attempt, int(extras.get('max_attempts') or attempt))
+        reason = str(extras.get('reason') or 'transient failure').strip()
+        source = str(extras.get('source') or '').strip().lower()
+        retry_target = 'provider stream' if source == 'llm_stream' else 'provider'
+        if status_type in ('retry_pending', 'llm_retry_pending'):
+            delay_seconds = extras.get('delay_seconds')
+            try:
+                delay = float(delay_seconds) if delay_seconds is not None else 0.0
+            except (TypeError, ValueError):
+                delay = 0.0
+            delay_str = f'{int(delay)}s' if delay >= 1 else '<1s'
+            return (
+                f'Backoff {attempt}/{max_attempts} (retrying in {delay_str})',
+                f'Waiting {delay_str} to retry after {reason}',
+                f'Auto-retrying {retry_target} in {delay_str} ({attempt}/{max_attempts}) after {reason}.',
+            )
+
+        return (
+            f'Retrying {attempt}/{max_attempts}',
+            f'Resuming after {reason}',
+            f'Retrying {retry_target} now ({attempt}/{max_attempts}) after {reason}.',
+        )
+
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
         if action.is_tool_call:
             return
@@ -2889,8 +2984,16 @@ class TUIRenderer:
             pass
 
         self._current_state = state
-        self._hud.update_agent_state(str(state))
-        self._tui.set_agent_phase(str(state))
+        current_label = (self._hud.state.agent_state_label or '').strip()
+        if state == AgentState.RATE_LIMITED:
+            self._hud.update_ledger('Backoff')
+            if not current_label.startswith(('Backoff', 'Retrying')):
+                self._hud.update_agent_state('Rate Limited')
+                current_label = 'Rate Limited'
+            self._tui.set_agent_phase(current_label)
+        else:
+            self._hud.update_agent_state(str(state))
+            self._tui.set_agent_phase(str(state))
 
         # End agent turn when reaching idle/terminal state
         if self._in_agent_turn and state in (

@@ -246,8 +246,15 @@ class TestRetryMixin(TestCase):
 
         self.assertEqual(result, 'success')
         listener.assert_called()
-        # Verify listener was called with attempt number and max retries
-        listener.assert_called_with(1, 2)
+        listener.assert_called_with(
+            1,
+            2,
+            status_type='llm_retry_pending',
+            reason='ValueError',
+            wait_seconds=1.0,
+            source='llm_completion',
+            streaming=False,
+        )
 
     @patch('backend.inference.retry_mixin.tenacity_before_sleep_factory')
     @patch('backend.inference.retry_mixin.tenacity_after_factory')

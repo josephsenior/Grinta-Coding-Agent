@@ -67,17 +67,20 @@ _RATE_LIMITED_EXCEPTIONS = (
     ServiceUnavailableError,
 )
 
-# Transient provider failures that should use the retry queue instead of
-# dropping straight back to the user. Timeouts are included here on purpose:
-# they indicate provider/network stall, not a task-level dead end.
-_QUEUED_RETRY_EXCEPTIONS = _RATE_LIMITED_EXCEPTIONS + (Timeout,)
-
 # After inner LLM retries (see ``LLM_RETRY_EXCEPTIONS`` in ``llm.py``), these
 # are still transport/provider issues—not actionable by the model.
 _TRANSIENT_LLM_INFRA_EXCEPTIONS = (
     APIConnectionError,
     InternalServerError,
     LLMNoResponseError,
+)
+
+# Transient provider failures that should use the retry queue instead of
+# dropping straight back to the user. Timeouts and post-retry transport
+# failures belong here on purpose: they indicate provider/network stall, not
+# a task-level dead end the model can fix by changing strategy.
+_QUEUED_RETRY_EXCEPTIONS = (
+    _RATE_LIMITED_EXCEPTIONS + _TRANSIENT_LLM_INFRA_EXCEPTIONS + (Timeout,)
 )
 
 

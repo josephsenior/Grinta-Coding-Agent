@@ -241,10 +241,10 @@ class OrchestratorPlanner:
                 create_text_editor_tool,
             )
 
-            # Primary editor: text_editor for targeted line-level edits
-            tools.append(create_text_editor_tool())
-            # Advanced editor: structure_editor (tree-sitter AST) for symbol-level refactoring
+            # Primary editor for code: symbol_editor (symbols + range edits)
             tools.append(create_symbol_editor_tool())
+            # Fallback editor for prose/config/format/section/patch flows
+            tools.append(create_text_editor_tool())
 
     def _add_execute_mcp_tool_tool(self, tools: list) -> None:
         """Add the MCP gateway proxy tool when MCP is enabled.

@@ -145,12 +145,15 @@ class TestRecoveryService:
         self, mock_context, ctrl, exc
     ):
         """Matches ``LLM_RETRY_EXCEPTIONS`` infra types after inner retries."""
+        ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=True)
         svc = RecoveryService(mock_context)
         await svc.react_to_exception(exc)
 
         err_obs = mock_context.emit_event.call_args[0][0]
         assert err_obs.notify_ui_only is True
         assert 'Transient provider or network issue' in err_obs.content
+        ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once_with(exc)
+        mock_context.set_agent_state.assert_awaited_once_with(AgentState.RATE_LIMITED)
 
     @pytest.mark.asyncio
     async def test_rate_limit_does_not_pollute_agent_context(self, mock_context, ctrl):
