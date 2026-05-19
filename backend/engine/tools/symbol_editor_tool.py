@@ -50,6 +50,7 @@ COMMANDS:
 
 6. `create_file` - Create a new file with content
     Required: path, file_text
+   Optional: overwrite_existing=true for intentional full rewrite of a large existing source file
    Creates parent directories if needed
 
 7. `read_file` - Read a file's contents
@@ -208,6 +209,10 @@ def create_symbol_editor_tool(
             'file_text': {
                 'description': 'Content to write to the file (for create_file command)',
                 'type': 'string',
+            },
+            'overwrite_existing': {
+                'description': 'Optional safety override for create_file when intentionally fully rewriting a large existing source file.',
+                'type': 'boolean',
             },
             'new_str': {
                 'description': 'Replacement text (for insert_text command)',

@@ -168,6 +168,33 @@ class TestFileEditorWrite:
         assert 'invalid Python comment prefix' in result.error
         assert not (Path(self.tmpdir) / 'bad.py').exists()
 
+    def test_large_existing_code_file_overwrite_requires_explicit_flag(self):
+        existing = Path(self.tmpdir) / 'big.py'
+        existing.write_text(''.join(f'line_{i} = {i}\n' for i in range(250)))
+        result = self.editor(
+            command='create_file',
+            path='big.py',
+            file_text='print("rewritten")\n',
+        )
+        assert result.error is not None
+        assert (
+            result.error_code
+            == 'FULL_FILE_OVERWRITE_REQUIRES_EXPLICIT_CONFIRMATION'
+        )
+        assert 'overwrite_existing=true' in result.error
+
+    def test_large_existing_code_file_overwrite_allows_explicit_flag(self):
+        existing = Path(self.tmpdir) / 'big.py'
+        existing.write_text(''.join(f'line_{i} = {i}\n' for i in range(250)))
+        result = self.editor(
+            command='create_file',
+            path='big.py',
+            file_text='print("rewritten")\n',
+            overwrite_existing=True,
+        )
+        assert result.error is None
+        assert existing.read_text() == 'print("rewritten")\n'
+
     def test_syntax_warning_includes_content_excerpt(self, monkeypatch):
         # Rich feedback: the WARNING text should carry a pointer-style excerpt
         # of the offending line so the model can patch without re-reading.

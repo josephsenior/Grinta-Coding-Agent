@@ -262,29 +262,40 @@ class TestExecuteFileEditor:
         result_mock.output = 'File edited successfully'
         result_mock.old_content = 'old'
         result_mock.new_content = 'new'
+        result_mock.error_code = None
+        result_mock.retryable = False
+        result_mock.operation = 'edit'
+        result_mock.metadata = {}
         editor = MagicMock(return_value=result_mock)
 
-        output, (old, new) = execute_file_editor(editor, 'edit', '/test.py')
+        output, (old, new), tool_result = execute_file_editor(editor, 'edit', '/test.py')
         assert output == 'File edited successfully'
         assert old == 'old'
         assert new == 'new'
+        assert tool_result['ok'] is True
 
     def test_editor_error(self):
         result_mock = MagicMock()
         result_mock.error = 'Something went wrong'
+        result_mock.error_code = 'EDITOR_ERROR'
+        result_mock.retryable = False
+        result_mock.operation = 'edit'
+        result_mock.metadata = {}
         result_mock.output = ''
         editor = MagicMock(return_value=result_mock)
 
-        output, (old, new) = execute_file_editor(editor, 'edit', '/test.py')
+        output, (old, new), tool_result = execute_file_editor(editor, 'edit', '/test.py')
         assert 'ERROR' in output
         assert old is None and new is None
+        assert tool_result['ok'] is False
 
     def test_invalid_insert_line(self):
         editor = MagicMock()
-        output, (old, new) = execute_file_editor(
+        output, (old, new), tool_result = execute_file_editor(
             editor, 'insert_text', '/test.py', insert_line='abc'
         )
         assert 'Invalid insert_line' in output
+        assert tool_result['error_code'] == 'INVALID_INSERT_LINE'
         editor.assert_not_called()
 
 

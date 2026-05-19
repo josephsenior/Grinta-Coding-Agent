@@ -212,6 +212,20 @@ class TestHandleStrReplaceEditorTool:
             }
         )
         assert isinstance(action, FileEditAction)
+        assert action.overwrite_existing is False
+
+    def test_create_file_accepts_overwrite_existing(self):
+        action = _handle_text_editor_tool(
+            {
+                'command': 'create_file',
+                'path': 'new.py',
+                'file_text': 'content',
+                'overwrite_existing': True,
+                'security_risk': 'LOW',
+            }
+        )
+        assert isinstance(action, FileEditAction)
+        assert action.overwrite_existing is True
 
     def test_unexpected_arg_raises(self):
         with pytest.raises(FunctionCallValidationError):
@@ -249,6 +263,22 @@ class TestHandleStrReplaceEditorTool:
                     'security_risk': 'LOW',
                 }
             )
+
+    def test_multi_edit_command_returns_message_action(self):
+        with patch(
+            'backend.engine.function_calling._handle_text_editor_multi_edit'
+        ) as handle_multi:
+            handle_multi.return_value = MessageAction(content='ok')
+            action = _handle_text_editor_tool(
+                {
+                    'command': 'multi_edit',
+                    'file_edits': [
+                        {'path': 'a.md', 'command': 'create_file', 'file_text': 'x'}
+                    ],
+                    'security_risk': 'LOW',
+                }
+            )
+        assert isinstance(action, MessageAction)
 
     def test_range_missing_start_line_raises(self):
         with pytest.raises(

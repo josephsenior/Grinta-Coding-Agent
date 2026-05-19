@@ -11,7 +11,7 @@ from backend.inference.tool_names import TEXT_EDITOR_TOOL_NAME
 
 _DETAILED_TEXT_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
 * `read_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
-* `create_file`: create a new file or fully overwrite an existing file with the given content. Requires `file_text` — full-file body. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call. Use this command for both new files and updating existing files.
+* `create_file`: create a new file or fully overwrite an existing file with the given content. Requires `file_text` — full-file body. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call. On large existing source files, full overwrite is blocked unless you explicitly set `overwrite_existing=true`.
 * `insert_text`: insert `new_str` after `insert_line`.
 * `undo_last_edit`: revert the last successful edit/write to this file in the current session (bounded history). Prefer checkpoint/rollback for large reversions.
 * `edit_mode`: deterministic non-code editing primitives:
@@ -19,6 +19,7 @@ _DETAILED_TEXT_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
   - `format`: parser-based mutation for json/yaml/toml/markdown/html/xml.
   - `section`: anchor-bounded section edit.
   - `patch`: unified diff hunk apply with strict context.
+* `multi_edit`: atomic batch for text-style edits. Use this for coordinated non-symbol changes across one or more files. Supported per-item commands: `create_file`, `insert_text`, and `edit` with `edit_mode=range`. The whole batch commits or rolls back together.
 
 Default mental model: **`symbol_editor` first for code edits** (symbols, ranges, atomic batches); **minimal valid `file_text` on create**, then **`edit_mode=range`** or **`insert_text`** to extend only when `symbol_editor` is the wrong fit. Avoid brittle string replacement.
 
@@ -37,8 +38,8 @@ If the tool reports `Syntax validation failed` with a hint about literal escape 
 """
 _SHORT_TEXT_EDITOR_DESCRIPTION = (
     'File reading, creation, and editing tool. '
-    'Commands: read_file, create_file, insert_text, undo_last_edit. '
-    'create_file creates new files OR overwrites existing files. '
+    'Commands: read_file, create_file, insert_text, undo_last_edit, multi_edit. '
+    'create_file creates new files OR overwrites existing files, but large existing source files require overwrite_existing=true. '
     'Use edit_mode=range or symbol_editor for deterministic edits. '
     'Supports edit_mode=format|section|range|patch. '
     'Use project-relative paths.\n'
@@ -67,7 +68,7 @@ def create_text_editor_tool(
         description=description,
         properties={
             'command': get_command_param(
-                'The commands to run: `read_file`, `create_file`, `insert_text`, `undo_last_edit`, `edit`. '
+                'The commands to run: `read_file`, `create_file`, `insert_text`, `undo_last_edit`, `edit`, `multi_edit`. '
                 'Use `command=edit` with `edit_mode=range` or `symbol_editor` to edit existing files.',
                 [
                     'read_file',
@@ -75,6 +76,7 @@ def create_text_editor_tool(
                     'insert_text',
                     'undo_last_edit',
                     'edit',
+                    'multi_edit',
                 ],
             ),
             'path': get_path_param(
@@ -88,6 +90,13 @@ def create_text_editor_tool(
                     'Do NOT double-escape (\\\\n produces the literal characters "\\n" in the file).'
                 ),
                 'type': 'string',
+            },
+            'overwrite_existing': {
+                'description': (
+                    'Optional safety override for `create_file`. Required when intentionally fully rewriting '
+                    'a large existing source-code file; otherwise prefer `symbol_editor` or `edit_mode=range`.'
+                ),
+                'type': 'boolean',
             },
             'new_str': {
                 'description': (
@@ -185,6 +194,34 @@ def create_text_editor_tool(
                 'description': '1-based end line (inclusive) when using edit_mode=range.',
                 'type': 'integer',
             },
+            'file_edits': {
+                'type': 'array',
+                'description': (
+                    'For multi_edit only: atomic ordered text edits across one or more files. '
+                    'Each item requires path and command. Supported item commands: '
+                    '`create_file` with `file_text`, `insert_text` with `insert_line` + `new_str`, '
+                    'and `edit` with `edit_mode=range`, `start_line`, `end_line`, and `new_str`.'
+                ),
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                        'path': {'type': 'string'},
+                        'command': {
+                            'type': 'string',
+                            'enum': ['create_file', 'insert_text', 'edit'],
+                        },
+                        'file_text': {'type': 'string'},
+                        'new_str': {'type': 'string'},
+                        'insert_line': {'type': 'integer'},
+                        'edit_mode': {'type': 'string', 'enum': ['range']},
+                        'start_line': {'type': 'integer'},
+                        'end_line': {'type': 'integer'},
+                        'expected_file_hash': {'type': 'string'},
+                        'overwrite_existing': {'type': 'boolean'},
+                    },
+                    'required': ['path', 'command'],
+                },
+            },
         },
-        required=['command', 'path', 'security_risk'],
+        required=['command', 'security_risk'],
     )
