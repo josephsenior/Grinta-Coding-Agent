@@ -18,6 +18,7 @@ from backend.inference.catalog_loader import (
     lookup,
     prefers_short_tool_descriptions,
     sanitize_call_kwargs_for_provider,
+    supports_function_calling,
     supports_tool_choice,
 )
 
@@ -272,8 +273,19 @@ class TestGetTokenLimits:
     def test_minimax_m2_7_output_limit_from_catalog(self):
         """OpenCode Go MiniMax should expose its configured output token limit."""
         input_limit, output_limit = get_token_limits('opencode-go/minimax-m2.7')
-        assert input_limit is None
+        assert input_limit == 204800
         assert output_limit == 131072
+
+    def test_minimax_m2_7_supports_tools_without_thinking_mode(self):
+        entry = lookup('opencode-go/minimax-m2.7')
+
+        assert entry is not None
+        assert entry.thinking_mode is None
+        assert entry.strip_reasoning_effort is True
+        assert supports_function_calling('opencode-go/minimax-m2.7') is True
+
+    def test_unknown_opencode_go_chat_models_keep_native_tools(self):
+        assert supports_function_calling('opencode-go/deepseek-v4-flash') is True
 
 
 class TestGetFeaturedModels:

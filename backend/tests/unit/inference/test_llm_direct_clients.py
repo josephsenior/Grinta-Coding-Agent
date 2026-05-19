@@ -298,21 +298,96 @@ class TestAnthropicClientHelpers:
         assert kwargs['system'] == 'Be helpful'
         assert kwargs['model'] == 'claude-3'
 
+    def test_prepare_kwargs_converts_openai_tools_to_anthropic_schema(self):
+        from backend.inference.mappers.anthropic import prepare_kwargs
+
+        messages = [{'role': 'user', 'content': 'Hi'}]
+        tools = [
+            {
+                'type': 'function',
+                'function': {
+                    'name': 'read_file',
+                    'description': 'Read a file',
+                    'parameters': {
+                        'type': 'object',
+                        'properties': {'path': {'type': 'string'}},
+                        'required': ['path'],
+                    },
+                },
+            },
+            {
+                'type': 'function',
+                'function': {'name': '', 'parameters': {}},
+            },
+        ]
+
+        _, kwargs = prepare_kwargs(
+            messages,
+            {'tools': tools},
+            default_model='minimax-m2.7',
+        )
+
+        assert kwargs['tools'] == [
+            {
+                'name': 'read_file',
+                'description': 'Read a file',
+                'input_schema': {
+                    'type': 'object',
+                    'properties': {'path': {'type': 'string'}},
+                    'required': ['path'],
+                },
+            }
+        ]
+
+    def test_prepare_kwargs_defaults_empty_tool_parameters(self):
+        from backend.inference.mappers.anthropic import prepare_kwargs
+
+        messages = [{'role': 'user', 'content': 'Hi'}]
+        tools = [
+            {
+                'type': 'function',
+                'function': {'name': 'finish', 'description': 'Finish'},
+            }
+        ]
+
+        _, kwargs = prepare_kwargs(
+            messages,
+            {'tools': tools},
+            default_model='minimax-m2.7',
+        )
+
+        assert kwargs['tools'][0]['name'] == 'finish'
+        assert kwargs['tools'][0]['input_schema'] == {
+            'type': 'object',
+            'properties': {},
+        }
+
     def test_prepare_stream_request_strips_openai_only_stream_kwargs(self):
         from backend.inference.direct_clients_anthropic_ops import (
             _prepare_anthropic_stream_request,
         )
 
         client = MagicMock(model_name='minimax-m2.7')
+        client._provider_name = 'opencode-go'
         messages = [
             {'role': 'system', 'content': 'Be helpful'},
             {'role': 'user', 'content': 'Hi'},
         ]
         original_kwargs = {
+            'model': 'opencode-go/minimax-m2.7',
             'stream': True,
             'stream_options': {'include_usage': True},
             'extra_body': {'metadata': {'trace': '1'}},
             'temperature': 0.2,
+            'tools': [
+                {
+                    'type': 'function',
+                    'function': {
+                        'name': 'read_file',
+                        'parameters': {'type': 'object', 'properties': {}},
+                    },
+                }
+            ],
         }
 
         filtered, system_msg, request_kwargs = _prepare_anthropic_stream_request(
@@ -327,6 +402,12 @@ class TestAnthropicClientHelpers:
             'max_tokens': 131072,
             'model': 'minimax-m2.7',
             'temperature': 0.2,
+            'tools': [
+                {
+                    'name': 'read_file',
+                    'input_schema': {'type': 'object', 'properties': {}},
+                }
+            ],
         }
         assert 'stream' not in request_kwargs
         assert 'stream_options' not in request_kwargs
@@ -339,6 +420,7 @@ class TestAnthropicClientHelpers:
         )
 
         client = MagicMock(model_name='minimax-m2.7')
+        client._provider_name = 'opencode-go'
         messages = [{'role': 'user', 'content': 'Hi'}]
 
         filtered, request_kwargs = prepare_anthropic_kwargs(client, messages, {})
@@ -353,6 +435,7 @@ class TestAnthropicClientHelpers:
         )
 
         client = MagicMock(model_name='minimax-m2.7')
+        client._provider_name = 'opencode-go'
         messages = [{'role': 'user', 'content': 'Hi'}]
 
         _, request_kwargs = prepare_anthropic_kwargs(

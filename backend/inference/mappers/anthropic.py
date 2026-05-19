@@ -3,6 +3,8 @@
 import json
 from typing import Any
 
+from backend.core.logger import app_logger as logger
+
 
 def extract_tool_calls(
     content_blocks: list,
@@ -68,11 +70,102 @@ def prepare_kwargs(
     if system_msg is not None:
         model = kwargs.get('model', default_model)
         kwargs['system'] = _apply_system_cache_control(system_msg, model, kwargs)
+    _normalize_tools(kwargs)
     # Mark the last tool definition with cache_control so Anthropic caches the
     # entire system + tools prefix.  Tool definitions are stable across turns,
     # making them ideal cache breakpoints (saves 3K-10K input tokens per call).
     _apply_tools_cache_control(kwargs)
     return filtered, kwargs
+
+
+def _default_input_schema() -> dict[str, Any]:
+    return {'type': 'object', 'properties': {}}
+
+
+def _normalize_input_schema(schema: Any) -> dict[str, Any]:
+    if not isinstance(schema, dict) or not schema:
+        return _default_input_schema()
+    normalized = dict(schema)
+    if not isinstance(normalized.get('type'), str) or not normalized.get('type'):
+        normalized['type'] = 'object'
+    if normalized.get('type') == 'object' and not isinstance(
+        normalized.get('properties'), dict
+    ):
+        normalized['properties'] = {}
+    return normalized
+
+
+def _openai_tool_to_anthropic(tool: dict[str, Any]) -> dict[str, Any] | None:
+    function = tool.get('function')
+    if not isinstance(function, dict):
+        return None
+    name = function.get('name')
+    if not isinstance(name, str) or not name.strip():
+        return None
+
+    converted: dict[str, Any] = {
+        'name': name.strip(),
+        'input_schema': _normalize_input_schema(function.get('parameters')),
+    }
+    description = function.get('description')
+    if isinstance(description, str) and description.strip():
+        converted['description'] = description
+    cache_control = tool.get('cache_control')
+    if cache_control is not None:
+        converted['cache_control'] = cache_control
+    return converted
+
+
+def _anthropic_tool_to_anthropic(tool: dict[str, Any]) -> dict[str, Any] | None:
+    name = tool.get('name')
+    if not isinstance(name, str) or not name.strip():
+        return None
+    converted = dict(tool)
+    converted['name'] = name.strip()
+    converted['input_schema'] = _normalize_input_schema(
+        converted.get('input_schema')
+    )
+    converted.pop('parameters', None)
+    return converted
+
+
+def _normalize_tool(tool: Any) -> dict[str, Any] | None:
+    if not isinstance(tool, dict):
+        return None
+    if 'function' in tool:
+        return _openai_tool_to_anthropic(tool)
+    if 'name' in tool:
+        return _anthropic_tool_to_anthropic(tool)
+    return None
+
+
+def _normalize_tools(kwargs: dict[str, Any]) -> None:
+    tools = kwargs.get('tools')
+    if tools is None:
+        return
+    if not isinstance(tools, list):
+        logger.warning('Dropping Anthropic tools payload because it is not a list')
+        kwargs.pop('tools', None)
+        return
+
+    normalized_tools: list[dict[str, Any]] = []
+    dropped = 0
+    for tool in tools:
+        normalized = _normalize_tool(tool)
+        if normalized is None:
+            dropped += 1
+            continue
+        normalized_tools.append(normalized)
+
+    if dropped:
+        logger.warning(
+            'Dropped %d invalid Anthropic tool definition(s) before provider request',
+            dropped,
+        )
+    if normalized_tools:
+        kwargs['tools'] = normalized_tools
+    else:
+        kwargs.pop('tools', None)
 
 
 def _apply_tools_cache_control(kwargs: dict[str, Any]) -> None:

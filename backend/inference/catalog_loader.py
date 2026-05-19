@@ -216,6 +216,28 @@ def supports_tool_choice(model: str) -> bool:
     return provider != 'google'
 
 
+def supports_function_calling(model: str) -> bool:
+    """Return whether the model should receive native tool schemas."""
+    entry = lookup(model)
+    if entry is not None:
+        return entry.supports_function_calling
+
+    from backend.inference.provider_resolver import extract_provider_prefix
+
+    provider = extract_provider_prefix(model)
+    return provider in {
+        'anthropic',
+        'cerebras',
+        'deepseek',
+        'mistral',
+        'opencode',
+        'opencode-go',
+        'openai',
+        'openrouter',
+        'xai',
+    }
+
+
 def prefers_short_tool_descriptions(model: str) -> bool:
     """Return whether planner should use compact tool descriptions for *model*."""
     entry = lookup(model)

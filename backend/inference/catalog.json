@@ -717,10 +717,15 @@
     "minimax-m2.7": {
       "provider": "opencode-go",
       "aliases": [
-        "opencode-go/minimax-m2.7"
+        "opencode-go/minimax-m2.7",
+        "minimax-m2.7"
       ],
+      "max_input_tokens": 204800,
       "max_output_tokens": 131072,
-      "thinking_mode": "enabled:8192:16384"
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "strip_reasoning_effort": true,
+      "default_temperature": 1.0
     },
     "zai-glm-4.7": {
       "provider": "cerebras",
