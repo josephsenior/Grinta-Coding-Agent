@@ -46,6 +46,7 @@ from backend.cli.theme import (
     CLR_STATUS_ERR,
     CLR_STATUS_WARN,
     CLR_USER_BORDER,
+    CLR_USER_BG,
     CLR_WARN_BODY,
     CLR_WARN_ICON,
     STYLE_BOLD_DIM,
@@ -488,7 +489,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
     async def add_user_message(self, text: str) -> None:
         """Print a user turn — rounded panel, high-contrast label."""
-        body = Text((text or '').rstrip(), style=STYLE_DEFAULT)
+        body = Markdown((text or '').rstrip())
         panel = Panel(
             Padding(body, CALLOUT_PANEL_PADDING),
             title=Text('  You  ', style=STYLE_BOLD_DIM),
@@ -496,7 +497,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             box=box.ROUNDED,
             border_style=CLR_USER_BORDER,
             padding=(0, 0),
-            style=STYLE_DEFAULT,
+            style=CLR_USER_BG,
         )
         framed = frame_transcript_body(panel)
         group = Group(framed)

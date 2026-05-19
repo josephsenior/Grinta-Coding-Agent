@@ -141,10 +141,15 @@ def build_task_panel(task_list: list[dict[str, Any]]) -> Any:
             style=f'bold {TASK_STATUS_PANEL_STYLES.get(status, "dim")}',
         )
 
-        body = Text()
+        from rich.markdown import Markdown
+        from rich.console import Group
+        
+        prefix = Text()
         if task_id and task_id != '?':
-            body.append(f'{task_id}  ', style=STYLE_DIM)
-        body.append(desc, style=STYLE_DEFAULT)
+            prefix.append(f'{task_id}  ', style=STYLE_DIM)
+            
+        desc_md = Markdown(desc)
+        body = Group(prefix, desc_md) if prefix.plain else desc_md
         table.add_row(badge, body)
 
     empty_state: Any = (
@@ -331,6 +336,8 @@ def build_system_notice_panel(
     tone: str = 'info',
 ) -> Panel:
     """Unified panel chrome for non-error system messages."""
+    from rich.markdown import Markdown
+
     normalized_title = normalize_system_title(title)
     accent_style, body_style = _SYSTEM_TONES.get(tone, _SYSTEM_TONES['info'])
     # ``accent_style`` is a "bold #hex" pair: use the colour-only suffix for
@@ -340,7 +347,10 @@ def build_system_notice_panel(
         accent_style.split(' ', 1)[1] if ' ' in accent_style else accent_style
     )
     panel_title = Text(normalized_title, style=accent_style)
-    body = Text((text or '').strip(), style=body_style)
+    
+    # Use Markdown for syntax highlighting if there is any code in the system message
+    body = Markdown((text or '').strip())
+    
     return Panel(
         body,
         title=panel_title,
