@@ -1665,10 +1665,6 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
     validate_security_risk(arguments, tool_name)
     command, normalized_args = _normalize_symbol_editor_alias(command, dict(arguments))
 
-    # Filter out unknown parameters using the schema whitelist
-    filtered_kwargs = {k: v for k, v in normalized_args.items() if k not in ('command', 'path', 'security_risk')}
-    normalized_args = {'command': command, 'path': path, **_filter_valid_symbol_editor_kwargs(filtered_kwargs)}
-
     # Repair double-escaped content (``\n`` / ``\"``) before it reaches the
     # StructureEditor. Structure-aware commands (replace_range, etc.) build
     # FileEditActions directly and would otherwise bypass the repair applied
@@ -1682,6 +1678,10 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
             path,
             ', '.join(f'{name}(x{count})' for name, count in repair_changes),
         )
+
+    # Filter out unknown parameters using the schema whitelist
+    filtered_kwargs = {k: v for k, v in normalized_args.items() if k not in ('command', 'path', 'security_risk')}
+    normalized_args = {'command': command, 'path': path, **_filter_valid_symbol_editor_kwargs(filtered_kwargs)}
 
     bridged = _symbol_editor_bridge_to_text_editor(command, path, normalized_args)
     if bridged is not None:
