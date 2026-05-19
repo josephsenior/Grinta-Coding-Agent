@@ -434,9 +434,13 @@ def _extract_xml_tool_calls_from_content(
             logger.warning(
                 'Unclosed <function=%s> block in response content', fn_name
             )
-            break
-
-        fn_body = content_text[open_m.end(0) : close_m.start(0)]
+            fn_body = content_text[open_m.end(0) :]
+            end_pos = len(content_text)
+            is_unclosed = True
+        else:
+            fn_body = content_text[open_m.end(0) : close_m.start(0)]
+            end_pos = close_m.end(0)
+            is_unclosed = False
 
         # Extract parameters as raw text — the key advantage of XML transport
         try:
@@ -451,14 +455,21 @@ def _extract_xml_tool_calls_from_content(
                 if param_value.endswith('\n'):
                     param_value = param_value[:-1]
                 params[param_name] = param_value
+
+            if is_unclosed:
+                params["__xml_syntax_error__"] = "Unclosed <function> tag. Use </function> to close."
+            elif not params and fn_body.strip():
+                params["__xml_syntax_error__"] = "No <parameter=...> tags found. You must wrap arguments in parameter tags."
+
         except Exception as e:
             logger.warning(
                 'Failed to parse parameters for <function=%s>: %s',
                 fn_name,
                 e,
             )
-            pos = close_m.end(0)
-            continue
+            params = {
+                "__xml_syntax_error__": f"Malformed parameters: {str(e)}"
+            }
 
         call_id = f'xml_toolu_{call_counter:02d}'
         call_counter += 1
@@ -468,7 +479,7 @@ def _extract_xml_tool_calls_from_content(
         arguments_json = json.dumps(params, ensure_ascii=False)
         results.append(_SyntheticToolCall(call_id, fn_name, arguments_json))
 
-        pos = close_m.end(0)
+        pos = end_pos
 
     return results
 

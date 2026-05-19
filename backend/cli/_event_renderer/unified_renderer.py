@@ -173,6 +173,7 @@ class ActivityRenderer:
         removed: int = 0,
         new_file: bool = False,
         diff_lines: list[str] | None = None,
+        preview_content: str | None = None,
     ) -> ActivityCard:
         """Create an activity card for a file edit."""
         detail = path
@@ -191,6 +192,21 @@ class ActivityRenderer:
             secondary = ', '.join(parts)
 
         extra_lines: list[ActivityLine] = []
+        if new_file and preview_content:
+            preview_lines = preview_content.splitlines()
+            for line in preview_lines[:12]:
+                truncated = line[:160] + ('...' if len(line) > 160 else '')
+                extra_lines.append(
+                    ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
+                )
+            if len(preview_lines) > 12:
+                extra_lines.append(
+                    ActivityLine(
+                        f'... {len(preview_lines) - 12} more lines',
+                        style=NAVY_TEXT_DIM,
+                        indent=1,
+                    )
+                )
         if diff_lines:
             for line in diff_lines[:20]:
                 stripped = line.rstrip()
@@ -235,13 +251,40 @@ class ActivityRenderer:
     @staticmethod
     def file_create(path: str, line_count: int = 0) -> ActivityCard:
         """Create an activity card for file creation."""
+        return ActivityRenderer.file_create_with_preview(path, line_count=line_count)
+
+    @staticmethod
+    def file_create_with_preview(
+        path: str,
+        line_count: int = 0,
+        preview_content: str | None = None,
+    ) -> ActivityCard:
+        """Create an activity card for file creation with optional body preview."""
         detail = path
         if line_count:
             detail += f'  [bold #54efae]+{line_count}[/]'
+        extra_lines: list[ActivityLine] = []
+        if preview_content:
+            preview_lines = preview_content.splitlines()
+            for line in preview_lines[:12]:
+                truncated = line[:160] + ('...' if len(line) > 160 else '')
+                extra_lines.append(
+                    ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
+                )
+            if len(preview_lines) > 12:
+                extra_lines.append(
+                    ActivityLine(
+                        f'... {len(preview_lines) - 12} more lines',
+                        style=NAVY_TEXT_DIM,
+                        indent=1,
+                    )
+                )
         return ActivityCard(
             verb='Created',
             detail=detail,
             badge_category='files',
+            extra_lines=extra_lines,
+            is_collapsible=bool(extra_lines),
         )
 
     @staticmethod

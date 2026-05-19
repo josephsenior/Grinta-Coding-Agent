@@ -23,6 +23,24 @@ if TYPE_CHECKING:
     pass
 
 
+def _preview_lines(
+    content: str,
+    *,
+    max_lines: int = 12,
+    max_chars: int = 160,
+) -> list[str]:
+    lines: list[str] = []
+    if not content:
+        return lines
+    raw_lines = content.splitlines()
+    for line in raw_lines[:max_lines]:
+        truncated = line[:max_chars] + ('...' if len(line) > max_chars else '')
+        lines.append(f'  [dim]{markup_escape(truncated)}[/dim]')
+    if len(raw_lines) > max_lines:
+        lines.append(f'  [dim]... {len(raw_lines) - max_lines} more lines[/dim]')
+    return lines
+
+
 def render_file_edit(
     verb: str,
     path: str,
@@ -31,6 +49,7 @@ def render_file_edit(
     added: int = 0,
     removed: int = 0,
     new_file: bool = False,
+    preview_content: str | None = None,
 ) -> list[str]:
     """Render a file edit with optional diff lines.
 
@@ -50,6 +69,8 @@ def render_file_edit(
         delta = format_activity_delta_secondary(added=added, removed=removed)
         if delta:
             lines.append(f'  {delta}')
+    elif new_file and preview_content:
+        lines.extend(_preview_lines(preview_content))
 
     lines.append(format_activity_primary(verb, detail))
 
@@ -96,10 +117,13 @@ def render_file_read(
 def render_file_create(
     path: str,
     line_count: int = 0,
+    preview_content: str | None = None,
 ) -> list[str]:
     """Render a new file creation."""
     detail = path
     if line_count:
         detail += f'  [{CLR_STATUS_OK}]+{line_count}[/{CLR_STATUS_OK}]'
 
-    return [format_activity_primary('Created', detail)]
+    lines = [format_activity_primary('Created', detail)]
+    lines.extend(_preview_lines(preview_content or ''))
+    return lines

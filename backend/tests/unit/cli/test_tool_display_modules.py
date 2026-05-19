@@ -4,6 +4,11 @@ from __future__ import annotations
 
 import unittest
 
+from backend.cli._tool_display.renderers.file_editor import (
+    render_file_create,
+    render_file_edit,
+)
+
 # ============================================================================
 # headline.py
 # ============================================================================
@@ -30,6 +35,43 @@ class TestToolHeadline(unittest.TestCase):
     def test_icon_always_empty(self) -> None:
         icon, _ = tool_headline('execute_bash', use_icons=True)
         self.assertEqual(icon, '')
+
+
+class TestFileEditorRenderers(unittest.TestCase):
+    def _join_parts(self, parts: list[object]) -> str:
+        return '\n'.join(
+            part.plain if hasattr(part, 'plain') else str(part) for part in parts
+        )
+
+    def test_render_file_create_shows_preview_content(self) -> None:
+        lines = render_file_create(
+            'src/config.xml',
+            line_count=3,
+            preview_content='<root>\n  <item>value</item>\n</root>\n',
+        )
+
+        joined = self._join_parts(lines)
+        self.assertIn('Created', joined)
+        self.assertIn('src/config.xml', joined)
+        self.assertIn('<root>', joined)
+        self.assertIn('<item>value</item>', joined)
+        self.assertNotIn('```', joined)
+
+    def test_render_file_edit_new_file_shows_plain_preview(self) -> None:
+        lines = render_file_edit(
+            'Created',
+            'src/config.xml',
+            new_file=True,
+            added=3,
+            preview_content='<root>\n  <item>value</item>\n</root>\n',
+        )
+
+        joined = self._join_parts(lines)
+        self.assertIn('Created', joined)
+        self.assertIn('src/config.xml', joined)
+        self.assertIn('<root>', joined)
+        self.assertIn('<item>value</item>', joined)
+        self.assertNotIn('syntax', joined.lower())
 
 
 class TestFriendlyVerbForTool(unittest.TestCase):
