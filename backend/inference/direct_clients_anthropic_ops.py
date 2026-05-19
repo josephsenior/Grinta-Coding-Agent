@@ -58,6 +58,10 @@ def _apply_required_anthropic_request_defaults(
 ) -> dict[str, Any]:
     """Ensure the Anthropic SDK request contains required arguments."""
     request_kwargs = _sanitize_anthropic_request_kwargs(kwargs)
+    # LLM._get_call_kwargs carries the configured model id, which may include a
+    # Grinta provider prefix such as "opencode-go/". Anthropic-compatible
+    # transports expect the SDK client model name selected by get_direct_client.
+    request_kwargs['model'] = client.model_name
     request_kwargs['max_tokens'] = _resolve_anthropic_max_tokens(client, request_kwargs)
     return request_kwargs
 
@@ -207,12 +211,16 @@ def _prepare_anthropic_stream_request(
     messages: list[dict[str, Any]],
     kwargs: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], Any, dict[str, Any]]:
-    from backend.inference.mappers.anthropic import _apply_system_cache_control
+    from backend.inference.mappers.anthropic import (
+        _apply_system_cache_control,
+        _normalize_tools,
+    )
 
     system_raw = next((m['content'] for m in messages if m['role'] == 'system'), None)
     filtered_messages = [message for message in messages if message['role'] != 'system']
     request_kwargs = _apply_required_anthropic_request_defaults(client, kwargs)
     request_kwargs.setdefault('model', client.model_name)
+    _normalize_tools(request_kwargs)
     system_msg = _apply_system_cache_control(
         system_raw,
         request_kwargs.get('model', client.model_name),

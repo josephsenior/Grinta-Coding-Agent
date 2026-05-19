@@ -328,7 +328,7 @@ class TestBuildLlmParams:
         ) as mock_ct:
             p.build_llm_params(messages, state, tools)
             # Simulate model change
-            p._llm.config.model = 'new-model-x'
+            p._llm.config.model = 'gpt-4o'
             p.build_llm_params(messages, state, tools)
 
         assert mock_ct.call_count == 2
@@ -435,6 +435,22 @@ class TestBuildLlmParams:
             params = p.build_llm_params(messages, state, tools)
 
         assert params['tools'] == []
+
+    def test_native_tools_included_for_opencode_go_minimax(self):
+        p = _make_planner(llm=_make_llm('opencode-go/minimax-m2.7'))
+        state = _make_state()
+        messages = [{'role': 'user', 'content': 'create a file'}]
+        tools = [{'type': 'function', 'function': {'name': 'think'}}]
+        checked = [{'type': 'function', 'function': {'name': 'think'}}]
+
+        with patch(
+            'backend.engine.planner.check_tools', return_value=checked
+        ) as mock_ct:
+            params = p.build_llm_params(messages, state, tools)
+
+        assert params['tools'] is checked
+        assert params['tool_choice'] == 'auto'
+        mock_ct.assert_called_once()
 
     def test_first_turn_orientation_disabled_by_default(self):
         p = _make_planner()

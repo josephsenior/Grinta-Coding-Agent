@@ -4,7 +4,10 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
-from backend.inference.catalog_loader import supports_tool_choice
+from backend.inference.catalog_loader import (
+    supports_function_calling,
+    supports_tool_choice,
+)
 from backend.inference.llm_utils import check_tools
 
 ChatCompletionToolParam = Any
@@ -298,19 +301,20 @@ class OrchestratorPlanner:
         # NOTE: We inject control/status messages *after* tool selection so
         # tool selection heuristics see the original user/assistant content.
 
-        self._refresh_checked_tools_cache(tools)
-
         messages = self._inject_turn_status(messages, state)
         _maybe_log_prompt_metrics(messages)
         self._warn_if_degraded_emergency_prompt(messages)
 
         params: dict[str, Any] = {
             'messages': messages,
-            'tools': self._checked_tools_cache,
             'stream': True,
         }
 
-        if tool_choice and self._llm_supports_tool_choice():
+        if self._llm_supports_function_calling():
+            self._refresh_checked_tools_cache(tools)
+            params['tools'] = self._checked_tools_cache
+
+        if 'tools' in params and tool_choice and self._llm_supports_tool_choice():
             params['tool_choice'] = tool_choice
 
         params['extra_body'] = {
@@ -382,6 +386,15 @@ class OrchestratorPlanner:
             if not model:
                 return False
             return supports_tool_choice(model)
+        except Exception:
+            return False
+
+    def _llm_supports_function_calling(self) -> bool:
+        try:
+            model = (self._llm.config.model or '').strip()
+            if not model:
+                return False
+            return supports_function_calling(model)
         except Exception:
             return False
 
