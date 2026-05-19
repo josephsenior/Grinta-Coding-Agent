@@ -506,6 +506,23 @@ class OrchestratorExecutor:
                 fallback_tool_calls = maybe_tool_calls
         return fallback_tool_calls if isinstance(fallback_tool_calls, list) else []
 
+    @staticmethod
+    def _extract_fallback_reasoning(
+        fallback: Any,
+        fallback_message: Any | None,
+    ) -> str:
+        for candidate in (fallback_message, fallback):
+            if candidate is None:
+                continue
+            reasoning = (
+                candidate.get('reasoning_content')
+                if isinstance(candidate, dict)
+                else getattr(candidate, 'reasoning_content', None)
+            )
+            if isinstance(reasoning, str) and reasoning:
+                return reasoning
+        return ''
+
     async def _apply_fallback_completion(
         self,
         fallback: Any,
@@ -518,6 +535,17 @@ class OrchestratorExecutor:
             await self._emit_stream_text_piece(
                 state,
                 fallback_content,
+                event_stream,
+            )
+
+        fallback_reasoning = self._extract_fallback_reasoning(
+            fallback,
+            fallback_message,
+        )
+        if fallback_reasoning:
+            await self._emit_stream_thinking_piece(
+                state,
+                fallback_reasoning,
                 event_stream,
             )
 
@@ -842,6 +870,7 @@ class OrchestratorExecutor:
         self,
         call_params: dict[str, Any],
         visible_accum: str,
+        thinking_accum: str,
         tool_calls_list: list[dict[str, Any]] | None,
         streamed_usage: dict[str, int] | None,
     ) -> Any:
@@ -861,6 +890,7 @@ class OrchestratorExecutor:
             response_id='',
             finish_reason='stop',
             tool_calls=tool_calls_list,
+            reasoning_content=thinking_accum,
         )
 
     def _record_streaming_metrics(self, response: Any, start_time: float) -> None:
@@ -930,6 +960,7 @@ class OrchestratorExecutor:
             response = self._build_streaming_response(
                 call_params,
                 visible_accum,
+                state.thinking_accumulate,
                 tool_calls_list,
                 state.streamed_usage,
             )

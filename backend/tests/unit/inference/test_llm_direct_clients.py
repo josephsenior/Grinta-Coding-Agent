@@ -86,6 +86,17 @@ class TestLLMResponse:
         assert tool_calls[0]['id'] == 'tc1'
         assert tool_calls[0]['type'] == 'function'
 
+    def test_to_dict_includes_reasoning_content(self):
+        resp = LLMResponse(
+            content='reply',
+            model='deepseek-v4-flash',
+            usage={},
+            reasoning_content='thinking trace',
+        )
+        d = resp.to_dict()
+        assert d['choices'][0]['message']['reasoning_content'] == 'thinking trace'
+        assert resp.choices[0].message.reasoning_content == 'thinking trace'
+
     def test_getitem(self):
         resp = LLMResponse(content='x', model='m', usage={})
         assert resp['model'] == 'm'
@@ -451,6 +462,56 @@ class TestOpenAIClientHelpers:
             openai_completion(client, [{'role': 'user', 'content': 'hi'}])
 
         client.client.chat.completions.create.assert_not_called()
+
+    def test_deepseek_thinking_history_recovers_stale_assistant_messages(self):
+        from backend.inference.direct_clients_openai_ops import (
+            _recover_deepseek_thinking_history,
+        )
+
+        client = MagicMock()
+        client._provider_name = 'opencode-go'
+        client.model_name = 'deepseek-v4-flash'
+        messages = [
+            {'role': 'system', 'content': 'sys'},
+            {'role': 'user', 'content': 'start'},
+            {
+                'role': 'assistant',
+                'content': 'I will inspect the file.',
+                'tool_calls': [
+                    {
+                        'id': 'call_1',
+                        'type': 'function',
+                        'function': {
+                            'name': 'read_file',
+                            'arguments': '{"path":"a.py"}',
+                        },
+                    }
+                ],
+            },
+            {
+                'role': 'tool',
+                'name': 'read_file',
+                'tool_call_id': 'call_1',
+                'content': 'print("ok")',
+            },
+            {
+                'role': 'assistant',
+                'content': 'Done.',
+                'reasoning_content': 'kept reasoning',
+            },
+        ]
+
+        recovered = _recover_deepseek_thinking_history(client, messages)
+
+        assert recovered[0] == messages[0]
+        assert recovered[1] == messages[1]
+        assert recovered[2]['role'] == 'user'
+        assert 'I will inspect the file.' in recovered[2]['content']
+        assert 'Read File' in recovered[2]['content']
+        assert 'tool_calls' not in recovered[2]
+        assert recovered[3]['role'] == 'user'
+        assert 'Tool result from read_file' in recovered[3]['content']
+        assert recovered[4] == messages[4]
 
 
 # ---------------------------------------------------------------------------

@@ -198,6 +198,78 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
         )
 
 
+def test_async_execute_preserves_streamed_reasoning_content(monkeypatch):
+    """DeepSeek thinking-mode streams must replay reasoning_content next turn."""
+    import backend.engine.function_calling as fc
+    from backend.engine.executor import OrchestratorExecutor
+
+    sys.modules.setdefault('app.engine.function_calling', fc)
+
+    from backend.engine import executor as executor_module
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: [],
+    )
+
+    async def fake_astream(**kwargs):
+        yield {
+            'id': 'chatcmpl-reasoning',
+            'model': 'deepseek-v4-flash',
+            'choices': [
+                {
+                    'delta': {'reasoning_content': 'think one '},
+                    'finish_reason': None,
+                }
+            ],
+        }
+        yield {
+            'id': 'chatcmpl-reasoning',
+            'model': 'deepseek-v4-flash',
+            'choices': [
+                {
+                    'delta': {'reasoning_content': 'think two'},
+                    'finish_reason': None,
+                }
+            ],
+        }
+        yield {
+            'id': 'chatcmpl-reasoning',
+            'model': 'deepseek-v4-flash',
+            'choices': [
+                {'delta': {'content': 'done'}, 'finish_reason': None}
+            ],
+        }
+        yield {
+            'id': 'chatcmpl-reasoning',
+            'model': 'deepseek-v4-flash',
+            'choices': [{'delta': {}, 'finish_reason': 'stop'}],
+        }
+
+    llm = MagicMock()
+    llm.astream = fake_astream
+
+    executor = OrchestratorExecutor(
+        llm=llm,
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    result = asyncio.run(executor.async_execute({'messages': []}, MagicMock()))
+
+    resp = result.response
+    assert resp is not None
+    assert resp.content == 'done'
+    assert resp.reasoning_content == 'think one think two'
+    assert resp.choices[0].message.reasoning_content == 'think one think two'
+    assert (
+        resp.to_dict()['choices'][0]['message']['reasoning_content']
+        == 'think one think two'
+    )
+
+
 def test_async_execute_accumulates_tool_calls(monkeypatch):
     """async_execute should accumulate streamed tool call deltas into complete tool calls."""
     import backend.engine.function_calling as fc
