@@ -268,15 +268,10 @@ class OrchestratorPlanner:
 
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):
-            from backend.engine.tools import (
-                create_symbol_editor_tool,
-                create_text_editor_tool,
-            )
+            from backend.engine.tools import create_file_editor_tool
 
-            # Primary editor for code: symbol_editor (symbols + range edits)
-            tools.append(create_symbol_editor_tool())
-            # Fallback editor for prose/config/format/section/patch flows
-            tools.append(create_text_editor_tool())
+            # Unified file editor: covers all file operations (read, create, edit, symbol-aware, multi-edit)
+            tools.append(create_file_editor_tool())
 
     def _add_execute_mcp_tool_tool(self, tools: list) -> None:
         """Add the MCP gateway proxy tool when MCP is enabled.

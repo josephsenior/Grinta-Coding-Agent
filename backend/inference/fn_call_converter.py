@@ -51,6 +51,7 @@ from backend.core.errors import (
 )
 from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_names import (
+    FILE_EDITOR_TOOL_NAME,
     FINISH_TOOL_NAME,
     TEXT_EDITOR_TOOL_NAME,
 )
@@ -203,6 +204,7 @@ def _get_tool_name_mapping() -> dict[str, str]:
         get_terminal_tool_name(): TERMINAL_EXAMPLE_KEY,
         'execute_bash': TERMINAL_EXAMPLE_KEY,
         'execute_powershell': TERMINAL_EXAMPLE_KEY,
+        FILE_EDITOR_TOOL_NAME: 'file_editor',
         TEXT_EDITOR_TOOL_NAME: 'text_editor',
         FINISH_TOOL_NAME: 'finish',
     }
@@ -275,7 +277,9 @@ class ExampleStepBuilder:
 
     def _add_file_creation_step(self) -> None:
         """Add file creation step based on available editors."""
-        if 'text_editor' in self.available_tools:
+        if 'file_editor' in self.available_tools:
+            self.example += TOOL_EXAMPLES['file_editor']['create']
+        elif 'text_editor' in self.available_tools:
             self.example += TOOL_EXAMPLES['text_editor']['create_file']
 
     def _add_server_run_step(self) -> None:
@@ -295,7 +299,9 @@ class ExampleStepBuilder:
 
     def _add_file_edit_step(self) -> None:
         """Add file edit step based on available editors."""
-        if 'text_editor' in self.available_tools:
+        if 'file_editor' in self.available_tools:
+            self.example += TOOL_EXAMPLES['file_editor']['replace_lines']
+        elif 'text_editor' in self.available_tools:
             self.example += TOOL_EXAMPLES['text_editor']['edit_range']
 
     def _add_server_rerun_step(self) -> None:

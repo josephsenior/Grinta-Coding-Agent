@@ -67,7 +67,7 @@ def execute_file_editor(
     insert_line, error_msg = _parse_insert_line(insert_line)
     if error_msg:
         return error_msg, (None, None), {
-            'tool': 'text_editor',
+            'tool': 'file_editor',
             'ok': False,
             'error_code': 'INVALID_INSERT_LINE',
             'retryable': False,
@@ -105,14 +105,14 @@ def execute_file_editor(
         enriched_error = append_editor_recovery_guidance(
             result.error,
             path=path,
-            tool_name='text_editor',
+            tool_name='file_editor',
             content=file_text or new_str or section_content or patch_text,
         )
         return (
             f'ERROR:\n{enriched_error}',
             (None, None),
             {
-                'tool': 'text_editor',
+                'tool': 'file_editor',
                 'ok': False,
                 'error_code': result.error_code or 'EDITOR_ERROR',
                 'retryable': result.retryable,
@@ -126,7 +126,7 @@ def execute_file_editor(
     if not result.output:
         logger.warning('No output from file_editor for %s', path)
         return '', (None, None), {
-            'tool': 'text_editor',
+            'tool': 'file_editor',
             'ok': True,
             'error_code': None,
             'retryable': False,
