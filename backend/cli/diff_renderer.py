@@ -25,6 +25,21 @@ from backend.cli.transcript import (
 )
 
 
+def _preview_text_lines(content: str, *, max_lines: int = 12, max_chars: int = 160) -> list[Text]:
+    lines: list[Text] = []
+    if not content:
+        return lines
+    raw_lines = content.splitlines()
+    for line in raw_lines[:max_lines]:
+        truncated = line[:max_chars] + ('...' if len(line) > max_chars else '')
+        lines.append(Text(f'  {truncated}', style=CLR_WARN_BODY))
+    if len(raw_lines) > max_lines:
+        lines.append(
+            Text(f'  ... {len(raw_lines) - max_lines} more lines', style=CLR_WARN_BODY)
+        )
+    return lines
+
+
 def _is_validation_secondary(text: str) -> bool:
     """True for syntax / lint / type feedback bundled with file edits."""
     low = (text or '').lower()
@@ -111,6 +126,10 @@ class DiffPanel:
         # New file creation — no diff, just show creation note
         if not prev_exist:
             self._append_new_file_delta(parts)
+            preview_content = (
+                getattr(obs, 'new_content', None) or getattr(obs, 'content', '')
+            )
+            parts.extend(_preview_text_lines(preview_content or ''))
             # Check for indentation warnings in content
             self._append_indentation_warnings(parts, obs)
             yield self._build_panel(parts)

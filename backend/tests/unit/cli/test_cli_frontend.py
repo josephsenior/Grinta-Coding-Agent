@@ -25,6 +25,7 @@ from backend.cli.main import (
     show_grinta_splash,
 )
 from backend.cli.reasoning_display import ReasoningDisplay
+from backend.cli.tui.app import _render_thinking_with_diff
 from backend.cli.repl import (
     Repl,
     _build_command_completer,
@@ -424,6 +425,32 @@ def test_diff_panel_new_file() -> None:
     assert 'Created' in output
     assert 'src/main.py' in output
     assert '+2 lines' in output
+    assert "print('hello')" in output
+    assert "print('world')" in output
+
+
+def test_diff_panel_new_xml_file_shows_plain_preview() -> None:
+    """DiffPanel should render new XML file content as plain text preview."""
+    obs = MagicMock()
+    obs.path = 'src/config.xml'
+    obs.prev_exist = False
+    obs.new_content = '<root>\n  <item>value</item>\n</root>\n'
+    obs.content = 'File created'
+
+    panel = DiffPanel(obs)
+    console = _make_console(width=80)
+    console.print(panel)
+    output = _console_output(console)
+    assert '<root>' in output
+    assert '<item>value</item>' in output
+    assert '```xml' not in output
+
+
+def test_thinking_render_is_plain_text() -> None:
+    """Thinking blocks should stay plain text and not become syntax-highlighted."""
+    text = _render_thinking_with_diff("```xml\n<root>\n  <item>value</item>\n</root>\n```")
+    assert isinstance(text, Text)
+    assert text.plain == "```xml\n<root>\n  <item>value</item>\n</root>\n```"
 
 
 def test_diff_panel_existing_file_with_groups() -> None:

@@ -170,49 +170,8 @@ def _strip_ansi(text: str) -> str:
 
 
 def _render_thinking_with_diff(text: str) -> Text:
-    """Render thinking text with diff-aware styling.
-
-    Detects unified diff blocks within thinking text and applies
-    colored backgrounds to additions/deletions while keeping
-    regular thinking text muted.
-    """
-    result = Text()
-    in_diff_block = False
-
-    for line in text.split('\n'):
-        stripped = line.strip()
-
-        # Detect diff block start
-        if stripped.startswith('```diff') or stripped.startswith('``` diff'):
-            in_diff_block = True
-            result.append(line + '\n', style=NAVY_TEXT_MUTED)
-            continue
-
-        # Detect diff block end
-        if in_diff_block and stripped == '```':
-            in_diff_block = False
-            result.append(line + '\n', style=NAVY_TEXT_MUTED)
-            continue
-
-        if in_diff_block:
-            # Style diff lines
-            if stripped.startswith('+') and not stripped.startswith('+++'):
-                result.append(line + '\n', style='#54efae on #0d2e1a')
-            elif stripped.startswith('-') and not stripped.startswith('---'):
-                result.append(line + '\n', style='#fd8383 on #2e0d0d')
-            elif (
-                stripped.startswith('@@')
-                or stripped.startswith('---')
-                or stripped.startswith('+++')
-            ):
-                result.append(line + '\n', style=NAVY_TEXT_MUTED)
-            else:
-                result.append(line + '\n', style=NAVY_TEXT_DIM)
-        else:
-            # Regular thinking text
-            result.append(line + '\n', style=NAVY_TEXT_MUTED)
-
-    return result
+    """Render thinking text as plain muted text."""
+    return Text(text or '', style=NAVY_TEXT_MUTED)
 
 
 # ── Widget classes ────────────────────────────────────────────────────────
@@ -2648,13 +2607,22 @@ class TUIRenderer:
                 is_new_file = True
 
             card = ActivityRenderer.file_edit(
-                verb, path, line_range, added=added_lines, new_file=is_new_file
+                verb,
+                path,
+                line_range,
+                added=added_lines,
+                new_file=is_new_file,
+                preview_content=(
+                    getattr(event, 'file_text', '') or getattr(event, 'new_content', '')
+                ),
             )
             self._write_card(card)
         elif isinstance(event, FileWriteAction):
             content = getattr(event, 'content', '') or ''
             line_count = content.count('\n') + 1 if content else 0
-            card = ActivityRenderer.file_create(event.path, line_count=line_count)
+            card = ActivityRenderer.file_create_with_preview(
+                event.path, line_count=line_count, preview_content=content
+            )
             self._write_card(card)
         elif isinstance(event, FileReadObservation):
             pass
