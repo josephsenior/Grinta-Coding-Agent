@@ -362,6 +362,79 @@ class TestAnthropicClientHelpers:
             'properties': {},
         }
 
+    def test_prepare_kwargs_converts_openai_tool_history_to_anthropic_blocks(self):
+        from backend.inference.mappers.anthropic import prepare_kwargs
+
+        messages = [
+            {
+                'role': 'assistant',
+                'content': '',
+                'tool_calls': [
+                    {
+                        'id': 'call_1',
+                        'type': 'function',
+                        'function': {
+                            'name': 'read_file',
+                            'arguments': '{"path": "README.md"}',
+                        },
+                    }
+                ],
+            },
+            {
+                'role': 'tool',
+                'tool_call_id': 'call_1',
+                'name': 'read_file',
+                'content': 'file contents',
+            },
+        ]
+
+        filtered, _ = prepare_kwargs(messages, {}, default_model='minimax-m2.7')
+
+        assert filtered == [
+            {
+                'role': 'assistant',
+                'content': [
+                    {
+                        'type': 'tool_use',
+                        'id': 'call_1',
+                        'name': 'read_file',
+                        'input': {'path': 'README.md'},
+                    }
+                ],
+            },
+            {
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'tool_result',
+                        'tool_use_id': 'call_1',
+                        'content': 'file contents',
+                    }
+                ],
+            },
+        ]
+
+    def test_prepare_kwargs_flattens_unmatched_tool_result(self):
+        from backend.inference.mappers.anthropic import prepare_kwargs
+
+        messages = [
+            {
+                'role': 'tool',
+                'tool_call_id': 'missing',
+                'name': 'read_file',
+                'content': 'orphaned result',
+            }
+        ]
+
+        filtered, _ = prepare_kwargs(messages, {}, default_model='minimax-m2.7')
+
+        assert filtered == [
+            {
+                'role': 'user',
+                'content': '[Unmatched tool result from read_file]\norphaned result',
+            }
+        ]
+
     def test_prepare_stream_request_strips_openai_only_stream_kwargs(self):
         from backend.inference.direct_clients_anthropic_ops import (
             _prepare_anthropic_stream_request,
