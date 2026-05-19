@@ -7,6 +7,7 @@ Provides simple, powerful API for all code editing operations.
 from __future__ import annotations
 
 import difflib
+import hashlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -118,6 +119,10 @@ def _format_context_window(
     return '\n'.join(output_parts)
 
 
+def _sha256_text(content: str) -> str:
+    return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+
 @dataclass
 class EditorConfig:
     """Configuration for the ultimate editor."""
@@ -196,6 +201,29 @@ class StructureEditor:
     # HIGH-LEVEL OPERATIONS
     # ========================================================================
 
+    def _write_text_atomically(self, path: str, content: str) -> None:
+        temp_path = f'{path}.tmp'
+        with open(temp_path, 'w', encoding='utf-8', newline='') as f:
+            f.write(content)
+        os.replace(temp_path, path)
+
+    def _verify_disk_content(
+        self, path: str, expected_content: str, *, operation: str
+    ) -> tuple[bool, str]:
+        try:
+            with open(path, encoding='utf-8') as f:
+                actual = f.read()
+        except Exception as e:
+            return False, f'Edit verification failed after {operation}: could not re-read file: {e}'
+        if actual == expected_content:
+            return True, ''
+        return (
+            False,
+            'Edit verification failed after '
+            f'{operation}: on-disk content hash {_sha256_text(actual)} '
+            f'did not match intended hash {_sha256_text(expected_content)}.',
+        )
+
     def create_file(self, path: str, content: str) -> EditResult:
         """Create a new file.
 
@@ -216,8 +244,12 @@ class StructureEditor:
             # Create parent directories if needed
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
 
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(content)
+            self._write_text_atomically(path, content)
+            verified, verify_msg = self._verify_disk_content(
+                path, content, operation='create_file'
+            )
+            if not verified:
+                return EditResult(success=False, message=verify_msg)
 
             return EditResult(
                 success=True,
@@ -426,6 +458,19 @@ class StructureEditor:
             try:
                 with open(path, encoding='utf-8') as f:
                     new_content = f.read()
+                if new_content == old_content:
+                    return EditResult(
+                        success=False,
+                        message='Edit verification failed after edit_symbol_body: file content did not change on disk.',
+                    )
+                if self.find_symbol(path, function_name) is None:
+                    return EditResult(
+                        success=False,
+                        message=(
+                            'Edit verification failed after edit_symbol_body: '
+                            f"symbol '{function_name}' could not be resolved after the write."
+                        ),
+                    )
                 context_window = _format_context_window(old_content, new_content)
                 if context_window:
                     result.message += '\n\n' + context_window
@@ -470,6 +515,11 @@ class StructureEditor:
             try:
                 with open(path, encoding='utf-8') as f:
                     new_content = f.read()
+                if new_content == old_content:
+                    return EditResult(
+                        success=False,
+                        message='Edit verification failed after rename_symbol: file content did not change on disk.',
+                    )
                 context_window = _format_context_window(old_content, new_content)
                 if context_window:
                     result.message += '\n\n' + context_window
@@ -608,7 +658,7 @@ class StructureEditor:
 
         return True, ''
 
-    def _write_and_clean_file(self, path: str, content: str) -> None:
+    def _write_and_clean_file(self, path: str, content: str) -> str:
         """Write content to file and optionally clean whitespace."""
         if self.config.backup_enabled:
             try:
@@ -620,14 +670,16 @@ class StructureEditor:
             except Exception as e:
                 logger.warning('Failed to save undo history: %s', e)
 
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write(content)
+        self._write_text_atomically(path, content)
+        final_content = content
 
         if self.config.clean_whitespace:
             language = self.universal.detect_language(path)
             cleaned = self.whitespace.clean_whitespace(content, language=language)
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(cleaned)
+            self._write_text_atomically(path, cleaned)
+            final_content = cleaned
+
+        return final_content
 
     def replace_code_range(
         self, path: str, start_line: int, end_line: int, new_code: str
@@ -670,19 +722,29 @@ class StructureEditor:
                     original_code=''.join(lines),
                 )
 
-            self._write_and_clean_file(path, new_content)
+            final_content = self._write_and_clean_file(path, new_content)
+            verified, verify_msg = self._verify_disk_content(
+                path, final_content, operation='replace_range'
+            )
+            if not verified:
+                return EditResult(
+                    success=False,
+                    message=verify_msg,
+                    syntax_valid=False,
+                    original_code=''.join(lines),
+                )
 
             result = EditResult(
                 success=True,
                 message=f'Replaced lines {start_line}-{end_line}',
-                modified_code=new_content,
+                modified_code=final_content,
                 lines_changed=end_line - start_line + 1,
                 original_code=''.join(lines),
             )
 
             # Add context window showing the edited region with line numbers
             old_content = ''.join(lines)
-            context_window = _format_context_window(old_content, new_content)
+            context_window = _format_context_window(old_content, final_content)
             if context_window:
                 result.message += '\n\n' + context_window
 

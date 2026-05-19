@@ -118,6 +118,9 @@ def execute_file_editor(
                 'retryable': result.retryable,
                 'operation': result.operation or command,
                 'payload': result.metadata or {},
+                'verification_passed': bool(
+                    (result.metadata or {}).get('verification_passed', False)
+                ),
             },
         )
     if not result.output:
@@ -129,6 +132,9 @@ def execute_file_editor(
             'retryable': False,
             'operation': result.operation or command,
             'payload': result.metadata or {},
+            'verification_passed': bool(
+                (result.metadata or {}).get('verification_passed', False)
+            ),
         }
 
     return result.output, (result.old_content, result.new_content), {
@@ -138,6 +144,9 @@ def execute_file_editor(
         'retryable': False,
         'operation': result.operation or command,
         'payload': result.metadata or {},
+        'verification_passed': bool(
+            (result.metadata or {}).get('verification_passed', False)
+        ),
     }
 
 

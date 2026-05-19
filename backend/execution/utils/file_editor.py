@@ -146,6 +146,22 @@ def _format_context_window(
     return '\n'.join(output_parts)
 
 
+def _to_changed_line_spans(
+    old_content: str | None, new_content: str | None
+) -> list[dict[str, int]]:
+    """Return compact 1-based inclusive line spans for changed regions."""
+    if old_content is None or new_content is None:
+        return []
+    old_lines = old_content.splitlines()
+    new_lines = new_content.splitlines()
+    spans: list[dict[str, int]] = []
+    for start, end in _find_changed_ranges(old_lines, new_lines):
+        if end <= start:
+            continue
+        spans.append({'start_line': start + 1, 'end_line': end})
+    return spans
+
+
 @dataclass(frozen=True)
 class _FileReadMeta:
     """Encoding and newline style for round-tripping disk I/O."""
@@ -787,8 +803,18 @@ class FileEditor(FileEditorEditOpsMixin):
                 new_content.old_content = old_content
                 return new_content
 
+            target_kind = 'range' if (edit_mode or '').strip().lower() == 'range' else (
+                'insert' if insert_line is not None else 'text'
+            )
+
             return self._finalize_edit_result(
-                file_path, old_content, new_content, dry_run
+                file_path,
+                old_content,
+                new_content,
+                dry_run,
+                target_kind=target_kind,
+                requested_start_line=start_line,
+                requested_end_line=end_line,
             )
 
         except Exception as e:
@@ -821,6 +847,73 @@ class FileEditor(FileEditorEditOpsMixin):
             ),
             old_content=None,
             new_content=None,
+            error_code='FILE_HASH_GUARD_FAILED',
+            retryable=True,
+            operation='file_hash_guard',
+        )
+
+    def _build_receipt(
+        self,
+        *,
+        file_path: Path,
+        old_content: str | None,
+        new_content: str | None,
+        operation: str,
+        target_kind: str,
+        verification_passed: bool,
+        requested_start_line: int | None = None,
+        requested_end_line: int | None = None,
+        rollback_available: bool = True,
+    ) -> dict[str, Any]:
+        return {
+            'path': str(file_path),
+            'pre_hash': self._sha256_text(old_content or ''),
+            'post_hash': self._sha256_text(new_content or ''),
+            'operation': operation,
+            'target_kind': target_kind,
+            'changed_line_spans': _to_changed_line_spans(old_content, new_content),
+            'verification_passed': verification_passed,
+            'rollback_available': rollback_available,
+            'requested_start_line': requested_start_line,
+            'requested_end_line': requested_end_line,
+        }
+
+    def _verify_post_write(
+        self,
+        *,
+        file_path: Path,
+        expected_content: str,
+        old_content: str | None,
+        operation: str,
+        target_kind: str,
+        requested_start_line: int | None = None,
+        requested_end_line: int | None = None,
+    ) -> ToolResult | None:
+        actual_content = self._read_file(file_path)
+        if actual_content == expected_content:
+            return None
+        receipt = self._build_receipt(
+            file_path=file_path,
+            old_content=old_content,
+            new_content=actual_content,
+            operation=operation,
+            target_kind=target_kind,
+            verification_passed=False,
+            requested_start_line=requested_start_line,
+            requested_end_line=requested_end_line,
+        )
+        return ToolResult(
+            output='',
+            error=(
+                'EDIT_VERIFICATION_FAILED: file contents on disk did not match the intended write. '
+                'Re-read the file and retry with a smaller verified edit.'
+            ),
+            old_content=old_content,
+            new_content=actual_content,
+            error_code='EDIT_VERIFICATION_FAILED',
+            retryable=True,
+            operation=operation,
+            metadata=receipt,
         )
 
     def _finalize_edit_result(
@@ -829,24 +922,60 @@ class FileEditor(FileEditorEditOpsMixin):
         old_content: str | None,
         new_content: str,
         dry_run: bool,
+        *,
+        target_kind: str,
+        requested_start_line: int | None = None,
+        requested_end_line: int | None = None,
     ) -> ToolResult:
         """Finalize edit result with dry-run, no-change, or write handling."""
         if dry_run:
-            return self._build_dry_run_result(old_content, new_content)
+            return self._build_dry_run_result(
+                file_path,
+                old_content,
+                new_content,
+                operation='edit_preview',
+                target_kind=target_kind,
+                requested_start_line=requested_start_line,
+                requested_end_line=requested_end_line,
+            )
 
         if old_content == new_content:
             return ToolResult(
                 output='No changes applied (content unchanged).',
                 old_content=old_content,
                 new_content=new_content,
+                operation='edit_noop',
+                metadata=self._build_receipt(
+                    file_path=file_path,
+                    old_content=old_content,
+                    new_content=new_content,
+                    operation='edit_noop',
+                    target_kind=target_kind,
+                    verification_passed=True,
+                    requested_start_line=requested_start_line,
+                    requested_end_line=requested_end_line,
+                ),
             )
 
-        return self._write_edit_result(file_path, old_content, new_content)
+        return self._write_edit_result(
+            file_path,
+            old_content,
+            new_content,
+            target_kind=target_kind,
+            requested_start_line=requested_start_line,
+            requested_end_line=requested_end_line,
+        )
 
     def _build_dry_run_result(
         self,
+        file_path: Path,
         old_content: str | None,
         new_content: str,
+        *,
+        operation: str,
+        target_kind: str,
+        requested_start_line: int | None = None,
+        requested_end_line: int | None = None,
     ) -> ToolResult:
         """Build result for dry-run preview."""
         output = 'Preview generated (no changes applied)'
@@ -858,10 +987,28 @@ class FileEditor(FileEditorEditOpsMixin):
             output=output,
             old_content=old_content,
             new_content=new_content,
+            operation=operation,
+            metadata=self._build_receipt(
+                file_path=file_path,
+                old_content=old_content,
+                new_content=new_content,
+                operation=operation,
+                target_kind=target_kind,
+                verification_passed=False,
+                requested_start_line=requested_start_line,
+                requested_end_line=requested_end_line,
+            ),
         )
 
     def _write_edit_result(
-        self, file_path: Path, old_content: str | None, new_content: str
+        self,
+        file_path: Path,
+        old_content: str | None,
+        new_content: str,
+        *,
+        target_kind: str,
+        requested_start_line: int | None = None,
+        requested_end_line: int | None = None,
     ) -> ToolResult:
         """Write the result of an edit operation to disk."""
         if old_content is not None and file_path.exists():
@@ -895,7 +1042,18 @@ class FileEditor(FileEditorEditOpsMixin):
         self._push_undo_snapshot(file_path, old_content)
 
         # Write new content
-        self._write_file(file_path, new_content)
+        written_content = self._write_file(file_path, new_content)
+        verification_error = self._verify_post_write(
+            file_path=file_path,
+            expected_content=written_content,
+            old_content=old_content,
+            operation='edit',
+            target_kind=target_kind,
+            requested_start_line=requested_start_line,
+            requested_end_line=requested_end_line,
+        )
+        if verification_error is not None:
+            return verification_error
 
         output = 'File updated successfully'
 
@@ -916,7 +1074,18 @@ class FileEditor(FileEditorEditOpsMixin):
         return ToolResult(
             output=output,
             old_content=old_content,
-            new_content=new_content,
+            new_content=written_content,
+            operation='edit',
+            metadata=self._build_receipt(
+                file_path=file_path,
+                old_content=old_content,
+                new_content=written_content,
+                operation='edit',
+                target_kind=target_kind,
+                verification_passed=True,
+                requested_start_line=requested_start_line,
+                requested_end_line=requested_end_line,
+            ),
         )
 
     def _is_large_existing_code_file(
@@ -949,6 +1118,15 @@ class FileEditor(FileEditorEditOpsMixin):
                 output='Preview generated (no changes applied)',
                 old_content=old_content,
                 new_content=content,
+                operation='create_file_preview' if is_create else 'write_preview',
+                metadata=self._build_receipt(
+                    file_path=file_path,
+                    old_content=old_content,
+                    new_content=content,
+                    operation='create_file_preview' if is_create else 'write_preview',
+                    target_kind='full_file',
+                    verification_passed=False,
+                ),
             )
         if file_existed and old_content == content:
             return ToolResult(
@@ -1019,7 +1197,16 @@ class FileEditor(FileEditorEditOpsMixin):
 
         self._push_undo_snapshot(file_path, old_content)
 
-        self._write_file(file_path, content)
+        written_content = self._write_file(file_path, content)
+        verification_error = self._verify_post_write(
+            file_path=file_path,
+            expected_content=written_content,
+            old_content=old_content,
+            operation='create_file' if is_create else 'write',
+            target_kind='full_file',
+        )
+        if verification_error is not None:
+            return verification_error
 
         output_msg = _compose_write_success_message(
             is_create=is_create,
@@ -1036,8 +1223,16 @@ class FileEditor(FileEditorEditOpsMixin):
         return ToolResult(
             output=output_msg,
             old_content=old_content,
-            new_content=content,
+            new_content=written_content,
             operation='create_file' if is_create else 'write',
+            metadata=self._build_receipt(
+                file_path=file_path,
+                old_content=old_content,
+                new_content=written_content,
+                operation='create_file' if is_create else 'write',
+                target_kind='full_file',
+                verification_passed=True,
+            ),
         )
 
     def _detect_stale_disk_on_write(
@@ -1157,7 +1352,7 @@ class FileEditor(FileEditorEditOpsMixin):
         self._remember_io_meta(file_path, meta)
         return text
 
-    def _write_file(self, file_path: Path, content: str) -> None:
+    def _write_file(self, file_path: Path, content: str) -> str:
         """Write file atomically, preserving prior encoding/newline style when known."""
         file_path.parent.mkdir(parents=True, exist_ok=True)
         temp_path = file_path.with_suffix(file_path.suffix + '.tmp')
@@ -1177,6 +1372,7 @@ class FileEditor(FileEditorEditOpsMixin):
             if temp_path.exists():
                 temp_path.unlink()
             raise
+        return content
 
     def _insert_at_line(self, content: str, new_text: str, line_num: int) -> str:
         """Insert text at a specific line number (1-indexed)."""
