@@ -650,19 +650,51 @@ class TestMultiEditCommand:
 
         assert not (tmp_path.parent / 'outside.py').exists()
 
-    def test_multi_edit_rejects_duplicate_paths_after_workspace_resolution(self):
+    def test_multi_edit_allows_sequential_duplicate_path_operations(self, tmp_path):
         from backend.engine.function_calling import _handle_multi_edit_command
 
-        with pytest.raises(FunctionCallValidationError, match='duplicate path'):
-            _handle_multi_edit_command(
-                '',
-                {
-                    'file_edits': [
-                        {'path': 'src/a.py', 'new_content': 'A = 1\n'},
-                        {'path': '/workspace/src/a.py', 'new_content': 'A = 2\n'},
-                    ]
-                },
-            )
+        action = _handle_multi_edit_command(
+            '',
+            {
+                'file_edits': [
+                    {'path': 'src/a.py', 'new_content': 'A = 1\nB = 2\n'},
+                    {
+                        'path': '/workspace/src/a.py',
+                        'command': 'replace_range',
+                        'start_line': 2,
+                        'end_line': 2,
+                        'new_code': 'B = 99\n',
+                    },
+                ]
+            },
+        )
+
+        assert isinstance(action, MessageAction)
+        assert (tmp_path / 'src' / 'a.py').read_text(encoding='utf-8') == 'A = 1\nB = 99\n'
+
+    def test_multi_edit_supports_symbol_body_edit(self, tmp_path):
+        from backend.engine.function_calling import _handle_multi_edit_command
+
+        py = tmp_path / 'src' / 'm.py'
+        py.parent.mkdir(parents=True, exist_ok=True)
+        py.write_text('def a():\n    return 1\n', encoding='utf-8')
+
+        action = _handle_multi_edit_command(
+            '',
+            {
+                'file_edits': [
+                    {
+                        'path': 'src/m.py',
+                        'command': 'edit_symbol_body',
+                        'symbol_name': 'a',
+                        'new_body': '    return 42',
+                    }
+                ]
+            },
+        )
+
+        assert isinstance(action, MessageAction)
+        assert 'return 42' in py.read_text(encoding='utf-8')
 
 
 # ---------------------------------------------------------------------------
@@ -779,8 +811,12 @@ class TestHandleFindSymbolCommand:
         from backend.engine.function_calling import _handle_find_symbol_command
 
         editor = MagicMock()
+        editor.errors.symbol_not_found.return_value = MagicMock(
+            message='Did you mean ghost_real?'
+        )
+        editor._get_available_symbols.return_value = ['ghost_real']
         editor.find_symbol.return_value = None
-        with pytest.raises(ToolExecutionError, match='not found'):
+        with pytest.raises(ToolExecutionError, match='find_symbol'):
             _handle_find_symbol_command(editor, 'f.py', {'symbol_name': 'ghost'})
 
     def test_missing_symbol_name_raises(self):
@@ -826,14 +862,15 @@ class TestHandleReplaceRangeCommand:
         )
         assert isinstance(result, FileReadAction)
 
-    def test_failure_returns_message_action(self):
+    def test_failure_raises_tool_execution_error(self):
+        from backend.core.errors import ToolExecutionError
         from backend.engine.function_calling import _handle_replace_range_command
 
         editor = self._make_editor(success=False)
-        result = _handle_replace_range_command(
-            editor, 'f.py', {'start_line': 1, 'end_line': 5, 'new_code': 'pass'}
-        )
-        assert isinstance(result, MessageAction)
+        with pytest.raises(ToolExecutionError, match='Replace failed'):
+            _handle_replace_range_command(
+                editor, 'f.py', {'start_line': 1, 'end_line': 5, 'new_code': 'pass'}
+            )
 
     def test_missing_start_line_raises(self):
         from backend.engine.function_calling import _handle_replace_range_command

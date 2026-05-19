@@ -5,6 +5,8 @@ This is similar to the functionality of `OrchestratorResponseParser`.
 
 from __future__ import annotations
 
+import shutil
+import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
 from pathlib import Path
@@ -18,6 +20,7 @@ import backend.engine.tools.delegate_task as delegate_task_tools
 import backend.engine.tools.lsp_query as lsp_query_tools
 import backend.engine.tools.terminal_manager as terminal_manager_tools
 from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
+from backend.core.editor_recovery import append_editor_recovery_guidance
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.errors import (
     FunctionCallNotExistsError,
@@ -678,7 +681,11 @@ def _handle_edit_symbol_body_command(
             path, symbol_name, new_body, line_number=line_number
         )
     except AmbiguousSymbolError as e:
-        error_msg = f"Ambiguous symbol '{symbol_name}': {e}"
+        error_msg = append_editor_recovery_guidance(
+            f"Ambiguous symbol '{symbol_name}': {e}",
+            path=path,
+            tool_name='symbol_editor',
+        )
         logger.warning(f'❌ {error_msg}')
         from backend.core.errors import ToolExecutionError
 
@@ -690,7 +697,11 @@ def _handle_edit_symbol_body_command(
             path=path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
 
-    error_msg = f"Edit failed for '{symbol_name}': {result.message}"
+    error_msg = append_editor_recovery_guidance(
+        f"Edit failed for '{symbol_name}': {result.message}",
+        path=path,
+        tool_name='symbol_editor',
+    )
     logger.warning(f'❌ {error_msg}')
     from backend.core.errors import ToolExecutionError
 
@@ -888,6 +899,17 @@ def _handle_find_symbol_command(
         )
 
     error_msg = f"Symbol '{symbol_name}' not found in {path}"
+    try:
+        available_symbols = editor._get_available_symbols(path, symbol_type)
+        suggestion = editor.errors.symbol_not_found(symbol_name, available_symbols)
+        error_msg = f'{error_msg}\n\n{suggestion.message}'
+    except Exception:
+        pass
+    error_msg = append_editor_recovery_guidance(
+        error_msg,
+        path=path,
+        tool_name='symbol_editor',
+    )
     logger.warning(f'❌ {error_msg}')
     from backend.core.errors import ToolExecutionError
 
@@ -913,7 +935,14 @@ def _handle_replace_range_command(
         return FileReadAction(
             path=path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
-    return MessageAction(content=f'❌ Replace failed: {result.message}')
+    error_msg = append_editor_recovery_guidance(
+        f'❌ Replace failed: {result.message}',
+        path=path,
+        tool_name='symbol_editor',
+    )
+    from backend.core.errors import ToolExecutionError
+
+    raise ToolExecutionError(error_msg)
 
 
 def _handle_normalize_indent_command(
@@ -1009,6 +1038,119 @@ def _resolve_multi_edit_path(raw_path: str, item_index: int) -> tuple[str, str]:
     return str(safe_path.path), safe_path.relative_to_workspace()
 
 
+def _multi_edit_raise(message: str, *, path: str | None = None) -> None:
+    from backend.core.errors import ToolExecutionError
+
+    raise ToolExecutionError(
+        append_editor_recovery_guidance(
+            message,
+            path=path,
+            tool_name='symbol_editor',
+        )
+    )
+
+
+def _multi_edit_relative_path(item_path: str, workspace_root: Path) -> str:
+    return str(Path(item_path).resolve().relative_to(workspace_root.resolve()))
+
+
+def _parse_multi_edit_operation(
+    raw_item: Mapping[str, Any],
+    idx: int,
+) -> tuple[str, dict[str, Any]]:
+    item_command = str(raw_item.get('command') or '').strip().lower()
+    if not item_command:
+        if isinstance(raw_item.get('new_content'), str):
+            item_command = 'replace_file'
+        elif (
+            raw_item.get('start_line') is not None
+            or raw_item.get('end_line') is not None
+            or raw_item.get('new_code') is not None
+        ):
+            item_command = 'replace_range'
+        elif raw_item.get('symbol_name') and raw_item.get('new_body'):
+            item_command = 'edit_symbol_body'
+        else:
+            raise FunctionCallValidationError(
+                f'multi_edit item {idx}: unable to infer command. '
+                "Use 'replace_file', 'replace_range', or 'edit_symbol_body'."
+            )
+    return item_command, dict(raw_item)
+
+
+def _apply_multi_edit_operation(
+    *,
+    rel_path: str,
+    temp_path: Path,
+    item_command: str,
+    item: dict[str, Any],
+    temp_editor: Any,
+    structure_editor: Any,
+) -> None:
+    if item_command == 'replace_file':
+        new_content = item.get('new_content')
+        if not isinstance(new_content, str):
+            raise FunctionCallValidationError(
+                "multi_edit replace_file requires 'new_content' (string)."
+            )
+        result = temp_editor(command='create_file', path=rel_path, file_text=new_content)
+        if result.error:
+            _multi_edit_raise(
+                f'❌ multi_edit replace_file failed for {rel_path}: {result.error}',
+                path=rel_path,
+            )
+        return
+
+    if item_command == 'replace_range':
+        start_line = item.get('start_line')
+        end_line = item.get('end_line')
+        new_code = item.get('new_code')
+        if start_line is None or end_line is None or not isinstance(new_code, str):
+            raise FunctionCallValidationError(
+                "multi_edit replace_range requires 'start_line', 'end_line', and 'new_code'."
+            )
+        result = temp_editor(
+            command='edit',
+            path=rel_path,
+            edit_mode='range',
+            start_line=int(start_line),
+            end_line=int(end_line),
+            new_str=new_code,
+        )
+        if result.error:
+            _multi_edit_raise(
+                f'❌ multi_edit replace_range failed for {rel_path}: {result.error}',
+                path=rel_path,
+            )
+        return
+
+    if item_command == 'edit_symbol_body':
+        symbol_name = item.get('symbol_name')
+        new_body = item.get('new_body')
+        line_number = item.get('line_number')
+        if not isinstance(symbol_name, str) or not isinstance(new_body, str):
+            raise FunctionCallValidationError(
+                "multi_edit edit_symbol_body requires 'symbol_name' and 'new_body'."
+            )
+        result = structure_editor.edit_function(
+            str(temp_path),
+            symbol_name,
+            new_body,
+            line_number=line_number,
+        )
+        if not result.success:
+            _multi_edit_raise(
+                f'❌ multi_edit edit_symbol_body failed for {rel_path}: {result.message}',
+                path=rel_path,
+            )
+        return
+
+    raise FunctionCallValidationError(
+        f"multi_edit item command {item_command!r} is unsupported. "
+        "Use 'replace_file', 'replace_range', or 'edit_symbol_body'."
+    )
+
+
 def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Action:
     """Apply an atomic multi-file batch edit via :class:`AtomicRefactor`.
 
@@ -1018,68 +1160,97 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     """
     raw_edits = arguments.get('file_edits')
     if not isinstance(raw_edits, list) or not raw_edits:
-        raise FunctionCallValidationError(
-            "multi_edit requires a non-empty 'file_edits' array of "
-            '{ path, new_content } items.'
-        )
+        raise FunctionCallValidationError("multi_edit requires a non-empty 'file_edits' array.")
     if len(raw_edits) > _MAX_MULTI_EDIT_FILES:
         raise FunctionCallValidationError(
             f'multi_edit supports at most {_MAX_MULTI_EDIT_FILES} files per call '
             f'(got {len(raw_edits)}). Split the batch.'
         )
 
-    parsed: list[tuple[str, str, str]] = []
+    parsed: list[tuple[str, str, str, dict[str, Any]]] = []
     seen_paths: set[str] = set()
     for idx, item in enumerate(raw_edits):
         if not isinstance(item, Mapping):
-            raise FunctionCallValidationError(
-                f"multi_edit item {idx} must be an object with 'path' and 'new_content'."
-            )
+            raise FunctionCallValidationError(f'multi_edit item {idx} must be an object.')
         item_path = item.get('path')
-        new_content = item.get('new_content')
         if not isinstance(item_path, str) or not item_path.strip():
             raise FunctionCallValidationError(
                 f"multi_edit item {idx} is missing required 'path'."
             )
-        if not isinstance(new_content, str):
-            raise FunctionCallValidationError(
-                f"multi_edit item {idx} is missing required 'new_content' (string)."
-            )
         requested_path = item_path.strip()
         canonical_path, display_path = _resolve_multi_edit_path(requested_path, idx)
-        if canonical_path in seen_paths:
-            raise FunctionCallValidationError(
-                f'multi_edit item {idx}: duplicate path {display_path!r} in batch. '
-                'Combine edits to the same file before submitting.'
-            )
         seen_paths.add(canonical_path)
-        parsed.append((canonical_path, display_path, new_content))
+        item_command, normalized_item = _parse_multi_edit_operation(item, idx)
+        parsed.append((canonical_path, display_path, item_command, normalized_item))
 
     try:
         from backend.engine.tools.atomic_refactor import AtomicRefactor
+        from backend.engine.tools.structure_editor import StructureEditor
+        from backend.core.workspace_resolution import require_effective_workspace_root
+        from backend.execution.utils.file_editor import FileEditor, _file_lock_for_path
     except Exception as e:  # pragma: no cover - defensive import guard
-        return MessageAction(
-            content=f'❌ multi_edit unavailable: AtomicRefactor import failed: {e}'
-        )
+        _multi_edit_raise(f'❌ multi_edit unavailable: AtomicRefactor import failed: {e}')
 
+    workspace_root = require_effective_workspace_root()
     refactor = AtomicRefactor()
     transaction = refactor.begin_transaction()
     try:
-        from backend.execution.utils.file_editor import _file_lock_for_path
-
+        original_snapshots: dict[str, str | None] = {}
+        final_contents: dict[str, str] = {}
         with ExitStack() as stack:
             for item_path in sorted(seen_paths):
                 stack.enter_context(_file_lock_for_path(Path(item_path)))
-            for item_path, _display_path, new_content in parsed:
-                import os as _os
+            with tempfile.TemporaryDirectory(prefix='grinta-multi-edit-') as temp_root_str:
+                temp_root = Path(temp_root_str)
+                temp_editor = FileEditor(workspace_root=str(temp_root))
+                structure_editor = StructureEditor()
+                temp_paths: dict[str, Path] = {}
 
-                operation = 'modify' if _os.path.exists(item_path) else 'create'
-                refactor.add_file_edit(
-                    transaction,
-                    item_path,
-                    new_content,
-                    operation=operation,
+                for item_path, _display_path, item_command, item in parsed:
+                    real_path = Path(item_path)
+                    rel_path = _multi_edit_relative_path(item_path, workspace_root)
+                    temp_path = temp_root / rel_path
+                    if item_path not in temp_paths:
+                        temp_paths[item_path] = temp_path
+                        temp_path.parent.mkdir(parents=True, exist_ok=True)
+                        if real_path.exists():
+                            original_snapshots[item_path] = real_path.read_text(
+                                encoding='utf-8'
+                            )
+                            shutil.copyfile(real_path, temp_path)
+                        else:
+                            original_snapshots[item_path] = None
+                    _apply_multi_edit_operation(
+                        rel_path=rel_path,
+                        temp_path=temp_path,
+                        item_command=item_command,
+                        item=item,
+                        temp_editor=temp_editor,
+                        structure_editor=structure_editor,
+                    )
+
+                for item_path, temp_path in temp_paths.items():
+                    if not temp_path.exists():
+                        _multi_edit_raise(
+                            f'❌ multi_edit produced no output file for {_multi_edit_relative_path(item_path, workspace_root)}.',
+                            path=_multi_edit_relative_path(item_path, workspace_root),
+                        )
+                    final_contents[item_path] = temp_path.read_text(encoding='utf-8')
+
+            for item_path, old_content in original_snapshots.items():
+                real_path = Path(item_path)
+                disk_now = (
+                    real_path.read_text(encoding='utf-8') if real_path.exists() else None
                 )
+                if disk_now != old_content:
+                    _multi_edit_raise(
+                        '❌ multi_edit aborted because the file changed on disk during batch preparation. Re-read and retry.',
+                        path=_multi_edit_relative_path(item_path, workspace_root),
+                    )
+
+            for item_path, final_content in final_contents.items():
+                operation = 'modify' if Path(item_path).exists() else 'create'
+                refactor.add_file_edit(transaction, item_path, final_content, operation=operation)
             result = refactor.commit(transaction, validate=False)
     except FunctionCallValidationError:
         raise
@@ -1089,12 +1260,12 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             refactor.rollback(transaction)
         except Exception:
             pass
-        return MessageAction(
-            content=f'❌ multi_edit failed before commit: {e}. No files modified.'
-        )
+        _multi_edit_raise(f'❌ multi_edit failed before commit: {e}. No files modified.')
 
     if result.success:
-        paths = [display_path for _item_path, display_path, _new_content in parsed]
+        paths = sorted(
+            {display_path for _item_path, display_path, _item_command, _item in parsed}
+        )
         if len(paths) == 1:
             file_lines = f'  • {paths[0]}'
         else:
@@ -1106,10 +1277,8 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             )
         )
     err_lines = '\n'.join(f'  - {e}' for e in (result.errors or [result.message]))
-    return MessageAction(
-        content=(
-            f'❌ multi_edit transaction rolled back — no files modified.\n{err_lines}'
-        )
+    _multi_edit_raise(
+        f'❌ multi_edit transaction rolled back — no files modified.\n{err_lines}'
     )
 
 
@@ -1202,7 +1371,11 @@ def _dispatch_structure_editor_commands(
     except FunctionCallValidationError:
         raise
     except Exception as e:
-        error_msg = f'Symbol Editor error: {str(e)}'
+        error_msg = append_editor_recovery_guidance(
+            f'Symbol Editor error: {str(e)}',
+            path=path,
+            tool_name='symbol_editor',
+        )
         logger.error(error_msg, exc_info=True)
         from backend.core.errors import ToolExecutionError
 

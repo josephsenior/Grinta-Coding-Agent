@@ -895,3 +895,78 @@ class TestInbandDisconnectDetection:
         chunks = [self._make_chunk(big_content), self._make_chunk('ç½‘ç»œä¸­æ–­')]
         result = self._run(self._make_llm(chunks))
         assert len(result) == 2
+
+
+class TestAstreamRetryListener:
+    @staticmethod
+    def _make_retrying_llm(listener: MagicMock) -> LLM:
+        from types import SimpleNamespace
+
+        llm = LLM.__new__(LLM)
+        llm.debug = False
+        llm.retry_listener = listener
+        llm.config = SimpleNamespace(
+            model='opencode-go/minimax-m2.7',
+            temperature=0,
+            max_output_tokens=None,
+            top_p=None,
+            top_k=None,
+            timeout=None,
+            seed=None,
+            reasoning_effort=None,
+            num_retries=2,
+            retry_min_wait=0,
+            retry_max_wait=0,
+            on_cancel_requested_fn=None,
+        )
+
+        attempts = {'count': 0}
+
+        async def _fake_astream(**_kwargs):
+            if attempts['count'] == 0:
+                attempts['count'] += 1
+                raise APIConnectionError('connection reset')
+            yield {'choices': [{'delta': {'content': 'ok'}}]}
+
+        llm.client = MagicMock()
+        llm.client.astream = _fake_astream  # type: ignore[attr-defined]
+        return llm
+
+    def test_astream_emits_retry_pending_and_resuming_listener_events(self):
+        import asyncio
+
+        listener = MagicMock()
+        llm = self._make_retrying_llm(listener)
+
+        async def _collect():
+            result = []
+            async for chunk in llm.astream():
+                result.append(chunk)
+            return result
+
+        with patch.multiple(
+            'backend.inference.catalog_loader',
+            apply_model_param_overrides=lambda _m, kw, **_kw2: kw,
+            sanitize_call_kwargs_for_provider=lambda _m, kw: kw,
+        ):
+            chunks = asyncio.run(_collect())
+
+        assert len(chunks) == 1
+        assert listener.call_count == 2
+        first = listener.call_args_list[0]
+        assert first.args == (1, 2)
+        assert first.kwargs == {
+            'status_type': 'llm_retry_pending',
+            'reason': 'APIConnectionError',
+            'wait_seconds': 1,
+            'source': 'llm_stream',
+            'streaming': True,
+        }
+        second = listener.call_args_list[1]
+        assert second.args == (2, 2)
+        assert second.kwargs == {
+            'status_type': 'llm_retry_resuming',
+            'reason': 'stream reconnect',
+            'source': 'llm_stream',
+            'streaming': True,
+        }

@@ -375,9 +375,9 @@ class StepGuardService:
     ) -> tuple[str, str]:
         """Build a generic stuck recovery message without task-text heuristics."""
         recent_errors = self._recent_error_contents(history)
-        text_editor_message = self._text_editor_recovery_message(recent_errors)
-        if text_editor_message is not None:
-            return text_editor_message
+        editor_message = self._editor_recovery_message(recent_errors)
+        if editor_message is not None:
+            return editor_message
 
         created_files_message = self._created_files_recovery_message(created_files)
         if created_files_message is not None:
@@ -402,9 +402,29 @@ class StepGuardService:
         ]
 
     @staticmethod
-    def _text_editor_recovery_message(
+    def _editor_recovery_message(
         recent_errors: list[str],
     ) -> tuple[str, str] | None:
+        symbol_hits = sum(
+            1
+            for content in recent_errors
+            if 'symbol editor error' in content.lower()
+            or 'symbol ' in content.lower()
+            and 'not found' in content.lower()
+            or '[editor_recovery_required]' in content.lower()
+        )
+        if symbol_hits >= 2:
+            return (
+                'STUCK LOOP DETECTED — repeated symbol/code-edit failures were detected.\n'
+                'MANDATORY NEXT ACTIONS:\n'
+                '1. If the error mentions a symbol, call `find_symbol` before editing again.\n'
+                '2. Re-read the affected file region to confirm the live code shape.\n'
+                '3. Retry exactly one targeted `symbol_editor` edit (`edit_symbol_body` or `replace_range`).\n'
+                '4. If that fails, switch to `text_editor` `edit_mode=range` with fresh line numbers.\n'
+                'Do NOT emit another near-identical symbol edit without new evidence.',
+                'STUCK RECOVERY: find_symbol or read_file, then one targeted symbol_editor retry max.',
+            )
+
         text_editor_hits = sum(
             1
             for content in recent_errors
@@ -419,10 +439,11 @@ class StepGuardService:
             'STUCK LOOP DETECTED — repeated text_editor failures were detected.\n'
             'MANDATORY NEXT ACTIONS:\n'
             '1. Read the target file again with read_file to refresh exact context lines.\n'
-            '2. Retry text_editor once with corrected unified diff context.\n'
-            '3. If it fails again, switch to a different edit strategy instead of retrying text_editor.\n'
+            '2. Prefer `symbol_editor` for the next code edit if the file is source code.\n'
+            '3. If you must stay in text_editor, retry once with `edit_mode=range` and corrected live context.\n'
+            '4. If it fails again, switch tools instead of retrying text_editor.\n'
             'Do NOT emit another near-identical text_editor call without new file evidence.',
-            'STUCK RECOVERY: read_file refresh, then one text_editor retry max, then switch strategy.',
+            'STUCK RECOVERY: read_file refresh, prefer symbol_editor, then one text_editor retry max.',
         )
 
     @staticmethod

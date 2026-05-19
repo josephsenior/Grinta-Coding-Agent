@@ -47,6 +47,22 @@ _RETRY_AFTER_HARD_CAP_SECONDS = 600.0
 class RetryMixin:
     """Mixin class for retry logic."""
 
+    @staticmethod
+    def _notify_retry_listener(
+        retry_listener: Callable[..., Any] | None,
+        attempt: int,
+        max_attempts: int,
+        **kwargs: Any,
+    ) -> None:
+        if retry_listener is None:
+            return
+        try:
+            retry_listener(attempt, max_attempts, **kwargs)
+            return
+        except TypeError:
+            pass
+        retry_listener(attempt, max_attempts)
+
     def retry_decorator(self, **kwargs: Any) -> Callable:
         """Create a LLM retry decorator with customizable parameters. This is used for 429 errors, and a few other exceptions in LLM classes.
 
@@ -77,7 +93,21 @@ class RetryMixin:
             """
             self.log_retry_attempt(retry_state)
             if retry_listener:
-                retry_listener(retry_state.attempt_number, num_retries)
+                exception = retry_state.outcome.exception()
+                wait_seconds = None
+                next_action = getattr(retry_state, 'next_action', None)
+                if next_action is not None:
+                    wait_seconds = getattr(next_action, 'sleep', None)
+                self._notify_retry_listener(
+                    retry_listener,
+                    retry_state.attempt_number,
+                    num_retries,
+                    status_type='llm_retry_pending',
+                    reason=type(exception).__name__ if exception is not None else '',
+                    wait_seconds=wait_seconds,
+                    source='llm_completion',
+                    streaming=False,
+                )
             exception = retry_state.outcome.exception()
             if isinstance(exception, LLMNoResponseError) and hasattr(
                 retry_state, 'kwargs'

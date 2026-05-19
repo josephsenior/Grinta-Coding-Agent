@@ -9,7 +9,7 @@
 
 <TOOL_ROUTING_LADDER>
 - **Search & Explore:** Prefer `search_code`, `read_symbol_definition`, or `analyze_project_structure`.
-- **Read & Edit:** Use `symbol_editor` (symbols/ranges) or `text_editor` (prose/config/line-bounded).
+- **Read & Edit:** Prefer `symbol_editor` for code edits (symbols/ranges/atomic batches). Use `text_editor` for prose, config, patch, format, or line-bounded fallback repairs.
 - **Shell & Execution:** Use the terminal strictly for build/test/git/processes.
 </TOOL_ROUTING_LADDER>
 

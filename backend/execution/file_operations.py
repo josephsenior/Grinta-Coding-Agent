@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from backend.core.enums import FileEditSource
 from backend.core.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
+from backend.core.editor_recovery import append_editor_recovery_guidance
 from backend.execution.utils.files import (
     detect_line_ending,
     insert_lines,
@@ -94,7 +95,13 @@ def execute_file_editor(
     )
 
     if result.error:
-        return f'ERROR:\n{result.error}', (None, None)
+        enriched_error = append_editor_recovery_guidance(
+            result.error,
+            path=path,
+            tool_name='text_editor',
+            content=file_text or new_str or section_content or patch_text,
+        )
+        return f'ERROR:\n{enriched_error}', (None, None)
     if not result.output:
         logger.warning('No output from file_editor for %s', path)
         return '', (None, None)

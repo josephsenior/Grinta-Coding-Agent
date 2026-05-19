@@ -764,6 +764,22 @@ class LLM(RetryMixin, DebugMixin):
             return False
         return is_retryable and not is_last and not yielded_any
 
+    def _notify_retry_listener(
+        self,
+        attempt: int,
+        max_attempts: int,
+        **kwargs: Any,
+    ) -> None:
+        listener = getattr(self, 'retry_listener', None)
+        if listener is None:
+            return
+        try:
+            listener(attempt, max_attempts, **kwargs)
+            return
+        except TypeError:
+            pass
+        listener(attempt, max_attempts)
+
     async def astream(self, *args, **kwargs) -> AsyncIterator[dict[str, Any]]:
         """Asynchronous streaming call with cancellation support and retry.
 
@@ -785,6 +801,15 @@ class LLM(RetryMixin, DebugMixin):
                 str
             ] = []  # accumulate leading content for disconnect probe
             try:
+                if attempt > 1:
+                    self._notify_retry_listener(
+                        attempt,
+                        max_attempts,
+                        status_type='llm_retry_resuming',
+                        reason='stream reconnect',
+                        source='llm_stream',
+                        streaming=True,
+                    )
                 self.log_prompt(messages)
                 stream_iter = self.client.astream(messages=messages, **call_kwargs)
                 async for chunk in _stream_with_chunk_timeout(
@@ -850,6 +875,15 @@ class LLM(RetryMixin, DebugMixin):
                     max_attempts,
                     e,
                     wait,
+                )
+                self._notify_retry_listener(
+                    attempt,
+                    max_attempts,
+                    status_type='llm_retry_pending',
+                    reason=type(e).__name__,
+                    wait_seconds=wait,
+                    source='llm_stream',
+                    streaming=True,
                 )
                 await _asyncio.sleep(wait)
 

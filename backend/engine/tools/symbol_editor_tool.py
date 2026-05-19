@@ -62,13 +62,16 @@ COMMANDS:
 
 9. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `insert_text`, etc.). Symbol-level commands (`edit_symbol_body`, `edit_symbols`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
 
-10. `multi_edit` - **ATOMIC multi-file edit (cross-file)**. Applies a batch of full-file replacements across many files as a single transaction: every file commits or none do (auto-rollback on first failure).
-    Required: `file_edits` array (each item: `{ path, new_content }`).
+10. `multi_edit` - **ATOMIC multi-file edit (cross-file)**. Applies a mixed batch of edits across many files as a single transaction: every file commits or none do (auto-rollback on first failure).
+    Required: `file_edits` array. Each item must include `path` and one of:
+      - `{ path, new_content }` or `{ path, command: "replace_file", new_content }`
+      - `{ path, command: "replace_range", start_line, end_line, new_code }`
+      - `{ path, command: "edit_symbol_body", symbol_name, new_body }`
     Optional: top-level `path` may be omitted (or set to `<batch>`).
-    Use this for coordinated refactors that span 2+ files where partial application would corrupt the project (rename a public symbol + update its imports, split a module, change an API signature + update all call sites you already prepared, etc.). Backups are taken before the batch and restored on any failure. Limit: 50 files per call.
+    Use this for coordinated refactors that span 2+ files where partial application would corrupt the project (rename a public symbol + update its imports, split a module, change an API signature + update all call sites you already prepared, etc.). Multiple edits to the same file are allowed and are applied sequentially inside the atomic batch. Backups are taken before the batch and restored on any failure. Limit: 50 operations per call.
 
 NOTE:
-- Prefer this tool for structure-aware code edits.
+- Prefer this tool for code edits. It is the default editor for source files.
 - For non-code files, range-based edits, or document-oriented edits (format/section/patch), use `text_editor`.
 
 FEATURES:
@@ -222,9 +225,11 @@ def create_symbol_editor_tool(
             'file_edits': {
                 'type': 'array',
                 'description': (
-                    'For multi_edit only: list of full-file replacements applied as one '
-                    'atomic transaction. All edits succeed together or all are rolled back. '
-                    'Each item: { path: str, new_content: str }. Max 50 items.'
+                    'For multi_edit only: list of atomic edit operations. All edits succeed '
+                    'together or all are rolled back. Each item must include path and one of: '
+                    '{ new_content }, { command="replace_range", start_line, end_line, new_code }, '
+                    'or { command="edit_symbol_body", symbol_name, new_body }. Multiple items may '
+                    'target the same file; they are applied sequentially inside the batch. Max 50 items.'
                 ),
                 'items': {
                     'type': 'object',
@@ -233,15 +238,39 @@ def create_symbol_editor_tool(
                             'type': 'string',
                             'description': 'Project-relative or absolute path to the file to write.',
                         },
+                        'command': {
+                            'type': 'string',
+                            'description': 'Optional per-item multi_edit command: replace_file, replace_range, edit_symbol_body.',
+                        },
                         'new_content': {
                             'type': 'string',
                             'description': (
-                                'Full new content for the file. JSON string — escape newlines as \\n, '
+                                'Full new content for replace_file. JSON string — escape newlines as \\n, '
                                 'embedded double quotes as \\".'
                             ),
                         },
+                        'start_line': {
+                            'type': 'integer',
+                            'description': '1-based start line for replace_range.',
+                        },
+                        'end_line': {
+                            'type': 'integer',
+                            'description': '1-based inclusive end line for replace_range.',
+                        },
+                        'new_code': {
+                            'type': 'string',
+                            'description': 'Replacement code for replace_range.',
+                        },
+                        'symbol_name': {
+                            'type': 'string',
+                            'description': 'Target symbol for edit_symbol_body.',
+                        },
+                        'new_body': {
+                            'type': 'string',
+                            'description': 'Replacement body for edit_symbol_body.',
+                        },
                     },
-                    'required': ['path', 'new_content'],
+                    'required': ['path'],
                 },
             },
             'security_risk': get_security_risk_param(),
