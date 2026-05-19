@@ -1772,6 +1772,258 @@ def _handle_communicate_tool(arguments: Mapping[str, Any]) -> Action:
         )
 
 
+
+
+def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
+    """Handle unified file_editor tool call."""
+    from backend.engine.tools.file_editor import create_file_editor_tool
+
+    tool_name = cast(str, create_file_editor_tool().get('function', {}).get('name', ''))
+    command = require_tool_argument(arguments, 'command', tool_name)
+    command = str(command).strip().lower()
+
+    # Validate command
+    _VALID_FILE_EDITOR_COMMANDS = {
+        'read', 'create', 'insert', 'undo',
+        'replace_lines', 'format_edit', 'section_edit', 'patch',
+        'edit_symbol', 'edit_symbols', 'rename_symbol', 'find_symbol',
+        'normalize_indent', 'multi_edit',
+    }
+    if command not in _VALID_FILE_EDITOR_COMMANDS:
+        raise FunctionCallValidationError(
+            f"Unknown command '{command}' for file_editor tool. "
+            f'Valid commands: {sorted(_VALID_FILE_EDITOR_COMMANDS)}'
+        )
+
+    # Validate path (required for all except multi_edit)
+    path = arguments.get('path')
+    if command != 'multi_edit':
+        if not path:
+            msg = f'Missing required argument "path" in tool call {tool_name}'
+            raise FunctionCallValidationError(msg)
+        path = str(path)
+
+    validate_security_risk(arguments, tool_name)
+
+    # Repair double-escaped content
+    from backend.core.content_escape_repair import repair_arguments_in_place
+    repair_arguments_in_place(dict(arguments), path or '')
+
+    # ── Simple I/O commands ────────────────────────────────────────
+    if command == 'read':
+        return FileReadAction(
+            path=path,
+            impl_source=FileReadSource.FILE_EDITOR,
+            view_range=cast(Any, arguments.get('view_range')),
+        )
+
+    if command == 'create':
+        content = cast(str, arguments.get('content', ''))
+        return FileEditAction(
+            path=path,
+            command='create_file',
+            file_text=content,
+            impl_source=FileEditSource.FILE_EDITOR,
+            overwrite_existing=parse_bool_argument(arguments.get('overwrite_existing', False)),
+        )
+
+    if command == 'insert':
+        content = cast(str, arguments.get('content', ''))
+        insert_line = arguments.get('insert_line')
+        if insert_line is None:
+            raise FunctionCallValidationError('insert requires insert_line parameter')
+        return FileEditAction(
+            path=path,
+            command='insert_text',
+            insert_line=int(insert_line),
+            new_str=content,
+            impl_source=FileEditSource.FILE_EDITOR,
+        )
+
+    if command == 'undo':
+        return FileEditAction(
+            path=path,
+            command='undo_last_edit',
+            impl_source=FileEditSource.FILE_EDITOR,
+        )
+
+    # ── Line-range edit ────────────────────────────────────────────
+    if command == 'replace_lines':
+        content = cast(str, arguments.get('content', ''))
+        start_line = arguments.get('start_line')
+        end_line = arguments.get('end_line')
+        if start_line is None:
+            raise FunctionCallValidationError('replace_lines requires start_line')
+        if end_line is None:
+            raise FunctionCallValidationError('replace_lines requires end_line')
+        return FileEditAction(
+            path=path,
+            command='edit',
+            edit_mode='range',
+            start_line=int(start_line),
+            end_line=int(end_line),
+            new_str=content,
+            impl_source=FileEditSource.FILE_EDITOR,
+            expected_file_hash=arguments.get('expected_file_hash'),
+        )
+
+    # ── Structured-data edits ──────────────────────────────────────
+    if command == 'format_edit':
+        return FileEditAction(
+            path=path,
+            command='edit',
+            edit_mode='format',
+            format_kind=arguments.get('format_kind'),
+            format_op=arguments.get('format_op'),
+            format_path=arguments.get('format_path'),
+            format_value=arguments.get('format_value'),
+            impl_source=FileEditSource.FILE_EDITOR,
+        )
+
+    if command == 'section_edit':
+        content = cast(str, arguments.get('content', ''))
+        return FileEditAction(
+            path=path,
+            command='edit',
+            edit_mode='section',
+            anchor_type=arguments.get('anchor_type'),
+            anchor_value=arguments.get('anchor_value'),
+            anchor_occurrence=arguments.get('anchor_occurrence'),
+            section_action=arguments.get('section_action'),
+            section_content=content,
+            impl_source=FileEditSource.FILE_EDITOR,
+        )
+
+    if command == 'patch':
+        content = cast(str, arguments.get('content', ''))
+        return FileEditAction(
+            path=path,
+            command='edit',
+            edit_mode='patch',
+            patch_text=content,
+            impl_source=FileEditSource.FILE_EDITOR,
+        )
+
+    # ── Symbol-aware edits (Tree-sitter) ───────────────────────────
+    if command in ('edit_symbol', 'edit_symbols', 'rename_symbol', 'find_symbol', 'normalize_indent'):
+        return _handle_file_editor_symbol_command(command, path, arguments)
+
+    # ── Multi-edit (cross-file atomic batch) ──────────────────────
+    if command == 'multi_edit':
+        return _handle_file_editor_multi_edit(arguments)
+
+    # Should not reach here
+    raise FunctionCallValidationError(f"Unhandled file_editor command: {command}")
+
+def _handle_file_editor_symbol_command(command: str, path: str, arguments: Mapping[str, Any]) -> Action:
+    """Handle symbol-aware commands for file_editor."""
+    from backend.engine.tools.structure_editor import StructureEditor
+
+    try:
+        editor = StructureEditor()
+    except Exception as e:
+        raise FunctionCallValidationError(f'Failed to initialize StructureEditor: {e}') from e
+
+    if command == 'edit_symbol':
+        symbol_name = arguments.get('symbol_name')
+        content = cast(str, arguments.get('content', ''))
+        line_number = arguments.get('line_number')
+        if not symbol_name:
+            raise FunctionCallValidationError('edit_symbol requires symbol_name')
+        return _handle_edit_symbol_body_command(editor, path, {
+            'symbol_name': symbol_name,
+            'new_body': content,
+            'line_number': line_number,
+        })
+
+    if command == 'edit_symbols':
+        raw_edits = arguments.get('edits')
+        if not isinstance(raw_edits, list) or not raw_edits:
+            raise FunctionCallValidationError('edit_symbols requires non-empty edits array')
+        # Map content -> new_body for each item
+        mapped_edits = []
+        for item in raw_edits:
+            if not isinstance(item, dict):
+                raise FunctionCallValidationError('Each edit item must be an object')
+            mapped_edits.append({
+                'symbol_name': item.get('symbol_name'),
+                'new_body': item.get('content', ''),
+            })
+        return _handle_edit_symbols_command(editor, path, {'edits': mapped_edits})
+
+    if command == 'rename_symbol':
+        return _handle_rename_symbol_command(editor, path, arguments)
+
+    if command == 'find_symbol':
+        return _handle_find_symbol_command(editor, path, arguments)
+
+    if command == 'normalize_indent':
+        return _handle_normalize_indent_command(editor, path, arguments)
+
+    raise FunctionCallValidationError(f"Unhandled symbol command: {command}")
+
+def _handle_file_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
+    """Handle multi_edit command for file_editor (cross-file atomic batch)."""
+    raw_edits = arguments.get('file_edits')
+    if not isinstance(raw_edits, list) or not raw_edits:
+        raise FunctionCallValidationError('multi_edit requires non-empty file_edits array')
+    if len(raw_edits) > 50:
+        raise FunctionCallValidationError('multi_edit supports at most 50 items per call')
+
+    # Map unified operation names to internal command names
+    _OP_MAP = {
+        'create': 'create_file',
+        'replace_lines': 'replace_range',
+        'edit_symbol': 'edit_symbol_body',
+        'replace_file': 'replace_file',
+    }
+
+    # Convert unified schema to internal schema
+    converted_edits = []
+    for idx, item in enumerate(raw_edits):
+        if not isinstance(item, dict):
+            raise FunctionCallValidationError(f'multi_edit item {idx} must be an object')
+        path = item.get('path')
+        operation = item.get('operation')
+        content = item.get('content', '')
+        if not path:
+            raise FunctionCallValidationError(f'multi_edit item {idx} missing path')
+        if not operation:
+            raise FunctionCallValidationError(f'multi_edit item {idx} missing operation')
+        internal_op = _OP_MAP.get(operation)
+        if not internal_op:
+            raise FunctionCallValidationError(f'multi_edit item {idx}: unknown operation {operation!r}')
+
+        converted = {'path': path, 'command': internal_op}
+
+        if operation == 'create':
+            converted['file_text'] = content
+            if 'overwrite_existing' in item:
+                converted['overwrite_existing'] = item['overwrite_existing']
+        elif operation == 'replace_lines':
+            converted['new_code'] = content
+            converted['start_line'] = item.get('start_line')
+            converted['end_line'] = item.get('end_line')
+            if converted['start_line'] is None or converted['end_line'] is None:
+                raise FunctionCallValidationError(f'multi_edit item {idx}: replace_lines requires start_line and end_line')
+        elif operation == 'edit_symbol':
+            converted['symbol_name'] = item.get('symbol_name')
+            converted['new_body'] = content
+            if not converted['symbol_name']:
+                raise FunctionCallValidationError(f'multi_edit item {idx}: edit_symbol requires symbol_name')
+        elif operation == 'replace_file':
+            converted['new_content'] = content
+
+        if 'expected_file_hash' in item:
+            converted['expected_file_hash'] = item['expected_file_hash']
+
+        converted_edits.append(converted)
+
+    # Delegate to existing symbol_editor multi_edit handler
+    return _handle_multi_edit_command('batch', {
+        'file_edits': converted_edits,
+    })
+
 def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     """Create dispatch map for tool handlers."""
     return {
@@ -1784,6 +2036,9 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         cast(
             str, create_text_editor_tool().get('function', {}).get('name', '')
         ): _handle_text_editor_tool,
+        cast(
+            str, create_file_editor_tool().get('function', {}).get('name', '')
+        ): _handle_file_editor_tool,
         cast(
             str, create_symbol_editor_tool().get('function', {}).get('name', '')
         ): _handle_symbol_editor_tool,

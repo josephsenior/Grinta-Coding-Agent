@@ -407,10 +407,12 @@ def _get_tool_definition_by_name(tool_name: str) -> dict | None:
 
     Returns the tool dict (with 'function.parameters' schema) or None if not found.
     """
+    from backend.engine.tools.file_editor import create_file_editor_tool
     from backend.engine.tools.symbol_editor_tool import create_symbol_editor_tool
     from backend.engine.tools.text_editor import create_text_editor_tool
 
     tool_creators = {
+        'file_editor': create_file_editor_tool,
         'text_editor': create_text_editor_tool,
         'symbol_editor': create_symbol_editor_tool,
     }

@@ -7,6 +7,7 @@ from .checkpoint import create_checkpoint_tool
 from .condensation_request import create_summarize_context_tool
 from .debugger import create_debugger_tool
 from .delegate_task import create_delegate_task_tool
+from .file_editor import create_file_editor_tool
 from .finish import create_finish_tool
 from .lsp_query import create_lsp_query_tool
 from .memory_manager import create_memory_manager_tool
@@ -24,6 +25,7 @@ __all__ = [
     'create_checkpoint_tool',
     'create_summarize_context_tool',
     'create_communicate_tool',
+    'create_file_editor_tool',
     'create_finish_tool',
     'create_lsp_query_tool',
     'create_memory_manager_tool',

@@ -16,7 +16,7 @@ ChatCompletionToolParam = Any
 # Tools whose primary payload is code are routed through the pseudo-XML
 # transport layer so the code never passes through JSON encoding.  All
 # other tools use native provider function calling for constrained decoding.
-CODE_PAYLOAD_TOOLS: frozenset[str] = frozenset({'symbol_editor', 'text_editor'})
+CODE_PAYLOAD_TOOLS: frozenset[str] = frozenset({'file_editor', 'symbol_editor', 'text_editor'})
 
 if TYPE_CHECKING:
     from backend.core.contracts.state import State
@@ -393,10 +393,11 @@ class OrchestratorPlanner:
             'standard tool calling format for these tools.\n\n'
             f'{formatted}\n'
             'To call a file-editing tool, emit EXACTLY this format in your response text:\n\n'
-            '<function=text_editor>\n'
-            '<parameter=command>create_file</parameter>\n'
+            'To call a file-editing tool, emit EXACTLY this format in your response text:\n\n'
+            '<function=file_editor>\n'
+            '<parameter=command>create</parameter>\n'
             '<parameter=path>/path/to/file</parameter>\n'
-            '<parameter=file_text>\n'
+            '<parameter=content>\n'
             'your code here -- raw text, no JSON escaping needed\n'
             '</parameter>\n'
             '</function>\n\n'
@@ -404,7 +405,7 @@ class OrchestratorPlanner:
             '- You may include natural-language reasoning BEFORE the <function=...> block.\n'
             '- Do NOT place any text AFTER the </function> closing tag.\n'
             '- Code between <parameter> tags is written exactly as it should appear in the file.\n'
-            '- Use CORRECT parameter names (file_text, new_str, new_code, new_body, etc.)\n'
+            '- Use the unified content parameter for all new text (create, replace_lines, insert, edit_symbol, etc.)\n'
             '- One file-editing call per message.\n'
             '</FILE_EDITING_TOOL_FORMAT>'
         )
