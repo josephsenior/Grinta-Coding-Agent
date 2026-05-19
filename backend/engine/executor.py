@@ -153,10 +153,26 @@ class OrchestratorExecutor:
         )
         self._checkpoint_cache: OrderedDict[str, StreamingCheckpoint] = OrderedDict()
         self._step_cancelled = False
+        self._active_stream_task: asyncio.Task[Any] | None = None
+        self._active_stream_iter: Any | None = None
 
     def cancel_step(self) -> None:
         """Signal the current (or next) streaming step to abort early."""
         self._step_cancelled = True
+        task = self._active_stream_task
+        if task is not None and not task.done():
+            task.cancel()
+            return
+
+        stream_iter = self._active_stream_iter
+        aclose = getattr(stream_iter, 'aclose', None)
+        if not callable(aclose):
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(aclose())
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -925,17 +941,11 @@ class OrchestratorExecutor:
             anchor_event_id=self._checkpoint_anchor_event_id(event_stream),
         )
 
-        from backend.core.llm_step_timeout import llm_step_timeout_seconds_from_env
-
-        timeout_seconds = llm_step_timeout_seconds_from_env()
-        # Always enforce a ceiling so a hung LLM stream cannot block forever.
-        _DEFAULT_STREAM_CEILING = 300.0
-        if timeout_seconds is None or timeout_seconds <= 0:
-            timeout_seconds = _DEFAULT_STREAM_CEILING
-
         response = None
         loop = asyncio.get_running_loop()
         state = _AsyncStreamingState()
+        stream_iter: Any | None = None
+        consume_task: asyncio.Task[Any] | None = None
 
         try:
             logger.info('OrchestratorExecutor.async_execute: calling LLM.astream')
@@ -948,7 +958,11 @@ class OrchestratorExecutor:
                     state,
                 )
             )
-            await asyncio.wait_for(consume_task, timeout=timeout_seconds)
+            self._active_stream_iter = stream_iter
+            self._active_stream_task = consume_task
+            await consume_task
+            if self._step_cancelled:
+                raise asyncio.CancelledError()
             tool_calls_list = self._finalize_stream_tool_calls(state)
             visible_accum = self._visible_stream_content(state.content_accumulate)
             self._emit_final_stream_event(
@@ -966,17 +980,9 @@ class OrchestratorExecutor:
             )
             self._record_streaming_metrics(response, start_time)
 
-        except asyncio.TimeoutError as exc:
-            from backend.inference.exceptions import Timeout as LLMTimeout
-
-            model_name = getattr(getattr(self._llm, 'config', None), 'model', None)
-            logger.error('LLM timeout %s', type(exc).__name__)
-            cap = timeout_seconds if timeout_seconds is not None else 0.0
-            raise LLMTimeout(
-                f'LLM streaming call timed out after {cap} seconds (Full Step Timeout)',
-                model=model_name,
-            ) from exc
         except asyncio.CancelledError:
+            self.cancel_step()
+            checkpoint.discard()
             raise
         except Exception as exc:
             from backend.inference.exceptions import LLMError, RateLimitError
@@ -993,6 +999,11 @@ class OrchestratorExecutor:
             raise ModelProviderError(
                 'LLM streaming failed', context={'error': error_message}
             ) from exc
+        finally:
+            if consume_task is not None and self._active_stream_task is consume_task:
+                self._active_stream_task = None
+            if stream_iter is not None and self._active_stream_iter is stream_iter:
+                self._active_stream_iter = None
 
         if response is None:
             raise ModelProviderError('LLM returned no response')

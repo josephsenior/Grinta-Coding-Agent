@@ -1212,6 +1212,13 @@ class GrintaScreen(Screen):
         import contextlib
 
         async def _do_interrupt() -> None:
+            if self._controller is not None:
+                mark = getattr(self._controller, 'mark_user_interrupt_stop', None)
+                if callable(mark):
+                    mark()
+                with contextlib.suppress(Exception):
+                    await self._controller.stop()
+
             if self._agent_task and not self._agent_task.done():
                 try:
                     await asyncio.wait_for(self._agent_task, timeout=5.0)
@@ -1225,13 +1232,6 @@ class GrintaScreen(Screen):
 
                 if runtime_client is not None:
                     await runtime_client.hard_kill()
-
-            if self._controller is not None:
-                mark = getattr(self._controller, 'mark_user_interrupt_stop', None)
-                if callable(mark):
-                    mark()
-                with contextlib.suppress(Exception):
-                    await self._controller.stop()
 
             if self._renderer is not None:
                 self._renderer._tui.add_system_message('Interrupted. Ready for input.')
@@ -1988,6 +1988,9 @@ class GrintaScreen(Screen):
             )
 
             def _on_agent_done(t: asyncio.Task[Any]) -> None:
+                if t.cancelled():
+                    _tui_logger.debug('_agent_task cancelled')
+                    return
                 exc = t.exception()
                 if exc:
                     _tui_logger.debug(

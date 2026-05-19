@@ -683,6 +683,17 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                 cancel_fn = getattr(executor, 'cancel_step', None)
                 if cancel_fn is not None:
                     cancel_fn()
+
+        current_task = asyncio.current_task()
+        if (
+            self._step_task is not None
+            and not self._step_task.done()
+            and self._step_task is not current_task
+        ):
+            self._step_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
+                await asyncio.wait_for(self._step_task, timeout=5.0)
+
         runtime = getattr(self, 'runtime', None)
         hard_kill = getattr(runtime, 'hard_kill', None)
         if callable(hard_kill):
