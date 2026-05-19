@@ -39,6 +39,7 @@ from backend.engine.function_calling_helpers import (
 )
 from backend.engine.tools import (
     create_cmd_run_tool,
+    create_file_editor_tool,
     create_finish_tool,
     create_summarize_context_tool,
     create_symbol_editor_tool,
