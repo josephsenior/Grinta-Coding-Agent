@@ -142,14 +142,11 @@ def build_task_panel(task_list: list[dict[str, Any]]) -> Any:
         )
 
         from rich.markdown import Markdown
-        from rich.console import Group
         
-        prefix = Text()
         if task_id and task_id != '?':
-            prefix.append(f'{task_id}  ', style=STYLE_DIM)
+            desc = f'**{task_id}**  {desc}'
             
-        desc_md = Markdown(desc)
-        body = Group(prefix, desc_md) if prefix.plain else desc_md
+        body = Markdown(desc)
         table.add_row(badge, body)
 
     empty_state: Any = (
