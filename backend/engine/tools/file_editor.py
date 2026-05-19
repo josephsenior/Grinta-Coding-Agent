@@ -38,6 +38,8 @@ Utilities:
 
 Batch:
   multi_edit       - Atomic multi-file refactoring (cross-file, max 50 ops).
+                     Uses nested <file_edit> XML blocks (no JSON arrays).
+                     Each block contains: <path>, <operation>, <content>.
 
 All commands require security_risk (LOW/MEDIUM/HIGH) and path (except multi_edit).
 

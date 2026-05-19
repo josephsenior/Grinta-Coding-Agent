@@ -402,6 +402,9 @@ class OrchestratorPlanner:
             '- Code between <parameter> tags is written exactly as it should appear in the file.\n'
             '- Use the unified content parameter for all new text (create, replace_lines, insert, edit_symbol, etc.)\n'
             '- One file-editing call per message.\n'
+            '- For multi_edit: use nested <file_edit> XML blocks (NOT JSON arrays).\n'
+            '- Each <file_edit> block: <path>, <operation>, <content>.\n'
+            '- Operations: create, replace_lines, edit_symbol, replace_file.\n'
             '</FILE_EDITING_TOOL_FORMAT>'
         )
 
