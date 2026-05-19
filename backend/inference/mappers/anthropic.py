@@ -64,7 +64,7 @@ def prepare_kwargs(
 ) -> tuple[list, dict[str, Any]]:
     """Extract system message and set model for Anthropic calls."""
     system_msg = next((m['content'] for m in messages if m['role'] == 'system'), None)
-    filtered = [m for m in messages if m['role'] != 'system']
+    filtered = _normalize_messages([m for m in messages if m['role'] != 'system'])
     if 'model' not in kwargs:
         kwargs['model'] = default_model
     if system_msg is not None:
@@ -76,6 +76,126 @@ def prepare_kwargs(
     # making them ideal cache breakpoints (saves 3K-10K input tokens per call).
     _apply_tools_cache_control(kwargs)
     return filtered, kwargs
+
+
+def _content_to_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return '' if content is None else str(content)
+    parts: list[str] = []
+    for item in content:
+        if isinstance(item, str):
+            parts.append(item)
+        elif isinstance(item, dict):
+            text = item.get('text')
+            if isinstance(text, str):
+                parts.append(text)
+    return '\n'.join(part for part in parts if part)
+
+
+def _parse_tool_arguments(arguments: Any) -> dict[str, Any]:
+    if isinstance(arguments, dict):
+        return arguments
+    if isinstance(arguments, str) and arguments.strip():
+        try:
+            parsed = json.loads(arguments)
+        except json.JSONDecodeError:
+            return {'arguments': arguments}
+        if isinstance(parsed, dict):
+            return parsed
+        return {'arguments': parsed}
+    return {}
+
+
+def _normalize_assistant_message(
+    message: dict[str, Any],
+    known_tool_ids: set[str],
+) -> dict[str, Any] | None:
+    tool_calls = message.get('tool_calls')
+    if not isinstance(tool_calls, list) or not tool_calls:
+        return message
+
+    content_blocks: list[dict[str, Any]] = []
+    text = _content_to_text(message.get('content')).strip()
+    if text:
+        content_blocks.append({'type': 'text', 'text': text})
+
+    for tool_call in tool_calls:
+        if not isinstance(tool_call, dict):
+            continue
+        tool_id = tool_call.get('id')
+        function = tool_call.get('function')
+        if not isinstance(tool_id, str) or not tool_id.strip():
+            continue
+        if not isinstance(function, dict):
+            continue
+        name = function.get('name')
+        if not isinstance(name, str) or not name.strip():
+            continue
+        known_tool_ids.add(tool_id)
+        content_blocks.append(
+            {
+                'type': 'tool_use',
+                'id': tool_id,
+                'name': name.strip(),
+                'input': _parse_tool_arguments(function.get('arguments')),
+            }
+        )
+
+    if not content_blocks:
+        return None
+    normalized = {k: v for k, v in message.items() if k != 'tool_calls'}
+    normalized['role'] = 'assistant'
+    normalized['content'] = content_blocks
+    return normalized
+
+
+def _normalize_tool_message(
+    message: dict[str, Any],
+    known_tool_ids: set[str],
+) -> dict[str, Any]:
+    tool_call_id = message.get('tool_call_id')
+    content = _content_to_text(message.get('content'))
+    if isinstance(tool_call_id, str) and tool_call_id in known_tool_ids:
+        return {
+            'role': 'user',
+            'content': [
+                {
+                    'type': 'tool_result',
+                    'tool_use_id': tool_call_id,
+                    'content': content,
+                }
+            ],
+        }
+
+    tool_name = message.get('name')
+    label = tool_name if isinstance(tool_name, str) and tool_name else 'tool'
+    return {
+        'role': 'user',
+        'content': f'[Unmatched tool result from {label}]\n{content}'.strip(),
+    }
+
+
+def _normalize_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    known_tool_ids: set[str] = set()
+    for raw_message in messages:
+        if not isinstance(raw_message, dict):
+            continue
+        message = dict(raw_message)
+        message.pop('tool_ok', None)
+        role = message.get('role')
+        if role == 'assistant':
+            assistant_message = _normalize_assistant_message(message, known_tool_ids)
+            if assistant_message is not None:
+                normalized.append(assistant_message)
+            continue
+        if role == 'tool':
+            normalized.append(_normalize_tool_message(message, known_tool_ids))
+            continue
+        normalized.append(message)
+    return normalized
 
 
 def _default_input_schema() -> dict[str, Any]:
