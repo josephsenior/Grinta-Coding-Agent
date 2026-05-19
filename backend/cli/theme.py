@@ -93,7 +93,7 @@ def _apply_theme_overrides() -> None:
     global STYLE_DELEGATE_STARTING, STYLE_DELEGATE_RUNNING
     global STYLE_DELEGATE_DONE, STYLE_DELEGATE_FAILED
     global CLR_SPINNER, CLR_ACTION, CLR_DRAFT_BORDER, CLR_DECISION_BORDER
-    global CLR_USER_BORDER, CLR_STATE_RUNNING
+    global CLR_USER_BORDER, CLR_USER_BG, CLR_STATE_RUNNING
     global CLR_AUTONOMY_BALANCED, CLR_AUTONOMY_FULL, CLR_AUTONOMY_CONSERVATIVE
     global CLR_QUESTION_TEXT, CLR_OPTION_TEXT, CLR_OPTION_RECOMMENDED
     global CLR_OUTPUT_PANEL_BORDER, CLR_OUTPUT_PANEL_TITLE
@@ -136,6 +136,7 @@ def _apply_theme_overrides() -> None:
         CLR_SPLASH_FIGLET = 'bold #b91c1c'
         CLR_SPLASH_LOGO_ACCENT = '#b91c1c'
         STYLE_BOLD_DIM = 'bold #475569'
+        CLR_USER_BG = 'on #f8fafc'
 
     elif preset == 'high-contrast':
         CLR_CARD_BORDER = 'white'
@@ -167,6 +168,7 @@ def _apply_theme_overrides() -> None:
         CLR_SPLASH_FIGLET = 'bold white'
         CLR_SPLASH_LOGO_ACCENT = 'white'
         STYLE_BOLD_DIM = 'bold white'
+        CLR_USER_BG = ''
 
     elif preset == 'ocean':
         CLR_CARD_BORDER = '#4895d6'
@@ -198,6 +200,7 @@ def _apply_theme_overrides() -> None:
         CLR_SPLASH_FIGLET = 'bold #0ea5e9'
         CLR_SPLASH_LOGO_ACCENT = '#0ea5e9'
         STYLE_BOLD_DIM = 'bold #7dd3fc'
+        CLR_USER_BG = 'on #0f1c2e'
 
     elif preset == 'mono':
         CLR_CARD_BORDER = 'bright_black'
@@ -229,6 +232,7 @@ def _apply_theme_overrides() -> None:
         CLR_SPLASH_FIGLET = 'bold white'
         CLR_SPLASH_LOGO_ACCENT = 'white'
         STYLE_BOLD_DIM = 'bold white'
+        CLR_USER_BG = ''
 
     elif preset == 'deep-system-instrumentation':
         # "Deep System Instrumentation" — Dolphie-inspired aesthetic.
@@ -296,6 +300,7 @@ def _apply_theme_overrides() -> None:
         CLR_DRAFT_BORDER = '#91abec'
         CLR_DECISION_BORDER = '#f6ff8f'
         CLR_USER_BORDER = 'dim #91abec'
+        CLR_USER_BG = 'on #131724'
         CLR_STATE_RUNNING = '#91abec bold'
         CLR_AUTONOMY_BALANCED = '#54efae'
         CLR_AUTONOMY_FULL = '#f6ff8f bold'
@@ -483,6 +488,7 @@ CLR_REASONING_SNAP = CLR_THOUGHT_BODY  # legacy alias; keep in sync
 CLR_DRAFT_BORDER = '#91abec'  # draft reply preview border accent (brand blue)
 CLR_DECISION_BORDER = '#f6ff8f'  # approval / question / options accent (lime yellow)
 CLR_USER_BORDER = 'dim #91abec'  # user message panel border (brand blue dim)
+CLR_USER_BG = 'on #131724'  # user message panel background
 CLR_STATE_RUNNING = '#91abec bold'  # running / active state badge (brand blue)
 CLR_AUTONOMY_BALANCED = '#54efae'  # balanced autonomy tag
 CLR_AUTONOMY_FULL = '#f6ff8f bold'  # full autonomy tag (lime yellow)
