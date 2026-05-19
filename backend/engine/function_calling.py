@@ -1665,6 +1665,18 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
     validate_security_risk(arguments, tool_name)
     command, normalized_args = _normalize_symbol_editor_alias(command, dict(arguments))
 
+    # Validate command early so invalid commands get clear errors before param filtering
+    _VALID_SYMBOL_EDITOR_COMMANDS = {
+        'edit_symbol_body', 'edit_symbols', 'rename_symbol', 'find_symbol',
+        'replace_range', 'normalize_indent', 'create_file', 'read_file',
+        'insert_text', 'undo_last_edit', 'multi_edit',
+    }
+    if command not in _VALID_SYMBOL_EDITOR_COMMANDS:
+        raise FunctionCallValidationError(
+            f"Unknown command '{command}' for symbol_editor tool. "
+            f'Valid commands: {sorted(_VALID_SYMBOL_EDITOR_COMMANDS)}'
+        )
+
     # Repair double-escaped content (``\n`` / ``\"``) before it reaches the
     # StructureEditor. Structure-aware commands (replace_range, etc.) build
     # FileEditActions directly and would otherwise bypass the repair applied
