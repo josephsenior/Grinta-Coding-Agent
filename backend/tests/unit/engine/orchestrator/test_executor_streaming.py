@@ -7,6 +7,8 @@ from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock
 
+import pytest
+
 from backend.engine.safety import OrchestratorSafetyManager
 
 
@@ -268,6 +270,130 @@ def test_async_execute_preserves_streamed_reasoning_content(monkeypatch):
         resp.to_dict()['choices'][0]['message']['reasoning_content']
         == 'think one think two'
     )
+
+
+def test_async_execute_does_not_timeout_active_reasoning_stream(
+    monkeypatch, tmp_path
+):
+    """Active reasoning streams are governed by per-chunk stall timeouts."""
+    import backend.engine.function_calling as fc
+    from backend.engine.executor import OrchestratorExecutor
+
+    sys.modules.setdefault('app.engine.function_calling', fc)
+
+    from backend.engine import executor as executor_module
+
+    monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
+    monkeypatch.setenv('APP_LLM_STEP_TIMEOUT_SECONDS', '0.01')
+    monkeypatch.setenv('APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '1')
+    monkeypatch.setenv('APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS', '1')
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: [],
+    )
+
+    async def fake_astream(**kwargs):
+        yield {
+            'id': 'chatcmpl-slow-thinking',
+            'model': 'deepseek-v4-flash',
+            'choices': [
+                {
+                    'delta': {'reasoning_content': 'still thinking'},
+                    'finish_reason': None,
+                }
+            ],
+        }
+        await asyncio.sleep(0.03)
+        yield {
+            'id': 'chatcmpl-slow-thinking',
+            'model': 'deepseek-v4-flash',
+            'choices': [{'delta': {'content': 'done'}, 'finish_reason': None}],
+        }
+        yield {
+            'id': 'chatcmpl-slow-thinking',
+            'model': 'deepseek-v4-flash',
+            'choices': [{'delta': {}, 'finish_reason': 'stop'}],
+        }
+
+    llm = MagicMock()
+    llm.astream = fake_astream
+
+    executor = OrchestratorExecutor(
+        llm=llm,
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    result = asyncio.run(executor.async_execute({'messages': []}, MagicMock()))
+
+    assert result.response is not None
+    assert result.response.content == 'done'
+    assert result.response.reasoning_content == 'still thinking'
+
+
+def test_cancel_step_cancels_active_stream_and_discards_checkpoint(
+    monkeypatch, tmp_path
+):
+    import backend.engine.function_calling as fc
+    from backend.engine.executor import OrchestratorExecutor
+
+    sys.modules.setdefault('app.engine.function_calling', fc)
+
+    from backend.engine import executor as executor_module
+
+    monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
+    monkeypatch.setenv('APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '1')
+    monkeypatch.setenv('APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS', '1')
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: [],
+    )
+
+    async def run_case() -> None:
+        first_chunk_seen = asyncio.Event()
+        stream_closed = asyncio.Event()
+
+        async def fake_astream(**kwargs):
+            try:
+                yield {
+                    'id': 'chatcmpl-cancel',
+                    'model': 'test-model',
+                    'choices': [
+                        {'delta': {'content': 'partial'}, 'finish_reason': None}
+                    ],
+                }
+                first_chunk_seen.set()
+                while True:
+                    await asyncio.sleep(10)
+            finally:
+                stream_closed.set()
+
+        llm = MagicMock()
+        llm.astream = fake_astream
+
+        executor = OrchestratorExecutor(
+            llm=llm,
+            safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+            planner=MagicMock(),
+            mcp_tools_provider=lambda: {},
+        )
+
+        task = asyncio.create_task(
+            executor.async_execute({'messages': []}, MagicMock())
+        )
+        await asyncio.wait_for(first_chunk_seen.wait(), timeout=1)
+
+        executor.cancel_step()
+
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, timeout=1)
+        await asyncio.wait_for(stream_closed.wait(), timeout=1)
+        assert not list(tmp_path.rglob('streaming_wal.json'))
+
+    asyncio.run(run_case())
 
 
 def test_async_execute_accumulates_tool_calls(monkeypatch):

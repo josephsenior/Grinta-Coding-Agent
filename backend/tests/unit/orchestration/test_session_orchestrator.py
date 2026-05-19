@@ -721,6 +721,28 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
             AgentState.STOPPED
         )
 
+    async def test_stop_cancels_active_step_task_and_executor(self):
+        self.ctrl.services.state.set_agent_state = AsyncMock()
+        self.ctrl.services.pending_action.set = MagicMock()
+        executor = MagicMock()
+        self.ctrl.config.agent.executor = executor
+        task_started = asyncio.Event()
+
+        async def slow_step() -> None:
+            task_started.set()
+            await asyncio.sleep(60)
+
+        self.ctrl._step_task = asyncio.create_task(slow_step())
+        await asyncio.wait_for(task_started.wait(), timeout=1)
+
+        await self.ctrl.stop()
+
+        executor.cancel_step.assert_called_once_with()
+        assert self.ctrl._step_task.cancelled()
+        self.ctrl.services.state.set_agent_state.assert_awaited_once_with(
+            AgentState.STOPPED
+        )
+
     async def test_stop_hard_kills_async_runtime_when_available(self):
         self.ctrl.services.state.set_agent_state = AsyncMock()
         self.ctrl.services.pending_action.set = MagicMock()
