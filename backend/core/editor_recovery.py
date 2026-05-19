@@ -71,7 +71,42 @@ def classify_editor_recovery(
             ),
         )
 
-    if 'syntax validation failed' in lower:
+    if 'file hash guard failed' in lower:
+        return EditorRecoveryAdvice(
+            kind='stale_file_context',
+            preferred_tool='text_editor',
+            next_action='read_file',
+            detail=(
+                'The file contents no longer match the last verified read. Re-read the file, '
+                'then retry one smaller edit with fresh context.'
+            ),
+        )
+
+    if 'edit verification failed' in lower:
+        preferred_tool = 'symbol_editor' if (tool_name or '').lower() == 'symbol_editor' else 'text_editor'
+        next_action = 'find_symbol' if preferred_tool == 'symbol_editor' else 'read_file'
+        return EditorRecoveryAdvice(
+            kind='edit_verification_failed',
+            preferred_tool=preferred_tool,
+            next_action=next_action,
+            detail=(
+                'The write completed but verification did not prove the intended change landed cleanly. '
+                'Refresh the file state, then retry once with a smaller, more targeted edit.'
+            ),
+        )
+
+    if 'large existing code file overwrite blocked' in lower:
+        return EditorRecoveryAdvice(
+            kind='full_file_overwrite_blocked',
+            preferred_tool='symbol_editor',
+            next_action='edit_symbol_body',
+            detail=(
+                'Full-file overwrite was blocked on a large existing source file. Prefer a symbol-aware or '
+                'line-range edit, and only use overwrite mode when you intentionally mean to replace the entire file.'
+            ),
+        )
+
+    if 'syntax validation failed' in lower or 'syntax error after edit' in lower:
         preferred_tool = 'symbol_editor' if (tool_name or '').lower() != 'text_editor' else 'text_editor'
         next_action = 'replace_range' if preferred_tool == 'symbol_editor' else 'edit_mode=range'
         return EditorRecoveryAdvice(

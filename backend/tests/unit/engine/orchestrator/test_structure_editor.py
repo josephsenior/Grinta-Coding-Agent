@@ -162,6 +162,19 @@ class TestCreateFile:
         result = editor.create_file(path, content)
         assert result.modified_code == content
 
+    def test_create_file_fails_when_post_write_verification_fails(
+        self, editor, tmp_path, monkeypatch
+    ):
+        path = str(tmp_path / 'verify.py')
+        monkeypatch.setattr(
+            editor,
+            '_verify_disk_content',
+            lambda *_args, **_kwargs: (False, 'Edit verification failed after create_file'),
+        )
+        result = editor.create_file(path, 'x = 1\n')
+        assert result.success is False
+        assert 'verification failed' in result.message.lower()
+
 
 # ---------------------------------------------------------------------------
 # read_file
@@ -365,6 +378,20 @@ class TestReplaceCodeRange:
         f.write_text('x = 1\ny = 2\nz = 3\n')
         editor.replace_code_range(str(f), 1, 1, 'x = 99')
         assert global_undo_manager.has_history(str(f))
+
+    def test_replace_range_fails_when_post_write_verification_fails(
+        self, editor_no_validate, tmp_path, monkeypatch
+    ):
+        f = tmp_path / 'rep_verify.py'
+        f.write_text('a = 1\nb = 2\n', encoding='utf-8')
+        monkeypatch.setattr(
+            editor_no_validate,
+            '_verify_disk_content',
+            lambda *_args, **_kwargs: (False, 'Edit verification failed after replace_range'),
+        )
+        result = editor_no_validate.replace_code_range(str(f), 2, 2, 'b = 99')
+        assert result.success is False
+        assert 'verification failed' in result.message.lower()
 
 
 # ---------------------------------------------------------------------------
