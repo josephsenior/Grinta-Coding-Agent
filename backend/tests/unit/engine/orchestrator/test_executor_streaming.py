@@ -734,11 +734,14 @@ def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_pro
     assert resolved.inspect_recovery().status == 'clean'
 
 
-def test_get_checkpoint_discards_when_no_persisted_control_event_supersedes_wal(
+def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
     monkeypatch, tmp_path
 ):
     from backend.engine.executor import OrchestratorExecutor
-    from backend.engine.streaming_checkpoint import StreamingCheckpoint
+    from backend.engine.streaming_checkpoint import (
+        StreamingCheckpoint,
+        StreamingCheckpointRecoveryError,
+    )
 
     monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
 
@@ -756,16 +759,20 @@ def test_get_checkpoint_discards_when_no_persisted_control_event_supersedes_wal(
     checkpoint = StreamingCheckpoint(str(tmp_path / 'streaming_checkpoints' / 'sid-2'))
     checkpoint.begin({'messages': []}, anchor_event_id=5)
 
-    executor._get_checkpoint(event_stream)
+    with pytest.raises(StreamingCheckpointRecoveryError):
+        executor._get_checkpoint(event_stream)
 
-    # Uncommitted checkpoints are discarded without blocking
+    assert checkpoint._wal_path.exists()
 
 
-def test_get_checkpoint_discards_stale_wal_when_auto_discard_disabled(
+def test_get_checkpoint_blocks_stale_wal_when_auto_discard_disabled(
     monkeypatch, tmp_path
 ):
     from backend.engine.executor import OrchestratorExecutor
-    from backend.engine.streaming_checkpoint import StreamingCheckpoint
+    from backend.engine.streaming_checkpoint import (
+        StreamingCheckpoint,
+        StreamingCheckpointRecoveryError,
+    )
 
     monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
 
@@ -792,10 +799,10 @@ def test_get_checkpoint_discards_stale_wal_when_auto_discard_disabled(
     checkpoint.begin({'messages': []}, anchor_event_id=5)
     _mark_checkpoint_stale(checkpoint)
 
-    executor._get_checkpoint(event_stream)
+    with pytest.raises(StreamingCheckpointRecoveryError):
+        executor._get_checkpoint(event_stream)
 
-    # Stale checkpoints are discarded without blocking
-    assert not checkpoint._wal_path.exists()
+    assert checkpoint._wal_path.exists()
 
 
 def test_get_checkpoint_clears_stale_wal_for_resumed_session_with_persisted_control_event(
@@ -864,11 +871,14 @@ def test_get_checkpoint_clears_stale_wal_for_resumed_session_with_persisted_cont
         resumed_stream.close()
 
 
-def test_get_checkpoint_discards_resumed_session_without_superseding_control_event(
+def test_get_checkpoint_blocks_resumed_session_without_superseding_control_event(
     monkeypatch, tmp_path
 ):
     from backend.engine.executor import OrchestratorExecutor
-    from backend.engine.streaming_checkpoint import StreamingCheckpoint
+    from backend.engine.streaming_checkpoint import (
+        StreamingCheckpoint,
+        StreamingCheckpointRecoveryError,
+    )
     from backend.ledger import EventSource
     from backend.ledger.observation import NullObservation
     from backend.ledger.stream import EventStream
@@ -914,11 +924,10 @@ def test_get_checkpoint_discards_resumed_session_without_superseding_control_eve
             mcp_tools_provider=lambda: {},
         )
 
-        resolved = executor._get_checkpoint(resumed_stream)
+        with pytest.raises(StreamingCheckpointRecoveryError):
+            executor._get_checkpoint(resumed_stream)
 
-        # Uncommitted checkpoints are discarded without blocking
-        assert resolved.inspect_recovery().status == 'clean'
-        assert not checkpoint._wal_path.exists()
+        assert checkpoint._wal_path.exists()
     finally:
         resumed_stream.close()
 
