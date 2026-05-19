@@ -12,6 +12,12 @@ from backend.inference.llm_utils import check_tools
 
 ChatCompletionToolParam = Any
 
+# ── Hybrid XML/Native transport ──────────────────────────────────────────
+# Tools whose primary payload is code are routed through the pseudo-XML
+# transport layer so the code never passes through JSON encoding.  All
+# other tools use native provider function calling for constrained decoding.
+CODE_PAYLOAD_TOOLS: frozenset[str] = frozenset({'symbol_editor', 'text_editor'})
+
 if TYPE_CHECKING:
     from backend.core.contracts.state import State
     from backend.inference.llm import LLM
@@ -106,6 +112,32 @@ class OrchestratorPlanner:
         # Invalidate cached checked-tools when toolset is rebuilt
         self._checked_tools_cache = None
         return tools
+
+    def partition_tools(
+        self, tools: list[ChatCompletionToolParam]
+    ) -> tuple[list[ChatCompletionToolParam], list[ChatCompletionToolParam]]:
+        """Split tools into native (JSON) and XML (raw-text) groups.
+
+        Code-heavy tools are routed through the pseudo-XML transport so that
+        code payloads are carried as raw text between tags — no JSON escaping.
+        All other tools use native provider function calling for the benefits
+        of constrained decoding.
+
+        Returns ``(native_tools, xml_tools)``.
+        """
+        if not self._llm_supports_function_calling():
+            # Non-native models: everything already goes through XML
+            return [], tools
+
+        native: list[ChatCompletionToolParam] = []
+        xml: list[ChatCompletionToolParam] = []
+        for tool in tools:
+            name = (tool.get('function') or {}).get('name', '')
+            if name in CODE_PAYLOAD_TOOLS:
+                xml.append(tool)
+            else:
+                native.append(tool)
+        return native, xml
 
     def _add_core_tools(self, tools: list) -> None:
         self._add_basic_tools(tools)
@@ -310,9 +342,19 @@ class OrchestratorPlanner:
             'stream': True,
         }
 
+        # ── Hybrid tool routing ──────────────────────────────────────
+        # Code-heavy tools (editors) go through pseudo-XML so their code
+        # payloads are raw text — never JSON-encoded.  Everything else
+        # stays on native function calling for constrained decoding.
+        native_tools, xml_tools = self.partition_tools(tools)
+
         if self._llm_supports_function_calling():
-            self._refresh_checked_tools_cache(tools)
+            self._refresh_checked_tools_cache(native_tools)
             params['tools'] = self._checked_tools_cache
+
+        if xml_tools:
+            messages = self._inject_xml_tool_descriptions(messages, xml_tools)
+            params['messages'] = messages
 
         if 'tools' in params and tool_choice and self._llm_supports_tool_choice():
             params['tool_choice'] = tool_choice
@@ -324,6 +366,64 @@ class OrchestratorPlanner:
             )
         }
         return params
+
+    @staticmethod
+    def _inject_xml_tool_descriptions(
+        messages: list, xml_tools: list[ChatCompletionToolParam]
+    ) -> list:
+        """Append pseudo-XML tool format instructions to the system prompt.
+
+        Editor tools are described using the same format that non-native models
+        already use, so the model emits ``<function=symbol_editor>`` blocks
+        with raw-text code payloads instead of JSON-encoded arguments.
+        """
+        from backend.inference.fn_call_converter import (
+            SYSTEM_PROMPT_SUFFIX_TEMPLATE,
+            convert_tools_to_description,
+        )
+
+        formatted = convert_tools_to_description(xml_tools)
+        # Build the suffix but replace the generic "one function at a time"
+        # note with hybrid-specific guidance.
+        suffix = (
+            '\n\n<FILE_EDITING_TOOL_FORMAT>\n'
+            'The following file-editing tools use an XML format for code payloads '
+            'so that code is never JSON-encoded.  When calling these tools, emit '
+            'the XML block shown below in your response text.  Do NOT use the '
+            'standard tool calling format for these tools.\n\n'
+            f'{formatted}\n'
+            'To call a file-editing tool, emit EXACTLY this format in your response text:\n\n'
+            '<function=tool_name>\n'
+            '<parameter=param_name>value</parameter>\n'
+            '<parameter=code_param>\n'
+            'your code here — raw text, no JSON escaping needed\n'
+            '</parameter>\n'
+            '</function>\n\n'
+            'RULES:\n'
+            '- You may include natural-language reasoning BEFORE the <function=...> block.\n'
+            '- Do NOT place any text AFTER the </function> closing tag.\n'
+            '- Code between <parameter> tags is written exactly as it should appear in the file.\n'
+            '- One file-editing call per message.\n'
+            '</FILE_EDITING_TOOL_FORMAT>'
+        )
+
+        msgs = list(messages)
+        for i, msg in enumerate(msgs):
+            if isinstance(msg, dict) and msg.get('role') == 'system':
+                content = msg.get('content', '')
+                if isinstance(content, str):
+                    msgs[i] = {**msg, 'content': content + suffix}
+                    return msgs
+                if isinstance(content, list) and content:
+                    last = content[-1]
+                    if isinstance(last, dict) and last.get('type') == 'text':
+                        content = list(content)
+                        content[-1] = {**last, 'text': last.get('text', '') + suffix}
+                        msgs[i] = {**msg, 'content': content}
+                        return msgs
+        # No system message found — prepend one
+        msgs.insert(0, {'role': 'system', 'content': suffix})
+        return msgs
 
     def _inject_turn_status(self, messages: list, state: State) -> list:
         """Inject a dedicated control/status message for the current turn.

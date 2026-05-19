@@ -272,15 +272,52 @@ def common_response_to_actions(
     create_action_fn: Callable[[Any, dict[str, Any]], Action],
     combine_thought_fn: Callable[[Action, str], Action],
     mcp_tool_names: list[str] | None = None,
+    xml_tool_names: frozenset[str] | None = None,
 ) -> list[Action]:
-    """Common implementation for converting model response to actions."""
+    """Common implementation for converting model response to actions.
+
+    Supports hybrid tool calling: native provider tool_calls for simple
+    tools **plus** pseudo-XML ``<function=...>`` blocks in response content
+    for code-heavy tools (editors).  The ``xml_tool_names`` parameter
+    lists tool names expected via the XML transport.
+
+    A compliance guard rejects native tool calls for code-heavy tools,
+    returning a directive error that tells the model to re-emit using
+    the XML format.
+    """
     validate_response_choices(response)
     assistant_msg = extract_assistant_message(response)
 
-    if tool_calls := getattr(assistant_msg, 'tool_calls', None):
+    native_tool_calls = list(getattr(assistant_msg, 'tool_calls', None) or [])
+
+    # ── Compliance guard ─────────────────────────────────────────────
+    # Reject native tool calls that target code-heavy tools.  These
+    # must use the XML transport so code is never JSON-encoded.
+    if xml_tool_names and native_tool_calls:
+        _enforce_xml_compliance(native_tool_calls, xml_tool_names)
+
+    # ── Parse pseudo-XML tool calls from content text ────────────────
+    xml_tool_calls: list[Any] = []
+    if xml_tool_names:
+        content = getattr(assistant_msg, 'content', None)
+        content_text = _raw_message_content_text(content)
+        xml_tool_calls = _extract_xml_tool_calls_from_content(
+            content_text, xml_tool_names
+        )
+
+    all_tool_calls = native_tool_calls + xml_tool_calls
+
+    if all_tool_calls:
         # Pass mcp_tool_names through tool_call object for the factory function
-        for tc in tool_calls:
-            tc._mcp_tool_names = mcp_tool_names
+        for tc in all_tool_calls:
+            if not hasattr(tc, '_mcp_tool_names'):
+                tc._mcp_tool_names = mcp_tool_names
+            else:
+                tc._mcp_tool_names = mcp_tool_names
+
+        # Replace the tool_calls on the assistant message so
+        # process_tool_calls sees the merged list.
+        assistant_msg.tool_calls = all_tool_calls
 
         actions = process_tool_calls(
             assistant_msg,
@@ -307,6 +344,133 @@ def common_response_to_actions(
 
     set_response_id_for_actions(actions, response)
     return actions
+
+
+def _enforce_xml_compliance(
+    tool_calls: list[Any], xml_tool_names: frozenset[str]
+) -> None:
+    """Reject native tool calls that should use the XML transport.
+
+    Raises :class:`FunctionCallValidationError` with a clear directive
+    telling the model to re-emit the call using the pseudo-XML format.
+    """
+    for tc in tool_calls:
+        fn = getattr(tc, 'function', None)
+        name = getattr(fn, 'name', '') if fn else ''
+        if name in xml_tool_names:
+            raise CoreFunctionCallValidationError(
+                f'[FORMAT_ERROR] Tool `{name}` must use the XML format, not '
+                f'the standard tool calling format.\n'
+                f'[CAUSE] The tool call was sent through JSON function calling, '
+                f'but `{name}` requires the pseudo-XML format so code payloads '
+                f'are not JSON-encoded.\n'
+                f'[ACTION] Re-emit this call using the XML format:\n'
+                f'  <function={name}>\n'
+                f'  <parameter=command>your_command</parameter>\n'
+                f'  <parameter=path>/path/to/file</parameter>\n'
+                f'  <parameter=new_code>\n'
+                f'  your code here — raw text, no escaping\n'
+                f'  </parameter>\n'
+                f'  </function>'
+            )
+
+
+class _SyntheticFunction:
+    """Lightweight stand-in for ``tool_call.function`` on XML-parsed calls."""
+
+    __slots__ = ('name', 'arguments')
+
+    def __init__(self, name: str, arguments: str) -> None:
+        self.name = name
+        self.arguments = arguments
+
+
+class _SyntheticToolCall:
+    """Lightweight stand-in for a native tool_call object."""
+
+    __slots__ = ('id', 'type', 'function', '_mcp_tool_names')
+
+    def __init__(self, call_id: str, name: str, arguments: str) -> None:
+        self.id = call_id
+        self.type = 'function'
+        self.function = _SyntheticFunction(name, arguments)
+        self._mcp_tool_names: list[str] | None = None
+
+
+def _extract_xml_tool_calls_from_content(
+    content_text: str, xml_tool_names: frozenset[str]
+) -> list[Any]:
+    """Parse pseudo-XML ``<function=...>`` blocks from response content.
+
+    Returns a list of :class:`_SyntheticToolCall` objects compatible with
+    the native tool_call interface so they can be processed through the
+    same ``process_tool_calls`` pipeline.
+    """
+    if not content_text or '<function' not in content_text:
+        return []
+
+    from backend.inference.fn_call_converter import (
+        _FN_CLOSE_RE,
+        _FN_OPEN_RE,
+        _iter_parameter_matches,
+    )
+
+    results: list[Any] = []
+    call_counter = 0
+
+    pos = 0
+    while pos < len(content_text):
+        open_m = _FN_OPEN_RE.search(content_text, pos)
+        if open_m is None:
+            break
+
+        fn_name = (open_m.group(1) or '').strip()
+        if fn_name not in xml_tool_names:
+            pos = open_m.end(0)
+            continue
+
+        close_m = _FN_CLOSE_RE.search(content_text, open_m.end(0))
+        if close_m is None:
+            logger.warning(
+                'Unclosed <function=%s> block in response content', fn_name
+            )
+            break
+
+        fn_body = content_text[open_m.end(0) : close_m.start(0)]
+
+        # Extract parameters as raw text — the key advantage of XML transport
+        try:
+            params: dict[str, Any] = {}
+            for pm in _iter_parameter_matches(fn_body):
+                param_name = pm.group(1)
+                param_value = pm.group(2)
+                # Strip exactly one leading/trailing newline from multiline
+                # values (the XML format adds them for readability).
+                if param_value.startswith('\n'):
+                    param_value = param_value[1:]
+                if param_value.endswith('\n'):
+                    param_value = param_value[:-1]
+                params[param_name] = param_value
+        except Exception as e:
+            logger.warning(
+                'Failed to parse parameters for <function=%s>: %s',
+                fn_name,
+                e,
+            )
+            pos = close_m.end(0)
+            continue
+
+        call_id = f'xml_toolu_{call_counter:02d}'
+        call_counter += 1
+
+        # Package as JSON arguments string for compatibility with
+        # parse_tool_call_arguments downstream.
+        arguments_json = json.dumps(params, ensure_ascii=False)
+        results.append(_SyntheticToolCall(call_id, fn_name, arguments_json))
+
+        pos = close_m.end(0)
+
+    return results
 
 
 def create_tool_definition(
