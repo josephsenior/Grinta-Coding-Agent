@@ -300,7 +300,7 @@ def _apply_theme_overrides() -> None:
         CLR_DRAFT_BORDER = '#91abec'
         CLR_DECISION_BORDER = '#f6ff8f'
         CLR_USER_BORDER = 'dim #91abec'
-        CLR_USER_BG = 'on #131724'
+        CLR_USER_BG = 'on #111b29'
         CLR_STATE_RUNNING = '#91abec bold'
         CLR_AUTONOMY_BALANCED = '#54efae'
         CLR_AUTONOMY_FULL = '#f6ff8f bold'
