@@ -291,7 +291,7 @@ class ExampleStepBuilder:
     def _add_file_edit_step(self) -> None:
         """Add file edit step based on available editors."""
         if 'text_editor' in self.available_tools:
-            self.example += TOOL_EXAMPLES['text_editor']['edit_file']
+            self.example += TOOL_EXAMPLES['text_editor']['edit_range']
 
     def _add_server_rerun_step(self) -> None:
         """Add server rerun step if terminal command tool is available."""
