@@ -529,6 +529,33 @@ def _apply_text_multi_edit_operation(
         )
 
 
+def _sort_multi_edit_bottom_to_top(
+    staged_items: list[tuple[str, str, dict[str, Any]]],
+) -> list[tuple[str, str, dict[str, Any]]]:
+    """Sort multi-edit items so that range edits are applied bottom-to-top.
+
+    For each file, range edits (those with ``start_line``) are sorted in
+    descending order so that edits at the bottom of the file are applied
+    first.  This prevents earlier edits from shifting the line coordinates
+    of later edits.
+
+    Non-range operations (``create_file``) use a high sentinel value so
+    they sort before range edits for the same file (they set up the file
+    content that subsequent edits modify).
+    """
+    _SENTINEL = float('inf')
+
+    def _sort_key(entry: tuple[str, str, dict[str, Any]]) -> tuple[str, float]:
+        item_path, _command, item = entry
+        start_line = item.get('start_line')
+        if start_line is not None:
+            return (item_path, -int(start_line))
+        # create_file / insert_text: put first for their file
+        return (item_path, -_SENTINEL)
+
+    return sorted(staged_items, key=_sort_key)
+
+
 def _handle_text_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
     raw_edits = arguments.get('file_edits')
     if not isinstance(raw_edits, list) or not raw_edits:
@@ -575,6 +602,16 @@ def _handle_text_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
                 temp_root = Path(temp_root_str)
                 temp_editor = FileEditor(workspace_root=str(temp_root))
                 temp_paths: dict[str, Path] = {}
+
+                # ── Bottom-to-top batch sort ─────────────────────────
+                # Sort range edits in descending start_line order per file
+                # so that edits at the bottom are applied first.  This
+                # prevents earlier edits from shifting the line numbers
+                # of later edits.  Non-range operations (create_file,
+                # insert_text) use a high sentinel so they sort first
+                # (before any range edits for the same file).
+                staged_items = _sort_multi_edit_bottom_to_top(staged_items)
+
                 for item_path, command, item in staged_items:
                     real_path = Path(item_path)
                     rel_path = _multi_edit_relative_path(item_path, workspace_root)
@@ -1739,7 +1776,13 @@ def response_to_actions(
     mcp_tool_names: list[str] | None = None,
     mcp_tools: dict[str, Any] | None = None,
 ) -> list[Action]:
-    """Convert LLM response to agent actions."""
+    """Convert LLM response to agent actions.
+
+    Uses hybrid tool routing: code-heavy tools (editors) are parsed from
+    pseudo-XML blocks in the response content text, while all other tools
+    use native provider tool calls.
+    """
+    from backend.engine.planner import CODE_PAYLOAD_TOOLS
 
     def process_with_mcp_tools(tc: Any, args: dict[str, Any]) -> Action:
         return _process_single_tool_call(tc, args)
@@ -1749,6 +1792,7 @@ def response_to_actions(
         create_action_fn=process_with_mcp_tools,
         combine_thought_fn=combine_thought,
         mcp_tool_names=mcp_tool_names,
+        xml_tool_names=CODE_PAYLOAD_TOOLS,
     )
 
 
