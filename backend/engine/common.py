@@ -369,9 +369,14 @@ def _enforce_xml_compliance(
                 f'  <parameter=command>your_command</parameter>\n'
                 f'  <parameter=path>/path/to/file</parameter>\n'
                 f'  <parameter=new_code>\n'
-                f'  your code here — raw text, no escaping\n'
+                f'  your code here \u2014 raw text, no escaping\n'
                 f'  </parameter>\n'
-                f'  </function>'
+                f'  </function>\n'
+                f'[FORMAT] Type rules for XML parameters:\n'
+                f'  - Integer params (start_line, end_line, insert_line): bare numbers (e.g. 7)\n'
+                f'  - Array params (view_range, file_edits, edits): JSON arrays (e.g. [1, 10])\n'
+                f'  - Boolean params (overwrite_existing): true or false (lowercase)\n'
+                f'  - String params (file_text, new_str, new_code, new_body): raw text between tags\n'
             )
 
 
@@ -395,6 +400,27 @@ class _SyntheticToolCall:
         self.type = 'function'
         self.function = _SyntheticFunction(name, arguments)
         self._mcp_tool_names: list[str] | None = None
+
+
+def _get_tool_definition_by_name(tool_name: str) -> dict | None:
+    """Look up the tool definition for a given tool name.
+
+    Returns the tool dict (with 'function.parameters' schema) or None if not found.
+    """
+    from backend.engine.tools.symbol_editor_tool import create_symbol_editor_tool
+    from backend.engine.tools.text_editor import create_text_editor_tool
+
+    tool_creators = {
+        'text_editor': create_text_editor_tool,
+        'symbol_editor': create_symbol_editor_tool,
+    }
+    creator = tool_creators.get(tool_name)
+    if creator is None:
+        return None
+    try:
+        return creator()
+    except Exception:
+        return None
 
 
 def _extract_xml_tool_calls_from_content(
@@ -442,19 +468,37 @@ def _extract_xml_tool_calls_from_content(
             end_pos = close_m.end(0)
             is_unclosed = False
 
-        # Extract parameters as raw text — the key advantage of XML transport
+        # Extract parameters with schema-aware type coercion and validation
         try:
-            params: dict[str, Any] = {}
-            for pm in _iter_parameter_matches(fn_body):
-                param_name = pm.group(1)
-                param_value = pm.group(2)
-                # Strip exactly one leading/trailing newline from multiline
-                # values (the XML format adds them for readability).
-                if param_value.startswith('\n'):
-                    param_value = param_value[1:]
-                if param_value.endswith('\n'):
-                    param_value = param_value[:-1]
-                params[param_name] = param_value
+            from backend.inference.fn_call_converter import (
+                _extract_and_validate_params as _validate_xml_params,
+            )
+
+            # Look up the tool definition for schema-aware validation
+            tool_def = _get_tool_definition_by_name(fn_name)
+            param_matches = list(_iter_parameter_matches(fn_body))
+
+            if tool_def is not None and param_matches:
+                # Use strict validation: type coercion, enum checks, required params
+                params = _validate_xml_params(tool_def, param_matches, fn_name)
+                # Strip newlines from string values (XML format adds them)
+                for k, v in params.items():
+                    if isinstance(v, str):
+                        if v.startswith(chr(10)):
+                            params[k] = v[1:]
+                        if params[k].endswith(chr(10)):
+                            params[k] = params[k][:-1]
+            else:
+                # Fallback: raw string extraction for unknown tools
+                params = {}
+                for pm in param_matches:
+                    pn = pm.group(1)
+                    pv = pm.group(2)
+                    if pv.startswith(chr(10)):
+                        pv = pv[1:]
+                    if pv.endswith(chr(10)):
+                        pv = pv[:-1]
+                    params[pn] = pv
 
             if is_unclosed:
                 params["__xml_syntax_error__"] = "Unclosed <function> tag. Use </function> to close."

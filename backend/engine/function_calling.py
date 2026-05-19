@@ -346,6 +346,28 @@ def _filter_valid_editor_kwargs(other_kwargs: Mapping[str, Any]) -> dict[str, An
     return valid_kwargs_for_editor
 
 
+def _filter_valid_symbol_editor_kwargs(other_kwargs: Mapping[str, Any]) -> dict[str, Any]:
+    """Filter and validate kwargs for symbol editor."""
+    symbol_editor_tool = create_symbol_editor_tool()
+    valid_params = set(
+        cast(dict[str, Any], symbol_editor_tool.get('function', {}).get('parameters', {}))
+        .get('properties', {})
+        .keys()
+    )
+    valid_kwargs: dict[str, Any] = {}
+    tool_name = cast(str, symbol_editor_tool.get('function', {}).get('name', ''))
+
+    for key, value in other_kwargs.items():
+        if key not in valid_params:
+            msg = f'Unexpected argument {key} in tool call {tool_name}. Allowed arguments are: {valid_params}'
+            raise FunctionCallValidationError(
+                msg,
+            )
+        if key != 'security_risk':
+            valid_kwargs[key] = value
+    return valid_kwargs
+
+
 def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle text_editor tool call."""
     command = cast(str, arguments.get('command', ''))
@@ -484,7 +506,7 @@ def _apply_text_multi_edit_operation(
             command='create_file',
             path=rel_path,
             file_text=file_text,
-            overwrite_existing=bool(item.get('overwrite_existing', False)),
+            overwrite_existing=parse_bool_argument(item.get('overwrite_existing', False)),
         )
     elif command == 'insert_text':
         new_str = item.get('new_str')
@@ -1642,6 +1664,10 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
     command, path = _validate_symbol_editor_args(dict(arguments), tool_name)
     validate_security_risk(arguments, tool_name)
     command, normalized_args = _normalize_symbol_editor_alias(command, dict(arguments))
+
+    # Filter out unknown parameters using the schema whitelist
+    filtered_kwargs = {k: v for k, v in normalized_args.items() if k not in ('command', 'path', 'security_risk')}
+    normalized_args = {'command': command, 'path': path, **_filter_valid_symbol_editor_kwargs(filtered_kwargs)}
 
     # Repair double-escaped content (``\n`` / ``\"``) before it reaches the
     # StructureEditor. Structure-aware commands (replace_range, etc.) build
