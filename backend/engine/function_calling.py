@@ -1692,8 +1692,12 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
         )
 
     # Filter out unknown parameters using the schema whitelist
-    filtered_kwargs = {k: v for k, v in normalized_args.items() if k not in ('command', 'path', 'security_risk')}
-    normalized_args = {'command': command, 'path': path, **_filter_valid_symbol_editor_kwargs(filtered_kwargs)}
+    filtered_kwargs = {k: v for k, v in normalized_args.items() if k not in ('command', 'path')}
+    filtered = _filter_valid_symbol_editor_kwargs(filtered_kwargs)
+    # Preserve security_risk for downstream handlers
+    if 'security_risk' in normalized_args:
+        filtered['security_risk'] = normalized_args['security_risk']
+    normalized_args = {'command': command, 'path': path, **filtered}
 
     bridged = _symbol_editor_bridge_to_text_editor(command, path, normalized_args)
     if bridged is not None:
