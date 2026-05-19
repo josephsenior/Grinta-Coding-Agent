@@ -31,6 +31,10 @@ class ToolResult:
     error: str | None = None
     old_content: str | None = None
     new_content: str | None = None
+    error_code: str | None = None
+    retryable: bool = False
+    operation: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 def _find_changed_ranges(
@@ -252,6 +256,33 @@ _GLOBAL_UNDO_HISTORY: dict[str, deque[str | None]] = defaultdict(
 )
 _GLOBAL_FILE_LOCKS: dict[str, threading.RLock] = {}
 _GLOBAL_FILE_LOCKS_GUARD = threading.Lock()
+_LARGE_CODE_OVERWRITE_LINE_THRESHOLD = 200
+_CODE_FILE_SUFFIXES = frozenset(
+    {
+        '.py',
+        '.pyi',
+        '.js',
+        '.jsx',
+        '.ts',
+        '.tsx',
+        '.go',
+        '.rs',
+        '.java',
+        '.kt',
+        '.kts',
+        '.c',
+        '.cc',
+        '.cpp',
+        '.cxx',
+        '.h',
+        '.hpp',
+        '.cs',
+        '.php',
+        '.rb',
+        '.swift',
+        '.scala',
+    }
+)
 
 
 def _canonical_lock_key(file_path: Path) -> str:
@@ -389,6 +420,7 @@ class FileEditor(FileEditorEditOpsMixin):
         patch_text: str | None = None,
         expected_hash: str | None = None,
         expected_file_hash: str | None = None,
+        overwrite_existing: bool = False,
         **_: Any,
     ) -> ToolResult:
         """Execute a file editor command.
@@ -457,6 +489,7 @@ class FileEditor(FileEditorEditOpsMixin):
                     patch_text=patch_text,
                     expected_hash=expected_hash,
                     expected_file_hash=expected_file_hash,
+                    overwrite_existing=overwrite_existing,
                 )
 
         except PathValidationError as e:
@@ -490,6 +523,7 @@ class FileEditor(FileEditorEditOpsMixin):
         patch_text: str | None,
         expected_hash: str | None,
         expected_file_hash: str | None,
+        overwrite_existing: bool,
     ) -> ToolResult:
         """Dispatch a validated editor command while the target file lock is held."""
         try:
@@ -531,6 +565,7 @@ class FileEditor(FileEditorEditOpsMixin):
                     content,
                     is_create=(command == 'create_file'),
                     dry_run=dry_run,
+                    overwrite_existing=overwrite_existing,
                 )
 
             raise ToolError(f'Unknown command: {command}')
@@ -884,6 +919,17 @@ class FileEditor(FileEditorEditOpsMixin):
             new_content=new_content,
         )
 
+    def _is_large_existing_code_file(
+        self, file_path: Path, old_content: str | None
+    ) -> bool:
+        if old_content is None:
+            return False
+        if file_path.suffix.lower() not in _CODE_FILE_SUFFIXES:
+            return False
+        return old_content.count('\n') + (1 if old_content else 0) >= (
+            _LARGE_CODE_OVERWRITE_LINE_THRESHOLD
+        )
+
     def _handle_write_maybe_short_circuit(
         self,
         *,
@@ -893,6 +939,7 @@ class FileEditor(FileEditorEditOpsMixin):
         file_existed: bool,
         is_create: bool,
         dry_run: bool,
+        overwrite_existing: bool,
     ) -> ToolResult | None:
         """Early exits before validation / disk write."""
         # create_file now overwrites existing files (was changed from silent-success behavior).
@@ -908,6 +955,30 @@ class FileEditor(FileEditorEditOpsMixin):
                 output='No changes applied (content unchanged).',
                 old_content=old_content,
                 new_content=content,
+                operation='write_noop',
+            )
+        if (
+            is_create
+            and file_existed
+            and not overwrite_existing
+            and self._is_large_existing_code_file(file_path, old_content)
+        ):
+            return ToolResult(
+                output='',
+                error=(
+                    'Large existing code file overwrite blocked. '
+                    'Use symbol_editor or text_editor edit_mode=range for incremental changes, '
+                    'or retry create_file with overwrite_existing=true if you intentionally want a full rewrite.'
+                ),
+                old_content=old_content,
+                new_content=content,
+                error_code='FULL_FILE_OVERWRITE_REQUIRES_EXPLICIT_CONFIRMATION',
+                retryable=False,
+                operation='create_file',
+                metadata={
+                    'requires_explicit_overwrite': True,
+                    'line_threshold': _LARGE_CODE_OVERWRITE_LINE_THRESHOLD,
+                },
             )
         return None
 
@@ -928,6 +999,9 @@ class FileEditor(FileEditorEditOpsMixin):
                 error=f'Syntax validation failed: {msg}',
                 old_content=old_content,
                 new_content=content,
+                error_code='SYNTAX_VALIDATION_FAILED',
+                retryable=True,
+                operation='write_validate',
             )
         soft_warning = msg if msg and msg.startswith('WARNING:') else ''
 
@@ -963,6 +1037,7 @@ class FileEditor(FileEditorEditOpsMixin):
             output=output_msg,
             old_content=old_content,
             new_content=content,
+            operation='create_file' if is_create else 'write',
         )
 
     def _detect_stale_disk_on_write(
@@ -986,6 +1061,9 @@ class FileEditor(FileEditorEditOpsMixin):
             ),
             old_content=old_content,
             new_content=new_content,
+            error_code='FILE_UNEXPECTEDLY_MODIFIED',
+            retryable=True,
+            operation='write_guard',
         )
 
     def _handle_write(
@@ -995,6 +1073,7 @@ class FileEditor(FileEditorEditOpsMixin):
         is_create: bool = False,
         *,
         dry_run: bool = False,
+        overwrite_existing: bool = False,
     ) -> ToolResult:
         """Handle write command - write new file content.
 
@@ -1017,6 +1096,7 @@ class FileEditor(FileEditorEditOpsMixin):
                 file_existed=file_existed,
                 is_create=is_create,
                 dry_run=dry_run,
+                overwrite_existing=overwrite_existing,
             )
             if short is not None:
                 return short

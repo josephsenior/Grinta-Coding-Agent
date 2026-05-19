@@ -61,11 +61,17 @@ def execute_file_editor(
     patch_text: str | None = None,
     expected_hash: str | None = None,
     expected_file_hash: str | None = None,
-) -> tuple[str, tuple[str | None, str | None]]:
+    overwrite_existing: bool = False,
+) -> tuple[str, tuple[str | None, str | None], dict[str, Any]]:
     """Execute file editor command and handle exceptions."""
     insert_line, error_msg = _parse_insert_line(insert_line)
     if error_msg:
-        return error_msg, (None, None)
+        return error_msg, (None, None), {
+            'tool': 'text_editor',
+            'ok': False,
+            'error_code': 'INVALID_INSERT_LINE',
+            'retryable': False,
+        }
 
     result = _invoke_editor(
         editor,
@@ -92,6 +98,7 @@ def execute_file_editor(
         patch_text=patch_text,
         expected_hash=expected_hash,
         expected_file_hash=expected_file_hash,
+        overwrite_existing=overwrite_existing,
     )
 
     if result.error:
@@ -101,12 +108,37 @@ def execute_file_editor(
             tool_name='text_editor',
             content=file_text or new_str or section_content or patch_text,
         )
-        return f'ERROR:\n{enriched_error}', (None, None)
+        return (
+            f'ERROR:\n{enriched_error}',
+            (None, None),
+            {
+                'tool': 'text_editor',
+                'ok': False,
+                'error_code': result.error_code or 'EDITOR_ERROR',
+                'retryable': result.retryable,
+                'operation': result.operation or command,
+                'payload': result.metadata or {},
+            },
+        )
     if not result.output:
         logger.warning('No output from file_editor for %s', path)
-        return '', (None, None)
+        return '', (None, None), {
+            'tool': 'text_editor',
+            'ok': True,
+            'error_code': None,
+            'retryable': False,
+            'operation': result.operation or command,
+            'payload': result.metadata or {},
+        }
 
-    return result.output, (result.old_content, result.new_content)
+    return result.output, (result.old_content, result.new_content), {
+        'tool': 'text_editor',
+        'ok': True,
+        'error_code': None,
+        'retryable': False,
+        'operation': result.operation or command,
+        'payload': result.metadata or {},
+    }
 
 
 def _parse_insert_line(insert_line: int | str | None) -> tuple[int | None, str | None]:
@@ -148,6 +180,7 @@ def _invoke_editor(
     patch_text: str | None = None,
     expected_hash: str | None = None,
     expected_file_hash: str | None = None,
+    overwrite_existing: bool = False,
 ) -> Any:
     """Safely invoke the editor with MISSING sentinels."""
     from backend.core.type_safety.sentinels import MISSING
@@ -178,6 +211,7 @@ def _invoke_editor(
             patch_text=patch_text,
             expected_hash=expected_hash,
             expected_file_hash=expected_file_hash,
+            overwrite_existing=overwrite_existing,
         )
     except ToolError as e:
         return ToolResult(output='', error=str(e))

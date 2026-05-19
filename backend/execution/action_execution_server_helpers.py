@@ -636,15 +636,17 @@ def resolve_path(executor: Any, path: str, working_dir: str) -> str:
 def handle_aci_file_read(executor: Any, action: Any) -> Any:
     from backend.execution.file_operations import execute_file_editor
 
-    result_str, _ = execute_file_editor(
+    result_str, _, _tool_result = execute_file_editor(
         executor.file_editor,
         command='read_file',
         path=action.path,
         view_range=action.view_range,
     )
-    return FileReadObservation(
+    obs = FileReadObservation(
         content=result_str, path=action.path, impl_source=FileReadSource.FILE_EDITOR
     )
+    obs.tool_result = _tool_result
+    return obs
 
 
 def edit_try_directory_view(
@@ -677,7 +679,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
     edit_mode = getattr(action, 'edit_mode', None) or ''
     is_range_edit = edit_mode.strip().lower() == 'range'
 
-    result_str, (old_content, new_content) = execute_file_editor(
+    result_str, (old_content, new_content), tool_result = execute_file_editor(
         executor.file_editor,
         command=command,
         path=action.path,
@@ -701,9 +703,12 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         patch_text=getattr(action, 'patch_text', None),
         expected_hash=getattr(action, 'expected_hash', None),
         expected_file_hash=getattr(action, 'expected_file_hash', None),
+        overwrite_existing=getattr(action, 'overwrite_existing', False),
     )
     if result_str.startswith('ERROR:'):
-        return ErrorObservation(result_str)
+        obs = ErrorObservation(result_str)
+        obs.tool_result = tool_result
+        return obs
 
     # Compute SHA-256 hash of new_content for verification
     new_content_hash = None
@@ -726,7 +731,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         except Exception:
             pass
 
-    return FileEditObservation(
+    obs = FileEditObservation(
         content=result_str,
         path=action.path,
         prev_exist=old_content is not None,
@@ -735,6 +740,8 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         impl_source=FileEditSource.FILE_EDITOR,
         new_content_hash=new_content_hash,
     )
+    obs.tool_result = tool_result
+    return obs
 
 
 def is_auto_lint_enabled(executor: Any) -> bool:

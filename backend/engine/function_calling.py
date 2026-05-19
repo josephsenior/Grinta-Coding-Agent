@@ -302,6 +302,8 @@ def _validate_text_editor_args(arguments: Mapping[str, Any]) -> tuple[str, str]:
     """Validate required arguments for text_editor tool."""
     tool_name = cast(str, create_text_editor_tool().get('function', {}).get('name', ''))
     command = require_tool_argument(arguments, 'command', tool_name)
+    if str(command).strip().lower() == 'multi_edit':
+        return '', str(command)
     path = arguments.get('path')
     if not path:
         msg = f'Missing required argument "path" in tool call {tool_name}'
@@ -373,12 +375,15 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
         'insert_text',
         'undo_last_edit',
         'edit',
+        'multi_edit',
     }
     if command not in valid_commands:
         raise FunctionCallValidationError(
             f"Unknown command '{command}' for text_editor tool. "
             f'Valid commands: {sorted(valid_commands)}'
         )
+    if command == 'multi_edit':
+        return _handle_text_editor_multi_edit(arguments)
     # Handle 'edit' command - requires edit_mode parameter
     if command == 'edit':
         edit_mode = normalized_args.get('edit_mode')
@@ -439,6 +444,214 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
     )
     set_security_risk(action, arguments)
     return action
+
+
+def _parse_text_multi_edit_item(
+    raw_item: Mapping[str, Any], idx: int
+) -> tuple[str, str, dict[str, Any]]:
+    item_path = raw_item.get('path')
+    if not isinstance(item_path, str) or not item_path.strip():
+        raise FunctionCallValidationError(
+            f"text_editor multi_edit item {idx} is missing required 'path'."
+        )
+    command = str(raw_item.get('command') or '').strip().lower()
+    if command not in {'create_file', 'insert_text', 'edit'}:
+        raise FunctionCallValidationError(
+            f"text_editor multi_edit item {idx} has unsupported command {command!r}."
+        )
+    item = dict(raw_item)
+    if command == 'edit' and str(item.get('edit_mode') or '').strip().lower() != 'range':
+        raise FunctionCallValidationError(
+            f"text_editor multi_edit item {idx}: command='edit' only supports edit_mode='range'."
+        )
+    return item_path.strip(), command, item
+
+
+def _apply_text_multi_edit_operation(
+    *,
+    temp_editor: Any,
+    rel_path: str,
+    command: str,
+    item: dict[str, Any],
+) -> None:
+    if command == 'create_file':
+        file_text = item.get('file_text')
+        if not isinstance(file_text, str):
+            raise FunctionCallValidationError(
+                "text_editor multi_edit create_file requires 'file_text'."
+            )
+        result = temp_editor(
+            command='create_file',
+            path=rel_path,
+            file_text=file_text,
+            overwrite_existing=bool(item.get('overwrite_existing', False)),
+        )
+    elif command == 'insert_text':
+        new_str = item.get('new_str')
+        insert_line = item.get('insert_line')
+        if not isinstance(new_str, str) or insert_line is None:
+            raise FunctionCallValidationError(
+                "text_editor multi_edit insert_text requires 'new_str' and 'insert_line'."
+            )
+        result = temp_editor(
+            command='insert_text',
+            path=rel_path,
+            new_str=new_str,
+            insert_line=int(insert_line),
+        )
+    else:
+        new_str = item.get('new_str')
+        start_line = item.get('start_line')
+        end_line = item.get('end_line')
+        if not isinstance(new_str, str) or start_line is None or end_line is None:
+            raise FunctionCallValidationError(
+                "text_editor multi_edit edit/range requires 'start_line', 'end_line', and 'new_str'."
+            )
+        result = temp_editor(
+            command='edit',
+            path=rel_path,
+            edit_mode='range',
+            start_line=int(start_line),
+            end_line=int(end_line),
+            new_str=new_str,
+            expected_file_hash=item.get('expected_file_hash'),
+        )
+    if result.error:
+        from backend.core.errors import ToolExecutionError
+
+        raise ToolExecutionError(
+            append_editor_recovery_guidance(
+                f'text_editor multi_edit failed for {rel_path}: {result.error}',
+                path=rel_path,
+                tool_name='text_editor',
+                content=cast(str | None, item.get('file_text') or item.get('new_str')),
+            )
+        )
+
+
+def _handle_text_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
+    raw_edits = arguments.get('file_edits')
+    if not isinstance(raw_edits, list) or not raw_edits:
+        raise FunctionCallValidationError(
+            "text_editor multi_edit requires a non-empty 'file_edits' array."
+        )
+    if len(raw_edits) > _MAX_MULTI_EDIT_FILES:
+        raise FunctionCallValidationError(
+            f'text_editor multi_edit supports at most {_MAX_MULTI_EDIT_FILES} items per call.'
+        )
+
+    parsed: list[tuple[str, str, str]] = []
+    staged_items: list[tuple[str, str, dict[str, Any]]] = []
+    for idx, raw_item in enumerate(raw_edits):
+        if not isinstance(raw_item, Mapping):
+            raise FunctionCallValidationError(
+                f'text_editor multi_edit item {idx} must be an object.'
+            )
+        item_path, command, item = _parse_text_multi_edit_item(raw_item, idx)
+        canonical_path, display_path = _resolve_multi_edit_path(item_path, idx)
+        parsed.append((canonical_path, display_path, command))
+        staged_items.append((canonical_path, command, item))
+
+    try:
+        from backend.core.workspace_resolution import require_effective_workspace_root
+        from backend.engine.tools.atomic_refactor import AtomicRefactor
+        from backend.execution.utils.file_editor import FileEditor, _file_lock_for_path
+    except Exception as e:  # pragma: no cover
+        from backend.core.errors import ToolExecutionError
+
+        raise ToolExecutionError(f'text_editor multi_edit unavailable: {e}') from e
+
+    workspace_root = require_effective_workspace_root()
+    refactor = AtomicRefactor()
+    transaction = refactor.begin_transaction()
+    seen_paths = sorted({item_path for item_path, _cmd, _item in staged_items})
+    final_contents: dict[str, str] = {}
+    original_snapshots: dict[str, str | None] = {}
+    try:
+        with ExitStack() as stack:
+            for item_path in seen_paths:
+                stack.enter_context(_file_lock_for_path(Path(item_path)))
+            with tempfile.TemporaryDirectory(prefix='grinta-text-multi-edit-') as temp_root_str:
+                temp_root = Path(temp_root_str)
+                temp_editor = FileEditor(workspace_root=str(temp_root))
+                temp_paths: dict[str, Path] = {}
+                for item_path, command, item in staged_items:
+                    real_path = Path(item_path)
+                    rel_path = _multi_edit_relative_path(item_path, workspace_root)
+                    temp_path = temp_root / rel_path
+                    if item_path not in temp_paths:
+                        temp_paths[item_path] = temp_path
+                        temp_path.parent.mkdir(parents=True, exist_ok=True)
+                        if real_path.exists():
+                            original_snapshots[item_path] = real_path.read_text(
+                                encoding='utf-8'
+                            )
+                            shutil.copyfile(real_path, temp_path)
+                        else:
+                            original_snapshots[item_path] = None
+                    _apply_text_multi_edit_operation(
+                        temp_editor=temp_editor,
+                        rel_path=rel_path,
+                        command=command,
+                        item=item,
+                    )
+                for item_path, temp_path in temp_paths.items():
+                    if not temp_path.exists():
+                        from backend.core.errors import ToolExecutionError
+
+                        raise ToolExecutionError(
+                            f'text_editor multi_edit produced no output for {_multi_edit_relative_path(item_path, workspace_root)}'
+                        )
+                    final_contents[item_path] = temp_path.read_text(encoding='utf-8')
+
+        for item_path, old_content in original_snapshots.items():
+            real_path = Path(item_path)
+            disk_now = real_path.read_text(encoding='utf-8') if real_path.exists() else None
+            if disk_now != old_content:
+                from backend.core.errors import ToolExecutionError
+
+                raise ToolExecutionError(
+                    append_editor_recovery_guidance(
+                        'text_editor multi_edit aborted because the file changed on disk during batch preparation. Re-read and retry.',
+                        path=_multi_edit_relative_path(item_path, workspace_root),
+                        tool_name='text_editor',
+                    )
+                )
+
+        for item_path, final_content in final_contents.items():
+            operation = 'modify' if Path(item_path).exists() else 'create'
+            refactor.add_file_edit(
+                transaction, item_path, final_content, operation=operation
+            )
+        result = refactor.commit(transaction, validate=False)
+    except FunctionCallValidationError:
+        raise
+    except Exception:
+        try:
+            refactor.rollback(transaction)
+        except Exception:
+            pass
+        raise
+
+    if not result.success:
+        from backend.core.errors import ToolExecutionError
+
+        err_lines = '\n'.join(f'  - {e}' for e in (result.errors or [result.message]))
+        raise ToolExecutionError(
+            append_editor_recovery_guidance(
+                f'text_editor multi_edit transaction rolled back — no files modified.\n{err_lines}',
+                tool_name='text_editor',
+            )
+        )
+
+    paths = sorted({display_path for _item_path, display_path, _command in parsed})
+    file_lines = '\n'.join(f'  • {path}' for path in paths)
+    return MessageAction(
+        content=(
+            f'✓ text_editor multi_edit committed {result.files_modified} file(s) atomically\n'
+            f'{file_lines}'
+        )
+    )
 
 
 def _handle_summarize_context_tool(
@@ -1315,6 +1528,7 @@ _SYMBOL_EDITOR_BRIDGE_KEYS = (
     'patch_text',
     'expected_hash',
     'expected_file_hash',
+    'overwrite_existing',
     'security_risk',
 )
 

@@ -113,6 +113,7 @@ class FileEditAction(Action):
     expected_file_hash: str | None = None
     start_line: int | None = None
     end_line: int | None = None
+    overwrite_existing: bool = False
 
     def __repr__(self) -> str:
         """Return a readable summary capturing edit mode and key fields."""
