@@ -22,6 +22,7 @@ _TASK_TRACKER_DESCRIPTION = (
     'Maintain a structured plan to track progress. '
     'Use `update` with a task_list to create or overwrite the plan. '
     'Use `view` (without a task_list) to read the current plan. '
+    'Use `update_status` to change a single task status by ID (no need to re-emit full list). '
     'Statuses: `todo`, `doing`, `done`, `skipped`, `blocked` '
     '(terminal states for finish are done, skipped, blocked).'
 )
@@ -75,6 +76,53 @@ class TaskTracker:
         with open(self.path, 'w', encoding='utf-8') as f:
             json.dump(normalized, f, indent=2, ensure_ascii=False)
 
+    def update_task_status(self, task_id: str, status: str) -> tuple[bool, str]:
+        """Update status of a single task by ID.
+
+        Args:
+            task_id: The ID of the task to update (e.g., '1', '1.1', '2')
+            status: New status value
+
+        Returns:
+            Tuple of (success, message)
+        """
+        valid_statuses = {
+            TASK_STATUS_TODO,
+            TASK_STATUS_DOING,
+            TASK_STATUS_DONE,
+            TASK_STATUS_SKIPPED,
+            TASK_STATUS_BLOCKED,
+        }
+        if status not in valid_statuses:
+            return False, f"Invalid status '{status}'. Valid: {', '.join(sorted(valid_statuses))}"
+
+        task_list = self.load_from_file()
+        if not task_list:
+            return False, 'No tasks found. Create a plan first with update command.'
+
+        task = _find_task_by_id(task_list, task_id)
+        if task is None:
+            return False, f"Task '{task_id}' not found."
+
+        old_status = task.get('status', 'unknown')
+        task['status'] = status
+        self.save_to_file(task_list)
+        return True, f"Task '{task_id}' status updated: {old_status} -> {status}"
+
+
+def _find_task_by_id(task_list: list[dict[str, Any]], task_id: str) -> dict[str, Any] | None:
+    """Find a task by ID in the task list, including nested subtasks."""
+    for task in task_list:
+        if task.get('id') == task_id:
+            return task
+        # Search subtasks recursively
+        subtasks = task.get('subtasks', [])
+        if subtasks:
+            found = _find_task_by_id(subtasks, task_id)
+            if found is not None:
+                return found
+    return None
+
 
 def create_task_tracker_tool() -> ChatCompletionToolParam:
     """Create the task tracker tool for the Orchestrator agent."""
@@ -83,8 +131,8 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
         description=_TASK_TRACKER_DESCRIPTION,
         properties={
             'command': get_command_param(
-                'The command to execute. `view` shows the current plan. `update` overwrites the entire plan with the new list.',
-                ['view', 'update'],
+                'The command to execute. `view` shows the current plan. `update` overwrites the entire plan with the new list. `update_status` changes a single task status by ID.',
+                ['view', 'update', 'update_status'],
             ),
             'task_list': {
                 'type': 'array',
@@ -135,6 +183,21 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
             'title': {
                 'type': 'string',
                 'description': 'Title for the current plan.',
+            },
+            'task_id': {
+                'type': 'string',
+                'description': "For 'update_status': the ID of the task to update (e.g. '1', '1.1', '2').",
+            },
+            'status': {
+                'type': 'string',
+                'description': "For 'update_status': new status value. One of: todo, doing, done, skipped, blocked.",
+                'enum': [
+                    TASK_STATUS_TODO,
+                    TASK_STATUS_DOING,
+                    TASK_STATUS_DONE,
+                    TASK_STATUS_SKIPPED,
+                    TASK_STATUS_BLOCKED,
+                ],
             },
         },
         required=['command'],

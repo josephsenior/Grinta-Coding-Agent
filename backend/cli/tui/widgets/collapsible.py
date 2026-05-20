@@ -127,6 +127,10 @@ class CollapsibleSection(Container):
     CollapsibleSection .collapsible-body.-hidden {
         display: none;
     }
+    CollapsibleSection .thinking-content {
+        color: lightgray;
+        opacity: 0.7;
+    }
     """
 
     can_focus = True
@@ -145,6 +149,7 @@ class CollapsibleSection(Container):
         accent_color: str = '#91abec',
         action_label: str | None = None,
         id: str | None = None,
+        is_thinking: bool = False,
     ) -> None:
         super().__init__(id=id)
         self._section_title = title
@@ -153,6 +158,7 @@ class CollapsibleSection(Container):
         self._accent_color = accent_color
         self._action_label = action_label
         self._items: list[tuple[Any, str]] = []
+        self._is_thinking = is_thinking
 
     @property
     def is_collapsed(self) -> bool:
@@ -176,7 +182,10 @@ class CollapsibleSection(Container):
                 for renderable, item_id in self._items:
                     yield SidebarRow(renderable, item_id)
             else:
-                yield Static(self._content or '', id='empty-text')
+                content_classes = 'empty-text'
+                if self._is_thinking:
+                    content_classes += ' thinking-content'
+                yield Static(self._content or '', id='empty-text', classes=content_classes)
 
     def toggle(self) -> None:
         """Toggle the collapsed state."""

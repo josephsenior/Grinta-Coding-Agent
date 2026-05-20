@@ -786,7 +786,7 @@ def _maybe_noop_task_tracker_action(
 def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle TASK_TRACKER_TOOL tool call."""
     command = require_tool_argument(arguments, 'command', TASK_TRACKER_TOOL_NAME)
-    if command not in {'view', 'update'}:
+    if command not in {'view', 'update', 'update_status'}:
         raise FunctionCallValidationError(
             f'Unsupported command {command!r} for tool call {TASK_TRACKER_TOOL_NAME}'
         )
@@ -794,6 +794,23 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
     if command == 'update' and 'task_list' not in arguments:
         raise FunctionCallValidationError(
             f'Missing required argument "task_list" for "update" command in tool call {TASK_TRACKER_TOOL_NAME}'
+        )
+
+    if command == 'update_status':
+        task_id = require_tool_argument(arguments, 'task_id', TASK_TRACKER_TOOL_NAME)
+        status = require_tool_argument(arguments, 'status', TASK_TRACKER_TOOL_NAME)
+        tracker = TaskTracker()
+        success, message = tracker.update_task_status(task_id, status)
+        if not success:
+            return TaskTrackingAction(
+                command='update_status',
+                task_list=[],
+                thought=f'[TASK_TRACKER] {message}',
+            )
+        return TaskTrackingAction(
+            command='update_status',
+            task_list=[],
+            thought=f'[TASK_TRACKER] {message}',
         )
 
     tracker = TaskTracker()

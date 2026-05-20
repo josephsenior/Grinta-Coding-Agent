@@ -172,8 +172,8 @@ def _strip_ansi(text: str) -> str:
 
 def _render_thinking_with_diff(text: str) -> Text:
     """Render thinking text as plain muted text."""
-    # Using DIM instead of MUTED to make it slightly more visible but still secondary
-    return Text(text or '', style=NAVY_TEXT_DIM)
+    from rich.style import Style
+    return Text(text or '', style=Style(color="lightgray", opacity=0.7))
 
 
 # ── Widget classes ────────────────────────────────────────────────────────
@@ -2560,6 +2560,7 @@ class TUIRenderer:
                     content=content,
                     collapsed=True,
                     accent_color='#5eead4',
+                    is_thinking=True,
                 )
                 display.mount(section)
                 display.scroll_end(animate=False)
