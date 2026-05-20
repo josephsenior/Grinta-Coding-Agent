@@ -192,7 +192,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     enable_swarming: bool = Field(default=False)
     enable_blackboard: bool = Field(default=False)
-    enable_verify_file_lines: bool = Field(default=True)
     enable_meta_cognition: bool = Field(default=True)
     enable_checkpoints: bool = Field(default=True)
     enable_parallel_tool_scheduling: bool = Field(

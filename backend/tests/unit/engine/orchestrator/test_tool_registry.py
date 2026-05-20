@@ -14,12 +14,9 @@ def _make_config(**kwargs):
     # Enable most tools by default so the toolset is representative.
     cfg.enable_finish = True
     cfg.enable_editor = True
-    cfg.enable_run_tests = True
-    cfg.enable_apply_patch = True
     cfg.enable_task_tracker_tool = True
     cfg.enable_checkpoints = True
     cfg.enable_working_memory = True
-    cfg.enable_verify_file_lines = True
     cfg.enable_browsing = True
     cfg.enable_debugger = True
     cfg.mcp.servers = []
