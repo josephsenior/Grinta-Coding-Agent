@@ -159,24 +159,25 @@ class ActivityCard(Container):
     def _get_formatted_extra_content(self) -> Any:
         from typing import Any
         from rich.syntax import Syntax
+        from backend.cli.theme import get_grinta_pygments_style
         content = self._extra_content or ""
 
         # Check if it looks like a unified diff (git diff style)
         if content.startswith('--- ') or content.startswith('diff --git') or '\n+ ' in content or '\n- ' in content:
-            return Syntax(content, "diff", theme="monokai", background_color="#0a1224")
+            return Syntax(content, "diff", theme=get_grinta_pygments_style(), background_color="#0a1224", line_numbers=True)
 
         # Check if it is JSON
         if (content.startswith('{') and content.endswith('}')) or (content.startswith('[') and content.endswith(']')):
             try:
                 import json
                 json.loads(content)
-                return Syntax(content, "json", theme="monokai", background_color="#0a1224")
+                return Syntax(content, "json", theme=get_grinta_pygments_style(), background_color="#0a1224")
             except Exception:
                 pass
 
         # Check if it is Python code
         if "def " in content or "class " in content or "import " in content:
-            return Syntax(content, "python", theme="monokai", background_color="#0a1224")
+            return Syntax(content, "python", theme=get_grinta_pygments_style(), background_color="#0a1224")
 
         return content
 

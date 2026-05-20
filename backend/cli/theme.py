@@ -727,3 +727,131 @@ def _prompt_toolkit_style_dict_no_color() -> dict[str, str]:
         'scrollbar.background': 'dim',
         'scrollbar.button': 'bold',
     }
+
+
+# ── Custom Pygments theme for syntax highlighting ─────────────────────────────
+
+def _build_grinta_pygments_style() -> type:
+    """Build a custom Pygments Style class using Grinta theme colors."""
+    from pygments.style import Style
+    from pygments.token import (
+        Comment, Error, Generic, Keyword, Literal, Name, Number,
+        Operator, Other, Punctuation, String, Text, Whitespace,
+    )
+
+    class GrintaStyle(Style):
+        """Pygments style matching Grinta's visual theme."""
+
+        background_color = '#0a1224'
+        highlight_color = '#1b233a'
+
+        styles = {
+            # Base text
+            Text: '#e9e9e9',
+            Whitespace: '#5a6a8a',
+
+            # Comments - dim blue
+            Comment: '#8f9fc1',
+            Comment.Preproc: '#91abec',
+            Comment.Special: '#91abec bold',
+
+            # Keywords - brand blue
+            Keyword: '#91abec',
+            Keyword.Constant: '#54efae',
+            Keyword.Declaration: '#91abec',
+            Keyword.Namespace: '#91abec',
+            Keyword.Pseudo: '#91abec',
+            Keyword.Reserved: '#91abec',
+            Keyword.Type: '#54efae',
+
+            # Names
+            Name: '#e9e9e9',
+            Name.Attribute: '#91abec',
+            Name.Builtin: '#54efae',
+            Name.Builtin.Pseudo: '#91abec',
+            Name.Class: '#f6ff8f',
+            Name.Constant: '#54efae',
+            Name.Decorator: '#91abec',
+            Name.Entity: '#fd8383',
+            Name.Exception: '#fd8383',
+            Name.Function: '#91abec',
+            Name.Function.Magic: '#54efae',
+            Name.Label: '#f6ff8f',
+            Name.Namespace: '#91abec',
+            Name.Other: '#e9e9e9',
+            Name.Property: '#91abec',
+            Name.Tag: '#91abec',
+            Name.Variable: '#e9e9e9',
+            Name.Variable.Class: '#54efae',
+            Name.Variable.Global: '#54efae',
+            Name.Variable.Instance: '#e9e9e9',
+            Name.Variable.Magic: '#54efae',
+
+            # Literals
+            Literal: '#e9e9e9',
+            Literal.Date: '#54efae',
+
+            # Strings - soft green
+            String: '#54efae',
+            String.Affix: '#54efae',
+            String.Backtick: '#54efae',
+            String.Char: '#54efae',
+            String.Delimiter: '#8f9fc1',
+            String.Doc: '#8f9fc1',
+            String.Double: '#54efae',
+            String.Escape: '#fd8383',
+            String.Heredoc: '#54efae',
+            String.Interpol: '#91abec',
+            String.Other: '#54efae',
+            String.Regex: '#54efae',
+            String.Single: '#54efae',
+            String.Symbol: '#54efae',
+
+            # Numbers
+            Number: '#54efae',
+            Number.Bin: '#54efae',
+            Number.Float: '#54efae',
+            Number.Hex: '#54efae',
+            Number.Integer: '#54efae',
+            Number.Integer.Long: '#54efae',
+            Number.Oct: '#54efae',
+
+            # Operators
+            Operator: '#91abec',
+            Operator.Word: '#91abec',
+
+            # Punctuation
+            Punctuation: '#969aad',
+
+            # Generic - for diff output
+            Generic.Deleted: '#fd8383',
+            Generic.Emph: '#e9e9e9 italic',
+            Generic.Error: '#fd8383 bold',
+            Generic.Heading: '#91abec bold',
+            Generic.Inserted: '#54efae',
+            Generic.Output: '#8f9fc1',
+            Generic.Prompt: '#91abec bold',
+            Generic.Strong: '#e9e9e9 bold',
+            Generic.Subheading: '#91abec',
+            Generic.Traceback: '#fd8383',
+
+            # Error
+            Error: '#fd8383 bg:#2e0d0d',
+
+            # Other
+            Other: '#e9e9e9',
+        }
+
+    return GrintaStyle
+
+
+# Cached style instance
+_GRINTA_PYGMENTS_STYLE: type | None = None
+
+
+def get_grinta_pygments_style() -> type:
+    """Get or create the Grinta Pygments style for syntax highlighting."""
+    global _GRINTA_PYGMENTS_STYLE
+    if _GRINTA_PYGMENTS_STYLE is None:
+        _GRINTA_PYGMENTS_STYLE = _build_grinta_pygments_style()
+    return _GRINTA_PYGMENTS_STYLE

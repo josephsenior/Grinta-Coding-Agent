@@ -208,26 +208,31 @@ class ActivityRenderer:
                     )
                 )
         if diff_lines:
+            line_num = 1
             for line in diff_lines[:20]:
                 stripped = line.rstrip()
                 if stripped.startswith('+') and not stripped.startswith('+++'):
-                    # Green background for additions (subtle, less opaque)
+                    # Green background for additions with line number
                     extra_lines.append(
-                        ActivityLine(stripped, style='#54efae on #0d2e1a', indent=1)
+                        ActivityLine(f'{line_num:>4} {stripped}', style='#54efae on #0d2e1a', indent=1)
                     )
+                    line_num += 1
                 elif stripped.startswith('-') and not stripped.startswith('---'):
-                    # Red background for deletions (subtle, less opaque)
+                    # Red background for deletions with line number
                     extra_lines.append(
-                        ActivityLine(stripped, style='#fd8383 on #2e0d0d', indent=1)
+                        ActivityLine(f'{line_num:>4} {stripped}', style='#fd8383 on #2e0d0d', indent=1)
                     )
+                    line_num += 1
                 elif stripped.startswith('@@'):
                     extra_lines.append(
                         ActivityLine(stripped, style=NAVY_TEXT_MUTED, indent=1)
                     )
                 else:
+                    # Context lines with line number
                     extra_lines.append(
-                        ActivityLine(stripped, style=NAVY_TEXT_DIM, indent=1)
+                        ActivityLine(f'{line_num:>4} {stripped}', style=NAVY_TEXT_DIM, indent=1)
                     )
+                    line_num += 1
 
             if len(diff_lines) > 20:
                 extra_lines.append(
