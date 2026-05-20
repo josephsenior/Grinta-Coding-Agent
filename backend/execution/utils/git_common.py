@@ -54,7 +54,8 @@ def run_git_args(args: Sequence[str], cwd: str) -> str:
         byte_content = result.stderr or result.stdout or b''
         msg = f'error_running_cmd:{result.returncode}:{byte_content.decode(errors="replace")}'
         raise RuntimeError(msg)
-    return result.stdout.decode(errors='replace').strip()
+    byte_content = result.stderr or result.stdout or b''
+    return byte_content.decode(errors='replace').strip()
 
 
 def run_git_cmd(cmd: str, cwd: str) -> str:

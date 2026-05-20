@@ -289,6 +289,8 @@ def _reject_windows_invalid_path(path: str, *, must_be_relative: bool) -> None:
     for segment in _normalized_input_path(path).split('/'):
         if not segment or segment.endswith(':'):
             continue
+        if segment in {'.', '..'}:
+            continue
         if segment[-1:] in {' ', '.'}:
             raise PathValidationError(
                 'Windows path segments may not end with a space or dot',
