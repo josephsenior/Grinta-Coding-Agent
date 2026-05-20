@@ -475,13 +475,51 @@ class ActivityRenderer:
     def search_results(
         query: str,
         match_count: int = 0,
+        file_count: int = 0,
+        file_list: list[tuple[str, int]] | None = None,
         result_lines: list[str] | None = None,
     ) -> ActivityCard:
-        """Create an activity card for search results."""
-        secondary = f'{match_count} matches' if match_count else 'No matches'
+        """Create an activity card for search results.
+
+        Args:
+            query: The search pattern
+            match_count: Total number of matches
+            file_count: Total number of files with matches
+            file_list: List of (filepath, match_count) tuples for display
+            result_lines: Legacy raw result lines (deprecated, use file_list)
+        """
+        secondary_parts = []
+        if match_count:
+            secondary_parts.append(f'{match_count} matches')
+        if file_count:
+            secondary_parts.append(f'in {file_count} files')
+        secondary = ' '.join(secondary_parts) if secondary_parts else 'No matches'
+
         extra_lines: list[ActivityLine] = []
 
-        if result_lines:
+        # Display file list (Option C)
+        if file_list:
+            for filepath, count in file_list:
+                extra_lines.append(
+                    ActivityLine(
+                        f'• {filepath} ({count} matches)',
+                        style=NAVY_TEXT_MUTED,
+                        indent=1,
+                    )
+                )
+            total_displayed = len(file_list)
+            if file_count > total_displayed:
+                remaining_files = file_count - total_displayed
+                remaining_matches = match_count - sum(c for _, c in file_list)
+                extra_lines.append(
+                    ActivityLine(
+                        f'... {remaining_files} more files, {remaining_matches} matches',
+                        style=NAVY_TEXT_DIM,
+                        indent=1,
+                    )
+                )
+        elif result_lines:
+            # Legacy fallback
             for line in result_lines:
                 extra_lines.append(ActivityLine(line, style=NAVY_TEXT_MUTED, indent=1))
 
@@ -493,5 +531,5 @@ class ActivityRenderer:
             secondary=secondary,
             secondary_kind='ok' if match_count else 'neutral',
             extra_lines=extra_lines,
-            is_collapsible=bool(result_lines),
+            is_collapsible=bool(file_list or result_lines),
         )

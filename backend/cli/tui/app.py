@@ -3171,29 +3171,24 @@ class TUIRenderer:
         if not content:
             return
 
-        # Parse results using existing CLI renderer
-        from backend.cli._tool_display.renderers.search import render_search_results
+        # Extract file summary for user display (Option C)
+        from backend.cli._tool_display.renderers.search import extract_file_summary
+
+        match_count, file_count, file_list = extract_file_summary(content)
 
         # Extract query from first line if it looks like a query
         lines = content.splitlines()
         query = ''
-        result_content = content
 
         # Check if first line is a query line (doesn't match file:line:content pattern)
         if lines and not re.match(r'^.*:\d+:', lines[0]):
             query = lines[0]  # type: ignore[unreachable]
-            result_content = '\n'.join(lines[1:]) if len(lines) > 1 else ''
-
-        # Parse and render results
-        result_lines = render_search_results(result_content, query=query)
-
-        # Count matches
-        match_count = sum(
-            1 for line in content.splitlines() if re.match(r'^.*:\d+:', line)
-        )
 
         card = ActivityRenderer.search_results(
-            query or 'code search', match_count, result_lines
+            query=query or 'code search',
+            match_count=match_count,
+            file_count=file_count,
+            file_list=file_list,
         )
         self._write_card(card)
 

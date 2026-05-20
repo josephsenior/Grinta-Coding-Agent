@@ -294,7 +294,10 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self._emit_activity_turn_header()
 
         if source_tool == 'search_code':
-            from backend.cli._tool_display.renderers.search import render_search_results
+            from backend.cli._tool_display.renderers.search import (
+                extract_file_summary,
+                render_file_list,
+            )
 
             raw_lines = [
                 ln
@@ -302,12 +305,22 @@ class ActionRenderersMixin(_ActionRenderersBase):
                 if ln.strip() and not ln.startswith('Error running')
             ]
             if raw_lines and any(re.match(r'^.*:\d+:', ln) for ln in raw_lines[:5]):
-                extra_lines = render_search_results(human_msg)
+                match_count, file_count, file_list = extract_file_summary(human_msg)
+                extra_lines = render_file_list(file_list, file_count, match_count)
                 kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
+
+                # Build secondary with match count and file count
+                secondary_parts = []
+                if match_count:
+                    secondary_parts.append(f'{match_count} matches')
+                if file_count:
+                    secondary_parts.append(f'in {file_count} files')
+                secondary = ' '.join(secondary_parts) if secondary_parts else None
+
                 inner = format_activity_block(
                     verb,
                     detail,
-                    secondary=None,
+                    secondary=secondary,
                     secondary_kind=kind,
                     extra_lines=extra_lines,
                     title=title,
@@ -345,20 +358,16 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
     @classmethod
     def _search_code_detail(cls, human_msg: str) -> str:
-        lines = [
-            ln
-            for ln in human_msg.splitlines()
-            if ln.strip() and not ln.startswith('Error running ripgrep:')
-        ]
-        if not lines:
+        from backend.cli._tool_display.renderers.search import extract_file_summary
+
+        match_count, file_count, _ = extract_file_summary(human_msg)
+        if not match_count:
             return 'No matches found.'
-        head_blob = '\n'.join(lines[:5])
-        if any(frag in head_blob for frag in cls._NO_MATCH_FRAGMENTS):
-            return 'No matches found.'
-        match_count = sum(1 for line in lines if re.match(r'^.*:\d+:', line)) or len(
-            lines
-        )
-        return f'Found {match_count} match lines.'
+
+        parts = [f'{match_count} matches']
+        if file_count:
+            parts.append(f'in {file_count} files')
+        return ' '.join(parts)
 
     def _render_cmd_run_action(self, action: CmdRunAction) -> None:
         self._flush_pending_activity_card()

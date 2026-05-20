@@ -130,3 +130,69 @@ def render_search_summary(
         lines.append(f'  [dim]{duration}[/dim]')
 
     return lines
+
+
+def extract_file_summary(
+    output: str,
+    max_files: int = 5,
+) -> tuple[int, int, list[tuple[str, int]]]:
+    """Extract file-level summary from ripgrep-style search output.
+
+    Returns:
+        Tuple of (total_matches, total_files, [(filepath, match_count), ...])
+        File list is sorted by match count (descending), limited to max_files.
+    """
+    raw_lines = [
+        line
+        for line in output.splitlines()
+        if line.strip() and not line.startswith('Error running')
+    ]
+
+    if not raw_lines:
+        return 0, 0, []
+
+    grouped: dict[str, int] = {}
+
+    for line in raw_lines:
+        m = _LINE_NUM_RE.match(line)
+        if m:
+            filepath = m.group(1)
+            grouped[filepath] = grouped.get(filepath, 0) + 1
+
+    if not grouped:
+        return 0, 0, []
+
+    total_matches = sum(grouped.values())
+    total_files = len(grouped)
+    sorted_files = sorted(grouped.items(), key=lambda x: x[1], reverse=True)
+    top_files = sorted_files[:max_files]
+
+    return total_matches, total_files, top_files
+
+
+def render_file_list(
+    files: list[tuple[str, int]],
+    total_files: int,
+    total_matches: int,
+) -> list[str]:
+    """Render a compact file list for user display (Option C).
+
+    Format:
+      • src/auth.py (12 matches)
+      • src/utils.py (8 matches)
+      ... 3 more files, 15 matches
+    """
+    lines: list[str] = []
+
+    for filepath, count in files:
+        escaped_path = markup_escape(filepath)
+        lines.append(f'  • [{CLR_BRAND_HUE}]{escaped_path}[/{CLR_BRAND_HUE}] [dim]({count} matches)[/dim]')
+
+    if total_files > len(files):
+        remaining_files = total_files - len(files)
+        remaining_matches = total_matches - sum(c for _, c in files)
+        lines.append(
+            f'  [dim]... {remaining_files} more files, {remaining_matches} matches[/dim]'
+        )
+
+    return lines
