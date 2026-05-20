@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 from textual import events
 from textual.app import ComposeResult
-from textual.containers import Container, Vertical
+from textual.containers import Container, Vertical, Horizontal
 from textual.widgets import Static
 from textual.message import Message
 
@@ -21,6 +21,12 @@ class SidebarRow(Static):
 
     class Selected(Message):
         """Event fired when the row is selected."""
+        def __init__(self, item_id: str | None) -> None:
+            super().__init__()
+            self.item_id = item_id
+
+    class DeleteRequested(Message):
+        """Event fired when the row receives a delete intent."""
         def __init__(self, item_id: str | None) -> None:
             super().__init__()
             self.item_id = item_id
@@ -45,9 +51,23 @@ class SidebarRow(Static):
             self.post_message(self.Selected(self.item_id))
             event.prevent_default()
             event.stop()
+        elif event.key in ("delete", "backspace"):
+            self.post_message(self.DeleteRequested(self.item_id))
+            event.prevent_default()
+            event.stop()
 
 
 class CollapsibleSection(Container):
+    class ActionClicked(Message):
+        """Event fired when the action label is clicked."""
+        
+        def __init__(self, control: 'CollapsibleSection') -> None:
+            super().__init__()
+            self._control = control
+
+        @property
+        def control(self) -> 'CollapsibleSection':
+            return self._control
     """A collapsible section with a header and expandable body.
 
     Usage::
@@ -71,11 +91,27 @@ class CollapsibleSection(Container):
         border-left: solid $accent;
         background: #0d162a;
     }
-    CollapsibleSection .collapsible-header {
+    CollapsibleSection .collapsible-header-row {
+        layout: horizontal;
+        height: 1;
         width: 100%;
+        margin-bottom: 1;
+    }
+    CollapsibleSection .collapsible-header {
+        width: 1fr;
         height: 1;
         color: $text;
         text-style: bold;
+    }
+    CollapsibleSection .collapsible-action {
+        width: auto;
+        height: 1;
+        color: #5eead4;
+        text-style: bold;
+        padding-right: 1;
+    }
+    CollapsibleSection .collapsible-action:hover {
+        color: #ffffff;
     }
     CollapsibleSection .collapsible-header.collapsed {
         color: $text-muted;
@@ -107,6 +143,7 @@ class CollapsibleSection(Container):
         *,
         collapsed: bool = True,
         accent_color: str = '#91abec',
+        action_label: str | None = None,
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
@@ -114,6 +151,7 @@ class CollapsibleSection(Container):
         self._content = content
         self._collapsed = collapsed
         self._accent_color = accent_color
+        self._action_label = action_label
         self._items: list[tuple[Any, str]] = []
 
     @property
@@ -124,9 +162,12 @@ class CollapsibleSection(Container):
         header_style = 'collapsed' if self._collapsed else 'expanded'
         icon = '▸' if self._collapsed else '▾'
         header_text = f'[{self._accent_color}]{icon}[/] {self._section_title}'
-        yield Static(
-            header_text, classes=f'collapsible-header {header_style}', id='header'
-        )
+        
+        with Horizontal(classes='collapsible-header-row', id='header-row'):
+            yield Static(header_text, classes=f'collapsible-header {header_style}', id='header')
+            if self._action_label:
+                yield Static(self._action_label, classes='collapsible-action', id='action-btn')
+                
         body_classes = (
             'collapsible-body -hidden' if self._collapsed else 'collapsible-body'
         )
@@ -161,7 +202,13 @@ class CollapsibleSection(Container):
 
     def on_click(self, event: events.Click) -> None:
         """Handle click events on the header or widget itself."""
-        if event.widget and (event.widget.id == 'header' or event.widget == self):
+        if event.widget and event.widget.id == 'action-btn':
+            self.post_message(self.ActionClicked(self))
+            event.prevent_default()
+            event.stop()
+            return
+
+        if event.widget and (event.widget.id in ('header', 'header-row') or event.widget == self):
             self.toggle()
             event.prevent_default()
             event.stop()

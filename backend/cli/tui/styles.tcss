@@ -96,6 +96,7 @@ InfoSidebar {
 
 SidebarRow {
     padding: 0 1;
+    margin: 0 0 1 0;
     background: transparent;
     transition: background 150ms, color 150ms;
     width: 100%;
@@ -155,7 +156,7 @@ HUD,
     height: auto;
     background: #0a1525;
     color: #969aad;
-    padding: 1 2 1 2;
+    padding: 1 2;
 }
 
 #hud-line-1 {
@@ -170,15 +171,15 @@ HUD,
 
 #hud-line-3 {
     height: 1;
-    margin-top: 1;
+    margin-top: 0;
     color: #8f9fc1;
 }
 
 #hud-line-4 {
     height: auto;
-    margin-top: 1;
+    margin-top: 0;
     border-top: solid #15233c;
-    padding-top: 1;
+    padding-top: 0;
     color: #54597b;
 }
 
@@ -339,7 +340,9 @@ GrintaConfirmDialog Button {
 }
 
 GrintaSettingsDialog,
-GrintaSessionsDialog {
+GrintaSessionsDialog,
+GrintaAddSkillDialog,
+GrintaAddMCPDialog {
     background: #060a14 70%;
     align: center middle;
 }
@@ -377,6 +380,22 @@ GrintaSessionsDialog {
 #settings-api-key,
 #settings-budget {
     margin-bottom: 1;
+}
+
+#settings-dialog TextArea {
+    background: #0f1c30;
+    color: #c8d4e8;
+    border: none;
+    padding: 0 1;
+    width: 100%;
+    height: 10;
+    margin-bottom: 1;
+    transition: background 150ms, border-left 150ms;
+}
+
+#settings-dialog TextArea:focus {
+    background: #12223a;
+    border-left: solid #91abec;
 }
 
 #settings-buttons,

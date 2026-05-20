@@ -376,9 +376,22 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
                 style=CLR_STATUS_WARN,
             )
 
+    global_dir = Path.home() / '.grinta'
+    is_global = False
+    try:
+        if settings_file.is_relative_to(global_dir):
+            is_global = True
+    except Exception:
+        pass
+
+    scope_note = ""
+    if not is_global:
+        scope_note = f'[{CLR_STATUS_WARN}]Note: Running from source. Settings localized to this directory.[/]\n'
+
     console.print(
         Panel.fit(
             f'Wrote [bold]{settings_file}[/bold]\n'
+            f'{scope_note}'
             f'Provider: [bold]{provider}[/bold]\n'
             f'Model: [bold]{model}[/bold]\n\n'
             f'Start the agent with: [{CLR_BRAND}]grinta[/]\n'
