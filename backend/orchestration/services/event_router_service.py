@@ -572,15 +572,43 @@ class EventRouterService:
 
     async def _handle_delegate_task_action(self, action: DelegateTaskAction) -> None:
         """Handle delegating a subtask to a worker agent."""
+        import asyncio
         import uuid
 
+        from backend.core.constants import DELEGATE_WORKER_TIMEOUT_SECONDS, MAX_DELEGATION_DEPTH
         from backend.core.config.agent_config import AgentConfig
+        from backend.core.errors import FunctionCallValidationError
         from backend.orchestration.agent import Agent
         from backend.orchestration.blackboard import Blackboard
         from backend.orchestration.conversation_stats import ConversationStats
         from backend.orchestration.orchestration_config import OrchestrationConfig
         from backend.orchestration.session_orchestrator import SessionOrchestrator
         from backend.utils.async_utils import run_or_schedule
+
+        # Check delegation depth limit
+        current_depth = getattr(action, 'depth', 0)
+        if current_depth >= MAX_DELEGATION_DEPTH:
+            self._ctrl.log(
+                'warning',
+                f'Delegation depth limit reached ({MAX_DELEGATION_DEPTH}). '
+                f'Cannot delegate further (current depth: {current_depth}).',
+            )
+            obs = DelegateTaskObservation(
+                success=False,
+                content='',
+                error_message=(
+                    f'Delegation depth limit exceeded (max {MAX_DELEGATION_DEPTH}). '
+                    f'Current depth: {current_depth}. Complete the task directly instead.'
+                ),
+            )
+            attach_observation_cause(
+                obs,
+                action,
+                context='event_router.delegate_task.depth_limit',
+            )
+            obs.tool_call_metadata = action.tool_call_metadata
+            self._ctrl.event_stream.add_event(obs, EventSource.ENVIRONMENT)
+            return
 
         blackboard = Blackboard()
 
@@ -593,6 +621,8 @@ class EventRouterService:
             worker_label: str = 'Worker',
             worker_order: int = 1,
             batch_id: int | None = None,
+            depth: int = 0,
+            timeout_seconds: float = DELEGATE_WORKER_TIMEOUT_SECONDS,
         ) -> tuple[bool, str, str]:
             """Run one worker agent and return (success, content, error_message)."""
             worker_id = f'pending_worker_{worker_order}'
@@ -691,8 +721,12 @@ class EventRouterService:
                 # Send the initial user message/directive to the worker.
                 # Inject parent's working memory, notes, and task plan so the
                 # sub-agent has full context without needing to rediscover it.
+                worker_depth = depth + 1
                 parent_context_lines: list[str] = [
-                    f'You are a worker agent delegated the following task:\n\n{task_description}\n\nFocus ONLY on this task. Once completed, finish.'
+                    f'You are a worker agent (depth {worker_depth}/{MAX_DELEGATION_DEPTH}) delegated the following task:\n\n{task_description}\n\nFocus ONLY on this task. Once completed, finish.\n\n'
+                    f'DELEGATION LIMIT: You can delegate sub-tasks up to depth {MAX_DELEGATION_DEPTH}. '
+                    f'Your current depth is {worker_depth}. '
+                    f'If you need to delegate further, you can go up to depth {MAX_DELEGATION_DEPTH}.'
                 ]
                 if shared_blackboard is not None:
                     parent_context_lines.append(
@@ -953,33 +987,73 @@ class EventRouterService:
                 # async) and after each step we drain every background task
                 # that event-stream callbacks spawned via run_or_schedule().
 
-                max_steps = max(
-                    10, int(getattr(parent_config, 'iteration_delta', 50) or 50)
-                )
-                for _ in range(max_steps):
-                    if worker_controller.get_agent_state() not in (
-                        AgentState.RUNNING,
-                        AgentState.AWAITING_USER_INPUT,
-                        AgentState.PAUSED,
-                    ):
-                        break
+                async def _run_worker_steps():
+                    """Run worker steps with timeout enforcement."""
+                    import time
 
-                    # Snapshot tasks before step so we can identify new ones.
-                    pre_tasks = set(_background_tasks)
+                    start_time = time.monotonic()
+                    max_steps = max(
+                        10, int(getattr(parent_config, 'iteration_delta', 50) or 50)
+                    )
+                    for step_num in range(max_steps):
+                        # Check timeout
+                        elapsed = time.monotonic() - start_time
+                        if elapsed >= timeout_seconds:
+                            self._ctrl.log(
+                                'warning',
+                                f'Worker {worker_id} timed out after {elapsed:.0f}s '
+                                f'(limit: {timeout_seconds}s)',
+                            )
+                            _emit_worker_progress(
+                                'failed',
+                                f'Worker timed out after {elapsed:.0f}s (limit: {timeout_seconds}s)',
+                            )
+                            return False, '', f'Worker timed out after {elapsed:.0f}s'
 
-                    await worker_controller._step_inner()
+                        if worker_controller.get_agent_state() not in (
+                            AgentState.RUNNING,
+                            AgentState.AWAITING_USER_INPUT,
+                            AgentState.PAUSED,
+                        ):
+                            break
 
-                    # Drain all background tasks that were spawned during the
-                    # step (typically _on_event coroutines from event-stream
-                    # inline dispatch → on_event → run_or_schedule).  Keep
-                    # draining until no new tasks appear, because each task
-                    # may itself schedule further tasks (e.g. the state-change
-                    # observation triggers another on_event cycle).
-                    await _drain_new_worker_tasks(pre_tasks, max_rounds=50)
+                        # Snapshot tasks before step so we can identify new ones.
+                        pre_tasks = set(_background_tasks)
 
-                # Final settle: give any remaining scheduled callbacks a
-                # chance to complete.
-                await _drain_new_worker_tasks(worker_task_baseline, max_rounds=20)
+                        await worker_controller._step_inner()
+
+                        # Drain all background tasks that were spawned during the
+                        # step (typically _on_event coroutines from event-stream
+                        # inline dispatch → on_event → run_or_schedule).  Keep
+                        # draining until no new tasks appear, because each task
+                        # may itself schedule further tasks (e.g. the state-change
+                        # observation triggers another on_event cycle).
+                        await _drain_new_worker_tasks(pre_tasks, max_rounds=50)
+
+                    # Final settle: give any remaining scheduled callbacks a
+                    # chance to complete.
+                    await _drain_new_worker_tasks(worker_task_baseline, max_rounds=20)
+                    return True, '', ''
+
+                timed_out = False
+                try:
+                    steps_success, _, timeout_msg = await asyncio.wait_for(
+                        _run_worker_steps(),
+                        timeout=timeout_seconds + 10,  # Small buffer
+                    )
+                except asyncio.TimeoutError:
+                    timed_out = True
+                    self._ctrl.log(
+                        'warning',
+                        f'Worker {worker_id} timed out (limit: {timeout_seconds}s)',
+                    )
+                    _emit_worker_progress(
+                        'failed',
+                        f'Worker timed out (limit: {timeout_seconds}s)',
+                    )
+
+                if timed_out:
+                    return False, '', f'Worker timed out after {timeout_seconds}s'
 
                 final_state = worker_controller.get_agent_state()
                 self._ctrl.log(
@@ -1042,11 +1116,12 @@ class EventRouterService:
             import asyncio
 
             parallel_tasks = getattr(action, 'parallel_tasks', [])
+            worker_depth = current_depth + 1
             if parallel_tasks:
                 # Parallel mode — run all workers concurrently
                 self._ctrl.log(
                     'info',
-                    f'Running {len(parallel_tasks)} sub-agents in parallel',
+                    f'Running {len(parallel_tasks)} sub-agents in parallel (depth {worker_depth})',
                 )
                 results = await asyncio.gather(
                     *[
@@ -1057,6 +1132,7 @@ class EventRouterService:
                             worker_label=f'Worker {i + 1}',
                             worker_order=i + 1,
                             batch_id=action.id if action.id > 0 else None,
+                            depth=worker_depth,
                         )
                         for i, t in enumerate(parallel_tasks)
                     ],
@@ -1099,6 +1175,10 @@ class EventRouterService:
                 )
             else:
                 # Single worker mode
+                self._ctrl.log(
+                    'info',
+                    f'Running sub-agent (depth {worker_depth}): {action.task_description[:50]}...',
+                )
                 success, content, error_message = await _execute_single_worker(
                     action.task_description,
                     getattr(action, 'files', []),
@@ -1106,6 +1186,7 @@ class EventRouterService:
                     worker_label='Worker',
                     worker_order=1,
                     batch_id=action.id if action.id > 0 else None,
+                    depth=worker_depth,
                 )
                 if blackboard is not None and blackboard.snapshot():
                     content += '\n\n[SHARED BLACKBOARD SNAPSHOT]\n' + '\n'.join(
@@ -1125,28 +1206,32 @@ class EventRouterService:
             obs.tool_call_metadata = action.tool_call_metadata
             self._ctrl.event_stream.add_event(obs, EventSource.ENVIRONMENT)
 
-        if getattr(action, 'run_in_background', False):
+        # Handle background vs foreground execution
+        run_in_background = getattr(action, 'run_in_background', False)
+
+        if run_in_background:
+            # Background mode: Schedule worker and return immediately.
+            # Parent agent continues working while worker runs.
+            # Parent can monitor progress via shared_task_board.
             self._ctrl.log(
-                'warning',
-                'delegate_task run_in_background requested; executing as foreground '
-                'to preserve middleware, rollback, and pending-action consistency.',
-                extra={'msg_type': 'DELEGATE_BACKGROUND_DISABLED'},
+                'info',
+                'Spawning background worker(s). Parent agent continues immediately.',
+                extra={'msg_type': 'DELEGATE_BACKGROUND'},
             )
-
-        # Register the action as pending so the parent agent blocks (can_step →
-        # False) until _run_subagent() emits a DelegateTaskObservation with
-        # cause=action.id that clears the pending slot. Background delegation is
-        # intentionally serialized for local workspace safety.
-        pending_service = getattr(
-            getattr(self._ctrl, 'services', None), 'pending_action', None
-        )
-        if pending_service is not None:
-            pending_service.set(action)
+            # Don't register as pending - parent should continue immediately
+            run_or_schedule(_run_subagent())
         else:
-            self._ctrl._pending_action = action
+            # Foreground mode: Register as pending so parent blocks until worker completes.
+            pending_service = getattr(
+                getattr(self._ctrl, 'services', None), 'pending_action', None
+            )
+            if pending_service is not None:
+                pending_service.set(action)
+            else:
+                self._ctrl._pending_action = action
 
-        # Run the subagent without blocking
-        run_or_schedule(_run_subagent())
+            # Run the subagent without blocking the routing loop
+            run_or_schedule(_run_subagent())
 
     async def _handle_meta_cognition_action(self, action: Action) -> None:
         """Handle meta-cognition actions (clarification, proposal, uncertainty, escalation).

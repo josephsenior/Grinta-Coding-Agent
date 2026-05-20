@@ -65,8 +65,20 @@ def _infinite_pending_timeout(_base: float, _action: Action) -> float:
     return math.inf
 
 
+def _delegate_task_pending_timeout(base: float, action: Action) -> float:
+    """DelegateTaskAction timeout: use worker timeout from constants.
+
+    Workers have a configurable timeout (default 5 minutes) to prevent
+    infinite hangs. This is much better than the previous infinite timeout.
+    """
+    from backend.core.constants import DELEGATE_WORKER_TIMEOUT_SECONDS
+
+    # Use the worker timeout, but ensure it's at least the base timeout
+    return max(float(base), DELEGATE_WORKER_TIMEOUT_SECONDS)
+
+
 _TIMEOUT_POLICY_BY_ACTION_NAME = {
-    'DelegateTaskAction': _infinite_pending_timeout,
+    'DelegateTaskAction': _delegate_task_pending_timeout,
     'CmdRunAction': _cmd_run_pending_timeout,
     'MCPAction': lambda base, _action: max(
         float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR
@@ -104,7 +116,7 @@ class PendingActionService:
     def _effective_timeout_seconds(base: float, action: Action) -> float:
         """MCP tool calls often need longer than the default (cold npx, network).
 
-        Delegated tasks run sub-agents that may take many minutes; use infinite timeout.
+        Delegated tasks run sub-agents with a configurable timeout (default 5 minutes).
         Terminal* actions (terminal_manager) use a high floor like CmdRunAction.
         """
         if base <= 0:

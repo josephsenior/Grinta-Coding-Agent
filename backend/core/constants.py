@@ -124,7 +124,17 @@ BROWSER_EXTRACT_TIMEOUT_SEC = 120.0
 # Worst single browser_tool call: cold session start + navigate (or snapshot). Not a "hang window".
 BROWSER_TOOL_SYNC_TIMEOUT_SECONDS = 300.0
 
-# ── Threshold Constants ─────────────────────────────────────────────
+# ── Delegation / Swarming ─────────────────────────────────────────
+# Worker timeout: maximum time a delegated worker can run before being terminated.
+# Default: 5 minutes (300 seconds). Override via GRINTA_DELEGATE_WORKER_TIMEOUT.
+DELEGATE_WORKER_TIMEOUT_SECONDS = float(
+    os.getenv('GRINTA_DELEGATE_WORKER_TIMEOUT', '300.0')
+)
+# Maximum delegation depth: prevents infinite recursion of delegate_task calls.
+# Default: 2 (parent → worker → sub-worker). Override via GRINTA_MAX_DELEGATION_DEPTH.
+MAX_DELEGATION_DEPTH = int(os.getenv('GRINTA_MAX_DELEGATION_DEPTH', '2'))
+
+# ─ Threshold Constants ─────────────────────────────────────────────
 IDLE_RECLAIM_SPIKE_THRESHOLD = 3
 EVICTION_SPIKE_THRESHOLD = 1
 

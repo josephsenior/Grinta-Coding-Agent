@@ -391,18 +391,23 @@ class DelegateTaskAction(Action):
         parallel_tasks (list[dict]): If non-empty, spawn multiple workers concurrently.
             Each item should have 'task_description' and optionally 'files'.
             When present, task_description/files on the parent action are ignored.
+        run_in_background (bool): If True, worker runs asynchronously and parent continues.
+        depth (int): Current delegation depth (0 = parent, 1 = first-level worker, etc.).
+            Used to prevent infinite recursion. Max depth is MAX_DELEGATION_DEPTH.
     """
 
     task_description: str = ''
     files: list[str] = field(default_factory=list)
     parallel_tasks: list[dict] = field(default_factory=list)
     run_in_background: bool = False
+    depth: int = 0
     action: ClassVar[str] = ActionType.DELEGATE_TASK
 
     @property
     def message(self) -> str:
         """Get delegation message."""
-        return f'Delegating task: {self.task_description[:50]}...'
+        bg = ' (background)' if self.run_in_background else ''
+        return f'Delegating task{bg}: {self.task_description[:50]}...'
 
 
 @dataclass
