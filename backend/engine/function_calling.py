@@ -799,8 +799,9 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
     if command == 'update_status':
         task_id = require_tool_argument(arguments, 'task_id', TASK_TRACKER_TOOL_NAME)
         status = require_tool_argument(arguments, 'status', TASK_TRACKER_TOOL_NAME)
+        result = arguments.get('result')
         tracker = TaskTracker()
-        success, message = tracker.update_task_status(task_id, status)
+        success, message = tracker.update_task_status(task_id, status, result)
         if not success:
             return TaskTrackingAction(
                 command='update_status',

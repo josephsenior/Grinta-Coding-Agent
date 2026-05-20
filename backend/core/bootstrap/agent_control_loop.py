@@ -118,6 +118,17 @@ async def run_agent_until_done(
     """
     _validate_status_callbacks(runtime, controller)
 
+    # Auto-sync scratchpad to working_memory at session start
+    try:
+        from backend.engine.tools.note import _load_notes
+        from backend.engine.tools.working_memory import sync_scratchpad_to_working_memory
+
+        notes = _load_notes()
+        if notes:
+            sync_scratchpad_to_working_memory(notes)
+    except Exception:
+        pass
+
     status_callback = _create_status_callback(controller)
     _set_status_callbacks(runtime, controller, memory, status_callback)
 
