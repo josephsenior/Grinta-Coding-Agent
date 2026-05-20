@@ -1,4 +1,4 @@
-# 36. The Verbose Status
+# 33. The Verbose Status
 
 The chapter on observability (chapter 27) was about admitting the black hole existed. This chapter is about the small, unglamorous instruments I added once I stopped pretending I could debug an autonomous system by reading the transcript.
 

@@ -1,4 +1,4 @@
-# 35. The Required Risk
+# 32. The Required Risk
 
 There is a particular failure mode I came to recognize on sight.
 

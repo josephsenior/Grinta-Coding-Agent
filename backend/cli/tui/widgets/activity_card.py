@@ -48,6 +48,11 @@ class ActivityCard(Container):
         width: 100%;
         height: auto;
         margin: 0 0 1 0;
+        border: transparent;
+    }
+    ActivityCard:focus {
+        border-left: solid $accent;
+        background: #0d162a;
     }
     ActivityCard .card-title {
         width: 100%;
@@ -81,6 +86,11 @@ class ActivityCard(Container):
         'neutral': NAVY_TEXT_MUTED,
     }
 
+    BINDINGS = [
+        ("enter", "toggle", "Toggle Expansion"),
+        ("space", "toggle", "Toggle Expansion"),
+    ]
+
     def __init__(
         self,
         verb: str,
@@ -103,13 +113,36 @@ class ActivityCard(Container):
         self._secondary_kind = secondary_kind
         self._extra_content = extra_content
         self._collapsed = collapsed
+        self.can_focus = bool(extra_content)
+        self.processing = False
+
+    def set_processing(self, processing: bool) -> None:
+        """Set the card processing status (pulsing indicator)."""
+        self.processing = processing
+        try:
+            header = self.query_one('#header', Static)
+            header.update(
+                self._build_header_markup() + '\n' + self._build_secondary_markup()
+            )
+        except Exception:
+            pass
 
     def _build_header_markup(self) -> str:
         badge = badge_for_tool_name(self._badge_category)
         badge_render = badge.render()
         verb_style = f'bold {NAVY_BRAND}'
         detail_text = self._detail
-        return f'{badge_render} [{verb_style}]{self._verb}[/] {detail_text}'
+
+        caret = ""
+        if self._extra_content:
+            icon = '▾' if not self._collapsed else '▸'
+            caret = f'[#54597b]{icon}[/] '
+
+        pulse = ""
+        if self.processing:
+            pulse = "[blink #5eead4]●[/] "
+
+        return f'{caret}{pulse}{badge_render} [{verb_style}]{self._verb}[/] {detail_text}'
 
     def _build_secondary_markup(self) -> str:
         if not self._secondary:
@@ -122,6 +155,30 @@ class ActivityCard(Container):
             'neutral': '[dim #969aad]•[/]',
         }.get(self._secondary_kind, '•')
         return f'    {icon} [{color}]{self._secondary}[/]'
+
+    def _get_formatted_extra_content(self) -> Any:
+        from typing import Any
+        from rich.syntax import Syntax
+        content = self._extra_content or ""
+
+        # Check if it looks like a unified diff (git diff style)
+        if content.startswith('--- ') or content.startswith('diff --git') or '\n+ ' in content or '\n- ' in content:
+            return Syntax(content, "diff", theme="monokai", background_color="#0a1224")
+
+        # Check if it is JSON
+        if (content.startswith('{') and content.endswith('}')) or (content.startswith('[') and content.endswith(']')):
+            try:
+                import json
+                json.loads(content)
+                return Syntax(content, "json", theme="monokai", background_color="#0a1224")
+            except Exception:
+                pass
+
+        # Check if it is Python code
+        if "def " in content or "class " in content or "import " in content:
+            return Syntax(content, "python", theme="monokai", background_color="#0a1224")
+
+        return content
 
     def compose(self) -> ComposeResult:
         parts: list[str] = []
@@ -139,7 +196,7 @@ class ActivityCard(Container):
 
         if self._extra_content:
             extra_classes = 'card-extra -hidden' if self._collapsed else 'card-extra'
-            yield Static(self._extra_content, classes=extra_classes, id='extra')
+            yield Static(self._get_formatted_extra_content(), classes=extra_classes, id='extra')
 
     def update_secondary(self, text: str, kind: str = 'neutral') -> None:
         """Update the secondary/result line (e.g., after a command completes)."""
@@ -156,10 +213,18 @@ class ActivityCard(Container):
             self._extra_content += '\n' + text
         else:
             self._extra_content = text
+        self.can_focus = True
         extra = self.query_one('#extra', Static)
-        extra.update(self._extra_content)
+        extra.update(self._get_formatted_extra_content())
         extra.remove_class('-hidden')
         self._collapsed = False
+        try:
+            header = self.query_one('#header', Static)
+            header.update(
+                self._build_header_markup() + '\n' + self._build_secondary_markup()
+            )
+        except Exception:
+            pass
 
     def toggle_extra(self) -> None:
         """Toggle visibility of extra content."""
@@ -167,6 +232,26 @@ class ActivityCard(Container):
         if extra:
             extra.toggle_class('-hidden')
             self._collapsed = not self._collapsed
+            try:
+                header = self.query_one('#header', Static)
+                header.update(
+                    self._build_header_markup() + '\n' + self._build_secondary_markup()
+                )
+            except Exception:
+                pass
+
+    def action_toggle(self) -> None:
+        """Action handler for enter/space keypresses."""
+        if self._extra_content:
+            self.toggle_extra()
+
+    def on_click(self, event: events.Click) -> None:
+        """Handle click events on the header or widget itself."""
+        from textual import events
+        if self._extra_content and event.widget and (event.widget.id == 'header' or event.widget == self):
+            self.toggle_extra()
+            event.prevent_default()
+            event.stop()
 
 
 class TurnDivider(Static):
@@ -188,41 +273,19 @@ class TurnDivider(Static):
 class UserMessage(Static):
     """User message display in the transcript."""
 
-    DEFAULT_CSS = """
-    UserMessage {
-        width: 100%;
-        height: auto;
-        margin: 1 0 1 0;
-    }
-    UserMessage .user-header {
-        color: #91abec;
-        text-style: bold;
-    }
-    UserMessage .user-body {
-        color: $text-primary;
-        margin-left: 1;
-    }
-    """
-
     def __init__(self, text: str, *, id: str | None = None) -> None:
-        markup = f'[bold #91abec]YOU[/]\n  {text}'
-        super().__init__(markup, id=id)
+        super().__init__(text, id=id)
 
 
 class AgentMessage(Static):
     """Agent response display in the transcript."""
 
-    DEFAULT_CSS = """
-    AgentMessage {
-        width: 100%;
-        height: auto;
-        margin: 1 0 1 0;
-    }
-    """
-
     def __init__(self, text: str, *, id: str | None = None) -> None:
-        markup = f'[bold #54efae]GRINTA[/]\n  {text}'
-        super().__init__(markup, id=id)
+        super().__init__(text, id=id)
+
+    def update_message(self, text: str) -> None:
+        """Update message content dynamically."""
+        self.update(text)
 
 
 class ThinkingIndicator(Static):
@@ -262,6 +325,13 @@ class ThinkingIndicator(Static):
         """Add a reasoning step."""
         self._thoughts.append(thought)
         self._step_count += 1
+        self._render()
+
+    def set_thoughts(self, text: str) -> None:
+        """Set thoughts by parsing accumulated text."""
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        self._thoughts = lines
+        self._step_count = len(lines)
         self._render()
 
     def update_action(self, action: str) -> None:

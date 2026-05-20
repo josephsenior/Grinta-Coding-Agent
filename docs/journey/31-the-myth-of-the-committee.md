@@ -1,4 +1,4 @@
-# 30. The Myth of the Committee
+# 27. The Myth of the Committee
 
 There is an obsession in the AI space with "Swarm Intelligence" or multi-agent systems. When you build an agent framework, the immediate temptation is to build a committee: an Architect agent, a Developer agent, a Reviewer agent, and a QA agent.
 
