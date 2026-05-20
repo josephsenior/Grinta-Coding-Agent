@@ -151,6 +151,7 @@ def _routing_memory_tool_placeholders(
             '<MEMORY_AND_CONTEXT_TOOLS>\n'
             '- Disk facts: `note(key, value)` / `recall(key)`. Use for long-lived facts (e.g., user preferences, architectural rules, common commands).\n'
             '- Session state: `memory_manager(action="working_memory", ...)` and `memory_manager(action="semantic_recall", key=...)`. Use for ephemeral task-local state (e.g., current bug hypotheses, "step 2 of 5").\n'
+            '- **Auto-sync**: Scratchpad notes are automatically synced to working_memory at session start and after condensation. No manual sync needed.\n'
             'Rule: cross-session knowledge → `note`; within-session state → `memory_manager`.\n'
             '</MEMORY_AND_CONTEXT_TOOLS>'
         )
@@ -318,7 +319,8 @@ def _render_system_capabilities(
 
     checkpoint_line = (
         '- **Checkpoints**: AVAILABLE for coarse-grained rollback of file/edit state. '
-        'Take one before risky multi-step edits when atomic batch tools are not a fit.'
+        'Take one before risky multi-step edits when atomic batch tools are not a fit. '
+        '`checkpoint(command="view")` auto-detects modified files from workspace snapshots — no need to manually specify `files_modified`.'
         if checkpoints_on
         else '- **Checkpoints**: not enabled in this run.'
     )
@@ -490,6 +492,7 @@ def _render_autonomy(
         task_tracker_discipline_block = (
             '<TASK_TRACKING>\n'
             '**task_tracker**: For multi-step tasks, use `view` to inspect the plan and `update` to replace the full `task_list`.\n'
+            'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task without re-emitting the full list. Optional `result` field captures outcome.\n'
             'Allowed statuses: `todo`, `doing`, `done`, `skipped`, `blocked`.\n'
             '**Completion**: Put waiting tasks to `blocked` before calling `finish`.'
             '</TASK_TRACKING>'

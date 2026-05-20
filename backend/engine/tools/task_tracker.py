@@ -76,12 +76,13 @@ class TaskTracker:
         with open(self.path, 'w', encoding='utf-8') as f:
             json.dump(normalized, f, indent=2, ensure_ascii=False)
 
-    def update_task_status(self, task_id: str, status: str) -> tuple[bool, str]:
+    def update_task_status(self, task_id: str, status: str, result: str | None = None) -> tuple[bool, str]:
         """Update status of a single task by ID.
 
         Args:
             task_id: The ID of the task to update (e.g., '1', '1.1', '2')
             status: New status value
+            result: Optional result or note about the task outcome
 
         Returns:
             Tuple of (success, message)
@@ -106,6 +107,8 @@ class TaskTracker:
 
         old_status = task.get('status', 'unknown')
         task['status'] = status
+        if result is not None:
+            task['result'] = result
         self.save_to_file(task_list)
         return True, f"Task '{task_id}' status updated: {old_status} -> {status}"
 
@@ -198,6 +201,10 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
                     TASK_STATUS_SKIPPED,
                     TASK_STATUS_BLOCKED,
                 ],
+            },
+            'result': {
+                'type': 'string',
+                'description': "For 'update_status': optional outcome or note about the task (e.g. 'Fixed auth bug - missing token refresh').",
             },
         },
         required=['command'],

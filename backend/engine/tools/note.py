@@ -26,8 +26,10 @@ _NOTE_DESCRIPTION = (
 )
 
 _RECALL_DESCRIPTION = (
-    'Retrieve a value from your persistent scratchpad.\n\n'
-    'Pass a specific key to get one value, or key="all" to dump the entire scratchpad.'
+    'Retrieve a specific value from your persistent scratchpad by key.\n\n'
+    'Scratchpad notes are automatically synced to working_memory at session start '
+    'and after condensation — no manual sync needed. Use this for targeted lookups '
+    'of specific notes you stored earlier.'
 )
 
 _AGENT_NOTES_NAME = 'agent_notes.json'
@@ -64,7 +66,7 @@ def create_recall_tool() -> ChatCompletionToolParam:
         properties={
             'key': {
                 'type': 'string',
-                'description': 'The key to retrieve. Use "all" to list every stored note.',
+                'description': 'The specific key to retrieve (e.g., "auth_decision", "db_url").',
             },
         },
         required=['key'],
@@ -177,24 +179,8 @@ def append_to_note(key: str, value: str, max_entries: int = 50) -> None:
 
 
 def build_recall_action(key: str) -> AgentThinkAction:
-    """Retrieve key (or all keys) from the scratchpad."""
+    """Retrieve a specific key from the scratchpad."""
     notes = _load_notes()
-    if key == 'all':
-        body = (
-            json.dumps(notes, indent=2, ensure_ascii=False)
-            if notes
-            else '(scratchpad is empty)'
-        )
-        # Auto-sync scratchpad to working_memory to reduce cognitive load
-        if notes:
-            import backend.engine.tools.working_memory as wm
-            synced = wm.sync_scratchpad_to_working_memory(notes)
-            sync_note = ''
-            if synced:
-                sync_note = f'\n\n[SYNCED to working_memory: {", ".join(synced)}]'
-        else:
-            sync_note = ''
-        return AgentThinkAction(thought=f'[SCRATCHPAD] All notes:\n{body}{sync_note}')
     if key in notes:
         return AgentThinkAction(thought=f'[SCRATCHPAD] [{key}] = {notes[key]!r}')
     if key == 'lessons':

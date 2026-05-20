@@ -240,6 +240,17 @@ def _handle_condensation_observation(
     scratchpad = _load_scratchpad_snapshot()
     working_memory = _load_working_memory_snapshot()
 
+    # Auto-sync scratchpad to working_memory after condensation
+    try:
+        from backend.engine.tools.note import _load_notes
+        from backend.engine.tools.working_memory import sync_scratchpad_to_working_memory
+
+        notes = _load_notes()
+        if notes:
+            synced = sync_scratchpad_to_working_memory(notes)
+    except Exception:
+        pass
+
     banner = _CONDENSATION_BANNER if not getattr(obs, 'is_prewarmed', False) else ''
 
     text = truncate_content(
