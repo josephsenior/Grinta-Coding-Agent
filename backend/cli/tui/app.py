@@ -3226,6 +3226,9 @@ class TUIRenderer:
             self._tui.add_thinking(thinking)
 
         content = (action.accumulated or '').strip()
+        from backend.cli.transcript import strip_pseudo_xml_function_calls
+        content = strip_pseudo_xml_function_calls(content)
+
         if action.is_final:
             # Add the finalized response text to history and clear live previews.
             self._tui.finalize_thinking()

@@ -57,10 +57,20 @@ _INDENTATION_WARNINGS_RE = re.compile(
     re.DOTALL,
 )
 
+_PSEUDO_XML_FUNCTION_RE = re.compile(
+    r'\s*<function=[^>]+>.*?(?:</function>|\Z)',
+    re.DOTALL,
+)
+
 
 def strip_tool_result_validation_annotations(text: str) -> str:
     """Remove internal tool-validation tags; keeps scrollback readable."""
     return _APP_RESULT_VALIDATION_RE.sub('', text or '').strip()
+
+
+def strip_pseudo_xml_function_calls(text: str) -> str:
+    """Remove raw pseudo-XML function calls from user-visible streaming text."""
+    return _PSEUDO_XML_FUNCTION_RE.sub('', text or '').strip()
 
 
 def strip_indentation_warnings(text: str) -> str:
