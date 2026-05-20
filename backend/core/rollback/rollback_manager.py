@@ -615,6 +615,20 @@ class RollbackManager:
         """
         return next((cp for cp in self.checkpoints if cp.id == checkpoint_id), None)
 
+    def get_checkpoint_files(self, checkpoint_id: str) -> list[str]:
+        """Get list of files tracked by a checkpoint.
+
+        Args:
+            checkpoint_id: Checkpoint ID
+
+        Returns:
+            List of file paths in the checkpoint snapshot
+        """
+        checkpoint = self.get_checkpoint(checkpoint_id)
+        if checkpoint is None:
+            return []
+        return list(checkpoint.file_snapshots.keys())
+
     def delete_checkpoint(self, checkpoint_id: str) -> bool:
         """Delete a specific checkpoint.
 

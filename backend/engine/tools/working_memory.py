@@ -268,3 +268,68 @@ def get_working_memory_prompt_block(char_budget: int = 2000) -> str:
         return ''
     lines.append('</WORKING_MEMORY>')
     return '\n'.join(lines)
+
+
+def sync_scratchpad_to_working_memory(notes: dict[str, str]) -> list[str]:
+    """Sync scratchpad notes to working_memory sections.
+
+    Maps scratchpad keys to working_memory sections intelligently:
+    - 'findings', 'discovery', 'discovered' -> findings
+    - 'decisions', 'decision', 'choice' -> decisions
+    - 'blockers', 'blocker', 'issues', 'problems' -> blockers
+    - 'hypothesis', 'hypotheses', 'theory', 'approach' -> hypothesis
+    - 'files', 'file_context', 'context' -> file_context
+    - 'plan', 'steps', 'todo' -> plan
+    - 'lessons', 'lessons_learned' -> findings (append)
+
+    Returns list of sections that were updated.
+    """
+    key_to_section: dict[str, str] = {
+        'findings': 'findings',
+        'discovery': 'findings',
+        'discovered': 'findings',
+        'decisions': 'decisions',
+        'decision': 'decisions',
+        'choice': 'decisions',
+        'blockers': 'blockers',
+        'blocker': 'blockers',
+        'issues': 'blockers',
+        'problems': 'blockers',
+        'hypothesis': 'hypothesis',
+        'hypotheses': 'hypothesis',
+        'theory': 'hypothesis',
+        'approach': 'hypothesis',
+        'files': 'file_context',
+        'file_context': 'file_context',
+        'context': 'file_context',
+        'plan': 'plan',
+        'steps': 'plan',
+        'todo': 'plan',
+        'lessons': 'findings',
+        'lessons_learned': 'findings',
+    }
+
+    memory = _load_memory()
+    updated: list[str] = []
+
+    for key, value in notes.items():
+        # Skip metadata keys
+        if key.startswith('_'):
+            continue
+
+        section = key_to_section.get(key.lower())
+        if section and value.strip():
+            # Append to existing content if section already has data
+            existing = memory.get(section, '')
+            if existing:
+                memory[section] = f'{existing}\n\n[{key}] {value}'
+            else:
+                memory[section] = value
+            if section not in updated:
+                updated.append(section)
+
+    if updated:
+        memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        _save_memory(memory)
+
+    return updated

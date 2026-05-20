@@ -391,8 +391,26 @@ def _view_checkpoints() -> AgentThinkAction:
 
     lines: list[str] = []
     for cp in checkpoints:
-        files = ', '.join(cp.get('files', []))
-        files_str = f' | files: {files}' if files else ''
+        # Collect files from both manual input and auto-detected rollback snapshot
+        files = set(cp.get('files', []))
+        rollback_id = cp.get('rollback_id')
+        if rollback_id:
+            try:
+                from backend.core.rollback.rollback_manager import RollbackManager
+                from backend.core.workspace_resolution import require_effective_workspace_root
+
+                manager = RollbackManager(
+                    workspace_path=str(require_effective_workspace_root()),
+                    max_checkpoints=30,
+                    auto_cleanup=True,
+                )
+                rollback_files = manager.get_checkpoint_files(rollback_id)
+                files.update(rollback_files)
+            except Exception:
+                pass
+
+        files_list = sorted(files)
+        files_str = f' | files: {", ".join(files_list)}' if files_list else ''
         lines.append(
             f'  #{cp["id"]} [{cp.get("timestamp", "?")}] {cp["label"]}{files_str}'
         )

@@ -185,7 +185,16 @@ def build_recall_action(key: str) -> AgentThinkAction:
             if notes
             else '(scratchpad is empty)'
         )
-        return AgentThinkAction(thought=f'[SCRATCHPAD] All notes:\n{body}')
+        # Auto-sync scratchpad to working_memory to reduce cognitive load
+        if notes:
+            import backend.engine.tools.working_memory as wm
+            synced = wm.sync_scratchpad_to_working_memory(notes)
+            sync_note = ''
+            if synced:
+                sync_note = f'\n\n[SYNCED to working_memory: {", ".join(synced)}]'
+        else:
+            sync_note = ''
+        return AgentThinkAction(thought=f'[SCRATCHPAD] All notes:\n{body}{sync_note}')
     if key in notes:
         return AgentThinkAction(thought=f'[SCRATCHPAD] [{key}] = {notes[key]!r}')
     if key == 'lessons':
