@@ -172,8 +172,7 @@ def _strip_ansi(text: str) -> str:
 
 def _render_thinking_with_diff(text: str) -> Text:
     """Render thinking text as plain muted text."""
-    from rich.style import Style
-    return Text(text or '', style=Style(color="lightgray", opacity=0.7))
+    return Text(text or '', style="dim lightgray")
 
 
 # ── Widget classes ────────────────────────────────────────────────────────
@@ -3007,9 +3006,17 @@ class TUIRenderer:
                 self._tui.set_last_tool_status(last_status)
                 self._tui._write_log(Text(f'  {message}', style=NAVY_TEXT_DIM))
                 return
+            if status_type == 'compaction':
+                self._hud.update_agent_state('Compacting')
+                self._tui.set_agent_phase('Compacting context...')
+                self._tui.set_last_tool_status('Compacting context...')
+                self._tui._write_log(Text('  Compacting context...', style=NAVY_TEXT_DIM))
+                return
             msg = (event.content or '').strip()
             if msg:
                 self._tui._write_log(Text(f'  {msg}', style=NAVY_TEXT_DIM))
+        elif isinstance(event, CondensationAction):
+            self._tui._write_log(Text('  Context compacted', style=NAVY_TEXT_DIM))
         elif isinstance(event, AgentThinkAction):
             source_tool = getattr(event, 'source_tool', '') or ''
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
@@ -3284,10 +3291,25 @@ class TUIRenderer:
                 elapsed = time.monotonic() - self._turn_start_time
                 duration_str = f'{elapsed:.1f}s'
                 plural = '' if self._tools_in_turn == 1 else 's'
-                summary_text = f' {self._tools_in_turn} tool{plural}  ·  {duration_str} '
-                # A subtle centered divider matching the theme
-                title_text = Text(summary_text, style='#969aad')
-                self._tui._write_log(Rule(title=title_text, style=NAVY_BORDER))
+                
+                from rich.align import Align
+                from rich.panel import Panel
+                from rich.text import Text
+                
+                summary_text = Text()
+                summary_text.append("✨ ", style="#5eead4")
+                summary_text.append("Turn Complete  ", style="bold #c8d4e8")
+                summary_text.append(f"{self._tools_in_turn} tool{plural} ", style="#91abec")
+                summary_text.append(f"· {duration_str}", style="#8f9fc1")
+                
+                panel = Panel(
+                    summary_text,
+                    expand=False,
+                    border_style="#1e293b",
+                    padding=(0, 2)
+                )
+                
+                self._tui._write_log(Align.center(panel))
                 self._tui._write_log(Text('\n'))
 
         # Ensure thinking UI is cleared on any idle/terminal state

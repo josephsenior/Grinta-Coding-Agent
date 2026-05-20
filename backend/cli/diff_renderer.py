@@ -300,6 +300,7 @@ class DiffPanel:
     def _render_groups(groups: list[dict[str, list[str]]]) -> Any:
         """Build a Rich Syntax from edit groups with colored +/- lines."""
         from rich.syntax import Syntax
+        from backend.cli.theme import get_grinta_pygments_style
 
         lines = []
         for i, group in enumerate(groups):
@@ -317,7 +318,7 @@ class DiffPanel:
         return Syntax(
             diff_str,
             lexer='diff',
-            theme='material',
+            theme=get_grinta_pygments_style(),
             word_wrap=True,
             padding=(0, 1),
             background_color='#060a14',

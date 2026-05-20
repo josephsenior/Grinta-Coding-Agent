@@ -1130,6 +1130,19 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                     )
                     import asyncio
 
+                    # Notify the TUI that compaction is blocking execution
+                    try:
+                        from backend.ledger.observation import StatusObservation
+                        from backend.ledger import EventSource
+
+                        compaction_status = StatusObservation(
+                            content='Compacting context...',
+                            status_type='compaction',
+                        )
+                        self.event_stream.add_event(compaction_status, EventSource.AGENT)
+                    except Exception:
+                        pass  # Never let UI notification crash the compaction path
+
                     try:
                         if self.memory_pressure._prewarm_task:
                             await asyncio.shield(self.memory_pressure._prewarm_task)
