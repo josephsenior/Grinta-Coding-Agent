@@ -1,4 +1,4 @@
-# 34. The Self-Knowing Agent
+# 31. The Self-Knowing Agent
 
 Most of what looks like model misbehavior is actually the model lying to *itself* about what tools it has.
 
@@ -77,4 +77,4 @@ The rest is plumbing — a sanitizer here, a mapper-level strip there, a runtime
 
 ---
 
-← [The Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md) | [The Book of Grinta](README.md) | [The Required Risk](36-the-required-risk.md) →
+← [The Fuzzy Match Heresy and the Death of Unified Diffs](34-the-fuzzy-match-heresy.md) | [The Book of Grinta](README.md) | [The Required Risk](36-the-required-risk.md) →

@@ -1,4 +1,4 @@
-# 32. The Small Async Wars
+# 29. The Small Async Wars
 
 Most of the bugs that nearly broke this project did not come from the model. They came from the half-second between two `await` points where I assumed the world stood still.
 
@@ -117,4 +117,4 @@ If you build agents, save yourself a week: the next time the model looks like it
 
 ---
 
-← [The Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) | [The Book of Grinta](README.md) | [The Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md) →
+← [The Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) | [The Book of Grinta](README.md) | [The Fuzzy Match Heresy and the Death of Unified Diffs](34-the-fuzzy-match-heresy.md) →

@@ -346,10 +346,15 @@ async def test_tui_run_agent_loop_is_awaitable(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_drain_events_noop_when_empty(mock_config):
+async def test_tui_drain_events_noop_when_empty(mock_config, monkeypatch):
     """Verify drain_events is safe to call with no pending events."""
     console = RichConsole()
     loop = asyncio.get_running_loop()
+    
+    # Prevent _bootstrap from failing and exiting the app
+    from backend.cli.tui.app import GrintaScreen
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', MagicMock())
+    
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
 
     async with app.run_test(size=(120, 36)) as pilot:

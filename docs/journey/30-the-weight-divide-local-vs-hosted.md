@@ -1,4 +1,4 @@
-# 29. The Weight Divide: Local vs Hosted
+# 26. The Weight Divide: Local vs Hosted
 
 Being model-agnostic means Grinta connects to Claude on Anthropic's API, GPT on OpenAI, Gemini on Google, or Llama running on a local Ollama instance. But supporting them was not about putting different HTTP clients in a switch statement.
 
@@ -56,4 +56,4 @@ The weight divide is not a problem to solve. It is a spectrum to design for. And
 
 ---
 
-← [The Latency Veil and Human Trust](29-the-latency-veil-and-human-trust.md) | [The Book of Grinta](README.md) | [The Myth of the Committee](31-the-myth-of-the-committee.md) →
+← [The Observability, Cost, and Latency Triad](27-the-observability-black-hole.md) | [The Book of Grinta](README.md) | [The Myth of the Committee](31-the-myth-of-the-committee.md) →

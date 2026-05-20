@@ -1,4 +1,4 @@
-# 23. The Parallelization Trap: When Speed Breaks the Agent
+# 24. The Parallelization Trap: When Speed Breaks the Agent
 
 The premise sounds perfect: If an agent can read a file in one second, why not let it read ten files at once? Why not let it run a search, start a server, and edit a config all in the same batch?
 
@@ -72,8 +72,8 @@ Throughput should never cost you determinism. When it does, your agent isn't get
 
 ## What Comes Next
 
-The next chapter returns to the epilogue perspective: what remains unfinished, where the architecture is still evolving, and what constraints still need better answers.
+The next chapter explores how we debug a non-deterministic agent loop and manage token budgets in production.
 
 ---
 
-← [The Identity and Execution Crisis](24-the-identity-and-execution-crisis.md) | [The Book of Grinta](README.md) | [The Perfect Prompt Illusion](26-the-perfect-prompt-illusion.md) →
+← [The Identity and Execution Crisis](24-the-identity-and-execution-crisis.md) | [The Book of Grinta](README.md) | [The Observability, Cost, and Latency Triad](27-the-observability-black-hole.md) →

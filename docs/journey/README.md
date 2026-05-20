@@ -65,11 +65,12 @@ The file names stay stable for repository sanity, but the strongest reading arc 
 - **Act IV — Proof, Cost, and Consequence:** [08](08-the-first-fixed-issue.md), [09](09-the-3am-decisions.md), [10](10-model-agnostic-reckoning.md), [11](11-the-console-wars.md), [12](12-open-source-was-the-better-business.md)
 - **Act V — Hidden Systems:** [13](13-the-hidden-playbooks.md), [14](14-the-verification-tax.md), [15](15-prompts-are-programs.md), [16](17-the-pragmatic-stack.md), [17](18-the-mind-of-the-agent.md)
 - **Act VI — Reliability Under Fire:** [18](19-surviving-the-crash.md), [19](20-circuit-breakers-and-hallucinations.md), [20](21-the-safety-sandbox-is-not-optional.md), [21](22-who-grades-the-agent.md), [22](23-the-middleware-contract.md), [23](24-the-identity-and-execution-crisis.md)
-- **Act VII — Incident Addenda and Prompt Discipline:** [24](25-the-parallelization-trap.md), [25](26-the-perfect-prompt-illusion.md)
-- **Act VIII — Operational Reality & Production:** [26](27-the-observability-black-hole.md), [27](28-token-economics-and-the-finops-trap.md), [28](29-the-latency-veil-and-human-trust.md), [29](30-the-weight-divide-local-vs-hosted.md), [30](31-the-myth-of-the-committee.md)
-- **Act IX — Addendum (The Terminal, Revisited):** [31](32-the-two-lives-of-the-terminal.md)
-- **Act X — Reliability Receipts and Editor Honesty:** [32](33-the-small-async-wars.md), [33](34-the-fuzzy-match-heresy.md), [34](35-the-self-knowing-agent.md), [35](36-the-required-risk.md), [36](37-the-verbose-status.md), [37](38-the-vendor-neutral-bench.md)
-- **Act XI — Memory and Retrieval Honesty:** [38](39-the-semantic-memory-that-survived.md)
+- **Act VII — Incident Addenda and Prompt Discipline:** [24](25-the-parallelization-trap.md)
+- **Act VIII — Operational Reality & Production:** [25](27-the-observability-black-hole.md), [26](30-the-weight-divide-local-vs-hosted.md), [27](31-the-myth-of-the-committee.md)
+- **Act IX — Addendum (The Terminal, Revisited):** [28](32-the-two-lives-of-the-terminal.md)
+- **Act X — Reliability Receipts and Editor Honesty:** [29](33-the-small-async-wars.md), [30](34-the-fuzzy-match-heresy.md), [31](35-the-self-knowing-agent.md), [32](36-the-required-risk.md), [33](37-the-verbose-status.md), [34](38-the-vendor-neutral-bench.md)
+- **Act XI — Memory and Retrieval Honesty:** [35](39-the-semantic-memory-that-survived.md)
+- **Act XII — The Interface and Transport Physics:** [36](40-the-facade-pattern-and-the-escape-from-json-prison.md)
 - **Epilogue:** [07](07-the-road-ahead.md)
 
 Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
@@ -91,7 +92,7 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [12](12-open-source-was-the-better-business.md) | **Open Source Was the Better Business** | Why deleting the SaaS platform was the smartest architectural choice. The economics of autonomy, the privacy barrier, and the power of local honesty. |
 | [13](13-the-hidden-playbooks.md) | **The Hidden Playbooks** | Why the right knowledge should arrive at the right moment, how playbooks evolved out of earlier micro-agent ideas, and why runtime expertise beats prompt bloat. |
 | [14](14-the-verification-tax.md) | **The Verification Tax** | Why autonomous agents cannot be allowed to grade their own homework, how validators, replay, and auditability make false finishes harder, and why testing the infrastructure matters more than congratulating the model. |
-| [15](15-prompts-are-programs.md) | **Prompts Are Programs** | Why prompt engineering became a software-design problem, how Python replaced Jinja, and why the system prompt had to become debuggable, modular, and platform-aware. |
+| [15](15-prompts-are-programs.md) | **Prompts Are Programs and the Perfect Prompt Illusion** | Why prompt engineering became a software-design problem, how Python replaced Jinja, how scannable structure halts regressions, and the bias of model self-critique. |
 | [16](17-the-pragmatic-stack.md) | **The Pragmatic Stack** | Why Grinta chose practical defaults over trend-chasing: `uv`, JSON-first config, and Python with strict architectural discipline. |
 | [17](18-the-mind-of-the-agent.md) | **The Mind of the Agent** | The cognitive architecture behind tool use and memory: what was removed, what stayed optional, and what made autonomous behavior more reliable. |
 | [18](19-surviving-the-crash.md) | **Surviving the Crash** | How event streams, WAL markers, backpressure policy, and replay semantics make long agent sessions recoverable after real failures. |
@@ -101,30 +102,28 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [22](23-the-middleware-contract.md) | **The Middleware Contract** | Why middleware order is execution governance, how rollback became first-class in the pipeline, and why timing is architecture in autonomous systems. |
 | [23](24-the-identity-and-execution-crisis.md) | **The Identity and Execution Crisis** | A postmortem of four reliability failures: prompt over-caution loops, silent startup crashes, shell-identity mismatch on Windows, and brittle patch fallback execution. |
 | [24](25-the-parallelization-trap.md) | **The Parallelization Trap** | Why aggressive parallelization breaks autonomous agents, how global states decouple, and why safe-subset scheduling won out over unlimited throughput. |
-| [25](26-the-perfect-prompt-illusion.md) | **The Perfect Prompt Illusion** | Why prompt quality is an architecture problem, how scannable structure improved behavior, and why LLM self-critique can be biased toward invented criticism. |
-| [26](27-the-observability-black-hole.md) | **The Observability Black Hole** | Tracing tool calls, latent reasoning, and non-deterministic debugging when the agent hallucinates. |
-| [27](28-token-economics-and-the-finops-trap.md) | **Token Economics and the FinOps Trap** | Managing token costs, iteration caps, and routing between cheap and expensive models for operational viability. |
-| [28](29-the-latency-veil-and-human-trust.md) | **The Latency Veil and Human Trust** | Human-in-the-loop (HITL), streaming UX, and the balance of asking for permission vs. forgiveness. |
-| [29](30-the-weight-divide-local-vs-hosted.md) | **The Weight Divide: Local vs Hosted** | The operational realities of deploying heavy local weights vs. depending on frontier AI API latency. |
-| [30](31-the-myth-of-the-committee.md) | **The Myth of the Committee** | Why we killed the multi-agent swarm in favor of a single orchestrator with execution modes. |
-| [31](32-the-two-lives-of-the-terminal.md) | **The Two Lives of the Terminal** | Native PTY for opt-in interactive shells without Docker; why the default session stayed “batch first”; and how that decision sits on top of the Console Wars chapter instead of deleting it. |
-| [32](33-the-small-async-wars.md) | **The Small Async Wars** | Five reliability fights from the async / state-machine layer: the `NULL_ACTION_LOOP` cap, the `StepGuardService` grounding gate, overlap-aware streamed tool-call merging, the `_step_inner` tail-call race, and routing checkpoint handoffs through planning directives instead of error panels. With an honest note on what `sandboxed_local` does (and does not) claim on Windows. |
-| [33](34-the-fuzzy-match-heresy.md) | **The Fuzzy Match Heresy** | Why exact-match purity was a lie on real files, the three match modes (`exact` / `normalize_ws` / `fuzzy_safe`), the tree-sitter syntax check that is the receipt, and the lines I refuse to cross. |
-| [34](35-the-self-knowing-agent.md) | **The Self-Knowing Agent** | The runtime-truth capability block, default-on read parallelism, atomic `multi_edit`, and getting `parallel_tool_calls` to actually reach the SDK so the prompt's claims have receipts. |
-| [35](36-the-required-risk.md) | **The Required Risk** | Why optional security parameters are not security parameters, the autonomy-mode collapse to a single honest knob, and the per-session “always allow” memory that turned a confirmation gate from noise back into signal. |
-| [36](37-the-verbose-status.md) | **The Verbose Status** | `/status verbose` diagnostics, `DO_NOT_TRACK` and `GRINTA_DISABLE_METRICS` as honest opt-outs, and the in-band disconnect probe that catches provider proxies pretending to be the model. |
-| [37](38-the-vendor-neutral-bench.md) | **The Vendor-Neutral Bench** | The internal eval pack: why the scorer refuses to drive other agents, how the five 0–5 metrics compose, why failure caps the score at 49, and what vendor-neutral honestly does (and does not) mean. |
-| [38](39-the-semantic-memory-that-survived.md) | **The Semantic Memory That Survived** | The RAG stack that survived deletion: ChromaDB + FastEmbed ONNX, SQLite FTS5 BM25, parent-child chunking, LRU cache, optional flashrank reranking, and why the 15,000-line graph memory had to die. |
+| [25](27-the-observability-black-hole.md) | **The Observability, Cost, and Latency Triad** | Tracing tool calls, token cost economics, budget middleware guards, real-time HUD displays, context compaction, and human-in-the-loop confirmation systems. |
+| [26](30-the-weight-divide-local-vs-hosted.md) | **The Weight Divide: Local vs Hosted** | The operational realities of deploying heavy local weights vs. depending on frontier AI API latency. |
+| [27](31-the-myth-of-the-committee.md) | **The Myth of the Committee** | Why we killed the multi-agent swarm in favor of a single orchestrator with execution modes. |
+| [28](32-the-two-lives-of-the-terminal.md) | **The Two Lives of the Terminal** | Native PTY for opt-in interactive shells without Docker; why the default session stayed “batch first”; and how that decision sits on top of the Console Wars chapter instead of deleting it. |
+| [29](33-the-small-async-wars.md) | **The Small Async Wars** | Five reliability fights from the async / state-machine layer: the `NULL_ACTION_LOOP` cap, the `StepGuardService` grounding gate, overlap-aware streamed tool-call merging, the `_step_inner` tail-call race, and routing checkpoint handoffs through planning directives instead of error panels. With an honest note on what `sandboxed_local` does (and does not) claim on Windows. |
+| [30](34-the-fuzzy-match-heresy.md) | **The Fuzzy Match Heresy and the Death of Unified Diffs** | Why exact-match purity was a lie on real files, the three match modes (`exact` / `normalize_ws` / `fuzzy_safe`), the tree-sitter syntax check that is the receipt, and the lines I refuse to cross. |
+| [31](35-the-self-knowing-agent.md) | **The Self-Knowing Agent** | The runtime-truth capability block, default-on read parallelism, atomic `multi_edit`, and getting `parallel_tool_calls` to actually reach the SDK so the prompt's claims have receipts. |
+| [32](36-the-required-risk.md) | **The Required Risk** | Why optional security parameters are not security parameters, the autonomy-mode collapse to a single honest knob, and the per-session “always allow” memory that turned a confirmation gate from noise back into signal. |
+| [33](37-the-verbose-status.md) | **The Verbose Status** | `/status verbose` diagnostics, `DO_NOT_TRACK` and `GRINTA_DISABLE_METRICS` as honest opt-outs, and the in-band disconnect probe that catches provider proxies pretending to be the model. |
+| [34](38-the-vendor-neutral-bench.md) | **The Vendor-Neutral Bench** | The internal eval pack: why the scorer refuses to drive other agents, how the five 0–5 metrics compose, why failure caps the score at 49, and what vendor-neutral honestly does (and does not) mean. |
+| [35](39-the-semantic-memory-that-survived.md) | **The Semantic Memory That Survived** | The RAG stack that survived deletion: ChromaDB + FastEmbed ONNX, SQLite FTS5 BM25, parent-child chunking, LRU cache, optional flashrank reranking, and why the 15,000-line graph memory had to die. |
+| [36](40-the-facade-pattern-and-the-escape-from-json-prison.md) | **The Facade Pattern and the Escape from JSON Prison** | How separating backend complexity from prompt cognitive load and moving multi-file edits to nested XML saved the agent from the JSON escaping prison. |
 | [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
 
 ### Short reading paths
 
 If you will not read linearly, three curated arcs:
 
-- **Reliability and proof:** [19 · Surviving the Crash](19-surviving-the-crash.md) → [20 · Circuit Breakers](20-circuit-breakers-and-hallucinations.md) → [21 · Safety Sandbox](21-the-safety-sandbox-is-not-optional.md) → [22 · Who Grades the Agent](22-who-grades-the-agent.md) → [23 · Middleware Contract](23-the-middleware-contract.md).
-- **Pivot and subtraction:** [02 · Killed Darlings](02-the-killed-darlings.md) → [12 · Open Source Was the Better Business](12-open-source-was-the-better-business.md) → [31 · Myth of the Committee](31-the-myth-of-the-committee.md).
-- **Terminal and execution:** [11 · Console Wars](11-the-console-wars.md) → [31 · Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) → [32 · Small Async Wars](33-the-small-async-wars.md) → [33 · Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md).
-- **Memory and retrieval:** [04 · Context War](04-the-context-war.md) → [18 · Mind of the Agent](18-the-mind-of-the-agent.md) → [38 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md).
+- **Reliability and proof:** [18 · Surviving the Crash](19-surviving-the-crash.md) → [19 · Circuit Breakers](20-circuit-breakers-and-hallucinations.md) → [20 · Safety Sandbox](21-the-safety-sandbox-is-not-optional.md) → [21 · Who Grades the Agent](22-who-grades-the-agent.md) → [22 · Middleware Contract](23-the-middleware-contract.md).
+- **Pivot and subtraction:** [02 · Killed Darlings](02-the-killed-darlings.md) → [12 · Open Source Was the Better Business](12-open-source-was-the-better-business.md) → [27 · Myth of the Committee](31-the-myth-of-the-committee.md).
+- **Terminal and execution:** [11 · Console Wars](11-the-console-wars.md) → [28 · Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) → [29 · Small Async Wars](33-the-small-async-wars.md) → [30 · Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md).
+- **Memory and retrieval:** [04 · Context War](04-the-context-war.md) → [17 · Mind of the Agent](18-the-mind-of-the-agent.md) → [35 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md).
 
 ### Reference companion
 
@@ -137,7 +136,8 @@ Use these when a chapter names a subsystem and you want current behavior in pros
 | Repo layout, tests, contribution | [Developer Guide](../DEVELOPER.md), [CI](../CI.md) |
 | Terms and symbols | [Vocabulary](../VOCABULARY.md) |
 | Security posture | [Security checklist](../SECURITY_CHECKLIST.md), [Reliability](../RELIABILITY.md) |
-| Memory and RAG stack | [38 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md); implementation under `backend/context/` |
+| Memory and RAG stack | [35 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md); implementation under `backend/context/` |
+| Tool design and XML editing | [36 · The Facade Pattern and the Escape from JSON Prison](40-the-facade-pattern-and-the-escape-from-json-prison.md); implementation under `backend/tools/` |
 
 ---
 
