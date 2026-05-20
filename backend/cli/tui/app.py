@@ -27,6 +27,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.text import Text
+from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -171,7 +172,8 @@ def _strip_ansi(text: str) -> str:
 
 def _render_thinking_with_diff(text: str) -> Text:
     """Render thinking text as plain muted text."""
-    return Text(text or '', style=NAVY_TEXT_MUTED)
+    # Using DIM instead of MUTED to make it slightly more visible but still secondary
+    return Text(text or '', style=NAVY_TEXT_DIM)
 
 
 # ── Widget classes ────────────────────────────────────────────────────────
@@ -208,7 +210,6 @@ class HUD(Vertical):
     def compose(self) -> ComposeResult:
         yield Label(id='hud-line-1')
         yield Label(id='hud-line-2')
-        yield Label(id='hud-line-3')
         yield Label(id='hud-line-4')
 
 
@@ -253,6 +254,91 @@ class GrintaConfirmDialog(ModalScreen[str | None]):
             if event.button.id == f'confirm-{key}':
                 self.dismiss(key)
                 return
+
+
+class GrintaAddSkillDialog(ModalScreen[dict[str, str] | None]):
+    """Dialog to create a custom skill dynamically."""
+
+    BINDINGS = [
+        Binding('escape', 'dismiss(None)', 'Cancel', show=False),
+        Binding('ctrl+s', 'save', 'Save', show=False),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id='settings-dialog'):
+            yield Label('[bold]Add Custom Skill[/]', classes='title')
+            yield Label('Skill Name (e.g. react_best_practices)', classes='field-label')
+            yield Input(id='skill-name')
+            yield Label('Instructions (Markdown)', classes='field-label')
+            yield TextArea(id='skill-content')
+            yield Label('', id='settings-feedback')
+            with Horizontal(id='settings-buttons'):
+                yield Button('Save', id='settings-save', variant='primary')
+                yield Button('Cancel', id='settings-cancel')
+
+    def on_mount(self) -> None:
+        self.query_one('#skill-name', Input).focus()
+
+    def action_save(self) -> None:
+        self._submit()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == 'settings-save':
+            self._submit()
+        elif event.button.id == 'settings-cancel':
+            self.dismiss(None)
+
+    def _submit(self) -> None:
+        name = self.query_one('#skill-name', Input).value.strip()
+        content = self.query_one('#skill-content', TextArea).text.strip()
+        if not name:
+            self.query_one('#settings-feedback', Label).update('[#f05757]Skill name required.[/]')
+            return
+        if not content:
+            self.query_one('#settings-feedback', Label).update('[#f05757]Content required.[/]')
+            return
+        self.dismiss({'name': name, 'content': content})
+
+
+class GrintaAddMCPDialog(ModalScreen[dict[str, str] | None]):
+    """Dialog to add an MCP Server."""
+
+    BINDINGS = [
+        Binding('escape', 'dismiss(None)', 'Cancel', show=False),
+        Binding('ctrl+s', 'save', 'Save', show=False),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id='settings-dialog'):
+            yield Label('[bold]Add MCP Server[/]', classes='title')
+            yield Label('Server Name', classes='field-label')
+            yield Input(id='mcp-name')
+            yield Label('Command or URL (e.g. npx -y @modelcontextprotocol/server-postgres)', classes='field-label')
+            yield Input(id='mcp-command')
+            yield Label('', id='settings-feedback')
+            with Horizontal(id='settings-buttons'):
+                yield Button('Save', id='settings-save', variant='primary')
+                yield Button('Cancel', id='settings-cancel')
+
+    def on_mount(self) -> None:
+        self.query_one('#mcp-name', Input).focus()
+
+    def action_save(self) -> None:
+        self._submit()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == 'settings-save':
+            self._submit()
+        elif event.button.id == 'settings-cancel':
+            self.dismiss(None)
+
+    def _submit(self) -> None:
+        name = self.query_one('#mcp-name', Input).value.strip()
+        cmd = self.query_one('#mcp-command', Input).value.strip()
+        if not name or not cmd:
+            self.query_one('#settings-feedback', Label).update('[#f05757]Name and command required.[/]')
+            return
+        self.dismiss({'name': name, 'command': cmd})
 
 
 class GrintaSettingsDialog(ModalScreen[dict[str, Any] | None]):
@@ -709,6 +795,7 @@ class GrintaScreen(Screen):
                     content="No MCP servers configured",
                     collapsed=False,
                     accent_color='#eacb8a',
+                    action_label='[+] Add',
                     id='sidebar-mcp',
                 )
                 yield CollapsibleSection(
@@ -716,6 +803,7 @@ class GrintaScreen(Screen):
                     content="No skills available",
                     collapsed=True,
                     accent_color='#7a849c',
+                    action_label='[+] Add',
                     id='sidebar-skills',
                 )
         with InputBar(id='input-bar'):
@@ -802,23 +890,19 @@ class GrintaScreen(Screen):
                 workspace = workspace.replace(home, '~', 1)
         except Exception:
             pass
-        line1 = (
-            f'[#91abec bold]GRINTA[/]  |  '
-            f'[#bbc8e8 bold]Workspace: {workspace}[/]  |  '
-            f'[#8f9fc1]Version: {GRINTA_VERSION}[/]'
-        )
-
-        # Build second-line HUD
-        line2_parts = []
-        line2_parts.append(f'[{state_color}]● {display_state}[/]')
-        line2_parts.append(f'[{NAVY_TEXT_SECONDARY}]Model: {model_display}[/]')
-        line2_parts.append(f'[{NAVY_BRAND}]Auto: {autonomy}[/]')
-        line2_parts.append(f'[{NAVY_TEXT_DIM}]Tokens: {used:,}[/]')
-        line2_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
-        line2_parts.append(f'[{NAVY_TEXT_DIM}]Calls: {calls}[/]')
+        line1_parts = []
+        line1_parts.append(f'[#91abec bold]GRINTA[/]')
+        line1_parts.append(f'[{state_color}]● {display_state}[/]')
+        if workspace:
+            line1_parts.append(f'[#bbc8e8]ws: {workspace}[/]')
+        line1_parts.append(f'[{NAVY_TEXT_SECONDARY}]{model_display}[/]')
+        line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
+        line1_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
+        line1 = '  |  '.join(line1_parts)
 
         elapsed = max(0, int(time.monotonic() - self._phase_started_at))
         runtime_line = (
+            f'[{NAVY_BRAND}]Auto: {autonomy}[/]  |  '
             f'[{NAVY_TEXT_DIM}]Phase: {self._phase_label}  |  '
             f'Elapsed: {elapsed}s  |  '
             f'Last: {self._last_tool_status}[/]'
@@ -831,8 +915,7 @@ class GrintaScreen(Screen):
 
         hud_bar = self.query_one('#hud-bar', HUD)
         hud_bar.query_one('#hud-line-1', Label).update(line1)
-        hud_bar.query_one('#hud-line-2', Label).update('  |  '.join(line2_parts))
-        hud_bar.query_one('#hud-line-3', Label).update(hint_line)
+        hud_bar.query_one('#hud-line-2', Label).update(hint_line)
 
         line4 = (
             f'[#54597b]Keys:[/] '
@@ -1342,6 +1425,95 @@ class GrintaScreen(Screen):
             skill_name = item_id.split(':', 1)[1]
             self.notify(f"Playbook Skill: {skill_name}.md", severity="info", timeout=3.0)
 
+    async def on_sidebar_row_delete_requested(self, event: Any) -> None:
+        """Handle SidebarRow delete events."""
+        from backend.cli.tui.widgets.collapsible import SidebarRow
+        if not isinstance(event, SidebarRow.DeleteRequested) or not event.item_id:
+            return
+        item_id = event.item_id
+        if item_id.startswith('skill:'):
+            skill_name = item_id[6:]
+            result = await self.app.push_screen_wait(
+                GrintaConfirmDialog(
+                    title="Delete Skill",
+                    body=f"Are you sure you want to delete {skill_name}.md?",
+                    options=[('cancel', 'Cancel'), ('delete', 'Delete')],
+                )
+            )
+            if result == 'delete':
+                self._delete_skill(skill_name)
+        elif item_id.startswith('mcp:'):
+            mcp_name = item_id.split(':', 1)[1]
+            result = await self.app.push_screen_wait(
+                GrintaConfirmDialog(
+                    title="Delete MCP Server",
+                    body=f"Are you sure you want to remove the server '{mcp_name}'?",
+                    options=[('cancel', 'Cancel'), ('delete', 'Remove')],
+                )
+            )
+            if result == 'delete':
+                self._delete_mcp_server(mcp_name)
+
+    def _delete_skill(self, name: str) -> None:
+        if not name.endswith('.md'):
+            name += '.md'
+        skill_path = Path.home() / '.grinta' / 'skills' / name
+        try:
+            if skill_path.exists():
+                skill_path.unlink()
+                self.notify(f'Skill deleted: {name}', severity='information')
+                self._last_sidebar_state = None
+            else:
+                self.notify(f'Skill not found: {name}', severity='warning')
+        except Exception as e:
+            self.notify(f'Failed to delete skill: {e}', severity='error')
+
+    def _delete_mcp_server(self, name: str) -> None:
+        from backend.cli.config_manager import remove_mcp_server
+        try:
+            remove_mcp_server(name)
+            self.notify(f'MCP Server removed: {name}', severity='information')
+            self._last_sidebar_state = None
+        except Exception as e:
+            self.notify(f'Failed to remove MCP server: {e}', severity='error')
+
+    @work
+    async def on_collapsible_section_action_clicked(self, event: Any) -> None:
+        """Handle [+] Add clicks on sidebar sections."""
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+        if not event.control:
+            return
+
+        if event.control.id == 'sidebar-skills':
+            result = await self.app.push_screen_wait(GrintaAddSkillDialog())
+            if result:
+                self._create_skill(result['name'], result['content'])
+        elif event.control.id == 'sidebar-mcp':
+            result = await self.app.push_screen_wait(GrintaAddMCPDialog())
+            if result:
+                self._add_mcp_server(result['name'], result['command'])
+
+    def _create_skill(self, name: str, content: str) -> None:
+        skills_dir = Path.home() / '.grinta' / 'skills'
+        skills_dir.mkdir(parents=True, exist_ok=True)
+        if not name.endswith('.md'):
+            name += '.md'
+        skill_path = skills_dir / name
+        try:
+            skill_path.write_text(content, encoding='utf-8')
+            self.notify(f'Skill created: {name}', severity='information')
+            self._last_sidebar_state = None  # Force full refresh next tick
+        except Exception as e:
+            self.notify(f'Failed to create skill: {e}', severity='error')
+
+    def _add_mcp_server(self, name: str, command: str) -> None:
+        from backend.cli.config_manager import add_mcp_server
+        try:
+            add_mcp_server(name, command=command)
+            self.notify(f'MCP Server added: {name}', severity='information')
+            self._last_sidebar_state = None  # Force full refresh next tick
+        except Exception as e:
+            self.notify(f'Failed to add MCP server: {e}', severity='error')
     # ── Input handling ──────────────────────────────────────────────────────
 
     def action_complete_command(self) -> None:
@@ -2486,7 +2658,7 @@ class TUIRenderer:
                         server_type = server.get('type', 'stdio')
 
                         row_text = Text()
-                        row_text.append('⚡ ', style='bold #eacb8a')
+                        row_text.append('● ', style='bold #eacb8a')
                         row_text.append(name, style='#c8d4e8')
                         row_text.append(f' ({server_type})', style='#54597b')
                         mcp_items.append((row_text, f"mcp:{name}"))
@@ -2504,7 +2676,7 @@ class TUIRenderer:
                 if skills_list:
                     for skill in sorted(skills_list):
                         row_text = Text()
-                        row_text.append('📚 ', style='bold #7a849c')
+                        row_text.append('● ', style='bold #7a849c')
                         row_text.append(skill, style='#a1acc2')
                         skill_items.append((row_text, f"skill:{skill}"))
 

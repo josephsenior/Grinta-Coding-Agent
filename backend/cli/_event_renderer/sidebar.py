@@ -120,7 +120,7 @@ def build_mcp_servers_panel(
             name = server.get('name', 'unknown')
             server_type = server.get('type', 'stdio')
 
-            bullet = Text('⚡ ', style='bold #eacb8a')
+            bullet = Text('• ', style='bold #eacb8a')
 
             type_badge = f'({server_type})'
             server_info = Text()
@@ -157,7 +157,7 @@ def build_skills_panel(
         for skill in sorted(skills):
             if displayed_count >= SIDEBAR_MAX_ROWS:
                 break
-            bullet = Text('📚 ', style='bold #7a849c')
+            bullet = Text('• ', style='bold #7a849c')
             skill_name = Text(skill, style='#a1acc2')
             table.add_row(bullet, skill_name)
             displayed_count += 1

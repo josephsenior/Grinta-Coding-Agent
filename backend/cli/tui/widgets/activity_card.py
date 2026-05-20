@@ -319,31 +319,31 @@ class ThinkingIndicator(Static):
         self._thoughts = []
         self._step_count = 0
         self.remove_class('-hidden')
-        self._render()
+        self._update_display()
 
     def add_thought(self, thought: str) -> None:
         """Add a reasoning step."""
         self._thoughts.append(thought)
         self._step_count += 1
-        self._render()
+        self._update_display()
 
     def set_thoughts(self, text: str) -> None:
         """Set thoughts by parsing accumulated text."""
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         self._thoughts = lines
         self._step_count = len(lines)
-        self._render()
+        self._update_display()
 
     def update_action(self, action: str) -> None:
         """Update the current action description."""
         self._current_action = action
-        self._render()
+        self._update_display()
 
     def stop(self) -> None:
         """Stop the thinking indicator."""
         self.add_class('-hidden')
 
-    def _render(self) -> None:
+    def _update_display(self) -> None:
         import time
 
         elapsed = int(time.monotonic() - self._start_time) if self._start_time else 0
