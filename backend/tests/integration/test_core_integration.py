@@ -523,7 +523,9 @@ class TestHealthSnapshot:
 
         # Circuit breaker service
         cb_config = CircuitBreakerConfig(enabled=True)
-        ctrl.circuit_breaker_service = CircuitBreaker(cb_config)
+        cb_service = MagicMock()
+        cb_service.circuit_breaker = CircuitBreaker(cb_config)
+        ctrl.circuit_breaker_service = cb_service
 
         # Retry service
         ctrl.retry_service = MagicMock()
@@ -560,7 +562,7 @@ class TestHealthSnapshot:
         ctrl = self._make_controller()
         # Record enough errors to trigger circuit breaker concern
         for _ in range(5):
-            ctrl.circuit_breaker_service.record_error(Exception('test'))
+            ctrl.circuit_breaker_service.circuit_breaker.record_error(Exception('test'))
         snap = collect_orchestration_health(ctrl)
         # Should have warnings about consecutive errors
         warnings = snap.get('warnings', [])

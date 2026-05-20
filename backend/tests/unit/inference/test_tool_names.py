@@ -31,6 +31,7 @@ class TestToolNames(TestCase):
             'FINISH_TOOL_NAME',
             'TEXT_EDITOR_TOOL_NAME',
             'TASK_TRACKER_TOOL_NAME',
+            'FILE_EDITOR_TOOL_NAME',
         ]
         self.assertEqual(set(tool_names.__all__), set(expected_exports))
 
@@ -66,8 +67,8 @@ class TestToolNames(TestCase):
         self.assertIsNotNone(TASK_TRACKER_TOOL_NAME)
 
     def test_all_list_length(self):
-        """Test that __all__ contains exactly 3 exports."""
-        self.assertEqual(len(tool_names.__all__), 3)
+        """Test that __all__ contains exactly 4 exports."""
+        self.assertEqual(len(tool_names.__all__), 4)
 
     def test_no_extra_exports(self):
         """Test that only expected constants are exported in __all__."""
