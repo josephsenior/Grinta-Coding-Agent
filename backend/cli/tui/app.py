@@ -312,42 +312,6 @@ class HUD(Vertical):
             yield Label(id='hud-line-2')
 
 
-class CurrentOperation(Vertical):
-    """Pinned surface showing the agent's current operation."""
-
-    def compose(self) -> ComposeResult:
-        yield Label('[#7f8aa3]Current Operation[/]', id='current-op-title')
-        yield Label('[#e9eefc]Idle[/]', id='current-op-main')
-        yield Label('[#7f8aa3]Waiting for activity[/]', id='current-op-meta')
-
-
-class WorkerStatusStrip(Vertical):
-    """Pinned surface summarizing delegated worker activity."""
-
-    def compose(self) -> ComposeResult:
-        yield Label('[#7f8aa3]Workers[/]', id='worker-strip-title')
-        yield Label('[#aeb9d3]No delegated work[/]', id='worker-strip-main')
-        yield Label('[#7f8aa3]Idle[/]', id='worker-strip-meta')
-
-
-class RetryStatusStrip(Vertical):
-    """Pinned surface for retry/backoff state."""
-
-    def compose(self) -> ComposeResult:
-        yield Label('[#7f8aa3]Retries[/]', id='retry-strip-title')
-        yield Label('[#aeb9d3]No retry activity[/]', id='retry-strip-main')
-        yield Label('[#7f8aa3]Idle[/]', id='retry-strip-meta')
-
-
-class RuntimeStatusStrip(Vertical):
-    """Pinned surface for low-value runtime/system notices."""
-
-    def compose(self) -> ComposeResult:
-        yield Label('[#7f8aa3]Runtime[/]', id='runtime-strip-title')
-        yield Label('[#aeb9d3]No runtime notices[/]', id='runtime-strip-main')
-        yield Label('[#7f8aa3]Idle[/]', id='runtime-strip-meta')
-
-
 class RendererDrainRequested(Message):
     """Message requesting the screen to drain queued renderer events."""
 
@@ -990,10 +954,6 @@ class GrintaScreen(Screen):
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
         with Horizontal(id='main-layout'):
             with Vertical(id='transcript-column'):
-                yield CurrentOperation(id='current-operation')
-                yield RetryStatusStrip(id='retry-strip')
-                yield RuntimeStatusStrip(id='runtime-strip')
-                yield WorkerStatusStrip(id='worker-strip')
                 yield Transcript(id='main-display')
             with InfoSidebar(id='sidebar-container'):
                 yield CollapsibleSection(
@@ -1029,27 +989,6 @@ class GrintaScreen(Screen):
         self._is_unmounted = False
 
         self._render_hud_bar()
-        self.set_current_operation(
-            self._current_operation_summary,
-            meta=self._current_operation_meta,
-            active=self._current_operation_active,
-        )
-        self.set_retry_status(
-            self._retry_summary,
-            meta=self._retry_meta,
-            active=self._retry_active,
-        )
-        self.set_runtime_status(
-            self._runtime_summary,
-            meta=self._runtime_meta,
-            active=self._runtime_active,
-        )
-        self.set_worker_status(
-            self._worker_summary,
-            meta=self._worker_meta,
-            active=self._worker_active,
-            has_error=self._worker_has_error,
-        )
         self._hud_tick = self.set_interval(1.0, self._refresh_runtime_feedback)
         ta = self.query_one('#input', TextArea)
         ta.text = ''
@@ -1084,12 +1023,12 @@ class GrintaScreen(Screen):
         if self._renderer:
             if self._renderer._event_stream:
                 self._renderer._event_stream.unsubscribe(
-                    EventStreamSubscriber.MAIN, 'grinta-tui'
+                    EventStreamSubscriber.CLI, 'grinta-tui'
                 )
             self._renderer._event_stream = None
         if self._event_stream is not None:
             try:
-                self._event_stream.unsubscribe(EventStreamSubscriber.MAIN, 'grinta-tui')
+                self._event_stream.unsubscribe(EventStreamSubscriber.CLI, 'grinta-tui')
                 close_fn = getattr(self._event_stream, 'close', None)
                 if callable(close_fn):
                     close_fn()
@@ -1213,21 +1152,6 @@ class GrintaScreen(Screen):
         self._current_operation_summary = summary_text
         self._current_operation_meta = meta_text or 'Waiting for activity'
         self._current_operation_active = active
-        try:
-            widget = self.query_one('#current-operation', CurrentOperation)
-            widget.query_one('#current-op-main', Label).update(
-                f'[{NAVY_TEXT_PRIMARY if active else NAVY_TEXT_MUTED}]{summary_text}[/]'
-            )
-            widget.query_one('#current-op-meta', Label).update(
-                f'[{NAVY_TEXT_SECONDARY if active else NAVY_TEXT_DIM}]'
-                f'{self._current_operation_meta}[/]'
-            )
-            if active:
-                widget.add_class('active')
-            else:
-                widget.remove_class('active')
-        except Exception:
-            pass
 
     def clear_current_operation(self, meta: str = 'Waiting for activity') -> None:
         self.set_current_operation('Idle', meta=meta, active=False)
@@ -1248,20 +1172,6 @@ class GrintaScreen(Screen):
         self._retry_summary = summary_text
         self._retry_meta = meta_text
         self._retry_active = active
-        try:
-            widget = self.query_one('#retry-strip', RetryStatusStrip)
-            widget.query_one('#retry-strip-main', Label).update(
-                f'[{NAVY_WAITING if active else NAVY_TEXT_MUTED}]{summary_text}[/]'
-            )
-            widget.query_one('#retry-strip-meta', Label).update(
-                f'[{NAVY_TEXT_SECONDARY if active else NAVY_TEXT_DIM}]{meta_text}[/]'
-            )
-            if active:
-                widget.add_class('active')
-            else:
-                widget.remove_class('active')
-        except Exception:
-            pass
 
     def clear_retry_status(self, meta: str = 'Idle') -> None:
         self.set_retry_status('No retry activity', meta=meta, active=False)
@@ -1282,20 +1192,6 @@ class GrintaScreen(Screen):
         self._runtime_summary = summary_text
         self._runtime_meta = meta_text
         self._runtime_active = active
-        try:
-            widget = self.query_one('#runtime-strip', RuntimeStatusStrip)
-            widget.query_one('#runtime-strip-main', Label).update(
-                f'[{NAVY_TEXT_PRIMARY if active else NAVY_TEXT_MUTED}]{summary_text}[/]'
-            )
-            widget.query_one('#runtime-strip-meta', Label).update(
-                f'[{NAVY_TEXT_SECONDARY if active else NAVY_TEXT_DIM}]{meta_text}[/]'
-            )
-            if active:
-                widget.add_class('active')
-            else:
-                widget.remove_class('active')
-        except Exception:
-            pass
 
     def clear_runtime_status(self, meta: str = 'Idle') -> None:
         self.set_runtime_status('No runtime notices', meta=meta, active=False)
@@ -1318,25 +1214,6 @@ class GrintaScreen(Screen):
         self._worker_meta = meta_text
         self._worker_active = active
         self._worker_has_error = has_error
-        try:
-            widget = self.query_one('#worker-strip', WorkerStatusStrip)
-            widget.query_one('#worker-strip-main', Label).update(
-                f'[{NAVY_TEXT_PRIMARY if active else NAVY_TEXT_MUTED}]{summary_text}[/]'
-            )
-            meta_color = NAVY_ERROR if has_error else (NAVY_TEXT_SECONDARY if active else NAVY_TEXT_DIM)
-            widget.query_one('#worker-strip-meta', Label).update(
-                f'[{meta_color}]{meta_text}[/]'
-            )
-            if active:
-                widget.add_class('active')
-            else:
-                widget.remove_class('active')
-            if has_error:
-                widget.add_class('error')
-            else:
-                widget.remove_class('error')
-        except Exception:
-            pass
 
     def _update_command_hint(self, text: str) -> None:
         stripped = _strip_ansi(text).strip()
@@ -2329,7 +2206,7 @@ class GrintaScreen(Screen):
         self._event_stream = None
         if old_stream is not None:
             with contextlib.suppress(Exception):
-                old_stream.unsubscribe(EventStreamSubscriber.MAIN, old_stream.sid)
+                old_stream.unsubscribe(EventStreamSubscriber.CLI, old_stream.sid)
             close_fn = getattr(old_stream, 'close', None)
             if callable(close_fn):
                 with contextlib.suppress(Exception):
@@ -2835,7 +2712,7 @@ class TUIRenderer:
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
-        event_stream.subscribe(EventStreamSubscriber.MAIN, self._on_event, sid)
+        event_stream.subscribe(EventStreamSubscriber.CLI, self._on_event, sid)
 
     def add_to_history(self, renderable: Any) -> None:
         """Add a finalized renderable or widget to the transcript."""
@@ -2920,7 +2797,6 @@ class TUIRenderer:
         """Clear the in-flight response preview widget."""
         self._live_response = ''
         self._live_response_dirty = False
-        self._last_final_response_text = ''
 
         display = self._tui._get_display()
         if type(display).__name__ == 'MagicMock':
@@ -3927,7 +3803,8 @@ class TUIRenderer:
         self._tui.finalize_thinking()
         self.clear_live_response()
         self._last_final_response_text = content
-        self._tui.add_agent_message(content)
+        from backend.cli.tui.widgets.activity_card import AgentMessage
+        self.add_to_history(AgentMessage(content))
 
     @staticmethod
     def _format_retry_status_message(
@@ -3976,7 +3853,8 @@ class TUIRenderer:
                 self._tui._renderer.clear_live_response()
             if content and self._tui._renderer:
                 self._last_final_response_text = content
-                body = Markdown(content)
+                from backend.cli.tui.widgets.activity_card import AgentMessage
+                body = AgentMessage(content)
                 self._tui._renderer.add_to_history(body)
             return
 
@@ -4026,27 +3904,10 @@ class TUIRenderer:
             if self._tools_in_turn > 0:
                 elapsed = time.monotonic() - self._turn_start_time
                 duration_str = f'{elapsed:.1f}s'
-                plural = '' if self._tools_in_turn == 1 else 's'
-                
-                from rich.align import Align
-                from rich.panel import Panel
-                from rich.text import Text
-                
-                summary_text = Text()
-                summary_text.append("✨ ", style="#5eead4")
-                summary_text.append("Turn Complete  ", style="bold #c8d4e8")
-                summary_text.append(f"{self._tools_in_turn} tool{plural} ", style="#91abec")
-                summary_text.append(f"· {duration_str}", style="#8f9fc1")
-                
-                panel = Panel(
-                    summary_text,
-                    expand=False,
-                    border_style="#1e293b",
-                    padding=(0, 2)
-                )
-                
-                self._tui._write_log(Align.center(panel))
-                self._tui._write_log(Text('\n'))
+
+                from backend.cli.tui.widgets.activity_card import TurnCompletion
+
+                self._tui._write_log(TurnCompletion(duration_str))
 
         # Ensure thinking UI is cleared on any idle/terminal state
         if state in (

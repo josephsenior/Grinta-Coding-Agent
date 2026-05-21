@@ -26,6 +26,7 @@ from backend.cli._event_renderer.unified_renderer import ActivityRenderer
 from backend.cli.tui.widgets.activity_card import (
     ActivityCard as TUIActivityCard,
     AgentMessage,
+    TurnCompletion,
 )
 from backend.core.enums import AgentState, EventSource
 from backend.ledger.action import MessageAction, StreamingChunkAction
@@ -35,11 +36,8 @@ from backend.ledger.action.terminal import (
     TerminalReadAction,
     TerminalRunAction,
 )
-from backend.ledger.action.agent import DelegateTaskAction
 from backend.ledger.observation.agent import AgentStateChangedObservation
-from backend.ledger.observation.agent import DelegateTaskObservation
 from backend.ledger.observation.commands import CmdOutputObservation
-from backend.ledger.observation.status import StatusObservation
 from backend.ledger.observation.terminal import TerminalObservation
 
 
@@ -526,27 +524,6 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(mock_config, mo
 
 
 @pytest.mark.asyncio
-async def test_tui_current_operation_widget_updates(mock_config):
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-
-        s = _get_screen(app)
-        s.set_current_operation('Shell: Ran $ pytest', meta='running', active=True)
-        await pilot.pause()
-
-        main = s.query_one('#current-op-main', Label)
-        meta = s.query_one('#current-op-meta', Label)
-        current = s.query_one('#current-operation')
-        assert 'pytest' in str(main.renderable)
-        assert 'running' in str(meta.renderable)
-        assert 'active' in current.classes
-
-
-@pytest.mark.asyncio
 async def test_tui_terminal_session_reuses_single_card(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
@@ -638,10 +615,10 @@ async def test_tui_agent_message_action_renders_response(mock_config):
         action = MessageAction(content='I can help with that.')
         action.source = EventSource.AGENT
         renderer._process_event(action)
-        await pilot.pause()
 
-        messages = s.query(AgentMessage).results()
-        assert any('I can help with that.' in str(msg.renderable) for msg in messages)
+        assert renderer._last_final_response_text == 'I can help with that.'
+        assert len(renderer._history) == 2
+        assert isinstance(renderer._history[0], AgentMessage)
 
 
 @pytest.mark.asyncio
@@ -678,6 +655,48 @@ async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config)
 
         assert renderer._last_final_response_text == 'Final answer.'
         assert len(renderer._history) == 2
+        assert isinstance(renderer._history[0], AgentMessage)
+
+
+@pytest.mark.asyncio
+async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.ledger import EventStream
+        from backend.persistence.in_memory_file_store import InMemoryFileStore
+        from backend.utils.async_utils import set_main_event_loop
+
+        set_main_event_loop(loop)
+        stream = EventStream('tui-render-test', InMemoryFileStore(), user_id='tui-test')
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+        renderer.subscribe(stream, stream.sid)
+
+        try:
+            stream.add_event(
+                MessageAction(content='Queued agent reply.'),
+                EventSource.AGENT,
+            )
+            await renderer.wait_for_activity(wait_timeout_sec=2.0)
+        finally:
+            stream.close()
+
+        assert renderer._last_final_response_text == 'Queued agent reply.'
+        assert len(renderer._history) == 2
+        assert isinstance(renderer._history[0], AgentMessage)
 
 
 @pytest.mark.asyncio
@@ -711,7 +730,7 @@ async def test_tui_shell_command_empty_output_still_completes(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_worker_strip_tracks_delegation_state(mock_config):
+async def test_tui_turn_completion_uses_full_width_thin_widget(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -729,118 +748,20 @@ async def test_tui_worker_strip_tracks_delegation_state(mock_config):
             tui=s,
             loop=loop,
         )
+        s._renderer = renderer
 
-        renderer._process_event(DelegateTaskAction(task_description='Audit shell failures'))
-        await pilot.pause()
-
-        main = s.query_one('#worker-strip-main', Label)
-        meta = s.query_one('#worker-strip-meta', Label)
-        strip = s.query_one('#worker-strip')
-        assert '1 worker active' in str(main.renderable)
-        assert 'Audit shell failures' in str(meta.renderable)
-        assert 'active' in strip.classes
-
-        renderer._process_event(
-            DelegateTaskObservation(success=False, content='traceback', error_message='validation failed')
-        )
-        await pilot.pause()
-
-        main = s.query_one('#worker-strip-main', Label)
-        meta = s.query_one('#worker-strip-meta', Label)
-        strip = s.query_one('#worker-strip')
-        assert 'Workers idle' in str(main.renderable)
-        assert 'failed 1' in str(meta.renderable)
-        assert 'error' in strip.classes
-
-
-@pytest.mark.asyncio
-async def test_tui_retry_strip_tracks_backoff_and_clears_on_recovery(mock_config):
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-
-        s = _get_screen(app)
-        from backend.cli.tui.app import TUIRenderer
-
-        renderer = TUIRenderer(
-            console=console,
-            hud=HUDBar(),
-            reasoning=ReasoningDisplay(),
-            tui=s,
-            loop=loop,
-        )
-
-        renderer._process_event(
-            StatusObservation(
-                content='',
-                status_type='retry_pending',
-                extras={'attempt': 2, 'max_attempts': 5, 'delay_seconds': 3, 'reason': 'rate limit'},
-            )
-        )
-        await pilot.pause()
-
-        main = s.query_one('#retry-strip-main', Label)
-        meta = s.query_one('#retry-strip-meta', Label)
-        strip = s.query_one('#retry-strip')
-        assert 'Backoff 2/5' in str(main.renderable)
-        assert 'Auto-retrying' in str(meta.renderable)
-        assert 'active' in strip.classes
-
+        renderer._process_event(CmdRunAction(command='true'))
         renderer._process_event(
             AgentStateChangedObservation(content='', agent_state='awaiting_user_input')
         )
-        await pilot.pause()
 
-        main = s.query_one('#retry-strip-main', Label)
-        meta = s.query_one('#retry-strip-meta', Label)
-        strip = s.query_one('#retry-strip')
-        assert 'No retry activity' in str(main.renderable)
-        assert 'Idle' in str(meta.renderable)
-        assert 'active' not in strip.classes
-
-
-@pytest.mark.asyncio
-async def test_tui_runtime_strip_handles_compaction_notice(mock_config):
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-
-        s = _get_screen(app)
-        from backend.cli.tui.app import TUIRenderer
-
-        renderer = TUIRenderer(
-            console=console,
-            hud=HUDBar(),
-            reasoning=ReasoningDisplay(),
-            tui=s,
-            loop=loop,
+        completion = next(
+            item for item in renderer._history if isinstance(item, TurnCompletion)
         )
-
-        renderer._process_event(StatusObservation(content='', status_type='compaction'))
-        await pilot.pause()
-
-        main = s.query_one('#runtime-strip-main', Label)
-        meta = s.query_one('#runtime-strip-meta', Label)
-        strip = s.query_one('#runtime-strip')
-        assert 'Compacting context' in str(main.renderable)
-        assert 'Reducing context' in str(meta.renderable)
-        assert 'active' in strip.classes
-
-        renderer._process_event(AgentStateChangedObservation(content='', agent_state='running'))
-        await pilot.pause()
-
-        main = s.query_one('#runtime-strip-main', Label)
-        meta = s.query_one('#runtime-strip-meta', Label)
-        strip = s.query_one('#runtime-strip')
-        assert 'No runtime notices' in str(main.renderable)
-        assert 'Idle' in str(meta.renderable)
-        assert 'active' not in strip.classes
+        assert completion is not None
+        rendered = str(completion.renderable)
+        assert 'Finished in:' in rendered
+        assert 'tool' not in rendered.lower()
 
 
 def test_activity_renderer_keeps_error_heavy_success_output_expanded() -> None:
