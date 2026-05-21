@@ -2826,9 +2826,11 @@ class TUIRenderer:
             self._live_thinking_widget = None
 
             if thoughts:
-                content = '\n'.join(thoughts)
-                thinking_text = Text(f'[bold #5eead4]Thinking:[/] ', style='lightgray') + Text(content, style='lightgray')
-                self._tui._write_log(thinking_text)
+                lines = [f'[bold #5eead4]Thinking:[/]']
+                for thought in thoughts:
+                    lines.append(f'  [lightgray opacity=0.7]{thought}[/]')
+                thinking_text = '\n'.join(lines)
+                self._tui._write_log(Text.from_markup(thinking_text))
 
             self._live_thinking = ''
             self._live_thinking_dirty = False
