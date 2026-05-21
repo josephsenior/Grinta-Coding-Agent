@@ -533,6 +533,10 @@ class ThinkingIndicator(Static):
         self._step_count = len(self._thoughts)
         self._update_display()
 
+    def stop(self) -> None:
+        """Stop the thinking indicator."""
+        self.add_class('-hidden')
+
     def _update_display(self) -> None:
         import time
 
