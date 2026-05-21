@@ -54,122 +54,6 @@ Transcript {
     padding: 1 2;
 }
 
-#current-operation {
-    height: auto;
-    margin: 1 2 0 2;
-    padding: 1 1;
-    border: round #1b233a;
-    background: #08101d;
-}
-
-#current-operation.active {
-    border: round #3b4d79;
-    background: #0b1526;
-}
-
-#current-op-title {
-    height: 1;
-    text-style: bold;
-}
-
-#current-op-main {
-    height: auto;
-    margin-top: 1;
-}
-
-#current-op-meta {
-    height: auto;
-    margin-top: 0;
-}
-
-#retry-strip {
-    height: auto;
-    margin: 1 2 0 2;
-    padding: 1 1;
-    border: round #3a3220;
-    background: #11100a;
-}
-
-#retry-strip.active {
-    border: round #6a5632;
-    background: #171309;
-}
-
-#retry-strip-title {
-    height: 1;
-    text-style: bold;
-}
-
-#retry-strip-main {
-    height: auto;
-    margin-top: 1;
-}
-
-#retry-strip-meta {
-    height: auto;
-    margin-top: 0;
-}
-
-#runtime-strip {
-    height: auto;
-    margin: 1 2 0 2;
-    padding: 1 1;
-    border: round #203042;
-    background: #08111b;
-}
-
-#runtime-strip.active {
-    border: round #3e5a78;
-    background: #0a1421;
-}
-
-#runtime-strip-title {
-    height: 1;
-    text-style: bold;
-}
-
-#runtime-strip-main {
-    height: auto;
-    margin-top: 1;
-}
-
-#runtime-strip-meta {
-    height: auto;
-    margin-top: 0;
-}
-
-#worker-strip {
-    height: auto;
-    margin: 1 2 0 2;
-    padding: 1 1;
-    border: round #18253d;
-    background: #07101c;
-}
-
-#worker-strip.active {
-    border: round #35517d;
-    background: #091524;
-}
-
-#worker-strip.error {
-    border: round #5b2d35;
-}
-
-#worker-strip-title {
-    height: 1;
-    text-style: bold;
-}
-
-#worker-strip-main {
-    height: auto;
-    margin-top: 1;
-}
-
-#worker-strip-meta {
-    height: auto;
-    margin-top: 0;
-}
-
 /* ── Interactive Components Focus & Hover ──────────── */
 ActivityCard {
     transition: background 150ms, border 150ms;
@@ -244,8 +128,11 @@ CollapsibleSection:focus {
 }
 
 .turn-summary {
+    width: 100%;
+    height: 1;
+    padding: 0 1;
+    background: #071b21;
     color: #5eead4;
-    text-style: bold;
     margin-bottom: 1;
 }
 

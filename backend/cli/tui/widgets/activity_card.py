@@ -442,6 +442,30 @@ class TurnDivider(Static):
         self.update('[dim #32416a]────────────────────────────────────────[/dim]')
 
 
+class TurnCompletion(Static):
+    """Thin full-width completion marker between agent turns."""
+
+    DEFAULT_CSS = """
+    TurnCompletion {
+        width: 100%;
+        height: 1;
+        margin: 0 0 1 0;
+        padding: 0 1;
+        background: #071b21;
+        color: #8f9fc1;
+    }
+    """
+
+    def __init__(
+        self,
+        duration: str,
+        *,
+        id: str | None = None,
+    ) -> None:
+        super().__init__(id=id)
+        self.update(f'[bold #5eead4]Finished in:[/] [#c8d4e8]{duration}[/]')
+
+
 class UserMessage(Static):
     """User message display in the transcript."""
 
