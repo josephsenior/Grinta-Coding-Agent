@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 from rich.console import Console as RichConsole
+from rich.markdown import Markdown
 from textual.widgets import Label, TextArea
 
 from backend.cli.tui.app import (
@@ -619,6 +620,7 @@ async def test_tui_agent_message_action_renders_response(mock_config):
         assert renderer._last_final_response_text == 'I can help with that.'
         assert len(renderer._history) == 2
         assert isinstance(renderer._history[0], AgentMessage)
+        assert isinstance(renderer._history[0].renderable, Markdown)
 
 
 @pytest.mark.asyncio
@@ -656,6 +658,7 @@ async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config)
         assert renderer._last_final_response_text == 'Final answer.'
         assert len(renderer._history) == 2
         assert isinstance(renderer._history[0], AgentMessage)
+        assert isinstance(renderer._history[0].renderable, Markdown)
 
 
 @pytest.mark.asyncio
@@ -697,6 +700,7 @@ async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
         assert renderer._last_final_response_text == 'Queued agent reply.'
         assert len(renderer._history) == 2
         assert isinstance(renderer._history[0], AgentMessage)
+        assert isinstance(renderer._history[0].renderable, Markdown)
 
 
 @pytest.mark.asyncio

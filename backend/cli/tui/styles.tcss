@@ -549,7 +549,7 @@ AgentMessage {
     margin: 1 0;
     padding: 1 2;
     background: #080c16;
-    border: round #253661;
+    border: none;
     color: #cbd5e1;
 }
 

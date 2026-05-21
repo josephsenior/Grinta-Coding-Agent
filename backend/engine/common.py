@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 import re
 from collections.abc import Callable
+from threading import Lock
 from typing import TYPE_CHECKING, Any
 
 from backend.core.errors import (
@@ -16,6 +19,8 @@ from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_types import make_function_chunk, make_tool_param
 from backend.ledger.action import Action
 
+_LOGGER = logging.getLogger(__name__)
+
 _THINK_TAG_RE = re.compile(
     r'<(?:redacted_thinking|think)>.*?</(?:redacted_thinking|think)>',
     re.DOTALL | re.IGNORECASE,
@@ -25,6 +30,49 @@ _THINK_INNER_RE = re.compile(
     r'<(?:redacted_thinking|think)>\s*(.*?)\s*</(?:redacted_thinking|think)>',
     re.DOTALL | re.IGNORECASE,
 )
+
+_RETRY_GUARD_LOCK = Lock()
+_RETRY_GUARD: dict[str, tuple[str, int]] = {}
+_RETRY_GUARD_MAX_ENTRIES = 1000
+_RETRY_GUARD_MAX_ATTEMPTS = 2
+
+
+def _compute_content_hash(content: str) -> str:
+    """Compute a short hash of content for retry tracking."""
+    return hashlib.sha256(content[:4096].encode()).hexdigest()[:16]
+
+
+def _check_format_error_retry_guard(
+    tool_name: str,
+    raw_content: str,
+    error_signature: str,
+) -> tuple[bool, str]:
+    """Check if a FORMAT_ERROR should be allowed to retry.
+
+    Returns (should_continue, reason). If should_continue is False, reason
+    explains why the retry was blocked.
+    """
+    key = f"{tool_name}:{error_signature}"
+    content_hash = _compute_content_hash(raw_content)
+    with _RETRY_GUARD_LOCK:
+        if len(_RETRY_GUARD) > _RETRY_GUARD_MAX_ENTRIES:
+            _RETRY_GUARD.clear()
+        if key in _RETRY_GUARD:
+            stored_hash, attempt_count = _RETRY_GUARD[key]
+            if stored_hash == content_hash and attempt_count >= _RETRY_GUARD_MAX_ATTEMPTS:
+                return False, (
+                    f"Retry guard triggered: {tool_name} with identical error "
+                    f"'{error_signature}' and same content hash {content_hash} "
+                    f"after {attempt_count} attempts. Stop auto-retry and report as "
+                    f"system/tool error."
+                )
+            if stored_hash == content_hash:
+                _RETRY_GUARD[key] = (content_hash, attempt_count + 1)
+            else:
+                _RETRY_GUARD[key] = (content_hash, 1)
+        else:
+            _RETRY_GUARD[key] = (content_hash, 1)
+    return True, ""
 
 
 def extract_redacted_thinking_inner(text: str) -> str:
@@ -353,12 +401,31 @@ def _enforce_xml_compliance(
 
     Raises :class:`FunctionCallValidationError` with a clear directive
     telling the model to re-emit the call using the pseudo-XML format.
+    Applies retry guard to prevent infinite loops when the same error repeats.
     """
     for tc in tool_calls:
         fn = getattr(tc, 'function', None)
         name = getattr(fn, 'name', '') if fn else ''
         if name in xml_tool_names:
+            raw_arguments = getattr(fn, 'arguments', '') or ''
+            error_sig = 'native_toolcall_rejected'
+            allowed, reason = _check_format_error_retry_guard(name, raw_arguments, error_sig)
+            if not allowed:
+                _LOGGER.error('FORMAT_ERROR retry guard: %s', reason)
+                raise CoreFunctionCallValidationError(
+                    f'[FORMAT_ERROR] Retry guard stopped repeated FORMAT_ERROR for '
+                    f'tool `{name}` after multiple attempts. This indicates a '
+                    f'persistent issue with the tool call format.\n'
+                    f'{reason}\n'
+                    f'[SYSTEM_ACTION] Report this as a system/tool error.'
+                )
             example = _xml_format_error_example(name)
+            _LOGGER.warning(
+                'FORMAT_ERROR: Tool %s sent via native tool call instead of XML. '
+                'Arguments preview: %s...',
+                name,
+                raw_arguments[:200],
+            )
             raise CoreFunctionCallValidationError(
                 f'[FORMAT_ERROR] Tool `{name}` must use the XML format, not '
                 f'the standard tool calling format.\n'
@@ -517,6 +584,7 @@ def _extract_xml_tool_calls_from_content(
 
     results: list[Any] = []
     call_counter = 0
+    seen_tool_names: set[str] = set()
 
     pos = 0
     while pos < len(content_text):
@@ -528,6 +596,18 @@ def _extract_xml_tool_calls_from_content(
         if fn_name not in xml_tool_names:
             pos = open_m.end(0)
             continue
+
+        # Reject multiple XML blocks for the same tool in one response.
+        # Each tool should be emitted once per response.
+        if fn_name in seen_tool_names:
+            logger.warning(
+                'Multiple <function=%s> blocks detected in single response. '
+                'Only the first occurrence is processed; subsequent ones are ignored.',
+                fn_name,
+            )
+            pos = open_m.end(0)
+            continue
+        seen_tool_names.add(fn_name)
 
         close_m = _FN_CLOSE_RE.search(content_text, open_m.end(0))
         if close_m is None:
@@ -558,7 +638,7 @@ def _extract_xml_tool_calls_from_content(
                     fn_body,
                     flags=re.DOTALL | re.IGNORECASE,
                 )
-            param_matches = list(_iter_parameter_matches(param_body))
+            param_matches = list(_iter_parameter_matches(fn_body, param_body))
 
             if tool_def is not None and param_matches:
                 # Use strict validation: type coercion, enum checks, required params
@@ -592,6 +672,17 @@ def _extract_xml_tool_calls_from_content(
                 params["__xml_syntax_error__"] = "Unclosed <function> tag. Use </function> to close."
             elif not params and fn_body.strip():
                 params["__xml_syntax_error__"] = "No <parameter=...> tags found. You must wrap arguments in parameter tags."
+
+            # Check retry guard for XML syntax errors
+            if "__xml_syntax_error__" in params:
+                serialized_args = json.dumps(params, sort_keys=True, ensure_ascii=False)
+                error_sig = f"xml_parsing:{params['__xml_syntax_error__']}"
+                allowed, reason = _check_format_error_retry_guard(fn_name, serialized_args, error_sig)
+                if not allowed:
+                    _LOGGER.error('XML parsing retry guard: %s', reason)
+                    params = {
+                        "__xml_syntax_error__": f"Retry guard stopped repeated error: {params['__xml_syntax_error__']}. Report as system error."
+                    }
 
         except Exception as e:
             logger.warning(

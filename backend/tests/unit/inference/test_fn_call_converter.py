@@ -741,3 +741,157 @@ class TestRegexPatterns:
             },
         ]
         assert _find_tool_result_match(content) is not None
+
+
+# --- Regression tests for XML parser issues -----------------------------
+
+
+class TestXmlParserRegression:
+    """Regression tests for XML parser issues.
+
+    Tests the specific bugs reported:
+    1. Trailing text false positives when file_edit blocks are stripped
+    2. Content containing pseudo-tags, quotes, braces
+    3. Consecutive valid calls with multiline content
+    4. Trailing prose outside XML block
+    """
+
+    def _make_file_editor_tool(self):
+        return {
+            'type': 'function',
+            'function': {
+                'name': 'file_editor',
+                'description': 'File editor tool',
+                'parameters': {
+                    'type': 'object',
+                    'properties': {
+                        'command': {'type': 'string'},
+                        'path': {'type': 'string'},
+                        'content': {'type': 'string'},
+                        'security_risk': {'type': 'string'},
+                    },
+                    'required': ['command', 'path', 'security_risk'],
+                },
+            },
+        }
+
+    def _parse_payload(content, tools):
+        """Helper to parse content into tool calls."""
+        messages = [{'role': 'assistant', 'content': content}]
+        result = convert_non_fncall_messages_to_fncall_messages(messages, tools)
+        return [
+            {'name': tc['function']['name'], 'arguments': json.loads(tc['function']['arguments'])}
+            for tc in result[0].get('tool_calls', [])
+        ]
+
+    def test_trailing_text_false_positive_with_file_edit_blocks(self):
+        """Regression: trailing text error when file_edit blocks are stripped.
+
+        Previously the parser used positions from the modified param_body
+        but checked trailing against fn_body, causing false positives
+        when multi_edit had nested file_edit blocks.
+        """
+        tools = [self._make_file_editor_tool()]
+        content = (
+            '<function=file_editor>\n'
+            '<parameter=command>multi_edit\n'
+            '<parameter=path>/path/file.txt\n'
+            '<parameter=content>\n'
+            '<file_edit>\n'
+            '<parameter=command>replace\n'
+            '<parameter=path>/path/file.txt\n'
+            '<parameter=content>old content</parameter>\n'
+            '<parameter=new_content>new content</parameter>\n'
+            '</file_edit>\n'
+            '</parameter>\n'
+            '<parameter=security_risk>LOW</parameter>\n'
+            '</function>\n'
+            '\n'
+            'Some trailing text that should NOT cause an error'
+        )
+        result = self._parse_payload(content, tools)
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]['name'] == 'file_editor'
+        assert result[0]['arguments']['command'] == 'multi_edit'
+
+    def test_content_with_pseudo_tags_quotes_braces(self):
+        """Regression: pseudo-tags, quotes, braces in content are not parsed as XML.
+
+        Previously the parser would incorrectly identify things like
+        '<parameter=name>' inside string content as XML tags.
+        """
+        tools = [self._make_file_editor_tool()]
+        content = (
+            '<function=file_editor>\n'
+            '<parameter=command>create\n'
+            '<parameter=path>/test.py\n'
+            '<parameter=content>def foo():\n'
+            '    x = "<parameter=name>test</parameter>"\n'
+            '    print("hello")\n'
+            '    return {"key": "value"}\n'
+            '</parameter>\n'
+            '<parameter=security_risk>LOW</parameter>\n'
+            '</function>'
+        )
+        result = self._parse_payload(content, tools)
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]['arguments']['command'] == 'create'
+        assert '<parameter=name>test</parameter>' in result[0]['arguments']['content']
+
+    def test_consecutive_calls_with_multiline_content(self):
+        """Regression: consecutive calls with multiline content in different blocks.
+
+        Verifies that multiline content in one call doesn't bleed into
+        the next call's parsing.
+        """
+        tools = [self._make_file_editor_tool()]
+        content = (
+            '<function=file_editor>\n'
+            '<parameter=command>create\n'
+            '<parameter=path>/a.txt\n'
+            '<parameter=content>Line 1\n'
+            'Line 2\n'
+            'Line 3\n'
+            '</parameter>\n'
+            '<parameter=security_risk>LOW</parameter>\n'
+            '</function>\n'
+            '<function=file_editor>\n'
+            '<parameter=command>create\n'
+            '<parameter=path>/b.txt\n'
+            '<parameter=content>Different\n'
+            'Multiline\n'
+            'Content\n'
+            '</parameter>\n'
+            '<parameter=security_risk>LOW</parameter>\n'
+            '</function>'
+        )
+        result = self._parse_payload(content, tools)
+        assert result is not None
+        assert len(result) == 2
+        assert result[0]['arguments']['path'] == '/a.txt'
+        assert result[1]['arguments']['path'] == '/b.txt'
+
+    def test_trailing_prose_outside_xml_block(self):
+        """Regression: trailing prose after XML block should not cause parse failure.
+
+        Previously the parser would fail if there was any text after the
+        closing XML tag that didn't look like another opening tag.
+        """
+        tools = [self._make_file_editor_tool()]
+        content = (
+            '<function=file_editor>\n'
+            '<parameter=command>edit\n'
+            '<parameter=path>/file.txt\n'
+            '<parameter=content>Hello World</parameter>\n'
+            '<parameter=security_risk>LOW</parameter>\n'
+            '</function>\n'
+            '\n'
+            'The file has been updated successfully.'
+        )
+        result = self._parse_payload(content, tools)
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]['arguments']['content'] == 'Hello World'
+

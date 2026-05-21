@@ -39,8 +39,10 @@ Tool result line syntax is shared via :mod:`backend.inference.tool_result_format
 """
 
 import copy
+import hashlib
 import json
 import re
+import logging
 from collections.abc import Iterable
 from threading import Lock
 from typing import Any, NoReturn
@@ -49,6 +51,8 @@ from backend.core.errors import (
     FunctionCallConversionError,
     FunctionCallValidationError,
 )
+
+logger = logging.getLogger(__name__)
 from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_names import (
     FILE_EDITOR_TOOL_NAME,
@@ -68,15 +72,21 @@ STOP_WORDS = ['</function']
 _STRICT_PARSE_SUCCESS = 'strict_parse_success'
 _STRICT_PARSE_FAILURE = 'strict_parse_failure'
 _MALFORMED_PAYLOAD_REJECTION = 'malformed_payload_rejection'
+_XML_TRAILING_TEXT = 'xml_trailing_text'
 _FN_CALL_PARSE_COUNTER_KEYS = (
     _STRICT_PARSE_SUCCESS,
     _STRICT_PARSE_FAILURE,
     _MALFORMED_PAYLOAD_REJECTION,
+    _XML_TRAILING_TEXT,
 )
 _fn_call_parse_counters_lock = Lock()
 _fn_call_parse_counters: dict[str, int] = {
     key: 0 for key in _FN_CALL_PARSE_COUNTER_KEYS
 }
+
+_RETRY_GUARD_LOCK = Lock()
+_RETRY_GUARD: dict[str, str] = {}
+_RETRY_GUARD_MAX_ENTRIES = 1000
 
 TERMINAL_EXAMPLE_KEY = 'terminal_command'
 
@@ -101,6 +111,61 @@ def reset_fn_call_parse_telemetry_counters() -> None:
     with _fn_call_parse_counters_lock:
         for key in _FN_CALL_PARSE_COUNTER_KEYS:
             _fn_call_parse_counters[key] = 0
+
+
+def _compute_content_hash(content: str) -> str:
+    """Compute a short hash of content for retry tracking."""
+    return hashlib.sha256(content[:4096].encode()).hexdigest()[:16]
+
+
+def _check_retry_guard(
+    tool_name: str, raw_hash: str, error_code: str
+) -> tuple[bool, str]:
+    """Check if a (tool, hash, error) combination should be allowed to retry.
+
+    Returns (should_continue, reason). If should_continue is False, reason
+    explains why the retry was blocked.
+    """
+    key = f"{tool_name}:{error_code}"
+    with _RETRY_GUARD_LOCK:
+        if len(_RETRY_GUARD) > _RETRY_GUARD_MAX_ENTRIES:
+            _RETRY_GUARD.clear()
+        if key in _RETRY_GUARD and _RETRY_GUARD[key] == raw_hash:
+            return False, (
+                f"Retry guard triggered: {tool_name} with same "
+                f"hash {raw_hash} and error {error_code}. "
+                "Stop auto-retry and report as system/tool error."
+            )
+        _RETRY_GUARD[key] = raw_hash
+    return True, ""
+
+
+def _log_xml_parser_diagnostics(
+    fn_name: str,
+    fn_body: str,
+    param_body: str | None,
+    error_code: str | None,
+    trailing_text: str | None,
+    last_end: int,
+    param_count: int,
+) -> None:
+    """Log structured diagnostics for XML tool call parsing.
+
+    This helps diagnose parser issues without changing behavior.
+    """
+    body_used = param_body if param_body is not None else fn_body
+    diagnostics = {
+        'tool': fn_name,
+        'parser_mode': 'xml',
+        'body_len': len(body_used),
+        'body_hash': _compute_content_hash(body_used),
+        'trailing_text_preview': (trailing_text[:200] if trailing_text else None),
+        'trailing_len': len(trailing_text) if trailing_text else 0,
+        'last_end': last_end,
+        'param_count': param_count,
+        'error_code': error_code,
+    }
+    logger.debug('XML parser diagnostics: %s', diagnostics)
 
 
 TOOL_EXAMPLES = {
@@ -971,8 +1036,20 @@ def _create_tool_call(
     return tool_call, tool_call_counter + 1
 
 
-def _iter_parameter_matches(fn_body: str) -> Iterable[Any]:
-    """Yield regex-like parameter matches parsed via strict tag scanning."""
+def _iter_parameter_matches(
+    fn_body: str,
+    param_body: str | None = None,
+) -> Iterable[Any]:
+    """Yield regex-like parameter matches parsed via strict tag scanning.
+
+    Args:
+        fn_body: The full function body text that was iterated for matches.
+        param_body: Optional alternate body to use for trailing text check.
+                    If None, fn_body is used. This allows callers to pass a
+                    modified body (e.g., with <file_edit> blocks stripped)
+                    while still getting correct trailing detection.
+    """
+    iterated_body = param_body if param_body is not None else fn_body
 
     class _PseudoMatch:
         def __init__(self, name: str, value: str) -> None:
@@ -987,24 +1064,38 @@ def _iter_parameter_matches(fn_body: str) -> Iterable[Any]:
             raise IndexError(index)
 
     last_end = 0
-    for m in _PARAM_BLOCK_RE.finditer(fn_body):
+    param_count = 0
+    for m in _PARAM_BLOCK_RE.finditer(iterated_body):
         param_name = (m.group(1) or '').strip()
         param_value = m.group(2)
         yield _PseudoMatch(param_name, param_value)
         last_end = m.end(0)
+        param_count += 1
 
     # Detect unclosed <parameter> tags (open tag present but no closed match)
-    open_count = len(_PARAM_OPEN_HAS_RE.findall(fn_body))
-    closed_count = len(_PARAM_BLOCK_RE.findall(fn_body))
+    open_count = len(_PARAM_OPEN_HAS_RE.findall(iterated_body))
+    closed_count = len(_PARAM_BLOCK_RE.findall(iterated_body))
     if open_count > closed_count:
+        _increment_parse_counter(_STRICT_PARSE_FAILURE)
         raise FunctionCallValidationError(
             'Malformed parameter block: missing closing </parameter> tag'
         )
 
-    trailing = fn_body[last_end:] if last_end else fn_body
+    trailing = iterated_body[last_end:] if last_end else iterated_body
     if trailing.strip():
+        _increment_parse_counter(_XML_TRAILING_TEXT)
+        _log_xml_parser_diagnostics(
+            fn_name='',
+            fn_body=iterated_body,
+            param_body=param_body,
+            error_code=_XML_TRAILING_TEXT,
+            trailing_text=trailing,
+            last_end=last_end,
+            param_count=param_count,
+        )
         raise FunctionCallValidationError(
-            'Unexpected trailing text after last parameter inside function block'
+            f'Unexpected trailing text after last parameter inside function block: '
+            f'"{trailing[:200]}"'
         )
 
 

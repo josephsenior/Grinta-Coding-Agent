@@ -2151,6 +2151,18 @@ def _process_single_tool_call(tool_call: Any, arguments: dict[str, Any]) -> Acti
 
     tool_name = cast(str, tool_call.function.name)
     if "__xml_syntax_error__" in arguments:
+        from backend.engine.common import _check_format_error_retry_guard
+        serialized_args = json.dumps(arguments, sort_keys=True, ensure_ascii=False)
+        error_sig = f"xml_syntax_error:{arguments['__xml_syntax_error__']}"
+        allowed, reason = _check_format_error_retry_guard(tool_name, serialized_args, error_sig)
+        if not allowed:
+            logger.error('FORMAT_ERROR retry guard in _process_single_tool_call: %s', reason)
+            raise FunctionCallValidationError(
+                f'[FORMAT_ERROR] Retry guard stopped repeated FORMAT_ERROR for '
+                f'tool `{tool_name}` after multiple attempts.\n'
+                f'{reason}\n'
+                f'[SYSTEM_ACTION] Report this as a system/tool error.'
+            )
         raise FunctionCallValidationError(
             f"Malformed XML tool call for {tool_name}: "
             f"{arguments['__xml_syntax_error__']}"

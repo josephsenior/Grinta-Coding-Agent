@@ -13,6 +13,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.widgets import Static
+from rich.markdown import Markdown
 
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
@@ -213,6 +214,10 @@ class ActivityCard(Container):
     def _get_formatted_extra_content(self) -> Any:
         from rich.syntax import Syntax
         content = self._extra_content or ""
+
+        # Content already has Rich-style background markup — return as-is
+        if '[on #' in content:
+            return content
 
         # Check if it looks like a unified diff (git diff style)
         diff_like = (
@@ -477,11 +482,11 @@ class AgentMessage(Static):
     """Agent response display in the transcript."""
 
     def __init__(self, text: str, *, id: str | None = None) -> None:
-        super().__init__(text, id=id)
+        super().__init__(Markdown(text), id=id)
 
     def update_message(self, text: str) -> None:
         """Update message content dynamically."""
-        self.update(text)
+        self.update(Markdown(text))
 
 
 class ThinkingIndicator(Static):
