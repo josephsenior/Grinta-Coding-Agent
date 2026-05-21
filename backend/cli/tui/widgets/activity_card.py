@@ -546,6 +546,6 @@ class ThinkingIndicator(Static):
         lines.append(f'[bold #5eead4]Thinking:[/] [dim]({elapsed}s)[/dim]')
 
         for thought in self._thoughts:
-            lines.append(f'  [lightgray opacity=0.7]{thought}[/]')
+            lines.append(f'  [rgb(150,154,189)]│ {thought}[/]')
 
         self.update('\n'.join(lines))
