@@ -529,20 +529,9 @@ class ThinkingIndicator(Static):
         self._update_display()
 
     def set_thoughts(self, text: str) -> None:
-        """Set thoughts by parsing accumulated text."""
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
-        self._thoughts = lines
-        self._step_count = len(lines)
+        self._thoughts = text.split('\n')
+        self._step_count = len(self._thoughts)
         self._update_display()
-
-    def update_action(self, action: str) -> None:
-        """Update the current action description."""
-        self._current_action = action
-        self._update_display()
-
-    def stop(self) -> None:
-        """Stop the thinking indicator."""
-        self.add_class('-hidden')
 
     def _update_display(self) -> None:
         import time
@@ -552,22 +541,7 @@ class ThinkingIndicator(Static):
         lines: list[str] = []
         lines.append(f'[bold #5eead4]Thinking:[/] [dim]({elapsed}s)[/dim]')
 
-        if self._thoughts:
-            for thought in self._thoughts[-5:]:
-                truncated = thought[:120] + ('...' if len(thought) > 120 else '')
-                lines.append(f'  [lightgray opacity=70]┃ {truncated}[/]')
-
-        if self._step_count >= 3:
-            avg_step = elapsed / self._step_count if self._step_count > 0 else 0
-            estimated_remaining = max(0, int((10 - self._step_count) * avg_step))
-            if estimated_remaining > 0:
-                eta = (
-                    f'~{estimated_remaining}s'
-                    if estimated_remaining < 60
-                    else f'~{estimated_remaining // 60}m'
-                )
-                lines.append(
-                    f'  [lightgray opacity=70]step {self._step_count} · {eta} remaining[/]'
-                )
+        for thought in self._thoughts:
+            lines.append(f'  [lightgray]{thought}[/]')
 
         self.update('\n'.join(lines))

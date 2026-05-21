@@ -2827,16 +2827,8 @@ class TUIRenderer:
 
             if thoughts:
                 content = '\n'.join(thoughts)
-                from backend.cli.tui.widgets.collapsible import CollapsibleSection
-                section = CollapsibleSection(
-                    title="Thinking Process",
-                    content=content,
-                    collapsed=True,
-                    accent_color='#5eead4',
-                    is_thinking=True,
-                )
-                display.mount(section)
-                display.scroll_end(animate=False)
+                thinking_text = Text(f'[bold #5eead4]Thinking:[/] ', style='lightgray') + Text(content, style='lightgray')
+                self._tui._write_log(thinking_text)
 
             self._live_thinking = ''
             self._live_thinking_dirty = False
