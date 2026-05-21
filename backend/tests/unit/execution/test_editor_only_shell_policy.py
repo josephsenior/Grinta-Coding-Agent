@@ -1,4 +1,4 @@
-"""Tests for editor-only shell write policy."""
+"""Tests for editor-only shell write policy (writes always allowed)."""
 
 from __future__ import annotations
 
@@ -24,17 +24,16 @@ def _cfg() -> SecurityConfig:
         ('dd if=/dev/zero of=image.img bs=1 count=1',),
     ],
 )
-def test_blocks_obvious_shell_writes(
-    monkeypatch: pytest.MonkeyPatch, command: str
-) -> None:
-    monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
-    msg = evaluate_editor_only_shell_block(
-        command=command,
-        security_config=_cfg(),
-        workspace_root='/workspace',
+def test_allows_shell_writes(command: str) -> None:
+    """Shell writes are always allowed."""
+    assert (
+        evaluate_editor_only_shell_block(
+            command=command,
+            security_config=_cfg(),
+            workspace_root='/workspace',
+        )
+        is None
     )
-    assert msg is not None
-    assert 'text_editor' in msg
 
 
 @pytest.mark.parametrize(
@@ -46,10 +45,7 @@ def test_blocks_obvious_shell_writes(
         ('npm run build > output.log',),
     ],
 )
-def test_allows_log_and_tmp_redirections(
-    monkeypatch: pytest.MonkeyPatch, command: str
-) -> None:
-    monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
+def test_allows_log_and_tmp_redirections(command: str) -> None:
     assert (
         evaluate_editor_only_shell_block(
             command=command,
@@ -60,8 +56,7 @@ def test_allows_log_and_tmp_redirections(
     )
 
 
-def test_allows_toolchain_commands(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
+def test_allows_toolchain_commands() -> None:
     assert (
         evaluate_editor_only_shell_block(
             command='git checkout -b feature',
@@ -80,20 +75,7 @@ def test_allows_toolchain_commands(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def test_allows_when_env_set(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('GRINTA_ALLOW_SHELL_WRITES', '1')
-    assert (
-        evaluate_editor_only_shell_block(
-            command='Set-Content -Path x.html -Value z',
-            security_config=_cfg(),
-            workspace_root='/workspace',
-        )
-        is None
-    )
-
-
-def test_allows_powershell_to_temp(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
+def test_allows_powershell_to_temp() -> None:
     assert (
         evaluate_editor_only_shell_block(
             command='Set-Content -Path $env:TEMP\\scratch.txt -Value x',
@@ -102,39 +84,3 @@ def test_allows_powershell_to_temp(monkeypatch: pytest.MonkeyPatch) -> None:
         )
         is None
     )
-
-
-@pytest.mark.parametrize('truthy', ['1', 'true', 'yes', 'on'])
-def test_env_override_allows_shell_writes(
-    monkeypatch: pytest.MonkeyPatch, truthy: str
-) -> None:
-    monkeypatch.setenv('GRINTA_ALLOW_SHELL_WRITES', truthy)
-    assert (
-        evaluate_editor_only_shell_block(
-            command='Set-Content -Path index.html -Value "<html>"',
-            security_config=_cfg(),
-            workspace_root='/workspace',
-        )
-        is None
-    )
-
-
-def test_env_override_off_preserves_block(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('GRINTA_ALLOW_SHELL_WRITES', '0')
-    msg = evaluate_editor_only_shell_block(
-        command='Set-Content -Path index.html -Value "<html>"',
-        security_config=_cfg(),
-        workspace_root='/workspace',
-    )
-    assert msg is not None
-
-
-def test_block_message_mentions_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
-    msg = evaluate_editor_only_shell_block(
-        command='Set-Content -Path index.html -Value z',
-        security_config=_cfg(),
-        workspace_root='/workspace',
-    )
-    assert msg is not None
-    assert 'GRINTA_ALLOW_SHELL_WRITES' in msg

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
@@ -21,6 +23,7 @@ from backend.engine.function_calling import (
     _handle_text_editor_tool,
     _process_single_tool_call,
     combine_thought,
+    response_to_actions,
     set_security_risk,
 )
 from backend.ledger.action import (
@@ -43,6 +46,30 @@ def _workspace_dir_for_task_tracker(tmp_path, monkeypatch):
         lambda: tmp_path,
     )
     return tmp_path
+
+
+def _model_response(*, content: str = '', tool_calls: list[Any] | None = None) -> Any:
+    return SimpleNamespace(
+        id='resp_1',
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content=content,
+                    tool_calls=tool_calls or [],
+                )
+            )
+        ],
+    )
+
+
+def _native_tool_call(name: str, arguments: dict[str, Any]) -> Any:
+    return SimpleNamespace(
+        id='call_1',
+        function=SimpleNamespace(
+            name=name,
+            arguments=json.dumps(arguments),
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -311,6 +338,98 @@ class TestHandleStrReplaceEditorTool:
                     'security_risk': 'LOW',
                 }
             )
+
+
+class TestFileEditorXmlTransport:
+    def test_native_file_editor_call_is_rejected_with_canonical_xml_example(self):
+        response = _model_response(
+            tool_calls=[
+                _native_tool_call(
+                    'file_editor',
+                    {
+                        'command': 'create',
+                        'path': 'app.py',
+                        'content': 'print("hi")\n',
+                        'security_risk': 'LOW',
+                    },
+                )
+            ]
+        )
+
+        with pytest.raises(FunctionCallValidationError) as exc_info:
+            response_to_actions(response)
+
+        message = str(exc_info.value)
+        assert '[FORMAT_ERROR]' in message
+        assert '<function=file_editor>' in message
+        assert '<parameter=security_risk>LOW</parameter>' in message
+        assert '<parameter=content>' in message
+        assert 'your_command' not in message
+        assert '<parameter=new_code>' not in message
+
+    def test_xml_file_editor_create_parses_with_required_security_risk(self):
+        response = _model_response(
+            content=(
+                '<function=file_editor>\n'
+                '<parameter=command>create</parameter>\n'
+                '<parameter=path>app.py</parameter>\n'
+                '<parameter=security_risk>LOW</parameter>\n'
+                '<parameter=content>\n'
+                'print("hi")\n'
+                '</parameter>\n'
+                '</function>'
+            )
+        )
+
+        actions = response_to_actions(response)
+
+        assert len(actions) == 1
+        action = actions[0]
+        assert isinstance(action, FileEditAction)
+        assert action.command == 'create_file'
+        assert action.path == 'app.py'
+        assert action.file_text == 'print("hi")'
+
+    def test_xml_file_editor_validation_error_is_not_rewritten_as_missing_command(self):
+        response = _model_response(
+            content=(
+                '<function=file_editor>\n'
+                '<parameter=command>create</parameter>\n'
+                '<parameter=path>app.py</parameter>\n'
+                '<parameter=content>print("hi")</parameter>\n'
+                '</function>'
+            )
+        )
+
+        with pytest.raises(FunctionCallValidationError) as exc_info:
+            response_to_actions(response)
+
+        message = str(exc_info.value)
+        assert 'Malformed XML tool call for file_editor' in message
+        assert 'security_risk' in message
+        assert 'Missing required argument "command"' not in message
+
+    def test_xml_file_editor_multi_edit_accepts_nested_file_edit_blocks(self):
+        response = _model_response(
+            content=(
+                '<function=file_editor>\n'
+                '<parameter=command>multi_edit</parameter>\n'
+                '<parameter=security_risk>LOW</parameter>\n'
+                '<file_edit>\n'
+                '<path>a.py</path>\n'
+                '<operation>create</operation>\n'
+                '<content>\n'
+                'A = 1\n'
+                '</content>\n'
+                '</file_edit>\n'
+                '</function>'
+            )
+        )
+
+        action = response_to_actions(response)[0]
+
+        assert isinstance(action, MessageAction)
+        assert 'multi_edit committed' in action.content
 
 
 # ---------------------------------------------------------------------------

@@ -159,7 +159,7 @@ class ActivityCard(Container):
     def _get_formatted_extra_content(self) -> Any:
         from typing import Any
         from rich.syntax import Syntax
-        from backend.cli.theme import get_grinta_pygments_style
+        from backend.cli.theme import get_grinta_pygments_style, NAVY_TEXT_MUTED
         content = self._extra_content or ""
 
         # Check if it looks like a unified diff (git diff style)
@@ -179,7 +179,10 @@ class ActivityCard(Container):
         if "def " in content or "class " in content or "import " in content:
             return Syntax(content, "python", theme=get_grinta_pygments_style(), background_color="#0a1224")
 
-        return content
+        # Default: wrap in muted style for plain text
+        lines = content.splitlines()
+        styled_lines = [f'[{NAVY_TEXT_MUTED}]{line}[/]' for line in lines]
+        return '\n'.join(styled_lines)
 
     def compose(self) -> ComposeResult:
         parts: list[str] = []

@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import unittest
+from contextlib import suppress
+from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation.commands import CmdOutputObservation
+from backend.ledger.stream import EventStream, EventStreamSubscriber
 from backend.orchestration.services.action_service import ActionService
 from backend.orchestration.services.observation_service import ObservationService
 from backend.orchestration.services.pending_action_service import PendingActionService
+from backend.persistence.local_file_store import LocalFileStore
 
 
 class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):
@@ -97,6 +101,71 @@ class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):
             observation, None
         )
         self.context.trigger_step.assert_called_once_with()
+
+    async def test_real_event_stream_arms_pending_before_runtime_dispatch(self):
+        """Runtime can emit an observation during action dispatch without stalling."""
+        tmpdir = TemporaryDirectory()
+        stream = EventStream(
+            sid='pending-race-test',
+            file_store=LocalFileStore(tmpdir.name),
+            worker_count=0,
+        )
+        try:
+            self.controller.event_stream = stream
+            self.context.emit_event.side_effect = (
+                lambda event, source: stream.add_event(event, source)
+            )
+
+            action = CmdRunAction(command='echo hello')
+            action.source = EventSource.AGENT
+            pending_was_armed_before_runtime: list[bool] = []
+            clean_metrics = MagicMock()
+            clean_metrics.get.return_value = {}
+            metrics = MagicMock(
+                accumulated_cost=0.0,
+                accumulated_token_usage=MagicMock(),
+                max_budget_per_task=None,
+            )
+            metrics.copy.return_value = clean_metrics
+            self.controller.conversation_stats.get_combined_metrics.return_value = (
+                metrics
+            )
+
+            def runtime_callback(event):
+                if not isinstance(event, CmdRunAction):
+                    return
+                pending_was_armed_before_runtime.append(
+                    self.pending_service.peek_for_cause(event.id) is not None
+                )
+                observation = CmdOutputObservation(
+                    content='hello',
+                    command='echo hello',
+                    metadata={'exit_code': 0},
+                )
+                observation.cause = event.id
+                stream.add_event(observation, EventSource.ENVIRONMENT)
+
+            stream.subscribe(
+                EventStreamSubscriber.RUNTIME,
+                runtime_callback,
+                'runtime-race',
+            )
+            stream.subscribe(
+                EventStreamSubscriber.MAIN,
+                lambda event: None,
+                'controller-placeholder',
+            )
+
+            with patch.object(PendingActionService, '_schedule_watchdog', autospec=True):
+                await self.action_service.run(action, None)
+
+            self.assertEqual(pending_was_armed_before_runtime, [True])
+            self.assertIsNotNone(self.pending_service.peek_for_cause(action.id))
+        finally:
+            with suppress(Exception):
+                stream.close()
+            with suppress(Exception):
+                tmpdir.cleanup()
 
     async def test_restored_state_late_observation_does_not_duplicate_advancement(self):
         """A restored controller with no pending action must ignore stale late observations."""
