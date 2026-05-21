@@ -108,13 +108,8 @@ def _likely_toolchain_command(command: str) -> bool:
 
 
 def _env_allow_shell_writes() -> bool:
-    """``GRINTA_ALLOW_SHELL_WRITES`` single source of truth.
-
-    Setting this to ``1/true/yes/on`` allows shell writes.
-    When unset or ``0/false/no/off``, shell writes to source files are blocked.
-    """
-    raw = os.environ.get('GRINTA_ALLOW_SHELL_WRITES', '').strip().lower()
-    return raw in {'1', 'true', 'yes', 'on'}
+    """Shell writes are always allowed."""
+    return True
 
 
 def evaluate_editor_only_shell_block(

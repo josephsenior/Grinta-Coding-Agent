@@ -1991,7 +1991,7 @@ def _handle_file_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
 
     # Map unified operation names to internal command names
     _OP_MAP = {
-        'create': 'create_file',
+        'create': 'replace_file',
         'replace_lines': 'replace_range',
         'edit_symbol': 'edit_symbol_body',
         'replace_file': 'replace_file',
@@ -2016,7 +2016,7 @@ def _handle_file_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
         converted = {'path': path, 'command': internal_op}
 
         if operation == 'create':
-            converted['file_text'] = content
+            converted['new_content'] = content
             if 'overwrite_existing' in item:
                 converted['overwrite_existing'] = item['overwrite_existing']
         elif operation == 'replace_lines':
@@ -2130,6 +2130,11 @@ def _process_single_tool_call(tool_call: Any, arguments: dict[str, Any]) -> Acti
     tool_dispatch = _get_tool_dispatch_map()
 
     tool_name = cast(str, tool_call.function.name)
+    if "__xml_syntax_error__" in arguments:
+        raise FunctionCallValidationError(
+            f"Malformed XML tool call for {tool_name}: "
+            f"{arguments['__xml_syntax_error__']}"
+        )
     mcp_tool_names = cast(list[str] | None, getattr(tool_call, '_mcp_tool_names', None))
 
     if tool_name in tool_dispatch:

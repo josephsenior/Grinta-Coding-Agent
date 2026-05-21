@@ -54,13 +54,6 @@ async def _set_waiting_message_state_if_needed(controller, action: Action) -> No
     await controller.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
 
 
-def _event_stream_has_pre_dispatch_hook(event_stream) -> bool:
-    return (
-        isinstance(event_stream, EventStream)
-        and event_stream.pre_runnable_action_dispatch is not None
-    )
-
-
 def _bind_action_context_if_present(
     controller, action: Action, ctx: ToolInvocationContext | None
 ) -> None:
@@ -68,6 +61,27 @@ def _bind_action_context_if_present(
         return
     ctx.action_id = action.id
     controller._bind_action_context(action, ctx)
+
+
+def _install_one_shot_pending_hook(
+    event_stream: EventStream,
+    action_service: ActionService,
+) -> object:
+    previous_hook = event_stream.pre_runnable_action_dispatch
+
+    def _arm_pending_before_dispatch(sanitized_action: Action) -> None:
+        if callable(previous_hook):
+            previous_hook(sanitized_action)
+        action_service.set_pending_action(sanitized_action)
+
+    event_stream.pre_runnable_action_dispatch = _arm_pending_before_dispatch
+    return previous_hook
+
+
+def _restore_pre_dispatch_hook(event_stream: EventStream, previous_hook: object) -> None:
+    event_stream.pre_runnable_action_dispatch = (
+        previous_hook if callable(previous_hook) else None
+    )
 
 
 class ActionService:
@@ -124,16 +138,18 @@ class ActionService:
         await _set_waiting_message_state_if_needed(controller, action)
 
         es = controller.event_stream
-        controller.event_stream.add_event(action, action.source or EventSource.AGENT)
+        previous_hook: object | None = None
+        if action.runnable and isinstance(es, EventStream):
+            previous_hook = _install_one_shot_pending_hook(es, self)
+        try:
+            controller.event_stream.add_event(action, action.source or EventSource.AGENT)
+        finally:
+            if previous_hook is not None and isinstance(es, EventStream):
+                _restore_pre_dispatch_hook(es, previous_hook)
 
-        # When the real EventStream has no pre-dispatch hook, register pending
-        # *after* add_event (so action.id is assigned). If
-        # ``pre_runnable_action_dispatch`` is set, it already ran *inside* add_event
-        # before inline delivery — avoids a race where the runtime observation
-        # arrives before the pending map. Use ``isinstance(..., EventStream)`` so
-        # unit tests with ``MagicMock`` event streams are not mis-detected as having
-        # a hook (MagicMock attributes are truthy).
-        if action.runnable and not _event_stream_has_pre_dispatch_hook(es):
+        # MagicMock event streams do not run EventStream's pre-dispatch hook, so
+        # keep tests and lightweight fakes on the old post-add path.
+        if action.runnable and not isinstance(es, EventStream):
             self.set_pending_action(action)
 
         _bind_action_context_if_present(controller, action, ctx)

@@ -2719,8 +2719,7 @@ class TUIRenderer:
             extra_parts = []
             for extra in card.extra_lines:
                 indent = '  ' * extra.indent
-                style = extra.style if extra.style else 'dim #969aad'
-                extra_parts.append(f'{indent}[{style}]{extra.text}[/]')
+                extra_parts.append(f'{indent}{extra.text}')
             extra_content = '\n'.join(extra_parts)
 
         from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard

@@ -358,26 +358,65 @@ def _enforce_xml_compliance(
         fn = getattr(tc, 'function', None)
         name = getattr(fn, 'name', '') if fn else ''
         if name in xml_tool_names:
+            example = _xml_format_error_example(name)
             raise CoreFunctionCallValidationError(
                 f'[FORMAT_ERROR] Tool `{name}` must use the XML format, not '
                 f'the standard tool calling format.\n'
                 f'[CAUSE] The tool call was sent through JSON function calling, '
                 f'but `{name}` requires the pseudo-XML format so code payloads '
                 f'are not JSON-encoded.\n'
-                f'[ACTION] Re-emit this call using the XML format:\n'
-                f'  <function={name}>\n'
-                f'  <parameter=command>your_command</parameter>\n'
-                f'  <parameter=path>/path/to/file</parameter>\n'
-                f'  <parameter=new_code>\n'
-                f'  your code here \u2014 raw text, no escaping\n'
-                f'  </parameter>\n'
-                f'  </function>\n'
+                f'[ACTION] Re-emit this call using the XML format exactly like this:\n'
+                f'{example}\n'
                 f'[FORMAT] Type rules for XML parameters:\n'
                 f'  - Integer params (start_line, end_line, insert_line): bare numbers (e.g. 7)\n'
                 f'  - Array params (view_range, file_edits, edits): JSON arrays (e.g. [1, 10])\n'
                 f'  - Boolean params (overwrite_existing): true or false (lowercase)\n'
-                f'  - String params (file_text, new_str, new_code, new_body): raw text between tags\n'
+                f'  - String params (content, path, symbol_name): raw text between tags\n'
             )
+
+
+def _xml_format_error_example(tool_name: str) -> str:
+    if tool_name == 'file_editor':
+        return (
+            f'  <function={tool_name}>\n'
+            f'  <parameter=command>create</parameter>\n'
+            f'  <parameter=path>/path/to/file</parameter>\n'
+            f'  <parameter=security_risk>LOW</parameter>\n'
+            f'  <parameter=content>\n'
+            f'  full file contents here -- raw text, no JSON escaping\n'
+            f'  </parameter>\n'
+            f'  </function>'
+        )
+    if tool_name == 'text_editor':
+        return (
+            f'  <function={tool_name}>\n'
+            f'  <parameter=command>create_file</parameter>\n'
+            f'  <parameter=path>/path/to/file</parameter>\n'
+            f'  <parameter=security_risk>LOW</parameter>\n'
+            f'  <parameter=file_text>\n'
+            f'  full file contents here -- raw text, no JSON escaping\n'
+            f'  </parameter>\n'
+            f'  </function>'
+        )
+    if tool_name == 'symbol_editor':
+        return (
+            f'  <function={tool_name}>\n'
+            f'  <parameter=command>replace_range</parameter>\n'
+            f'  <parameter=path>/path/to/file</parameter>\n'
+            f'  <parameter=security_risk>LOW</parameter>\n'
+            f'  <parameter=start_line>1</parameter>\n'
+            f'  <parameter=end_line>1</parameter>\n'
+            f'  <parameter=new_code>\n'
+            f'  replacement code here -- raw text, no JSON escaping\n'
+            f'  </parameter>\n'
+            f'  </function>'
+        )
+    return (
+        f'  <function={tool_name}>\n'
+        f'  <parameter=command>command_name</parameter>\n'
+        f'  <parameter=security_risk>LOW</parameter>\n'
+        f'  </function>'
+    )
 
 
 class _SyntheticFunction:
@@ -420,7 +459,8 @@ def _get_tool_definition_by_name(tool_name: str) -> dict | None:
     if creator is None:
         return None
     try:
-        return creator()
+        tool = creator()
+        return tool.get('function') if isinstance(tool, dict) else None
     except Exception:
         return None
 
@@ -510,7 +550,15 @@ def _extract_xml_tool_calls_from_content(
 
             # Look up the tool definition for schema-aware validation
             tool_def = _get_tool_definition_by_name(fn_name)
-            param_matches = list(_iter_parameter_matches(fn_body))
+            param_body = fn_body
+            if fn_name == 'file_editor' and '<file_edit>' in fn_body:
+                param_body = re.sub(
+                    r'<file_edit>.*?</file_edit>',
+                    '',
+                    fn_body,
+                    flags=re.DOTALL | re.IGNORECASE,
+                )
+            param_matches = list(_iter_parameter_matches(param_body))
 
             if tool_def is not None and param_matches:
                 # Use strict validation: type coercion, enum checks, required params
