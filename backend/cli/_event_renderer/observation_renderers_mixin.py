@@ -66,6 +66,8 @@ from backend.cli.theme import (
     CLR_OUTPUT_PANEL_TITLE,
     CLR_QUESTION_TEXT,
     CLR_STATUS_WARN,
+    NAVY_BG,
+    get_grinta_pygments_style,
 )
 from backend.cli.tool_call_display import (
     mcp_result_syntax_extras,
@@ -144,9 +146,9 @@ def _cmd_stdout_syntax_extras(content: str) -> list[Any] | None:
             body,
             lex,
             word_wrap=True,
-            theme='ansi_dark',
+            theme=get_grinta_pygments_style(),
             line_numbers=n_lines > 10,
-            background_color='#060a14',
+            background_color=NAVY_BG,
         )
     ]
 
@@ -374,6 +376,8 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
                     verb=pending.verb if pending else None,
                     detail=pending.detail if pending else path,
                     secondary=pending.secondary if pending else None,
+                    title=pending.title if pending else None,
+                    badge_label=pending.badge_label if pending else 'file_editor',
                 ),
                 pad=ACTIVITY_BLOCK_BOTTOM_PAD,
             )
@@ -726,8 +730,8 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
                         body,
                         _terminal_output_lexer(body),
                         word_wrap=True,
-                        theme='ansi_dark',
-                        background_color='#060a14',
+                        theme=get_grinta_pygments_style(),
+                        background_color=NAVY_BG,
                     ),
                     title=panel_title,
                     title_align='left',

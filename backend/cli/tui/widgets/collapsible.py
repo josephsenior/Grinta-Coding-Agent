@@ -36,12 +36,21 @@ class SidebarRow(Static):
         renderable: Any,
         item_id: str | None = None,
         *,
+        deletable: bool = False,
         classes: str | None = None,
     ) -> None:
         super().__init__(renderable, classes=classes)
         self.item_id = item_id
+        self.deletable = deletable
 
     def on_click(self, event: events.Click) -> None:
+        if self.deletable:
+            size = self.size.width or 0
+            if size > 6 and event.x >= max(0, size - 4):
+                self.post_message(self.DeleteRequested(self.item_id))
+                event.prevent_default()
+                event.stop()
+                return
         self.post_message(self.Selected(self.item_id))
         event.prevent_default()
         event.stop()
@@ -157,7 +166,7 @@ class CollapsibleSection(Container):
         self._collapsed = collapsed
         self._accent_color = accent_color
         self._action_label = action_label
-        self._items: list[tuple[Any, str]] = []
+        self._items: list[tuple[Any, str, bool]] = []
         self._is_thinking = is_thinking
 
     @property
@@ -179,8 +188,8 @@ class CollapsibleSection(Container):
         )
         with Vertical(classes=body_classes, id='body'):
             if self._items:
-                for renderable, item_id in self._items:
-                    yield SidebarRow(renderable, item_id)
+                for renderable, item_id, deletable in self._items:
+                    yield SidebarRow(renderable, item_id, deletable=deletable)
             else:
                 content_classes = 'empty-text'
                 if self._is_thinking:
@@ -238,15 +247,23 @@ class CollapsibleSection(Container):
         header_text = f'[{self._accent_color}]{icon}[/] {self._section_title}'
         header.update(header_text)
 
-    def set_items(self, items: list[tuple[Any, str]]) -> None:
+    def set_items(self, items: list[tuple[Any, str] | tuple[Any, str, bool]]) -> None:
         """Update the list of interactive items in the body."""
-        self._items = items
+        normalized: list[tuple[Any, str, bool]] = []
+        for item in items:
+            if len(item) == 2:
+                renderable, item_id = item
+                normalized.append((renderable, item_id, False))
+            else:
+                renderable, item_id, deletable = item
+                normalized.append((renderable, item_id, deletable))
+        self._items = normalized
         body = self.query_one('#body', Vertical)
         body.remove_children()
 
-        if items:
-            for renderable, item_id in items:
-                body.mount(SidebarRow(renderable, item_id))
+        if normalized:
+            for renderable, item_id, deletable in normalized:
+                body.mount(SidebarRow(renderable, item_id, deletable=deletable))
         else:
             body.mount(Static(self._content or 'No items', id='empty-text'))
 

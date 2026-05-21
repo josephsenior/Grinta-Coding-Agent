@@ -409,6 +409,23 @@ class TestFileEditorXmlTransport:
         assert 'security_risk' in message
         assert 'Missing required argument "command"' not in message
 
+    def test_xml_file_editor_create_requires_explicit_content_parameter(self):
+        response = _model_response(
+            content=(
+                '<function=file_editor>\n'
+                '<parameter=command>create</parameter>\n'
+                '<parameter=path>app.py</parameter>\n'
+                '<parameter=security_risk>LOW</parameter>\n'
+                '</function>'
+            )
+        )
+
+        with pytest.raises(FunctionCallValidationError) as exc_info:
+            response_to_actions(response)
+
+        message = str(exc_info.value)
+        assert "requires an explicit 'content' parameter" in message
+
     def test_xml_file_editor_multi_edit_accepts_nested_file_edit_blocks(self):
         response = _model_response(
             content=(

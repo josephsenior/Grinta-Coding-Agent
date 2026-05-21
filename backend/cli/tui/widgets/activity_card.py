@@ -7,17 +7,24 @@ implemented as native Textual widgets for incremental updates.
 
 from __future__ import annotations
 
+from typing import Any
+
+from textual import events
 from textual.app import ComposeResult
-from textual.containers import Container
+from textual.containers import Container, Vertical
 from textual.widgets import Static
 
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
+    NAVY_BG,
     NAVY_BRAND,
+    NAVY_BORDER,
     NAVY_ERROR,
     NAVY_READY,
+    NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
     NAVY_WAITING,
+    get_grinta_pygments_style,
 )
 
 
@@ -48,33 +55,73 @@ class ActivityCard(Container):
         width: 100%;
         height: auto;
         margin: 0 0 1 0;
-        border: transparent;
+        border: round #1b233a;
+        background: #08101d;
+        padding: 0;
+    }
+    ActivityCard:hover {
+        background: #0a1323;
+        border: round #26365b;
     }
     ActivityCard:focus {
-        border-left: solid $accent;
         background: #0d162a;
+        border: round #4a5f99;
+    }
+    ActivityCard.processing {
+        border: round #32416a;
+        background: #091320;
+    }
+    ActivityCard.category-shell.processing,
+    ActivityCard.category-terminal.processing {
+        border: round #3e557f;
+    }
+    ActivityCard .card-shell {
+        width: 100%;
+        height: auto;
+        padding: 0 1;
     }
     ActivityCard .card-title {
         width: 100%;
         height: 1;
-        color: $text-muted;
+        color: #7f8aa3;
         text-style: bold;
+        padding: 0 1;
+        margin-top: 1;
     }
     ActivityCard .card-header {
         width: 100%;
         height: auto;
+        padding: 0 1;
+        margin-top: 1;
     }
     ActivityCard .card-secondary {
         width: 100%;
         height: auto;
-        margin-left: 2;
+        padding: 0 1;
+    }
+    ActivityCard .card-extra-wrap {
+        width: 100%;
+        height: auto;
+        margin: 1 1 1 2;
+        padding: 0 0;
+        border: round #15233c;
+        background: #050b16;
+    }
+    ActivityCard.category-shell .card-extra-wrap,
+    ActivityCard.category-terminal .card-extra-wrap {
+        border: round #24385c;
+        background: #050913;
+    }
+    ActivityCard.category-files .card-extra-wrap {
+        border: round #1f314f;
+        background: #07101d;
     }
     ActivityCard .card-extra {
         width: 100%;
         height: auto;
-        margin-left: 2;
+        padding: 0 1;
     }
-    ActivityCard .card-extra.-hidden {
+    ActivityCard .card-extra-wrap.-hidden {
         display: none;
     }
     """
@@ -115,15 +162,22 @@ class ActivityCard(Container):
         self._collapsed = collapsed
         self.can_focus = bool(extra_content)
         self.processing = False
+        self.add_class(f'category-{badge_category}')
+        if extra_content:
+            self.add_class('expandable')
+        if title:
+            self.add_class('has-title')
 
     def set_processing(self, processing: bool) -> None:
         """Set the card processing status (pulsing indicator)."""
         self.processing = processing
+        if processing:
+            self.add_class('processing')
+        else:
+            self.remove_class('processing')
         try:
             header = self.query_one('#header', Static)
-            header.update(
-                self._build_header_markup() + '\n' + self._build_secondary_markup()
-            )
+            header.update(self._build_header_markup())
         except Exception:
             pass
 
@@ -136,7 +190,7 @@ class ActivityCard(Container):
         caret = ""
         if self._extra_content:
             icon = '▾' if not self._collapsed else '▸'
-            caret = f'[#54597b]{icon}[/] '
+            caret = f'[{NAVY_TEXT_DIM}]{icon}[/] '
 
         pulse = ""
         if self.processing:
@@ -154,93 +208,208 @@ class ActivityCard(Container):
             'warn': '[bold #f6ff8f]⚠[/]',
             'neutral': '[dim #969aad]•[/]',
         }.get(self._secondary_kind, '•')
-        return f'    {icon} [{color}]{self._secondary}[/]'
+        return f'  {icon} [{color}]{self._secondary}[/]'
 
     def _get_formatted_extra_content(self) -> Any:
-        from typing import Any
         from rich.syntax import Syntax
-        from backend.cli.theme import get_grinta_pygments_style, NAVY_TEXT_MUTED
         content = self._extra_content or ""
 
         # Check if it looks like a unified diff (git diff style)
-        if content.startswith('--- ') or content.startswith('diff --git') or '\n+ ' in content or '\n- ' in content:
-            return Syntax(content, "diff", theme=get_grinta_pygments_style(), background_color="#0a1224", line_numbers=True)
+        diff_like = (
+            content.startswith('--- ')
+            or content.startswith('diff --git')
+            or any(
+                line.startswith(('+', '-', '@@'))
+                for line in content.splitlines()
+                if line and not line.startswith(('+++', '---'))
+            )
+        )
+        if diff_like:
+            return Syntax(
+                content,
+                "diff",
+                theme=get_grinta_pygments_style(),
+                background_color=NAVY_BG,
+                line_numbers=True,
+                padding=(0, 1),
+                word_wrap=True,
+            )
 
         # Check if it is JSON
         if (content.startswith('{') and content.endswith('}')) or (content.startswith('[') and content.endswith(']')):
             try:
                 import json
                 json.loads(content)
-                return Syntax(content, "json", theme=get_grinta_pygments_style(), background_color="#0a1224")
+                return Syntax(
+                    content,
+                    "json",
+                    theme=get_grinta_pygments_style(),
+                    background_color=NAVY_BG,
+                    padding=(0, 1),
+                    word_wrap=True,
+                )
             except Exception:
                 pass
 
         # Check if it is Python code
         if "def " in content or "class " in content or "import " in content:
-            return Syntax(content, "python", theme=get_grinta_pygments_style(), background_color="#0a1224")
+            return Syntax(
+                content,
+                "python",
+                theme=get_grinta_pygments_style(),
+                background_color=NAVY_BG,
+                padding=(0, 1),
+                word_wrap=True,
+            )
 
         # Default: wrap in muted style for plain text
-        lines = content.splitlines()
+        lines = content.splitlines() or ['']
         styled_lines = [f'[{NAVY_TEXT_MUTED}]{line}[/]' for line in lines]
         return '\n'.join(styled_lines)
 
     def compose(self) -> ComposeResult:
-        parts: list[str] = []
-
         if self._title:
-            parts.append(f'[dim]{self._title}[/dim]')
+            yield Static(f'[{NAVY_TEXT_DIM}]{self._title}[/]', classes='card-title')
 
-        parts.append(self._build_header_markup())
+        with Vertical(classes='card-shell'):
+            yield Static(self._build_header_markup(), classes='card-header', id='header')
 
-        if self._secondary:
-            parts.append(self._build_secondary_markup())
-
-        header_text = '\n'.join(parts)
-        yield Static(header_text, classes='card-header', id='header')
+            if self._secondary:
+                yield Static(
+                    self._build_secondary_markup(),
+                    classes='card-secondary',
+                    id='secondary',
+                )
 
         if self._extra_content:
-            extra_classes = 'card-extra -hidden' if self._collapsed else 'card-extra'
-            yield Static(self._get_formatted_extra_content(), classes=extra_classes, id='extra')
+            wrap_classes = 'card-extra-wrap -hidden' if self._collapsed else 'card-extra-wrap'
+            with Container(classes=wrap_classes, id='extra-wrap'):
+                yield Static(
+                    self._get_formatted_extra_content(),
+                    classes='card-extra',
+                    id='extra',
+                )
 
     def update_secondary(self, text: str, kind: str = 'neutral') -> None:
         """Update the secondary/result line (e.g., after a command completes)."""
         self._secondary = text
         self._secondary_kind = kind
-        header = self.query_one('#header', Static)
-        header.update(
-            self._build_header_markup() + '\n' + self._build_secondary_markup()
-        )
+        if not self.is_mounted:
+            return
+        try:
+            secondary = self.query_one('#secondary', Static)
+            secondary.update(self._build_secondary_markup())
+        except Exception:
+            try:
+                header = self.query_one('#header', Static)
+                header.parent.mount(
+                    Static(
+                        self._build_secondary_markup(),
+                        classes='card-secondary',
+                        id='secondary',
+                    )
+                )
+            except Exception:
+                return
+
+    def update_header(
+        self,
+        *,
+        verb: str | None = None,
+        detail: str | None = None,
+        title: str | None = None,
+    ) -> None:
+        """Update the card header/title in place."""
+        if verb is not None:
+            self._verb = verb
+        if detail is not None:
+            self._detail = detail
+        if title is not None:
+            self._title = title
+        if not self.is_mounted:
+            return
+        try:
+            header = self.query_one('#header', Static)
+            header.update(self._build_header_markup())
+        except Exception:
+            pass
+        try:
+            title_widget = self.query_one('.card-title', Static)
+            if self._title:
+                title_widget.update(f'[{NAVY_TEXT_DIM}]{self._title}[/]')
+        except Exception:
+            pass
 
     def append_extra(self, text: str) -> None:
         """Append content to the extra section."""
+        was_empty = not self._extra_content
         if self._extra_content:
             self._extra_content += '\n' + text
         else:
             self._extra_content = text
         self.can_focus = True
-        extra = self.query_one('#extra', Static)
-        extra.update(self._get_formatted_extra_content())
-        extra.remove_class('-hidden')
+        self.add_class('expandable')
+        if not self.is_mounted:
+            self._collapsed = False
+            return
+        if was_empty:
+            self.mount(
+                Container(
+                    Static(
+                        self._get_formatted_extra_content(),
+                        classes='card-extra',
+                        id='extra',
+                    ),
+                    classes='card-extra-wrap',
+                    id='extra-wrap',
+                )
+            )
+        else:
+            try:
+                extra = self.query_one('#extra', Static)
+                extra.update(self._get_formatted_extra_content())
+            except Exception:
+                return
+        try:
+            self.query_one('#extra-wrap', Container).remove_class('-hidden')
+        except Exception:
+            return
         self._collapsed = False
         try:
             header = self.query_one('#header', Static)
-            header.update(
-                self._build_header_markup() + '\n' + self._build_secondary_markup()
-            )
+            header.update(self._build_header_markup())
+        except Exception:
+            pass
+
+    def set_collapsed(self, collapsed: bool) -> None:
+        """Set the expanded/collapsed state without toggling blindly."""
+        self._collapsed = collapsed
+        if not self.is_mounted:
+            return
+        try:
+            extra_wrap = self.query_one('#extra-wrap', Container)
+        except Exception:
+            extra_wrap = None
+        if extra_wrap is not None:
+            if collapsed:
+                extra_wrap.add_class('-hidden')
+            else:
+                extra_wrap.remove_class('-hidden')
+        try:
+            header = self.query_one('#header', Static)
+            header.update(self._build_header_markup())
         except Exception:
             pass
 
     def toggle_extra(self) -> None:
         """Toggle visibility of extra content."""
-        extra = self.query_one('#extra', Static)
-        if extra:
-            extra.toggle_class('-hidden')
+        extra_wrap = self.query_one('#extra-wrap', Container)
+        if extra_wrap:
+            extra_wrap.toggle_class('-hidden')
             self._collapsed = not self._collapsed
             try:
                 header = self.query_one('#header', Static)
-                header.update(
-                    self._build_header_markup() + '\n' + self._build_secondary_markup()
-                )
+                header.update(self._build_header_markup())
             except Exception:
                 pass
 
@@ -251,7 +420,6 @@ class ActivityCard(Container):
 
     def on_click(self, event: events.Click) -> None:
         """Handle click events on the header or widget itself."""
-        from textual import events
         if self._extra_content and event.widget and (event.widget.id == 'header' or event.widget == self):
             self.toggle_extra()
             event.prevent_default()

@@ -10,11 +10,14 @@ from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.panel import Panel
 from rich.text import Text
 
+from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     CLR_CARD_BORDER,
     CLR_CARD_TITLE,
+    NAVY_BG,
     CLR_STATUS_WARN,
     CLR_WARN_BODY,
+    get_grinta_pygments_style,
 )
 from backend.cli.transcript import (
     format_activity_delta_secondary,
@@ -38,6 +41,58 @@ def _preview_text_lines(content: str, *, max_lines: int = 12, max_chars: int = 1
             Text(f'  ... {len(raw_lines) - max_lines} more lines', style=CLR_WARN_BODY)
         )
     return lines
+
+
+_PREVIEW_LEXERS: dict[str, str] = {
+    'py': 'python',
+    'js': 'javascript',
+    'ts': 'typescript',
+    'tsx': 'typescript',
+    'jsx': 'javascript',
+    'json': 'json',
+    'yml': 'yaml',
+    'yaml': 'yaml',
+    'toml': 'toml',
+    'xml': 'xml',
+    'html': 'html',
+    'css': 'css',
+    'scss': 'scss',
+    'md': 'markdown',
+    'sh': 'bash',
+    'ps1': 'powershell',
+    'rs': 'rust',
+    'go': 'go',
+}
+
+
+def _preview_syntax_block(path: str, content: str) -> Any | None:
+    """Syntax-highlight short full-file previews when the language is obvious."""
+    if not content.strip():
+        return None
+    ext = path.rsplit('.', 1)[-1].lower() if '.' in path else ''
+    lexer = _PREVIEW_LEXERS.get(ext)
+    if lexer is None:
+        stripped = content.lstrip()
+        if stripped.startswith('{') or stripped.startswith('['):
+            lexer = 'json'
+        elif stripped.startswith('<'):
+            lexer = 'xml'
+    if lexer is None:
+        return None
+    body = content
+    if len(body) > 4000:
+        body = body[:4000] + '\n… (truncated)'
+    from rich.syntax import Syntax
+
+    return Syntax(
+        body,
+        lexer=lexer,
+        theme=get_grinta_pygments_style(),
+        word_wrap=True,
+        line_numbers=True,
+        padding=(0, 1),
+        background_color=NAVY_BG,
+    )
 
 
 def _is_validation_secondary(text: str) -> bool:
@@ -107,11 +162,15 @@ class DiffPanel:
         verb: str | None = None,
         detail: str | None = None,
         secondary: str | None = None,
+        title: str | None = None,
+        badge_label: str | None = None,
     ) -> None:
         self._obs = obs
         self._verb = verb
         self._detail = detail
         self._secondary = secondary
+        self._title = title
+        self._badge_label = badge_label
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
@@ -129,7 +188,11 @@ class DiffPanel:
             preview_content = (
                 getattr(obs, 'new_content', None) or getattr(obs, 'content', '')
             )
-            parts.extend(_preview_text_lines(preview_content or ''))
+            preview_block = _preview_syntax_block(path, preview_content or '')
+            if preview_block is not None:
+                parts.append(preview_block)
+            else:
+                parts.extend(_preview_text_lines(preview_content or ''))
             # Check for indentation warnings in content
             self._append_indentation_warnings(parts, obs)
             yield self._build_panel(parts)
@@ -285,22 +348,30 @@ class DiffPanel:
             parts.append(delta)
         parts.append(diff_text)
 
-    @staticmethod
-    def _build_panel(parts: list[Any]) -> Panel:
+    def _build_panel(self, parts: list[Any]) -> Panel:
+        title_text = self._panel_title()
         return Panel(
             Group(*parts),
-            title=Text('', style=CLR_CARD_TITLE),
+            title=title_text,
             title_align='left',
             border_style=CLR_CARD_BORDER,
-            box=box.SQUARE,
+            box=box.ROUNDED,
             padding=(0, 0),
         )
+
+    def _panel_title(self) -> Text:
+        badge = badge_for_tool_name(self._badge_label or 'files')
+        title = Text()
+        title.append(badge.label, style=f'bold {badge.label_color}')
+        if self._title:
+            title.append(' · ', style=CLR_CARD_BORDER)
+            title.append(self._title, style=CLR_CARD_TITLE)
+        return title
 
     @staticmethod
     def _render_groups(groups: list[dict[str, list[str]]]) -> Any:
         """Build a Rich Syntax from edit groups with colored +/- lines."""
         from rich.syntax import Syntax
-        from backend.cli.theme import get_grinta_pygments_style
 
         lines = []
         for i, group in enumerate(groups):
@@ -321,6 +392,6 @@ class DiffPanel:
             theme=get_grinta_pygments_style(),
             word_wrap=True,
             padding=(0, 1),
-            background_color='#060a14',
+            background_color=NAVY_BG,
             line_numbers=True,
         )

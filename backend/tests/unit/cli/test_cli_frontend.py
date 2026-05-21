@@ -475,6 +475,25 @@ def test_diff_panel_existing_file_with_groups() -> None:
     assert '-1 lines' in output
 
 
+def test_diff_panel_shows_files_badge_title_when_requested() -> None:
+    obs = MagicMock()
+    obs.path = 'src/main.py'
+    obs.prev_exist = True
+    obs.get_edit_groups.return_value = [
+        {
+            'before_edits': ['-print("old")'],
+            'after_edits': ['+print("new")'],
+        }
+    ]
+
+    panel = DiffPanel(obs, badge_label='file_editor')
+    console = _make_console(width=80)
+    console.print(panel)
+    output = _console_output(console)
+    assert 'Files' in output
+    assert 'main.py' in output
+
+
 def test_show_grinta_splash_renders_logo_text() -> None:
     console = _make_console(width=120)
     show_grinta_splash(console)

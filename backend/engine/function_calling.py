@@ -1800,6 +1800,7 @@ def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
     tool_name = cast(str, create_file_editor_tool().get('function', {}).get('name', ''))
     command = require_tool_argument(arguments, 'command', tool_name)
     command = str(command).strip().lower()
+    normalized_args = dict(arguments)
 
     # Validate command
     _VALID_FILE_EDITOR_COMMANDS = {
@@ -1822,33 +1823,35 @@ def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
             raise FunctionCallValidationError(msg)
         path = str(path)
 
-    validate_security_risk(arguments, tool_name)
+    validate_security_risk(normalized_args, tool_name)
 
     # Repair double-escaped content
     from backend.core.content_escape_repair import repair_arguments_in_place
-    repair_arguments_in_place(dict(arguments), path or '')
+    repair_arguments_in_place(normalized_args, path or '')
 
     # ── Simple I/O commands ────────────────────────────────────────
     if command == 'read':
         return FileReadAction(
             path=path,
             impl_source=FileReadSource.FILE_EDITOR,
-            view_range=cast(Any, arguments.get('view_range')),
+            view_range=cast(Any, normalized_args.get('view_range')),
         )
 
     if command == 'create':
-        content = cast(str, arguments.get('content', ''))
+        content = _require_file_editor_content(normalized_args, command)
         return FileEditAction(
             path=path,
             command='create_file',
             file_text=content,
             impl_source=FileEditSource.FILE_EDITOR,
-            overwrite_existing=parse_bool_argument(arguments.get('overwrite_existing', False)),
+            overwrite_existing=parse_bool_argument(
+                normalized_args.get('overwrite_existing', False)
+            ),
         )
 
     if command == 'insert':
-        content = cast(str, arguments.get('content', ''))
-        insert_line = arguments.get('insert_line')
+        content = _require_file_editor_content(normalized_args, command)
+        insert_line = normalized_args.get('insert_line')
         if insert_line is None:
             raise FunctionCallValidationError('insert requires insert_line parameter')
         return FileEditAction(
@@ -1868,9 +1871,9 @@ def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
 
     # ── Line-range edit ────────────────────────────────────────────
     if command == 'replace_lines':
-        content = cast(str, arguments.get('content', ''))
-        start_line = arguments.get('start_line')
-        end_line = arguments.get('end_line')
+        content = _require_file_editor_content(normalized_args, command)
+        start_line = normalized_args.get('start_line')
+        end_line = normalized_args.get('end_line')
         if start_line is None:
             raise FunctionCallValidationError('replace_lines requires start_line')
         if end_line is None:
@@ -1892,29 +1895,33 @@ def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
             path=path,
             command='edit',
             edit_mode='format',
-            format_kind=arguments.get('format_kind'),
-            format_op=arguments.get('format_op'),
-            format_path=arguments.get('format_path'),
-            format_value=arguments.get('format_value'),
+            format_kind=normalized_args.get('format_kind'),
+            format_op=normalized_args.get('format_op'),
+            format_path=normalized_args.get('format_path'),
+            format_value=normalized_args.get('format_value'),
             impl_source=FileEditSource.FILE_EDITOR,
         )
 
     if command == 'section_edit':
-        content = cast(str, arguments.get('content', ''))
+        section_action = normalized_args.get('section_action')
+        if section_action != 'delete':
+            content = _require_file_editor_content(normalized_args, command)
+        else:
+            content = cast(str, normalized_args.get('content', ''))
         return FileEditAction(
             path=path,
             command='edit',
             edit_mode='section',
-            anchor_type=arguments.get('anchor_type'),
-            anchor_value=arguments.get('anchor_value'),
-            anchor_occurrence=arguments.get('anchor_occurrence'),
-            section_action=arguments.get('section_action'),
+            anchor_type=normalized_args.get('anchor_type'),
+            anchor_value=normalized_args.get('anchor_value'),
+            anchor_occurrence=normalized_args.get('anchor_occurrence'),
+            section_action=section_action,
             section_content=content,
             impl_source=FileEditSource.FILE_EDITOR,
         )
 
     if command == 'patch':
-        content = cast(str, arguments.get('content', ''))
+        content = _require_file_editor_content(normalized_args, command)
         return FileEditAction(
             path=path,
             command='edit',
@@ -1925,11 +1932,11 @@ def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
 
     # ── Symbol-aware edits (Tree-sitter) ───────────────────────────
     if command in ('edit_symbol', 'edit_symbols', 'rename_symbol', 'find_symbol', 'normalize_indent'):
-        return _handle_file_editor_symbol_command(command, path, arguments)
+        return _handle_file_editor_symbol_command(command, path, normalized_args)
 
     # ── Multi-edit (cross-file atomic batch) ──────────────────────
     if command == 'multi_edit':
-        return _handle_file_editor_multi_edit(arguments)
+        return _handle_file_editor_multi_edit(normalized_args)
 
     # Should not reach here
     raise FunctionCallValidationError(f"Unhandled file_editor command: {command}")
@@ -1945,7 +1952,7 @@ def _handle_file_editor_symbol_command(command: str, path: str, arguments: Mappi
 
     if command == 'edit_symbol':
         symbol_name = arguments.get('symbol_name')
-        content = cast(str, arguments.get('content', ''))
+        content = _require_file_editor_content(arguments, command)
         line_number = arguments.get('line_number')
         if not symbol_name:
             raise FunctionCallValidationError('edit_symbol requires symbol_name')
@@ -1980,6 +1987,19 @@ def _handle_file_editor_symbol_command(command: str, path: str, arguments: Mappi
         return _handle_normalize_indent_command(editor, path, arguments)
 
     raise FunctionCallValidationError(f"Unhandled symbol command: {command}")
+
+
+def _require_file_editor_content(
+    arguments: Mapping[str, Any], command: str
+) -> str:
+    raw = arguments.get('content')
+    if raw is None and 'content' not in arguments:
+        raise FunctionCallValidationError(
+            f"file_editor command '{command}' requires an explicit 'content' parameter. "
+            'In XML mode, provide the raw file text inside '
+            '<parameter=content>...</parameter>.'
+        )
+    return '' if raw is None else cast(str, raw)
 
 def _handle_file_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
     """Handle multi_edit command for file_editor (cross-file atomic batch)."""

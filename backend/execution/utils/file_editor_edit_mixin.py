@@ -118,6 +118,21 @@ class FileEditorEditOpsMixin:
 
     @staticmethod
     def _preflight_content_guard(file_path: Path, content: str) -> str | None:
+        placeholder_lines = {
+            'your code here -- raw text, no json escaping needed',
+            'full file contents here -- raw text, no json escaping',
+            'raw file content here',
+            '# raw file content here',
+        }
+        normalized_lines = {
+            line.strip().lower() for line in content.splitlines() if line.strip()
+        }
+        if normalized_lines and normalized_lines.issubset(placeholder_lines):
+            return (
+                'Placeholder example content detected. The file_editor XML examples '
+                'must be replaced with the real file contents before writing.'
+            )
+
         suffix = file_path.suffix.lower()
         if suffix == '.py':
             for idx, line in enumerate(content.splitlines(), start=1):

@@ -168,6 +168,16 @@ class TestFileEditorWrite:
         assert 'invalid Python comment prefix' in result.error
         assert not (Path(self.tmpdir) / 'bad.py').exists()
 
+    def test_placeholder_example_content_is_rejected_preflight(self):
+        result = self.editor(
+            command='create_file',
+            path='placeholder.py',
+            file_text='# raw file content here\n',
+        )
+        assert result.error is not None
+        assert 'Placeholder example content detected' in result.error
+        assert not (Path(self.tmpdir) / 'placeholder.py').exists()
+
     def test_large_existing_code_file_overwrite_requires_explicit_flag(self):
         existing = Path(self.tmpdir) / 'big.py'
         existing.write_text(''.join(f'line_{i} = {i}\n' for i in range(250)))
