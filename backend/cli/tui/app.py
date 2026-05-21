@@ -2825,12 +2825,13 @@ class TUIRenderer:
             self._live_thinking_widget.remove()
             self._live_thinking_widget = None
 
-            if thoughts:
+            if thoughts and self._live_thinking_dirty:
                 lines = [f'[bold #5eead4]Thinking:[/]']
                 for thought in thoughts:
-                    lines.append(f'  [lightgray opacity=0.7]{thought}[/]')
+                    lines.append(f'  [rgb(150,154,189)]│ {thought}[/]')
                 thinking_text = '\n'.join(lines)
                 self._tui._write_log(Text.from_markup(thinking_text))
+            self._live_thinking_dirty = False
 
             self._live_thinking = ''
             self._live_thinking_dirty = False
@@ -3812,6 +3813,10 @@ class TUIRenderer:
             self.clear_live_response()
             return
 
+        if content == self._last_final_response_text:
+            self.clear_live_response()
+            return
+
         self._tui.finalize_thinking()
         self.clear_live_response()
         self._last_final_response_text = content
@@ -3859,12 +3864,13 @@ class TUIRenderer:
         content = strip_pseudo_xml_function_calls(content)
 
         if action.is_final:
-            # Add the finalized response text to history and clear live previews.
             self._tui.finalize_thinking()
             if self._tui._renderer:
                 self._tui._renderer.clear_live_response()
             if content and self._tui._renderer:
-                self._last_final_response_text = content
+                if content == self._tui._renderer._last_final_response_text:
+                    return
+                self._tui._renderer._last_final_response_text = content
                 from backend.cli.tui.widgets.activity_card import AgentMessage
                 body = AgentMessage(content)
                 self._tui._renderer.add_to_history(body)
