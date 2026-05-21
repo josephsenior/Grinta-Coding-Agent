@@ -609,7 +609,12 @@ class SlashCommandsMixin:
         from rich.syntax import Syntax
         from rich.text import Text
 
-        from backend.cli.theme import CLR_CARD_BORDER, CLR_CARD_TITLE
+        from backend.cli.theme import (
+            CLR_CARD_BORDER,
+            CLR_CARD_TITLE,
+            NAVY_BG,
+            get_grinta_pygments_style,
+        )
 
         files = self._parse_diff_files(diff_body)
 
@@ -627,10 +632,10 @@ class SlashCommandsMixin:
             syntax = Syntax(
                 diff_body,
                 lexer='diff',
-                theme='monokai',
+                theme=get_grinta_pygments_style(),
                 word_wrap=True,
                 padding=(1, 2),
-                background_color='default',
+                background_color=NAVY_BG,
                 line_numbers=True,
             )
             renderer.add_system_message(f'{summary}\n\n{syntax}', title='diff')
@@ -650,10 +655,10 @@ class SlashCommandsMixin:
             syntax = Syntax(
                 file_diff,
                 lexer='diff',
-                theme='monokai',
+                theme=get_grinta_pygments_style(),
                 word_wrap=True,
                 padding=(1, 2),
-                background_color='default',
+                background_color=NAVY_BG,
                 line_numbers=True,
             )
             panel = Panel(

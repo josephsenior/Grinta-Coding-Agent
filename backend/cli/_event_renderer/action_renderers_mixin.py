@@ -425,13 +425,14 @@ class ActionRenderersMixin(_ActionRenderersBase):
             verb, detail = 'Edited', f'{path} · L{start}:{end_str}'
         else:
             verb, detail = 'Edited', path
+        badge_label = self._file_badge_label(action)
         self._buffer_pending_activity(
             title=ACTIVITY_CARD_TITLE_FILES,
             verb=verb,
             detail=detail,
             secondary=stats,
             kind='file_edit',
-            badge_label='text_editor',
+            badge_label=badge_label,
         )
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(self._reasoning, f'{verb} {detail}', thought)
@@ -444,7 +445,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
             verb='Created',
             detail=action.path,
             kind='file_write',
-            badge_label='text_editor',
+            badge_label='files',
         )
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(
@@ -475,11 +476,21 @@ class ActionRenderersMixin(_ActionRenderersBase):
             verb='Read',
             detail=detail,
             kind='file_read',
-            badge_label='text_editor',
+            badge_label=self._file_badge_label(action),
         )
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(self._reasoning, f'Read {path}', thought)
         self.refresh()
+
+    @staticmethod
+    def _file_badge_label(action: Any) -> str:
+        impl_source = getattr(action, 'impl_source', None)
+        source_value = getattr(impl_source, 'value', impl_source)
+        if source_value == 'file_editor':
+            return 'file_editor'
+        if source_value == 'default':
+            return 'files'
+        return 'files'
 
     def _render_mcp_action(self, action: MCPAction) -> None:
         self._flush_pending_tool_cards()

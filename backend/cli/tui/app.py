@@ -17,7 +17,7 @@ import shlex
 import shutil
 import threading
 import time
-from collections import deque
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
@@ -93,6 +93,9 @@ from backend.cli.theme import (
     NAVY_WAITING,
 )
 from backend.cli.transcript import strip_tool_result_validation_annotations
+from backend.cli._event_renderer.text_utils import (
+    sanitize_visible_transcript_text,
+)
 from backend.core.bootstrap.agent_control_loop import run_agent_until_done
 from backend.core.bootstrap.main import (
     create_agent,
@@ -170,6 +173,18 @@ def _strip_ansi(text: str) -> str:
     return _rich_text(text).plain
 
 
+_TERMINAL_MOUSE_REPORT_RE = re.compile(
+    r'(?:\x1b)?\[\<\d{1,4};\d{1,4};\d{1,4}[mM]'
+)
+
+
+def _strip_terminal_control_literals(text: str) -> str:
+    """Remove terminal mouse reports that some consoles leak as input text."""
+    if not text:
+        return text
+    return _TERMINAL_MOUSE_REPORT_RE.sub('', text)
+
+
 def _render_thinking_with_diff(text: str) -> Text:
     """Render thinking text as plain muted text."""
     return Text(text or '', style="dim lightgray")
@@ -203,13 +218,134 @@ class InputBar(Horizontal):
     """Bottom input row with border and prompt."""
 
 
+class AutonomyTabs(Static):
+    """Compact autonomy selector for the HUD."""
+
+    can_focus = True
+    _OPTIONS = [
+        ('conservative', 'Conservative'),
+        ('balanced', 'Balanced'),
+        ('full', 'Full'),
+    ]
+
+    class Changed(Message):
+        def __init__(self, value: str) -> None:
+            super().__init__()
+            self.value = value
+
+    def __init__(self, value: str = 'balanced', *, id: str | None = None) -> None:
+        super().__init__(id=id)
+        self._value = value if value in {name for name, _ in self._OPTIONS} else 'balanced'
+        self._spans: list[tuple[int, int, str]] = []
+
+    @property
+    def value(self) -> str:
+        return self._value
+
+    @value.setter
+    def value(self, new_value: str) -> None:
+        self.set_value(new_value)
+
+    def on_mount(self) -> None:
+        self._refresh()
+
+    def _refresh(self) -> None:
+        parts: list[str] = []
+        spans: list[tuple[int, int, str]] = []
+        cursor = 0
+        for index, (name, label) in enumerate(self._OPTIONS):
+            if index > 0:
+                sep = ' '
+                parts.append(sep)
+                cursor += len(sep)
+            segment_plain = label
+            start = cursor
+            end = cursor + len(segment_plain)
+            spans.append((start, end, name))
+            if name == self._value:
+                parts.append(f'[bold #e9eefc on #1e3a70] {label} [/]')
+            else:
+                parts.append(f'[#8f9fc1]{label}[/]')
+            cursor = end
+        self._spans = spans
+        self.update(''.join(parts))
+
+    def set_value(self, new_value: str, *, emit: bool = True) -> None:
+        normalized = (new_value or '').strip().lower()
+        if normalized not in {name for name, _ in self._OPTIONS}:
+            return
+        if normalized == self._value:
+            return
+        self._value = normalized
+        self._refresh()
+        if emit:
+            self.post_message(self.Changed(normalized))
+
+    def on_click(self, event: events.Click) -> None:
+        for start, end, value in self._spans:
+            if start <= event.x <= end:
+                self.set_value(value)
+                event.prevent_default()
+                event.stop()
+                return
+
+    def on_key(self, event: events.Key) -> None:
+        order = [name for name, _ in self._OPTIONS]
+        index = order.index(self._value)
+        if event.key in ('left', 'up'):
+            self.set_value(order[(index - 1) % len(order)])
+            event.prevent_default()
+            event.stop()
+        elif event.key in ('right', 'down', 'enter', 'space'):
+            self.set_value(order[(index + 1) % len(order)])
+            event.prevent_default()
+            event.stop()
+
+
 class HUD(Vertical):
     """Multi-line status bar at the very bottom."""
 
     def compose(self) -> ComposeResult:
         yield Label(id='hud-line-1')
-        yield Label(id='hud-line-2')
-        yield Label(id='hud-line-4')
+        with Horizontal(id='hud-line-2-row'):
+            yield AutonomyTabs(id='hud-autonomy')
+            yield Label(id='hud-line-2')
+
+
+class CurrentOperation(Vertical):
+    """Pinned surface showing the agent's current operation."""
+
+    def compose(self) -> ComposeResult:
+        yield Label('[#7f8aa3]Current Operation[/]', id='current-op-title')
+        yield Label('[#e9eefc]Idle[/]', id='current-op-main')
+        yield Label('[#7f8aa3]Waiting for activity[/]', id='current-op-meta')
+
+
+class WorkerStatusStrip(Vertical):
+    """Pinned surface summarizing delegated worker activity."""
+
+    def compose(self) -> ComposeResult:
+        yield Label('[#7f8aa3]Workers[/]', id='worker-strip-title')
+        yield Label('[#aeb9d3]No delegated work[/]', id='worker-strip-main')
+        yield Label('[#7f8aa3]Idle[/]', id='worker-strip-meta')
+
+
+class RetryStatusStrip(Vertical):
+    """Pinned surface for retry/backoff state."""
+
+    def compose(self) -> ComposeResult:
+        yield Label('[#7f8aa3]Retries[/]', id='retry-strip-title')
+        yield Label('[#aeb9d3]No retry activity[/]', id='retry-strip-main')
+        yield Label('[#7f8aa3]Idle[/]', id='retry-strip-meta')
+
+
+class RuntimeStatusStrip(Vertical):
+    """Pinned surface for low-value runtime/system notices."""
+
+    def compose(self) -> ComposeResult:
+        yield Label('[#7f8aa3]Runtime[/]', id='runtime-strip-title')
+        yield Label('[#aeb9d3]No runtime notices[/]', id='runtime-strip-main')
+        yield Label('[#7f8aa3]Idle[/]', id='runtime-strip-meta')
 
 
 class RendererDrainRequested(Message):
@@ -253,6 +389,46 @@ class GrintaConfirmDialog(ModalScreen[str | None]):
             if event.button.id == f'confirm-{key}':
                 self.dismiss(key)
                 return
+
+
+class GrintaHelpDialog(ModalScreen[None]):
+    """Dedicated help and shortcuts modal."""
+
+    BINDINGS = [
+        Binding('escape', 'dismiss(None)', 'Close', show=False),
+    ]
+
+    def compose(self) -> ComposeResult:
+        help_markup = (
+            f'[{NAVY_TEXT_SECONDARY}]/help[/]      [{NAVY_TEXT_TERTIARY}]Show help and shortcuts[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]/clear[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]/settings[/]  [{NAVY_TEXT_TERTIARY}]Open runtime settings[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]/sessions[/]  [{NAVY_TEXT_TERTIARY}]Browse and resume sessions[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]/resume[/]    [{NAVY_TEXT_TERTIARY}]Resume a session directly[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]/quit[/]      [{NAVY_TEXT_TERTIARY}]Exit Grinta[/]\n\n'
+            f'[{NAVY_TEXT_SECONDARY}]Ctrl+C[/]     [{NAVY_TEXT_TERTIARY}]Interrupt agent or copy[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]Ctrl+B[/]     [{NAVY_TEXT_TERTIARY}]Toggle sidebar[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]Ctrl+L[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]Ctrl+Space[/] [{NAVY_TEXT_TERTIARY}]Autocomplete slash commands[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]PageUp/Down[/] [{NAVY_TEXT_TERTIARY}]Scroll transcript[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]Home/End[/]   [{NAVY_TEXT_TERTIARY}]Jump transcript[/]'
+        )
+        with Vertical(id='help-dialog'):
+            yield Label('[bold]Help[/]', classes='title')
+            yield Static(
+                f'[{NAVY_TEXT_MUTED}]Use the transcript for evidence and the pinned strips for runtime state.[/]\n\n'
+                f'{help_markup}',
+                id='help-body',
+            )
+            with Horizontal(id='help-buttons'):
+                yield Button('Close', id='help-close', variant='primary')
+
+    def on_mount(self) -> None:
+        self.query_one('#help-close', Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == 'help-close':
+            self.dismiss(None)
 
 
 class GrintaAddSkillDialog(ModalScreen[dict[str, str] | None]):
@@ -504,10 +680,19 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
     def action_refresh(self) -> None:
         self._refresh_table()
 
-    def action_delete_selected(self) -> None:
+    async def action_delete_selected(self) -> None:
         sid = self._current_session_id()
         if not sid:
             self._set_feedback('No session selected.', error=True)
+            return
+        result = await self.app.push_screen_wait(
+            GrintaConfirmDialog(
+                title='Delete Session',
+                body=f'Permanently delete session {sid[:12]}?',
+                options=[('cancel', 'Cancel'), ('delete', 'Delete')],
+            )
+        )
+        if result != 'delete':
             return
         deleted, errors = self._delete_sessions([sid])
         if deleted:
@@ -522,7 +707,7 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
             self._refresh_table()
             return
         if bid == 'sessions-delete':
-            self.action_delete_selected()
+            self.run_worker(self.action_delete_selected(), exclusive=True)
             return
         if bid == 'sessions-resume':
             sid = self._current_session_id()
@@ -623,12 +808,23 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
             return
         sid, meta, event_count = self._visible_entries[row_index]
         cost = meta.get('accumulated_cost') or 0
+        branch = str(meta.get('selected_branch') or '—')
+        repo = str(meta.get('selected_repository') or '—')
+        trigger = str(meta.get('trigger') or '—')
+        total_tokens = meta.get('total_tokens') or 0
+        prompt_tokens = meta.get('prompt_tokens') or 0
+        completion_tokens = meta.get('completion_tokens') or 0
         preview = Text.from_markup(
             f'[bold]ID:[/] {sid}\n'
             f'[bold]Title:[/] {str(meta.get("title") or meta.get("name") or "—")}\n'
             f'[bold]Model:[/] {str(meta.get("llm_model") or "—")}\n'
+            f'[bold]Repository:[/] {repo}\n'
+            f'[bold]Branch:[/] {branch}\n'
+            f'[bold]Trigger:[/] {trigger}\n'
             f'[bold]Events:[/] {event_count}\n'
             f'[bold]Cost:[/] {f"${float(cost):.4f}" if cost else "—"}\n'
+            f'[bold]Tokens:[/] {int(total_tokens):,} total'
+            f'  [{NAVY_TEXT_DIM}](p:{int(prompt_tokens):,} c:{int(completion_tokens):,})[/]\n'
             f'[bold]Updated:[/] {str(meta.get("last_updated_at") or meta.get("created_at") or "—")[:19]}'
         )
         self.query_one('#sessions-preview', Static).update(preview)
@@ -712,6 +908,19 @@ class GrintaScreen(Screen):
         self._phase_label = 'Ready'
         self._phase_started_at = time.monotonic()
         self._last_tool_status = 'No tool activity yet'
+        self._current_operation_summary = 'Idle'
+        self._current_operation_meta = 'Waiting for activity'
+        self._current_operation_active = False
+        self._worker_summary = 'No delegated work'
+        self._worker_meta = 'Idle'
+        self._worker_active = False
+        self._worker_has_error = False
+        self._retry_summary = 'No retry activity'
+        self._retry_meta = 'Idle'
+        self._retry_active = False
+        self._runtime_summary = 'No runtime notices'
+        self._runtime_meta = 'Idle'
+        self._runtime_active = False
         self._hud_tick = None
 
     _STATE_LABELS = {
@@ -780,7 +989,12 @@ class GrintaScreen(Screen):
     def compose(self) -> ComposeResult:
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
         with Horizontal(id='main-layout'):
-            yield Transcript(id='main-display')
+            with Vertical(id='transcript-column'):
+                yield CurrentOperation(id='current-operation')
+                yield RetryStatusStrip(id='retry-strip')
+                yield RuntimeStatusStrip(id='runtime-strip')
+                yield WorkerStatusStrip(id='worker-strip')
+                yield Transcript(id='main-display')
             with InfoSidebar(id='sidebar-container'):
                 yield CollapsibleSection(
                     title="Tasks (0)",
@@ -815,6 +1029,27 @@ class GrintaScreen(Screen):
         self._is_unmounted = False
 
         self._render_hud_bar()
+        self.set_current_operation(
+            self._current_operation_summary,
+            meta=self._current_operation_meta,
+            active=self._current_operation_active,
+        )
+        self.set_retry_status(
+            self._retry_summary,
+            meta=self._retry_meta,
+            active=self._retry_active,
+        )
+        self.set_runtime_status(
+            self._runtime_summary,
+            meta=self._runtime_meta,
+            active=self._runtime_active,
+        )
+        self.set_worker_status(
+            self._worker_summary,
+            meta=self._worker_meta,
+            active=self._worker_active,
+            has_error=self._worker_has_error,
+        )
         self._hud_tick = self.set_interval(1.0, self._refresh_runtime_feedback)
         ta = self.query_one('#input', TextArea)
         ta.text = ''
@@ -895,36 +1130,40 @@ class GrintaScreen(Screen):
         if workspace:
             line1_parts.append(f'[#bbc8e8]ws: {workspace}[/]')
         line1_parts.append(f'[{NAVY_TEXT_SECONDARY}]{model_display}[/]')
+        elapsed = max(0, int(time.monotonic() - self._phase_started_at))
+        phase_compact = (self._phase_label or '').strip()
+        if phase_compact and phase_compact.lower() != display_state.lower():
+            line1_parts.append(f'[{NAVY_TEXT_DIM}]Phase: {phase_compact}[/]')
+        line1_parts.append(f'[{NAVY_TEXT_DIM}]Elapsed: {elapsed}s[/]')
         line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
         line1_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
         line1 = '  |  '.join(line1_parts)
 
-        elapsed = max(0, int(time.monotonic() - self._phase_started_at))
-        runtime_line = (
-            f'[{NAVY_BRAND}]Auto: {autonomy}[/]  |  '
-            f'[{NAVY_TEXT_DIM}]Phase: {self._phase_label}  |  '
-            f'Elapsed: {elapsed}s  |  '
-            f'Last: {self._last_tool_status}[/]'
-        )
-        hint_line = (
-            f'[{NAVY_TEXT_SECONDARY}]Hint: {self._command_hint}[/]'
+        activity_or_hint = (
+            f'[{NAVY_TEXT_SECONDARY}]Hint:[/] '
+            f'[{NAVY_TEXT_PRIMARY}]{self._command_hint}[/]'
             if self._command_hint
-            else runtime_line
+            else (
+                f'[{NAVY_TEXT_SECONDARY}]Now:[/] '
+                f'[{NAVY_TEXT_PRIMARY}]{self._last_tool_status}[/]'
+            )
+        )
+        line2 = (
+            f'{activity_or_hint}'
+            f'  |  [#54597b]Keys:[/] '
+            f'[#eacb8a bold]Ctrl+B[/] [#969aad]Sidebar[/]  |  '
+            f'[#eacb8a bold]Ctrl+L[/] [#969aad]Clear[/]  |  '
+            f'[#eacb8a bold]Ctrl+C[/] [#969aad]Interrupt[/]  |  '
+            f'[#eacb8a bold]F1[/] [#969aad]Help[/]'
         )
 
         hud_bar = self.query_one('#hud-bar', HUD)
         hud_bar.query_one('#hud-line-1', Label).update(line1)
-        hud_bar.query_one('#hud-line-2', Label).update(hint_line)
-
-        line4 = (
-            f'[#54597b]Keys:[/] '
-            f'[#eacb8a bold]Ctrl+B[/] [#969aad]Toggle Sidebar[/]  |  '
-            f'[#eacb8a bold]Ctrl+L[/] [#969aad]Clear Screen[/]  |  '
-            f'[#eacb8a bold]Ctrl+C[/] [#969aad]Interrupt[/]  |  '
-            f'[#eacb8a bold]F1[/] [#969aad]Help[/]'
-        )
+        hud_bar.query_one('#hud-line-2', Label).update(line2)
         try:
-            hud_bar.query_one('#hud-line-4', Label).update(line4)
+            autonomy_tabs = hud_bar.query_one('#hud-autonomy', AutonomyTabs)
+            if autonomy_tabs.value != autonomy:
+                autonomy_tabs.set_value(autonomy, emit=False)
         except Exception:
             pass
 
@@ -957,6 +1196,147 @@ class GrintaScreen(Screen):
             compact = compact[:93] + '...'
         self._last_tool_status = compact
         self._render_hud_bar()
+
+    def set_current_operation(
+        self,
+        summary: str,
+        *,
+        meta: str = '',
+        active: bool = True,
+    ) -> None:
+        summary_text = re.sub(r'\s+', ' ', (summary or '').strip()) or 'Idle'
+        if len(summary_text) > 120:
+            summary_text = summary_text[:117] + '...'
+        meta_text = re.sub(r'\s+', ' ', (meta or '').strip())
+        if len(meta_text) > 140:
+            meta_text = meta_text[:137] + '...'
+        self._current_operation_summary = summary_text
+        self._current_operation_meta = meta_text or 'Waiting for activity'
+        self._current_operation_active = active
+        try:
+            widget = self.query_one('#current-operation', CurrentOperation)
+            widget.query_one('#current-op-main', Label).update(
+                f'[{NAVY_TEXT_PRIMARY if active else NAVY_TEXT_MUTED}]{summary_text}[/]'
+            )
+            widget.query_one('#current-op-meta', Label).update(
+                f'[{NAVY_TEXT_SECONDARY if active else NAVY_TEXT_DIM}]'
+                f'{self._current_operation_meta}[/]'
+            )
+            if active:
+                widget.add_class('active')
+            else:
+                widget.remove_class('active')
+        except Exception:
+            pass
+
+    def clear_current_operation(self, meta: str = 'Waiting for activity') -> None:
+        self.set_current_operation('Idle', meta=meta, active=False)
+
+    def set_retry_status(
+        self,
+        summary: str,
+        *,
+        meta: str = '',
+        active: bool = True,
+    ) -> None:
+        summary_text = re.sub(r'\s+', ' ', (summary or '').strip()) or 'No retry activity'
+        if len(summary_text) > 120:
+            summary_text = summary_text[:117] + '...'
+        meta_text = re.sub(r'\s+', ' ', (meta or '').strip()) or 'Idle'
+        if len(meta_text) > 160:
+            meta_text = meta_text[:157] + '...'
+        self._retry_summary = summary_text
+        self._retry_meta = meta_text
+        self._retry_active = active
+        try:
+            widget = self.query_one('#retry-strip', RetryStatusStrip)
+            widget.query_one('#retry-strip-main', Label).update(
+                f'[{NAVY_WAITING if active else NAVY_TEXT_MUTED}]{summary_text}[/]'
+            )
+            widget.query_one('#retry-strip-meta', Label).update(
+                f'[{NAVY_TEXT_SECONDARY if active else NAVY_TEXT_DIM}]{meta_text}[/]'
+            )
+            if active:
+                widget.add_class('active')
+            else:
+                widget.remove_class('active')
+        except Exception:
+            pass
+
+    def clear_retry_status(self, meta: str = 'Idle') -> None:
+        self.set_retry_status('No retry activity', meta=meta, active=False)
+
+    def set_runtime_status(
+        self,
+        summary: str,
+        *,
+        meta: str = '',
+        active: bool = False,
+    ) -> None:
+        summary_text = re.sub(r'\s+', ' ', (summary or '').strip()) or 'No runtime notices'
+        if len(summary_text) > 120:
+            summary_text = summary_text[:117] + '...'
+        meta_text = re.sub(r'\s+', ' ', (meta or '').strip()) or 'Idle'
+        if len(meta_text) > 160:
+            meta_text = meta_text[:157] + '...'
+        self._runtime_summary = summary_text
+        self._runtime_meta = meta_text
+        self._runtime_active = active
+        try:
+            widget = self.query_one('#runtime-strip', RuntimeStatusStrip)
+            widget.query_one('#runtime-strip-main', Label).update(
+                f'[{NAVY_TEXT_PRIMARY if active else NAVY_TEXT_MUTED}]{summary_text}[/]'
+            )
+            widget.query_one('#runtime-strip-meta', Label).update(
+                f'[{NAVY_TEXT_SECONDARY if active else NAVY_TEXT_DIM}]{meta_text}[/]'
+            )
+            if active:
+                widget.add_class('active')
+            else:
+                widget.remove_class('active')
+        except Exception:
+            pass
+
+    def clear_runtime_status(self, meta: str = 'Idle') -> None:
+        self.set_runtime_status('No runtime notices', meta=meta, active=False)
+
+    def set_worker_status(
+        self,
+        summary: str,
+        *,
+        meta: str = '',
+        active: bool = False,
+        has_error: bool = False,
+    ) -> None:
+        summary_text = re.sub(r'\s+', ' ', (summary or '').strip()) or 'No delegated work'
+        if len(summary_text) > 120:
+            summary_text = summary_text[:117] + '...'
+        meta_text = re.sub(r'\s+', ' ', (meta or '').strip()) or 'Idle'
+        if len(meta_text) > 160:
+            meta_text = meta_text[:157] + '...'
+        self._worker_summary = summary_text
+        self._worker_meta = meta_text
+        self._worker_active = active
+        self._worker_has_error = has_error
+        try:
+            widget = self.query_one('#worker-strip', WorkerStatusStrip)
+            widget.query_one('#worker-strip-main', Label).update(
+                f'[{NAVY_TEXT_PRIMARY if active else NAVY_TEXT_MUTED}]{summary_text}[/]'
+            )
+            meta_color = NAVY_ERROR if has_error else (NAVY_TEXT_SECONDARY if active else NAVY_TEXT_DIM)
+            widget.query_one('#worker-strip-meta', Label).update(
+                f'[{meta_color}]{meta_text}[/]'
+            )
+            if active:
+                widget.add_class('active')
+            else:
+                widget.remove_class('active')
+            if has_error:
+                widget.add_class('error')
+            else:
+                widget.remove_class('error')
+        except Exception:
+            pass
 
     def _update_command_hint(self, text: str) -> None:
         stripped = _strip_ansi(text).strip()
@@ -1389,8 +1769,11 @@ class GrintaScreen(Screen):
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         if event.text_area.id == 'input':
-            self._update_command_hint(event.text_area.text)
-            text = event.text_area.text
+            text = _strip_terminal_control_literals(event.text_area.text)
+            if text != event.text_area.text:
+                event.text_area.text = text
+                return
+            self._update_command_hint(text)
             line_count = len(text.split('\n')) if text else 1
             desired_textarea_height = max(3, min(6, line_count))
             desired_input_bar_height = desired_textarea_height + 1
@@ -1400,6 +1783,26 @@ class GrintaScreen(Screen):
                 self.query_one('#input-bar', InputBar).styles.height = desired_input_bar_height
             except Exception:
                 pass
+
+    def on_autonomy_tabs_changed(self, event: AutonomyTabs.Changed) -> None:
+        self._apply_autonomy_level(event.value)
+
+    def _apply_autonomy_level(self, new_level: str) -> None:
+        level = (new_level or '').strip().lower()
+        if level not in {'conservative', 'balanced', 'full'}:
+            return
+        controller = self._controller
+        if controller is not None:
+            ac = getattr(controller, 'autonomy_controller', None)
+            if ac is not None:
+                ac.autonomy_level = level
+        try:
+            setattr(self._config, 'autonomy_level', level)
+        except Exception:
+            pass
+        self._hud.update_autonomy(level)
+        self._render_hud_bar()
+        self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
 
     def on_sidebar_row_selected(self, event: Any) -> None:
         """Handle SidebarRow selected events and notify the user."""
@@ -1419,10 +1822,18 @@ class GrintaScreen(Screen):
             self.notify(f"Task {task_id}: {desc}", severity="info", timeout=3.0)
         elif item_id.startswith('mcp:'):
             mcp_name = item_id.split(':', 1)[1]
-            self.notify(f"MCP Server: {mcp_name} (active/connected)", severity="info", timeout=3.0)
+            self.notify(
+                f"MCP Server: {mcp_name}  |  Press Delete to remove",
+                severity="info",
+                timeout=3.0,
+            )
         elif item_id.startswith('skill:'):
             skill_name = item_id.split(':', 1)[1]
-            self.notify(f"Playbook Skill: {skill_name}.md", severity="info", timeout=3.0)
+            self.notify(
+                f"Playbook Skill: {skill_name}.md  |  Press Delete to remove",
+                severity="info",
+                timeout=3.0,
+            )
 
     async def on_sidebar_row_delete_requested(self, event: Any) -> None:
         """Handle SidebarRow delete events."""
@@ -1564,7 +1975,10 @@ class GrintaScreen(Screen):
             _tui_logger.debug('action_submit_input: lock held, ignoring')
             return
         ta = self.query_one('#input', TextArea)
-        text = _strip_ansi(ta.text).strip()
+        clean_text = _strip_terminal_control_literals(ta.text)
+        if clean_text != ta.text:
+            ta.text = clean_text
+        text = _strip_ansi(clean_text).strip()
         _tui_logger.debug(f'action_submit_input: text_len={len(text)}')
         if not text:
             _tui_logger.debug('action_submit_input: empty text, ignoring')
@@ -1650,10 +2064,9 @@ class GrintaScreen(Screen):
                     # Internal ready - no user-facing message
                 else:
                     _tui_logger.debug(
-                        '_handle_input: controller exists, calling _ensure_agent_task()'
+                        '_handle_input: controller exists, dispatch will ensure task'
                     )
-                    logger.info('[TUI] _handle_input: controller exists, ensuring task')
-                    await self._ensure_agent_task()
+                    logger.info('[TUI] _handle_input: controller exists')
                 assert self._controller is not None, (
                     'Controller must be initialized after agent task setup'
                 )
@@ -1924,27 +2337,7 @@ class GrintaScreen(Screen):
         self._memory_stub = None
 
     def show_help(self) -> None:
-        self.add_divider()
-        self.add_system_message(
-            f'[{NAVY_BRAND}]GRINTA[/] — AI-Powered Development Platform'
-        )
-        self.add_divider()
-        from rich.text import Text
-
-        help_text = Text.from_markup(
-            f'  [{NAVY_TEXT_SECONDARY}]/help[/]      [{NAVY_TEXT_TERTIARY}]Show this help[/]\n'
-            f'  [{NAVY_TEXT_SECONDARY}]/clear[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
-            f'  [{NAVY_TEXT_SECONDARY}]/settings[/]  [{NAVY_TEXT_TERTIARY}]Open settings[/]\n'
-            f'  [{NAVY_TEXT_SECONDARY}]/sessions[/]  [{NAVY_TEXT_TERTIARY}]Manage sessions[/]\n'
-            f'  [{NAVY_TEXT_SECONDARY}]/resume[/]    [{NAVY_TEXT_TERTIARY}]Resume a session[/]\n'
-            f'  [{NAVY_TEXT_SECONDARY}]/quit[/]      [{NAVY_TEXT_TERTIARY}]Exit Grinta[/]\n'
-            f'  [{NAVY_TEXT_SECONDARY}]Ctrl+C[/]     [{NAVY_TEXT_TERTIARY}]Stop agent[/]\n'
-            f'  [{NAVY_TEXT_SECONDARY}]Tab[/]        [{NAVY_TEXT_TERTIARY}]Newline in input[/]\n'
-            f'  [{NAVY_TEXT_SECONDARY}]Ctrl+Space[/] [{NAVY_TEXT_TERTIARY}]Command autocomplete[/]'
-        )
-        self._write_log(help_text)
-        self.add_divider()
-        self._scroll_to_bottom()
+        self.app.push_screen(GrintaHelpDialog())
 
     # ── Bootstrap (preserved agent logic) ───────────────────────────────────
 
@@ -2278,6 +2671,15 @@ class GrintaScreen(Screen):
             )
             return
 
+        action = MessageAction(content=text)
+        self._event_stream.add_event(action, EventSource.USER)
+        _tui_logger.debug('_dispatch_to_agent: event added')
+        try:
+            logger.info('[TUI] _dispatch_to_agent: event added')
+        except Exception as exc:
+            _tui_logger.debug(
+                f'_dispatch_to_agent: logger.info FAILED: {type(exc).__name__}: {exc}'
+            )
         try:
             await self._ensure_agent_task()
             _tui_logger.debug('_dispatch_to_agent: _ensure_agent_task OK')
@@ -2286,19 +2688,6 @@ class GrintaScreen(Screen):
                 f'_dispatch_to_agent: _ensure_agent_task FAILED: {type(exc).__name__}: {exc}'
             )
             raise
-
-        action = MessageAction(content=text)
-        self._event_stream.add_event(action, EventSource.USER)
-        # NOTE: _ensure_agent_task (via run_agent_until_done) already calls
-        # controller.step() internally.  We skip the redundant explicit step()
-        # to avoid double-processing the queued MessageAction.
-        _tui_logger.debug('_dispatch_to_agent: event added')
-        try:
-            logger.info('[TUI] _dispatch_to_agent: event added')
-        except Exception as exc:
-            _tui_logger.debug(
-                f'_dispatch_to_agent: logger.info FAILED: {type(exc).__name__}: {exc}'
-            )
         try:
             end_states = {
                 AgentState.AWAITING_USER_INPUT,
@@ -2429,12 +2818,20 @@ class TUIRenderer:
         self._live_thinking_dirty: bool = False
         self._live_response: str = ''
         self._live_response_dirty: bool = False
+        self._last_final_response_text: str = ''
 
         # Turn tracking for grouping tool calls by agent turn
         self._turn_count: int = 0
         self._in_agent_turn: bool = False
         self._tools_in_turn: int = 0
         self._turn_start_time: float = 0.0
+        self._terminal_cards_by_session: dict[str, Any] = {}
+        self._pending_terminal_card: Any | None = None
+        self._pending_shell_cards_by_command: dict[str, deque[Any]] = defaultdict(deque)
+        self._active_worker_tasks: list[str] = []
+        self._worker_recent_results: deque[str] = deque(maxlen=3)
+        self._worker_completed: int = 0
+        self._worker_failed: int = 0
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
@@ -2523,6 +2920,7 @@ class TUIRenderer:
         """Clear the in-flight response preview widget."""
         self._live_response = ''
         self._live_response_dirty = False
+        self._last_final_response_text = ''
 
         display = self._tui._get_display()
         if type(display).__name__ == 'MagicMock':
@@ -2570,6 +2968,13 @@ class TUIRenderer:
     def clear_history(self) -> None:
         self._live_thinking_widget = None
         self._live_response_widget = None
+        self._terminal_cards_by_session = {}
+        self._pending_terminal_card = None
+        self._pending_shell_cards_by_command = defaultdict(deque)
+        self._active_worker_tasks = []
+        self._worker_recent_results.clear()
+        self._worker_completed = 0
+        self._worker_failed = 0
         self._history = []
         self._history_items_dropped = 0
         self._live_thinking = ''
@@ -2661,7 +3066,7 @@ class TUIRenderer:
                         row_text.append('● ', style='bold #eacb8a')
                         row_text.append(name, style='#c8d4e8')
                         row_text.append(f' ({server_type})', style='#54597b')
-                        mcp_items.append((row_text, f"mcp:{name}"))
+                        mcp_items.append((row_text, f"mcp:{name}", True))
 
                 mcp_widget.set_title(f"MCP Servers ({len(mcp_servers) if mcp_servers else 0})")
                 mcp_widget.set_items(mcp_items)
@@ -2678,7 +3083,7 @@ class TUIRenderer:
                         row_text = Text()
                         row_text.append('● ', style='bold #7a849c')
                         row_text.append(skill, style='#a1acc2')
-                        skill_items.append((row_text, f"skill:{skill}"))
+                        skill_items.append((row_text, f"skill:{skill}", True))
 
                 skills_widget.set_title(f"Skills ({len(skills_list)})")
                 skills_widget.set_items(skill_items)
@@ -2707,6 +3112,61 @@ class TUIRenderer:
             except Exception:
                 pass
             self._last_active_card = None
+        self._tui.clear_current_operation()
+
+    def _update_retry_strip(self, summary: str, meta: str) -> None:
+        self._tui.set_retry_status(summary, meta=meta, active=True)
+
+    def _clear_retry_strip(self, meta: str = 'Idle') -> None:
+        self._tui.clear_retry_status(meta=meta)
+
+    def _update_runtime_strip(self, summary: str, meta: str, *, active: bool = False) -> None:
+        self._tui.set_runtime_status(summary, meta=meta, active=active)
+
+    def _clear_runtime_strip(self, meta: str = 'Idle') -> None:
+        self._tui.clear_runtime_status(meta=meta)
+
+    @staticmethod
+    def _summarize_worker_task(task: str) -> str:
+        compact = re.sub(r'\s+', ' ', (task or '').strip())
+        if not compact:
+            return 'delegated task'
+        return compact[:72] + ('...' if len(compact) > 72 else '')
+
+    def _sync_worker_strip(self) -> None:
+        active = len(self._active_worker_tasks)
+        if active:
+            summary = f'{active} worker{"s" if active != 1 else ""} active'
+            meta_parts = [
+                ' | '.join(self._active_worker_tasks[:2]),
+                f'done {self._worker_completed}',
+            ]
+            if self._worker_failed:
+                meta_parts.append(f'failed {self._worker_failed}')
+            self._tui.set_worker_status(
+                summary,
+                meta='  •  '.join(part for part in meta_parts if part),
+                active=True,
+                has_error=self._worker_failed > 0,
+            )
+            return
+
+        if self._worker_completed or self._worker_failed:
+            summary = 'Workers idle'
+            meta_parts = [f'done {self._worker_completed}']
+            if self._worker_failed:
+                meta_parts.append(f'failed {self._worker_failed}')
+            if self._worker_recent_results:
+                meta_parts.append('latest: ' + ' | '.join(self._worker_recent_results))
+            self._tui.set_worker_status(
+                summary,
+                meta='  •  '.join(meta_parts),
+                active=False,
+                has_error=self._worker_failed > 0,
+            )
+            return
+
+        self._tui.set_worker_status('No delegated work', meta='Idle', active=False, has_error=False)
 
     def _write_card(self, card: ActivityCard) -> None:
         """Write an activity card to the transcript using native ActivityCard widget."""
@@ -2731,19 +3191,180 @@ class TUIRenderer:
             secondary=card.secondary,
             secondary_kind=card.secondary_kind,
             extra_content=extra_content,
-            collapsed=card.is_collapsible,
+            collapsed=card.start_collapsed if card.is_collapsible else False,
         )
 
         # Defer/enable processing state if it is a tool card that is actively executing
-        is_tool = card.badge_category in ('tool', 'shell', 'files', 'web', 'subagent', 'mcp')
+        is_tool = card.badge_category in (
+            'tool',
+            'shell',
+            'terminal',
+            'files',
+            'browser',
+            'mcp',
+            'workers',
+            'code',
+        )
         is_active = is_tool and (not card.secondary or card.secondary_kind == 'neutral')
         if is_active:
             widget.set_processing(True)
             self._last_active_card = widget
+            self._tui.set_current_operation(
+                f'{card.title or "Activity"}: {card.verb} {card.detail}'.strip(),
+                meta=card.secondary or 'Running',
+                active=True,
+            )
+        else:
+            self._tui.set_current_operation(
+                f'{card.title or "Activity"}: {card.verb} {card.detail}'.strip(),
+                meta=card.secondary or 'Completed',
+                active=False,
+            )
 
         display = self._tui._get_display()
         display.mount(widget)
         display.scroll_end(animate=False)
+
+    def _upsert_terminal_session_card(
+        self,
+        *,
+        session_id: str,
+        verb: str,
+        detail: str,
+        secondary: str | None = None,
+        secondary_kind: str = 'neutral',
+        extra_content: str | None = None,
+        processing: bool = True,
+        collapse_after_update: bool = False,
+    ) -> None:
+        from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
+
+        session_key = session_id or 'terminal'
+        widget = self._terminal_cards_by_session.get(session_key)
+        if widget is None and session_id and self._pending_terminal_card is not None:
+            widget = self._pending_terminal_card
+            self._terminal_cards_by_session[session_key] = widget
+            self._pending_terminal_card = None
+        if widget is None:
+            widget = TUIActivityCard(
+                verb=verb,
+                detail=detail,
+                badge_category='terminal',
+                title='Terminal',
+                secondary=secondary,
+                secondary_kind=secondary_kind,
+                extra_content=extra_content,
+                collapsed=False,
+            )
+            display = self._tui._get_display()
+            display.mount(widget)
+            display.scroll_end(animate=False)
+            if session_id:
+                self._terminal_cards_by_session[session_key] = widget
+            else:
+                self._pending_terminal_card = widget
+        else:
+            widget.update_header(verb=verb, detail=detail, title='Terminal')
+            if secondary:
+                widget.update_secondary(secondary, kind=secondary_kind)
+            if extra_content:
+                widget.append_extra(extra_content)
+
+        if not extra_content and collapse_after_update:
+            widget.set_collapsed(True)
+        elif collapse_after_update:
+            widget.set_collapsed(True)
+
+        widget.set_processing(processing)
+        if processing:
+            self._clear_last_active_card_processing()
+            widget.set_processing(True)
+            self._last_active_card = widget
+            self._tui.set_last_tool_status(f'{verb} {detail}'.strip())
+            self._tui.set_current_operation(
+                f'Terminal: {verb} {detail}'.strip(),
+                meta=secondary or f'session {session_key}',
+                active=True,
+            )
+        else:
+            if self._last_active_card is widget:
+                self._last_active_card = None
+            self._tui.set_last_tool_status(f'{verb} {detail}'.strip())
+            self._tui.set_current_operation(
+                f'Terminal: {verb} {detail}'.strip(),
+                meta=secondary or f'session {session_key}',
+                active=False,
+            )
+
+    def _create_shell_command_card(self, command: str) -> Any:
+        from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
+
+        card = ActivityRenderer.shell_command(command)
+        widget = TUIActivityCard(
+            verb=card.verb,
+            detail=card.detail,
+            badge_category=card.badge_category,
+            title=card.title,
+            secondary=card.secondary,
+            secondary_kind=card.secondary_kind,
+            extra_content=None,
+            collapsed=False,
+        )
+        widget.set_processing(True)
+        self._clear_last_active_card_processing()
+        self._last_active_card = widget
+        self._pending_shell_cards_by_command[command].append(widget)
+        self._tui.set_last_tool_status(f'{card.verb} {card.detail}'.strip())
+        self._tui.set_current_operation(
+            f'{card.title or "Shell"}: {card.verb} {card.detail}'.strip(),
+            meta='running',
+            active=True,
+        )
+        display = self._tui._get_display()
+        display.mount(widget)
+        display.scroll_end(animate=False)
+        return widget
+
+    def _complete_shell_command_card(
+        self,
+        command: str,
+        *,
+        output: str,
+        exit_code: int | None,
+    ) -> None:
+        queue = self._pending_shell_cards_by_command.get(command)
+        widget = queue.popleft() if queue else None
+        if queue is not None and not queue:
+            self._pending_shell_cards_by_command.pop(command, None)
+
+        card = ActivityRenderer.shell_command(command, output=output, exit_code=exit_code)
+        if widget is None:
+            self._write_card(card)
+            return
+
+        if self._last_active_card is widget:
+            self._last_active_card = None
+
+        widget.update_header(verb=card.verb, detail=card.detail, title=card.title)
+        if card.secondary:
+            widget.update_secondary(card.secondary, kind=card.secondary_kind)
+
+        extra_content = None
+        if card.extra_lines:
+            extra_content = '\n'.join(
+                f'{"  " * extra.indent}{extra.text}' for extra in card.extra_lines
+            )
+        if extra_content:
+            widget.append_extra(extra_content)
+            widget.set_collapsed(card.start_collapsed if card.is_collapsible else False)
+
+        widget.set_processing(False)
+        self._tui.set_last_tool_status(f'{card.verb} {card.detail}'.strip())
+        self._tui.set_current_operation(
+            f'{card.title or "Shell"}: {card.verb} {card.detail}'.strip(),
+            meta=card.secondary or 'completed',
+            active=False,
+        )
 
     def drain_events(self) -> None:
         with self._pending_lock:
@@ -2850,9 +3471,9 @@ class TUIRenderer:
             self._tools_in_turn += 1
 
         if isinstance(event, MessageAction):
-            if source == EventSource.USER or source == 'user':
+            if self._is_user_source(source):
                 return
-            pass
+            self._handle_message_action(event)
         elif isinstance(event, FileReadAction):
             path = getattr(event, 'path', '')
             view_range = getattr(event, 'view_range', None)
@@ -2968,24 +3589,27 @@ class TUIRenderer:
         elif isinstance(event, CmdRunAction):
             cmd = getattr(event, 'command', '') or ''
             if not getattr(event, 'hidden', False):
-                card = ActivityRenderer.shell_command(cmd)
-                self._write_card(card)
+                self._create_shell_command_card(cmd)
         elif isinstance(event, MCPObservation):
             card = ActivityRenderer.mcp_tool('mcp', result=event.content)
             self._write_card(card)
         elif isinstance(event, CmdOutputObservation):
             output = (event.content or '').strip()
+            exit_code = getattr(event, 'exit_code', None)
+            cmd = getattr(event, 'command', '') or ''
             if output:
                 output = strip_tool_result_validation_annotations(output)
-                exit_code = getattr(event, 'exit_code', None)
-                cmd = getattr(event, 'command', '') or ''
-                card = ActivityRenderer.shell_command(
-                    cmd, output=output[:500], exit_code=exit_code
+            if output or exit_code is not None:
+                self._complete_shell_command_card(
+                    cmd,
+                    output=output[:500],
+                    exit_code=exit_code,
                 )
-                self._write_card(card)
         elif isinstance(event, ErrorObservation):
             self._tui.add_error(event.content or 'An unknown error occurred')
         elif isinstance(event, SuccessObservation):
+            self._clear_retry_strip('Recovered')
+            self._clear_runtime_status('Recovered')
             self._tui.add_success(event.content or 'Done')
         elif isinstance(event, StatusObservation):
             status_type = str(getattr(event, 'status_type', '') or '')
@@ -3003,19 +3627,29 @@ class TUIRenderer:
                 self._hud.update_agent_state(label)
                 self._tui.set_agent_phase(label)
                 self._tui.set_last_tool_status(last_status)
-                self._tui._write_log(Text(f'  {message}', style=NAVY_TEXT_DIM))
+                self._update_retry_strip(label, message)
                 return
             if status_type == 'compaction':
+                self._clear_retry_strip('Idle')
                 self._hud.update_agent_state('Compacting')
                 self._tui.set_agent_phase('Compacting context...')
                 self._tui.set_last_tool_status('Compacting context...')
-                self._tui._write_log(Text('  Compacting context...', style=NAVY_TEXT_DIM))
+                self._update_runtime_strip(
+                    'Compacting context',
+                    'Reducing context to continue the task',
+                    active=True,
+                )
                 return
             msg = (event.content or '').strip()
             if msg:
-                self._tui._write_log(Text(f'  {msg}', style=NAVY_TEXT_DIM))
+                summary = status_type.replace('_', ' ').strip().title() if status_type else 'Runtime notice'
+                self._update_runtime_strip(summary, msg, active=False)
         elif isinstance(event, CondensationAction):
-            self._tui._write_log(Text('  Context compacted', style=NAVY_TEXT_DIM))
+            self._update_runtime_strip(
+                'Context compacted',
+                'Compaction completed successfully',
+                active=False,
+            )
         elif isinstance(event, AgentThinkAction):
             source_tool = getattr(event, 'source_tool', '') or ''
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
@@ -3052,24 +3686,67 @@ class TUIRenderer:
             self._write_card(card)
         elif isinstance(event, TerminalRunAction):
             cmd = getattr(event, 'command', '') or ''
-            card = ActivityRenderer.shell_command(cmd)
-            self._write_card(card)
+            session_id = getattr(event, 'session_id', '') or ''
+            detail = f'$ {cmd[:80]}' if cmd else f'session {session_id or "terminal"}'
+            self._upsert_terminal_session_card(
+                session_id=session_id,
+                verb='Started',
+                detail=detail,
+                secondary=f'session {session_id}' if session_id else 'starting session',
+                secondary_kind='neutral',
+                extra_content=f'$ {cmd}' if cmd else None,
+                processing=True,
+            )
         elif isinstance(event, TerminalInputAction):
-            cmd = getattr(event, 'command', '') or getattr(event, 'input', '') or ''
-            card = ActivityRenderer.shell_command(cmd)
-            self._write_card(card)
+            session_id = getattr(event, 'session_id', '') or ''
+            submitted = getattr(event, 'input', '') or ''
+            detail = f'session {session_id or "terminal"}'
+            self._upsert_terminal_session_card(
+                session_id=session_id,
+                verb='Sent',
+                detail=detail,
+                secondary='awaiting output',
+                secondary_kind='neutral',
+                extra_content=f'> {submitted.rstrip()}',
+                processing=True,
+            )
         elif isinstance(event, TerminalReadAction):
             session_id = getattr(event, 'session_id', '') or ''
-            card = ActivityRenderer.terminal_output('', session_id=session_id)
-            self._write_card(card)
+            self._upsert_terminal_session_card(
+                session_id=session_id,
+                verb='Reading',
+                detail=f'session {session_id or "terminal"}',
+                secondary='streaming output',
+                secondary_kind='neutral',
+                processing=True,
+            )
         elif isinstance(event, TerminalObservation):
             content = (event.content or '').strip()
+            session_id = getattr(event, 'session_id', '') or ''
+            exit_code = getattr(event, 'exit_code', None)
+            state = getattr(event, 'state', None)
+            secondary = (
+                f'exit {exit_code}'
+                if exit_code is not None
+                else (state or f'session {session_id or "terminal"}')
+            )
+            secondary_kind = (
+                'ok'
+                if exit_code == 0
+                else ('err' if exit_code is not None and exit_code != 0 else 'neutral')
+            )
             if content:
                 content = strip_tool_result_validation_annotations(content)
-                session_id = getattr(event, 'session_id', '') or ''
-                exit_code = getattr(event, 'exit_code', None)
-                card = ActivityRenderer.terminal_output(content, session_id, exit_code)
-                self._write_card(card)
+            self._upsert_terminal_session_card(
+                session_id=session_id,
+                verb='Output',
+                detail=f'session {session_id or "terminal"}',
+                secondary=secondary,
+                secondary_kind=secondary_kind,
+                extra_content=content or None,
+                processing=exit_code is None,
+                collapse_after_update=exit_code == 0 and bool(content),
+            )
         elif isinstance(event, RecallAction):
             # Don't show memory recall as a visible card - it's an internal operation
             pass
@@ -3086,21 +3763,42 @@ class TUIRenderer:
             card = ActivityRenderer.condensation(pruned_count, count)
             self._write_card(card)
         elif isinstance(event, AgentCondensationObservation):
-            card = ActivityCard(
-                verb='Compressed',
-                detail='Context compressed successfully',
-                badge_category='tool',
-                secondary_kind='ok',
+            self._update_runtime_strip(
+                'Context compacted',
+                'Context compressed successfully',
+                active=False,
             )
-            self._write_card(card)
         elif isinstance(event, DelegateTaskAction):
-            task = getattr(event, 'task', '') or ''
+            task = getattr(event, 'task_description', '') or getattr(event, 'task', '') or ''
             worker = getattr(event, 'worker', '') or ''
+            if getattr(event, 'parallel_tasks', None):
+                for item in list(getattr(event, 'parallel_tasks', []) or []):
+                    task_desc = self._summarize_worker_task(str(item.get('task_description') or 'delegated task'))
+                    self._active_worker_tasks.append(task_desc)
+            else:
+                self._active_worker_tasks.append(self._summarize_worker_task(task))
+            self._sync_worker_strip()
             card = ActivityRenderer.delegation(task, worker)
             self._write_card(card)
         elif isinstance(event, DelegateTaskObservation):
             content = (event.content or '').strip()
-            card = ActivityRenderer.delegation('Result', result=content)
+            success = bool(getattr(event, 'success', True))
+            error_message = (getattr(event, 'error_message', '') or '').strip()
+            resolved_task = self._active_worker_tasks.pop(0) if self._active_worker_tasks else 'delegated task'
+            if success:
+                self._worker_completed += 1
+                if resolved_task:
+                    self._worker_recent_results.append(f'ok: {resolved_task}')
+            else:
+                self._worker_failed += 1
+                if resolved_task:
+                    self._worker_recent_results.append(f'fail: {resolved_task}')
+            self._sync_worker_strip()
+            card = ActivityRenderer.delegation(
+                resolved_task,
+                result=error_message or content,
+                success=success,
+            )
             self._write_card(card)
         elif isinstance(event, PlaybookFinishAction):
             summary = (
@@ -3192,6 +3890,46 @@ class TUIRenderer:
         self._write_card(card)
 
     @staticmethod
+    def _is_user_source(source: Any) -> bool:
+        value = getattr(source, 'value', source)
+        return str(value or '').strip().lower() == EventSource.USER.value
+
+    def _handle_message_action(self, action: MessageAction) -> None:
+        if bool(getattr(action, 'suppress_cli', False)):
+            self._tui.finalize_thinking()
+            self.clear_live_response()
+            return
+
+        thought = (getattr(action, 'thought', '') or '').strip()
+        if thought and thought != 'Your thought has been logged.':
+            self._tui.add_thinking(thought)
+            self._tui.finalize_thinking()
+
+        content = (getattr(action, 'content', '') or '').strip()
+        if not content:
+            self._tui.finalize_thinking()
+            self.clear_live_response()
+            return
+
+        from backend.cli.transcript import strip_pseudo_xml_function_calls
+
+        content = strip_pseudo_xml_function_calls(content)
+        content = sanitize_visible_transcript_text(content).strip()
+        if not content:
+            self._tui.finalize_thinking()
+            self.clear_live_response()
+            return
+
+        if content == self._last_final_response_text:
+            self.clear_live_response()
+            return
+
+        self._tui.finalize_thinking()
+        self.clear_live_response()
+        self._last_final_response_text = content
+        self._tui.add_agent_message(content)
+
+    @staticmethod
     def _format_retry_status_message(
         status_type: str, extras: dict[str, Any]
     ) -> tuple[str, str, str]:
@@ -3237,6 +3975,7 @@ class TUIRenderer:
             if self._tui._renderer:
                 self._tui._renderer.clear_live_response()
             if content and self._tui._renderer:
+                self._last_final_response_text = content
                 body = Markdown(content)
                 self._tui._renderer.add_to_history(body)
             return
@@ -3270,6 +4009,9 @@ class TUIRenderer:
                 current_label = 'Rate Limited'
             self._tui.set_agent_phase(current_label)
         else:
+            self._clear_retry_strip('Idle')
+            if state not in (AgentState.ERROR,):
+                self._clear_runtime_strip('Idle')
             self._hud.update_agent_state(str(state))
             self._tui.set_agent_phase(str(state))
 

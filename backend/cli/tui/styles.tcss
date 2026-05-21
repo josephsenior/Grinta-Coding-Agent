@@ -12,6 +12,12 @@ Screen {
     height: 1fr;
 }
 
+#transcript-column {
+    width: 70%;
+    height: 100%;
+    background: #060a14;
+}
+
 #sidebar-container {
     width: 30%;
     height: 100%;
@@ -30,14 +36,14 @@ Transcript {
     scrollbar-color-hover: #404f71 #161e31;
     scrollbar-color-active: #4f608a #161e31;
     scrollbar-size: 1 0;
-    padding: 1 2;
+    padding: 1 2 2 2;
     height: 1fr;
     layout: vertical;
     overflow-x: hidden;
 }
 
 #main-display {
-    width: 70%;
+    width: 100%;
     height: 100%;
     background: #060a14;
     color: #e9e9e9;
@@ -48,20 +54,178 @@ Transcript {
     padding: 1 2;
 }
 
+#current-operation {
+    height: auto;
+    margin: 1 2 0 2;
+    padding: 1 1;
+    border: round #1b233a;
+    background: #08101d;
+}
+
+#current-operation.active {
+    border: round #3b4d79;
+    background: #0b1526;
+}
+
+#current-op-title {
+    height: 1;
+    text-style: bold;
+}
+
+#current-op-main {
+    height: auto;
+    margin-top: 1;
+}
+
+#current-op-meta {
+    height: auto;
+    margin-top: 0;
+}
+
+#retry-strip {
+    height: auto;
+    margin: 1 2 0 2;
+    padding: 1 1;
+    border: round #3a3220;
+    background: #11100a;
+}
+
+#retry-strip.active {
+    border: round #6a5632;
+    background: #171309;
+}
+
+#retry-strip-title {
+    height: 1;
+    text-style: bold;
+}
+
+#retry-strip-main {
+    height: auto;
+    margin-top: 1;
+}
+
+#retry-strip-meta {
+    height: auto;
+    margin-top: 0;
+}
+
+#runtime-strip {
+    height: auto;
+    margin: 1 2 0 2;
+    padding: 1 1;
+    border: round #203042;
+    background: #08111b;
+}
+
+#runtime-strip.active {
+    border: round #3e5a78;
+    background: #0a1421;
+}
+
+#runtime-strip-title {
+    height: 1;
+    text-style: bold;
+}
+
+#runtime-strip-main {
+    height: auto;
+    margin-top: 1;
+}
+
+#runtime-strip-meta {
+    height: auto;
+    margin-top: 0;
+}
+
+#worker-strip {
+    height: auto;
+    margin: 1 2 0 2;
+    padding: 1 1;
+    border: round #18253d;
+    background: #07101c;
+}
+
+#worker-strip.active {
+    border: round #35517d;
+    background: #091524;
+}
+
+#worker-strip.error {
+    border: round #5b2d35;
+}
+
+#worker-strip-title {
+    height: 1;
+    text-style: bold;
+}
+
+#worker-strip-main {
+    height: auto;
+    margin-top: 1;
+}
+
+#worker-strip-meta {
+    height: auto;
+    margin-top: 0;
+}
+
 /* ── Interactive Components Focus & Hover ──────────── */
 ActivityCard {
-    transition: background 150ms, border-left 150ms;
-    border-left: transparent;
-    padding: 0 1;
+    transition: background 150ms, border 150ms;
+    border: round #1b233a;
+    background: #08101d;
+    padding: 0;
+    margin: 0 0 1 0;
 }
 
 ActivityCard:hover {
-    background: #0a1122;
+    background: #0a1323;
+    border: round #26365b;
 }
 
 ActivityCard:focus {
     background: #0d162a;
-    border-left: solid #91abec;
+    border: round #4a5f99;
+}
+
+ActivityCard.processing {
+    background: #091320;
+    border: round #32416a;
+}
+
+ActivityCard.category-shell.processing,
+ActivityCard.category-terminal.processing {
+    border: round #3e557f;
+}
+
+ActivityCard .card-title {
+    color: #7f8aa3;
+    text-style: bold;
+}
+
+ActivityCard .card-header {
+    color: #e9e9e9;
+}
+
+ActivityCard .card-secondary {
+    color: #969aad;
+}
+
+ActivityCard .card-extra-wrap {
+    border: round #15233c;
+    background: #050b16;
+}
+
+ActivityCard.category-shell .card-extra-wrap,
+ActivityCard.category-terminal .card-extra-wrap {
+    border: round #24385c;
+    background: #050913;
+}
+
+ActivityCard.category-files .card-extra-wrap {
+    border: round #1f314f;
+    background: #07101d;
 }
 
 CollapsibleSection {
@@ -117,25 +281,25 @@ SidebarRow:focus {
 /* ── InputBar ──────────────────────────────────────── */
 InputBar {
     height: 4;
-    background: #070e1b;
-    border-top: solid #1e293b;
+    background: #08101d;
+    border-top: solid #1b233a;
     padding: 0 2;
     layout: horizontal;
 }
 
 InputBar TextArea {
-    background: #0f1c30;
+    background: #0b1628;
     color: #c8d4e8;
-    border: none;
+    border: round #15233c;
     padding: 0 1;
     width: 100%;
     height: 3;
-    transition: background 150ms, border-left 150ms;
+    transition: background 150ms, border 150ms;
 }
 
 InputBar TextArea:focus {
     background: #12223a;
-    border-left: solid #3b82f6;
+    border: round #43548b;
 }
 
 #spinner {
@@ -157,6 +321,7 @@ HUD,
     background: #0a1525;
     color: #969aad;
     padding: 1 2;
+    border-top: solid #15233c;
 }
 
 #hud-line-1 {
@@ -165,22 +330,30 @@ HUD,
 }
 
 #hud-line-2 {
+    width: 1fr;
     height: 1;
-    margin-top: 1;
-}
-
-#hud-line-3 {
-    height: 1;
-    margin-top: 0;
     color: #8f9fc1;
 }
 
-#hud-line-4 {
+#hud-line-2-row {
     height: auto;
+    layout: horizontal;
+    align-vertical: middle;
     margin-top: 0;
     border-top: solid #15233c;
     padding-top: 0;
-    color: #54597b;
+}
+
+#hud-autonomy {
+    width: 34;
+    height: 1;
+    margin-right: 2;
+    background: #0a1525;
+    color: #8f9fc1;
+}
+
+#hud-autonomy:focus {
+    background: #0d162a;
 }
 
 /* ── Textual Generic Controls Design System ──────────────── */
@@ -345,13 +518,15 @@ GrintaConfirmDialog Button {
 GrintaSettingsDialog,
 GrintaSessionsDialog,
 GrintaAddSkillDialog,
-GrintaAddMCPDialog {
+GrintaAddMCPDialog,
+GrintaHelpDialog {
     background: #060a14 70%;
     align: center middle;
 }
 
 #settings-dialog,
-#sessions-dialog {
+#sessions-dialog,
+#help-dialog {
     background: #080c18;
     border: round #1e293b;
     padding: 2 4;
@@ -361,7 +536,8 @@ GrintaAddMCPDialog {
 }
 
 #settings-dialog .title,
-#sessions-dialog .title {
+#sessions-dialog .title,
+#help-dialog .title {
     color: #91abec;
     text-style: bold;
     margin-bottom: 2;
@@ -402,14 +578,16 @@ GrintaAddMCPDialog {
 }
 
 #settings-buttons,
-#sessions-buttons {
+#sessions-buttons,
+#help-buttons {
     height: auto;
     align-horizontal: right;
     margin-top: 2;
 }
 
 #settings-buttons Button,
-#sessions-buttons Button {
+#sessions-buttons Button,
+#help-buttons Button {
     margin-left: 2;
 }
 
@@ -443,11 +621,19 @@ GrintaAddMCPDialog {
 }
 
 #sessions-preview {
-    height: 8;
+    height: 12;
     border: round #1e293b;
     padding: 1 2;
     background: #060a14;
     color: #cbd5e1;
+}
+
+#help-body {
+    height: auto;
+    color: #cbd5e1;
+    border: round #1e293b;
+    background: #060a14;
+    padding: 1 2;
 }
 
 /* ── Toast notifications ──────────────────────────── */
@@ -466,7 +652,7 @@ UserMessage {
     margin: 1 0;
     padding: 1 2;
     background: #091522;
-    border-left: solid #14b8a6;
+    border: round #18485a;
     color: #f8fafc;
 }
 
@@ -476,16 +662,8 @@ AgentMessage {
     margin: 1 0;
     padding: 1 2;
     background: #080c16;
-    border-left: solid #6366f1;
+    border: round #253661;
     color: #cbd5e1;
-}
-
-ActivityCard .card-extra {
-    width: 100%;
-    height: auto;
-    margin-left: 2;
-    margin-top: 1;
-    padding: 0 1;
 }
 
 /* ── Utility ───────────────────────────────────────── */

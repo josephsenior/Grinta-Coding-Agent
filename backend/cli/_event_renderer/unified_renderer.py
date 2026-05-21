@@ -8,6 +8,7 @@ and structured content instead of heavy bordered panels.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 
 from rich.text import Text
 
@@ -27,6 +28,21 @@ def _strip_ansi(text: str) -> str:
     if not text:
         return text
     return Text.from_ansi(text).plain
+
+
+_ERROR_HEAVY_PATTERN = re.compile(
+    r'(?im)\b('
+    r'error|errors|exception|traceback|failed|failure|panic|fatal|assertionerror|'
+    r'validation|invalid|permission denied|not found|syntaxerror|typeerror|'
+    r'<<<<<<<|=======|>>>>>>>'
+    r')\b'
+)
+
+
+def _looks_error_heavy(text: str | None) -> bool:
+    if not text:
+        return False
+    return bool(_ERROR_HEAVY_PATTERN.search(text))
 
 
 @dataclass
@@ -53,6 +69,7 @@ class ActivityCard:
     secondary_kind: str = 'neutral'
     extra_lines: list[ActivityLine] = field(default_factory=list)
     is_collapsible: bool = False
+    start_collapsed: bool = False
 
     _KIND_COLORS = {
         'ok': NAVY_READY,
@@ -143,6 +160,8 @@ class ActivityRenderer:
                     )
                 )
 
+        should_collapse = bool(output) and exit_code == 0 and not _looks_error_heavy(output)
+
         return ActivityCard(
             verb='Ran',
             detail=f'$ {cmd_preview}',
@@ -152,6 +171,7 @@ class ActivityRenderer:
             secondary_kind=kind,
             extra_lines=extra_lines,
             is_collapsible=bool(output),
+            start_collapsed=should_collapse,
         )
 
     @staticmethod
@@ -162,6 +182,7 @@ class ActivityRenderer:
             verb='Read',
             detail=detail,
             badge_category='files',
+            title='Files',
         )
 
     @staticmethod
@@ -208,31 +229,9 @@ class ActivityRenderer:
                     )
                 )
         if diff_lines:
-            line_num = 1
             for line in diff_lines[:20]:
                 stripped = line.rstrip()
-                if stripped.startswith('+') and not stripped.startswith('+++'):
-                    # Green background for additions with line number
-                    extra_lines.append(
-                        ActivityLine(f'{line_num:>4} {stripped}', style='#54efae on #0d2e1a', indent=1)
-                    )
-                    line_num += 1
-                elif stripped.startswith('-') and not stripped.startswith('---'):
-                    # Red background for deletions with line number
-                    extra_lines.append(
-                        ActivityLine(f'{line_num:>4} {stripped}', style='#fd8383 on #2e0d0d', indent=1)
-                    )
-                    line_num += 1
-                elif stripped.startswith('@@'):
-                    extra_lines.append(
-                        ActivityLine(stripped, style=NAVY_TEXT_MUTED, indent=1)
-                    )
-                else:
-                    # Context lines with line number
-                    extra_lines.append(
-                        ActivityLine(f'{line_num:>4} {stripped}', style=NAVY_TEXT_DIM, indent=1)
-                    )
-                    line_num += 1
+                extra_lines.append(ActivityLine(stripped, indent=0))
 
             if len(diff_lines) > 20:
                 extra_lines.append(
@@ -243,14 +242,19 @@ class ActivityRenderer:
                     )
                 )
 
+        diff_text = '\n'.join(diff_lines or [])
+        should_collapse = bool(diff_lines) and len(diff_lines or []) > 12 and not _looks_error_heavy(diff_text)
+
         return ActivityCard(
             verb=verb,
             detail=detail,
             badge_category='files',
+            title='Files',
             secondary=secondary,
             secondary_kind='ok' if added else 'neutral',
             extra_lines=extra_lines,
             is_collapsible=bool(diff_lines),
+            start_collapsed=should_collapse,
         )
 
     @staticmethod
@@ -288,8 +292,10 @@ class ActivityRenderer:
             verb='Created',
             detail=detail,
             badge_category='files',
+            title='Files',
             extra_lines=extra_lines,
             is_collapsible=bool(extra_lines),
+            start_collapsed=bool(extra_lines) and len(extra_lines) > 8,
         )
 
     @staticmethod
@@ -318,6 +324,7 @@ class ActivityRenderer:
             title='Connected Tool',
             extra_lines=extra_lines,
             is_collapsible=bool(result),
+            start_collapsed=bool(result),
         )
 
     @staticmethod
@@ -346,11 +353,15 @@ class ActivityRenderer:
             title='Code',
             extra_lines=extra_lines,
             is_collapsible=bool(result),
+            start_collapsed=bool(result),
         )
 
     @staticmethod
     def delegation(
-        task: str, worker: str = '', result: str | None = None
+        task: str,
+        worker: str = '',
+        result: str | None = None,
+        success: bool | None = None,
     ) -> ActivityCard:
         """Create an activity card for task delegation."""
         task_preview = task[:100] + ('...' if len(task) > 100 else '')
@@ -364,13 +375,27 @@ class ActivityRenderer:
             preview = result[:200] + ('...' if len(result) > 200 else '')
             extra_lines.append(ActivityLine(preview, style=NAVY_TEXT_MUTED, indent=1))
 
+        secondary = None
+        secondary_kind = 'neutral'
+        if success is True:
+            secondary = 'completed'
+            secondary_kind = 'ok'
+        elif success is False:
+            secondary = 'failed'
+            secondary_kind = 'err'
+
+        should_collapse = bool(result) and success is not False and not _looks_error_heavy(result)
+
         return ActivityCard(
             verb='Delegated',
             detail=task_preview,
             badge_category='workers',
             title='Workers',
+            secondary=secondary,
+            secondary_kind=secondary_kind,
             extra_lines=extra_lines,
             is_collapsible=bool(result),
+            start_collapsed=should_collapse,
         )
 
     @staticmethod
@@ -409,6 +434,10 @@ class ActivityRenderer:
         if exit_code is not None:
             secondary = f'exit {exit_code}'
             kind = 'ok' if exit_code == 0 else 'err'
+        elif session_id:
+            secondary = f'session {session_id}'
+
+        should_collapse = bool(content) and exit_code == 0 and not _looks_error_heavy(content)
 
         return ActivityCard(
             verb='Output',
@@ -418,7 +447,8 @@ class ActivityRenderer:
             secondary=secondary,
             secondary_kind=kind,
             extra_lines=extra_lines,
-            is_collapsible=True,
+            is_collapsible=bool(extra_lines),
+            start_collapsed=should_collapse,
         )
 
     @staticmethod

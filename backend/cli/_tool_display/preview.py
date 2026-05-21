@@ -9,6 +9,7 @@ from typing import Any
 from rich.syntax import Syntax
 
 from backend.cli._tool_display.constants import _TOOL_CALL_PREFIX
+from backend.cli.theme import NAVY_BG, get_grinta_pygments_style
 from backend.cli._tool_display.summarize import (
     _preview_result_item,
     _summarize_raw_mcp_text,
@@ -305,9 +306,9 @@ def mcp_result_syntax_extras(
             body,
             'json',
             word_wrap=True,
-            theme='ansi_dark',
+            theme=get_grinta_pygments_style(),
             line_numbers=False,
-            background_color='#060a14',
+            background_color=NAVY_BG,
         )
     ]
 
@@ -358,9 +359,9 @@ def file_read_syntax_highlight(
             body,
             lexer,
             word_wrap=True,
-            theme='monokai',
+            theme=get_grinta_pygments_style(),
             line_numbers=True,
-            background_color='#060a14',
+            background_color=NAVY_BG,
             padding=(1, 1),
         )
     ]
