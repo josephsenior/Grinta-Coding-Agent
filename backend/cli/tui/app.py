@@ -3063,7 +3063,6 @@ class TUIRenderer:
             verb=card.verb,
             detail=card.detail,
             badge_category=card.badge_category,
-            title=card.title,
             secondary=card.secondary,
             secondary_kind=card.secondary_kind,
             extra_content=extra_content,
@@ -3097,6 +3096,17 @@ class TUIRenderer:
                 active=False,
             )
 
+        display = self._tui._get_display()
+        display.mount(widget)
+        display.scroll_end(animate=False)
+
+    def _write_tui_file_card(self, verb: str, path: str, extra_content: str | None, delta: str) -> None:
+        from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
+        detail = f'{path}  {delta}' if delta else path
+        widget = TUIActivityCard(
+            verb=verb, detail=detail, badge_category='files', extra_content=extra_content, collapsed=False,
+        )
+        self._tui.set_last_tool_status(f'{verb} {path}')
         display = self._tui._get_display()
         display.mount(widget)
         display.scroll_end(animate=False)
@@ -3180,7 +3190,6 @@ class TUIRenderer:
             verb=card.verb,
             detail=card.detail,
             badge_category=card.badge_category,
-            title=card.title,
             secondary=card.secondary,
             secondary_kind=card.secondary_kind,
             extra_content=None,
@@ -3221,7 +3230,7 @@ class TUIRenderer:
         if self._last_active_card is widget:
             self._last_active_card = None
 
-        widget.update_header(verb=card.verb, detail=card.detail, title=card.title)
+        widget.update_header(verb=card.verb, detail=card.detail)
         if card.secondary:
             widget.update_secondary(card.secondary, kind=card.secondary_kind)
 
@@ -3400,31 +3409,29 @@ class TUIRenderer:
                 verb = 'Edited'
                 line_range = ''
 
-            added_lines = 0
-            is_new_file = False
             if cmd == 'create_file':
                 file_text = getattr(event, 'file_text', '') or ''
-                added_lines = file_text.count('\n') + 1 if file_text else 0
-                is_new_file = True
-
-            card = ActivityRenderer.file_edit(
-                verb,
-                path,
-                line_range,
-                added=added_lines,
-                new_file=is_new_file,
-                preview_content=(
-                    getattr(event, 'file_text', '') or getattr(event, 'new_content', '')
-                ),
-            )
-            self._write_card(card)
+                extra_parts = []
+                pad = len(str(file_text.count('\n') + 1)) + 1 if file_text else 1
+                for i, line in enumerate(file_text.splitlines()):
+                    display = line[:160] + ('...' if len(line) > 160 else (line if line else ' '))
+                    extra_parts.append(f'  [on #14532d]+{i + 1:>{pad - 1}}|{display}[/]')
+                extra_content = '\n'.join(extra_parts) if extra_parts else None
+                added = file_text.count('\n') + 1 if file_text else 0
+                self._write_tui_file_card('Created', path, extra_content, f'[bold #54efae]+{added}[/]')
+            else:
+                card = ActivityRenderer.file_edit(verb, path, line_range)
+                self._write_card(card)
         elif isinstance(event, FileWriteAction):
             content = getattr(event, 'content', '') or ''
-            line_count = content.count('\n') + 1 if content else 0
-            card = ActivityRenderer.file_create_with_preview(
-                event.path, line_count=line_count, preview_content=content
-            )
-            self._write_card(card)
+            extra_parts = []
+            pad = len(str(content.count('\n') + 1)) + 1 if content else 1
+            for i, line in enumerate(content.splitlines()):
+                display = line[:160] + ('...' if len(line) > 160 else (line if line else ' '))
+                extra_parts.append(f'  [on #14532d]+{i + 1:>{pad - 1}}|{display}[/]')
+            extra_content = '\n'.join(extra_parts) if extra_parts else None
+            added = content.count('\n') + 1 if content else 0
+            self._write_tui_file_card('Created', event.path, extra_content, f'[bold #54efae]+{added}[/]')
         elif isinstance(event, FileReadObservation):
             pass
         elif isinstance(event, FileEditObservation):
@@ -3434,19 +3441,30 @@ class TUIRenderer:
             if hasattr(event, 'content') and event.content:
                 event.content = strip_indentation_warnings(event.content)
 
-            diff = self._extract_file_edit_diff(event)
-            added = event.added
-            removed = event.removed
-            if diff:
-                diff_lines = diff.splitlines()
-                card = ActivityRenderer.file_edit(
-                    'Edited',
-                    event.path,
-                    diff_lines=diff_lines,
-                    added=added,
-                    removed=removed,
-                )
-                self._write_card(card)
+            groups = event.get_edit_groups(n_context_lines=0)
+            if groups:
+                extra_parts = []
+                for group in groups:
+                    if extra_parts:
+                        extra_parts.append('')
+                    for line in group.get('before_edits', []):
+                        display = line if line else ' '
+                        extra_parts.append(f'  [bold #fd8383 on #7f1d1d]{display}[/]')
+                    for line in group.get('after_edits', []):
+                        display = line if line else ' '
+                        extra_parts.append(f'  [bold #54efae on #14532d]{display}[/]')
+                extra_content = '\n'.join(extra_parts) if extra_parts else None
+                added = event.added
+                removed = event.removed
+                delta = ''
+                if added or removed:
+                    parts = []
+                    if added:
+                        parts.append(f'+{added}')
+                    if removed:
+                        parts.append(f'-{removed}')
+                    delta = f'  [dim]({", ".join(parts)})[/dim]'
+                self._write_tui_file_card('Edited', event.path, extra_content, delta)
             else:
                 summary = f'Edited {event.path}'
                 if added or removed:

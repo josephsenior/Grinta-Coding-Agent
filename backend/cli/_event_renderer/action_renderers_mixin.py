@@ -264,6 +264,14 @@ class ActionRenderersMixin(_ActionRenderersBase):
             self._render_tool_sourced_think(source_tool, thought)
             return
 
+        # De-duplicate consecutive thinking cards with identical content
+        import hashlib
+        content_hash = hashlib.sha256((thought or '').encode()).hexdigest()[:16]
+        if content_hash == getattr(self, '_last_think_action_hash', None):
+            self.refresh()
+            return
+        self._last_think_action_hash = content_hash
+
         extra_lines = render_think(thought)
         kind = 'neutral'
         first_line = (

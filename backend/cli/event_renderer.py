@@ -253,6 +253,8 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._last_refresh_time: float = 0.0
         #: Last reasoning lines committed to transcript (for prefix de-dup per turn).
         self._last_committed_reasoning_lines: list[str] | None = None
+        #: Hash of the last AgentThinkAction rendered to avoid duplicate consecutive cards.
+        self._last_think_action_hash: str | None = None
 
     @property
     def current_state(self) -> AgentState | None:

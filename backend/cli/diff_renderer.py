@@ -164,6 +164,7 @@ class DiffPanel:
         secondary: str | None = None,
         title: str | None = None,
         badge_label: str | None = None,
+        show_line_numbers: bool = True,
     ) -> None:
         self._obs = obs
         self._verb = verb
@@ -171,6 +172,7 @@ class DiffPanel:
         self._secondary = secondary
         self._title = title
         self._badge_label = badge_label
+        self._show_line_numbers = show_line_numbers
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
@@ -330,7 +332,6 @@ class DiffPanel:
         parts: list[Any],
         groups: list[dict[str, list[str]]],
     ) -> None:
-        diff_text = self._render_groups(groups)
         added = sum(
             1
             for g in groups
@@ -346,6 +347,9 @@ class DiffPanel:
         delta = format_activity_delta_secondary(added=added, removed=removed)
         if delta is not None:
             parts.append(delta)
+        obs = self._obs
+        path = getattr(obs, 'path', 'edited file')
+        diff_text = self._render_groups(groups, file_path=path)
         parts.append(diff_text)
 
     def _build_panel(self, parts: list[Any]) -> Panel:
@@ -369,29 +373,57 @@ class DiffPanel:
         return title
 
     @staticmethod
-    def _render_groups(groups: list[dict[str, list[str]]]) -> Any:
-        """Build a Rich Syntax from edit groups with colored +/- lines."""
-        from rich.syntax import Syntax
+    def _render_groups(groups: list[dict[str, list[str]]], file_path: str = 'edited file') -> Any:
+        """Build colored diff lines with green/red backgrounds for +/- lines.
 
-        lines = []
+        Format: filename +N lines -N lines (header) followed by colored diff lines
+        with line number prefixes.
+        """
+        from rich.console import Group
+        from rich.text import Text
+
+        all_lines: list[Text] = []
+
+        # Count totals for header
+        total_added = 0
+        total_removed = 0
+        for g in groups:
+            for line in g.get('after_edits', []):
+                if line.startswith('+'):
+                    total_added += 1
+            for line in g.get('before_edits', []):
+                if line.startswith('-'):
+                    total_removed += 1
+
+        # Build header: filename +N -N
+        header_parts = [file_path]
+        if total_added:
+            header_parts.append(f'+{total_added}')
+        if total_removed:
+            header_parts.append(f'-{total_removed}')
+        header_text = ' · '.join(header_parts)
+        all_lines.append(Text(f'  {header_text}', style=f'bold {CLR_CARD_TITLE}'))
+
         for i, group in enumerate(groups):
             if i > 0:
-                lines.append('···\n')
+                all_lines.append(Text('  ···', style=f'dim {CLR_CARD_BORDER}'))
+
             for line in group.get('before_edits', []):
-                lines.append(line + '\n')
+                if line.startswith('-'):
+                    styled = Text(f'  {line}', style=f'bold {CLR_DIFF_REM} on #7f1d1d')
+                elif line.startswith('+'):
+                    styled = Text(f'  {line}', style=f'bold {CLR_DIFF_ADD} on #14532d')
+                else:
+                    styled = Text(f'  {line}', style=f'dim {CLR_CARD_TITLE}')
+                all_lines.append(styled)
+
             for line in group.get('after_edits', []):
-                lines.append(line + '\n')
+                if line.startswith('-'):
+                    styled = Text(f'  {line}', style=f'bold {CLR_DIFF_REM} on #7f1d1d')
+                elif line.startswith('+'):
+                    styled = Text(f'  {line}', style=f'bold {CLR_DIFF_ADD} on #14532d')
+                else:
+                    styled = Text(f'  {line}', style=f'dim {CLR_CARD_TITLE}')
+                all_lines.append(styled)
 
-        diff_str = ''.join(lines)
-        if len(diff_str) > 3000:
-            diff_str = diff_str[:3000] + '\n… (truncated)'
-
-        return Syntax(
-            diff_str,
-            lexer='diff',
-            theme=get_grinta_pygments_style(),
-            word_wrap=True,
-            padding=(0, 1),
-            background_color=NAVY_BG,
-            line_numbers=True,
-        )
+        return Group(*all_lines)
