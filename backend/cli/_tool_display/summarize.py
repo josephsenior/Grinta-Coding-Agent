@@ -198,13 +198,47 @@ def _summary_shell(args: dict[str, Any]) -> str:
     return f'$ {_trunc(cmd, 120)}' if cmd else 'command…'
 
 
-def _summary_text_editor(args: dict[str, Any]) -> str:
-    cmd = str(args.get('command', '') or '')
-    path = str(args.get('path', '') or '')
-    if cmd == 'create_file' and path:
-        return f'{path} · new file'
-    parts = [p for p in (path, cmd) if p]
-    return ' · '.join(parts) if parts else 'file…'
+def _summary_read_file(args: dict[str, Any]) -> str:
+    path = _arg_str(args, 'path')
+    if not path:
+        return 'file…'
+    vr = args.get('view_range')
+    if isinstance(vr, list) and len(vr) >= 2:
+        return f'{path} · lines {vr[0]}–{vr[1]}'
+    return path
+
+
+def _summary_create_file(args: dict[str, Any]) -> str:
+    path = _arg_str(args, 'path')
+    return f'{path} · new file' if path else 'new file'
+
+
+def _summary_insert_text(args: dict[str, Any]) -> str:
+    path = _arg_str(args, 'path')
+    insert_line = args.get('insert_line')
+    if path and insert_line is not None:
+        return f'{path} · after line {insert_line}'
+    return path or 'insert…'
+
+
+def _summary_undo_last_edit(args: dict[str, Any]) -> str:
+    path = _arg_str(args, 'path')
+    return f'{path} · undo' if path else 'undo'
+
+
+def _summary_rename_symbol(args: dict[str, Any]) -> str:
+    path = _arg_str(args, 'path')
+    old_name = _arg_str(args, 'old_name')
+    new_name = _arg_str(args, 'new_name')
+    bits = [b for b in (path, f'{old_name} → {new_name}' if old_name and new_name else '') if b]
+    return ' · '.join(bits) if bits else 'rename…'
+
+
+def _summary_find_symbol(args: dict[str, Any]) -> str:
+    path = _arg_str(args, 'path')
+    symbol = _arg_str(args, 'symbol_name')
+    bits = [b for b in (path, symbol) if b]
+    return ' · '.join(bits) if bits else 'find symbol…'
 
 
 def _summary_think(args: dict[str, Any]) -> str:
@@ -304,27 +338,6 @@ def _summary_summarize_context(_args: dict[str, Any]) -> str:
     return 'compress conversation'
 
 
-def _summary_symbol_editor(args: dict[str, Any]) -> str:
-    path = args.get('path')
-    cmd = args.get('command')
-    if cmd == 'edit_symbols':
-        return _summary_symbol_editor_edit(path, args)
-    bits = [str(x) for x in (cmd, path) if x]
-    return _trunc(' · '.join(bits), 120) if bits else 'Code edit…'
-
-
-def _summary_symbol_editor_edit(path: Any, args: dict[str, Any]) -> str:
-    edits = args.get('edits') or args.get('symbol_edits') or []
-    n = len(edits) if isinstance(edits, list) else 0
-    bits = [
-        'edit_symbols',
-        str(path) if path else '',
-        f'{n} symbols' if n else '',
-    ]
-    joined = ' · '.join(b for b in bits if b)
-    return _trunc(joined, 120) if joined else 'Code batch…'
-
-
 def _summary_shared_board(args: dict[str, Any]) -> str:
     op = args.get('operation') or args.get('command')
     return str(op) if op else 'board…'
@@ -333,7 +346,12 @@ def _summary_shared_board(args: dict[str, Any]) -> str:
 _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'execute_bash': _summary_shell,
     'execute_powershell': _summary_shell,
-    'text_editor': _summary_text_editor,
+    'read_file': _summary_read_file,
+    'create_file': _summary_create_file,
+    'insert_text': _summary_insert_text,
+    'undo_last_edit': _summary_undo_last_edit,
+    'rename_symbol': _summary_rename_symbol,
+    'find_symbol': _summary_find_symbol,
     'think': _summary_think,
     'agent_think': _summary_think,
     'finish': _summary_finish,
@@ -342,7 +360,7 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'search_code': _summary_search_code,
     'lsp': _summary_lsp,
     'analyze_project_structure': _summary_analyze_project,
-    'read_symbol_definition': _summary_read_symbol,
+    'read_symbol': _summary_read_symbol,
     'apply_patch': _summary_apply_patch,
     'verify_file_lines': _summary_verify_file,
     'delegate_task': _summary_delegate_task,
@@ -350,7 +368,6 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'call_mcp_tool': _summary_call_mcp,
     'checkpoint': _summary_checkpoint,
     'summarize_context': _summary_summarize_context,
-    'symbol_editor': _summary_symbol_editor,
     'terminal_manager': _summarize_terminal_manager_args,
     'shared_task_board': _summary_shared_board,
 }

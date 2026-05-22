@@ -7,8 +7,6 @@ from backend.engine.tools.common import (
     get_path_param,
     get_security_risk_param,
 )
-from backend.inference.tool_names import FILE_EDITOR_TOOL_NAME
-
 _DETAILED_DESCRIPTION = """Unified file editor: reading, creation, editing, and structure-aware refactoring.
 
 COMMANDS (11):
@@ -57,7 +55,7 @@ def create_file_editor_tool(
         _SHORT_DESCRIPTION if use_short_description else _DETAILED_DESCRIPTION
     )
     return create_tool_definition(
-        name=FILE_EDITOR_TOOL_NAME,
+        name='file_editor',
         description=description,
         properties={
             'command': get_command_param(

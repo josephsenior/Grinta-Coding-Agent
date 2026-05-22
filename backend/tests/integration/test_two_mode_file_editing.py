@@ -7,6 +7,7 @@ from backend.engine.file_edit_protocol import (
     get_transaction_store,
     parse_editor_response,
 )
+from backend.ledger.action import FileReadAction, MessageAction
 from backend.execution.action_execution_server_helpers import edit_via_file_editor
 from backend.execution.utils.file_editor import FileEditor
 from backend.ledger.observation import FileEditObservation
@@ -46,3 +47,69 @@ def test_two_mode_content_reaches_existing_file_editor_pipeline(tmp_path):
     assert obs.tool_result['ok'] is True
     assert target.read_text(encoding='utf-8') == 'def value():\n    return 42\n'
     store.clear_active_transaction('integration_session')
+
+
+def test_two_mode_edit_symbols_payload_reaches_existing_structure_pipeline(tmp_path):
+    target = tmp_path / 'app.py'
+    target.write_text(
+        'def a():\n    return 1\n\n\ndef b():\n    return 2\n',
+        encoding='utf-8',
+    )
+
+    store = get_transaction_store()
+    txn = store.create_transaction(
+        'integration_edit_symbols',
+        str(target),
+        'edit_symbols',
+        {'security_risk': 'LOW'},
+    )
+    raw_payload = (
+        '[\n'
+        '  {"symbol_name": "a", "new_body": "    return 10"},\n'
+        '  {"symbol_name": "b", "new_body": "    return 20"}\n'
+        ']\n'
+    )
+    response = '<file_edit>\n' + raw_payload + f'{txn.delimiter}\n</file_edit>\n'
+
+    parsed = parse_editor_response(response, txn)
+    assert parsed.ok
+    action = apply_edit_from_transaction(parsed.content, txn)
+
+    assert isinstance(action, FileReadAction)
+    assert 'return 10' in target.read_text(encoding='utf-8')
+    assert 'return 20' in target.read_text(encoding='utf-8')
+    store.clear_active_transaction('integration_edit_symbols')
+
+
+def test_two_mode_multi_edit_payload_reaches_existing_batch_pipeline(
+    tmp_path, monkeypatch
+):
+    first = tmp_path / 'a.py'
+    second = tmp_path / 'b.py'
+    first.write_text('x = 1\n', encoding='utf-8')
+    second.write_text('y = 1\n', encoding='utf-8')
+    monkeypatch.chdir(tmp_path)
+
+    store = get_transaction_store()
+    txn = store.create_transaction(
+        'integration_multi_edit',
+        '<batch>',
+        'multi_edit',
+        {'security_risk': 'LOW'},
+    )
+    raw_payload = (
+        '[\n'
+        '  {"path": "a.py", "command": "replace_range", "start_line": 1, "end_line": 1, "new_code": "x = 2\\n"},\n'
+        '  {"path": "b.py", "command": "replace_range", "start_line": 1, "end_line": 1, "new_code": "y = 2\\n"}\n'
+        ']\n'
+    )
+    response = '<file_edit>\n' + raw_payload + f'{txn.delimiter}\n</file_edit>\n'
+
+    parsed = parse_editor_response(response, txn)
+    assert parsed.ok
+    action = apply_edit_from_transaction(parsed.content, txn)
+
+    assert isinstance(action, MessageAction)
+    assert first.read_text(encoding='utf-8') == 'x = 2\n'
+    assert second.read_text(encoding='utf-8') == 'y = 2\n'
+    store.clear_active_transaction('integration_multi_edit')

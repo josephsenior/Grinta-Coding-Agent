@@ -7,8 +7,6 @@ from backend.engine.tools.common import (
     get_path_param,
     get_security_risk_param,
 )
-from backend.inference.tool_names import TEXT_EDITOR_TOOL_NAME
-
 _DETAILED_TEXT_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
 * `read_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
 * `create_file`: create a new file or fully overwrite an existing file with the given content. Requires `file_text` — full-file body. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call. On large existing source files, full overwrite is blocked unless you explicitly set `overwrite_existing=true`.
@@ -60,7 +58,7 @@ def create_text_editor_tool(
         else _DETAILED_TEXT_EDITOR_DESCRIPTION
     )
     return create_tool_definition(
-        name=TEXT_EDITOR_TOOL_NAME,
+        name='text_editor',
         description=description,
         properties={
             'command': get_command_param(

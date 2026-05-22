@@ -81,7 +81,7 @@ class TestToolCallMetadataSchema:
 
     def test_with_model_response(self):
         m = ToolCallMetadataSchema(
-            function_name='text_editor',
+            function_name='start_file_edit',
             tool_call_id='tc_002',
             total_calls_in_response=2,
             model_response={'id': 'resp_1'},

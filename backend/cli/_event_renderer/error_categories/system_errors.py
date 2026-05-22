@@ -22,23 +22,22 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
     _GuidanceRule(
         _has('edit_mode=range requires'),
         ErrorGuidance(
-            summary="text_editor 'edit' with edit_mode=range needs start_line and end_line.",
+            summary='A range edit is missing start_line or end_line.',
             steps=(
-                'Add both start_line and end_line as integers (1-based, inclusive), and new_str as the replacement text.',
-                'Example: {"command": "edit", "edit_mode": "range", '
-                '"start_line": 1, "end_line": 10, "new_str": "..."}.',
+                'Add both start_line and end_line as integers (1-based, inclusive), plus the replacement content.',
+                'Use `start_file_edit` with `operation="replace_range"` and those line bounds.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-TE-001',
         ),
     ),
     _GuidanceRule(
-        _has("text_editor command 'edit' requires 'edit_mode'"),
+        _has("command 'edit' requires 'edit_mode'"),
         ErrorGuidance(
-            summary='text_editor edit command is missing an edit_mode.',
+            summary='A legacy edit command is missing its edit_mode.',
             steps=(
-                'Add edit_mode=range with start_line, end_line, and new_str.',
-                'If the edit is not a range edit, use start_file_edit instead.',
+                'Use `start_file_edit` instead of the retired edit command.',
+                'For line edits, use `operation="replace_range"` with start_line and end_line.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-TE-002',
@@ -47,9 +46,9 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
     _GuidanceRule(
         _has('deterministic edit failed'),
         ErrorGuidance(
-            summary='text_editor could not find a valid edit path for those arguments.',
+            summary='The edit arguments did not match a valid file-edit path.',
             steps=(
-                'If using edit_mode=range, check start_line, end_line, and new_str are present.',
+                'If using `start_file_edit`, check that the operation and required metadata are present.',
                 'Re-read the file first, then retry with the correct parameter set.',
             ),
             omit_summary_in_recovery=False,
@@ -59,12 +58,11 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
     _GuidanceRule(
         _has('replace_range requires'),
         ErrorGuidance(
-            summary='symbol_editor replace_range is missing required parameters.',
+            summary='replace_range is missing required parameters.',
             steps=(
                 'Provide all three: start_line (int, 1-based), end_line (int, inclusive), '
-                'and new_code (the replacement source text).',
-                'Example: {"command": "replace_range", "path": "f.py", '
-                '"start_line": 1, "end_line": 5, "new_code": "pass"}',
+                'and the replacement source text.',
+                'Use `start_file_edit` with `operation="replace_range"` and the target path.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-SE-001',

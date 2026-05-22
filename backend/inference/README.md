@@ -452,7 +452,7 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "text_editor",
+            "name": "start_file_edit",
             "description": "Edit a file with structured commands",
             "parameters": {
                 "type": "object",

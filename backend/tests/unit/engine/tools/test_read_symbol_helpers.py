@@ -1,4 +1,4 @@
-"""Tests for read_symbol_definition helpers (no full tree-sitter graph required)."""
+"""Tests for read_symbol helpers (no full tree-sitter graph required)."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ import pytest
 from backend.engine.tools import read_symbol as rs
 
 
-def test_create_read_symbol_definition_tool_shape() -> None:
-    tool = rs.create_read_symbol_definition_tool()
-    assert tool['function']['name'] == rs.READ_SYMBOL_DEFINITION_TOOL_NAME
+def test_create_read_symbol_tool_shape() -> None:
+    tool = rs.create_read_symbol_tool()
+    assert tool['function']['name'] == rs.READ_SYMBOL_TOOL_NAME
     assert 'entity_names' in tool['function']['parameters']['properties']
 
 
@@ -45,7 +45,7 @@ def test_extract_symbol_whole_file_without_symbol(
     assert 'hello' in out.get('content', '')
 
 
-def test_build_read_symbol_definition_action_serializes_results() -> None:
-    act = rs.build_read_symbol_definition_action({'entity_names': ['missing.py:nope']})
-    assert 'READ_SYMBOL_DEFINITION' in act.thought
+def test_build_read_symbol_action_serializes_results() -> None:
+    act = rs.build_read_symbol_action({'entity_names': ['missing.py:nope']})
+    assert 'READ_SYMBOL' in act.thought
     assert 'results' in act.thought

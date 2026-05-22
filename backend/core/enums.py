@@ -217,13 +217,13 @@ class EventSource(str, Enum):
 class FileEditSource(str, Enum):
     """Enumerates subsystems that can perform file edit operations."""
 
-    FILE_EDITOR = 'file_editor'
+    FILE_EDITOR = 'file_edit'
 
 
 class FileReadSource(str, Enum):
     """Enumerates subsystems that can read files during execution."""
 
-    FILE_EDITOR = 'file_editor'
+    FILE_EDITOR = 'file_edit'
     DEFAULT = 'default'
 
 

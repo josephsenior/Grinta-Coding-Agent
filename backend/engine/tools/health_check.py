@@ -15,7 +15,7 @@ class HealthCheckComponent(TypedDict):
 
 
 class HealthCheckResult(TypedDict):
-    symbol_editor: HealthCheckComponent
+    structure_editor: HealthCheckComponent
     atomic_refactor: HealthCheckComponent
     overall_status: str
 
@@ -118,7 +118,7 @@ def run_production_health_check(raise_on_failure: bool = True) -> HealthCheckRes
     ar_success, ar_msg = check_atomic_refactor_dependencies()
 
     results: HealthCheckResult = {
-        'symbol_editor': {
+        'structure_editor': {
             'status': 'PASS' if ue_success else 'FAIL',
             'message': ue_msg,
             'critical': True,
@@ -132,7 +132,7 @@ def run_production_health_check(raise_on_failure: bool = True) -> HealthCheckRes
     }
 
     health_components: dict[str, HealthCheckComponent] = {
-        'symbol_editor': results['symbol_editor'],
+        'structure_editor': results['structure_editor'],
         'atomic_refactor': results['atomic_refactor'],
     }
 
@@ -170,7 +170,7 @@ if __name__ == '__main__':
 
     print('\n📊 HEALTH CHECK RESULTS:')
     component_results: dict[str, HealthCheckComponent] = {
-        'symbol_editor': check_results['symbol_editor'],
+        'structure_editor': check_results['structure_editor'],
         'atomic_refactor': check_results['atomic_refactor'],
     }
     for component, data in component_results.items():

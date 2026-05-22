@@ -14,6 +14,8 @@ from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     CLR_CARD_BORDER,
     CLR_CARD_TITLE,
+    CLR_DIFF_ADD,
+    CLR_DIFF_REM,
     NAVY_BG,
     CLR_STATUS_WARN,
     CLR_WARN_BODY,

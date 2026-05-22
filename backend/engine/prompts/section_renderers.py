@@ -66,12 +66,12 @@ def _explore_hint(_config: Any = None) -> str:
     """Return the canonical layout-discovery tool hint."""
     if _lsp_available(_config):
         return (
-            '`search_code` for text/symbol search, `read_symbol_definition` to fetch a '
+            '`search_code` for text/symbol search, `read_symbol` to fetch a '
             'specific symbol/file body, `lsp` for definitions/references '
             '(LSP), `analyze_project_structure` for tree layout'
         )
     return (
-        '`search_code` for text/symbol search, `read_symbol_definition` to fetch a '
+        '`search_code` for text/symbol search, `read_symbol` to fetch a '
         'specific symbol/file body, `analyze_project_structure` for tree layout'
     )
 
@@ -434,9 +434,11 @@ def _render_security(cli_mode: bool = True) -> str:
     return (
         '# 🔐 Security Risk Policy\n'
         '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
-        '`start_file_edit`, and `browser`. Pick one of `LOW` / `MEDIUM` / `HIGH` '
-        'based on the action you are about to take. The server may escalate your risk label; '
-        'it never lowers it. Missing or invalid values fail the call.\n\n'
+        '`browser`, `start_file_edit`, and the file tools `read_file`, `create_file`, '
+        '`undo_last_edit`, `find_symbol`, `read_symbol`, and `rename_symbol`. '
+        'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
+        'The server may escalate your risk label; it never lowers it. Missing or invalid values '
+        'fail the call.\n\n'
         f'{risk_block}\n\n'
         '**Global Rules**\n'
         '- Always escalate to **HIGH** if sensitive data leaves the environment.\n'
@@ -623,9 +625,9 @@ def _render_examples(
         else 'If approved, keep the change surface small and verify immediately after the action.'
     )
     adjacent_tool_fallback = (
-        'symbol lookup → `start_file_edit` `replace_range`; `lsp` → `search_code`'
+        'symbol lookup → `search_code`; `lsp` → `search_code`'
         if lsp_available
-        else 'symbol lookup → `start_file_edit` `replace_range`; refine the `search_code` query and read nearby files'
+        else 'symbol lookup → `search_code`; refine the `search_code` query and read nearby files'
     )
     failure_escalation_step = (
         'After 3 failed attempts on the same sub-task, escalate via `communicate_with_user` with a 1-line post-mortem and a specific question.'

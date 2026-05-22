@@ -21,7 +21,7 @@ _BACKGROUND_OBSERVATION_NAMES = frozenset(
 
 # XML-format tools that previously triggered FORMAT_ERROR recovery prompts.
 # After successful execution, stale FORMAT_ERROR observations should be cleaned up.
-_XML_FORMAT_TOOLS = frozenset({'file_editor'})
+_XML_FORMAT_TOOLS = frozenset()
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
@@ -52,7 +52,7 @@ def _cleanup_stale_format_error_observations(
 ) -> int:
     """Remove stale FORMAT_ERROR recovery observations for a tool after successful execution.
 
-    When the model successfully calls an XML-format tool (file_editor),
+    When the model successfully calls an XML-format tool,
     any previous FORMAT_ERROR recovery observations for that same tool are removed
     from history so the agent gets a clean slate.
 

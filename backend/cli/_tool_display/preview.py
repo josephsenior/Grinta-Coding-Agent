@@ -39,7 +39,7 @@ def looks_like_streaming_tool_arguments(text: str) -> bool:
         '"path"',
         '"tool_name"',
         '"arguments"',
-        '"text_editor"',
+        '"start_file_edit"',
         '"function"',
     )
     return any(m in text for m in markers)

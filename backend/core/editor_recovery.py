@@ -27,7 +27,7 @@ def _python_comment_prefix_issue(content: str, path: str | None) -> EditorRecove
         return None
     return EditorRecoveryAdvice(
         kind='python_comment_prefix',
-        preferred_tool='symbol_editor',
+        preferred_tool='start_file_edit',
         next_action='replace_range',
         detail=(
             'Python file detected with `//` comment prefix. Python comments use `#`, '
@@ -52,18 +52,18 @@ def classify_editor_recovery(
     if 'symbol ' in lower and 'not found' in lower:
         return EditorRecoveryAdvice(
             kind='symbol_not_found',
-            preferred_tool='symbol_editor',
+            preferred_tool='find_symbol',
             next_action='find_symbol',
             detail=(
-                'The symbol lookup failed. Call `symbol_editor(command="find_symbol")` '
-                'first to verify the live symbol name and location before retrying the edit.'
+                'The symbol lookup failed. Call `find_symbol` first to verify the live '
+                'symbol name and location before retrying the edit.'
             ),
         )
 
     if 'file_unexpectedly_modified' in lower or 'file changed on disk since it was read' in lower:
         return EditorRecoveryAdvice(
             kind='stale_file_context',
-            preferred_tool='text_editor',
+            preferred_tool='read_file',
             next_action='read_file',
             detail=(
                 'The file changed since the last read. Refresh the exact file contents with '
@@ -74,7 +74,7 @@ def classify_editor_recovery(
     if 'file hash guard failed' in lower:
         return EditorRecoveryAdvice(
             kind='stale_file_context',
-            preferred_tool='text_editor',
+            preferred_tool='read_file',
             next_action='read_file',
             detail=(
                 'The file contents no longer match the last verified read. Re-read the file, '
@@ -83,12 +83,10 @@ def classify_editor_recovery(
         )
 
     if 'edit verification failed' in lower:
-        preferred_tool = 'symbol_editor' if (tool_name or '').lower() == 'symbol_editor' else 'text_editor'
-        next_action = 'find_symbol' if preferred_tool == 'symbol_editor' else 'read_file'
         return EditorRecoveryAdvice(
             kind='edit_verification_failed',
-            preferred_tool=preferred_tool,
-            next_action=next_action,
+            preferred_tool='read_file',
+            next_action='read_file',
             detail=(
                 'The write completed but verification did not prove the intended change landed cleanly. '
                 'Refresh the file state, then retry once with a smaller, more targeted edit.'
@@ -98,7 +96,7 @@ def classify_editor_recovery(
     if 'large existing code file overwrite blocked' in lower:
         return EditorRecoveryAdvice(
             kind='full_file_overwrite_blocked',
-            preferred_tool='symbol_editor',
+            preferred_tool='start_file_edit',
             next_action='edit_symbol',
             detail=(
                 'Full-file overwrite was blocked on a large existing source file. Prefer a symbol-aware or '
@@ -107,12 +105,10 @@ def classify_editor_recovery(
         )
 
     if 'syntax validation failed' in lower or 'syntax error after edit' in lower:
-        preferred_tool = 'symbol_editor' if (tool_name or '').lower() != 'text_editor' else 'text_editor'
-        next_action = 'replace_range' if preferred_tool == 'symbol_editor' else 'edit_mode=range'
         return EditorRecoveryAdvice(
             kind='syntax_validation_failed',
-            preferred_tool=preferred_tool,
-            next_action=next_action,
+            preferred_tool='start_file_edit',
+            next_action='replace_range',
             detail=(
                 'The edit produced invalid syntax. Re-read the affected region, then do one surgical repair '
                 'with a symbol-aware or line-range edit instead of repeating the same full write.'
@@ -122,19 +118,19 @@ def classify_editor_recovery(
     if 'edit context mismatch' in lower or 'range edit context mismatch' in lower:
         return EditorRecoveryAdvice(
             kind='range_context_mismatch',
-            preferred_tool='text_editor',
-            next_action='edit_mode=range',
+            preferred_tool='start_file_edit',
+            next_action='replace_range',
             detail=(
-                'The edit context is stale or malformed. Re-read the file and retry once with `edit_mode=range` '
-                'using exact current line numbers.'
+                'The edit context is stale or malformed. Re-read the file and retry once with '
+                '`start_file_edit(operation="replace_range")` using exact current line numbers.'
             ),
         )
 
     if 'replace failed' in lower or 'start line' in lower or 'end_line must be' in lower:
         return EditorRecoveryAdvice(
             kind='range_edit_failed',
-            preferred_tool='text_editor',
-            next_action='edit_mode=range',
+            preferred_tool='start_file_edit',
+            next_action='replace_range',
             detail=(
                 'The range edit inputs are invalid or stale. Re-read the file to confirm line numbers, '
                 'then retry one smaller line-bounded edit.'
@@ -144,7 +140,7 @@ def classify_editor_recovery(
     if 'multi_edit transaction rolled back' in lower:
         return EditorRecoveryAdvice(
             kind='atomic_batch_failed',
-            preferred_tool='symbol_editor',
+            preferred_tool='multi_edit',
             next_action='multi_edit',
             detail=(
                 'The atomic batch failed pre-commit. Inspect the failing item, fix that specific edit, '

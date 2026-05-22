@@ -1123,7 +1123,7 @@ class RuntimeExecutorIOAndTerminalMixin:
 
         if not action.command:
             return ErrorObservation(
-                'Legacy edit_file actions are no longer supported. Use text_editor or symbol_editor instead.'
+                'Legacy edit_file actions are no longer supported. Use start_file_edit or the dedicated file tools instead.'
             )
 
         return self._edit_via_file_editor(action)
