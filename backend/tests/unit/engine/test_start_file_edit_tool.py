@@ -11,8 +11,10 @@ from backend.engine.file_edit_protocol import (
     start_file_edit_transaction,
 )
 from backend.engine.function_calling import _handle_start_file_edit_tool
+from backend.engine.tools.text_editor import create_text_editor_tool
+from backend.engine.tools.symbol_editor_tool import create_symbol_editor_tool
 from backend.engine.tools.start_file_edit import create_start_file_edit_tool
-from backend.ledger.action import FileEditAction, FileReadAction, StartFileEditAction
+from backend.ledger.action import FileReadAction, StartFileEditAction
 from backend.ledger.observation import ErrorObservation
 
 
@@ -35,7 +37,7 @@ def test_start_file_edit_schema_does_not_accept_content_fields():
 def test_start_file_edit_creates_start_action_for_content_operation():
     action = _handle_start_file_edit_tool(
         {
-            'operation': 'replace_lines',
+            'operation': 'replace_range',
             'path': 'app.py',
             'start_line': 1,
             'end_line': 2,
@@ -43,7 +45,7 @@ def test_start_file_edit_creates_start_action_for_content_operation():
         }
     )
     assert isinstance(action, StartFileEditAction)
-    assert action.operation == 'replace_lines'
+    assert action.operation == 'replace_range'
     assert action.metadata['start_line'] == 1
 
 
@@ -65,22 +67,6 @@ def test_start_file_edit_bypasses_editor_mode_for_read():
     )
     assert isinstance(action, FileReadAction)
     assert action.path == 'app.py'
-
-
-def test_start_file_edit_bypasses_editor_mode_for_delete_section():
-    action = _handle_start_file_edit_tool(
-        {
-            'operation': 'section_edit',
-            'path': 'README.md',
-            'anchor_type': 'heading',
-            'anchor_value': 'Old',
-            'section_action': 'delete',
-            'security_risk': 'LOW',
-        }
-    )
-    assert isinstance(action, FileEditAction)
-    assert action.edit_mode == 'section'
-    assert action.section_action == 'delete'
 
 
 def test_start_file_edit_path_safety_still_runs(tmp_path):
@@ -121,11 +107,21 @@ def test_start_file_edit_rejects_parser_time_mutating_structure_ops():
         )
 
 
+def test_public_editor_schemas_do_not_expose_retired_edit_modes():
+    start_ops = create_start_file_edit_tool()['function']['parameters']['properties']['operation']['enum']
+    text_edit_modes = create_text_editor_tool()['function']['parameters']['properties']['edit_mode']['enum']
+    symbol_commands = create_symbol_editor_tool()['function']['parameters']['properties']['command']['enum']
+
+    assert set(start_ops) == {'read', 'create', 'insert', 'undo', 'replace_range', 'find_symbol'}
+    assert text_edit_modes == ['range']
+    assert {'edit_symbol_body', 'edit_symbols', 'rename_symbol', 'find_symbol', 'replace_range'} <= set(symbol_commands)
+
+
 def test_start_file_edit_required_metadata_validation_runs():
     with pytest.raises(FunctionCallValidationError, match='start_line'):
         _handle_start_file_edit_tool(
             {
-                'operation': 'replace_lines',
+                'operation': 'replace_range',
                 'path': 'app.py',
                 'end_line': 4,
                 'security_risk': 'LOW',

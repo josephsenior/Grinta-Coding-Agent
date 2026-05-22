@@ -15,19 +15,16 @@ _DETAILED_TEXT_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
 * `insert_text`: insert `new_str` after `insert_line`.
 * `undo_last_edit`: revert the last successful edit/write to this file in the current session (bounded history). Prefer checkpoint/rollback for large reversions.
 * `edit_mode`: deterministic non-code editing primitives:
-  - `range`: line-range replacement. Provide `start_line`, `end_line`, and `new_str` to replace a specific block. THIS IS THE PREFERRED WAY to edit files if not using `symbol_editor`.
-  - `format`: parser-based mutation for json/yaml/toml/markdown/html/xml.
-  - `section`: anchor-bounded section edit.
-  - `patch`: unified diff hunk apply with strict context.
+  - `range`: line-range replacement. Provide `start_line`, `end_line`, and `new_str` to replace a specific block.
 * `multi_edit`: atomic batch for text-style edits. Use this for coordinated non-symbol changes across one or more files. Supported per-item commands: `create_file`, `insert_text`, and `edit` with `edit_mode=range`. The whole batch commits or rolls back together.
 
-Default mental model: **`symbol_editor` first for code edits** (symbols, ranges, atomic batches); **minimal valid `file_text` on create**, then **`edit_mode=range`** or **`insert_text`** to extend only when `symbol_editor` is the wrong fit. Avoid brittle string replacement.
+Default mental model: **`start_file_edit` for file edits**; use **minimal valid `file_text` on create**, then **`edit_mode=range`** or **`insert_text`** to extend. Avoid brittle string replacement.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
 
 ## STRING ARGUMENT ESCAPING RULES (critical)
 
-`file_text`, `new_str`, `section_content`, and `patch_text` are **JSON strings**. Follow JSON escape rules — NOT Python/C repr rules:
+`file_text` and `new_str` are **JSON strings**. Follow JSON escape rules — NOT Python/C repr rules:
 - Newline in the content → the single escape sequence `\\n` on the wire (one backslash + n). This decodes to an actual newline character when written to disk.
 - Double quote inside the content → `\\"` on the wire (one backslash + quote).
 - Tab → `\\t`. Carriage return → `\\r`. Literal backslash → `\\\\`.
@@ -40,8 +37,7 @@ _SHORT_TEXT_EDITOR_DESCRIPTION = (
     'File reading, creation, and editing tool. '
     'Commands: read_file, create_file, insert_text, undo_last_edit, multi_edit. '
     'create_file creates new files OR overwrites existing files, but large existing source files require overwrite_existing=true. '
-    'Use edit_mode=range or symbol_editor for deterministic edits. '
-    'Supports edit_mode=format|section|range|patch. '
+    'Use edit_mode=range for deterministic edits. '
     'Use project-relative paths.\n'
 )
 
@@ -69,7 +65,7 @@ def create_text_editor_tool(
         properties={
             'command': get_command_param(
                 'The commands to run: `read_file`, `create_file`, `insert_text`, `undo_last_edit`, `edit`, `multi_edit`. '
-                'Use `command=edit` with `edit_mode=range` or `symbol_editor` to edit existing files.',
+                'Use `command=edit` with `edit_mode=range` to edit existing files.',
                 [
                     'read_file',
                     'create_file',
@@ -94,7 +90,7 @@ def create_text_editor_tool(
             'overwrite_existing': {
                 'description': (
                     'Optional safety override for `create_file`. Required when intentionally fully rewriting '
-                    'a large existing source-code file; otherwise prefer `symbol_editor` or `edit_mode=range`.'
+                    'a large existing source-code file; otherwise prefer `edit_mode=range`.'
                 ),
                 'type': 'boolean',
             },
@@ -116,64 +112,9 @@ def create_text_editor_tool(
             },
             'security_risk': get_security_risk_param(),
             'edit_mode': {
-                'description': 'Optional edit strategy for write commands: format, section, range, patch.',
+                'description': 'Optional edit strategy for write commands: range.',
                 'type': 'string',
-                'enum': ['format', 'section', 'range', 'patch'],
-            },
-            'format_kind': {
-                'description': 'Required when edit_mode=format. Parser target kind.',
-                'type': 'string',
-                'enum': ['json', 'yaml', 'toml', 'markdown', 'html', 'xml'],
-            },
-            'format_op': {
-                'description': 'Operation for edit_mode=format: set/delete/append.',
-                'type': 'string',
-                'enum': ['set', 'delete', 'append'],
-            },
-            'format_path': {
-                'description': 'Path/key for format edits (e.g. $.scripts.build).',
-                'type': 'string',
-            },
-            'format_value': {
-                'description': 'Value for format set/append operations. JSON-compatible value or string.',
-            },
-            'anchor_type': {
-                'description': (
-                    'Anchor selector type when edit_mode=section. '
-                    'Together with anchor_value (and optionally anchor_occurrence) these three '
-                    'params form a single "anchor" that locates the section boundary: '
-                    'markdown_heading = match a ## Heading line; '
-                    'literal = exact substring match; regex = regular expression match.'
-                ),
-                'type': 'string',
-                'enum': ['markdown_heading', 'literal', 'regex'],
-            },
-            'anchor_value': {
-                'description': 'The heading text, literal substring, or regex pattern to anchor on (edit_mode=section).',
-                'type': 'string',
-            },
-            'anchor_occurrence': {
-                'description': '1-indexed occurrence of the anchor match to use when multiple matches exist (edit_mode=section, default 1).',
-                'type': 'integer',
-            },
-            'section_action': {
-                'description': 'Section edit action for edit_mode=section.',
-                'type': 'string',
-                'enum': ['replace', 'insert_before', 'insert_after', 'delete'],
-            },
-            'section_content': {
-                'description': (
-                    'Replacement/insert content for edit_mode=section. JSON string — '
-                    'escape newlines as \\n, embedded quotes as \\".'
-                ),
-                'type': 'string',
-            },
-            'patch_text': {
-                'description': (
-                    'Unified diff patch body for edit_mode=patch. JSON string — escape '
-                    'newlines as \\n so the diff structure survives JSON decoding.'
-                ),
-                'type': 'string',
+                'enum': ['range'],
             },
             'expected_hash': {
                 'description': 'Optional SHA-256 hash guard for range edits (computed over target slice text).',

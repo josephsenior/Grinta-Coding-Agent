@@ -37,52 +37,6 @@ def test_edit_mode_range_replaces_entire_inclusive_span(tmp_path):
     assert target.read_text(encoding='utf-8') == 'one\nTWO\nTHREE\nfour\n'
 
 
-def test_edit_mode_section_markdown_replace(tmp_path):
-    target = tmp_path / 'README.md'
-    target.write_text('## Intro\nold\n\n## Next\nkeep\n', encoding='utf-8')
-    editor = FileEditor(workspace_root=str(tmp_path))
-    result = editor(
-        command='edit',
-        path='README.md',
-        edit_mode='section',
-        anchor_type='markdown_heading',
-        anchor_value='Intro',
-        section_action='replace',
-        section_content='## Intro\nnew\n\n',
-    )
-    assert result.error is None
-    assert '## Intro\nnew\n\n## Next\nkeep\n' == target.read_text(encoding='utf-8')
-
-
-def test_edit_mode_patch_applies_single_hunk(tmp_path):
-    target = tmp_path / 'sample.txt'
-    target.write_bytes(b'a\nb\nc\n')
-    editor = FileEditor(workspace_root=str(tmp_path))
-    patch = '@@ -1,3 +1,3 @@\n a\n-b\n+B\n c\n'
-    result = editor(
-        command='edit', path='sample.txt', edit_mode='patch', patch_text=patch
-    )
-    assert result.error is None
-    assert target.read_text(encoding='utf-8') == 'a\nB\nc\n'
-
-
-def test_edit_mode_format_json_set(tmp_path):
-    target = tmp_path / 'config.json'
-    target.write_text('{"name":"app","scripts":{"test":"vitest"}}', encoding='utf-8')
-    editor = FileEditor(workspace_root=str(tmp_path))
-    result = editor(
-        command='edit',
-        path='config.json',
-        edit_mode='format',
-        format_kind='json',
-        format_op='set',
-        format_path='$.scripts.build',
-        format_value='vite build',
-    )
-    assert result.error is None
-    assert '"build": "vite build"' in target.read_text(encoding='utf-8')
-
-
 def test_expected_file_hash_guard_rejects_stale_content(tmp_path):
     target = tmp_path / 'x.py'
     target.write_bytes(b'alpha\n')

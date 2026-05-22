@@ -11,7 +11,7 @@ from backend.inference.tool_names import FILE_EDITOR_TOOL_NAME
 
 _DETAILED_DESCRIPTION = """Unified file editor: reading, creation, editing, and structure-aware refactoring.
 
-COMMANDS (14):
+COMMANDS (11):
 
 Simple I/O:
   read             - Read file with line numbers or list directory (2 levels).
@@ -20,12 +20,7 @@ Simple I/O:
   undo             - Undo last edit to this file in current session.
 
 Line-range edit:
-  replace_lines    - Replace lines [start_line, end_line] with content.
-
-Structured-data edits:
-  format_edit      - Parser-based mutation for json/yaml/toml/markdown/html/xml.
-  section_edit     - Anchor-bounded section edit.
-  patch            - Apply unified diff patch hunks.
+  replace_range    - Replace lines [start_line, end_line] with content.
 
 Symbol-aware edits (Tree-sitter, 40+ languages):
   edit_symbol      - Edit function/method/class body by name.
@@ -47,8 +42,8 @@ Paths are project-relative or absolute under the project root.
 """
 
 _SHORT_DESCRIPTION = (
-    "Unified file editor with 14 commands: read, create, insert, undo, "
-    "replace_lines, format_edit, section_edit, patch, edit_symbol, "
+    "Unified file editor with 11 commands: read, create, insert, undo, "
+    "replace_range, edit_symbol, "
     "edit_symbols, rename_symbol, find_symbol, normalize_indent, multi_edit. "
     "Uses XML format for code payloads."
 )
@@ -72,10 +67,7 @@ def create_file_editor_tool(
                     'create',
                     'insert',
                     'undo',
-                    'replace_lines',
-                    'format_edit',
-                    'section_edit',
-                    'patch',
+                    'replace_range',
                     'edit_symbol',
                     'edit_symbols',
                     'rename_symbol',
@@ -98,11 +90,11 @@ def create_file_editor_tool(
                 'type': 'integer',
             },
             'start_line': {
-                'description': "1-based start line for replace_lines.",
+                'description': "1-based start line for replace_range.",
                 'type': 'integer',
             },
             'end_line': {
-                'description': "1-based inclusive end line for replace_lines.",
+                'description': "1-based inclusive end line for replace_range.",
                 'type': 'integer',
             },
             'view_range': {
@@ -113,41 +105,6 @@ def create_file_editor_tool(
             'expected_file_hash': {
                 'description': "SHA-256 hash guard.",
                 'type': 'string',
-            },
-            'format_kind': {
-                'description': "Parser target for format_edit.",
-                'type': 'string',
-                'enum': ['json', 'yaml', 'toml', 'markdown', 'html', 'xml'],
-            },
-            'format_op': {
-                'description': "Operation for format_edit.",
-                'type': 'string',
-                'enum': ['set', 'delete', 'append'],
-            },
-            'format_path': {
-                'description': "Key path for format_edit.",
-                'type': 'string',
-            },
-            'format_value': {
-                'description': "Value for format_edit set/append.",
-            },
-            'anchor_type': {
-                'description': "Anchor selector for section_edit.",
-                'type': 'string',
-                'enum': ['markdown_heading', 'literal', 'regex'],
-            },
-            'anchor_value': {
-                'description': "Anchor text/pattern for section_edit.",
-                'type': 'string',
-            },
-            'anchor_occurrence': {
-                'description': "1-indexed occurrence for section_edit.",
-                'type': 'integer',
-            },
-            'section_action': {
-                'description': "Section edit action.",
-                'type': 'string',
-                'enum': ['replace', 'insert_before', 'insert_after', 'delete'],
             },
             'symbol_name': {
                 'type': 'string',
@@ -200,7 +157,7 @@ def create_file_editor_tool(
                         'path': {'type': 'string'},
                         'operation': {
                             'type': 'string',
-                            'enum': ['create', 'replace_lines', 'edit_symbol', 'replace_file'],
+                            'enum': ['create', 'replace_range', 'edit_symbol', 'replace_file'],
                         },
                         'content': {'type': 'string'},
                         'start_line': {'type': 'integer'},

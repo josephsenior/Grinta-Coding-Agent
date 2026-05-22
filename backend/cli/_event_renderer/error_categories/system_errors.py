@@ -37,9 +37,8 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='text_editor edit command is missing an edit_mode.',
             steps=(
-                'Add edit_mode with one of: format, section, range, patch.',
-                'For line-range edits: edit_mode=range with start_line, end_line, and new_str.',
-                'For parser-based edits (JSON/YAML): edit_mode=format with format_kind, format_path, and format_value.',
+                'Add edit_mode=range with start_line, end_line, and new_str.',
+                'If the edit is not a range edit, use start_file_edit instead.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-TE-002',
@@ -50,8 +49,7 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='text_editor could not find a valid edit path for those arguments.',
             steps=(
-                'If using edit_mode, check edit_mode is set and required params are present '
-                '(range → start_line + end_line; section → anchor_value; format → format_path).',
+                'If using edit_mode=range, check start_line, end_line, and new_str are present.',
                 'Re-read the file first, then retry with the correct parameter set.',
             ),
             omit_summary_in_recovery=False,

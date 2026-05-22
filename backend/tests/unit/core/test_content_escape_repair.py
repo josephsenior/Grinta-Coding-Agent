@@ -202,7 +202,7 @@ class TestRepairArgumentsInPlace:
     def test_known_content_names_contain_expected_keys(self) -> None:
         # Regression guard — these are the field names referenced by the
         # file-editor tool schema.
-        for expected in ('file_text', 'new_str', 'section_content', 'patch_text'):
+        for expected in ('file_text', 'new_str'):
             assert expected in CONTENT_ARG_NAMES
 
     def test_repairs_batch_edit_bodies(self) -> None:

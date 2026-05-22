@@ -119,13 +119,13 @@ def classify_editor_recovery(
             ),
         )
 
-    if 'patch failed to apply' in lower or 'corrupt patch' in lower:
+    if 'edit context mismatch' in lower or 'range edit context mismatch' in lower:
         return EditorRecoveryAdvice(
-            kind='patch_context_mismatch',
+            kind='range_context_mismatch',
             preferred_tool='text_editor',
             next_action='edit_mode=range',
             detail=(
-                'The patch context is stale or malformed. Re-read the file and retry once with `edit_mode=range` '
+                'The edit context is stale or malformed. Re-read the file and retry once with `edit_mode=range` '
                 'using exact current line numbers.'
             ),
         )

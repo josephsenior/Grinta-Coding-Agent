@@ -367,8 +367,8 @@ class OrchestratorPlanner:
         """Append pseudo-XML tool format instructions to the system prompt.
 
         Editor tools are described using the same format that non-native models
-        already use, so the model emits ``<function=file_editor>`` blocks
-        with raw-text code payloads instead of JSON-encoded arguments.
+        already use, but file edits now route through the two-mode
+        ``start_file_edit`` protocol with raw content blocks.
         """
         from backend.inference.fn_call_converter import (
             convert_tools_to_description,
@@ -381,23 +381,23 @@ class OrchestratorPlanner:
         # note with hybrid-specific guidance.
         suffix = (
             '\n\n<FILE_EDITING_TOOL_FORMAT>\n'
-            'The `file_editor` tool uses an XML format for code payloads '
-            'so that code is never JSON-encoded.  When calling `file_editor`, emit '
-            'a `<function=file_editor>...</function>` block in your response text. '
-            'Do NOT use the standard JSON tool calling format for `file_editor`.\n'
+            'The `start_file_edit` tool initiates a metadata-only edit transaction. '
+            'When the runtime enters FILE EDITOR MODE, emit one `<file_edit>` block '
+            'containing raw file content. Do NOT use the standard JSON tool calling '
+            'format for file content.\n'
             f'{formatted}\n'
-            'Canonical XML examples (emit one block per message; copy parameter names exactly):\n\n'
+            'Canonical examples (emit one block per message; copy parameter names exactly):\n\n'
             f'{xml_examples}\n\n'
             'RULES:\n'
-            '- You may include natural-language reasoning BEFORE the <function=...> block.\n'
-            '- Do NOT place any text AFTER the </function> closing tag.\n'
-            '- Code between <parameter> tags is written exactly as it should appear in the file.\n'
+            '- You may include natural-language reasoning BEFORE the raw-content block.\n'
+            '- Do NOT place any text AFTER the closing tag.\n'
+            '- Code between tags is written exactly as it should appear in the file.\n'
             '- Always include <parameter=security_risk>LOW|MEDIUM|HIGH</parameter>.\n'
-            '- Use the unified content parameter for all new text (create, replace_lines, insert, edit_symbol, etc.)\n'
+            '- Use the raw-content editor block for file writes; metadata-only for the starter call.\n'
             '- One file-editing call per message.\n'
-            '- For multi_edit: use nested <file_edit> XML blocks (NOT JSON arrays).\n'
-            '- Each <file_edit> block: <path>, <operation>, <content>.\n'
-            '- Operations: create, replace_lines, edit_symbol, replace_file.\n'
+            '- For multi_edit: use nested raw-content blocks (NOT JSON arrays).\n'
+            '- Each block: <path>, <operation>, <content>.\n'
+            '- Operations: create, replace_range, edit_symbol, replace_file.\n'
             '</FILE_EDITING_TOOL_FORMAT>'
         )
 

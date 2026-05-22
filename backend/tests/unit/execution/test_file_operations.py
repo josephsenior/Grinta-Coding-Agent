@@ -233,6 +233,25 @@ class TestWriteFileContent:
             assert err is None
             assert open(fp, encoding='utf-8').read() == 'hello world'
 
+    def test_insert_existing_file_after_line_preserves_tail(self):
+        with tempfile.TemporaryDirectory() as td:
+            fp = os.path.join(td, 'existing.txt')
+            with open(fp, 'w', encoding='utf-8') as f:
+                f.write('line1\nline2\nline3\n')
+
+            action = FileWriteAction(
+                path=fp,
+                content='inserted',
+                start=2,
+                end=2,
+            )
+            err = write_file_content(fp, action, file_exists=True)
+            assert err is None
+
+            assert open(fp, encoding='utf-8').read() == (
+                'line1\nline2\ninserted\nline3\n'
+            )
+
     def test_write_error_returns_observation(self):
         # Try writing to a directory
         with tempfile.TemporaryDirectory() as td:

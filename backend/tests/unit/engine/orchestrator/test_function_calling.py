@@ -407,13 +407,13 @@ class TestStartFileEditTransport:
 
         assert 'does not accept file content fields' in str(exc_info.value)
 
-    def test_start_file_edit_replace_lines_requires_metadata(self):
+    def test_start_file_edit_replace_range_requires_metadata(self):
         response = _model_response(
             tool_calls=[
                 _native_tool_call(
                     'start_file_edit',
                     {
-                        'operation': 'replace_lines',
+                        'operation': 'replace_range',
                         'path': 'app.py',
                         'start_line': 1,
                         'security_risk': 'LOW',
