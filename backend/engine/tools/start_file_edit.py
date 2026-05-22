@@ -57,7 +57,48 @@ def create_start_file_edit_tool() -> ChatCompletionToolParam:
             'symbol_names': {
                 'type': 'array',
                 'items': {'type': 'string'},
-                'description': 'Optional symbol names for edit_symbols context gathering.',
+                'description': 'Target symbol names for edit_symbols. Raw replacement bodies are provided later in editor mode.',
+            },
+            'batch_operations': {
+                'type': 'array',
+                'description': 'Metadata-only batch plan for multi_edit. Do not include file content here.',
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                        'path': get_path_param('Project-relative path for this batch item.'),
+                        'operation': {
+                            'type': 'string',
+                            'enum': ['replace_file', 'replace_range', 'edit_symbol'],
+                            'description': 'Batch item operation. Raw content is provided later in editor mode.',
+                        },
+                        'start_line': {
+                            'type': 'integer',
+                            'description': '1-based start line for replace_range batch items.',
+                        },
+                        'end_line': {
+                            'type': 'integer',
+                            'description': '1-based inclusive end line for replace_range batch items.',
+                        },
+                        'symbol_name': {
+                            'type': 'string',
+                            'description': 'Target symbol for edit_symbol batch items.',
+                        },
+                        'line_number': {
+                            'type': 'integer',
+                            'description': 'Optional disambiguation line number for edit_symbol batch items.',
+                        },
+                        'expected_file_hash': {
+                            'type': 'string',
+                            'description': 'Optional SHA-256 guard for this batch item path.',
+                        },
+                        'overwrite_existing': {
+                            'type': 'boolean',
+                            'description': 'Optional overwrite flag for replace_file batch items.',
+                        },
+                    },
+                    'required': ['path', 'operation'],
+                    'additionalProperties': False,
+                },
             },
             'expected_file_hash': {
                 'type': 'string',

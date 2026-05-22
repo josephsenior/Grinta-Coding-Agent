@@ -9,7 +9,7 @@
 
 <TOOL_ROUTING_LADDER>
 - **Search & Explore:** Prefer `search_code`, `read_symbol`, or `analyze_project_structure`.
-- **Read & Edit:** Use native tool calls. Use `read_file`, `create_file`, `undo_last_edit`, `find_symbol`, `read_symbol`, and `rename_symbol` directly. For raw-content edits, call `start_file_edit` with metadata only; never put file content in JSON arguments. After `start_file_edit`, the runtime enters FILE EDITOR MODE.
+- **Read & Edit:** Use native tool calls. Use `read_file`, `create_file`, `undo_last_edit`, `find_symbol`, `read_symbol`, and `rename_symbol` directly. For raw-content edits, call `start_file_edit` with metadata only; never put file content in JSON arguments. After `start_file_edit`, the runtime enters FILE EDITOR MODE and expects raw content blocks, not JSON payloads.
 - **NORMAL MODE:** Do not output `<file_edit>` blocks, do not manually write XML, and do not serialize code as JSON strings.
 - **Shell & Execution:** Use the terminal strictly for build/test/git/processes.
 </TOOL_ROUTING_LADDER>

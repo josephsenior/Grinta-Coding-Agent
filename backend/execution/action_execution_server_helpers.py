@@ -679,6 +679,9 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
     edit_mode = getattr(action, 'edit_mode', None) or ''
     is_range_edit = edit_mode.strip().lower() == 'range'
 
+    if command in {'edit_symbol', 'edit_symbols', 'multi_edit'}:
+        return _execute_structured_file_edit_action(executor, action)
+
     result_str, (old_content, new_content), tool_result = execute_file_editor(
         executor.file_editor,
         command=command,
@@ -731,6 +734,169 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         new_content_hash=new_content_hash,
     )
     obs.tool_result = tool_result
+    return obs
+
+
+def _read_existing_text(path: Path) -> str | None:
+    if not path.exists() or not path.is_file():
+        return None
+    return path.read_text(encoding='utf-8')
+
+
+def _structured_payload_dict(action: Any) -> dict[str, Any]:
+    payload = getattr(action, 'structured_payload', None)
+    if not isinstance(payload, dict):
+        return {}
+    return payload
+
+
+def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
+    import hashlib
+
+    from backend.core.errors import FunctionCallValidationError, ToolExecutionError
+    from backend.engine.function_calling import (
+        _handle_edit_symbol_command,
+        _handle_edit_symbols_command,
+        _handle_multi_edit_command,
+    )
+    from backend.engine.tools.structure_editor import StructureEditor
+    from backend.ledger.action import FileReadAction, MessageAction
+    from backend.ledger.observation import ErrorObservation, FileEditObservation
+
+    command = str(action.command or '').strip().lower()
+    payload = _structured_payload_dict(action)
+
+    if command == 'multi_edit':
+        try:
+            outcome = _handle_multi_edit_command(
+                action.path,
+                {'file_edits': payload.get('file_edits')},
+            )
+        except (FunctionCallValidationError, ToolExecutionError, ValueError) as exc:
+            obs = ErrorObservation(str(exc))
+            obs.tool_result = {
+                'tool': 'file_edit',
+                'ok': False,
+                'error_code': 'STRUCTURED_EDIT_ERROR',
+                'retryable': False,
+                'operation': command,
+                'payload': payload,
+            }
+            return obs
+
+        summary = (
+            outcome.content
+            if isinstance(outcome, MessageAction)
+            else getattr(outcome, 'thought', '') or getattr(outcome, 'content', '')
+        )
+        obs = FileEditObservation(
+            content=summary,
+            path=action.path,
+            prev_exist=None,
+            old_content=None,
+            new_content=None,
+            impl_source=FileEditSource.FILE_EDITOR,
+        )
+        obs.tool_result = {
+            'tool': 'file_edit',
+            'ok': True,
+            'error_code': None,
+            'retryable': False,
+            'operation': command,
+            'payload': payload,
+        }
+        return obs
+
+    action_path = Path(action.path)
+    resolved = (
+        action_path.resolve()
+        if action_path.is_absolute()
+        else executor.file_editor._resolve_path_safe(action.path).path
+    )
+    old_content = _read_existing_text(resolved)
+
+    try:
+        editor = StructureEditor()
+        if command == 'edit_symbol':
+            outcome = _handle_edit_symbol_command(
+                editor,
+                str(resolved),
+                {
+                    'symbol_name': payload.get('symbol_name'),
+                    'new_body': action.new_str,
+                    'line_number': payload.get('line_number'),
+                },
+                tool_name='start_file_edit',
+            )
+        elif command == 'edit_symbols':
+            outcome = _handle_edit_symbols_command(
+                editor,
+                str(resolved),
+                {'edits': payload.get('edits')},
+                tool_name='start_file_edit',
+            )
+        else:
+            return ErrorObservation(f'Unsupported structured file edit command: {command}')
+    except (FunctionCallValidationError, ToolExecutionError, ValueError) as exc:
+        obs = ErrorObservation(str(exc))
+        obs.tool_result = {
+            'tool': 'file_edit',
+            'ok': False,
+            'error_code': 'STRUCTURED_EDIT_ERROR',
+            'retryable': False,
+            'operation': command,
+            'payload': payload,
+        }
+        return obs
+
+    if isinstance(outcome, MessageAction):
+        obs = ErrorObservation(outcome.content)
+        obs.tool_result = {
+            'tool': 'file_edit',
+            'ok': False,
+            'error_code': 'STRUCTURED_EDIT_ERROR',
+            'retryable': False,
+            'operation': command,
+            'payload': payload,
+        }
+        return obs
+
+    new_content = _read_existing_text(resolved)
+    new_content_hash = None
+    if new_content is not None:
+        new_content_hash = hashlib.sha256(new_content.encode('utf-8')).hexdigest()
+
+    result_str = (
+        outcome.thought
+        if isinstance(outcome, FileReadAction)
+        else getattr(outcome, 'content', '')
+    )
+    if old_content is not None and new_content is not None:
+        try:
+            diff = get_diff(old_content, new_content, action.path)
+            if diff:
+                diff = truncate_diff(diff)
+                result_str = result_str + '\n\n[EDIT_DIFF]\n' + diff
+        except Exception:
+            pass
+
+    obs = FileEditObservation(
+        content=result_str,
+        path=action.path,
+        prev_exist=old_content is not None,
+        old_content=old_content,
+        new_content=new_content,
+        impl_source=FileEditSource.FILE_EDITOR,
+        new_content_hash=new_content_hash,
+    )
+    obs.tool_result = {
+        'tool': 'file_edit',
+        'ok': True,
+        'error_code': None,
+        'retryable': False,
+        'operation': command,
+        'payload': payload,
+    }
     return obs
 
 

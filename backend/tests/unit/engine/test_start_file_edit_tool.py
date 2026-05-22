@@ -144,12 +144,30 @@ def test_start_file_edit_accepts_multi_edit_without_path():
     action = _handle_start_file_edit_tool(
         {
             'operation': 'multi_edit',
+            'batch_operations': [
+                {
+                    'path': 'a.py',
+                    'operation': 'replace_range',
+                    'start_line': 1,
+                    'end_line': 1,
+                }
+            ],
             'security_risk': 'LOW',
         }
     )
     assert isinstance(action, StartFileEditAction)
     assert action.path == '<batch>'
     assert action.operation == 'multi_edit'
+
+
+def test_start_file_edit_multi_edit_requires_batch_operations():
+    with pytest.raises(FunctionCallValidationError, match='batch_operations'):
+        _handle_start_file_edit_tool(
+            {
+                'operation': 'multi_edit',
+                'security_risk': 'LOW',
+            }
+        )
 
 
 def test_start_file_edit_runtime_creates_transaction(tmp_path):

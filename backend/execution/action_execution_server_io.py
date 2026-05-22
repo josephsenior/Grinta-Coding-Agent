@@ -1045,7 +1045,11 @@ class RuntimeExecutorIOAndTerminalMixin:
         if os.path.isfile(action.path) and is_binary(action.path):
             return ErrorObservation('ERROR_BINARY_FILE')
 
-        if action.impl_source == FileReadSource.FILE_EDITOR:
+        impl_source = action.impl_source
+        if impl_source == FileReadSource.FILE_EDITOR or str(impl_source).lower() in {
+            'file_editor',
+            'filereadsource.file_editor',
+        }:
             return self._handle_aci_file_read(action)
 
         working_dir = bash_session.cwd
@@ -1110,6 +1114,8 @@ class RuntimeExecutorIOAndTerminalMixin:
             return shell_err
         assert bash_session is not None
         working_dir = bash_session.cwd
+        if (action.command or '').strip().lower() == 'multi_edit':
+            return self._edit_via_file_editor(action)
         try:
             filepath = self._resolve_workspace_file_path(action.path, working_dir)
         except PermissionError:

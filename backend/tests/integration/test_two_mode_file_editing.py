@@ -7,7 +7,7 @@ from backend.engine.file_edit_protocol import (
     get_transaction_store,
     parse_editor_response,
 )
-from backend.ledger.action import FileReadAction, MessageAction
+from backend.ledger.action import FileEditAction
 from backend.execution.action_execution_server_helpers import edit_via_file_editor
 from backend.execution.utils.file_editor import FileEditor
 from backend.ledger.observation import FileEditObservation
@@ -35,6 +35,7 @@ def test_two_mode_content_reaches_existing_file_editor_pipeline(tmp_path):
     parsed = parse_editor_response(response, txn)
     assert parsed.ok
     action = apply_edit_from_transaction(parsed.content, txn)
+    assert isinstance(action, FileEditAction)
 
     executor = SimpleNamespace(
         file_editor=FileEditor(workspace_root=tmp_path),
@@ -61,21 +62,39 @@ def test_two_mode_edit_symbols_payload_reaches_existing_structure_pipeline(tmp_p
         'integration_edit_symbols',
         str(target),
         'edit_symbols',
-        {'security_risk': 'LOW'},
+        {
+            'security_risk': 'LOW',
+            'editor_items': [
+                {'name': 'a', 'delimiter': 'GRINTA_ITEM_END_a'},
+                {'name': 'b', 'delimiter': 'GRINTA_ITEM_END_b'},
+            ],
+        },
     )
     raw_payload = (
-        '[\n'
-        '  {"symbol_name": "a", "new_body": "    return 10"},\n'
-        '  {"symbol_name": "b", "new_body": "    return 20"}\n'
-        ']\n'
+        '<symbol name="a">\n'
+        '    return 10\n'
+        'GRINTA_ITEM_END_a\n'
+        '</symbol>\n'
+        '<symbol name="b">\n'
+        '    return 20\n'
+        'GRINTA_ITEM_END_b\n'
+        '</symbol>\n'
     )
     response = '<file_edit>\n' + raw_payload + f'{txn.delimiter}\n</file_edit>\n'
 
     parsed = parse_editor_response(response, txn)
     assert parsed.ok
     action = apply_edit_from_transaction(parsed.content, txn)
+    assert isinstance(action, FileEditAction)
 
-    assert isinstance(action, FileReadAction)
+    executor = SimpleNamespace(
+        file_editor=FileEditor(workspace_root=tmp_path),
+        _is_auto_lint_enabled=lambda: True,
+    )
+    obs = edit_via_file_editor(executor, action)
+
+    assert isinstance(obs, FileEditObservation)
+    assert obs.tool_result['ok'] is True
     assert 'return 10' in target.read_text(encoding='utf-8')
     assert 'return 20' in target.read_text(encoding='utf-8')
     store.clear_active_transaction('integration_edit_symbols')
@@ -95,21 +114,53 @@ def test_two_mode_multi_edit_payload_reaches_existing_batch_pipeline(
         'integration_multi_edit',
         '<batch>',
         'multi_edit',
-        {'security_risk': 'LOW'},
+        {
+            'security_risk': 'LOW',
+            'editor_items': [
+                {
+                    'index': 1,
+                    'delimiter': 'GRINTA_ITEM_END_1',
+                    'path': 'a.py',
+                    'operation': 'replace_range',
+                    'start_line': 1,
+                    'end_line': 1,
+                },
+                {
+                    'index': 2,
+                    'delimiter': 'GRINTA_ITEM_END_2',
+                    'path': 'b.py',
+                    'operation': 'replace_range',
+                    'start_line': 1,
+                    'end_line': 1,
+                },
+            ],
+        },
     )
     raw_payload = (
-        '[\n'
-        '  {"path": "a.py", "command": "replace_range", "start_line": 1, "end_line": 1, "new_code": "x = 2\\n"},\n'
-        '  {"path": "b.py", "command": "replace_range", "start_line": 1, "end_line": 1, "new_code": "y = 2\\n"}\n'
-        ']\n'
+        '<edit index="1">\n'
+        'x = 2\n'
+        'GRINTA_ITEM_END_1\n'
+        '</edit>\n'
+        '<edit index="2">\n'
+        'y = 2\n'
+        'GRINTA_ITEM_END_2\n'
+        '</edit>\n'
     )
     response = '<file_edit>\n' + raw_payload + f'{txn.delimiter}\n</file_edit>\n'
 
     parsed = parse_editor_response(response, txn)
     assert parsed.ok
     action = apply_edit_from_transaction(parsed.content, txn)
+    assert isinstance(action, FileEditAction)
 
-    assert isinstance(action, MessageAction)
+    executor = SimpleNamespace(
+        file_editor=FileEditor(workspace_root=tmp_path),
+        _is_auto_lint_enabled=lambda: True,
+    )
+    obs = edit_via_file_editor(executor, action)
+
+    assert isinstance(obs, FileEditObservation)
+    assert obs.tool_result['ok'] is True
     assert first.read_text(encoding='utf-8') == 'x = 2\n'
     assert second.read_text(encoding='utf-8') == 'y = 2\n'
     store.clear_active_transaction('integration_multi_edit')
