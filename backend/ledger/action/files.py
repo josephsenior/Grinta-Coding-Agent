@@ -123,6 +123,7 @@ class FileEditAction(Action):
     start_line: int | None = None
     end_line: int | None = None
     overwrite_existing: bool = False
+    structured_payload: dict[str, Any] | None = None
 
     def __repr__(self) -> str:
         """Return a readable summary capturing edit mode and key fields."""
@@ -140,4 +141,6 @@ class FileEditAction(Action):
             ret += f'New String: ```\n{self.new_str}\n```\n'
         elif self.command == 'undo_last_edit':
             ret += 'Undo Edit\n'
+        elif self.command in {'edit_symbol', 'edit_symbols', 'multi_edit'}:
+            ret += f'Structured Payload: {self.structured_payload}\n'
         return ret

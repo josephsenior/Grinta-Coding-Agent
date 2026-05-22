@@ -36,6 +36,7 @@ from backend.ledger import EventSource, EventStreamSubscriber
 from backend.ledger.action import (
     Action,
     MessageAction,
+    PlaybookFinishAction,
     SystemMessageAction,
 )
 from backend.ledger.observation import (
@@ -852,6 +853,19 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             if action.wait_for_response:
                 if self.get_agent_state() == AgentState.RUNNING:
                     await self.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+        # Finish must terminate the current response immediately. Any queued
+        # follow-up actions from the same LLM response are stale once finish was
+        # chosen, so drop them and do not schedule another step from this turn.
+        if isinstance(action, PlaybookFinishAction):
+            with contextlib.suppress(Exception):
+                clear_queued_actions = getattr(self.agent, 'clear_queued_actions', None)
+                if callable(clear_queued_actions):
+                    clear_queued_actions(reason='finish_action_dispatched')
+            from backend.utils.async_utils import drain_background_tasks
+
+            await drain_background_tasks(max_rounds=2, timeout=2.0)
+            await self._handle_post_execution()
+            return
         await self._handle_post_execution()
 
         # Batch-drain queued non-blocking actions from the same LLM response.

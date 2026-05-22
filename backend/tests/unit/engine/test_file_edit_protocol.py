@@ -5,10 +5,13 @@ from pathlib import Path
 from backend.engine.file_edit_protocol import (
     EditTransaction,
     EditTransactionStore,
+    EditorContentValidationError,
     apply_edit_from_transaction,
     build_editor_mode_prompt,
     parse_editor_response,
+    validate_editor_transaction_content,
 )
+from backend.ledger.action import FileEditAction
 
 
 def _txn() -> EditTransaction:
@@ -197,8 +200,8 @@ def test_editor_mode_prompt_explicitly_requests_raw_plain_text() -> None:
     txn = _txn()
     prompt = build_editor_mode_prompt(txn, target_context='print("hello")\n')
 
-    assert 'raw file content' in prompt
-    assert 'Do not serialize it as JSON or a tool payload' in prompt
+    assert 'Output only the replacement text for the requested line range.' in prompt
+    assert 'Do not serialize raw code as JSON strings or escaped newline sequences.' in prompt
     assert '<current_target>' in prompt
     assert '<file_edit>' in prompt
     assert '<file_edit transaction_id=' not in prompt
@@ -211,11 +214,18 @@ def test_editor_mode_prompt_mentions_json_for_edit_symbols() -> None:
         path='pkg/app.py',
         operation='edit_symbols',
         delimiter='GRINTA_END_json1',
-        metadata={},
+        metadata={
+            'editor_items': [
+                {'name': 'a', 'delimiter': 'GRINTA_ITEM_END_a'},
+                {'name': 'b', 'delimiter': 'GRINTA_ITEM_END_b'},
+            ]
+        },
         status='pending_content',
     )
     prompt = build_editor_mode_prompt(txn)
-    assert '"edits"' in prompt
+    assert '<symbol name="a">' in prompt
+    assert 'GRINTA_ITEM_END_a' in prompt
+    assert 'Do not serialize raw code as JSON strings' in prompt
 
 
 def test_editor_mode_prompt_mentions_json_for_multi_edit() -> None:
@@ -225,19 +235,195 @@ def test_editor_mode_prompt_mentions_json_for_multi_edit() -> None:
         path='<batch>',
         operation='multi_edit',
         delimiter='GRINTA_END_json2',
-        metadata={},
+        metadata={
+            'editor_items': [
+                {
+                    'index': 1,
+                    'delimiter': 'GRINTA_ITEM_END_1',
+                    'path': 'a.py',
+                    'operation': 'replace_range',
+                    'start_line': 1,
+                    'end_line': 1,
+                }
+            ]
+        },
         status='pending_content',
     )
     prompt = build_editor_mode_prompt(txn)
-    assert '"file_edits"' in prompt
+    assert '<edit index="1">' in prompt
+    assert 'replace_range path=a.py' in prompt
+    assert 'Do not serialize raw code as JSON strings' in prompt
+
+
+def test_validate_editor_transaction_content_accepts_edit_symbols_blocks() -> None:
+    txn = EditTransaction(
+        transaction_id='edit_json3',
+        session_id='s1',
+        path='pkg/app.py',
+        operation='edit_symbols',
+        delimiter='GRINTA_END_json3',
+        metadata={
+            'editor_items': [
+                {'name': 'a', 'delimiter': 'GRINTA_ITEM_END_a'},
+            ]
+        },
+        status='pending_content',
+    )
+    validate_editor_transaction_content(
+        '<symbol name="a">\n    return 1\nGRINTA_ITEM_END_a\n</symbol>\n',
+        txn,
+    )
+
+
+def test_validate_editor_transaction_content_rejects_edit_symbols_missing_block() -> None:
+    txn = EditTransaction(
+        transaction_id='edit_json4',
+        session_id='s1',
+        path='pkg/app.py',
+        operation='edit_symbols',
+        delimiter='GRINTA_END_json4',
+        metadata={
+            'editor_items': [
+                {'name': 'a', 'delimiter': 'GRINTA_ITEM_END_a'},
+                {'name': 'b', 'delimiter': 'GRINTA_ITEM_END_b'},
+            ]
+        },
+        status='pending_content',
+    )
+    try:
+        validate_editor_transaction_content(
+            '<symbol name="a">\n    return 1\nGRINTA_ITEM_END_a\n</symbol>\n',
+            txn,
+        )
+    except EditorContentValidationError as exc:
+        assert 'missing blocks' in str(exc)
+    else:  # pragma: no cover - defensive
+        raise AssertionError('Expected EditorContentValidationError')
+
+
+def test_validate_editor_transaction_content_rejects_multi_edit_missing_path() -> None:
+    txn = EditTransaction(
+        transaction_id='edit_json5',
+        session_id='s1',
+        path='<batch>',
+        operation='multi_edit',
+        delimiter='GRINTA_END_json5',
+        metadata={
+            'editor_items': [
+                {
+                    'index': 1,
+                    'delimiter': 'GRINTA_ITEM_END_1',
+                    'path': 'a.py',
+                    'operation': 'replace_range',
+                    'start_line': 1,
+                    'end_line': 1,
+                }
+            ]
+        },
+        status='pending_content',
+    )
+    try:
+        validate_editor_transaction_content(
+            '<edit index="2">\nvalue\nGRINTA_ITEM_END_1\n</edit>\n',
+            txn,
+        )
+    except EditorContentValidationError as exc:
+        assert 'Unexpected multi_edit block index' in str(exc)
+    else:  # pragma: no cover - defensive
+        raise AssertionError('Expected EditorContentValidationError')
+
+
+def test_apply_edit_symbol_transaction_builds_file_edit_action() -> None:
+    txn = EditTransaction(
+        transaction_id='edit_sym1',
+        session_id='s1',
+        path='pkg/app.py',
+        operation='edit_symbol',
+        delimiter='GRINTA_END_sym1',
+        metadata={'symbol_name': 'Thing'},
+        status='pending_content',
+    )
+    action = apply_edit_from_transaction('    return 2\n', txn)
+    assert isinstance(action, FileEditAction)
+    assert action.command == 'edit_symbol'
+    assert action.new_str == '    return 2\n'
+    assert action.structured_payload == {'symbol_name': 'Thing'}
+
+
+def test_apply_edit_symbols_transaction_builds_file_edit_action() -> None:
+    txn = EditTransaction(
+        transaction_id='edit_sym2',
+        session_id='s1',
+        path='pkg/app.py',
+        operation='edit_symbols',
+        delimiter='GRINTA_END_sym2',
+        metadata={
+            'editor_items': [
+                {'name': 'a', 'delimiter': 'GRINTA_ITEM_END_a'},
+            ]
+        },
+        status='pending_content',
+    )
+    action = apply_edit_from_transaction(
+        '<symbol name="a">\n    return 2\nGRINTA_ITEM_END_a\n</symbol>\n',
+        txn,
+    )
+    assert isinstance(action, FileEditAction)
+    assert action.command == 'edit_symbols'
+    assert action.structured_payload == {
+        'edits': [{'symbol_name': 'a', 'new_body': '    return 2\n'}]
+    }
+
+
+def test_apply_multi_edit_transaction_builds_file_edit_action() -> None:
+    txn = EditTransaction(
+        transaction_id='edit_sym3',
+        session_id='s1',
+        path='<batch>',
+        operation='multi_edit',
+        delimiter='GRINTA_END_sym3',
+        metadata={
+            'editor_items': [
+                {
+                    'index': 1,
+                    'delimiter': 'GRINTA_ITEM_END_1',
+                    'path': 'a.py',
+                    'operation': 'replace_range',
+                    'start_line': 1,
+                    'end_line': 1,
+                }
+            ]
+        },
+        status='pending_content',
+    )
+    action = apply_edit_from_transaction(
+        '<edit index="1">\nx = 2\nGRINTA_ITEM_END_1\n</edit>\n',
+        txn,
+    )
+    assert isinstance(action, FileEditAction)
+    assert action.command == 'multi_edit'
+    assert action.structured_payload == {
+        'file_edits': [
+            {
+                'path': 'a.py',
+                'command': 'replace_range',
+                'start_line': 1,
+                'end_line': 1,
+                'new_code': 'x = 2\n',
+            }
+        ]
+    }
 
 
 def test_prompt_assets_include_concise_file_edit_policy() -> None:
     root = Path(__file__).resolve().parents[3] / 'engine' / 'prompts'
     routing = (root / 'system_partial_00_routing.md').read_text(encoding='utf-8')
     tools = (root / 'system_partial_02_tools.md').read_text(encoding='utf-8')
+    examples = (root / 'system_partial_05_examples.md').read_text(encoding='utf-8')
 
-    assert 'After `start_file_edit`, the runtime enters FILE EDITOR MODE.' in routing
+    assert 'After `start_file_edit`, the runtime enters FILE EDITOR MODE and expects raw content blocks, not JSON payloads.' in routing
     assert 'Do not output `<file_edit>` blocks, do not manually write XML' in routing
     assert 'File Editing Policy' in tools
     assert 'Never pass multiline file content through JSON tool arguments.' in tools
+    assert '<symbol name="...">' in examples
+    assert '<edit index="N">' in examples

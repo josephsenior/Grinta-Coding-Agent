@@ -24,6 +24,7 @@ from backend.orchestration.session_orchestrator import (
     TRAFFIC_CONTROL_REMINDER,
     SessionOrchestrator,
 )
+from backend.ledger.action import MessageAction, PlaybookFinishAction
 
 
 def _noop_init(self: SessionOrchestrator, *args: object, **kwargs: object) -> None:
@@ -1683,6 +1684,41 @@ class TestStepDispatch(unittest.TestCase):
 
         self.assertEqual(
             self.ctrl.services.action_execution.execute_action.call_count, 1
+        )
+
+    async def test_finish_action_clears_stale_queued_followups(self):
+        """A finish action must stop the same-response drain loop immediately."""
+        self.ctrl.services.step_prerequisites.can_step.return_value = True
+        self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
+        self.ctrl.services.retry.retry_count = 0
+        finish = PlaybookFinishAction(final_thought='done')
+        finish.source = EventSource.AGENT
+        stale = MessageAction(content='Anything else?', wait_for_response=True)
+        stale.source = EventSource.AGENT
+        self.ctrl.services.action_execution.get_next_action = AsyncMock(
+            side_effect=[finish, stale]
+        )
+        self.ctrl.services.action_execution.execute_action = AsyncMock()
+        self.ctrl.agent = MagicMock()
+        self.ctrl.agent.clear_queued_actions = MagicMock(return_value=1)
+        self.ctrl.get_agent_state = MagicMock(return_value=AgentState.RUNNING)
+
+        with (
+            patch.object(self.ctrl, '_run_control_flags_safely', return_value=True),
+            patch.object(self.ctrl, '_can_drain_pending', return_value=True),
+            patch.object(self.ctrl, '_handle_post_execution', new_callable=AsyncMock),
+            patch(
+                'backend.orchestration.session_orchestrator.drain_background_tasks',
+                new_callable=AsyncMock,
+            ),
+        ):
+            await self.ctrl._step()
+
+        self.ctrl.services.action_execution.execute_action.assert_awaited_once_with(
+            finish
+        )
+        self.ctrl.agent.clear_queued_actions.assert_called_once_with(
+            reason='finish_action_dispatched'
         )
 
     def test_add_system_message_user_present(self):

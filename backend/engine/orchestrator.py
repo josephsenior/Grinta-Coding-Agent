@@ -55,11 +55,13 @@ from backend.engine.contracts import (
 from backend.engine.executor import OrchestratorExecutor
 from backend.engine.executor_response_helpers import extract_response_text
 from backend.engine.file_edit_protocol import (
+    EditorContentValidationError,
     apply_edit_from_transaction,
     build_editor_mode_prompt,
     build_target_context,
     get_transaction_store,
     parse_editor_response,
+    validate_editor_transaction_content,
 )
 from backend.engine.memory_manager import ContextMemoryManager
 from backend.engine.planner import OrchestratorPlanner
@@ -438,6 +440,36 @@ class Orchestrator(Agent):
 
             txn.touch(status='content_captured')
             store.update_transaction(session_id, txn)
+            try:
+                validate_editor_transaction_content(parsed.content or '', txn)
+            except EditorContentValidationError as exc:
+                txn.retry_count += 1
+                store.update_transaction(session_id, txn)
+                parse_error = type(parsed)(
+                    ok=False,
+                    error_code='EDITOR_CONTENT_INVALID',
+                    error_message=str(exc),
+                )
+                logger.warning(
+                    'EDITOR_CONTENT_INVALID transaction=%s retry=%s/%s error=%s',
+                    txn.transaction_id,
+                    txn.retry_count,
+                    txn.max_retries,
+                    exc,
+                )
+                if txn.retry_count <= txn.max_retries:
+                    continue
+                txn.touch(status='failed')
+                store.update_transaction(session_id, txn)
+                store.clear_active_transaction(session_id)
+                return AgentThinkAction(
+                    thought=(
+                        '[EDITOR_CONTENT_INVALID] Editor mode failed after '
+                        f'{txn.retry_count} attempts: {exc}. Return to normal mode, '
+                        'reread the target if needed, and retry with start_file_edit.'
+                    ),
+                    suppress_cli=True,
+                )
             try:
                 action = apply_edit_from_transaction(parsed.content, txn)
             except Exception as exc:

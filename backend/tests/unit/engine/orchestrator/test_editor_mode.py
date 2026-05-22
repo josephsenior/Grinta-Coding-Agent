@@ -222,3 +222,78 @@ async def test_huge_malformed_response_is_not_returned_wholesale(tmp_path):
     assert isinstance(action, AgentThinkAction)
     assert len(action.thought) < 1000
     assert 'x' * 1000 not in action.thought
+
+
+@pytest.mark.asyncio
+async def test_structured_payload_failure_retries_editor_mode(tmp_path):
+    store = get_transaction_store()
+    target = tmp_path / 'app.py'
+    target.write_text('def a():\n    return 1\n', encoding='utf-8')
+    txn = store.create_transaction(
+        'editor_session',
+        str(target),
+        'edit_symbols',
+        {
+            'security_risk': 'LOW',
+            'editor_items': [{'name': 'a', 'delimiter': 'GRINTA_ITEM_END_a'}],
+        },
+    )
+    agent = _agent(
+        tmp_path,
+        [
+            _response(txn, 'not a symbol block\n'),
+            _response(
+                txn,
+                '<symbol name="a">\n    return 2\nGRINTA_ITEM_END_a\n</symbol>\n',
+            ),
+        ],
+    )
+
+    action = await agent._execute_editor_mode_if_active(FakeState())
+
+    assert isinstance(action, FileEditAction)
+    assert len(agent.llm.calls) == 2
+    assert txn.retry_count == 1
+    assert action.command == 'edit_symbols'
+    assert action.structured_payload == {
+        'edits': [{'symbol_name': 'a', 'new_body': '    return 2\n'}]
+    }
+
+
+@pytest.mark.asyncio
+async def test_structured_payload_max_retries_clears_transaction(tmp_path):
+    store = get_transaction_store()
+    txn = store.create_transaction(
+        'editor_session',
+        '<batch>',
+        'multi_edit',
+        {
+            'security_risk': 'LOW',
+            'editor_items': [
+                {
+                    'index': 1,
+                    'delimiter': 'GRINTA_ITEM_END_1',
+                    'path': 'a.py',
+                    'operation': 'replace_range',
+                    'start_line': 1,
+                    'end_line': 1,
+                }
+            ],
+        },
+    )
+    txn.max_retries = 1
+    store.update_transaction('editor_session', txn)
+    agent = _agent(
+        tmp_path,
+        [
+            _response(txn, '<edit index="2">\nx\nGRINTA_ITEM_END_1\n</edit>\n'),
+            _response(txn, '<edit index="2">\nx\nGRINTA_ITEM_END_1\n</edit>\n'),
+        ],
+    )
+
+    action = await agent._execute_editor_mode_if_active(FakeState())
+
+    assert isinstance(action, AgentThinkAction)
+    assert 'EDITOR_CONTENT_INVALID' in action.thought
+    assert store.get_active_transaction('editor_session') is None
+    assert len(agent.llm.calls) == 2
