@@ -569,7 +569,7 @@ class TreeSitterEditor:
         tree, file_bytes, language = parse_result
         original_code = file_bytes.decode('utf-8')
 
-        # Find the function node
+        # Find the function or class node
         logger.info(f"Looking for symbol '{function_name}' in {file_path}")
         try:
             func_node = self._find_function_node(
@@ -595,6 +595,11 @@ class TreeSitterEditor:
                     success=False,
                     message=str(e),
                 )
+        if not func_node:
+            class_node = self._find_class_node(tree, file_bytes, function_name, language)
+            if class_node is not None:
+                func_node = class_node
+
         if not func_node:
             # Check if tree has syntax errors (parse was partially successful but broken)
             has_errors = self._has_syntax_errors(tree.root_node)
