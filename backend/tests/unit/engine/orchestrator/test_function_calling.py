@@ -15,7 +15,7 @@ from backend.core.errors import (
 )
 from backend.engine.function_calling import (
     _handle_cmd_run_tool,
-    _handle_edit_symbol_body_command,
+    _handle_edit_symbol_command,
     _handle_finish_tool,
     _handle_mcp_tool,
     _handle_summarize_context_tool,
@@ -696,7 +696,7 @@ class TestValidateStructureEditorArgs:
         from backend.engine.function_calling import _handle_symbol_editor_tool
 
         with pytest.raises(FunctionCallValidationError, match='path'):
-            _handle_symbol_editor_tool({'command': 'edit_symbol_body'})
+            _handle_symbol_editor_tool({'command': 'edit_symbol'})
 
     def test_canonical_path_with_read_file_command(self):
         from backend.engine.function_calling import _handle_symbol_editor_tool
@@ -889,7 +889,7 @@ class TestMultiEditCommand:
                 'file_edits': [
                     {
                         'path': 'src/m.py',
-                        'command': 'edit_symbol_body',
+                        'command': 'edit_symbol',
                         'symbol_name': 'a',
                         'new_body': '    return 42',
                     }
@@ -902,7 +902,7 @@ class TestMultiEditCommand:
 
 
 # ---------------------------------------------------------------------------
-# _handle_edit_symbol_body_command (imported directly)
+# _handle_edit_symbol_command (imported directly)
 # ---------------------------------------------------------------------------
 
 
@@ -917,7 +917,7 @@ class TestHandleEditFunctionCommand:
 
     def test_success_returns_file_read_action(self):
         editor = self._make_editor(success=True)
-        result = _handle_edit_symbol_body_command(
+        result = _handle_edit_symbol_command(
             editor, 'foo.py', {'symbol_name': 'my_fn', 'new_body': 'return 1'}
         )
         assert isinstance(result, FileReadAction)
@@ -927,19 +927,19 @@ class TestHandleEditFunctionCommand:
 
         editor = self._make_editor(success=False, message='parse error')
         with pytest.raises(ToolExecutionError, match='parse error'):
-            _handle_edit_symbol_body_command(
+            _handle_edit_symbol_command(
                 editor, 'foo.py', {'symbol_name': 'my_fn', 'new_body': 'return 1'}
             )
 
     def test_missing_symbol_name_raises(self):
         with pytest.raises(FunctionCallValidationError, match='symbol_name'):
-            _handle_edit_symbol_body_command(
+            _handle_edit_symbol_command(
                 MagicMock(), 'foo.py', {'new_body': 'return 1'}
             )
 
     def test_missing_new_body_raises(self):
         with pytest.raises(FunctionCallValidationError, match='new_body'):
-            _handle_edit_symbol_body_command(
+            _handle_edit_symbol_command(
                 MagicMock(), 'foo.py', {'symbol_name': 'fn'}
             )
 

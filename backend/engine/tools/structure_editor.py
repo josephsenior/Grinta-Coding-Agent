@@ -461,13 +461,13 @@ class StructureEditor:
                 if new_content == old_content:
                     return EditResult(
                         success=False,
-                        message='Edit verification failed after edit_symbol_body: file content did not change on disk.',
+                        message='Edit verification failed after edit_symbol: file content did not change on disk.',
                     )
                 if self.find_symbol(path, function_name) is None:
                     return EditResult(
                         success=False,
                         message=(
-                            'Edit verification failed after edit_symbol_body: '
+                            'Edit verification failed after edit_symbol: '
                             f"symbol '{function_name}' could not be resolved after the write."
                         ),
                     )

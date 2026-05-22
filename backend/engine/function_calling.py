@@ -954,20 +954,20 @@ def _normalize_symbol_editor_alias(
 _MAX_EDIT_SYMBOLS_PER_BATCH = 25
 
 
-def _handle_edit_symbol_body_command(
+def _handle_edit_symbol_command(
     editor: Any, path: str, arguments: Mapping[str, Any]
 ) -> Action:
-    """Handle edit_symbol_body command."""
+    """Handle edit_symbol command."""
     symbol_name = cast(str | None, arguments.get('symbol_name'))
     new_body = cast(str | None, arguments.get('new_body'))
     line_number = cast(int | None, arguments.get('line_number'))
 
     if not symbol_name or not new_body:
         raise FunctionCallValidationError(
-            "edit_symbol_body requires 'symbol_name' and 'new_body' arguments"
+            "edit_symbol requires 'symbol_name' and 'new_body' arguments"
         )
 
-    logger.info(f"Executing edit_symbol_body: symbol='{symbol_name}' in {path}")
+    logger.info(f"Executing edit_symbol: symbol='{symbol_name}' in {path}")
 
     from backend.utils.treesitter_editor import AmbiguousSymbolError
 
@@ -987,7 +987,7 @@ def _handle_edit_symbol_body_command(
         raise ToolExecutionError(error_msg)
 
     if result.success:
-        logger.info(f"✓ edit_symbol_body succeeded for '{symbol_name}'")
+        logger.info(f"✓ edit_symbol succeeded for '{symbol_name}'")
         return FileReadAction(
             path=path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
@@ -1127,7 +1127,7 @@ def _run_edit_symbols_sequence(
 def _handle_edit_symbols_command(
     editor: Any, path: str, arguments: Mapping[str, Any]
 ) -> Action:
-    """Apply multiple ``edit_symbol_body``-style replacements in one call.
+    """Apply multiple ``edit_symbol``-style replacements in one call.
 
     On any failure after the file was modified, restores the file from a
     pre-batch snapshot so the workspace does not stay half-refactored.
@@ -1364,11 +1364,11 @@ def _parse_multi_edit_operation(
         ):
             item_command = 'replace_range'
         elif raw_item.get('symbol_name') and raw_item.get('new_body'):
-            item_command = 'edit_symbol_body'
+            item_command = 'edit_symbol'
         else:
             raise FunctionCallValidationError(
                 f'multi_edit item {idx}: unable to infer command. '
-                "Use 'replace_file', 'replace_range', or 'edit_symbol_body'."
+                "Use 'replace_file', 'replace_range', or 'edit_symbol'."
             )
     return item_command, dict(raw_item)
 
@@ -1419,13 +1419,13 @@ def _apply_multi_edit_operation(
             )
         return
 
-    if item_command == 'edit_symbol_body':
+    if item_command == 'edit_symbol':
         symbol_name = item.get('symbol_name')
         new_body = item.get('new_body')
         line_number = item.get('line_number')
         if not isinstance(symbol_name, str) or not isinstance(new_body, str):
             raise FunctionCallValidationError(
-                "multi_edit edit_symbol_body requires 'symbol_name' and 'new_body'."
+                "multi_edit edit_symbol requires 'symbol_name' and 'new_body'."
             )
         result = structure_editor.edit_function(
             str(temp_path),
@@ -1435,14 +1435,14 @@ def _apply_multi_edit_operation(
         )
         if not result.success:
             _multi_edit_raise(
-                f'❌ multi_edit edit_symbol_body failed for {rel_path}: {result.message}',
+                f'❌ multi_edit edit_symbol failed for {rel_path}: {result.message}',
                 path=rel_path,
             )
         return
 
     raise FunctionCallValidationError(
         f"multi_edit item command {item_command!r} is unsupported. "
-        "Use 'replace_file', 'replace_range', or 'edit_symbol_body'."
+        "Use 'replace_file', 'replace_range', or 'edit_symbol'."
     )
 
 
@@ -1626,7 +1626,7 @@ def _dispatch_structure_editor_commands(
     editor_command_handlers: dict[
         str, Callable[[Any, str, Mapping[str, Any]], Action]
     ] = {
-        'edit_symbol_body': _handle_edit_symbol_body_command,
+        'edit_symbol': _handle_edit_symbol_command,
         'edit_symbols': _handle_edit_symbols_command,
         'rename_symbol': _handle_rename_symbol_command,
         'find_symbol': _handle_find_symbol_command,
@@ -1680,7 +1680,7 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
 
     # Validate command early so invalid commands get clear errors before param filtering
     _VALID_SYMBOL_EDITOR_COMMANDS = {
-        'edit_symbol_body', 'edit_symbols', 'rename_symbol', 'find_symbol',
+        'edit_symbol', 'edit_symbols', 'rename_symbol', 'find_symbol',
         'replace_range', 'normalize_indent', 'create_file', 'read_file',
         'insert_text', 'undo_last_edit', 'multi_edit',
     }
@@ -1953,7 +1953,7 @@ def _handle_file_editor_symbol_command(command: str, path: str, arguments: Mappi
         line_number = arguments.get('line_number')
         if not symbol_name:
             raise FunctionCallValidationError('edit_symbol requires symbol_name')
-        return _handle_edit_symbol_body_command(editor, path, {
+        return _handle_edit_symbol_command(editor, path, {
             'symbol_name': symbol_name,
             'new_body': content,
             'line_number': line_number,
@@ -2010,7 +2010,7 @@ def _handle_file_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
     _OP_MAP = {
         'create': 'replace_file',
         'replace_range': 'replace_range',
-        'edit_symbol': 'edit_symbol_body',
+        'edit_symbol': 'edit_symbol',
         'replace_file': 'replace_file',
     }
 
