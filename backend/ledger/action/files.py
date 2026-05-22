@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
 from backend.core.enums import ActionSecurityRisk, FileEditSource, FileReadSource
@@ -63,6 +63,26 @@ class FileWriteAction(Action):
             f'**FileWriteAction**\nPath: {self.path}\nRange: {range_str}'
             f'\nThought: {self.thought}\nContent:\n```\n{self.content}\n```\n'
         )
+
+
+@dataclass
+class StartFileEditAction(Action):
+    """Starts a two-mode file-edit transaction without carrying file content."""
+
+    path: str = ''
+    operation: str = ''
+    metadata: dict[str, Any] = field(default_factory=dict)
+    session_id: str | None = None
+    transaction_id: str | None = None
+    delimiter: str | None = None
+    thought: str = ''
+    action: ClassVar[str] = ActionType.START_FILE_EDIT
+    runnable: ClassVar[bool] = True
+    security_risk: ActionSecurityRisk = ActionSecurityRisk.UNKNOWN
+
+    @property
+    def message(self) -> str:
+        return f'Starting file edit: {self.operation} {self.path}'
 
 
 @dataclass

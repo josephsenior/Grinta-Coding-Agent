@@ -16,6 +16,8 @@ from rich.console import Console
 from rich.text import Text
 
 from backend.cli.confirmation import _risk_label
+from backend.cli._event_renderer.panels import task_panel_signature
+from backend.cli._event_renderer.sidebar import build_task_list_panel
 from backend.cli.diff_renderer import DiffPanel
 from backend.cli.event_renderer import CLIEventRenderer
 from backend.cli.hud import HUDBar
@@ -38,6 +40,7 @@ from backend.core.config import AppConfig
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 from backend.core.enums import ActionSecurityRisk, AgentState, EventSource
 from backend.inference.metrics import Metrics, ResponseLatency, TokenUsage
+from backend.orchestration.state.state import PlanStep
 from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
@@ -2953,6 +2956,35 @@ async def test_renderer_handles_task_tracking_action() -> None:
     await renderer.handle_event(action)
     # No error should be raised; event is silently processed
     assert _console_output(console) == ''
+
+
+def test_task_panel_signature_accepts_planstep_payloads() -> None:
+    steps = [
+        PlanStep(id='1', description='Implement task tracker', status='doing'),
+        PlanStep(id='2', description='Verify sidebar refresh', status='done'),
+    ]
+
+    signature = task_panel_signature(steps)
+
+    assert signature == (
+        ('1', 'doing', 'Implement task tracker'),
+        ('2', 'done', 'Verify sidebar refresh'),
+    )
+
+
+def test_task_sidebar_panel_renders_planstep_payloads() -> None:
+    steps = [
+        PlanStep(id='1', description='Implement task tracker', status='doing'),
+        PlanStep(id='2', description='Verify sidebar refresh', status='done'),
+    ]
+
+    console = _make_console()
+    console.print(build_task_list_panel(steps))
+
+    output = _console_output(console)
+    assert 'Tasks (2)' in output
+    assert 'Implement task tracker' in output
+    assert 'Verify sidebar refresh' in output
 
 
 @pytest.mark.asyncio

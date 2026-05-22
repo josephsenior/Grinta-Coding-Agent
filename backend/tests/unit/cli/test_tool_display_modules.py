@@ -647,6 +647,18 @@ class TestRedactStreamedToolCallMarkers(unittest.TestCase):
         self.assertNotIn('[Tool call]', result)
         self.assertIn('Done.', result)
 
+    def test_redacts_minimax_xml_tool_call_block(self) -> None:
+        text = (
+            'Before\n'
+            '<minimax:tool_call name="task_tracker">update</minimax:tool_call>\n'
+            'After'
+        )
+        result = redact_streamed_tool_call_markers(text)
+        self.assertIn('Before', result)
+        self.assertIn('After', result)
+        self.assertNotIn('minimax:tool_call', result)
+        self.assertNotIn('update', result)
+
 
 class TestExtractToolCallsFromTextMarkers(unittest.TestCase):
     def test_no_markers(self) -> None:
@@ -678,6 +690,30 @@ class TestExtractToolCallsFromTextMarkers(unittest.TestCase):
 
         args = json.loads(result[0]['function']['arguments'])
         self.assertEqual(args['command'], 'git status')
+
+    def test_minimax_xml_tool_call_with_json_payload(self) -> None:
+        text = (
+            '<minimax:tool_call>'
+            '{"name":"task_tracker","arguments":{"command":"view"}}'
+            '</minimax:tool_call>'
+        )
+        result = extract_tool_calls_from_text_markers(text)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['function']['name'], 'task_tracker')
+        import json
+
+        args = json.loads(result[0]['function']['arguments'])
+        self.assertEqual(args['command'], 'view')
+
+    def test_minimax_xml_tool_call_with_name_attribute(self) -> None:
+        text = '<minimax:tool_call name="task_tracker">view</minimax:tool_call>'
+        result = extract_tool_calls_from_text_markers(text)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['function']['name'], 'task_tracker')
+        import json
+
+        args = json.loads(result[0]['function']['arguments'])
+        self.assertEqual(args['command'], 'view')
 
 
 # ============================================================================

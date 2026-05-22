@@ -35,8 +35,8 @@ def validate_security_risk(arguments: Mapping[str, Any], tool_name: str) -> None
     """Validate that ``security_risk`` is present and one of ``RISK_LEVELS``.
 
     Used by tools that mandate an explicit risk label from the model
-    (``execute_bash``/``execute_powershell``, ``text_editor``, ``symbol_editor``,
-    ``browser``). Raises :class:`FunctionCallValidationError` on missing or
+    (``execute_bash``/``execute_powershell``, ``start_file_edit``, ``browser``).
+    Raises :class:`FunctionCallValidationError` on missing or
     invalid value so the failure is surfaced to the model as a tool-call error
     instead of being silently auto-classified server-side. Accepts any case
     (``low``/``LOW``/``Low``) so model output variations don't trip validation.

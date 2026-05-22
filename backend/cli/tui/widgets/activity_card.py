@@ -9,17 +9,17 @@ from __future__ import annotations
 
 from typing import Any
 
+from rich.markdown import Markdown
+from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.widgets import Static
-from rich.markdown import Markdown
 
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     NAVY_BG,
     NAVY_BRAND,
-    NAVY_BORDER,
     NAVY_ERROR,
     NAVY_READY,
     NAVY_TEXT_DIM,
@@ -27,6 +27,67 @@ from backend.cli.theme import (
     NAVY_WAITING,
     get_grinta_pygments_style,
 )
+
+DIFF_ADD_PREFIX = '\x1fgrinta-diff-add\x1f'
+DIFF_REM_PREFIX = '\x1fgrinta-diff-rem\x1f'
+DIFF_CTX_PREFIX = '\x1fgrinta-diff-ctx\x1f'
+
+
+class DiffLine(Static):
+    """Full-width row for file preview and edit diff lines."""
+
+    DEFAULT_CSS = """
+    DiffLine {
+        width: 100%;
+        height: 1;
+        padding: 0 1;
+    }
+    DiffLine.add {
+        background: #0f2f22;
+        color: #7de6a1;
+    }
+    DiffLine.rem {
+        background: #351818;
+        color: #ff9a9a;
+    }
+    DiffLine.ctx {
+        background: transparent;
+        color: #969aad;
+    }
+    """
+
+    _STYLE_BY_KIND = {
+        'add': '#7de6a1',
+        'rem': '#ff9a9a',
+        'ctx': NAVY_TEXT_MUTED,
+    }
+
+    def __init__(self, text: str, kind: str, *, id: str | None = None) -> None:
+        super().__init__(
+            Text(text, style=self._STYLE_BY_KIND.get(kind, NAVY_TEXT_MUTED)),
+            id=id,
+        )
+        self.add_class(kind)
+
+
+def encode_diff_line(text: str, kind: str) -> str:
+    prefix = {
+        'add': DIFF_ADD_PREFIX,
+        'rem': DIFF_REM_PREFIX,
+        'ctx': DIFF_CTX_PREFIX,
+    }.get(kind, DIFF_CTX_PREFIX)
+    return f'{prefix}{text}'
+
+
+def _decode_diff_line(line: str) -> tuple[str, str] | None:
+    for prefix, kind in (
+        (DIFF_ADD_PREFIX, 'add'),
+        (DIFF_REM_PREFIX, 'rem'),
+        (DIFF_CTX_PREFIX, 'ctx'),
+    ):
+        if line.startswith(prefix):
+            return kind, line[len(prefix) :]
+    return None
 
 
 class ActivityCard(Container):
@@ -215,6 +276,9 @@ class ActivityCard(Container):
         from rich.syntax import Syntax
         content = self._extra_content or ""
 
+        if any(_decode_diff_line(line) for line in content.splitlines()):
+            return content
+
         # Content already has Rich-style background markup — return as-is
         if '[on #' in content:
             return content
@@ -272,6 +336,22 @@ class ActivityCard(Container):
         styled_lines = [f'[{NAVY_TEXT_MUTED}]{line}[/]' for line in lines]
         return '\n'.join(styled_lines)
 
+    def _extra_renderables(self) -> list[Static]:
+        content = self._extra_content or ''
+        renderables: list[Static] = []
+        diff_mode = False
+        for line in content.splitlines():
+            decoded = _decode_diff_line(line)
+            if decoded is None:
+                if diff_mode and line == '':
+                    renderables.append(DiffLine('', 'ctx'))
+                    continue
+                return [Static(self._get_formatted_extra_content(), classes='card-extra', id='extra')]
+            diff_mode = True
+            kind, body = decoded
+            renderables.append(DiffLine(body, kind))
+        return renderables or [Static('', classes='card-extra', id='extra')]
+
     def compose(self) -> ComposeResult:
         if self._title:
             yield Static(f'[{NAVY_TEXT_DIM}]{self._title}[/]', classes='card-title')
@@ -289,11 +369,7 @@ class ActivityCard(Container):
         if self._extra_content:
             wrap_classes = 'card-extra-wrap -hidden' if self._collapsed else 'card-extra-wrap'
             with Container(classes=wrap_classes, id='extra-wrap'):
-                yield Static(
-                    self._get_formatted_extra_content(),
-                    classes='card-extra',
-                    id='extra',
-                )
+                yield from self._extra_renderables()
 
     def update_secondary(self, text: str, kind: str = 'neutral') -> None:
         """Update the secondary/result line (e.g., after a command completes)."""

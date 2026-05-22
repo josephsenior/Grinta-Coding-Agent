@@ -32,6 +32,7 @@ from backend.ledger.action import (
     FileReadAction,
     MessageAction,
     PlaybookFinishAction,
+    StartFileEditAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import CondensationRequestAction
@@ -340,8 +341,8 @@ class TestHandleStrReplaceEditorTool:
             )
 
 
-class TestFileEditorXmlTransport:
-    def test_native_file_editor_call_is_rejected_with_canonical_xml_example(self):
+class TestStartFileEditTransport:
+    def test_native_file_editor_call_is_rejected_as_internal_only(self):
         response = _model_response(
             tool_calls=[
                 _native_tool_call(
@@ -360,85 +361,79 @@ class TestFileEditorXmlTransport:
             response_to_actions(response)
 
         message = str(exc_info.value)
-        assert '[FORMAT_ERROR]' in message
-        assert '<function=file_editor>' in message
-        assert '<parameter=security_risk>LOW</parameter>' in message
-        assert '<parameter=content>' in message
-        assert 'your_command' not in message
-        assert '<parameter=new_code>' not in message
+        assert 'file_editor is internal-only' in message
+        assert 'start_file_edit' in message
 
-    def test_xml_file_editor_create_parses_with_required_security_risk(self):
+    def test_start_file_edit_create_returns_metadata_only_action(self):
         response = _model_response(
-            content=(
-                '<function=file_editor>\n'
-                '<parameter=command>create</parameter>\n'
-                '<parameter=path>app.py</parameter>\n'
-                '<parameter=security_risk>LOW</parameter>\n'
-                '<parameter=content>\n'
-                'print("hi")\n'
-                '</parameter>\n'
-                '</function>'
-            )
+            tool_calls=[
+                _native_tool_call(
+                    'start_file_edit',
+                    {
+                        'operation': 'create',
+                        'path': 'app.py',
+                        'security_risk': 'LOW',
+                    },
+                )
+            ]
         )
 
         actions = response_to_actions(response)
 
         assert len(actions) == 1
         action = actions[0]
-        assert isinstance(action, FileEditAction)
-        assert action.command == 'create_file'
+        assert isinstance(action, StartFileEditAction)
         assert action.path == 'app.py'
-        assert action.file_text == 'print("hi")'
+        assert action.operation == 'create'
+        assert 'content' not in action.metadata
 
-    def test_xml_file_editor_validation_error_is_not_rewritten_as_missing_command(self):
+    def test_start_file_edit_rejects_native_content_payloads(self):
         response = _model_response(
-            content=(
-                '<function=file_editor>\n'
-                '<parameter=command>create</parameter>\n'
-                '<parameter=path>app.py</parameter>\n'
-                '<parameter=content>print("hi")</parameter>\n'
-                '</function>'
-            )
+            tool_calls=[
+                _native_tool_call(
+                    'start_file_edit',
+                    {
+                        'operation': 'create',
+                        'path': 'app.py',
+                        'content': 'print("hi")\n',
+                        'security_risk': 'LOW',
+                    },
+                )
+            ]
         )
 
         with pytest.raises(FunctionCallValidationError) as exc_info:
             response_to_actions(response)
 
-        message = str(exc_info.value)
-        assert 'Malformed XML tool call for file_editor' in message
-        assert 'security_risk' in message
-        assert 'Missing required argument "command"' not in message
+        assert 'does not accept file content fields' in str(exc_info.value)
 
-    def test_xml_file_editor_create_requires_explicit_content_parameter(self):
+    def test_start_file_edit_replace_lines_requires_metadata(self):
+        response = _model_response(
+            tool_calls=[
+                _native_tool_call(
+                    'start_file_edit',
+                    {
+                        'operation': 'replace_lines',
+                        'path': 'app.py',
+                        'start_line': 1,
+                        'security_risk': 'LOW',
+                    },
+                )
+            ]
+        )
+
+        with pytest.raises(FunctionCallValidationError) as exc_info:
+            response_to_actions(response)
+
+        assert 'end_line' in str(exc_info.value)
+
+    def test_xml_file_editor_block_is_plain_text_in_normal_mode(self):
         response = _model_response(
             content=(
                 '<function=file_editor>\n'
                 '<parameter=command>create</parameter>\n'
                 '<parameter=path>app.py</parameter>\n'
                 '<parameter=security_risk>LOW</parameter>\n'
-                '</function>'
-            )
-        )
-
-        with pytest.raises(FunctionCallValidationError) as exc_info:
-            response_to_actions(response)
-
-        message = str(exc_info.value)
-        assert "requires an explicit 'content' parameter" in message
-
-    def test_xml_file_editor_multi_edit_accepts_nested_file_edit_blocks(self):
-        response = _model_response(
-            content=(
-                '<function=file_editor>\n'
-                '<parameter=command>multi_edit</parameter>\n'
-                '<parameter=security_risk>LOW</parameter>\n'
-                '<file_edit>\n'
-                '<path>a.py</path>\n'
-                '<operation>create</operation>\n'
-                '<content>\n'
-                'A = 1\n'
-                '</content>\n'
-                '</file_edit>\n'
                 '</function>'
             )
         )
@@ -446,7 +441,50 @@ class TestFileEditorXmlTransport:
         action = response_to_actions(response)[0]
 
         assert isinstance(action, MessageAction)
-        assert 'multi_edit committed' in action.content
+        assert '<function=file_editor>' in action.content
+
+    def test_start_file_edit_read_bypasses_editor_mode(self):
+        response = _model_response(
+            tool_calls=[
+                _native_tool_call(
+                    'start_file_edit',
+                    {
+                        'operation': 'read',
+                        'path': 'app.py',
+                        'security_risk': 'LOW',
+                    },
+                )
+            ]
+        )
+
+        action = response_to_actions(response)[0]
+
+        assert isinstance(action, FileReadAction)
+        assert action.path == 'app.py'
+
+    def test_minimax_text_tool_call_is_converted_before_message_action(self):
+        response = _model_response(
+            content=(
+                '<minimax:tool_call>'
+                '{"name":"task_tracker","arguments":{"command":"view"}}'
+                '</minimax:tool_call>'
+            )
+        )
+
+        action = response_to_actions(response)[0]
+
+        assert isinstance(action, TaskTrackingAction)
+        assert action.command == 'view'
+
+    def test_minimax_text_tool_call_shape_error_does_not_become_message_action(self):
+        response = _model_response(
+            content='<minimax:tool_call name="task_tracker">update</minimax:tool_call>'
+        )
+
+        with pytest.raises(FunctionCallValidationError) as exc_info:
+            response_to_actions(response)
+
+        assert 'task_list' in str(exc_info.value)
 
 
 # ---------------------------------------------------------------------------

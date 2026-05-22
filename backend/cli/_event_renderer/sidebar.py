@@ -15,15 +15,12 @@ from backend.cli.layout_tokens import (
     SIDEBAR_VISIBLE_MIN_WIDTH,
     SIDEBAR_WIDTH_RATIO,
 )
+from backend.cli._event_renderer.panels import task_panel_signature
 from backend.cli.theme import (
     STYLE_DEFAULT,
     STYLE_DIM,
 )
-from backend.core.task_status import (
-    TASK_STATUS_PANEL_STYLES,
-    TASK_STATUS_TODO,
-    normalize_task_status,
-)
+from backend.core.task_status import TASK_STATUS_PANEL_STYLES
 
 
 def _create_sidebar_panel(title: str, content: Any, count: int | None = None) -> Panel:
@@ -62,7 +59,7 @@ def compute_main_width(terminal_width: int) -> int:
 
 
 def build_task_list_panel(
-    task_list: list[dict[str, Any]],
+    task_list: list[Any],
     *,
     width: int | None = None,
 ) -> Panel:
@@ -71,16 +68,11 @@ def build_task_list_panel(
     table.add_column(width=1)  # status icon
     table.add_column(ratio=1)  # task description
 
+    signature = task_panel_signature(task_list)
     displayed_count = 0
-    for item in task_list:
+    for task_id, status, desc in signature:
         if displayed_count >= SIDEBAR_MAX_ROWS:
             break
-        try:
-            status = normalize_task_status(item.get('status'), default=TASK_STATUS_TODO)
-        except ValueError:
-            status = TASK_STATUS_TODO
-        desc = str(item.get('description') or '…')
-        task_id = str(item.get('id') or '?')
 
         status_style = TASK_STATUS_PANEL_STYLES.get(status, 'dim')
         status_icon = Text('●', style=f'bold {status_style}')
@@ -98,8 +90,8 @@ def build_task_list_panel(
         style=STYLE_DIM,
     )
 
-    content = table if task_list else empty_state
-    return _create_sidebar_panel('Tasks', content, len(task_list))
+    content = table if signature else empty_state
+    return _create_sidebar_panel('Tasks', content, len(signature))
 
 
 def build_mcp_servers_panel(

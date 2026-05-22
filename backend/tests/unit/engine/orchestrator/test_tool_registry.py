@@ -125,11 +125,13 @@ class TestFeatureFlagToolPresence:
 
     def test_editor_enabled(self):
         names = _build_toolset(enable_editor=True)
-        assert 'file_editor' in names
+        assert 'start_file_edit' in names
+        assert 'file_editor' not in names
         self._assert_dispatch_covered(names)
 
     def test_editor_disabled(self):
         names = _build_toolset(enable_editor=False)
+        assert 'start_file_edit' not in names
         assert 'file_editor' not in names
 
     def test_checkpoints_enabled(self):

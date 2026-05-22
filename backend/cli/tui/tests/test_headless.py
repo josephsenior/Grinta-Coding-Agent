@@ -27,10 +27,11 @@ from backend.cli._event_renderer.unified_renderer import ActivityRenderer
 from backend.cli.tui.widgets.activity_card import (
     ActivityCard as TUIActivityCard,
     AgentMessage,
+    DiffLine,
     TurnCompletion,
 )
 from backend.core.enums import AgentState, EventSource
-from backend.ledger.action import MessageAction, StreamingChunkAction
+from backend.ledger.action import FileWriteAction, MessageAction, StreamingChunkAction
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.terminal import (
     TerminalInputAction,
@@ -662,6 +663,71 @@ async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config)
 
 
 @pytest.mark.asyncio
+async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        final_stream = StreamingChunkAction(
+            accumulated='Final answer.',
+            is_final=True,
+        )
+        final_stream.source = EventSource.AGENT
+        renderer._process_event(final_stream)
+
+        final_message = MessageAction(content='<function_calls></function_calls>\nFinal answer.')
+        final_message.source = EventSource.AGENT
+        renderer._process_event(final_message)
+
+        assert renderer._last_final_response_text == 'Final answer.'
+        assert len(renderer._history) == 2
+        assert isinstance(renderer._history[0], AgentMessage)
+
+
+@pytest.mark.asyncio
+async def test_tui_file_write_uses_full_width_diff_rows(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(FileWriteAction(path='demo.txt', content='alpha\nbeta'))
+        await pilot.pause()
+
+        diff_rows = list(s.query(DiffLine).results())
+        assert len(diff_rows) == 2
+        assert all('add' in row.classes for row in diff_rows)
+
+
+@pytest.mark.asyncio
 async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
@@ -865,6 +931,42 @@ async def test_tui_dispatch_enqueues_user_message_before_starting_agent(mock_con
         assert ensure_seen_counts == [1]
         assert event_stream.events[0][1] == EventSource.USER
         assert event_stream.events[0][0].content == 'hello'
+
+
+@pytest.mark.asyncio
+async def test_tui_handle_input_does_not_bootstrap_twice_after_background_ready(
+    mock_config,
+    monkeypatch,
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    calls = 0
+
+    class FakeController:
+        def get_agent_state(self):
+            return AgentState.AWAITING_USER_INPUT
+
+    async def fake_bootstrap(self, session_id=None):
+        nonlocal calls
+        calls += 1
+        marker = asyncio.Event()
+        self._bootstrapping = marker
+        self._controller = FakeController()
+        marker.set()
+
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', fake_bootstrap)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._dispatch_to_agent = AsyncMock()  # type: ignore[method-assign]
+
+        await s._handle_input('hello')
+
+        assert calls == 1
+        s._dispatch_to_agent.assert_awaited_once_with('hello')
 
 
 @pytest.mark.asyncio

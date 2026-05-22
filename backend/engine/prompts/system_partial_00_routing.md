@@ -9,7 +9,8 @@
 
 <TOOL_ROUTING_LADDER>
 - **Search & Explore:** Prefer `search_code`, `read_symbol_definition`, or `analyze_project_structure`.
-- **Read & Edit:** Prefer `symbol_editor` for code edits (symbols/ranges/atomic batches). Use `text_editor` for prose, config, patch, format, or line-bounded fallback repairs.
+- **Read & Edit:** Use native tool calls. For file edits, call `start_file_edit` with metadata only; never put file content in JSON arguments. After `start_file_edit`, the runtime enters FILE EDITOR MODE.
+- **NORMAL MODE:** Do not output `<file_edit>` blocks, do not manually write XML, and do not serialize code as JSON strings.
 - **Shell & Execution:** Use the terminal strictly for build/test/git/processes.
 </TOOL_ROUTING_LADDER>
 

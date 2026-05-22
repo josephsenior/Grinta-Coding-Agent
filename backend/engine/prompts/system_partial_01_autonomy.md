@@ -52,9 +52,9 @@ Do not edit in batches without one; checkpoint.save.name="batch before X".
 Read errors quickly. If path is uncertain: {path_discovery_hint}
 
 On tool failure:
-- `symbol_editor` symbol error → `find_symbol`, then retry `symbol_editor`
-- `symbol_editor` range error → re-read exact lines, then retry one smaller `replace_range`
-- `text_editor` code-edit failure → prefer `symbol_editor` on the next attempt
+- symbol edit error → locate the symbol with search/read tools, then use `start_file_edit` `operation=replace_lines`
+- `start_file_edit` `replace_lines` error → re-read exact lines, then retry a smaller line range
+- `start_file_edit` format/section edit failure → retry with `replace_lines` or `patch` on the same path
 {error_recovery_pivot_lines}
 
 Fix immediately or pivot — never re-run the same failing call unchanged.

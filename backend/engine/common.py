@@ -329,14 +329,31 @@ def common_response_to_actions(
     for code-heavy tools (editors).  The ``xml_tool_names`` parameter
     lists tool names expected via the XML transport.
 
-    A compliance guard rejects native tool calls for code-heavy tools,
-    returning a directive error that tells the model to re-emit using
-    the XML format.
+    When the model emits both native tool_calls and valid pseudo-XML for the
+    same code-heavy tool, the XML transport wins and duplicate native calls are
+    dropped.  Remaining native calls for code-heavy tools still raise a
+    directive error so the model re-emits using the XML format.
     """
     validate_response_choices(response)
     assistant_msg = extract_assistant_message(response)
 
     native_tool_calls = list(getattr(assistant_msg, 'tool_calls', None) or [])
+    content = getattr(assistant_msg, 'content', None)
+    content_text = _raw_message_content_text(content)
+    text_marker_tool_calls = _extract_text_marker_tool_calls_from_content(content_text)
+
+    # ── Parse pseudo-XML tool calls from content text ────────────────
+    xml_tool_calls: list[Any] = []
+    if xml_tool_names:
+        xml_tool_calls = _extract_xml_tool_calls_from_content(
+            content_text, xml_tool_names
+        )
+
+    # ── Prefer XML over duplicate native calls ───────────────────────
+    if xml_tool_names and native_tool_calls and xml_tool_calls:
+        native_tool_calls = _filter_native_tool_calls_superseded_by_xml(
+            native_tool_calls, xml_tool_calls, xml_tool_names
+        )
 
     # ── Compliance guard ─────────────────────────────────────────────
     # Reject native tool calls that target code-heavy tools.  These
@@ -344,16 +361,7 @@ def common_response_to_actions(
     if xml_tool_names and native_tool_calls:
         _enforce_xml_compliance(native_tool_calls, xml_tool_names)
 
-    # ── Parse pseudo-XML tool calls from content text ────────────────
-    xml_tool_calls: list[Any] = []
-    if xml_tool_names:
-        content = getattr(assistant_msg, 'content', None)
-        content_text = _raw_message_content_text(content)
-        xml_tool_calls = _extract_xml_tool_calls_from_content(
-            content_text, xml_tool_names
-        )
-
-    all_tool_calls = native_tool_calls + xml_tool_calls
+    all_tool_calls = native_tool_calls + text_marker_tool_calls + xml_tool_calls
 
     if all_tool_calls:
         # Pass mcp_tool_names through tool_call object for the factory function
@@ -375,7 +383,6 @@ def common_response_to_actions(
             combine_thought_fn,
         )
     else:
-        content = getattr(assistant_msg, 'content', None)
         text_content = _coerce_message_content_text(content)
         cot = extract_redacted_thinking_inner(
             _raw_message_content_text(content)
@@ -392,6 +399,77 @@ def common_response_to_actions(
 
     set_response_id_for_actions(actions, response)
     return actions
+
+
+def _tool_call_function_name(tool_call: Any) -> str:
+    fn = getattr(tool_call, 'function', None)
+    return str(getattr(fn, 'name', '') or '') if fn else ''
+
+
+def _xml_tools_successfully_parsed(xml_tool_calls: list[Any]) -> set[str]:
+    """Return tool names parsed from content XML without syntax errors."""
+    names: set[str] = set()
+    for tc in xml_tool_calls:
+        name = _tool_call_function_name(tc)
+        if not name:
+            continue
+        raw_arguments = getattr(getattr(tc, 'function', None), 'arguments', '') or '{}'
+        try:
+            arguments = (
+                json.loads(raw_arguments)
+                if isinstance(raw_arguments, str)
+                else raw_arguments
+            )
+        except json.JSONDecodeError:
+            continue
+        if isinstance(arguments, dict) and '__xml_syntax_error__' in arguments:
+            continue
+        names.add(name)
+    return names
+
+
+def _filter_native_tool_calls_superseded_by_xml(
+    native_tool_calls: list[Any],
+    xml_tool_calls: list[Any],
+    xml_tool_names: frozenset[str],
+) -> list[Any]:
+    """Drop native calls when the same tool was successfully parsed from XML."""
+    superseded = _xml_tools_successfully_parsed(xml_tool_calls) & set(xml_tool_names)
+    if not superseded:
+        return native_tool_calls
+
+    filtered: list[Any] = []
+    dropped: set[str] = set()
+    for tc in native_tool_calls:
+        name = _tool_call_function_name(tc)
+        if name in superseded:
+            dropped.add(name)
+            continue
+        filtered.append(tc)
+
+    if dropped:
+        logger.info(
+            'Ignoring native tool call(s) for %s; valid XML transport present in content',
+            sorted(dropped),
+        )
+    return filtered
+
+
+def _extract_text_marker_tool_calls_from_content(content_text: str) -> list[Any]:
+    if not content_text or 'tool_call' not in content_text and '[Tool call]' not in content_text:
+        return []
+    from backend.cli.tool_call_display import extract_tool_calls_from_text_markers
+
+    tool_calls = extract_tool_calls_from_text_markers(content_text)
+    return [
+        _SyntheticToolCall(
+            str(tool_call.get('id') or f'text_toolu_{index:02d}'),
+            str((tool_call.get('function') or {}).get('name') or ''),
+            str((tool_call.get('function') or {}).get('arguments') or '{}'),
+        )
+        for index, tool_call in enumerate(tool_calls)
+        if (tool_call.get('function') or {}).get('name')
+    ]
 
 
 def _enforce_xml_compliance(
@@ -454,30 +532,6 @@ def _xml_format_error_example(tool_name: str) -> str:
             f'  </parameter>\n'
             f'  </function>'
         )
-    if tool_name == 'text_editor':
-        return (
-            f'  <function={tool_name}>\n'
-            f'  <parameter=command>create_file</parameter>\n'
-            f'  <parameter=path>/path/to/file</parameter>\n'
-            f'  <parameter=security_risk>LOW</parameter>\n'
-            f'  <parameter=file_text>\n'
-            f'  full file contents here -- raw text, no JSON escaping\n'
-            f'  </parameter>\n'
-            f'  </function>'
-        )
-    if tool_name == 'symbol_editor':
-        return (
-            f'  <function={tool_name}>\n'
-            f'  <parameter=command>replace_range</parameter>\n'
-            f'  <parameter=path>/path/to/file</parameter>\n'
-            f'  <parameter=security_risk>LOW</parameter>\n'
-            f'  <parameter=start_line>1</parameter>\n'
-            f'  <parameter=end_line>1</parameter>\n'
-            f'  <parameter=new_code>\n'
-            f'  replacement code here -- raw text, no JSON escaping\n'
-            f'  </parameter>\n'
-            f'  </function>'
-        )
     return (
         f'  <function={tool_name}>\n'
         f'  <parameter=command>command_name</parameter>\n'
@@ -514,13 +568,9 @@ def _get_tool_definition_by_name(tool_name: str) -> dict | None:
     Returns the tool dict (with 'function.parameters' schema) or None if not found.
     """
     from backend.engine.tools.file_editor import create_file_editor_tool
-    from backend.engine.tools.symbol_editor_tool import create_symbol_editor_tool
-    from backend.engine.tools.text_editor import create_text_editor_tool
 
     tool_creators = {
         'file_editor': create_file_editor_tool,
-        'text_editor': create_text_editor_tool,
-        'symbol_editor': create_symbol_editor_tool,
     }
     creator = tool_creators.get(tool_name)
     if creator is None:

@@ -45,7 +45,7 @@ from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.action.empty import NullActionReason
 from backend.ledger.observation import ErrorObservation
 from backend.orchestration.agent_circuit_breaker import (
-    classify_text_editor_error_bucket,
+    classify_file_edit_error_bucket,
 )
 
 if TYPE_CHECKING:
@@ -402,8 +402,9 @@ class ActionExecutionService:
         if isinstance(exc, LLMNoActionError):
             return (
                 'No tool call detected - the response contains text but no tool call.\n\n'
-                'Use tool calls: symbol_editor for code edits, text_editor for prose/config edits, '
-                'terminal_manager to run commands, think to reason, or send a message to the user.'
+                'Use the available native tool calls shown in the prompt. '
+                'For file edits use `start_file_edit`; for commands use `terminal_manager`; '
+                'for user clarification use `communicate_with_user`.'
             )
         return str(exc)
 
@@ -415,7 +416,10 @@ class ActionExecutionService:
         if error_logged:
             return True
         self._publish_agent_event(
-            ErrorObservation(content=self._format_repair_error_message(exc))
+            ErrorObservation(
+                content=self._format_repair_error_message(exc),
+                agent_only=True,
+            )
         )
         return True
 
@@ -429,8 +433,8 @@ class ActionExecutionService:
         if cb_service is None:
             return
         error_lower = error_signature.lower()
-        if 'text_editor' in error_lower or '[text_editor' in error_lower:
-            bucket = classify_text_editor_error_bucket(str(exc))
+        if 'start_file_edit' in error_lower or '[start_file_edit' in error_lower:
+            bucket = classify_file_edit_error_bucket(str(exc))
             cb_service.record_error(exc, tool_name=bucket)
 
     def _effective_retry_limit(
@@ -603,11 +607,11 @@ class ActionExecutionService:
                 ErrorObservation(
                     content=(
                         'No tool call detected — retrying with explicit instruction.\n\n'
-                        'You MUST use a tool: text_editor, terminal_manager, think, or similar.\n'
+                        'You MUST use a tool call from the available tool set shown in the prompt.\n'
                         'Pick the single most important next step and execute it now.'
                     ),
                     error_id='NULL_ACTION_LOOP_RECOVERY',
-                    notify_ui_only=True,
+                    agent_only=True,
                 )
             )
             return action  # let the loop continue
@@ -627,7 +631,7 @@ class ActionExecutionService:
                     'Provide clearer instructions or ask the agent to retry.'
                 ),
                 error_id='NULL_ACTION_LOOP',
-                notify_ui_only=True,
+                agent_only=True,
             )
         )
 

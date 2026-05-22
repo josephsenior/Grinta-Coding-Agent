@@ -1,0 +1,149 @@
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+
+from backend.core.errors import FunctionCallValidationError
+from backend.engine.file_edit_protocol import (
+    PROHIBITED_CONTENT_FIELDS,
+    get_transaction_store,
+    start_file_edit_transaction,
+)
+from backend.engine.function_calling import _handle_start_file_edit_tool
+from backend.engine.tools.start_file_edit import create_start_file_edit_tool
+from backend.ledger.action import FileEditAction, FileReadAction, StartFileEditAction
+from backend.ledger.observation import ErrorObservation
+
+
+def _walk_schema_keys(node):
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield key
+            yield from _walk_schema_keys(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _walk_schema_keys(value)
+
+
+def test_start_file_edit_schema_does_not_accept_content_fields():
+    schema = create_start_file_edit_tool()['function']['parameters']
+    keys = set(_walk_schema_keys(schema))
+    assert not (keys & PROHIBITED_CONTENT_FIELDS)
+
+
+def test_start_file_edit_creates_start_action_for_content_operation():
+    action = _handle_start_file_edit_tool(
+        {
+            'operation': 'replace_lines',
+            'path': 'app.py',
+            'start_line': 1,
+            'end_line': 2,
+            'security_risk': 'LOW',
+        }
+    )
+    assert isinstance(action, StartFileEditAction)
+    assert action.operation == 'replace_lines'
+    assert action.metadata['start_line'] == 1
+
+
+def test_start_file_edit_rejects_content_arguments():
+    with pytest.raises(FunctionCallValidationError, match='does not accept'):
+        _handle_start_file_edit_tool(
+            {
+                'operation': 'create',
+                'path': 'app.py',
+                'content': 'print(1)',
+                'security_risk': 'LOW',
+            }
+        )
+
+
+def test_start_file_edit_bypasses_editor_mode_for_read():
+    action = _handle_start_file_edit_tool(
+        {'operation': 'read', 'path': 'app.py', 'security_risk': 'LOW'}
+    )
+    assert isinstance(action, FileReadAction)
+    assert action.path == 'app.py'
+
+
+def test_start_file_edit_bypasses_editor_mode_for_delete_section():
+    action = _handle_start_file_edit_tool(
+        {
+            'operation': 'section_edit',
+            'path': 'README.md',
+            'anchor_type': 'heading',
+            'anchor_value': 'Old',
+            'section_action': 'delete',
+            'security_risk': 'LOW',
+        }
+    )
+    assert isinstance(action, FileEditAction)
+    assert action.edit_mode == 'section'
+    assert action.section_action == 'delete'
+
+
+def test_start_file_edit_path_safety_still_runs(tmp_path):
+    action = StartFileEditAction(
+        path='../outside.py',
+        operation='create',
+        metadata={'security_risk': 'LOW'},
+        session_id='path_safety',
+    )
+    runtime = SimpleNamespace(workspace_root=tmp_path)
+    obs = start_file_edit_transaction(runtime, action)
+    assert isinstance(obs, ErrorObservation)
+    assert get_transaction_store().get_active_transaction('path_safety') is None
+
+
+def test_start_file_edit_unsupported_operation_fails_cleanly():
+    with pytest.raises(FunctionCallValidationError, match='not supported'):
+        _handle_start_file_edit_tool(
+            {
+                'operation': 'edit_symbol',
+                'path': 'app.py',
+                'symbol_name': 'main',
+                'security_risk': 'LOW',
+            }
+        )
+
+
+def test_start_file_edit_rejects_parser_time_mutating_structure_ops():
+    with pytest.raises(FunctionCallValidationError, match='not supported'):
+        _handle_start_file_edit_tool(
+            {
+                'operation': 'rename_symbol',
+                'path': 'app.py',
+                'old_name': 'old',
+                'new_name': 'new',
+                'security_risk': 'LOW',
+            }
+        )
+
+
+def test_start_file_edit_required_metadata_validation_runs():
+    with pytest.raises(FunctionCallValidationError, match='start_line'):
+        _handle_start_file_edit_tool(
+            {
+                'operation': 'replace_lines',
+                'path': 'app.py',
+                'end_line': 4,
+                'security_risk': 'LOW',
+            }
+        )
+
+
+def test_start_file_edit_runtime_creates_transaction(tmp_path):
+    action = StartFileEditAction(
+        path='app.py',
+        operation='create',
+        metadata={'security_risk': 'LOW'},
+        session_id='runtime_create',
+    )
+    runtime = SimpleNamespace(workspace_root=tmp_path)
+    obs = start_file_edit_transaction(runtime, action)
+    txn = get_transaction_store().get_active_transaction('runtime_create')
+    assert obs.tool_result['status'] == 'editor_mode_required'
+    assert txn is not None
+    assert txn.transaction_id == obs.tool_result['transaction_id']
+    get_transaction_store().clear_active_transaction('runtime_create')

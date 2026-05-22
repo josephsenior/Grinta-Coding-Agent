@@ -375,6 +375,7 @@ DISABLE_COLOR_PRINTING = False
 # ── Tool Names ──────────────────────────────────────────────────────
 TEXT_EDITOR_TOOL_NAME = 'text_editor'
 FILE_EDITOR_TOOL_NAME = 'file_editor'
+START_FILE_EDIT_TOOL_NAME = 'start_file_edit'
 FINISH_TOOL_NAME = 'finish'
 TASK_TRACKER_TOOL_NAME = 'task_tracker'
 NOTE_TOOL_NAME = 'note'

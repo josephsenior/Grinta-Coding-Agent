@@ -69,19 +69,8 @@ if TYPE_CHECKING:
 
 
 def _multi_edit_tool_available() -> bool:
-    """Return True when the symbol_editor exposes the atomic multi_edit command.
-
-    Detected by looking up the dispatcher's command registry so the prompt
-    block stays in lockstep with the actual tool surface — no flag drift.
-    """
-    try:
-        from backend.engine.function_calling import (
-            _structure_editor_supports_multi_edit,  # type: ignore[attr-defined]
-        )
-
-        return bool(_structure_editor_supports_multi_edit())
-    except Exception:
-        return False
+    """Return True when atomic multi-edit is exposed to the model."""
+    return False
 
 
 def _provider_parallel_tool_calls_supported(model_id: str) -> bool:

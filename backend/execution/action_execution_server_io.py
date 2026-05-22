@@ -283,6 +283,11 @@ class RuntimeExecutorIOAndTerminalMixin:
     def _resolve_workspace_file_path(self, path: str, working_dir: str) -> str:
         return _resolve_workspace_file_path_impl(self, path, working_dir)
 
+    async def start_file_edit(self, action) -> Observation:
+        from backend.engine.file_edit_protocol import start_file_edit_transaction
+
+        return start_file_edit_transaction(self, action)
+
     def _annotate_environment_errors(self, observation: CmdOutputObservation) -> None:
         _annotate_environment_errors_impl(self, observation)
 

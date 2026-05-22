@@ -86,7 +86,7 @@ def _repo_discovery_contract(
     if not is_windows:
         return (
             'Repo/source intelligence: follow `<TOOL_ROUTING_LADDER>` and use '
-            '`text_editor`/`read_file`—avoid improvised `find`/`grep`/`cat` tree walks; '
+            '`start_file_edit` (`operation=read`)—avoid improvised `find`/`grep`/`cat` tree walks; '
             '`<SHELL_IDENTITY>` governs allowed shell usage.'
         )
     if windows_with_bash:
@@ -276,7 +276,7 @@ def _render_system_capabilities(
     if parallel_enabled and parallel_tool_calls_provider_flag and fc_mode == 'native':
         parallel_line = (
             '- **Parallel tool scheduling**: ENABLED for read-only batches '
-            '(`read_file`, `search_code`, `lsp`, `symbol_editor`, `think`).\n'
+            '(`start_file_edit` read, `search_code`, `lsp`).\n'
             '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
             'Emit independent reads in a single assistant turn to run them concurrently.\n'
             '  - **Constraint**: Writes, edits, and shell commands always run sequentially.'
@@ -293,14 +293,13 @@ def _render_system_capabilities(
     if multi_edit_available:
         multi_edit_line = (
             '- **Atomic multi-file edits**: AVAILABLE. '
-            '`symbol_editor` `command=multi_edit` is the preferred path for code-aware batch refactors. '
-            '`text_editor` `command=multi_edit` is also available for text-style batches '
-            '(`create_file`, `insert_text`, `edit_mode=range`). '
-            'Use these instead of sequential edits when the changes must succeed as a unit.'
+            '`start_file_edit` is the preferred path for file edits; '
+            'atomic multi-edit is not part of the editor-mode protocol. '
+            'Use it instead of sequential edits when the changes must succeed as a unit.'
         )
     else:
         multi_edit_line = (
-            '- **Atomic multi-file edits**: not exposed in this build — use `text_editor` `edit_mode=range` '
+            '- **Atomic multi-file edits**: not exposed in this build — use `start_file_edit` `replace_lines` '
             'sequentially'
             + (
                 ' and take a `checkpoint` before the batch for coarse rollback.'
@@ -392,14 +391,13 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
             '- **Language servers (LSP / `lsp`)**: detected on PATH → '
             f'{", ".join(lsp_available)}. Use `lsp` for definition / '
             'references / hover / diagnostics on these languages. '
-            'For symbol rename or structural edits use `symbol_editor` (rename, '
-            'edit_symbol_body, multi_edit) — `lsp` is read-only.'
+            'For file edits use `start_file_edit`; `lsp` is read-only.'
         )
     else:
         lsp_line = (
             '- **Language servers (LSP)**: none detected on the host. The LSP '
             'navigation tool is hidden from your toolset; fall back to '
-            '`search_code` + `read_file` for navigation. To enable it the user '
+            '`search_code` + `start_file_edit` `operation=read` for navigation. To enable it the user '
             'can install e.g. `pip install python-lsp-server`, `npm i -g '
             'typescript-language-server`, `rustup component add rust-analyzer`.'
         )
@@ -436,7 +434,7 @@ def _render_security(cli_mode: bool = True) -> str:
     return (
         '# 🔐 Security Risk Policy\n'
         '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
-        '`text_editor`, `symbol_editor`, and `browser`. Pick one of `LOW` / `MEDIUM` / `HIGH` '
+        '`start_file_edit`, and `browser`. Pick one of `LOW` / `MEDIUM` / `HIGH` '
         'based on the action you are about to take. The server may escalate your risk label; '
         'it never lowers it. Missing or invalid values fail the call.\n\n'
         f'{risk_block}\n\n'
@@ -475,7 +473,7 @@ def _render_autonomy(
         "Plan, execute, and verify the user's task end-to-end. The runtime may "
         'interrupt a tool call to surface a user decision; treat that decision as '
         'authoritative and continue from where you stopped. On tool failure, pivot '
-        'to an alternative tool in the same turn (e.g. symbol_editor \u2192 text_editor) '
+        'to an alternative tool in the same turn (e.g. symbol lookup \u2192 `replace_lines` via `start_file_edit`) '
         'and auto-retry recoverable errors before reporting back.'
         f'{cp_line}\n</AUTONOMY>'
     )
@@ -625,9 +623,9 @@ def _render_examples(
         else 'If approved, keep the change surface small and verify immediately after the action.'
     )
     adjacent_tool_fallback = (
-        '`symbol_editor` → `text_editor`; `lsp` → `search_code`'
+        'symbol lookup → `start_file_edit` `replace_lines`; `lsp` → `search_code`'
         if lsp_available
-        else '`symbol_editor` → `text_editor`; refine the `search_code` query and read nearby files'
+        else 'symbol lookup → `start_file_edit` `replace_lines`; refine the `search_code` query and read nearby files'
     )
     failure_escalation_step = (
         'After 3 failed attempts on the same sub-task, escalate via `communicate_with_user` with a 1-line post-mortem and a specific question.'

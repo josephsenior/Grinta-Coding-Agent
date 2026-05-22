@@ -32,25 +32,25 @@ from backend.core.constants import (
 from backend.core.logger import app_logger as logger
 from backend.ledger.action import ActionSecurityRisk
 from backend.ledger.observation import ErrorObservation
+from backend.inference.tool_names import START_FILE_EDIT_TOOL_NAME
 
-# Per-tool keys for text_editor failures. Syntax validation rejects are
+# Per-tool keys for start_file_edit failures. Syntax validation rejects are
 # tracked separately with higher trip thresholds than match/path/guard errors.
-TEXT_EDITOR_TOOL_NAME = 'text_editor'
-TEXT_EDITOR_SYNTAX_TOOL_NAME = 'text_editor_syntax'
+START_FILE_EDIT_SYNTAX_TOOL_NAME = f'{START_FILE_EDIT_TOOL_NAME}_syntax'
 
 _PER_TOOL_ERRORS_MAX = 100
 
 
-def classify_text_editor_error_bucket(content: str) -> str:
-    """Map text_editor error text to a circuit-breaker per-tool bucket.
+def classify_file_edit_error_bucket(content: str) -> str:
+    """Map file-edit error text to a circuit-breaker per-tool bucket.
 
     Syntax validation failures are common while iterating on generated code;
-    they use ``TEXT_EDITOR_SYNTAX_TOOL_NAME`` and higher ``check()``
+    they use ``START_FILE_EDIT_SYNTAX_TOOL_NAME`` and higher ``check()``
     thresholds than deterministic match failures.
     """
     if 'syntax validation failed' in (content or '').lower():
-        return TEXT_EDITOR_SYNTAX_TOOL_NAME
-    return TEXT_EDITOR_TOOL_NAME
+        return START_FILE_EDIT_SYNTAX_TOOL_NAME
+    return START_FILE_EDIT_TOOL_NAME
 
 
 @dataclass
@@ -160,7 +160,7 @@ class CircuitBreaker:
             maxlen=config.error_rate_window * 2
         )
         # Per-tool-type consecutive error tracking — prevents cross-task
-        # failures (e.g. symbol_editor + npm lint) from compounding into
+        # failures (e.g. file edits + npm lint) from compounding into
         # a single global counter that trips too early.
         self._per_tool_errors: dict[str, int] = {}
 
@@ -172,7 +172,7 @@ class CircuitBreaker:
             config.adaptive,
         )
 
-    def _trip_if_text_editor_syntax(
+    def _trip_if_file_edit_syntax(
         self, str_replace_syntax: int
     ) -> CircuitBreakerResult | None:
         if str_replace_syntax < DEFAULT_TEXT_EDITOR_SYNTAX_SWITCH:
@@ -190,7 +190,7 @@ class CircuitBreaker:
         return CircuitBreakerResult(
             tripped=True,
             reason=(
-                'Repeated text_editor syntax validation failures '
+                'Repeated file edit syntax validation failures '
                 f'({str_replace_syntax})'
             ),
             action='pause'
@@ -200,25 +200,25 @@ class CircuitBreaker:
             system_message=recommendation,
         )
 
-    def _trip_if_text_editor_hard(
+    def _trip_if_file_edit_hard(
         self, str_replace_hard: int
     ) -> CircuitBreakerResult | None:
         if str_replace_hard < DEFAULT_TEXT_EDITOR_HARD_SWITCH:
             return None
         recommendation = (
-            'Repeated deterministic text_editor failures detected. '
+            'Repeated deterministic file edit failures detected. '
             'Refresh file context with read_file before reattempting. '
             'If this persists, switch to a different edit strategy.'
         )
         if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE:
             recommendation = (
                 recommendation
-                + ' text_editor retries are now blocked until strategy changes.'
+                + ' file edit retries are now blocked until strategy changes.'
             )
         return CircuitBreakerResult(
             tripped=True,
             reason=(
-                f'Repeated text_editor deterministic failures ({str_replace_hard})'
+                f'Repeated file edit deterministic failures ({str_replace_hard})'
             ),
             action='pause'
             if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE
@@ -267,9 +267,11 @@ class CircuitBreaker:
                 ),
             )
 
-        # 2.5 Deterministic same-tool failures (text_editor taxonomy)
-        str_replace_hard = self.get_tool_error_count(TEXT_EDITOR_TOOL_NAME)
-        str_replace_syntax = self.get_tool_error_count(TEXT_EDITOR_SYNTAX_TOOL_NAME)
+        # 2.5 Deterministic same-tool failures (file-edit taxonomy)
+        str_replace_hard = self.get_tool_error_count(START_FILE_EDIT_TOOL_NAME)
+        str_replace_syntax = self.get_tool_error_count(
+            START_FILE_EDIT_SYNTAX_TOOL_NAME
+        )
 
         # Syntax rejects: much higher budget than match-not-found / path /
         # guard failures. Since the default write path now downgrades the
@@ -279,10 +281,10 @@ class CircuitBreaker:
         # ``GRINTA_STRICT_WRITE_VALIDATION=1``. We therefore pick thresholds
         # that are generous enough to let the agent iterate on a genuinely
         # hard file rather than trigger a pause on minor churn.
-        if trip := self._trip_if_text_editor_syntax(str_replace_syntax):
+        if trip := self._trip_if_file_edit_syntax(str_replace_syntax):
             return trip
 
-        if trip := self._trip_if_text_editor_hard(str_replace_hard):
+        if trip := self._trip_if_file_edit_hard(str_replace_hard):
             return trip
 
         # 3. Stuck detections
@@ -330,7 +332,7 @@ class CircuitBreaker:
             tool_name: Optional tool name for per-tool tracking
 
         """
-        if tool_name != TEXT_EDITOR_SYNTAX_TOOL_NAME:
+        if tool_name != START_FILE_EDIT_SYNTAX_TOOL_NAME:
             self.consecutive_errors += 1
         self.recent_errors.append(str(error))
         self.recent_actions_success.append(False)
@@ -361,7 +363,10 @@ class CircuitBreaker:
         else:
             self.consecutive_errors = max(0, self.consecutive_errors - decay)
         self.recent_actions_success.append(True)
-        if tool_name and tool_name not in (TEXT_EDITOR_TOOL_NAME, TEXT_EDITOR_SYNTAX_TOOL_NAME):
+        if tool_name and tool_name not in (
+            START_FILE_EDIT_TOOL_NAME,
+            START_FILE_EDIT_SYNTAX_TOOL_NAME,
+        ):
             if decay <= 0:
                 self._per_tool_errors.pop(tool_name, None)
             else:
@@ -370,12 +375,18 @@ class CircuitBreaker:
                     self._per_tool_errors.pop(tool_name, None)
                 else:
                     self._per_tool_errors[tool_name] = cur - decay
-        elif tool_name in (TEXT_EDITOR_TOOL_NAME, TEXT_EDITOR_SYNTAX_TOOL_NAME):
+        elif tool_name in (
+            START_FILE_EDIT_TOOL_NAME,
+            START_FILE_EDIT_SYNTAX_TOOL_NAME,
+        ):
             if decay <= 0:
-                self._per_tool_errors.pop(TEXT_EDITOR_TOOL_NAME, None)
-                self._per_tool_errors.pop(TEXT_EDITOR_SYNTAX_TOOL_NAME, None)
+                self._per_tool_errors.pop(START_FILE_EDIT_TOOL_NAME, None)
+                self._per_tool_errors.pop(START_FILE_EDIT_SYNTAX_TOOL_NAME, None)
             else:
-                for key in (TEXT_EDITOR_TOOL_NAME, TEXT_EDITOR_SYNTAX_TOOL_NAME):
+                for key in (
+                    START_FILE_EDIT_TOOL_NAME,
+                    START_FILE_EDIT_SYNTAX_TOOL_NAME,
+                ):
                     cur = self._per_tool_errors.get(key, 0)
                     if cur <= decay:
                         self._per_tool_errors.pop(key, None)

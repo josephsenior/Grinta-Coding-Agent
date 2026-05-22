@@ -22,6 +22,7 @@ from backend.ledger.observation import (
     UserRejectObservation,
 )
 from backend.ledger.observation.agent import AgentCondensationObservation
+from backend.ledger.observation.agent import AgentThinkObservation
 
 # ── _get_observation_content ─────────────────────────────────────────
 
@@ -100,6 +101,25 @@ class TestConvertObservation:
         msg = convert_observation_to_message(obs, max_message_chars=None)
         assert '[MCP_RESULT' in msg.content[0].text  # type: ignore[union-attr]
         assert 'mcp result' in msg.content[0].text  # type: ignore[union-attr]
+
+    def test_tool_backed_think_observation_is_labeled_internal_tool_result(self):
+        obs = AgentThinkObservation(content='Your thought has been logged.')
+        obs.tool_result = {
+            'ok': True,
+            'retryable': False,
+            'exit_code': None,
+            'action': 'think',
+            'observation': 'think',
+        }
+
+        msg = convert_observation_to_message(obs, max_message_chars=None)
+
+        assert msg.role == 'user'
+        text = msg.content[0].text  # type: ignore[union-attr]
+        assert text.startswith('Internal tool observation, not a user request.')
+        payload = text.split('\n', 1)[1]
+        assert '"action": "think"' in payload
+        assert '"observation": "think"' in payload
 
     def test_cmd_output_observation(self):
         obs = CmdOutputObservation(

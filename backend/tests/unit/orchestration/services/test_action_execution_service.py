@@ -173,6 +173,15 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RateLimitError):
             await self.service.get_next_action()
 
+    def test_format_repair_error_message_uses_current_tool_names(self):
+        msg = self.service._format_repair_error_message(LLMNoActionError('no action'))
+
+        self.assertIn('start_file_edit', msg)
+        self.assertIn('terminal_manager', msg)
+        self.assertIn('communicate_with_user', msg)
+        self.assertNotIn('text_editor', msg)
+        self.assertNotIn('symbol_editor', msg)
+
     async def test_get_next_action_recovers_first_round_then_pauses(self):
         """Null-action loop uses two-round recovery before pausing.
 
@@ -203,7 +212,9 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         first_obs = self.mock_context.event_stream.add_event.call_args_list[0][0][0]
         second_obs = self.mock_context.event_stream.add_event.call_args_list[1][0][0]
         self.assertEqual(first_obs.error_id, 'NULL_ACTION_LOOP_RECOVERY')
+        self.assertTrue(first_obs.agent_only)
         self.assertEqual(second_obs.error_id, 'NULL_ACTION_LOOP')
+        self.assertTrue(second_obs.agent_only)
 
         # Only pauses after the second round is exhausted.
         mock_controller.set_agent_state_to.assert_awaited_once_with(
@@ -236,6 +247,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.mock_context.event_stream.add_event.call_count, 1)
         obs = self.mock_context.event_stream.add_event.call_args[0][0]
         self.assertEqual(obs.error_id, 'NULL_ACTION_LOOP_RECOVERY')
+        self.assertTrue(obs.agent_only)
         mock_controller.set_agent_state_to.assert_not_awaited()
 
     async def test_get_next_action_resets_null_streak_after_real_action(self):
@@ -289,7 +301,9 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         first_obs = self.mock_context.event_stream.add_event.call_args_list[0][0][0]
         second_obs = self.mock_context.event_stream.add_event.call_args_list[1][0][0]
         self.assertEqual(first_obs.error_id, 'NULL_ACTION_LOOP_RECOVERY')
+        self.assertTrue(first_obs.agent_only)
         self.assertEqual(second_obs.error_id, 'NULL_ACTION_LOOP')
+        self.assertTrue(second_obs.agent_only)
         mock_controller.set_agent_state_to.assert_awaited_once_with(
             AgentState.AWAITING_USER_INPUT
         )
@@ -496,6 +510,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.mock_context.event_stream.add_event.call_count, 1)
         obs = self.mock_context.event_stream.add_event.call_args[0][0]
         self.assertEqual(obs.error_id, 'NULL_ACTION_LOOP_RECOVERY')
+        self.assertTrue(obs.agent_only)
 
     async def test_mixed_sentinel_and_real_null_actions(self):
         """SENTINEL NullActions interleaved with untagged ones must not dilute the counter.
@@ -534,6 +549,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.mock_context.event_stream.add_event.call_count, 1)
         obs = self.mock_context.event_stream.add_event.call_args[0][0]
         self.assertEqual(obs.error_id, 'NULL_ACTION_LOOP_RECOVERY')
+        self.assertTrue(obs.agent_only)
 
 
 if __name__ == '__main__':

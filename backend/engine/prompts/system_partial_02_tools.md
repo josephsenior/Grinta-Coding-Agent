@@ -2,11 +2,12 @@
 Editor `path` values create parent dirs and normalize automatically. {confirm_paths}
 Edit the user path directly; no shadow copies; remove temp files when done.
 
-**Edit shapes:**
-- **Surgical edits:** `insert_text`, `edit_mode`, or structure-aware `symbol_editor` ops.
-- **New files:** create a minimal parsing-valid stub, then grow it.
-- **Full-file create/replace:** use `create_file`.
-- **`patch` mode:** strict unified diff apply (preview first if confidence is low).
+**File Editing Policy**
+- All normal tools use provider-native tool calls.
+- For file edits, use `start_file_edit` with metadata only.
+- Never pass multiline file content through JSON tool arguments.
+- Do not include fields named `content`, `new_content`, `replacement`, `replacement_text`, `file_body`, or `code`.
+- After `start_file_edit`, the runtime enters FILE EDITOR MODE.
 </EDITOR_AND_FILE_OPERATIONS>
 
 <CODE_QUALITY>

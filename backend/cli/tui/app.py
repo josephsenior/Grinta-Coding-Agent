@@ -77,6 +77,7 @@ from backend.cli._event_renderer.unified_renderer import (
     ActivityCard,
     ActivityRenderer,
 )
+from backend.cli._event_renderer.panels import task_panel_signature
 from backend.cli.config_manager import AppConfig
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
@@ -96,6 +97,7 @@ from backend.cli.transcript import strip_tool_result_validation_annotations
 from backend.cli._event_renderer.text_utils import (
     sanitize_visible_transcript_text,
 )
+from backend.cli.tui.widgets.activity_card import encode_diff_line
 from backend.core.bootstrap.agent_control_loop import run_agent_until_done
 from backend.core.bootstrap.main import (
     create_agent,
@@ -103,6 +105,7 @@ from backend.core.bootstrap.main import (
 )
 from backend.core.bootstrap.setup import (
     create_controller,
+    generate_sid,
     create_memory,
     create_runtime,
 )
@@ -1023,12 +1026,14 @@ class GrintaScreen(Screen):
         if self._renderer:
             if self._renderer._event_stream:
                 self._renderer._event_stream.unsubscribe(
-                    EventStreamSubscriber.CLI, 'grinta-tui'
+                    EventStreamSubscriber.CLI, self._renderer._event_stream.sid
                 )
             self._renderer._event_stream = None
         if self._event_stream is not None:
             try:
-                self._event_stream.unsubscribe(EventStreamSubscriber.CLI, 'grinta-tui')
+                self._event_stream.unsubscribe(
+                    EventStreamSubscriber.CLI, self._event_stream.sid
+                )
                 close_fn = getattr(self._event_stream, 'close', None)
                 if callable(close_fn):
                     close_fn()
@@ -1692,9 +1697,12 @@ class GrintaScreen(Screen):
         if item_id.startswith('task:'):
             task_id = item_id.split(':', 1)[1]
             desc = "Unknown task"
-            for t in self._renderer._task_list if self._renderer else []:
-                if str(t.get('id')) == task_id:
-                    desc = str(t.get('description') or desc)
+            tasks = task_panel_signature(
+                self._renderer._task_list if self._renderer else []
+            )
+            for tid, _status, description in tasks:
+                if tid == task_id:
+                    desc = description or desc
                     break
             self.notify(f"Task {task_id}: {desc}", severity="info", timeout=3.0)
         elif item_id.startswith('mcp:'):
@@ -1927,8 +1935,8 @@ class GrintaScreen(Screen):
                         logger.info(
                             '[TUI] _handle_input: bootstrapping (no controller)'
                         )
-                    # Internal bootstrap - no user-facing message
-                    await self._bootstrap()
+                        # Internal bootstrap - no user-facing message
+                        await self._bootstrap()
                     if self._controller is None:
                         raise RuntimeError('Bootstrap failed to initialize controller')
                     _tui_logger.debug(  # type: ignore[unreachable]
@@ -2233,7 +2241,7 @@ class GrintaScreen(Screen):
         event_stream = None
         try:
             file_store = get_file_store(config)
-            sid = (session_id or 'grinta-tui').strip() or 'grinta-tui'
+            sid = session_id.strip() if session_id else generate_sid(config)
             event_stream = EventStream(sid=sid, file_store=file_store)
             self._event_stream = event_stream
             try:
@@ -2826,11 +2834,13 @@ class TUIRenderer:
             self._live_thinking_widget = None
 
             if thoughts and self._live_thinking_dirty:
-                lines = [f'[bold #5eead4]Thinking:[/]']
-                for thought in thoughts:
-                    lines.append(f'  [rgb(150,154,189)]│ {thought}[/]')
-                thinking_text = '\n'.join(lines)
-                self._tui._write_log(Text.from_markup(thinking_text))
+                display = self._tui._get_display()
+                if type(display).__name__ != 'MagicMock':
+                    lines = [f'[bold #5eead4]Thinking:[/]']
+                    for thought in thoughts:
+                        lines.append(f'  [rgb(150,154,189)]│ {thought}[/]')
+                    display.mount(Static('\n'.join(lines)))
+                    display.scroll_end(animate=False)
             self._live_thinking_dirty = False
 
             self._live_thinking = ''
@@ -2861,11 +2871,7 @@ class TUIRenderer:
     def _refresh_display(self) -> None:
         """Refresh derived sidebar state; transcript writes are incremental."""
         from backend.cli.theme import STYLE_DEFAULT, STYLE_DIM
-        from backend.core.task_status import (
-            TASK_STATUS_PANEL_STYLES,
-            TASK_STATUS_TODO,
-            normalize_task_status,
-        )
+        from backend.core.task_status import TASK_STATUS_PANEL_STYLES
         from backend.cli._event_renderer.sidebar import _load_playbook_skills
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
         from rich.text import Text
@@ -2892,19 +2898,14 @@ class TUIRenderer:
                 for i in range(mcp_count)
             ]
 
-        current_state = (self._task_list, mcp_servers, skill_count)
+        task_signature = task_panel_signature(self._task_list)
+        current_state = (task_signature, mcp_servers, skill_count)
         if current_state != self._last_sidebar_state:
             # 1. Update Tasks Section
             try:
                 tasks_widget = self._tui.query_one('#sidebar-tasks', CollapsibleSection)
                 task_items = []
-                for item in self._task_list:
-                    try:
-                        status = normalize_task_status(item.get('status'), default=TASK_STATUS_TODO)
-                    except Exception:
-                        status = TASK_STATUS_TODO
-                    desc = str(item.get('description') or '…')
-                    task_id = str(item.get('id') or '?')
+                for task_id, status, desc in task_signature:
 
                     status_style = TASK_STATUS_PANEL_STYLES.get(status, 'dim')
                     status_icon = Text('●', style=f'bold {status_style}')
@@ -2919,7 +2920,7 @@ class TUIRenderer:
                     row_text.append(body)
                     task_items.append((row_text, f"task:{task_id}"))
 
-                tasks_widget.set_title(f"Tasks ({len(self._task_list)})")
+                tasks_widget.set_title(f"Tasks ({len(task_signature)})")
                 tasks_widget.set_items(task_items)
             except Exception:
                 pass
@@ -2983,7 +2984,9 @@ class TUIRenderer:
             except Exception:
                 pass
             self._last_active_card = None
-        self._tui.clear_current_operation()
+        clear_current_operation = getattr(self._tui, 'clear_current_operation', None)
+        if callable(clear_current_operation):
+            clear_current_operation()
 
     def _update_retry_strip(self, summary: str, meta: str) -> None:
         self._tui.set_retry_status(summary, meta=meta, active=True)
@@ -3410,7 +3413,7 @@ class TUIRenderer:
                 pad = len(str(file_text.count('\n') + 1)) + 1 if file_text else 1
                 for i, line in enumerate(file_text.splitlines()):
                     display = line[:160] + ('...' if len(line) > 160 else (line if line else ' '))
-                    extra_parts.append(f'  [on #14532d]+{i + 1:>{pad - 1}}|{display}[/]')
+                    extra_parts.append(encode_diff_line(f'+{i + 1:>{pad - 1}}| {display}', 'add'))
                 extra_content = '\n'.join(extra_parts) if extra_parts else None
                 added = file_text.count('\n') + 1 if file_text else 0
                 self._write_tui_file_card('Created', path, extra_content, f'[bold #54efae]+{added}[/]')
@@ -3423,7 +3426,7 @@ class TUIRenderer:
             pad = len(str(content.count('\n') + 1)) + 1 if content else 1
             for i, line in enumerate(content.splitlines()):
                 display = line[:160] + ('...' if len(line) > 160 else (line if line else ' '))
-                extra_parts.append(f'  [on #14532d]+{i + 1:>{pad - 1}}|{display}[/]')
+                extra_parts.append(encode_diff_line(f'+{i + 1:>{pad - 1}}| {display}', 'add'))
             extra_content = '\n'.join(extra_parts) if extra_parts else None
             added = content.count('\n') + 1 if content else 0
             self._write_tui_file_card('Created', event.path, extra_content, f'[bold #54efae]+{added}[/]')
@@ -3444,10 +3447,10 @@ class TUIRenderer:
                         extra_parts.append('')
                     for line in group.get('before_edits', []):
                         display = line if line else ' '
-                        extra_parts.append(f'  [bold #fd8383 on #7f1d1d]{display}[/]')
+                        extra_parts.append(encode_diff_line(display, 'rem'))
                     for line in group.get('after_edits', []):
                         display = line if line else ' '
-                        extra_parts.append(f'  [bold #54efae on #14532d]{display}[/]')
+                        extra_parts.append(encode_diff_line(display, 'add'))
                 extra_content = '\n'.join(extra_parts) if extra_parts else None
                 added = event.added
                 removed = event.removed
@@ -3711,7 +3714,9 @@ class TUIRenderer:
                 Text(f'  [bold #91abec]Downloaded[/] {url}', style=NAVY_TEXT_PRIMARY)
             )
         elif isinstance(event, TaskTrackingObservation):
-            pass
+            if event.task_list:
+                self._task_list = event.task_list
+                self._refresh_display()
         elif isinstance(event, StreamingChunkAction):
             self._handle_streaming_chunk(event)
         elif isinstance(event, AgentStateChangedObservation):
@@ -3727,6 +3732,7 @@ class TUIRenderer:
         elif isinstance(event, TaskTrackingAction):
             if event.task_list is not None:
                 self._task_list = event.task_list
+                self._refresh_display()
         else:
             name = type(event).__name__
             self._tui._write_log(Text(f'  [{name}]', style=NAVY_TEXT_MUTED))
@@ -3783,6 +3789,45 @@ class TUIRenderer:
         value = getattr(source, 'value', source)
         return str(value or '').strip().lower() == EventSource.USER.value
 
+    @staticmethod
+    def _normalize_final_response_text(text: str) -> str:
+        from backend.cli.transcript import strip_pseudo_xml_function_calls
+
+        content = strip_pseudo_xml_function_calls(text or '')
+        content = re.sub(
+            r'\s*<minimax:tool_call\b[^>]*>.*?(?:</minimax:tool_call>|\Z)',
+            '',
+            content,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        content = re.sub(
+            r'\s*<tool_call\b[^>]*>.*?(?:</tool_call>|\Z)',
+            '',
+            content,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        content = re.sub(
+            r'\s*<function_calls\b[^>]*>.*?(?:</function_calls>|\Z)',
+            '',
+            content,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        return sanitize_visible_transcript_text(content).strip()
+
+    def _commit_final_response(self, text: str) -> None:
+        """Commit a final assistant response once, regardless of event shape."""
+        content = self._normalize_final_response_text(text)
+        self._tui.finalize_thinking()
+        self.clear_live_response()
+        if not content:
+            return
+        if content == self._last_final_response_text:
+            return
+        self._last_final_response_text = content
+        from backend.cli.tui.widgets.activity_card import AgentMessage
+
+        self.add_to_history(AgentMessage(content))
+
     def _handle_message_action(self, action: MessageAction) -> None:
         if bool(getattr(action, 'suppress_cli', False)):
             self._tui.finalize_thinking()
@@ -3800,28 +3845,7 @@ class TUIRenderer:
             self.clear_live_response()
             return
 
-        from backend.cli.transcript import strip_pseudo_xml_function_calls
-
-        content = strip_pseudo_xml_function_calls(content)
-        content = sanitize_visible_transcript_text(content).strip()
-        if not content:
-            self._tui.finalize_thinking()
-            self.clear_live_response()
-            return
-
-        if content == self._last_final_response_text:
-            self.clear_live_response()
-            return
-
-        if content == self._last_final_response_text:
-            self.clear_live_response()
-            return
-
-        self._tui.finalize_thinking()
-        self.clear_live_response()
-        self._last_final_response_text = content
-        from backend.cli.tui.widgets.activity_card import AgentMessage
-        self.add_to_history(AgentMessage(content))
+        self._commit_final_response(content)
 
     @staticmethod
     def _format_retry_status_message(
@@ -3859,25 +3883,14 @@ class TUIRenderer:
         if thinking and thinking != 'Your thought has been logged.':
             self._tui.add_thinking(thinking)
 
-        content = (action.accumulated or '').strip()
-        from backend.cli.transcript import strip_pseudo_xml_function_calls
-        content = strip_pseudo_xml_function_calls(content)
+        content = self._normalize_final_response_text(action.accumulated or '')
 
         if action.is_final:
-            self._tui.finalize_thinking()
-            if self._tui._renderer:
-                self._tui._renderer.clear_live_response()
-            if content and self._tui._renderer:
-                if content == self._tui._renderer._last_final_response_text:
-                    return
-                self._tui._renderer._last_final_response_text = content
-                from backend.cli.tui.widgets.activity_card import AgentMessage
-                body = AgentMessage(content)
-                self._tui._renderer.add_to_history(body)
+            self._commit_final_response(content)
             return
 
-        if content and self._tui._renderer:
-            self._tui._renderer.update_live_response(content)
+        if content:
+            self.update_live_response(content)
 
     def _update_metrics(self, event: Any) -> None:
         if hasattr(event, 'model') and event.model:
