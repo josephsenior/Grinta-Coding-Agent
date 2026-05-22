@@ -114,7 +114,7 @@ def test_public_editor_schemas_do_not_expose_retired_edit_modes():
 
     assert set(start_ops) == {'read', 'create', 'insert', 'undo', 'replace_range', 'find_symbol'}
     assert text_edit_modes == ['range']
-    assert {'edit_symbol_body', 'edit_symbols', 'rename_symbol', 'find_symbol', 'replace_range'} <= set(symbol_commands)
+    assert {'edit_symbol', 'edit_symbols', 'rename_symbol', 'find_symbol', 'replace_range'} <= set(symbol_commands)
 
 
 def test_start_file_edit_required_metadata_validation_runs():

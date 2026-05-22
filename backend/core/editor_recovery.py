@@ -99,7 +99,7 @@ def classify_editor_recovery(
         return EditorRecoveryAdvice(
             kind='full_file_overwrite_blocked',
             preferred_tool='symbol_editor',
-            next_action='edit_symbol_body',
+            next_action='edit_symbol',
             detail=(
                 'Full-file overwrite was blocked on a large existing source file. Prefer a symbol-aware or '
                 'line-range edit, and only use overwrite mode when you intentionally mean to replace the entire file.'

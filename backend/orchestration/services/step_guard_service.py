@@ -419,7 +419,7 @@ class StepGuardService:
                 'MANDATORY NEXT ACTIONS:\n'
                 '1. If the error mentions a symbol, call `find_symbol` before editing again.\n'
                 '2. Re-read the affected file region to confirm the live code shape.\n'
-                '3. Retry exactly one targeted `start_file_edit` edit (`replace_range` or `edit_symbol_body`).\n'
+                '3. Retry exactly one targeted `start_file_edit` edit (`replace_range` or `edit_symbol`).\n'
                 '4. If that fails, switch to `start_file_edit` `replace_range` with fresh line numbers.\n'
                 'Do NOT emit another near-identical edit without new evidence.',
                 'STUCK RECOVERY: find_symbol or read the file region, then one targeted start_file_edit retry max.',

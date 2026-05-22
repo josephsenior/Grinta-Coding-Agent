@@ -21,7 +21,7 @@ KEY ADVANTAGES over string matching:
 
 COMMANDS:
 
-1. `edit_symbol_body` - Edit a function by name (any language)
+1. `edit_symbol` - Edit a function by name (any language)
     Required: path, symbol_name, new_body
    Example: Edit function "process_data" in Python/JS/Go/Rust/etc.
 
@@ -61,13 +61,13 @@ COMMANDS:
     Required: path, new_str, insert_line
     insert_line=0 inserts at the beginning of the file
 
-9. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `insert_text`, etc.). Symbol-level commands (`edit_symbol_body`, `edit_symbols`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
+9. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `insert_text`, etc.). Symbol-level commands (`edit_symbol`, `edit_symbols`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
 
 10. `multi_edit` - **ATOMIC multi-file edit (cross-file)**. Applies a mixed batch of edits across many files as a single transaction: every file commits or none do (auto-rollback on first failure).
     Required: `file_edits` array. Each item must include `path` and one of:
       - `{ path, new_content }` or `{ path, command: "replace_file", new_content }`
       - `{ path, command: "replace_range", start_line, end_line, new_code }`
-      - `{ path, command: "edit_symbol_body", symbol_name, new_body }`
+      - `{ path, command: "edit_symbol", symbol_name, new_body }`
     Optional: top-level `path` may be omitted (or set to `<batch>`).
     Use this for coordinated refactors that span 2+ files where partial application would corrupt the project (rename a public symbol + update its imports, split a module, change an API signature + update all call sites you already prepared, etc.). Multiple edits to the same file are allowed and are applied sequentially inside the atomic batch. Backups are taken before the batch and restored on any failure. Limit: 50 operations per call.
 
@@ -83,7 +83,7 @@ FEATURES:
 - Whitespace intelligence: Never fails on tabs vs. spaces
 
 BEST PRACTICES:
-1. Use `edit_symbol_body` or `edit_symbols` instead of line-based replacements when possible
+1. Use `edit_symbol` or `edit_symbols` instead of line-based replacements when possible
 2. Use `start_file_edit` with `replace_range` for targeted text changes that don't map to a named symbol (imports, constants, comments)
 3. Use `find_symbol` first to verify symbol exists
 4. Trust the auto-indentation - it matches your file's style
@@ -93,7 +93,7 @@ BEST PRACTICES:
 
 _SHORT_STRUCTURE_EDITOR_DESCRIPTION = """Structure-aware editor for 40+ languages (Python, JS, TS, Go, Rust, Java, C++, etc.)
 
-Commands: edit_symbol_body, edit_symbols, rename_symbol, find_symbol, replace_range, normalize_indent,
+Commands: edit_symbol, edit_symbols, rename_symbol, find_symbol, replace_range, normalize_indent,
           create_file, read_file, insert_text, undo_last_edit, multi_edit (atomic cross-file batch)
 - Edits by symbol name (function/class), not line numbers
 - Auto-indents code to match file style
@@ -128,7 +128,7 @@ def create_symbol_editor_tool(
             'command': get_command_param(
                 'The command to execute',
                 [
-                    'edit_symbol_body',
+                    'edit_symbol',
                     'edit_symbols',
                     'rename_symbol',
                     'find_symbol',
@@ -144,11 +144,11 @@ def create_symbol_editor_tool(
             'path': get_path_param('Path to the file to edit'),
             'symbol_name': {
                 'type': 'string',
-                'description': 'Name of the symbol to edit or find (required for edit_symbol_body and find_symbol)',
+                'description': 'Name of the symbol to edit or find (required for edit_symbol and find_symbol)',
             },
             'new_body': {
                 'type': 'string',
-                'description': 'New content for the function (required for edit_symbol_body)',
+                'description': 'New content for the function (required for edit_symbol)',
             },
             'edits': {
                 'type': 'array',
@@ -162,7 +162,7 @@ def create_symbol_editor_tool(
                     'properties': {
                         'symbol_name': {
                             'type': 'string',
-                            'description': 'Symbol to edit — function, method, or class (same rules as edit_symbol_body). Supports dot notation: MyClass.method_name.',
+                            'description': 'Symbol to edit — function, method, or class (same rules as edit_symbol). Supports dot notation: MyClass.method_name.',
                         },
                         'new_body': {
                             'type': 'string',
@@ -233,7 +233,7 @@ def create_symbol_editor_tool(
                     'For multi_edit only: list of atomic edit operations. All edits succeed '
                     'together or all are rolled back. Each item must include path and one of: '
                     '{ new_content }, { command="replace_range", start_line, end_line, new_code }, '
-                    'or { command="edit_symbol_body", symbol_name, new_body }. Multiple items may '
+                    'or { command="edit_symbol", symbol_name, new_body }. Multiple items may '
                     'target the same file; they are applied sequentially inside the batch. Max 50 items.'
                 ),
                 'items': {
@@ -245,7 +245,7 @@ def create_symbol_editor_tool(
                         },
                         'command': {
                             'type': 'string',
-                            'description': 'Optional per-item multi_edit command: replace_file, replace_range, edit_symbol_body.',
+                            'description': 'Optional per-item multi_edit command: replace_file, replace_range, edit_symbol.',
                         },
                         'new_content': {
                             'type': 'string',
@@ -268,11 +268,11 @@ def create_symbol_editor_tool(
                         },
                         'symbol_name': {
                             'type': 'string',
-                            'description': 'Target symbol for edit_symbol_body.',
+                            'description': 'Target symbol for edit_symbol.',
                         },
                         'new_body': {
                             'type': 'string',
-                            'description': 'Replacement body for edit_symbol_body.',
+                            'description': 'Replacement body for edit_symbol.',
                         },
                     },
                     'required': ['path'],
