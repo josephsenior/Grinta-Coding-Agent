@@ -97,6 +97,11 @@ def test_two_mode_edit_symbols_payload_reaches_existing_structure_pipeline(tmp_p
     assert obs.tool_result['ok'] is True
     assert 'return 10' in target.read_text(encoding='utf-8')
     assert 'return 20' in target.read_text(encoding='utf-8')
+    undo = executor.file_editor(command='undo_last_edit', path='app.py')
+    assert undo.error is None
+    assert target.read_text(encoding='utf-8') == (
+        'def a():\n    return 1\n\n\ndef b():\n    return 2\n'
+    )
     store.clear_active_transaction('integration_edit_symbols')
 
 
@@ -163,4 +168,49 @@ def test_two_mode_multi_edit_payload_reaches_existing_batch_pipeline(
     assert obs.tool_result['ok'] is True
     assert first.read_text(encoding='utf-8') == 'x = 2\n'
     assert second.read_text(encoding='utf-8') == 'y = 2\n'
+    undo_first = executor.file_editor(command='undo_last_edit', path='a.py')
+    assert undo_first.error is None
+    undo_second = executor.file_editor(command='undo_last_edit', path='b.py')
+    assert undo_second.error is None
+    assert first.read_text(encoding='utf-8') == 'x = 1\n'
+    assert second.read_text(encoding='utf-8') == 'y = 1\n'
     store.clear_active_transaction('integration_multi_edit')
+
+
+def test_two_mode_edit_symbol_registers_runtime_undo_history(tmp_path):
+    target = tmp_path / 'app.py'
+    target.write_text('def value():\n    return 1\n', encoding='utf-8')
+
+    store = get_transaction_store()
+    txn = store.create_transaction(
+        'integration_edit_symbol_undo',
+        'app.py',
+        'edit_symbol',
+        {'symbol_name': 'value', 'security_risk': 'LOW'},
+    )
+    response = (
+        '<file_edit>\n'
+        'return 42\n'
+        f'{txn.delimiter}\n'
+        '</file_edit>\n'
+    )
+
+    parsed = parse_editor_response(response, txn)
+    assert parsed.ok
+    action = apply_edit_from_transaction(parsed.content, txn)
+    assert isinstance(action, FileEditAction)
+
+    executor = SimpleNamespace(
+        file_editor=FileEditor(workspace_root=tmp_path),
+        _is_auto_lint_enabled=lambda: True,
+    )
+    obs = edit_via_file_editor(executor, action)
+
+    assert isinstance(obs, FileEditObservation)
+    assert obs.tool_result['ok'] is True
+    assert target.read_text(encoding='utf-8') == 'def value():\n    return 42\n'
+
+    undo = executor.file_editor(command='undo_last_edit', path='app.py')
+    assert undo.error is None
+    assert target.read_text(encoding='utf-8') == 'def value():\n    return 1\n'
+    store.clear_active_transaction('integration_edit_symbol_undo')
