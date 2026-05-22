@@ -86,7 +86,7 @@ def _repo_discovery_contract(
     if not is_windows:
         return (
             'Repo/source intelligence: follow `<TOOL_ROUTING_LADDER>` and use '
-            '`start_file_edit` (`operation=read`)—avoid improvised `find`/`grep`/`cat` tree walks; '
+            '`read_file`—avoid improvised `find`/`grep`/`cat` tree walks; '
             '`<SHELL_IDENTITY>` governs allowed shell usage.'
         )
     if windows_with_bash:
@@ -276,7 +276,7 @@ def _render_system_capabilities(
     if parallel_enabled and parallel_tool_calls_provider_flag and fc_mode == 'native':
         parallel_line = (
             '- **Parallel tool scheduling**: ENABLED for read-only batches '
-            '(`start_file_edit` read, `search_code`, `lsp`).\n'
+            '(`read_file`, `search_code`, `lsp`).\n'
             '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
             'Emit independent reads in a single assistant turn to run them concurrently.\n'
             '  - **Constraint**: Writes, edits, and shell commands always run sequentially.'
@@ -391,15 +391,15 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
             '- **Language servers (LSP / `lsp`)**: detected on PATH → '
             f'{", ".join(lsp_available)}. Use `lsp` for definition / '
             'references / hover / diagnostics on these languages. '
-            'For file edits use `start_file_edit`; `lsp` is read-only.'
+            'For file edits use `start_file_edit`; `lsp` is read-only. For file reads use `read_file`.'
         )
     else:
         lsp_line = (
             '- **Language servers (LSP)**: none detected on the host. The LSP '
             'navigation tool is hidden from your toolset; fall back to '
-            '`search_code` + `start_file_edit` `operation=read` for navigation. To enable it the user '
-            'can install e.g. `pip install python-lsp-server`, `npm i -g '
-            'typescript-language-server`, `rustup component add rust-analyzer`.'
+            '`search_code` + `read_file` for navigation. To enable it the user can install e.g. '
+            '`pip install python-lsp-server`, `npm i -g typescript-language-server`, '
+            '`rustup component add rust-analyzer`.'
         )
 
     if not debugger_enabled:

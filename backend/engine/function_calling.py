@@ -1790,7 +1790,6 @@ def _handle_communicate_tool(arguments: Mapping[str, Any]) -> Action:
 def _handle_start_file_edit_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle metadata-only file edit transaction starter."""
     from backend.engine.file_edit_protocol import (
-        operation_requires_content,
         reject_content_fields,
         validate_start_file_edit_metadata,
     )
@@ -1816,10 +1815,6 @@ def _handle_start_file_edit_tool(arguments: Mapping[str, Any]) -> Action:
         if k not in {'operation', 'path'}
     }
     validate_start_file_edit_metadata(operation, path, metadata)
-
-    if not operation_requires_content(operation, metadata):
-        legacy_args = {'command': operation, 'path': path, **metadata}
-        return _handle_file_editor_tool(legacy_args)
 
     action = StartFileEditAction(
         path=path,

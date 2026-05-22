@@ -14,7 +14,7 @@ from backend.engine.function_calling import _handle_start_file_edit_tool
 from backend.engine.tools.text_editor import create_text_editor_tool
 from backend.engine.tools.symbol_editor_tool import create_symbol_editor_tool
 from backend.engine.tools.start_file_edit import create_start_file_edit_tool
-from backend.ledger.action import FileReadAction, StartFileEditAction
+from backend.ledger.action import StartFileEditAction
 from backend.ledger.observation import ErrorObservation
 
 
@@ -61,18 +61,10 @@ def test_start_file_edit_rejects_content_arguments():
         )
 
 
-def test_start_file_edit_bypasses_editor_mode_for_read():
-    action = _handle_start_file_edit_tool(
-        {'operation': 'read', 'path': 'app.py', 'security_risk': 'LOW'}
-    )
-    assert isinstance(action, FileReadAction)
-    assert action.path == 'app.py'
-
-
 def test_start_file_edit_path_safety_still_runs(tmp_path):
     action = StartFileEditAction(
         path='../outside.py',
-        operation='create',
+        operation='replace_range',
         metadata={'security_risk': 'LOW'},
         session_id='path_safety',
     )
@@ -86,25 +78,23 @@ def test_start_file_edit_unsupported_operation_fails_cleanly():
     with pytest.raises(FunctionCallValidationError, match='not supported'):
         _handle_start_file_edit_tool(
             {
-                'operation': 'edit_symbol',
+                'operation': 'create',
                 'path': 'app.py',
-                'symbol_name': 'main',
                 'security_risk': 'LOW',
             }
         )
 
 
-def test_start_file_edit_rejects_parser_time_mutating_structure_ops():
-    with pytest.raises(FunctionCallValidationError, match='not supported'):
-        _handle_start_file_edit_tool(
-            {
-                'operation': 'rename_symbol',
-                'path': 'app.py',
-                'old_name': 'old',
-                'new_name': 'new',
-                'security_risk': 'LOW',
-            }
-        )
+def test_start_file_edit_rejects_find_and_undo_operations():
+    for operation in ('find_symbol', 'undo'):
+        with pytest.raises(FunctionCallValidationError, match='not supported'):
+            _handle_start_file_edit_tool(
+                {
+                    'operation': operation,
+                    'path': 'app.py',
+                    'security_risk': 'LOW',
+                }
+            )
 
 
 def test_public_editor_schemas_do_not_expose_retired_edit_modes():
@@ -112,7 +102,7 @@ def test_public_editor_schemas_do_not_expose_retired_edit_modes():
     text_edit_modes = create_text_editor_tool()['function']['parameters']['properties']['edit_mode']['enum']
     symbol_commands = create_symbol_editor_tool()['function']['parameters']['properties']['command']['enum']
 
-    assert set(start_ops) == {'read', 'create', 'insert', 'undo', 'replace_range', 'find_symbol'}
+    assert set(start_ops) == {'insert', 'replace_range'}
     assert text_edit_modes == ['range']
     assert {'edit_symbol', 'edit_symbols', 'rename_symbol', 'find_symbol', 'replace_range'} <= set(symbol_commands)
 
@@ -132,8 +122,8 @@ def test_start_file_edit_required_metadata_validation_runs():
 def test_start_file_edit_runtime_creates_transaction(tmp_path):
     action = StartFileEditAction(
         path='app.py',
-        operation='create',
-        metadata={'security_risk': 'LOW'},
+        operation='replace_range',
+        metadata={'security_risk': 'LOW', 'start_line': 1, 'end_line': 2},
         session_id='runtime_create',
     )
     runtime = SimpleNamespace(workspace_root=tmp_path)

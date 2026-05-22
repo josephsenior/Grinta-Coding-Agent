@@ -364,7 +364,7 @@ class TestStartFileEditTransport:
         assert 'file_editor is internal-only' in message
         assert 'start_file_edit' in message
 
-    def test_start_file_edit_create_returns_metadata_only_action(self):
+    def test_start_file_edit_create_is_rejected(self):
         response = _model_response(
             tool_calls=[
                 _native_tool_call(
@@ -374,18 +374,12 @@ class TestStartFileEditTransport:
                         'path': 'app.py',
                         'security_risk': 'LOW',
                     },
-                )
-            ]
+            )
+        ]
         )
 
-        actions = response_to_actions(response)
-
-        assert len(actions) == 1
-        action = actions[0]
-        assert isinstance(action, StartFileEditAction)
-        assert action.path == 'app.py'
-        assert action.operation == 'create'
-        assert 'content' not in action.metadata
+        with pytest.raises(FunctionCallValidationError, match='not supported'):
+            response_to_actions(response)
 
     def test_start_file_edit_rejects_native_content_payloads(self):
         response = _model_response(
@@ -443,7 +437,7 @@ class TestStartFileEditTransport:
         assert isinstance(action, MessageAction)
         assert '<function=file_editor>' in action.content
 
-    def test_start_file_edit_read_bypasses_editor_mode(self):
+    def test_start_file_edit_read_is_rejected(self):
         response = _model_response(
             tool_calls=[
                 _native_tool_call(
@@ -457,10 +451,8 @@ class TestStartFileEditTransport:
             ]
         )
 
-        action = response_to_actions(response)[0]
-
-        assert isinstance(action, FileReadAction)
-        assert action.path == 'app.py'
+        with pytest.raises(FunctionCallValidationError, match='not supported'):
+            response_to_actions(response)
 
     def test_minimax_text_tool_call_is_converted_before_message_action(self):
         response = _model_response(
