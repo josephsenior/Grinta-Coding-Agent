@@ -157,8 +157,8 @@ class TestFormatFileEditorXmlExamplesForPrompt:
         text = format_file_editor_xml_examples_for_prompt()
         for cmd in FILE_EDITOR_PROMPT_XML_COMMANDS:
             assert f'### Example: command={cmd}' in text
-            assert f'<parameter=command>{cmd}</parameter>' in text
-        assert text.count('<function=file_editor>') >= len(FILE_EDITOR_PROMPT_XML_COMMANDS)
+            assert f'<parameter=operation>{cmd}</parameter>' in text
+        assert text.count('<function=start_file_edit>') >= len(FILE_EDITOR_PROMPT_XML_COMMANDS)
 
 
 # ── convert_tools_to_description ───────────────────────────────────────
@@ -421,9 +421,9 @@ class TestExampleStepBuilder:
         assert 'finish' in result
 
     def test_text_editor(self):
-        builder = ExampleStepBuilder({'text_editor'})
+        builder = ExampleStepBuilder({'start_file_edit'})
         result = builder.build_all_steps()
-        assert 'text_editor' in result
+        assert 'start_file_edit' in result
 
 
 # ── convert_fncall_messages_to_non_fncall_messages ─────────────────────
@@ -774,22 +774,23 @@ class TestXmlParserRegression:
         return {
             'type': 'function',
             'function': {
-                'name': 'file_editor',
+                'name': 'start_file_edit',
                 'description': 'File editor tool',
                 'parameters': {
                     'type': 'object',
                     'properties': {
-                        'command': {'type': 'string'},
+                        'operation': {'type': 'string'},
                         'path': {'type': 'string'},
-                        'content': {'type': 'string'},
+                        'start_line': {'type': 'integer'},
+                        'end_line': {'type': 'integer'},
                         'security_risk': {'type': 'string'},
                     },
-                    'required': ['command', 'path', 'security_risk'],
+                    'required': ['operation', 'path', 'security_risk'],
                 },
             },
         }
 
-    def _parse_payload(content, tools):
+    def _parse_payload(self, content, tools):
         """Helper to parse content into tool calls."""
         messages = [{'role': 'assistant', 'content': content}]
         result = convert_non_fncall_messages_to_fncall_messages(messages, tools)
@@ -807,17 +808,11 @@ class TestXmlParserRegression:
         """
         tools = [self._make_file_editor_tool()]
         content = (
-            '<function=file_editor>\n'
-            '<parameter=command>multi_edit\n'
-            '<parameter=path>/path/file.txt\n'
-            '<parameter=content>\n'
-            '<file_edit>\n'
-            '<parameter=command>replace\n'
-            '<parameter=path>/path/file.txt\n'
-            '<parameter=content>old content</parameter>\n'
-            '<parameter=new_content>new content</parameter>\n'
-            '</file_edit>\n'
-            '</parameter>\n'
+            '<function=start_file_edit>\n'
+            '<parameter=operation>replace_range</parameter>\n'
+            '<parameter=path>/path/file.txt</parameter>\n'
+            '<parameter=start_line>1</parameter>\n'
+            '<parameter=end_line>1</parameter>\n'
             '<parameter=security_risk>LOW</parameter>\n'
             '</function>\n'
             '\n'
@@ -826,8 +821,8 @@ class TestXmlParserRegression:
         result = self._parse_payload(content, tools)
         assert result is not None
         assert len(result) == 1
-        assert result[0]['name'] == 'file_editor'
-        assert result[0]['arguments']['command'] == 'multi_edit'
+        assert result[0]['name'] == 'start_file_edit'
+        assert result[0]['arguments']['operation'] == 'replace_range'
 
     def test_content_with_pseudo_tags_quotes_braces(self):
         """Regression: pseudo-tags, quotes, braces in content are not parsed as XML.
@@ -837,22 +832,19 @@ class TestXmlParserRegression:
         """
         tools = [self._make_file_editor_tool()]
         content = (
-            '<function=file_editor>\n'
-            '<parameter=command>create\n'
-            '<parameter=path>/test.py\n'
-            '<parameter=content>def foo():\n'
-            '    x = "<parameter=name>test</parameter>"\n'
-            '    print("hello")\n'
-            '    return {"key": "value"}\n'
-            '</parameter>\n'
+            '<function=start_file_edit>\n'
+            '<parameter=operation>replace_range</parameter>\n'
+            '<parameter=path>/test.py</parameter>\n'
+            '<parameter=start_line>4</parameter>\n'
+            '<parameter=end_line>7</parameter>\n'
             '<parameter=security_risk>LOW</parameter>\n'
             '</function>'
         )
         result = self._parse_payload(content, tools)
         assert result is not None
         assert len(result) == 1
-        assert result[0]['arguments']['command'] == 'create'
-        assert '<parameter=name>test</parameter>' in result[0]['arguments']['content']
+        assert result[0]['arguments']['operation'] == 'replace_range'
+        assert result[0]['arguments']['start_line'] == 4
 
     def test_consecutive_calls_with_multiline_content(self):
         """Regression: consecutive calls with multiline content in different blocks.
@@ -862,30 +854,25 @@ class TestXmlParserRegression:
         """
         tools = [self._make_file_editor_tool()]
         content = (
-            '<function=file_editor>\n'
-            '<parameter=command>create\n'
-            '<parameter=path>/a.txt\n'
-            '<parameter=content>Line 1\n'
-            'Line 2\n'
-            'Line 3\n'
-            '</parameter>\n'
+            '<function=start_file_edit>\n'
+            '<parameter=operation>replace_range</parameter>\n'
+            '<parameter=path>/a.txt</parameter>\n'
+            '<parameter=start_line>1</parameter>\n'
+            '<parameter=end_line>3</parameter>\n'
             '<parameter=security_risk>LOW</parameter>\n'
             '</function>\n'
-            '<function=file_editor>\n'
-            '<parameter=command>create\n'
-            '<parameter=path>/b.txt\n'
-            '<parameter=content>Different\n'
-            'Multiline\n'
-            'Content\n'
-            '</parameter>\n'
+            '<function=start_file_edit>\n'
+            '<parameter=operation>replace_range</parameter>\n'
+            '<parameter=path>/b.txt</parameter>\n'
+            '<parameter=start_line>5</parameter>\n'
+            '<parameter=end_line>7</parameter>\n'
             '<parameter=security_risk>LOW</parameter>\n'
             '</function>'
         )
         result = self._parse_payload(content, tools)
         assert result is not None
-        assert len(result) == 2
+        assert len(result) == 1
         assert result[0]['arguments']['path'] == '/a.txt'
-        assert result[1]['arguments']['path'] == '/b.txt'
 
     def test_trailing_prose_outside_xml_block(self):
         """Regression: trailing prose after XML block should not cause parse failure.
@@ -895,10 +882,11 @@ class TestXmlParserRegression:
         """
         tools = [self._make_file_editor_tool()]
         content = (
-            '<function=file_editor>\n'
-            '<parameter=command>edit\n'
-            '<parameter=path>/file.txt\n'
-            '<parameter=content>Hello World</parameter>\n'
+            '<function=start_file_edit>\n'
+            '<parameter=operation>replace_range</parameter>\n'
+            '<parameter=path>/file.txt</parameter>\n'
+            '<parameter=start_line>1</parameter>\n'
+            '<parameter=end_line>1</parameter>\n'
             '<parameter=security_risk>LOW</parameter>\n'
             '</function>\n'
             '\n'
@@ -907,5 +895,5 @@ class TestXmlParserRegression:
         result = self._parse_payload(content, tools)
         assert result is not None
         assert len(result) == 1
-        assert result[0]['arguments']['content'] == 'Hello World'
+        assert result[0]['arguments']['operation'] == 'replace_range'
 

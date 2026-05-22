@@ -1,8 +1,8 @@
-"""Block shell-level project file writes so agents use editor tools instead.
+"""Block shell-level project file writes so agents use dedicated edit tools.
 
 This is deterministic policy (not prompt-only): execute_bash / execute_powershell
-cannot replace text_editor / symbol_editor for creating or overwriting
-source and document files.
+cannot replace the native file-edit tools for creating or overwriting source and
+document files.
 """
 
 from __future__ import annotations
@@ -156,8 +156,9 @@ def evaluate_editor_only_shell_block(
 _BLOCK_MSG = (
     'SECURITY POLICY: Shell-based file writes to project source files are restricted to prevent '
     'accidental corruption and bypass of validation. Please use the dedicated editor tools instead:\n'
-    '- `text_editor` (create_file, insert_text, edit_mode) for creating or editing source files.\n'
-    '- `symbol_editor` (create_file, replace_range, …) for structured code modifications.\n'
+    '- `create_file` or `insert_text` for direct file creation and insertion.\n'
+    '- `start_file_edit` for raw-content edit transactions such as `replace_range` or `edit_symbol`.\n'
+    '- `find_symbol` and `rename_symbol` for symbol-aware navigation and renames.\n'
     'Direct shell commands like `Set-Content`, `Out-File`, `tee`, or `>` / `>>` are only allowed for '
     '`.log` / `.tmp` files or files in temporary directories. To allow shell-level writes, set '
     'env var `GRINTA_ALLOW_SHELL_WRITES=1`.'

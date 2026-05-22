@@ -666,7 +666,7 @@ class StructureEditor:
                 if os.path.exists(path):
                     with open(path, encoding='utf-8') as f:
                         old_content = f.read()
-                global_undo_manager.push(path, old_content, 'symbol_editor')
+                global_undo_manager.push(path, old_content, 'structure_edit')
             except Exception as e:
                 logger.warning('Failed to save undo history: %s', e)
 

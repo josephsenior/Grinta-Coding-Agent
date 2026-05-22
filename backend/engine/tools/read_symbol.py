@@ -1,4 +1,4 @@
-"""`read_symbol_definition` tool.
+"""`read_symbol` tool.
 
 Returns the source of a named symbol (function/class/method) or the full
 contents of a file. Backed by the tree-sitter universal editor that ships
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from backend.ledger.action import AgentThinkAction
 
 
-READ_SYMBOL_DEFINITION_TOOL_NAME = 'read_symbol_definition'
+READ_SYMBOL_TOOL_NAME = 'read_symbol'
 
 _DESCRIPTION = """
 Retrieve the full source of named symbols or files in one call.
@@ -40,10 +40,10 @@ hover, or references, use `lsp`.
 """.strip()
 
 
-def create_read_symbol_definition_tool() -> ChatCompletionToolParam:
-    """Create the read_symbol_definition tool definition."""
+def create_read_symbol_tool() -> ChatCompletionToolParam:
+    """Create the read_symbol tool definition."""
     return create_tool_definition(
-        name=READ_SYMBOL_DEFINITION_TOOL_NAME,
+        name=READ_SYMBOL_TOOL_NAME,
         description=_DESCRIPTION,
         properties={
             'entity_names': {
@@ -140,8 +140,8 @@ def _extract_symbol(entity: str) -> dict[str, Any]:
     }
 
 
-def build_read_symbol_definition_action(arguments: dict) -> AgentThinkAction:
-    """Build action for read_symbol_definition tool."""
+def build_read_symbol_action(arguments: dict) -> AgentThinkAction:
+    """Build action for read_symbol tool."""
     from backend.ledger.action import AgentThinkAction
 
     entity_names = arguments.get('entity_names') or []
@@ -150,5 +150,5 @@ def build_read_symbol_definition_action(arguments: dict) -> AgentThinkAction:
 
     results = [_extract_symbol(str(e)) for e in entity_names]
     return AgentThinkAction(
-        thought=f'[READ_SYMBOL_DEFINITION]\n{json.dumps({"results": results}, indent=2)}'
+        thought=f'[READ_SYMBOL]\n{json.dumps({"results": results}, indent=2)}'
     )

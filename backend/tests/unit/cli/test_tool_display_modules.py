@@ -75,26 +75,6 @@ class TestFileEditorRenderers(unittest.TestCase):
 
 
 class TestFriendlyVerbForTool(unittest.TestCase):
-    def test_text_editor_read(self) -> None:
-        v = friendly_verb_for_tool('text_editor', {'command': 'read_file'})
-        self.assertEqual(v, 'Read')
-
-    def test_text_editor_create(self) -> None:
-        v = friendly_verb_for_tool('text_editor', {'command': 'create_file'})
-        self.assertEqual(v, 'Created')
-
-    def test_text_editor_insert(self) -> None:
-        v = friendly_verb_for_tool('text_editor', {'command': 'insert_text'})
-        self.assertEqual(v, 'Inserted')
-
-    def test_text_editor_undo(self) -> None:
-        v = friendly_verb_for_tool('text_editor', {'command': 'undo_last_edit'})
-        self.assertEqual(v, 'Reverted')
-
-    def test_text_editor_unknown_command(self) -> None:
-        v = friendly_verb_for_tool('text_editor', {'command': 'unknown_cmd'})
-        self.assertEqual(v, 'Edited')
-
     def test_execute_bash(self) -> None:
         v = friendly_verb_for_tool('execute_bash', {})
         self.assertEqual(v, 'Ran')
@@ -121,6 +101,12 @@ class TestFriendlyVerbForTool(unittest.TestCase):
         self.assertEqual(v, 'Terminal Manager')
 
     def test_simple_map_tools(self) -> None:
+        self.assertEqual(friendly_verb_for_tool('read_file', {}), 'Read')
+        self.assertEqual(friendly_verb_for_tool('create_file', {}), 'Created')
+        self.assertEqual(friendly_verb_for_tool('insert_text', {}), 'Inserted')
+        self.assertEqual(friendly_verb_for_tool('undo_last_edit', {}), 'Reverted')
+        self.assertEqual(friendly_verb_for_tool('find_symbol', {}), 'Found')
+        self.assertEqual(friendly_verb_for_tool('rename_symbol', {}), 'Renamed')
         self.assertEqual(friendly_verb_for_tool('search_code', {}), 'Searched')
         self.assertEqual(friendly_verb_for_tool('think', {}), 'Thinking')
         self.assertEqual(friendly_verb_for_tool('finish', {}), 'Finished')
@@ -151,29 +137,6 @@ class TestToolActivityStatsHint(unittest.TestCase):
     def test_analyze_project_with_path(self) -> None:
         hint = tool_activity_stats_hint('analyze_project_structure', {'path': '/mydir'})
         self.assertIn('/mydir', hint)  # type: ignore[arg-type]
-
-    def test_text_editor_read_with_range(self) -> None:
-        hint = tool_activity_stats_hint(
-            'text_editor',
-            {
-                'command': 'read_file',
-                'path': 'foo.py',
-                'view_range_start': 10,
-                'view_range_end': 20,
-            },
-        )
-        self.assertIsNotNone(hint)
-        self.assertIn('10', hint)  # type: ignore[arg-type]
-
-    def test_text_editor_edit_with_path(self) -> None:
-        hint = tool_activity_stats_hint(
-            'text_editor',
-            {
-                'command': 'edit',
-                'path': 'myfile.py',
-            },
-        )
-        self.assertIsNotNone(hint)
 
     def test_task_tracker_with_list(self) -> None:
         hint = tool_activity_stats_hint(
@@ -320,12 +283,15 @@ class TestSummarizeToolArguments(unittest.TestCase):
         s = summarize_tool_arguments('execute_bash', {'command': 'ls -la'})
         self.assertIn('ls -la', s)
 
-    def test_text_editor_create(self) -> None:
-        s = summarize_tool_arguments(
-            'text_editor', {'command': 'create_file', 'path': 'foo.py'}
-        )
+    def test_create_file(self) -> None:
+        s = summarize_tool_arguments('create_file', {'path': 'foo.py'})
         self.assertIn('foo.py', s)
         self.assertIn('new file', s)
+
+    def test_find_symbol(self) -> None:
+        s = summarize_tool_arguments('find_symbol', {'path': 'foo.py', 'symbol_name': 'main'})
+        self.assertIn('foo.py', s)
+        self.assertIn('main', s)
 
     def test_think(self) -> None:
         s = summarize_tool_arguments('think', {'thought': 'Plan A'})
@@ -392,27 +358,6 @@ class TestSummarizeToolArguments(unittest.TestCase):
     def test_summarize_context(self) -> None:
         s = summarize_tool_arguments('summarize_context', {})
         self.assertEqual(s, 'compress conversation')
-
-    def test_symbol_editor_edit_symbols(self) -> None:
-        s = summarize_tool_arguments(
-            'symbol_editor',
-            {
-                'command': 'edit_symbols',
-                'path': 'foo.py',
-                'edits': [1, 2],
-            },
-        )
-        self.assertIn('2 symbols', s)
-
-    def test_symbol_editor_other_command(self) -> None:
-        s = summarize_tool_arguments(
-            'symbol_editor',
-            {
-                'command': 'rename',
-                'path': 'bar.py',
-            },
-        )
-        self.assertIn('rename', s)
 
     def test_shared_task_board(self) -> None:
         s = summarize_tool_arguments('shared_task_board', {'operation': 'list'})
@@ -554,9 +499,9 @@ class TestStripToolCallMarkerLines(unittest.TestCase):
 
     def test_keeps_json_format_tool_call_line(self) -> None:
         # Lines with [Tool call] name({...}) are actual tool calls — kept.
-        text = 'before\n[Tool call] text_editor({"command":"read_file","path":"f.py"})\nafter'
+        text = 'before\n[Tool call] read_file({"path":"f.py"})\nafter'
         result = strip_tool_call_marker_lines(text)
-        self.assertIn('[Tool call] text_editor', result)
+        self.assertIn('[Tool call] read_file', result)
         self.assertIn('after', result)
 
     def test_strips_friendly_summary_line(self) -> None:
@@ -619,10 +564,10 @@ class TestRedactStreamedToolCallMarkers(unittest.TestCase):
         self.assertEqual(redact_streamed_tool_call_markers(text), 'Hello world')
 
     def test_redacts_complete_marker(self) -> None:
-        text = '[Tool call] text_editor({"command": "read_file", "path": "a.py"})'
+        text = '[Tool call] read_file({"path": "a.py"})'
         result = redact_streamed_tool_call_markers(text)
         self.assertNotIn('[Tool call]', result)
-        self.assertNotIn('text_editor', result)
+        self.assertNotIn('read_file', result)
 
     def test_keeps_surrounding_text(self) -> None:
         text = 'Before.\n[Tool call] execute_bash({"command": "ls"})\nAfter.'
@@ -674,13 +619,13 @@ class TestExtractToolCallsFromTextMarkers(unittest.TestCase):
     def test_multiple_markers(self) -> None:
         text = (
             '[Tool call] execute_bash({"command": "ls"})\n'
-            '[Tool call] text_editor({"command": "read_file", "path": "a.py"})\n'
+            '[Tool call] read_file({"path": "a.py"})\n'
         )
         result = extract_tool_calls_from_text_markers(text)
         self.assertEqual(len(result), 2)
         names = [r['function']['name'] for r in result]
         self.assertIn('execute_bash', names)
-        self.assertIn('text_editor', names)
+        self.assertIn('read_file', names)
 
     def test_arguments_preserved(self) -> None:
         text = '[Tool call] execute_bash({"command": "git status"})'

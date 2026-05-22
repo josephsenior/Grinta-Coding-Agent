@@ -28,14 +28,6 @@ def tool_headline(tool_name: str, *, use_icons: bool = True) -> tuple[str, str]:
 # Verb mapping
 # ---------------------------------------------------------------------------
 
-_TEXT_EDITOR_VERBS = {
-    'read_file': 'Read',
-    'create_file': 'Created',
-    'insert_text': 'Inserted',
-    'undo_last_edit': 'Reverted',
-    'edit': 'Edited',
-}
-
 _TERMINAL_MANAGER_VERBS = {
     'open': 'Started',
     'input': 'Sent',
@@ -43,7 +35,12 @@ _TERMINAL_MANAGER_VERBS = {
 }
 
 _SIMPLE_VERB_MAP = {
-    'symbol_editor': 'Refactored',
+    'read_file': 'Read',
+    'create_file': 'Created',
+    'insert_text': 'Inserted',
+    'undo_last_edit': 'Reverted',
+    'rename_symbol': 'Renamed',
+    'find_symbol': 'Found',
     'agent_think': 'Thinking',
     'think': 'Thinking',
     'finish': 'Finished',
@@ -53,7 +50,7 @@ _SIMPLE_VERB_MAP = {
     'search_code': 'Searched',
     'lsp': 'Analyzed',
     'analyze_project_structure': 'Explored',
-    'read_symbol_definition': 'Read',
+    'read_symbol': 'Read',
     'browser': 'Browser',
     'delegate_task': 'Delegated',
     'shared_task_board': 'Checked',
@@ -61,12 +58,6 @@ _SIMPLE_VERB_MAP = {
     'call_mcp_tool': 'Invoked',
     'checkpoint': 'Saved',
 }
-
-
-def _verb_text_editor(args: dict[str, Any]) -> str:
-    return _TEXT_EDITOR_VERBS.get(str(args.get('command', '') or ''), 'Edited')
-
-
 def _verb_terminal_manager(args: dict[str, Any]) -> str:
     op = str(args.get('action') or '').strip().lower()
     return _TERMINAL_MANAGER_VERBS.get(op, 'Tool')
@@ -76,8 +67,6 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
     """Short English verb for the activity row (no emoji)."""
     tn = (tool_name or '').strip()
     a = args or {}
-    if tn == 'text_editor':
-        return _verb_text_editor(a)
     if tn in {'execute_bash', 'execute_powershell'}:
         return 'Ran'
     if tn == 'terminal_manager':
@@ -108,19 +97,6 @@ def _stats_analyze_project(args: dict[str, Any]) -> str | None:
     p = args.get('path') or args.get('root')
     if isinstance(p, str) and p.strip():
         return f'path: {p}'
-    return None
-
-
-def _stats_text_editor(args: dict[str, Any]) -> str | None:
-    cmd = str(args.get('command', '') or '')
-    path_hint = str(args.get('path', '') or '')
-    if cmd == 'read_file' and path_hint:
-        start = args.get('view_range_start')
-        end = args.get('view_range_end')
-        if start is not None and end is not None:
-            return f'lines {start}–{end}'
-    if cmd == 'edit' and path_hint:
-        return path_hint
     return None
 
 
@@ -164,8 +140,7 @@ def _stats_read_symbol(args: dict[str, Any]) -> str | None:
 _STATS_HANDLERS: dict[str, Callable[[dict[str, Any]], str | None]] = {
     'search_code': _stats_search_code,
     'analyze_project_structure': _stats_analyze_project,
-    'read_symbol_definition': _stats_read_symbol,
-    'text_editor': _stats_text_editor,
+    'read_symbol': _stats_read_symbol,
     'task_tracker': _stats_task_tracker,
     'terminal_manager': _stats_terminal_manager,
     'lsp': _stats_lsp,

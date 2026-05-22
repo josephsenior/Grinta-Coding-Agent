@@ -122,7 +122,7 @@ def create_symbol_editor_tool(
     )
 
     return create_tool_definition(
-        name='symbol_editor',
+        name='structure_edit',
         description=description,
         properties={
             'command': get_command_param(

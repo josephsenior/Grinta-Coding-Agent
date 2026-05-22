@@ -67,7 +67,7 @@ class TestToolCallDisplay(unittest.TestCase):
 
     def test_format_invocation_line(self) -> None:
         icon, line = format_tool_invocation_line(
-            'text_editor',
+            'start_file_edit',
             {'command': 'read_file', 'path': 'src/a.py'},
         )
         self.assertIsInstance(icon, str)
@@ -86,15 +86,15 @@ class TestToolCallDisplay(unittest.TestCase):
         self.assertFalse(looks_like_streaming_tool_arguments('Hello {'))
 
     def test_redact_streamed_tool_call_markers(self) -> None:
-        raw = '[Tool call] text_editor({"command":"create_file","path":"a.txt"})'
+        raw = '[Tool call] start_file_edit({"operation":"replace_range","path":"a.txt","start_line":1,"end_line":1})'
         self.assertEqual(redact_streamed_tool_call_markers(raw).strip(), '')
 
     def test_strip_tool_call_marker_lines_keeps_json_shape(self) -> None:
-        raw = '[Tool call] text_editor({"command":"create_file","path":"a.txt"})'
+        raw = '[Tool call] start_file_edit({"operation":"replace_range","path":"a.txt","start_line":1,"end_line":1})'
 
     def test_redact_removes_friendly_tool_call_lines(self) -> None:
         friendly = flatten_tool_call_for_history(
-            'text_editor',
+            'start_file_edit',
             '{"command":"read_file","path":"axis-3/query_rag.py"}',
         )
         raw = f'Intro line.\n{friendly}\n\nHello.'
@@ -122,7 +122,7 @@ class TestToolCallDisplay(unittest.TestCase):
 
     def test_flatten_tool_call_for_history_no_raw_json(self) -> None:
         line = flatten_tool_call_for_history(
-            'text_editor',
+            'start_file_edit',
             '{"command":"create_file","path":"hello.txt"}',
         )
         self.assertNotIn('{', line)

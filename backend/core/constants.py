@@ -284,7 +284,7 @@ DEFAULT_AGENT_PARALLEL_BATCH_SIZE = 10
 # can't mask a still-failing tool. Set to 0 to restore legacy zero-reset.
 DEFAULT_AGENT_ERROR_DECAY_PER_SUCCESS = 1
 
-# ── text_editor Per-Tool Circuit Breaker Thresholds ─────────────────
+# ── File Edit Per-Tool Circuit Breaker Thresholds ───────────────────
 # Hard (deterministic match/path/guard) failures: switch then pause.
 DEFAULT_TEXT_EDITOR_HARD_SWITCH = 2
 DEFAULT_TEXT_EDITOR_HARD_PAUSE = 3
@@ -373,9 +373,13 @@ LOG_COLORS = {
 DISABLE_COLOR_PRINTING = False
 
 # ── Tool Names ──────────────────────────────────────────────────────
-TEXT_EDITOR_TOOL_NAME = 'text_editor'
-FILE_EDITOR_TOOL_NAME = 'file_editor'
 START_FILE_EDIT_TOOL_NAME = 'start_file_edit'
+READ_FILE_TOOL_NAME = 'read_file'
+CREATE_FILE_TOOL_NAME = 'create_file'
+READ_SYMBOL_TOOL_NAME = 'read_symbol'
+UNDO_LAST_EDIT_TOOL_NAME = 'undo_last_edit'
+RENAME_SYMBOL_TOOL_NAME = 'rename_symbol'
+FIND_SYMBOL_TOOL_NAME = 'find_symbol'
 FINISH_TOOL_NAME = 'finish'
 TASK_TRACKER_TOOL_NAME = 'task_tracker'
 NOTE_TOOL_NAME = 'note'

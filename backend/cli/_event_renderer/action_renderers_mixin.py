@@ -494,8 +494,8 @@ class ActionRenderersMixin(_ActionRenderersBase):
     def _file_badge_label(action: Any) -> str:
         impl_source = getattr(action, 'impl_source', None)
         source_value = getattr(impl_source, 'value', impl_source)
-        if source_value == 'file_editor':
-            return 'file_editor'
+        if source_value == 'file_edit':
+            return 'file_edit'
         if source_value == 'default':
             return 'files'
         return 'files'

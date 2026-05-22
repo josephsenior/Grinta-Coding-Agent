@@ -377,7 +377,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
                     detail=pending.detail if pending else path,
                     secondary=pending.secondary if pending else None,
                     title=pending.title if pending else None,
-                    badge_label=pending.badge_label if pending else 'file_editor',
+                    badge_label=pending.badge_label if pending else 'file_edit',
                 ),
                 pad=ACTIVITY_BLOCK_BOTTOM_PAD,
             )

@@ -145,12 +145,16 @@ class OrchestratorPlanner:
         self._add_terminal_and_special_tools(tools)
 
     def _add_basic_tools(self, tools: list) -> None:
-        """Add cmd, finish, summarize_context, memory tools."""
+        """Add cmd, finish, summarize_context, memory, and read-only file tools."""
         from backend.engine.tools.bash import create_cmd_run_tool
         from backend.engine.tools.condensation_request import (
             create_summarize_context_tool,
         )
         from backend.engine.tools.finish import create_finish_tool
+        from backend.engine.tools.native_file_tools import (
+            create_find_symbol_tool,
+            create_read_file_tool,
+        )
         from backend.engine.tools.memory_manager import (
             create_memory_manager_tool,
         )
@@ -165,11 +169,13 @@ class OrchestratorPlanner:
             tools.append(create_memory_manager_tool())
         tools.append(create_note_tool())
         tools.append(create_recall_tool())
+        tools.append(create_read_file_tool())
+        tools.append(create_find_symbol_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
-        """Add task_tracker, search_code and read_symbol_definition tools."""
+        """Add task_tracker, search_code and read_symbol tools."""
         from backend.engine.tools.read_symbol import (
-            create_read_symbol_definition_tool,
+            create_read_symbol_tool,
         )
         from backend.engine.tools.search_code import (
             create_search_code_tool,
@@ -181,7 +187,7 @@ class OrchestratorPlanner:
         if getattr(self._config, 'enable_task_tracker_tool', False):
             tools.append(create_task_tracker_tool())
         tools.append(create_search_code_tool())
-        tools.append(create_read_symbol_definition_tool())
+        tools.append(create_read_symbol_tool())
 
     def _add_terminal_and_special_tools(self, tools: list) -> None:
         """Add terminal, optional feature tools (web search, delegate, etc.), and meta-cognition tools."""
@@ -269,7 +275,15 @@ class OrchestratorPlanner:
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):
             from backend.engine.tools import create_start_file_edit_tool
+            from backend.engine.tools.native_file_tools import (
+                create_create_file_tool,
+                create_rename_symbol_tool,
+                create_undo_last_edit_tool,
+            )
 
+            tools.append(create_create_file_tool())
+            tools.append(create_undo_last_edit_tool())
+            tools.append(create_rename_symbol_tool())
             tools.append(create_start_file_edit_tool())
 
     def _add_execute_mcp_tool_tool(self, tools: list) -> None:
@@ -397,7 +411,7 @@ class OrchestratorPlanner:
             '- One file-editing call per message.\n'
             '- For multi_edit: use nested raw-content blocks (NOT JSON arrays).\n'
             '- Each block: <path>, <operation>, <content>.\n'
-            '- Operations: create, replace_range, edit_symbol, replace_file.\n'
+            '- Operations: insert, replace_range, edit_symbol.\n'
             '</FILE_EDITING_TOOL_FORMAT>'
         )
 

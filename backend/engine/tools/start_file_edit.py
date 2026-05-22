@@ -28,9 +28,12 @@ def create_start_file_edit_tool() -> ChatCompletionToolParam:
                 'enum': [
                     'insert',
                     'replace_range',
+                    'edit_symbol',
+                    'edit_symbols',
+                    'multi_edit',
                 ],
             },
-            'path': get_path_param('Project-relative path to the target file.'),
+            'path': get_path_param('Project-relative path to the target file. Optional for multi_edit.'),
             'insert_line': {
                 'type': 'integer',
                 'description': 'Line number after which insert content is placed.',
@@ -42,6 +45,19 @@ def create_start_file_edit_tool() -> ChatCompletionToolParam:
             'end_line': {
                 'type': 'integer',
                 'description': '1-based inclusive end line for replace_range.',
+            },
+            'symbol_name': {
+                'type': 'string',
+                'description': 'Target symbol name for edit_symbol.',
+            },
+            'line_number': {
+                'type': 'integer',
+                'description': 'Optional disambiguation line number for edit_symbol.',
+            },
+            'symbol_names': {
+                'type': 'array',
+                'items': {'type': 'string'},
+                'description': 'Optional symbol names for edit_symbols context gathering.',
             },
             'expected_file_hash': {
                 'type': 'string',

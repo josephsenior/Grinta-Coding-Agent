@@ -225,13 +225,13 @@ class TestEventSource:
 
 class TestFileEditSource:
     def test_values(self):
-        assert FileEditSource.FILE_EDITOR.value == 'file_editor'
+        assert FileEditSource.FILE_EDITOR.value == 'file_edit'
         assert len(FileEditSource) == 1
 
 
 class TestFileReadSource:
     def test_values(self):
-        assert FileReadSource.FILE_EDITOR.value == 'file_editor'
+        assert FileReadSource.FILE_EDITOR.value == 'file_edit'
         assert FileReadSource.DEFAULT.value == 'default'
 
 

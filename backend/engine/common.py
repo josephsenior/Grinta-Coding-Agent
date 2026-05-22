@@ -521,15 +521,12 @@ def _enforce_xml_compliance(
 
 
 def _xml_format_error_example(tool_name: str) -> str:
-    if tool_name == 'file_editor':
+    if tool_name == 'start_file_edit':
         return (
             f'  <function={tool_name}>\n'
-            f'  <parameter=command>create</parameter>\n'
+            f'  <parameter=operation>replace_range</parameter>\n'
             f'  <parameter=path>/path/to/file</parameter>\n'
             f'  <parameter=security_risk>LOW</parameter>\n'
-            f'  <parameter=content>\n'
-            f'  full file contents here -- raw text, no JSON escaping\n'
-            f'  </parameter>\n'
             f'  </function>'
         )
     return (
@@ -567,10 +564,10 @@ def _get_tool_definition_by_name(tool_name: str) -> dict | None:
 
     Returns the tool dict (with 'function.parameters' schema) or None if not found.
     """
-    from backend.engine.tools.file_editor import create_file_editor_tool
+    from backend.engine.tools.start_file_edit import create_start_file_edit_tool
 
     tool_creators = {
-        'file_editor': create_file_editor_tool,
+        'start_file_edit': create_start_file_edit_tool,
     }
     creator = tool_creators.get(tool_name)
     if creator is None:
@@ -681,7 +678,7 @@ def _extract_xml_tool_calls_from_content(
             # Look up the tool definition for schema-aware validation
             tool_def = _get_tool_definition_by_name(fn_name)
             param_body = fn_body
-            if fn_name == 'file_editor' and '<file_edit>' in fn_body:
+            if fn_name == 'start_file_edit' and '<file_edit>' in fn_body:
                 param_body = re.sub(
                     r'<file_edit>.*?</file_edit>',
                     '',

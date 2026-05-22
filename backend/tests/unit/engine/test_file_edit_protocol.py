@@ -5,6 +5,7 @@ from pathlib import Path
 from backend.engine.file_edit_protocol import (
     EditTransaction,
     EditTransactionStore,
+    apply_edit_from_transaction,
     build_editor_mode_prompt,
     parse_editor_response,
 )
@@ -201,6 +202,34 @@ def test_editor_mode_prompt_explicitly_requests_raw_plain_text() -> None:
     assert '<current_target>' in prompt
     assert '<file_edit>' in prompt
     assert '<file_edit transaction_id=' not in prompt
+
+
+def test_editor_mode_prompt_mentions_json_for_edit_symbols() -> None:
+    txn = EditTransaction(
+        transaction_id='edit_json1',
+        session_id='s1',
+        path='pkg/app.py',
+        operation='edit_symbols',
+        delimiter='GRINTA_END_json1',
+        metadata={},
+        status='pending_content',
+    )
+    prompt = build_editor_mode_prompt(txn)
+    assert '"edits"' in prompt
+
+
+def test_editor_mode_prompt_mentions_json_for_multi_edit() -> None:
+    txn = EditTransaction(
+        transaction_id='edit_json2',
+        session_id='s1',
+        path='<batch>',
+        operation='multi_edit',
+        delimiter='GRINTA_END_json2',
+        metadata={},
+        status='pending_content',
+    )
+    prompt = build_editor_mode_prompt(txn)
+    assert '"file_edits"' in prompt
 
 
 def test_prompt_assets_include_concise_file_edit_policy() -> None:

@@ -84,7 +84,7 @@ def badge_for_tool_name(tool_name: str) -> ToolBadge:
 
     if 'bash' in name or 'powershell' in name or 'shell' in name:
         return _BADGES['shell']
-    if 'text_editor' in name or 'file' in name or 'symbol' in name:
+    if 'file' in name or 'symbol' in name:
         return _BADGES['files']
     if 'search' in name:
         return _BADGES['search']

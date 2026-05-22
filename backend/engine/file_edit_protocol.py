@@ -8,6 +8,7 @@ the existing internal file-editor action shape.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import secrets
@@ -21,7 +22,8 @@ from backend.core.errors import FunctionCallValidationError
 from backend.core.logger import app_logger as logger
 from backend.core.type_safety.path_validation import PathValidationError, SafePath
 from backend.engine.function_calling_helpers import parse_bool_argument, set_security_risk
-from backend.ledger.action import FileEditAction
+from backend.core.enums import FileReadSource
+from backend.ledger.action import FileEditAction, FileReadAction
 from backend.ledger.action.files import StartFileEditAction
 from backend.ledger.observation import AgentThinkObservation, ErrorObservation, Observation
 
@@ -40,19 +42,18 @@ DEFAULT_MAX_CONTENT_SIZE = int(
 _SESSION_NONE_KEY = '__grinta_default_session__'
 _OPEN_TAG_RE = re.compile(r'^<file_edit(?:\s+transaction_id="([^"]+)")?>$')
 
-CONTENT_REQUIRED_OPERATIONS = frozenset({'insert', 'replace_range'})
 UNSUPPORTED_START_FILE_EDIT_OPERATIONS = frozenset(
     {
         'create',
         'read',
         'undo',
         'find_symbol',
-        'edit_symbol',
-        'edit_symbols',
-        'multi_edit',
         'rename_symbol',
         'normalize_indent',
     }
+)
+CONTENT_REQUIRED_OPERATIONS = frozenset(
+    {'insert', 'replace_range', 'edit_symbol', 'edit_symbols', 'multi_edit'}
 )
 VALID_START_FILE_EDIT_OPERATIONS = (
     CONTENT_REQUIRED_OPERATIONS
@@ -212,12 +213,13 @@ def validate_start_file_edit_metadata(
             'is not supported by the two-mode start_file_edit path yet. '
             'Use replace_range with explicit file context or the AST tools.'
         )
-    if not isinstance(path, str) or not path.strip():
+    if op != 'multi_edit' and (not isinstance(path, str) or not path.strip()):
         raise FunctionCallValidationError('start_file_edit requires path')
 
     required_by_operation = {
         'insert': ('insert_line',),
         'replace_range': ('start_line', 'end_line'),
+        'edit_symbol': ('symbol_name',),
     }
     missing = [
         name
@@ -424,6 +426,7 @@ def build_editor_mode_prompt(
         'Do not include commentary.',
         'Output exactly one file_edit block.',
         'replace_range overwrites the inclusive line range; it does not insert.',
+        'edit_symbol replaces the complete body/content for the target symbol.',
         '',
         'Transaction:',
         f'- path: {txn.path}',
@@ -442,11 +445,27 @@ def build_editor_mode_prompt(
         )
     if target_context:
         lines.extend(['Current target content:', '<current_target>', target_context, '</current_target>', ''])
+    payload_line = '[raw replacement content only]'
+    payload_rules = ['Do not serialize it as JSON or a tool payload.']
+    if txn.operation == 'edit_symbols':
+        payload_line = '[JSON payload only: {"edits":[{"symbol_name":"...","new_body":"..."}]}]'
+        payload_rules = [
+            'For edit_symbols, the raw content must be JSON with an "edits" array or a bare JSON array.',
+            'Each item must contain symbol_name and new_body.',
+            'Do not wrap the JSON in markdown fences or tool-call syntax.',
+        ]
+    elif txn.operation == 'multi_edit':
+        payload_line = '[JSON payload only: {"file_edits":[...]}]'
+        payload_rules = [
+            'For multi_edit, the raw content must be JSON with a "file_edits" array or a bare JSON array.',
+            'Each item must match the existing multi_edit schema.',
+            'Do not wrap the JSON in markdown fences or tool-call syntax.',
+        ]
     lines.extend(
         [
             'Required output format:',
             '<file_edit>',
-            '[raw replacement content only]',
+            payload_line,
             txn.delimiter,
             '</file_edit>',
             '',
@@ -454,7 +473,7 @@ def build_editor_mode_prompt(
             'The delimiter must appear exactly once, on its own line.',
             'The closing tag must immediately follow the delimiter line.',
             'Everything between opening tag and delimiter is raw file content.',
-            'Do not serialize it as JSON or a tool payload.',
+            *payload_rules,
         ]
     )
     return '\n'.join(lines)
@@ -463,7 +482,7 @@ def build_editor_mode_prompt(
 def build_file_edit_action_from_transaction(
     content: str,
     txn: EditTransaction,
-) -> FileEditAction:
+) -> Any:
     metadata = dict(txn.metadata)
     expected_file_hash = metadata.get('expected_file_hash') or metadata.get(
         'expected_old_hash'
@@ -506,9 +525,83 @@ def build_file_edit_action_from_transaction(
             ),
             metadata,
         )
+    if op == 'edit_symbol':
+        from backend.engine.tools.structure_editor import StructureEditor
+
+        editor = StructureEditor()
+        symbol_name = str(metadata['symbol_name'])
+        line_number = metadata.get('line_number')
+        result = editor.edit_function(
+            txn.path,
+            symbol_name,
+            content,
+            line_number=int(line_number) if line_number is not None else None,
+        )
+        if not result.success:
+            raise FunctionCallValidationError(
+                f"edit_symbol failed for '{symbol_name}': {result.message}"
+            )
+        action = FileReadAction(
+            path=txn.path,
+            impl_source=FileReadSource.DEFAULT,
+            thought=result.message,
+        )
+        set_security_risk(action, metadata)
+        return action
+    if op == 'edit_symbols':
+        from backend.engine.function_calling import _handle_edit_symbols_command
+        from backend.engine.tools.structure_editor import StructureEditor
+
+        payload = _parse_structured_editor_payload(content, key='edits')
+        editor = StructureEditor()
+        action = _handle_edit_symbols_command(
+            editor,
+            txn.path,
+            {'edits': payload},
+            tool_name='start_file_edit',
+        )
+        set_security_risk(action, metadata)
+        return action
+    if op == 'multi_edit':
+        from backend.engine.function_calling import _handle_multi_edit_command
+
+        payload = _parse_structured_editor_payload(content, key='file_edits')
+        action = _handle_multi_edit_command(
+            txn.path,
+            {'file_edits': payload},
+        )
+        set_security_risk(action, metadata)
+        return action
     raise FunctionCallValidationError(
         f"Operation '{op}' does not accept editor-mode content."
     )
+
+
+def _parse_structured_editor_payload(
+    content: str,
+    *,
+    key: str,
+) -> list[dict[str, Any]]:
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise FunctionCallValidationError(
+            f'Editor-mode payload must be valid JSON for structured edit operations: {exc}'
+        ) from exc
+
+    items: Any = parsed
+    if isinstance(parsed, dict):
+        items = parsed.get(key)
+    if not isinstance(items, list) or not items:
+        raise FunctionCallValidationError(
+            f'Editor-mode structured payload must contain a non-empty "{key}" array.'
+        )
+    for idx, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise FunctionCallValidationError(
+                f'Editor-mode structured payload item {idx} must be an object.'
+            )
+    return items
 
 
 def _with_security(action: FileEditAction, metadata: dict[str, Any]) -> FileEditAction:
@@ -519,7 +612,7 @@ def _with_security(action: FileEditAction, metadata: dict[str, Any]) -> FileEdit
 def apply_edit_from_transaction(
     content: str | None,
     txn: EditTransaction,
-) -> FileEditAction:
+) -> Any:
     """Build the existing internal editor action from captured raw content."""
     if content is None:
         raise FunctionCallValidationError('Editor transaction content is missing.')
@@ -532,7 +625,8 @@ def start_file_edit_transaction(runtime: Any, action: StartFileEditAction) -> Ob
     operation = action.operation.strip().lower()
     try:
         validate_start_file_edit_metadata(operation, action.path, metadata)
-        _validate_path_against_runtime(runtime, action.path)
+        if operation != 'multi_edit':
+            _validate_path_against_runtime(runtime, action.path)
         if not operation_requires_content(operation, metadata):
             raise FunctionCallValidationError(
                 f"start_file_edit operation '{operation}' is not supported. "
@@ -614,6 +708,47 @@ def build_target_context(
         start = max(int(txn.metadata.get('start_line', 1)) - 1, 0)
         end = min(int(txn.metadata.get('end_line', start + 1)), len(lines))
         return ''.join(lines[start:end])
+    if txn.operation == 'edit_symbol':
+        try:
+            from backend.engine.tools.structure_editor import StructureEditor
+
+            editor = StructureEditor()
+            symbol = editor.find_symbol(
+                txn.path,
+                str(txn.metadata.get('symbol_name', '')),
+                None,
+            )
+            if symbol is not None:
+                start = max(symbol.line_start - 1, 0)
+                end = min(symbol.line_end, len(lines))
+                return ''.join(lines[start:end])
+        except Exception:
+            return None
+    if txn.operation == 'edit_symbols':
+        symbol_names = txn.metadata.get('symbol_names')
+        if not isinstance(symbol_names, list) or not symbol_names:
+            return None
+        contexts: list[str] = []
+        try:
+            from backend.engine.tools.structure_editor import StructureEditor
+
+            editor = StructureEditor()
+            for raw_name in symbol_names:
+                if not isinstance(raw_name, str) or not raw_name.strip():
+                    continue
+                symbol = editor.find_symbol(txn.path, raw_name, None)
+                if symbol is None:
+                    continue
+                start = max(symbol.line_start - 1, 0)
+                end = min(symbol.line_end, len(lines))
+                contexts.append(
+                    f'# symbol: {raw_name}\n' + ''.join(lines[start:end])
+                )
+        except Exception:
+            return None
+        return '\n\n'.join(contexts) or None
+    if txn.operation == 'multi_edit':
+        return None
     if txn.operation == 'insert':
         insert_line = int(txn.metadata.get('insert_line', 0))
         start = max(insert_line - 5, 0)

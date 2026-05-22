@@ -361,7 +361,7 @@ class TestStartFileEditTransport:
             response_to_actions(response)
 
         message = str(exc_info.value)
-        assert 'file_editor is internal-only' in message
+        assert 'legacy file-edit tool is internal-only' in message.lower()
         assert 'start_file_edit' in message
 
     def test_start_file_edit_create_is_rejected(self):
@@ -424,8 +424,8 @@ class TestStartFileEditTransport:
     def test_xml_file_editor_block_is_plain_text_in_normal_mode(self):
         response = _model_response(
             content=(
-                '<function=file_editor>\n'
-                '<parameter=command>create</parameter>\n'
+                '<function=start_file_edit>\n'
+                '<parameter=operation>replace_range</parameter>\n'
                 '<parameter=path>app.py</parameter>\n'
                 '<parameter=security_risk>LOW</parameter>\n'
                 '</function>'
@@ -435,7 +435,7 @@ class TestStartFileEditTransport:
         action = response_to_actions(response)[0]
 
         assert isinstance(action, MessageAction)
-        assert '<function=file_editor>' in action.content
+        assert '<function=start_file_edit>' in action.content
 
     def test_start_file_edit_read_is_rejected(self):
         response = _model_response(
@@ -704,7 +704,7 @@ class TestValidateStructureEditorArgs:
         assert result.path == 'x.py'
 
     def test_edit_not_valid_for_symbol_editor(self):
-        """Edit is NOT a symbol_editor command — use text_editor instead."""
+        """Edit is not a structure-edit command."""
         from backend.engine.function_calling import _handle_symbol_editor_tool
 
         with pytest.raises(FunctionCallValidationError, match='Unknown command'):
@@ -1133,7 +1133,7 @@ class TestHealthCheck:
         from backend.engine.tools.health_check import run_production_health_check
 
         result = run_production_health_check(raise_on_failure=False)
-        assert 'symbol_editor' in result
+        assert 'structure_editor' in result
 
     def test_atomic_refactor_check_present(self):
         from backend.engine.tools.health_check import run_production_health_check

@@ -21,7 +21,6 @@ import backend.engine.tools.delegate_task as delegate_task_tools
 import backend.engine.tools.lsp_query as lsp_query_tools
 import backend.engine.tools.terminal_manager as terminal_manager_tools
 from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
-from backend.inference.tool_names import FILE_EDITOR_TOOL_NAME
 from backend.core.editor_recovery import append_editor_recovery_guidance
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.errors import (
@@ -41,6 +40,11 @@ from backend.engine.function_calling_helpers import (
 )
 from backend.engine.tools import (
     create_cmd_run_tool,
+    create_create_file_tool,
+    create_find_symbol_tool,
+    create_read_file_tool,
+    create_rename_symbol_tool,
+    create_undo_last_edit_tool,
     create_file_editor_tool,
     create_finish_tool,
     create_start_file_edit_tool,
@@ -75,8 +79,8 @@ from backend.engine.tools.memory_manager import (
 from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engine.tools.note import build_note_action, build_recall_action
 from backend.engine.tools.read_symbol import (
-    READ_SYMBOL_DEFINITION_TOOL_NAME,
-    build_read_symbol_definition_action,
+    READ_SYMBOL_TOOL_NAME,
+    build_read_symbol_action,
 )
 from backend.engine.tools.search_code import (
     SEARCH_CODE_TOOL_NAME,
@@ -86,7 +90,15 @@ from backend.engine.tools.task_tracker import TaskTracker
 from backend.engine.tools.terminal_manager import (
     TERMINAL_MANAGER_TOOL_NAME,
 )
-from backend.inference.tool_names import START_FILE_EDIT_TOOL_NAME, TASK_TRACKER_TOOL_NAME
+from backend.inference.tool_names import (
+    CREATE_FILE_TOOL_NAME,
+    FIND_SYMBOL_TOOL_NAME,
+    READ_FILE_TOOL_NAME,
+    RENAME_SYMBOL_TOOL_NAME,
+    START_FILE_EDIT_TOOL_NAME,
+    TASK_TRACKER_TOOL_NAME,
+    UNDO_LAST_EDIT_TOOL_NAME,
+)
 from backend.ledger.action import (
     Action,
     AgentThinkAction,
@@ -284,11 +296,11 @@ def _handle_search_code_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     )
 
 
-def _handle_read_symbol_definition_tool(
+def _handle_read_symbol_tool(
     arguments: Mapping[str, Any],
 ) -> AgentThinkAction:
-    """Handle READ_SYMBOL_DEFINITION_TOOL: fetch symbol/file source via tree-sitter."""
-    return build_read_symbol_definition_action(dict(arguments))
+    """Handle READ_SYMBOL_TOOL: fetch symbol/file source via tree-sitter."""
+    return build_read_symbol_action(dict(arguments))
 
 
 def _handle_checkpoint_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
@@ -304,7 +316,7 @@ def _handle_analyze_project_structure_tool(
 
 
 def _validate_text_editor_args(arguments: Mapping[str, Any]) -> tuple[str, str]:
-    """Validate required arguments for text_editor tool."""
+    """Validate required arguments for the internal native file tool schema."""
     tool_name = cast(str, create_text_editor_tool().get('function', {}).get('name', ''))
     command = require_tool_argument(arguments, 'command', tool_name)
     if str(command).strip().lower() == 'multi_edit':
@@ -374,11 +386,11 @@ def _filter_valid_symbol_editor_kwargs(other_kwargs: Mapping[str, Any]) -> dict[
 
 
 def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
-    """Handle text_editor tool call."""
+    """Handle the internal native file tool schema."""
     command = cast(str, arguments.get('command', ''))
 
     path, command = _validate_text_editor_args(arguments)
-    validate_security_risk(arguments, 'text_editor')
+    validate_security_risk(arguments, 'file_edit')
     command, normalized_args = _normalize_file_editor_command_and_args(
         command, arguments
     )
@@ -406,7 +418,7 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
     }
     if command not in valid_commands:
         raise FunctionCallValidationError(
-            f"Unknown command '{command}' for text_editor tool. "
+            f"Unknown command '{command}' for file edit tool. "
             f'Valid commands: {sorted(valid_commands)}'
         )
     if command == 'multi_edit':
@@ -416,7 +428,7 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
         edit_mode = normalized_args.get('edit_mode')
         if not edit_mode:
             raise FunctionCallValidationError(
-                "[ERROR] text_editor command 'edit' requires 'edit_mode'. "
+                "[ERROR] file edit command 'edit' requires 'edit_mode'. "
                 '[CAUSE] edit_mode was omitted from the tool call arguments. '
                 "[SUGGESTION] Provide 'range'. "
                 'Example: {"command": "edit", "edit_mode": "range", '
@@ -479,17 +491,17 @@ def _parse_text_multi_edit_item(
     item_path = raw_item.get('path')
     if not isinstance(item_path, str) or not item_path.strip():
         raise FunctionCallValidationError(
-            f"text_editor multi_edit item {idx} is missing required 'path'."
+            f"multi_edit item {idx} is missing required 'path'."
         )
     command = str(raw_item.get('command') or '').strip().lower()
     if command not in {'create_file', 'insert_text', 'edit'}:
         raise FunctionCallValidationError(
-            f"text_editor multi_edit item {idx} has unsupported command {command!r}."
+            f"multi_edit item {idx} has unsupported command {command!r}."
         )
     item = dict(raw_item)
     if command == 'edit' and str(item.get('edit_mode') or '').strip().lower() != 'range':
         raise FunctionCallValidationError(
-            f"text_editor multi_edit item {idx}: command='edit' only supports edit_mode='range'."
+            f"multi_edit item {idx}: command='edit' only supports edit_mode='range'."
         )
     return item_path.strip(), command, item
 
@@ -505,7 +517,7 @@ def _apply_text_multi_edit_operation(
         file_text = item.get('file_text')
         if not isinstance(file_text, str):
             raise FunctionCallValidationError(
-                "text_editor multi_edit create_file requires 'file_text'."
+                "multi_edit create_file requires 'file_text'."
             )
         result = temp_editor(
             command='create_file',
@@ -518,7 +530,7 @@ def _apply_text_multi_edit_operation(
         insert_line = item.get('insert_line')
         if not isinstance(new_str, str) or insert_line is None:
             raise FunctionCallValidationError(
-                "text_editor multi_edit insert_text requires 'new_str' and 'insert_line'."
+                "multi_edit insert_text requires 'new_str' and 'insert_line'."
             )
         result = temp_editor(
             command='insert_text',
@@ -532,7 +544,7 @@ def _apply_text_multi_edit_operation(
         end_line = item.get('end_line')
         if not isinstance(new_str, str) or start_line is None or end_line is None:
             raise FunctionCallValidationError(
-                "text_editor multi_edit edit/range requires 'start_line', 'end_line', and 'new_str'."
+                "multi_edit edit/range requires 'start_line', 'end_line', and 'new_str'."
             )
         result = temp_editor(
             command='edit',
@@ -548,9 +560,9 @@ def _apply_text_multi_edit_operation(
 
         raise ToolExecutionError(
             append_editor_recovery_guidance(
-                f'text_editor multi_edit failed for {rel_path}: {result.error}',
+                f'multi_edit failed for {rel_path}: {result.error}',
                 path=rel_path,
-                tool_name='text_editor',
+                tool_name='multi_edit',
                 content=cast(str | None, item.get('file_text') or item.get('new_str')),
             )
         )
@@ -587,11 +599,11 @@ def _handle_text_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
     raw_edits = arguments.get('file_edits')
     if not isinstance(raw_edits, list) or not raw_edits:
         raise FunctionCallValidationError(
-            "text_editor multi_edit requires a non-empty 'file_edits' array."
+            "multi_edit requires a non-empty 'file_edits' array."
         )
     if len(raw_edits) > _MAX_MULTI_EDIT_FILES:
         raise FunctionCallValidationError(
-            f'text_editor multi_edit supports at most {_MAX_MULTI_EDIT_FILES} items per call.'
+            f'multi_edit supports at most {_MAX_MULTI_EDIT_FILES} items per call.'
         )
 
     parsed: list[tuple[str, str, str]] = []
@@ -599,7 +611,7 @@ def _handle_text_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
     for idx, raw_item in enumerate(raw_edits):
         if not isinstance(raw_item, Mapping):
             raise FunctionCallValidationError(
-                f'text_editor multi_edit item {idx} must be an object.'
+                f'multi_edit item {idx} must be an object.'
             )
         item_path, command, item = _parse_text_multi_edit_item(raw_item, idx)
         canonical_path, display_path = _resolve_multi_edit_path(item_path, idx)
@@ -613,7 +625,7 @@ def _handle_text_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
     except Exception as e:  # pragma: no cover
         from backend.core.errors import ToolExecutionError
 
-        raise ToolExecutionError(f'text_editor multi_edit unavailable: {e}') from e
+        raise ToolExecutionError(f'multi_edit unavailable: {e}') from e
 
     workspace_root = require_effective_workspace_root()
     refactor = AtomicRefactor()
@@ -664,7 +676,7 @@ def _handle_text_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
                         from backend.core.errors import ToolExecutionError
 
                         raise ToolExecutionError(
-                            f'text_editor multi_edit produced no output for {_multi_edit_relative_path(item_path, workspace_root)}'
+                            f'multi_edit produced no output for {_multi_edit_relative_path(item_path, workspace_root)}'
                         )
                     final_contents[item_path] = temp_path.read_text(encoding='utf-8')
 
@@ -676,9 +688,9 @@ def _handle_text_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
 
                 raise ToolExecutionError(
                     append_editor_recovery_guidance(
-                        'text_editor multi_edit aborted because the file changed on disk during batch preparation. Re-read and retry.',
+                        'multi_edit aborted because the file changed on disk during batch preparation. Re-read and retry.',
                         path=_multi_edit_relative_path(item_path, workspace_root),
-                        tool_name='text_editor',
+                        tool_name='multi_edit',
                     )
                 )
 
@@ -703,8 +715,8 @@ def _handle_text_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
         err_lines = '\n'.join(f'  - {e}' for e in (result.errors or [result.message]))
         raise ToolExecutionError(
             append_editor_recovery_guidance(
-                f'text_editor multi_edit transaction rolled back — no files modified.\n{err_lines}',
-                tool_name='text_editor',
+                f'multi_edit transaction rolled back — no files modified.\n{err_lines}',
+                tool_name='multi_edit',
             )
         )
 
@@ -712,7 +724,7 @@ def _handle_text_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
     file_lines = '\n'.join(f'  • {path}' for path in paths)
     return MessageAction(
         content=(
-            f'✓ text_editor multi_edit committed {result.files_modified} file(s) atomically\n'
+            f'✓ multi_edit committed {result.files_modified} file(s) atomically\n'
             f'{file_lines}'
         )
     )
@@ -942,7 +954,7 @@ def _normalize_symbol_editor_alias(
     command: str,
     arguments: Mapping[str, Any],
 ) -> tuple[str, dict[str, Any]]:
-    """Normalize symbol_editor command casing.
+    """Normalize structure edit command casing.
 
     Canonical-only mode: no legacy command or field aliases are accepted.
     """
@@ -955,7 +967,11 @@ _MAX_EDIT_SYMBOLS_PER_BATCH = 25
 
 
 def _handle_edit_symbol_command(
-    editor: Any, path: str, arguments: Mapping[str, Any]
+    editor: Any,
+    path: str,
+    arguments: Mapping[str, Any],
+    *,
+    tool_name: str = 'start_file_edit',
 ) -> Action:
     """Handle edit_symbol command."""
     symbol_name = cast(str | None, arguments.get('symbol_name'))
@@ -979,7 +995,7 @@ def _handle_edit_symbol_command(
         error_msg = append_editor_recovery_guidance(
             f"Ambiguous symbol '{symbol_name}': {e}",
             path=path,
-            tool_name='symbol_editor',
+            tool_name=tool_name,
         )
         logger.warning(f'❌ {error_msg}')
         from backend.core.errors import ToolExecutionError
@@ -995,7 +1011,7 @@ def _handle_edit_symbol_command(
     error_msg = append_editor_recovery_guidance(
         f"Edit failed for '{symbol_name}': {result.message}",
         path=path,
-        tool_name='symbol_editor',
+        tool_name=tool_name,
     )
     logger.warning(f'❌ {error_msg}')
     from backend.core.errors import ToolExecutionError
@@ -1125,7 +1141,11 @@ def _run_edit_symbols_sequence(
 
 
 def _handle_edit_symbols_command(
-    editor: Any, path: str, arguments: Mapping[str, Any]
+    editor: Any,
+    path: str,
+    arguments: Mapping[str, Any],
+    *,
+    tool_name: str = 'structure_edit',
 ) -> Action:
     """Apply multiple ``edit_symbol``-style replacements in one call.
 
@@ -1140,7 +1160,11 @@ def _handle_edit_symbols_command(
 
 
 def _handle_rename_symbol_command(
-    editor: Any, path: str, arguments: Mapping[str, Any]
+    editor: Any,
+    path: str,
+    arguments: Mapping[str, Any],
+    *,
+    tool_name: str = 'rename_symbol',
 ) -> Action:
     """Handle rename_symbol command."""
     old_name = cast(str | None, arguments.get('old_name'))
@@ -1158,7 +1182,11 @@ def _handle_rename_symbol_command(
             path=path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
 
-    error_msg = f'Rename failed: {result.message}'
+    error_msg = append_editor_recovery_guidance(
+        f'Rename failed: {result.message}',
+        path=path,
+        tool_name=tool_name,
+    )
     logger.warning(f'❌ {error_msg}')
     from backend.core.errors import ToolExecutionError
 
@@ -1166,7 +1194,11 @@ def _handle_rename_symbol_command(
 
 
 def _handle_find_symbol_command(
-    editor: Any, path: str, arguments: Mapping[str, Any]
+    editor: Any,
+    path: str,
+    arguments: Mapping[str, Any],
+    *,
+    tool_name: str = 'find_symbol',
 ) -> Action:
     """Handle find_symbol command."""
     symbol_name = cast(str | None, arguments.get('symbol_name'))
@@ -1203,7 +1235,7 @@ def _handle_find_symbol_command(
     error_msg = append_editor_recovery_guidance(
         error_msg,
         path=path,
-        tool_name='symbol_editor',
+        tool_name=tool_name,
     )
     logger.warning(f'❌ {error_msg}')
     from backend.core.errors import ToolExecutionError
@@ -1212,7 +1244,11 @@ def _handle_find_symbol_command(
 
 
 def _handle_replace_range_command(
-    editor: Any, path: str, arguments: Mapping[str, Any]
+    editor: Any,
+    path: str,
+    arguments: Mapping[str, Any],
+    *,
+    tool_name: str = 'replace_range',
 ) -> Action:
     """Handle replace_range command."""
     start_line = arguments.get('start_line')
@@ -1233,7 +1269,7 @@ def _handle_replace_range_command(
     error_msg = append_editor_recovery_guidance(
         f'❌ Replace failed: {result.message}',
         path=path,
-        tool_name='symbol_editor',
+        tool_name=tool_name,
     )
     from backend.core.errors import ToolExecutionError
 
@@ -1241,7 +1277,11 @@ def _handle_replace_range_command(
 
 
 def _handle_normalize_indent_command(
-    editor: Any, path: str, arguments: Mapping[str, Any]
+    editor: Any,
+    path: str,
+    arguments: Mapping[str, Any],
+    *,
+    tool_name: str = 'normalize_indent',
 ) -> Action:
     """Handle normalize_indent command."""
     style = arguments.get('style')
@@ -1256,12 +1296,13 @@ def _handle_normalize_indent_command(
 
 
 def _handle_create_file_command(path: str, arguments: Mapping[str, Any]) -> Action:
-    """Handle create_file command — delegates to text_editor create_file."""
+    """Handle create_file command."""
     file_text = cast(str, arguments.get('file_text', ''))
     return FileEditAction(
         path=path,
         command='create_file',
         file_text=file_text,
+        overwrite_existing=bool(arguments.get('overwrite_existing', False)),
         impl_source=FileEditSource.FILE_EDITOR,
     )
 
@@ -1270,7 +1311,16 @@ def _handle_read_file_command(
     path: str, _arguments: Mapping[str, Any] | None = None
 ) -> Action:
     """Handle read_file command — reads file contents."""
-    return FileReadAction(path=path, impl_source=FileReadSource.FILE_EDITOR)
+    view_range = None
+    if _arguments is not None:
+        raw_view_range = _arguments.get('view_range')
+        if isinstance(raw_view_range, list):
+            view_range = raw_view_range
+    return FileReadAction(
+        path=path,
+        view_range=view_range,
+        impl_source=FileReadSource.FILE_EDITOR,
+    )
 
 
 def _handle_insert_text_command(path: str, arguments: Mapping[str, Any]) -> Action:
@@ -1299,6 +1349,67 @@ def _handle_undo_last_edit_command(
         command='undo_last_edit',
         impl_source=FileEditSource.FILE_EDITOR,
     )
+
+
+def _handle_read_file_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, READ_FILE_TOOL_NAME)
+    path = require_tool_argument(arguments, 'path', READ_FILE_TOOL_NAME)
+    action = _handle_read_file_command(str(path), arguments)
+    set_security_risk(action, arguments)
+    return action
+
+
+def _handle_create_file_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, CREATE_FILE_TOOL_NAME)
+    path = require_tool_argument(arguments, 'path', CREATE_FILE_TOOL_NAME)
+    require_tool_argument(arguments, 'file_text', CREATE_FILE_TOOL_NAME)
+    normalized_args = dict(arguments)
+    from backend.core.content_escape_repair import repair_arguments_in_place
+
+    repair_arguments_in_place(normalized_args, str(path))
+    action = _handle_create_file_command(str(path), normalized_args)
+    set_security_risk(action, arguments)
+    return action
+
+
+def _handle_undo_last_edit_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, UNDO_LAST_EDIT_TOOL_NAME)
+    path = require_tool_argument(arguments, 'path', UNDO_LAST_EDIT_TOOL_NAME)
+    action = _handle_undo_last_edit_command(str(path), arguments)
+    set_security_risk(action, arguments)
+    return action
+
+
+def _handle_rename_symbol_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, RENAME_SYMBOL_TOOL_NAME)
+    path = require_tool_argument(arguments, 'path', RENAME_SYMBOL_TOOL_NAME)
+    normalized_args = dict(arguments)
+    from backend.core.content_escape_repair import repair_arguments_in_place
+    from backend.engine.tools.structure_editor import StructureEditor
+
+    repair_arguments_in_place(normalized_args, str(path))
+    editor = StructureEditor()
+    action = _handle_rename_symbol_command(
+        editor, str(path), normalized_args, tool_name=RENAME_SYMBOL_TOOL_NAME
+    )
+    set_security_risk(action, arguments)
+    return action
+
+
+def _handle_find_symbol_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, FIND_SYMBOL_TOOL_NAME)
+    path = require_tool_argument(arguments, 'path', FIND_SYMBOL_TOOL_NAME)
+    normalized_args = dict(arguments)
+    from backend.core.content_escape_repair import repair_arguments_in_place
+    from backend.engine.tools.structure_editor import StructureEditor
+
+    repair_arguments_in_place(normalized_args, str(path))
+    editor = StructureEditor()
+    action = _handle_find_symbol_command(
+        editor, str(path), normalized_args, tool_name=FIND_SYMBOL_TOOL_NAME
+    )
+    set_security_risk(action, arguments)
+    return action
 
 
 _MAX_MULTI_EDIT_FILES = 50
@@ -1340,7 +1451,7 @@ def _multi_edit_raise(message: str, *, path: str | None = None) -> None:
         append_editor_recovery_guidance(
             message,
             path=path,
-            tool_name='symbol_editor',
+            tool_name='multi_edit',
         )
     )
 
@@ -1622,6 +1733,8 @@ def _dispatch_structure_editor_commands(
     command: str,
     path: str,
     normalized_args: dict[str, Any],
+    *,
+    tool_name: str = 'structure_edit',
 ) -> Action:
     editor_command_handlers: dict[
         str, Callable[[Any, str, Mapping[str, Any]], Action]
@@ -1643,7 +1756,7 @@ def _dispatch_structure_editor_commands(
     try:
         if command in editor_command_handlers:
             handler = editor_command_handlers[command]
-            return handler(editor, path, normalized_args)
+            return handler(editor, path, normalized_args, tool_name=tool_name)
         if command in simple_command_handlers:
             simple_handler = simple_command_handlers[command]
             return simple_handler(path, normalized_args)
@@ -1651,7 +1764,7 @@ def _dispatch_structure_editor_commands(
             simple_command_handlers.keys()
         )
         raise FunctionCallValidationError(
-            f"Unknown command '{command}' for symbol_editor tool. "
+            f"Unknown command '{command}' for {tool_name} tool. "
             f'Valid commands: {all_cmds}'
         )
     except FunctionCallValidationError:
@@ -1660,7 +1773,7 @@ def _dispatch_structure_editor_commands(
         error_msg = append_editor_recovery_guidance(
             f'Symbol Editor error: {str(e)}',
             path=path,
-            tool_name='symbol_editor',
+            tool_name=tool_name,
         )
         logger.error(error_msg, exc_info=True)
         from backend.core.errors import ToolExecutionError
@@ -1686,7 +1799,7 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
     }
     if command not in _VALID_SYMBOL_EDITOR_COMMANDS:
         raise FunctionCallValidationError(
-            f"Unknown command '{command}' for symbol_editor tool. "
+            f"Unknown command '{command}' for structure edit tool. "
             f'Valid commands: {sorted(_VALID_SYMBOL_EDITOR_COMMANDS)}'
         )
 
@@ -1699,7 +1812,7 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
     repair_changes = repair_arguments_in_place(normalized_args, path)
     if repair_changes:
         logger.warning(
-            '[escape_repair] %s (symbol_editor): corrected literal escapes in %s',
+            '[escape_repair] %s (structure_edit): corrected literal escapes in %s',
             path,
             ', '.join(f'{name}(x{count})' for name, count in repair_changes),
         )
@@ -1804,6 +1917,8 @@ def _handle_start_file_edit_tool(arguments: Mapping[str, Any]) -> Action:
     validate_security_risk(normalized_args, tool_name)
 
     path = normalized_args.get('path')
+    if operation == 'multi_edit' and not path:
+        path = '<batch>'
     if not path:
         raise FunctionCallValidationError(
             f'Missing required argument "path" in tool call {tool_name}'
@@ -1826,7 +1941,7 @@ def _handle_start_file_edit_tool(arguments: Mapping[str, Any]) -> Action:
 
 
 def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
-    """Handle unified file_editor tool call."""
+    """Handle the legacy unified file-edit tool schema."""
     from backend.engine.tools.file_editor import create_file_editor_tool
 
     tool_name = cast(str, create_file_editor_tool().get('function', {}).get('name', ''))
@@ -1843,7 +1958,7 @@ def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
     }
     if command not in _VALID_FILE_EDITOR_COMMANDS:
         raise FunctionCallValidationError(
-            f"Unknown command '{command}' for file_editor tool. "
+            f"Unknown command '{command}' for legacy file-edit tool. "
             f'Valid commands: {sorted(_VALID_FILE_EDITOR_COMMANDS)}'
         )
 
@@ -1931,10 +2046,10 @@ def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
         return _handle_file_editor_multi_edit(normalized_args)
 
     # Should not reach here
-    raise FunctionCallValidationError(f"Unhandled file_editor command: {command}")
+    raise FunctionCallValidationError(f"Unhandled legacy file-edit command: {command}")
 
 def _handle_file_editor_symbol_command(command: str, path: str, arguments: Mapping[str, Any]) -> Action:
-    """Handle symbol-aware commands for file_editor."""
+    """Handle symbol-aware commands for the legacy file-edit schema."""
     from backend.engine.tools.structure_editor import StructureEditor
 
     try:
@@ -1987,14 +2102,14 @@ def _require_file_editor_content(
     raw = arguments.get('content')
     if raw is None and 'content' not in arguments:
         raise FunctionCallValidationError(
-            f"file_editor command '{command}' requires an explicit 'content' parameter. "
+            f"Legacy file-edit command '{command}' requires an explicit 'content' parameter. "
             'In XML mode, provide the raw file text inside '
             '<parameter=content>...</parameter>.'
         )
     return '' if raw is None else cast(str, raw)
 
 def _handle_file_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
-    """Handle multi_edit command for file_editor (cross-file atomic batch)."""
+    """Handle multi_edit command for the legacy unified file-edit schema."""
     raw_edits = arguments.get('file_edits')
     if not isinstance(raw_edits, list) or not raw_edits:
         raise FunctionCallValidationError('multi_edit requires non-empty file_edits array')
@@ -2050,7 +2165,7 @@ def _handle_file_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
 
         converted_edits.append(converted)
 
-    # Delegate to existing symbol_editor multi_edit handler
+    # Delegate to the existing structure-edit multi_edit handler
     return _handle_multi_edit_command('batch', {
         'file_edits': converted_edits,
     })
@@ -2065,6 +2180,21 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             str, create_finish_tool().get('function', {}).get('name', '')
         ): _handle_finish_tool,
         cast(
+            str, create_read_file_tool().get('function', {}).get('name', '')
+        ): _handle_read_file_tool,
+        cast(
+            str, create_create_file_tool().get('function', {}).get('name', '')
+        ): _handle_create_file_tool,
+        cast(
+            str, create_undo_last_edit_tool().get('function', {}).get('name', '')
+        ): _handle_undo_last_edit_tool,
+        cast(
+            str, create_rename_symbol_tool().get('function', {}).get('name', '')
+        ): _handle_rename_symbol_tool,
+        cast(
+            str, create_find_symbol_tool().get('function', {}).get('name', '')
+        ): _handle_find_symbol_tool,
+        cast(
             str, create_file_editor_tool().get('function', {}).get('name', '')
         ): _handle_file_editor_tool,
         START_FILE_EDIT_TOOL_NAME: _handle_start_file_edit_tool,
@@ -2078,7 +2208,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         ),
         RECALL_TOOL_NAME: lambda args: build_recall_action(cast(str, args['key'])),
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
-        READ_SYMBOL_DEFINITION_TOOL_NAME: _handle_read_symbol_definition_tool,
+        READ_SYMBOL_TOOL_NAME: _handle_read_symbol_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
         DELEGATE_TASK_TOOL_NAME: lambda args: build_delegate_task_action(dict(args)),
         CODE_INTELLIGENCE_TOOL_NAME: lambda args: build_lsp_query_action(dict(args)),
@@ -2136,9 +2266,9 @@ def _process_single_tool_call(tool_call: Any, arguments: dict[str, Any]) -> Acti
     tool_dispatch = _get_tool_dispatch_map()
 
     tool_name = cast(str, tool_call.function.name)
-    if tool_name == FILE_EDITOR_TOOL_NAME:
+    if tool_name == 'file_editor':
         raise FunctionCallValidationError(
-            'file_editor is internal-only. Use start_file_edit with metadata only; '
+            'The legacy file-edit tool is internal-only. Use start_file_edit with metadata only; '
             'do not place file content in native JSON tool arguments.'
         )
     if "__xml_syntax_error__" in arguments:
