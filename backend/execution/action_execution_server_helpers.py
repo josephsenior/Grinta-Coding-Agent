@@ -743,6 +743,19 @@ def _read_existing_text(path: Path) -> str | None:
     return path.read_text(encoding='utf-8')
 
 
+def _resolve_structured_edit_path(executor: Any, path: str) -> Path:
+    action_path = Path(path)
+    if action_path.is_absolute():
+        return action_path.resolve()
+    return executor.file_editor._resolve_path_safe(path).path
+
+
+def _record_runtime_undo_snapshot(
+    executor: Any, resolved_path: Path, snapshot: str | None
+) -> None:
+    executor.file_editor._push_undo_snapshot(resolved_path, snapshot)
+
+
 def _structured_payload_dict(action: Any) -> dict[str, Any]:
     payload = getattr(action, 'structured_payload', None)
     if not isinstance(payload, dict):
@@ -767,6 +780,17 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
     payload = _structured_payload_dict(action)
 
     if command == 'multi_edit':
+        original_snapshots: dict[Path, str | None] = {}
+        for item in payload.get('file_edits') or []:
+            if not isinstance(item, dict):
+                continue
+            item_path = item.get('path')
+            if not isinstance(item_path, str) or not item_path.strip():
+                continue
+            resolved_item_path = _resolve_structured_edit_path(executor, item_path)
+            original_snapshots.setdefault(
+                resolved_item_path, _read_existing_text(resolved_item_path)
+            )
         try:
             outcome = _handle_multi_edit_command(
                 action.path,
@@ -783,6 +807,9 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
                 'payload': payload,
             }
             return obs
+
+        for resolved_item_path, original_content in original_snapshots.items():
+            _record_runtime_undo_snapshot(executor, resolved_item_path, original_content)
 
         summary = (
             outcome.content
@@ -807,12 +834,7 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
         }
         return obs
 
-    action_path = Path(action.path)
-    resolved = (
-        action_path.resolve()
-        if action_path.is_absolute()
-        else executor.file_editor._resolve_path_safe(action.path).path
-    )
+    resolved = _resolve_structured_edit_path(executor, action.path)
     old_content = _read_existing_text(resolved)
 
     try:
@@ -858,8 +880,10 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
             'retryable': False,
             'operation': command,
             'payload': payload,
-        }
+            }
         return obs
+
+    _record_runtime_undo_snapshot(executor, resolved, old_content)
 
     new_content = _read_existing_text(resolved)
     new_content_hash = None

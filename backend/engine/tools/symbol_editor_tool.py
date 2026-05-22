@@ -61,7 +61,7 @@ COMMANDS:
     Required: path, new_str, insert_line
     insert_line=0 inserts at the beginning of the file
 
-9. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `insert_text`, etc.). Symbol-level commands (`edit_symbol`, `edit_symbols`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
+9. `undo_last_edit` - Undo the last successful edit to this path recorded by the runtime editor stack (session-local, bounded). This includes `create_file`, `insert`, `replace_range`, `edit_symbol`, `edit_symbols`, and `multi_edit` writes routed through the runtime.
 
 10. `multi_edit` - **ATOMIC multi-file edit (cross-file)**. Applies a mixed batch of edits across many files as a single transaction: every file commits or none do (auto-rollback on first failure).
     Required: `file_edits` array. Each item must include `path` and one of:
