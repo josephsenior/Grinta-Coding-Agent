@@ -296,6 +296,22 @@ class TestEditFunction:
         content = open(py_file, encoding='utf-8').read()
         assert 'Hi!' in content
 
+    def test_edit_top_level_class_body(self, editor, tmp_path):
+        path = tmp_path / 'events.py'
+        path.write_text(
+            'class EventType:\n    CLICK = "click"\n',
+            encoding='utf-8',
+        )
+        result = editor.edit_function(
+            str(path),
+            'EventType',
+            '    CLICK = "press"\n    HOVER = "hover"',
+        )
+        assert result.success is True
+        content = path.read_text(encoding='utf-8')
+        assert 'press' in content
+        assert 'HOVER' in content
+
     def test_edit_unknown_function(self, editor, py_file):
         result = editor.edit_function(py_file, 'nonexistent_fn', '    pass')
         assert result.success is False
