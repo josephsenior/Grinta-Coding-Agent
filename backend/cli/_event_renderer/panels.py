@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 from rich import box
 from rich.panel import Panel
@@ -90,18 +90,32 @@ class PendingActivityCard:
 # ---------------------------------------------------------------------------
 
 
+def _task_item_value(item: Any, key: str, default: Any = None) -> Any:
+    """Read a task field from dict-like or attribute-like payloads."""
+    if isinstance(item, Mapping):
+        return item.get(key, default)
+    return getattr(item, key, default)
+
+
 def task_panel_signature(
-    task_list: list[dict[str, Any]],
+    task_list: list[Any],
 ) -> tuple[tuple[str, str, str], ...]:
     """Build a stable signature for the visible task tracker state."""
     rows: list[tuple[str, str, str]] = []
     for item in task_list:
         try:
-            status = normalize_task_status(item.get('status'), default=TASK_STATUS_TODO)
-        except ValueError:
+            status = normalize_task_status(
+                _task_item_value(item, 'status'), default=TASK_STATUS_TODO
+            )
+        except (TypeError, ValueError):
             status = TASK_STATUS_TODO
-        desc = str(item.get('description') or '…')
-        task_id = str(item.get('id') or '?')
+        desc = str(
+            _task_item_value(item, 'description')
+            or _task_item_value(item, 'name')
+            or _task_item_value(item, 'title')
+            or '…'
+        )
+        task_id = str(_task_item_value(item, 'id') or '?')
         rows.append((task_id, status, desc))
     return tuple(rows)
 
@@ -127,7 +141,7 @@ def delegate_worker_panel_signature(
     return tuple(sorted(rows, key=lambda row: (row[0], row[1], row[3], row[4])))
 
 
-def build_task_panel(task_list: list[dict[str, Any]]) -> Any:
+def build_task_panel(task_list: list[Any]) -> Any:
     """Render the current task list as a single reusable panel block."""
     table = Table.grid(expand=True, padding=(0, 1))
     table.add_column()

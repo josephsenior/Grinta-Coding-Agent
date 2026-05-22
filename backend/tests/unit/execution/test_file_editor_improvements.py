@@ -21,6 +21,22 @@ def test_edit_mode_range_with_hash_guard(tmp_path):
     assert target.read_text(encoding='utf-8') == 'one\nTWO\nthree\n'
 
 
+def test_edit_mode_range_replaces_entire_inclusive_span(tmp_path):
+    target = tmp_path / 'doc.txt'
+    target.write_text('one\ntwo\nthree\nfour\n', encoding='utf-8')
+    editor = FileEditor(workspace_root=str(tmp_path))
+    result = editor(
+        command='edit',
+        path='doc.txt',
+        edit_mode='range',
+        start_line=2,
+        end_line=3,
+        new_str='TWO\nTHREE\n',
+    )
+    assert result.error is None
+    assert target.read_text(encoding='utf-8') == 'one\nTWO\nTHREE\nfour\n'
+
+
 def test_edit_mode_section_markdown_replace(tmp_path):
     target = tmp_path / 'README.md'
     target.write_text('## Intro\nold\n\n## Next\nkeep\n', encoding='utf-8')

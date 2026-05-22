@@ -193,6 +193,7 @@ TOOL_EXAMPLES = {
         'section_edit': "\nASSISTANT:\nLet me update the Authentication section in the README:\n<function=file_editor>\n<parameter=command>section_edit</parameter>\n<parameter=path>/workspace/README.md</parameter>\n<parameter=security_risk>LOW</parameter>\n<parameter=anchor_type>markdown_heading</parameter>\n<parameter=anchor_value>Authentication</parameter>\n<parameter=section_action>replace</parameter>\n<parameter=content>\n## Authentication\n\nTo authenticate with the API, include your token in the authorization header:\n\n```bash\ncurl -H \"Authorization: Bearer <token>\" https://api.example.com/data\n```\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [file_editor]:\nSection Authentication updated successfully.",
         'patch': "\nASSISTANT:\nLet me apply a unified diff patch to resolve the concurrency issue in utils.py:\n<function=file_editor>\n<parameter=command>patch</parameter>\n<parameter=path>/workspace/src/utils.py</parameter>\n<parameter=security_risk>LOW</parameter>\n<parameter=content>\n--- /workspace/src/utils.py\n+++ /workspace/src/utils.py\n@@ -10,6 +10,8 @@\n import time\n+import threading\n \n+lock = threading.Lock()\n counter = 0\n \n def increment():\n     global counter\n-    counter += 1\n+    with lock:\n+        counter += 1\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [file_editor]:\nPatch applied successfully to: /workspace/src/utils.py",
         'multi_edit': "\nASSISTANT:\nLet me perform a multi-file edit to update both auth.py and session.py:\n<function=file_editor>\n<parameter=command>multi_edit</parameter>\n<parameter=security_risk>LOW</parameter>\n<file_edit>\n  <path>/workspace/src/auth.py</path>\n  <operation>edit_symbol</operation>\n  <symbol_name>login</symbol_name>\n  <content>\ndef login(username, password, timeout=30):\n    print('No escaping needed for quotes!')\n    return True\n  </content>\n</file_edit>\n<file_edit>\n  <path>/workspace/src/session.py</path>\n  <operation>replace_lines</operation>\n  <start_line>15</start_line>\n  <end_line>18</end_line>\n  <content>\n    if not auth.login(username, password):\n        raise PermissionError(\"Invalid login credentials\")\n  </content>\n</file_edit>\n</function>\n\nUSER: EXECUTION RESULT of [file_editor]:\nMulti-file edit succeeded: 2 operations applied.",
+        'insert': "\nASSISTANT:\nLet me add a health check route:\n<function=file_editor>\n<parameter=command>insert</parameter>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=security_risk>LOW</parameter>\n<parameter=insert_line>8</parameter>\n<parameter=content>\n\n@app.route('/health')\ndef health():\n    return 'OK'\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [file_editor]:\nText inserted successfully.",
     },
     'browser': {
         'view_page': "\nASSISTANT:\nLet me check how the page looks in the browser:\n<function=browser>\n<parameter=code>\ngoto('http://127.0.0.1:5000')\nnoop(1000)  # Wait for page to load\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [browser]:\n[Browser shows the numbers in a table format]\n",
@@ -201,6 +202,35 @@ TOOL_EXAMPLES = {
         'example': '\nASSISTANT:\nThe server is running on port 5000 with PID 126. You can access the list of numbers in a table format by visiting http://127.0.0.1:5000. Let me know if you have any further requests!\n<function=finish>\n<parameter=message>The task has been completed. The web server is running and displaying numbers 1-10 in a table format at http://127.0.0.1:5000.</parameter>\n</function>\n',
     },
 }
+
+_FILE_EDITOR_XML_BLOCK_RE = re.compile(
+    r'<function=file_editor>.*?</function>',
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Commands injected into hybrid FILE_EDITING_TOOL_FORMAT (beyond the inline create stub).
+FILE_EDITOR_PROMPT_XML_COMMANDS: tuple[str, ...] = (
+    'create',
+    'replace_lines',
+    'edit_symbol',
+    'insert',
+)
+
+
+def format_file_editor_xml_examples_for_prompt(
+    commands: tuple[str, ...] | None = None,
+) -> str:
+    """Return pseudo-XML call blocks from TOOL_EXAMPLES for hybrid prompt injection."""
+    keys = commands or FILE_EDITOR_PROMPT_XML_COMMANDS
+    examples = TOOL_EXAMPLES.get('file_editor', {})
+    sections: list[str] = []
+    for key in keys:
+        raw = examples.get(key, '')
+        match = _FILE_EDITOR_XML_BLOCK_RE.search(raw)
+        if not match:
+            continue
+        sections.append(f'### Example: command={key}\n{match.group(0).strip()}\n')
+    return '\n'.join(sections)
 
 
 def get_example_for_tools(tools: list[dict]) -> str:

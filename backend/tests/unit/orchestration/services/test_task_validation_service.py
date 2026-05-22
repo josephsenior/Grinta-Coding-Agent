@@ -241,7 +241,11 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.event_stream.add_event.assert_called_once()
         observation = self.mock_controller.event_stream.add_event.call_args[0][0]
         self.assertEqual(observation.error_id, 'TASK_TRACKER_INCOMPLETE')
-        self.assertIn('marked `done`', observation.content)
+        self.assertIn(
+            'Finish rejected: task tracker contains unfinished tasks.',
+            observation.content,
+        )
+        self.assertIn('Unfinished tasks:', observation.content)
 
     async def test_handle_finish_allows_terminal_plan_steps(self):
         action = PlaybookFinishAction(outputs={})

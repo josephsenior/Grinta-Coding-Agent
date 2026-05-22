@@ -13,10 +13,10 @@ from backend.inference.llm_utils import check_tools
 ChatCompletionToolParam = Any
 
 # ── Hybrid XML/Native transport ──────────────────────────────────────────
-# Tools whose primary payload is code are routed through the pseudo-XML
-# transport layer so the code never passes through JSON encoding.  All
-# other tools use native provider function calling for constrained decoding.
-CODE_PAYLOAD_TOOLS: frozenset[str] = frozenset({'file_editor', 'symbol_editor', 'text_editor'})
+# File content is no longer routed through provider JSON arguments. Normal
+# tools remain native; file edits start with the metadata-only start_file_edit
+# tool and capture raw content in isolated EDITOR MODE.
+CODE_PAYLOAD_TOOLS: frozenset[str] = frozenset()
 
 if TYPE_CHECKING:
     from backend.core.contracts.state import State
@@ -268,10 +268,9 @@ class OrchestratorPlanner:
 
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):
-            from backend.engine.tools import create_file_editor_tool
+            from backend.engine.tools import create_start_file_edit_tool
 
-            # Unified file editor: covers all file operations (read, create, edit, symbol-aware, multi-edit)
-            tools.append(create_file_editor_tool())
+            tools.append(create_start_file_edit_tool())
 
     def _add_execute_mcp_tool_tool(self, tools: list) -> None:
         """Add the MCP gateway proxy tool when MCP is enabled.
@@ -337,10 +336,9 @@ class OrchestratorPlanner:
             'stream': True,
         }
 
-        # ── Hybrid tool routing ──────────────────────────────────────
-        # Code-heavy tools (editors) go through pseudo-XML so their code
-        # payloads are raw text — never JSON-encoded.  Everything else
-        # stays on native function calling for constrained decoding.
+        # ── Tool routing ─────────────────────────────────────────────
+        # All normal tools are native provider function calls. File content is
+        # captured separately in EDITOR MODE after start_file_edit.
         native_tools, xml_tools = self.partition_tools(tools)
 
         if self._llm_supports_function_calling():
@@ -369,33 +367,27 @@ class OrchestratorPlanner:
         """Append pseudo-XML tool format instructions to the system prompt.
 
         Editor tools are described using the same format that non-native models
-        already use, so the model emits ``<function=symbol_editor>`` blocks
+        already use, so the model emits ``<function=file_editor>`` blocks
         with raw-text code payloads instead of JSON-encoded arguments.
         """
         from backend.inference.fn_call_converter import (
-            SYSTEM_PROMPT_SUFFIX_TEMPLATE,
             convert_tools_to_description,
+            format_file_editor_xml_examples_for_prompt,
         )
 
         formatted = convert_tools_to_description(xml_tools)
+        xml_examples = format_file_editor_xml_examples_for_prompt()
         # Build the suffix but replace the generic "one function at a time"
         # note with hybrid-specific guidance.
         suffix = (
             '\n\n<FILE_EDITING_TOOL_FORMAT>\n'
-            'The following file-editing tools use an XML format for code payloads '
-            'so that code is never JSON-encoded.  When calling these tools, emit '
-            'the XML block shown below in your response text.  Do NOT use the '
-            'standard tool calling format for these tools.\n\n'
+            'The `file_editor` tool uses an XML format for code payloads '
+            'so that code is never JSON-encoded.  When calling `file_editor`, emit '
+            'a `<function=file_editor>...</function>` block in your response text. '
+            'Do NOT use the standard JSON tool calling format for `file_editor`.\n'
             f'{formatted}\n'
-            'To call a file-editing tool, emit EXACTLY this format in your response text:\n\n'
-            '<function=file_editor>\n'
-            '<parameter=command>create</parameter>\n'
-            '<parameter=path>/path/to/file</parameter>\n'
-            '<parameter=security_risk>LOW</parameter>\n'
-            '<parameter=content>\n'
-            'your code here -- raw text, no JSON escaping needed\n'
-            '</parameter>\n'
-            '</function>\n\n'
+            'Canonical XML examples (emit one block per message; copy parameter names exactly):\n\n'
+            f'{xml_examples}\n\n'
             'RULES:\n'
             '- You may include natural-language reasoning BEFORE the <function=...> block.\n'
             '- Do NOT place any text AFTER the </function> closing tag.\n'

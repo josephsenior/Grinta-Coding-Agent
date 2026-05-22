@@ -11,6 +11,7 @@ import os as _os
 from typing import TYPE_CHECKING
 
 from backend.core.schemas import AgentState
+from backend.core.task_status import ACTIVE_TASK_STATUSES
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber, RecallType
 from backend.ledger.action import (
     Action,
@@ -53,8 +54,13 @@ if TYPE_CHECKING:
     from backend.orchestration.session_orchestrator import SessionOrchestrator
 
 
-_CHECKPOINT_INTERMEDIATE_TOOLS = frozenset({'checkpoint'})
 _DELEGATE_PROGRESS_STATUS = 'delegate_progress'
+_TEXT_TOOL_CALL_MARKERS = (
+    '<minimax:tool_call',
+    '</minimax:tool_call>',
+    '<tool_call',
+    '</tool_call>',
+)
 
 
 def _truncate_delegate_progress(text: str, limit: int = 120) -> str:
@@ -62,6 +68,11 @@ def _truncate_delegate_progress(text: str, limit: int = 120) -> str:
     if len(collapsed) <= limit:
         return collapsed
     return collapsed[: max(limit - 1, 0)].rstrip() + '…'
+
+
+def _looks_like_text_tool_call_handoff(text: str) -> bool:
+    low = (text or '').lower()
+    return any(marker in low for marker in _TEXT_TOOL_CALL_MARKERS)
 
 
 def _summarize_delegate_file_action(
@@ -178,11 +189,16 @@ def _summarize_delegate_browser_action(
         return 'running', f'Browser {cmd}'
     if isinstance(event, BrowseInteractiveAction):
         ba = getattr(event, 'browser_actions', '') or ''
-        import re
-
-        url_match = re.search(r'https?://[^\s\'")\]]+', ba)
-        if url_match:
-            url = _truncate_delegate_progress(url_match.group(0), 60)
+        url = next(
+            (
+                token.strip('\'")]},>')
+                for token in ba.split()
+                if token.startswith(('http://', 'https://'))
+            ),
+            '',
+        )
+        if url:
+            url = _truncate_delegate_progress(url, 60)
             return 'running', f'Browsing {url}'
         return 'running', 'Browsing…'  # type: ignore[unreachable]
     return None
@@ -387,16 +403,6 @@ class EventRouterService:
         if self._ctrl.get_agent_state() != AgentState.RUNNING:
             await self._ctrl.set_agent_state_to(AgentState.RUNNING)
 
-    @staticmethod
-    def _checkpoint_tool_result_from_event(event: Event) -> dict[str, object] | None:
-        tool_result = getattr(event, 'tool_result', None)
-        if not isinstance(tool_result, dict):
-            return None
-        tool_name = str(tool_result.get('tool') or '').strip()
-        if tool_name in _CHECKPOINT_INTERMEDIATE_TOOLS:
-            return tool_result
-        return None
-
     # ── public entry point ────────────────────────────────────────────
 
     async def route_event(self, event: Event) -> None:
@@ -491,68 +497,99 @@ class EventRouterService:
             await self._handle_user_message(action)
         elif action.source == EventSource.AGENT:
             if action.wait_for_response:
-                if await self._intercept_incomplete_checkpoint_handoff(action):
+                if await self._intercept_text_tool_call_handoff(action):
                     return
+                if self._task_tracker_has_unfinished_tasks():
+                    if await self._intercept_protocol_message_handoff(action):
+                        return
                 await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
 
-    async def _intercept_incomplete_checkpoint_handoff(
-        self, action: MessageAction
-    ) -> bool:
-        recent_tool_result = self._recent_checkpoint_tool_result()
-        if recent_tool_result is None:
+    def _task_tracker_has_unfinished_tasks(self) -> bool:
+        state = getattr(self._ctrl, 'state', None)
+        return self._plan_has_active_steps(getattr(state, 'plan', None))
+
+    def _plan_has_active_steps(self, plan: object | None) -> bool:
+        if plan is None:
+            return False
+        steps = getattr(plan, 'steps', None) or []
+        return self._steps_have_active_status(steps)
+
+    def _steps_have_active_status(self, steps: object) -> bool:
+        if not isinstance(steps, list):
+            return False
+        for step in steps:
+            if isinstance(step, dict):
+                status = step.get('status')
+                subtasks = step.get('subtasks')
+            else:
+                status = getattr(step, 'status', None)
+                subtasks = getattr(step, 'subtasks', None)
+            if str(status or '').strip().lower() in ACTIVE_TASK_STATUSES:
+                return True
+            if self._steps_have_active_status(subtasks or []):
+                return True
+        return False
+
+    async def _intercept_text_tool_call_handoff(self, action: MessageAction) -> bool:
+        content = str(getattr(action, 'content', '') or '')
+        if not _looks_like_text_tool_call_handoff(content):
             return False
 
-        tool_name = str(recent_tool_result.get('tool') or 'checkpoint')
-        next_best_action = str(recent_tool_result.get('next_best_action') or '').strip()
-        guidance_lines = [
-            f'{tool_name} is an intermediate control tool, not a terminal reply.',
-        ]
-        if next_best_action:
-            guidance_lines.append(f'Latest tool guidance: {next_best_action}')
-        guidance_lines.extend(
-            [
-                'Continue in the same turn: execute the next step, or if a plan step changed state call task_tracker update first.',
-                'If the overall task is complete, call finish with a short user-facing summary and concrete next_steps.',
-                'Only wait for user input when you genuinely need clarification or confirmation.',
-            ]
+        guidance = (
+            'Protocol error: provider-specific text tool-call markup was returned '
+            'instead of a valid Grinta tool action.'
         )
+        await self._reject_agent_message_handoff(
+            action,
+            guidance,
+            source='EventRouterService._intercept_text_tool_call_handoff',
+            error_id='TEXT_TOOL_CALL_FORMAT_INCOMPLETE',
+        )
+        return True
 
+    async def _intercept_protocol_message_handoff(
+        self, action: MessageAction
+    ) -> bool:
+        guidance = (
+            'Protocol error: assistant message returned during active task execution.'
+        )
+        await self._reject_agent_message_handoff(
+            action,
+            guidance,
+            source='EventRouterService._intercept_protocol_message_handoff',
+            error_id='ASSISTANT_MESSAGE_PROTOCOL_ERROR',
+        )
+        return True
+
+    async def _reject_agent_message_handoff(
+        self,
+        action: MessageAction,
+        guidance: str,
+        *,
+        source: str,
+        error_id: str,
+    ) -> None:
         state = getattr(self._ctrl, 'state', None)
         if state is not None and hasattr(state, 'set_planning_directive'):
             state.set_planning_directive(
-                '\n'.join(guidance_lines),
-                source='EventRouterService._intercept_incomplete_checkpoint_handoff',
+                guidance,
+                source=source,
             )
         else:
             observation = ErrorObservation(
-                content='\n'.join(guidance_lines),
-                error_id='CHECKPOINT_FLOW_INCOMPLETE',
+                content=guidance,
+                error_id=error_id,
             )
             attach_observation_cause(
                 observation,
                 action,
-                context='EventRouterService._intercept_incomplete_checkpoint_handoff',
+                context=source,
             )
             self._ctrl.event_stream.add_event(observation, EventSource.ENVIRONMENT)
         if self._ctrl.get_agent_state() != AgentState.RUNNING:
             await self._ctrl.set_agent_state_to(AgentState.RUNNING)
-        # Mark the MessageAction as suppressed in the CLI — it's an internal
-        # mid-task message that should not appear in the user-facing transcript.
         action.suppress_cli = True
-        return True
-
-    def _recent_checkpoint_tool_result(self) -> dict[str, object] | None:
-        history = getattr(self._ctrl.state, 'history', None) or []
-        if not history:
-            return None
-
-        prior_events = history[:-1] if history and history[-1] is not None else history
-        for event in reversed(prior_events):
-            if isinstance(event, MessageAction) and event.source == EventSource.USER:
-                break
-            if tool_result := self._checkpoint_tool_result_from_event(event):
-                return tool_result
-        return None
+        action.wait_for_response = False
 
     async def _handle_user_message(self, action: MessageAction) -> None:
         """Handle user message: log, create recall, set pending, start agent."""

@@ -5,6 +5,7 @@ This is similar to the functionality of `OrchestratorResponseParser`.
 
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
@@ -20,6 +21,7 @@ import backend.engine.tools.delegate_task as delegate_task_tools
 import backend.engine.tools.lsp_query as lsp_query_tools
 import backend.engine.tools.terminal_manager as terminal_manager_tools
 from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
+from backend.inference.tool_names import FILE_EDITOR_TOOL_NAME
 from backend.core.editor_recovery import append_editor_recovery_guidance
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.errors import (
@@ -41,10 +43,11 @@ from backend.engine.tools import (
     create_cmd_run_tool,
     create_file_editor_tool,
     create_finish_tool,
+    create_start_file_edit_tool,
     create_summarize_context_tool,
-    create_symbol_editor_tool,
-    create_text_editor_tool,
 )
+from backend.engine.tools.symbol_editor_tool import create_symbol_editor_tool
+from backend.engine.tools.text_editor import create_text_editor_tool
 from backend.engine.tools.analyze_project_structure import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
 )
@@ -83,7 +86,7 @@ from backend.engine.tools.task_tracker import TaskTracker
 from backend.engine.tools.terminal_manager import (
     TERMINAL_MANAGER_TOOL_NAME,
 )
-from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
+from backend.inference.tool_names import START_FILE_EDIT_TOOL_NAME, TASK_TRACKER_TOOL_NAME
 from backend.ledger.action import (
     Action,
     AgentThinkAction,
@@ -93,6 +96,7 @@ from backend.ledger.action import (
     FileReadAction,
     MessageAction,
     PlaybookFinishAction,
+    StartFileEditAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import CondensationRequestAction
@@ -1303,7 +1307,7 @@ _MAX_MULTI_EDIT_FILES = 50
 def _structure_editor_supports_multi_edit() -> bool:
     """Capability probe used by the system-prompt builder.
 
-    Returns True when this build registers the ``multi_edit`` symbol_editor
+    Returns True when this build registers the ``multi_edit`` file_editor
     command. Keeping the probe co-located with the handler ensures the system
     prompt automatically tracks the live tool surface — no flag drift.
     """
@@ -1793,6 +1797,49 @@ def _handle_communicate_tool(arguments: Mapping[str, Any]) -> Action:
 
 
 
+def _handle_start_file_edit_tool(arguments: Mapping[str, Any]) -> Action:
+    """Handle metadata-only file edit transaction starter."""
+    from backend.engine.file_edit_protocol import (
+        operation_requires_content,
+        reject_content_fields,
+        validate_start_file_edit_metadata,
+    )
+
+    tool_name = cast(
+        str, create_start_file_edit_tool().get('function', {}).get('name', '')
+    )
+    operation = require_tool_argument(arguments, 'operation', tool_name)
+    operation = str(operation).strip().lower()
+    normalized_args = dict(arguments)
+    reject_content_fields(normalized_args)
+    validate_security_risk(normalized_args, tool_name)
+
+    path = normalized_args.get('path')
+    if not path:
+        raise FunctionCallValidationError(
+            f'Missing required argument "path" in tool call {tool_name}'
+        )
+    path = str(path)
+    metadata = {
+        k: v
+        for k, v in normalized_args.items()
+        if k not in {'operation', 'path'}
+    }
+    validate_start_file_edit_metadata(operation, path, metadata)
+
+    if not operation_requires_content(operation, metadata):
+        legacy_args = {'command': operation, 'path': path, **metadata}
+        return _handle_file_editor_tool(legacy_args)
+
+    action = StartFileEditAction(
+        path=path,
+        operation=operation,
+        metadata=metadata,
+    )
+    set_security_risk(action, normalized_args)
+    return action
+
+
 def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle unified file_editor tool call."""
     from backend.engine.tools.file_editor import create_file_editor_tool
@@ -2073,14 +2120,9 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             str, create_finish_tool().get('function', {}).get('name', '')
         ): _handle_finish_tool,
         cast(
-            str, create_text_editor_tool().get('function', {}).get('name', '')
-        ): _handle_text_editor_tool,
-        cast(
             str, create_file_editor_tool().get('function', {}).get('name', '')
         ): _handle_file_editor_tool,
-        cast(
-            str, create_symbol_editor_tool().get('function', {}).get('name', '')
-        ): _handle_symbol_editor_tool,
+        START_FILE_EDIT_TOOL_NAME: _handle_start_file_edit_tool,
         cast(
             str, create_summarize_context_tool().get('function', {}).get('name', '')
         ): _handle_summarize_context_tool,
@@ -2114,9 +2156,8 @@ def response_to_actions(
 ) -> list[Action]:
     """Convert LLM response to agent actions.
 
-    Uses hybrid tool routing: code-heavy tools (editors) are parsed from
-    pseudo-XML blocks in the response content text, while all other tools
-    use native provider tool calls.
+    Normal tools use provider-native tool calls. File content is captured by
+    the separate editor-mode protocol after ``start_file_edit``.
     """
     from backend.engine.planner import CODE_PAYLOAD_TOOLS
 
@@ -2150,6 +2191,11 @@ def _process_single_tool_call(tool_call: Any, arguments: dict[str, Any]) -> Acti
     tool_dispatch = _get_tool_dispatch_map()
 
     tool_name = cast(str, tool_call.function.name)
+    if tool_name == FILE_EDITOR_TOOL_NAME:
+        raise FunctionCallValidationError(
+            'file_editor is internal-only. Use start_file_edit with metadata only; '
+            'do not place file content in native JSON tool arguments.'
+        )
     if "__xml_syntax_error__" in arguments:
         from backend.engine.common import _check_format_error_retry_guard
         serialized_args = json.dumps(arguments, sort_keys=True, ensure_ascii=False)

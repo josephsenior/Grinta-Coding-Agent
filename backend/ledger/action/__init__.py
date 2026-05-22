@@ -30,6 +30,7 @@ from backend.ledger.action.files import (
     FileEditAction,
     FileReadAction,
     FileWriteAction,
+    StartFileEditAction,
 )
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.message import (
@@ -65,6 +66,7 @@ __all__ = [
     'FileEditAction',
     'FileReadAction',
     'FileWriteAction',
+    'StartFileEditAction',
     'LspQueryAction',
     'MCPAction',
     'MessageAction',

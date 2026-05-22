@@ -197,8 +197,8 @@ class TestCircuitBreakerMiddlewarePipeline:
     async def test_observe_str_replace_syntax_uses_syntax_bucket(self):
         from backend.ledger.observation import ErrorObservation
         from backend.orchestration.agent_circuit_breaker import (
-            TEXT_EDITOR_SYNTAX_TOOL_NAME,
-            TEXT_EDITOR_TOOL_NAME,
+            START_FILE_EDIT_SYNTAX_TOOL_NAME,
+            START_FILE_EDIT_TOOL_NAME,
         )
 
         controller = MagicMock()
@@ -206,7 +206,9 @@ class TestCircuitBreakerMiddlewarePipeline:
         controller.circuit_breaker_service = service
         mw = CircuitBreakerMiddleware(controller)
         action = MagicMock()
-        action.tool_call_metadata = MagicMock(function_name=TEXT_EDITOR_TOOL_NAME)
+        action.tool_call_metadata = MagicMock(
+            function_name=START_FILE_EDIT_TOOL_NAME
+        )
         ctx = ToolInvocationContext(
             controller=controller, action=action, state=MagicMock()
         )
@@ -215,14 +217,14 @@ class TestCircuitBreakerMiddlewarePipeline:
         service.record_error.assert_called_once()
         assert (
             service.record_error.call_args.kwargs['tool_name']
-            == TEXT_EDITOR_SYNTAX_TOOL_NAME
+            == START_FILE_EDIT_SYNTAX_TOOL_NAME
         )
 
     @pytest.mark.asyncio
     async def test_observe_str_replace_non_syntax_uses_hard_bucket(self):
         from backend.ledger.observation import ErrorObservation
         from backend.orchestration.agent_circuit_breaker import (
-            TEXT_EDITOR_TOOL_NAME,
+            START_FILE_EDIT_TOOL_NAME,
         )
 
         controller = MagicMock()
@@ -230,14 +232,17 @@ class TestCircuitBreakerMiddlewarePipeline:
         controller.circuit_breaker_service = service
         mw = CircuitBreakerMiddleware(controller)
         action = MagicMock()
-        action.tool_call_metadata = MagicMock(function_name=TEXT_EDITOR_TOOL_NAME)
+        action.tool_call_metadata = MagicMock(
+            function_name=START_FILE_EDIT_TOOL_NAME
+        )
         ctx = ToolInvocationContext(
             controller=controller, action=action, state=MagicMock()
         )
         obs = ErrorObservation(content='old_str not found')
         await mw.observe(ctx, obs)
         assert (
-            service.record_error.call_args.kwargs['tool_name'] == TEXT_EDITOR_TOOL_NAME
+            service.record_error.call_args.kwargs['tool_name']
+            == START_FILE_EDIT_TOOL_NAME
         )
 
     @pytest.mark.asyncio

@@ -15,12 +15,12 @@ from unittest.mock import MagicMock
 
 from backend.ledger.action import ActionSecurityRisk
 from backend.orchestration.agent_circuit_breaker import (
-    TEXT_EDITOR_SYNTAX_TOOL_NAME,
-    TEXT_EDITOR_TOOL_NAME,
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerResult,
-    classify_text_editor_error_bucket,
+    START_FILE_EDIT_SYNTAX_TOOL_NAME,
+    START_FILE_EDIT_TOOL_NAME,
+    classify_file_edit_error_bucket,
 )
 
 
@@ -381,13 +381,13 @@ class TestHysteresis:
 
         for _ in range(3):
             breaker.record_error(
-                RuntimeError('bad edit'), tool_name=TEXT_EDITOR_TOOL_NAME
+                RuntimeError('bad edit'), tool_name=START_FILE_EDIT_TOOL_NAME
             )
-        assert breaker.get_tool_error_count(TEXT_EDITOR_TOOL_NAME) == 3
+        assert breaker.get_tool_error_count(START_FILE_EDIT_TOOL_NAME) == 3
 
-        breaker.record_success(tool_name=TEXT_EDITOR_TOOL_NAME)
+        breaker.record_success(tool_name=START_FILE_EDIT_TOOL_NAME)
         # Must decay to 2, not 0.
-        assert breaker.get_tool_error_count(TEXT_EDITOR_TOOL_NAME) == 2
+        assert breaker.get_tool_error_count(START_FILE_EDIT_TOOL_NAME) == 2
 
     def test_per_tool_removed_when_decayed_to_zero(self):
         """Per-tool entry is cleaned up when decayed fully to zero."""
@@ -609,17 +609,17 @@ class TestUpdateMetrics:
         assert breaker.consecutive_errors == 0
 
 
-class TestTextEditorTaxonomy:
-    """text_editor vs syntax bucket thresholds and classification."""
+class TestFileEditTaxonomy:
+    """start_file_edit vs syntax bucket thresholds and classification."""
 
     def test_classify_syntax_vs_hard(self):
         assert (
-            classify_text_editor_error_bucket('Syntax validation failed: oops')
-            == TEXT_EDITOR_SYNTAX_TOOL_NAME
+            classify_file_edit_error_bucket('Syntax validation failed: oops')
+            == START_FILE_EDIT_SYNTAX_TOOL_NAME
         )
         assert (
-            classify_text_editor_error_bucket('old_str not found')
-            == TEXT_EDITOR_TOOL_NAME
+            classify_file_edit_error_bucket('old_str not found')
+            == START_FILE_EDIT_TOOL_NAME
         )
 
     def test_syntax_errors_skip_consecutive_counter(self):
@@ -629,7 +629,7 @@ class TestTextEditorTaxonomy:
         for _ in range(10):
             breaker.record_error(
                 RuntimeError('Syntax validation failed: x'),
-                tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME,
+                tool_name=START_FILE_EDIT_SYNTAX_TOOL_NAME,
             )
         assert breaker.consecutive_errors == 0
 
@@ -646,10 +646,12 @@ class TestTextEditorTaxonomy:
         breaker = CircuitBreaker(config)
         for _ in range(9):
             breaker.record_error(
-                RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME
+                RuntimeError('x'), tool_name=START_FILE_EDIT_SYNTAX_TOOL_NAME
             )
         assert breaker.check(MagicMock()).tripped is False
-        breaker.record_error(RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME)
+        breaker.record_error(
+            RuntimeError('x'), tool_name=START_FILE_EDIT_SYNTAX_TOOL_NAME
+        )
         result = breaker.check(MagicMock())
         assert result.tripped is True
         assert result.action == 'switch_context'
@@ -663,10 +665,12 @@ class TestTextEditorTaxonomy:
         breaker = CircuitBreaker(config)
         for _ in range(14):
             breaker.record_error(
-                RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME
+                RuntimeError('x'), tool_name=START_FILE_EDIT_SYNTAX_TOOL_NAME
             )
         assert breaker.check(MagicMock()).action == 'switch_context'
-        breaker.record_error(RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME)
+        breaker.record_error(
+            RuntimeError('x'), tool_name=START_FILE_EDIT_SYNTAX_TOOL_NAME
+        )
         result = breaker.check(MagicMock())
         assert result.tripped is True
         assert result.action == 'pause'
@@ -678,9 +682,13 @@ class TestTextEditorTaxonomy:
             max_stuck_detections=100,
         )
         breaker = CircuitBreaker(config)
-        breaker.record_error(RuntimeError('no match'), tool_name=TEXT_EDITOR_TOOL_NAME)
+        breaker.record_error(
+            RuntimeError('no match'), tool_name=START_FILE_EDIT_TOOL_NAME
+        )
         assert breaker.check(MagicMock()).tripped is False
-        breaker.record_error(RuntimeError('no match'), tool_name=TEXT_EDITOR_TOOL_NAME)
+        breaker.record_error(
+            RuntimeError('no match'), tool_name=START_FILE_EDIT_TOOL_NAME
+        )
         result = breaker.check(MagicMock())
         assert result.tripped is True
         assert result.action == 'switch_context'
@@ -688,13 +696,15 @@ class TestTextEditorTaxonomy:
     def test_record_success_clears_both_str_replace_buckets(self):
         config = CircuitBreakerConfig()
         breaker = CircuitBreaker(config)
-        breaker.record_error(RuntimeError('a'), tool_name=TEXT_EDITOR_TOOL_NAME)
+        breaker.record_error(
+            RuntimeError('a'), tool_name=START_FILE_EDIT_TOOL_NAME
+        )
         breaker.record_error(
             RuntimeError('Syntax validation failed:'),
-            tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME,
+            tool_name=START_FILE_EDIT_SYNTAX_TOOL_NAME,
         )
-        assert breaker.get_tool_error_count(TEXT_EDITOR_TOOL_NAME) == 1
-        assert breaker.get_tool_error_count(TEXT_EDITOR_SYNTAX_TOOL_NAME) == 1
-        breaker.record_success(tool_name=TEXT_EDITOR_TOOL_NAME)
-        assert breaker.get_tool_error_count(TEXT_EDITOR_TOOL_NAME) == 0
-        assert breaker.get_tool_error_count(TEXT_EDITOR_SYNTAX_TOOL_NAME) == 0
+        assert breaker.get_tool_error_count(START_FILE_EDIT_TOOL_NAME) == 1
+        assert breaker.get_tool_error_count(START_FILE_EDIT_SYNTAX_TOOL_NAME) == 1
+        breaker.record_success(tool_name=START_FILE_EDIT_TOOL_NAME)
+        assert breaker.get_tool_error_count(START_FILE_EDIT_TOOL_NAME) == 0
+        assert breaker.get_tool_error_count(START_FILE_EDIT_SYNTAX_TOOL_NAME) == 0

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -144,6 +145,7 @@ def _scan_tool_call_close(text: str, end_json: int) -> int | None:
 def redact_streamed_tool_call_markers(text: str) -> str:
     """Remove ``[Tool call] name({...})`` spans from assistant-visible text."""
     text = strip_protocol_echo_blocks(strip_tool_call_marker_lines(text))
+    text = _redact_xml_tool_call_blocks(text)
     if _TOOL_CALL_PREFIX not in text:
         return text
     out: list[str] = []
@@ -174,14 +176,15 @@ def redact_streamed_tool_call_markers(text: str) -> str:
 
 
 def extract_tool_calls_from_text_markers(text: str) -> list[dict[str, Any]]:
-    """Extract structured tool-call dicts from ``[Tool call] name({...})`` spans."""
-    if _TOOL_CALL_PREFIX not in text:
-        return []
+    """Extract structured tool-call dicts from text-encoded tool-call spans."""
+    results = _extract_xml_tool_call_blocks(text)
+    call_index = len(results)
 
-    results: list[dict[str, Any]] = []
+    if _TOOL_CALL_PREFIX not in text:
+        return results
+
     i = 0
     n = len(text)
-    call_index = 0
 
     while i < n:
         j = text.find(_TOOL_CALL_PREFIX, i)
@@ -223,6 +226,166 @@ def extract_tool_calls_from_text_markers(text: str) -> list[dict[str, Any]]:
         i = end
 
     return results
+
+
+def _redact_xml_tool_call_blocks(text: str) -> str:
+    if '<' not in text or 'tool_call' not in text:
+        return text
+    out: list[str] = []
+    pos = 0
+    while pos < len(text):
+        block = _find_next_xml_tool_call_block(text, pos)
+        if block is None:
+            out.append(text[pos:])
+            break
+        start, end, _tag, _attrs, _body = block
+        out.append(text[pos:start])
+        pos = end
+    return ''.join(out).rstrip()
+
+
+def _extract_xml_tool_call_blocks(text: str) -> list[dict[str, Any]]:
+    if '<' not in text or 'tool_call' not in text:
+        return []
+    results: list[dict[str, Any]] = []
+    pos = 0
+    while pos < len(text):
+        block = _find_next_xml_tool_call_block(text, pos)
+        if block is None:
+            break
+        _start, end, _tag, attrs, body = block
+        parsed = _xml_tool_call_to_dict(attrs, body, len(results))
+        if parsed is not None:
+            results.append(parsed)
+        pos = end
+    return results
+
+
+def _find_next_xml_tool_call_block(
+    text: str,
+    pos: int,
+) -> tuple[int, int, str, dict[str, str], str] | None:
+    lower = text.lower()
+    candidates = [
+        idx
+        for idx in (
+            lower.find('<minimax:tool_call', pos),
+            lower.find('<tool_call', pos),
+        )
+        if idx >= 0
+    ]
+    if not candidates:
+        return None
+    start = min(candidates)
+    tag_end = text.find('>', start)
+    if tag_end < 0:
+        return start, len(text), '', {}, text[start:]
+
+    start_tag = text[start + 1 : tag_end].strip()
+    tag_name = start_tag.split(None, 1)[0].strip().lower()
+    attrs_text = start_tag[len(tag_name) :].strip()
+    close = f'</{tag_name}>'
+    close_start = lower.find(close, tag_end + 1)
+    if close_start < 0:
+        return start, len(text), tag_name, _parse_tag_attrs(attrs_text), text[tag_end + 1 :]
+    end = close_start + len(close)
+    return (
+        start,
+        end,
+        tag_name,
+        _parse_tag_attrs(attrs_text),
+        text[tag_end + 1 : close_start],
+    )
+
+
+def _parse_tag_attrs(attrs_text: str) -> dict[str, str]:
+    attrs: dict[str, str] = {}
+    i = 0
+    n = len(attrs_text)
+    while i < n:
+        while i < n and attrs_text[i].isspace():
+            i += 1
+        key_start = i
+        while i < n and (attrs_text[i].isalnum() or attrs_text[i] in '_:-'):
+            i += 1
+        key = attrs_text[key_start:i].strip().lower()
+        while i < n and attrs_text[i].isspace():
+            i += 1
+        if not key or i >= n or attrs_text[i] != '=':
+            while i < n and not attrs_text[i].isspace():
+                i += 1
+            continue
+        i += 1
+        while i < n and attrs_text[i].isspace():
+            i += 1
+        if i < n and attrs_text[i] in ('"', "'"):
+            quote = attrs_text[i]
+            i += 1
+            value_start = i
+            while i < n and attrs_text[i] != quote:
+                i += 1
+            value = attrs_text[value_start:i]
+            if i < n:
+                i += 1
+        else:
+            value_start = i
+            while i < n and not attrs_text[i].isspace():
+                i += 1
+            value = attrs_text[value_start:i]
+        attrs[key] = value
+    return attrs
+
+
+def _xml_tool_call_to_dict(
+    attrs: dict[str, str],
+    body: str,
+    index: int,
+) -> dict[str, Any] | None:
+    body_text = (body or '').strip()
+    name = attrs.get('name') or attrs.get('tool') or attrs.get('function')
+    arguments: Any = None
+
+    if body_text.startswith('{'):
+        try:
+            payload = json.loads(body_text)
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            if not name:
+                name = (
+                    payload.get('name')
+                    or payload.get('tool')
+                    or payload.get('function_name')
+                )
+            function_payload = payload.get('function')
+            if isinstance(function_payload, dict):
+                name = name or function_payload.get('name')
+                arguments = function_payload.get('arguments')
+            if arguments is None:
+                arguments = payload.get('arguments') or payload.get('input')
+            if arguments is None and name:
+                arguments = {
+                    k: v
+                    for k, v in payload.items()
+                    if k not in {'name', 'tool', 'function_name', 'function'}
+                }
+
+    if not name:
+        return None
+
+    if arguments is None:
+        arguments = {'command': body_text} if body_text else {}
+
+    if isinstance(arguments, str):
+        arguments_str = arguments
+    else:
+        arguments_str = json.dumps(arguments, ensure_ascii=False, separators=(',', ':'))
+
+    return {
+        'id': f'call_xml_{index + 1:02d}',
+        'type': 'function',
+        'function': {'name': str(name), 'arguments': arguments_str},
+    }
 
 
 def redact_internal_result_markers(text: str) -> str:

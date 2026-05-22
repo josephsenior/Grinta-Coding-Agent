@@ -87,13 +87,11 @@ class TaskValidationService:
         )
         more = ''
         if len(active_steps) > 5:
-            more = f'\n- ... and {len(active_steps) - 5} more plan step(s)'
+            more = f'\n- ... and {len(active_steps) - 5} more unfinished task(s)'
 
         return await self._emit_finish_block(
-            '⚠️ FINISH BLOCKED: The task plan still has active steps. '
-            'You must ensure all tasks are marked `done` or another terminal state (`skipped` or `blocked`) '
-            'before calling the finish tool.\n\n'
-            f'Active steps:\n{bullets}{more}',
+            'Finish rejected: task tracker contains unfinished tasks.\n\n'
+            f'Unfinished tasks:\n{bullets}{more}',
             error_id='TASK_TRACKER_INCOMPLETE',
             cause_action=action,
         )

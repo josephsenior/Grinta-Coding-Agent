@@ -4,10 +4,8 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 from backend.core.constants import LOG_ALL_EVENTS
-from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import Action, NullAction
-from backend.ledger.action.message import MessageAction
 from backend.ledger.stream import EventStream
 
 if TYPE_CHECKING:
@@ -47,11 +45,8 @@ async def _run_execute_pipeline_if_present(
 
 
 async def _set_waiting_message_state_if_needed(controller, action: Action) -> None:
-    if not isinstance(action, MessageAction):
-        return
-    if action.source != EventSource.AGENT or not action.wait_for_response:
-        return
-    await controller.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+    # Agent MessageAction handoffs are protocol-validated by EventRouterService.
+    return
 
 
 def _bind_action_context_if_present(
@@ -129,12 +124,8 @@ class ActionService:
 
         self._prepare_metrics_for_action(action)
 
-        # Set AWAITING_USER_INPUT *before* emitting the event so that the
-        # _step drain loop (which checks can_step → agent_state == RUNNING)
-        # sees the state change immediately.  Without this, the event-stream
-        # callback that normally sets AWAITING_USER_INPUT runs on a background
-        # thread and may not execute before the drain loop re-enters
-        # _step_inner, causing a duplicate LLM call and double response.
+        # Lifecycle state for agent message handoffs is decided by the router
+        # after protocol validation.
         await _set_waiting_message_state_if_needed(controller, action)
 
         es = controller.event_stream

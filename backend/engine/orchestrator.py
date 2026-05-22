@@ -53,6 +53,14 @@ from backend.engine.contracts import (
     SafetyManagerProtocol,
 )
 from backend.engine.executor import OrchestratorExecutor
+from backend.engine.executor_response_helpers import extract_response_text
+from backend.engine.file_edit_protocol import (
+    apply_edit_from_transaction,
+    build_editor_mode_prompt,
+    build_target_context,
+    get_transaction_store,
+    parse_editor_response,
+)
 from backend.engine.memory_manager import ContextMemoryManager
 from backend.engine.planner import OrchestratorPlanner
 from backend.engine.safety import OrchestratorSafetyManager
@@ -63,6 +71,7 @@ from backend.execution.plugins.agent_skills import AgentSkillsRequirement
 from backend.inference.exceptions import LLMError
 from backend.inference.llm_registry import LLMRegistry
 from backend.ledger.action import AgentThinkAction, MessageAction, PlaybookFinishAction
+from backend.ledger.action.files import StartFileEditAction
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import EventSource
 from backend.orchestration.agent import Agent
@@ -375,10 +384,111 @@ class Orchestrator(Agent):
             self._reset_step_recovery_counters()
             return pending
 
+        if editor_action := await self._execute_editor_mode_if_active(state):
+            self._reset_step_recovery_counters()
+            return editor_action
+
         condensed = self.memory_manager.condense_history(state)
         action = await self._execute_llm_step_async(state, condensed)
         self._reset_step_recovery_counters()
         return action
+
+    async def _execute_editor_mode_if_active(self, state: State) -> Action | None:
+        """Capture raw file content for an active edit transaction."""
+        session_id = self._session_id_for_state(state)
+        store = get_transaction_store()
+        txn = store.get_active_transaction(session_id)
+        if txn is None or txn.status != 'pending_content':
+            return None
+
+        parse_error = None
+        while True:
+            prompt = build_editor_mode_prompt(
+                txn,
+                target_context=self._editor_target_context(txn),
+                parse_error=parse_error,
+            )
+            response_text = await self._call_editor_mode_model(state, prompt)
+            parsed = parse_editor_response(response_text, txn)
+            if not parsed.ok:
+                txn.retry_count += 1
+                store.update_transaction(session_id, txn)
+                logger.warning(
+                    'EDITOR_PARSE_FAILED transaction=%s code=%s retry=%s/%s',
+                    txn.transaction_id,
+                    parsed.error_code,
+                    txn.retry_count,
+                    txn.max_retries,
+                )
+                if txn.retry_count <= txn.max_retries:
+                    parse_error = parsed
+                    continue
+                txn.touch(status='failed')
+                store.update_transaction(session_id, txn)
+                store.clear_active_transaction(session_id)
+                return AgentThinkAction(
+                    thought=(
+                        '[EDITOR_PARSE_FAILED] Editor mode failed after '
+                        f'{txn.retry_count} attempts: {parsed.error_code}: '
+                        f'{parsed.error_message}. Return to normal mode, reread the '
+                        'target if needed, and retry with start_file_edit.'
+                    ),
+                    suppress_cli=True,
+                )
+
+            txn.touch(status='content_captured')
+            store.update_transaction(session_id, txn)
+            try:
+                action = apply_edit_from_transaction(parsed.content, txn)
+            except Exception as exc:
+                txn.touch(status='failed')
+                store.update_transaction(session_id, txn)
+                store.clear_active_transaction(session_id)
+                return AgentThinkAction(
+                    thought=(
+                        '[EDIT_APPLY_FAILED] Captured editor content could not be '
+                        f'converted into an edit action: {exc}'
+                    ),
+                    suppress_cli=True,
+                )
+
+            txn.touch(status='applying')
+            store.update_transaction(session_id, txn)
+            store.clear_active_transaction(session_id)
+            return action
+
+    async def _call_editor_mode_model(self, state: State, prompt: str) -> str:
+        messages = self._build_editor_mode_messages(state, prompt)
+        params: dict[str, Any] = {
+            'messages': messages,
+            'stream': False,
+            'tools': [],
+        }
+        params['extra_body'] = {
+            'metadata': state.to_llm_metadata(
+                model_name=(self.llm.config.model or '').strip() or 'unknown',
+                agent_name=getattr(state, 'agent_name', 'Orchestrator'),
+            )
+        }
+
+        self._sync_executor_llm()
+
+        def _complete():
+            return self.llm.completion(**params)
+
+        response = await asyncio.to_thread(_complete)
+        return extract_response_text(response)
+
+    def _build_editor_mode_messages(self, state: State, prompt: str) -> list[dict[str, Any]]:
+        return [
+            {'role': 'system', 'content': prompt},
+            {
+                'role': 'user',
+                'content': (
+                    'FILE EDITOR MODE is active. Output exactly one <file_edit> block with raw file text only.'
+                ),
+            },
+        ]
 
     async def _astep_handle_context_limit_error(self, state: State) -> Action:
         """Condense/retry after ContextLimitError; may degrade or raise."""
@@ -592,6 +702,7 @@ class Orchestrator(Agent):
         actions = result.actions or []
         if not actions:
             return self._build_fallback_action(result)
+        self._attach_session_id_to_actions(actions, state)
         self._queue_additional_actions(actions[1:])
         return actions[0]
 
@@ -650,12 +761,39 @@ class Orchestrator(Agent):
         actions = result.actions or []
         if not actions:
             return self._build_fallback_action(result)
+        self._attach_session_id_to_actions(actions, state)
         self._queue_additional_actions(actions[1:])
         return actions[0]
 
     # ------------------------------------------------------------------ #
     # Test/mocking helpers
     # ------------------------------------------------------------------ #
+    def _session_id_for_state(self, state: State) -> str | None:
+        return (
+            getattr(state, 'session_id', None)
+            or getattr(self.event_stream, 'sid', None)
+            or getattr(self.config, 'sid', None)
+        )
+
+    def _workspace_root_for_editor_context(self) -> str | None:
+        root = (
+            getattr(self.config, 'project_root', None)
+            or getattr(self.config, 'workspace_mount_path_in_runtime', None)
+            or os.getcwd()
+        )
+        return str(root) if root else None
+
+    def _editor_target_context(self, txn) -> str | None:
+        return build_target_context(txn, self._workspace_root_for_editor_context())
+
+    def _attach_session_id_to_actions(
+        self, actions: list[Action], state: State
+    ) -> None:
+        session_id = self._session_id_for_state(state)
+        for action in actions:
+            if isinstance(action, StartFileEditAction) and not action.session_id:
+                action.session_id = session_id
+
     def set_llm(self, llm) -> None:  # pragma: no cover - used in tests
         """Replace the active LLM and propagate to planner/executor/compactor.
 

@@ -408,7 +408,7 @@ class StepGuardService:
         symbol_hits = sum(
             1
             for content in recent_errors
-            if 'symbol editor error' in content.lower()
+            if 'symbol edit error' in content.lower()
             or 'symbol ' in content.lower()
             and 'not found' in content.lower()
             or '[editor_recovery_required]' in content.lower()
@@ -419,31 +419,31 @@ class StepGuardService:
                 'MANDATORY NEXT ACTIONS:\n'
                 '1. If the error mentions a symbol, call `find_symbol` before editing again.\n'
                 '2. Re-read the affected file region to confirm the live code shape.\n'
-                '3. Retry exactly one targeted `symbol_editor` edit (`edit_symbol_body` or `replace_range`).\n'
-                '4. If that fails, switch to `text_editor` `edit_mode=range` with fresh line numbers.\n'
-                'Do NOT emit another near-identical symbol edit without new evidence.',
-                'STUCK RECOVERY: find_symbol or read_file, then one targeted symbol_editor retry max.',
+                '3. Retry exactly one targeted `start_file_edit` edit (`replace_lines` or `patch`).\n'
+                '4. If that fails, switch to `start_file_edit` `replace_lines` with fresh line numbers.\n'
+                'Do NOT emit another near-identical edit without new evidence.',
+                'STUCK RECOVERY: find_symbol or read the file region, then one targeted start_file_edit retry max.',
             )
 
-        text_editor_hits = sum(
+        file_edit_hits = sum(
             1
             for content in recent_errors
-            if 'text_editor' in content.lower()
+            if 'start_file_edit' in content.lower()
             or 'corrupt patch' in content.lower()
             or 'patch failed to apply' in content.lower()
-            or '[text_editor_guidance]' in content.lower()
+            or '[file_edit_guidance]' in content.lower()
         )
-        if text_editor_hits < 2:
+        if file_edit_hits < 2:
             return None
         return (
-            'STUCK LOOP DETECTED — repeated text_editor failures were detected.\n'
+            'STUCK LOOP DETECTED — repeated file-edit failures were detected.\n'
             'MANDATORY NEXT ACTIONS:\n'
             '1. Read the target file again with read_file to refresh exact context lines.\n'
-            '2. Prefer `symbol_editor` for the next code edit if the file is source code.\n'
-            '3. If you must stay in text_editor, retry once with `edit_mode=range` and corrected live context.\n'
-            '4. If it fails again, switch tools instead of retrying text_editor.\n'
-            'Do NOT emit another near-identical text_editor call without new file evidence.',
-            'STUCK RECOVERY: read_file refresh, prefer symbol_editor, then one text_editor retry max.',
+            '2. Prefer `start_file_edit` for the next code edit if the file is source code.\n'
+            '3. Retry once with `replace_lines` and corrected live context.\n'
+            '4. If it fails again, switch tools instead of retrying the same edit shape.\n'
+            'Do NOT emit another near-identical edit without new file evidence.',
+            'STUCK RECOVERY: refresh the file, then one start_file_edit retry max.',
         )
 
     @staticmethod

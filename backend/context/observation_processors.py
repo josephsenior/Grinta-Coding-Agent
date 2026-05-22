@@ -79,10 +79,17 @@ def _is_tool_backed_think_observation(event: Observation) -> bool:
 def _handle_tool_backed_think_observation(
     obs: Observation, max_message_chars: int | None
 ) -> Message:
+    import json as _json
+
     tool_result = getattr(obs, 'tool_result', None)
     assert isinstance(tool_result, dict)
+    payload = _json.dumps(tool_result, ensure_ascii=False)
+    if getattr(obs, 'tool_call_metadata', None) is not None:
+        text_content = payload
+    else:
+        text_content = 'Internal tool observation, not a user request.\n' + payload
     text = truncate_content(
-        json.dumps(tool_result, ensure_ascii=False),
+        text_content,
         max_message_chars,
         strategy='balanced',
     )

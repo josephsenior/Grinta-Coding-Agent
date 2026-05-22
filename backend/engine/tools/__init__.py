@@ -16,10 +16,9 @@ from .meta_cognition import (
 )
 from .read_symbol import create_read_symbol_definition_tool
 from .search_code import create_search_code_tool
-from .symbol_editor_tool import create_symbol_editor_tool
+from .start_file_edit import create_start_file_edit_tool
 from .task_tracker import create_task_tracker_tool
 from .terminal_manager import create_terminal_manager_tool
-from .text_editor import create_text_editor_tool
 
 __all__ = [
     'create_checkpoint_tool',
@@ -33,10 +32,9 @@ __all__ = [
     'create_analyze_project_structure_tool',
     'create_read_symbol_definition_tool',
     'create_search_code_tool',
+    'create_start_file_edit_tool',
     'create_cmd_run_tool',
     'create_browser_tool',
-    'create_text_editor_tool',
-    'create_symbol_editor_tool',
     'create_task_tracker_tool',
     'create_delegate_task_tool',
     'create_terminal_manager_tool',

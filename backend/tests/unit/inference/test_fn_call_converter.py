@@ -147,6 +147,20 @@ class TestConvertToolCallToString:
             convert_tool_call_to_string({'id': '1'})
 
 
+class TestFormatFileEditorXmlExamplesForPrompt:
+    def test_includes_canonical_command_blocks(self):
+        from backend.inference.fn_call_converter import (
+            FILE_EDITOR_PROMPT_XML_COMMANDS,
+            format_file_editor_xml_examples_for_prompt,
+        )
+
+        text = format_file_editor_xml_examples_for_prompt()
+        for cmd in FILE_EDITOR_PROMPT_XML_COMMANDS:
+            assert f'### Example: command={cmd}' in text
+            assert f'<parameter=command>{cmd}</parameter>' in text
+        assert text.count('<function=file_editor>') >= len(FILE_EDITOR_PROMPT_XML_COMMANDS)
+
+
 # ── convert_tools_to_description ───────────────────────────────────────
 
 

@@ -17,8 +17,6 @@ from backend.ledger.action import (
     TaskTrackingAction,
 )
 from backend.ledger.observation import Observation
-from backend.ledger.observation.agent import AgentThinkObservation
-from backend.ledger.tool import ToolCallMetadata
 from backend.orchestration.services.event_router_service import (
     EventRouterService,
     _build_delegate_progress_observation,
@@ -161,17 +159,63 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.event_stream.add_event.assert_called_once()
 
     async def test_handle_action_message_from_agent_wait_response(self):
-        """Test _handle_action sets awaiting input for agent message."""
+        """Test agent messages wait for user input when no task plan is active."""
         action = MessageAction(content='Question?')
         action.source = EventSource.AGENT
         action.wait_for_response = True
 
         await self.service._handle_action(action)
 
-        # Should set state to awaiting user input
         self.mock_controller.set_agent_state_to.assert_called_once_with(
             AgentState.AWAITING_USER_INPUT
         )
+        self.mock_controller.state.set_planning_directive.assert_not_called()
+
+    async def test_handle_action_message_from_agent_active_plan_rejects_handoff(self):
+        action = MessageAction(content='I am done.')
+        action.source = EventSource.AGENT
+        action.wait_for_response = True
+        self.mock_controller.state.plan = SimpleNamespace(
+            steps=[
+                SimpleNamespace(
+                    id='1',
+                    description='Still working',
+                    status='doing',
+                    subtasks=[],
+                )
+            ]
+        )
+
+        await self.service._handle_action(action)
+
+        self.mock_controller.set_agent_state_to.assert_not_called()
+        self.mock_controller.state.set_planning_directive.assert_called_once()
+        self.assertTrue(action.suppress_cli)
+        self.assertFalse(action.wait_for_response)
+
+    async def test_handle_action_message_from_agent_terminal_plan_allows_handoff(
+        self,
+    ):
+        action = MessageAction(content='Done.')
+        action.source = EventSource.AGENT
+        action.wait_for_response = True
+        self.mock_controller.state.plan = SimpleNamespace(
+            steps=[
+                SimpleNamespace(
+                    id='1',
+                    description='Finished work',
+                    status='done',
+                    subtasks=[],
+                )
+            ]
+        )
+
+        await self.service._handle_action(action)
+
+        self.mock_controller.set_agent_state_to.assert_called_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+        self.mock_controller.state.set_planning_directive.assert_not_called()
 
     async def test_handle_action_message_from_agent_no_wait(self):
         """Test _handle_action skips state change when no wait."""
@@ -184,72 +228,30 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         # Should not change state
         self.mock_controller.set_agent_state_to.assert_not_called()
 
-    async def test_handle_action_message_from_agent_blocks_incomplete_checkpoint_handoff(
+    async def test_handle_action_message_from_agent_intercepts_text_tool_call_handoff(
         self,
     ):
-        checkpoint_obs = AgentThinkObservation(content='Your thought has been logged.')
-        checkpoint_obs.tool_result = {
-            'tool': 'checkpoint',
-            'ok': True,
-            'status': 'saved',
-            'next_best_action': 'Continue with the next planned step.',
-        }
-        checkpoint_obs.tool_call_metadata = ToolCallMetadata(
-            function_name='checkpoint',
-            tool_call_id='call_checkpoint',
-            model_response={'id': 'resp_checkpoint'},
-            total_calls_in_response=1,
-        )
-        action = MessageAction(content='Checkpoint saved.')
-        action.source = EventSource.AGENT
-        action.wait_for_response = True
-        self.mock_controller.state.history = [checkpoint_obs, action]
-
-        await self.service._handle_action(action)
-
-        self.mock_controller.set_agent_state_to.assert_not_called()
-        self.mock_controller.event_stream.add_event.assert_not_called()
-        self.mock_controller.state.set_planning_directive.assert_called_once()
-        directive = self.mock_controller.state.set_planning_directive.call_args[0][0]
-        self.assertIn('task_tracker update', directive)
-        self.assertIn('finish', directive)
-
-    async def test_handle_action_message_from_agent_always_intercepts_after_checkpoint(
-        self,
-    ):
-        """After any checkpoint tool call, MessageAction(wait_for_response=True) is
-        always intercepted regardless of content — no content sniffing.
-
-        If the agent thinks the task is done it must call PlaybookFinish, not hand
-        back via a MessageAction.  The guidance injected here tells it exactly that.
-        """
-        checkpoint_obs = AgentThinkObservation(content='Your thought has been logged.')
-        checkpoint_obs.tool_result = {
-            'tool': 'checkpoint',
-            'ok': True,
-            'status': 'saved',
-            'next_best_action': 'Continue with the next planned step.',
-        }
-        checkpoint_obs.tool_call_metadata = ToolCallMetadata(
-            function_name='checkpoint',
-            tool_call_id='call_checkpoint',
-            model_response={'id': 'resp_checkpoint'},
-            total_calls_in_response=1,
-        )
         action = MessageAction(
-            content='Implementation is complete. Next steps: 1. run the focused tests 2. commit if the results are clean.'
+            content=(
+                "I'll update the plan.\n"
+                '<minimax:tool_call name="task_tracker">update</minimax:tool_call>'
+            )
         )
         action.source = EventSource.AGENT
         action.wait_for_response = True
-        self.mock_controller.state.history = [checkpoint_obs, action]
 
         await self.service._handle_action(action)
 
-        # Always intercepted — agent stays RUNNING, guided to continue or call finish
         self.mock_controller.set_agent_state_to.assert_not_called()
         self.mock_controller.state.set_planning_directive.assert_called_once()
         directive = self.mock_controller.state.set_planning_directive.call_args[0][0]
-        self.assertIn('checkpoint is an intermediate control tool', directive)
+        self.assertEqual(
+            directive,
+            'Protocol error: provider-specific text tool-call markup was returned '
+            'instead of a valid Grinta tool action.',
+        )
+        self.assertTrue(action.suppress_cli)
+        self.assertFalse(action.wait_for_response)
 
     @patch.dict('os.environ', {'LOG_ALL_EVENTS': 'true'})
     async def test_handle_message_action_log_all_events(self):
