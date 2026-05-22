@@ -20,12 +20,12 @@ def test_two_mode_content_reaches_existing_file_editor_pipeline(tmp_path):
     txn = store.create_transaction(
         'integration_session',
         'app.py',
-        'replace_lines',
+        'replace_range',
         {'start_line': 2, 'end_line': 2, 'security_risk': 'LOW'},
     )
     raw_content = '    return 42\n'
     response = (
-        f'<file_edit transaction_id="{txn.transaction_id}">\n'
+        '<file_edit>\n'
         f'{raw_content}'
         f'{txn.delimiter}\n'
         '</file_edit>\n'

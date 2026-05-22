@@ -10,7 +10,7 @@ MANDATORY:
 7. **No unchanged retries after failure** — change strategy or escalate with hypothesis, action/outcome, and ruled-out paths.
 8. **Tests must track real APIs** — Before adding or changing test code, **read** the implementation module(s) you are testing in this session and align mocks, fixtures, and calls with the **actual** signatures and return shapes. Do not assume parity with a different module or an earlier draft from memory.
 9. **Postmortem on failing tests** — After a test failure, state the likely root cause class (wrong assumed API vs mock shape vs implementation bug vs flake), then change **one** lever and re-run a **narrow** test command; avoid blind rewrite loops.
-10. **Non-test failures** — After tool/build/lint/patch/runtime failure, state the **root-cause class** in one phrase (wrong path/symbol vs stale assumption vs environment vs defect); then follow `<ERROR_RECOVERY>` earlier in this system prompt (pivot tools, never rerun the same failing command unchanged, escalate with hypothesis / action-outcome / ruled-out paths). Rule 7 still applies.
+10. **Non-test failures** — After tool/build/lint/runtime failure, state the **root-cause class** in one phrase (wrong path/symbol vs stale assumption vs environment vs defect); then follow `<ERROR_RECOVERY>` earlier in this system prompt (pivot tools, never rerun the same failing command unchanged, escalate with hypothesis / action-outcome / ruled-out paths). Rule 7 still applies.
 </CRITICAL_TOOL_EXECUTION_RULES>
 
 <ANTI_PATTERNS>

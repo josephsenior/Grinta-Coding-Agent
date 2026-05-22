@@ -30,10 +30,7 @@ def create_start_file_edit_tool() -> ChatCompletionToolParam:
                     'create',
                     'insert',
                     'undo',
-                    'replace_lines',
-                    'format_edit',
-                    'section_edit',
-                    'patch',
+                    'replace_range',
                     'find_symbol',
                 ],
             },
@@ -48,11 +45,11 @@ def create_start_file_edit_tool() -> ChatCompletionToolParam:
             },
             'start_line': {
                 'type': 'integer',
-                'description': '1-based start line for replace_lines.',
+                'description': '1-based start line for replace_range.',
             },
             'end_line': {
                 'type': 'integer',
-                'description': '1-based inclusive end line for replace_lines.',
+                'description': '1-based inclusive end line for replace_range.',
             },
             'view_range': {
                 'type': 'array',
@@ -75,43 +72,9 @@ def create_start_file_edit_tool() -> ChatCompletionToolParam:
                 'type': 'string',
                 'description': 'Operation-specific hash guard when supported.',
             },
-            'format_kind': {
-                'type': 'string',
-                'description': 'Parser target for format_edit.',
-                'enum': ['json', 'yaml', 'toml', 'markdown', 'html', 'xml'],
-            },
-            'format_op': {
-                'type': 'string',
-                'description': 'Parser operation for format_edit.',
-            },
-            'format_path': {
-                'type': 'string',
-                'description': 'Path/query inside the structured document.',
-            },
-            'format_value': {
-                'description': 'JSON/YAML/TOML scalar or object for format_edit.',
-            },
-            'anchor_type': {
-                'type': 'string',
-                'description': 'Anchor kind for section_edit.',
-                'enum': ['heading', 'regex', 'literal'],
-            },
-            'anchor_value': {
-                'type': 'string',
-                'description': 'Anchor value for section_edit.',
-            },
-            'anchor_occurrence': {
-                'type': 'integer',
-                'description': '1-based anchor occurrence for section_edit.',
-            },
-            'section_action': {
-                'type': 'string',
-                'description': 'Section operation.',
-                'enum': ['replace', 'insert_after', 'insert_before', 'delete'],
-            },
             'symbol_name': {
                 'type': 'string',
-                'description': 'Symbol name for edit_symbol or find_symbol.',
+                'description': 'Symbol name for find_symbol.',
             },
             'symbol_kind': {
                 'type': 'string',

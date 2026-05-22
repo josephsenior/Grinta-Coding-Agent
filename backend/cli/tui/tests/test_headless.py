@@ -728,6 +728,41 @@ async def test_tui_file_write_uses_full_width_diff_rows(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_file_write_preview_lines_are_not_duplicated(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            FileWriteAction(
+                path='demo.txt',
+                content='# This is a test file\nIt contains multiple sections',
+            )
+        )
+        await pilot.pause()
+
+        diff_rows = list(s.query(DiffLine).results())
+        assert [row.renderable.plain for row in diff_rows] == [
+            '+1| # This is a test file',
+            '+2| It contains multiple sections',
+        ]
+
+
+@pytest.mark.asyncio
 async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()

@@ -49,16 +49,6 @@ def execute_file_editor(
     dry_run: bool = False,
     *,
     edit_mode: str | None = None,
-    format_kind: str | None = None,
-    format_op: str | None = None,
-    format_path: str | None = None,
-    format_value: Any = None,
-    anchor_type: str | None = None,
-    anchor_value: str | None = None,
-    anchor_occurrence: int | None = None,
-    section_action: str | None = None,
-    section_content: str | None = None,
-    patch_text: str | None = None,
     expected_hash: str | None = None,
     expected_file_hash: str | None = None,
     overwrite_existing: bool = False,
@@ -86,16 +76,6 @@ def execute_file_editor(
         enable_linting,
         dry_run,
         edit_mode=edit_mode,
-        format_kind=format_kind,
-        format_op=format_op,
-        format_path=format_path,
-        format_value=format_value,
-        anchor_type=anchor_type,
-        anchor_value=anchor_value,
-        anchor_occurrence=anchor_occurrence,
-        section_action=section_action,
-        section_content=section_content,
-        patch_text=patch_text,
         expected_hash=expected_hash,
         expected_file_hash=expected_file_hash,
         overwrite_existing=overwrite_existing,
@@ -106,7 +86,7 @@ def execute_file_editor(
             result.error,
             path=path,
             tool_name='file_editor',
-            content=file_text or new_str or section_content or patch_text,
+            content=file_text or new_str,
         )
         return (
             f'ERROR:\n{enriched_error}',
@@ -138,7 +118,7 @@ def execute_file_editor(
         }
 
     return result.output, (result.old_content, result.new_content), {
-        'tool': 'text_editor',
+        'tool': 'file_editor',
         'ok': True,
         'error_code': None,
         'retryable': False,
@@ -177,16 +157,6 @@ def _invoke_editor(
     dry_run: bool,
     *,
     edit_mode: str | None = None,
-    format_kind: str | None = None,
-    format_op: str | None = None,
-    format_path: str | None = None,
-    format_value: Any = None,
-    anchor_type: str | None = None,
-    anchor_value: str | None = None,
-    anchor_occurrence: int | None = None,
-    section_action: str | None = None,
-    section_content: str | None = None,
-    patch_text: str | None = None,
     expected_hash: str | None = None,
     expected_file_hash: str | None = None,
     overwrite_existing: bool = False,
@@ -208,16 +178,6 @@ def _invoke_editor(
             enable_linting=enable_linting,
             dry_run=dry_run,
             edit_mode=edit_mode,
-            format_kind=format_kind,
-            format_op=format_op,
-            format_path=format_path,
-            format_value=format_value,
-            anchor_type=anchor_type,
-            anchor_value=anchor_value,
-            anchor_occurrence=anchor_occurrence,
-            section_action=section_action,
-            section_content=section_content,
-            patch_text=patch_text,
             expected_hash=expected_hash,
             expected_file_hash=expected_file_hash,
             overwrite_existing=overwrite_existing,
@@ -611,7 +571,12 @@ def write_file_content(
             # Preserve existing file newline style while normalizing inserted text.
             to_insert = split_content_lines(action.content)
 
-            start = (action.start or 1) - 1
+            # ``insert_lines`` already treats ``start`` as the insertion index
+            # in the 0-based line list. ``action.start`` is the caller-facing
+            # line number after which to insert, so pass it through directly.
+            # This keeps "insert after line N" aligned with the documented tool
+            # contract and preserves the untouched tail of the file.
+            start = action.start if action.start is not None else 0
             end = action.end if action.end is not None else -1
 
             new_lines = insert_lines(

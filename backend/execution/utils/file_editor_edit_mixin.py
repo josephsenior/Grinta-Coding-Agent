@@ -12,22 +12,7 @@ from backend.execution.utils.file_editor_edit_ops import (
     apply_edit_logic as _apply_edit_logic_impl,
 )
 from backend.execution.utils.file_editor_edit_ops import (
-    apply_format_edit as _apply_format_edit_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    apply_section_edit as _apply_section_edit_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    apply_unified_patch as _apply_unified_patch_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
     line_ending_for_content as _line_ending_for_content_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    mutate_structured_data as _mutate_structured_data_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    parse_structured_content as _parse_structured_content_impl,
 )
 from backend.execution.utils.file_editor_edit_ops import (
     replace_range_guarded as _replace_range_guarded_impl,
@@ -36,16 +21,10 @@ from backend.execution.utils.file_editor_edit_ops import (
     resolve_edit_content as _resolve_edit_content_impl,
 )
 from backend.execution.utils.file_editor_edit_ops import (
-    serialize_structured_content as _serialize_structured_content_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
     sha256_text as _sha256_text_impl,
 )
 from backend.execution.utils.file_editor_edit_ops import (
     slice_text_by_line_range as _slice_text_by_line_range_impl,
-)
-from backend.execution.utils.file_editor_edit_ops import (
-    structured_path_tokens as _structured_path_tokens_impl,
 )
 
 
@@ -213,16 +192,6 @@ class FileEditorEditOpsMixin:
         end_line: int | None,
         *,
         edit_mode: str | None = None,
-        format_kind: str | None = None,
-        format_op: str | None = None,
-        format_path: str | None = None,
-        format_value: Any = None,
-        anchor_type: str | None = None,
-        anchor_value: str | None = None,
-        anchor_occurrence: int | None = None,
-        section_action: str | None = None,
-        section_content: str | None = None,
-        patch_text: str | None = None,
         expected_hash: str | None = None,
         file_path: Path | None = None,
     ) -> Any:
@@ -235,16 +204,6 @@ class FileEditorEditOpsMixin:
             start_line,
             end_line,
             edit_mode=edit_mode,
-            format_kind=format_kind,
-            format_op=format_op,
-            format_path=format_path,
-            format_value=format_value,
-            anchor_type=anchor_type,
-            anchor_value=anchor_value,
-            anchor_occurrence=anchor_occurrence,
-            section_action=section_action,
-            section_content=section_content,
-            patch_text=patch_text,
             expected_hash=expected_hash,
             file_path=file_path,
         )
@@ -274,61 +233,3 @@ class FileEditorEditOpsMixin:
             end_line,
             expected_hash=expected_hash,
         )
-
-    def _apply_format_edit(
-        self,
-        content: str,
-        *,
-        file_path: Path | None,
-        format_kind: str | None,
-        format_op: str | None,
-        format_path: str | None,
-        format_value: Any,
-    ) -> Any:
-        return _apply_format_edit_impl(
-            self,
-            content,
-            file_path=file_path,
-            format_kind=format_kind,
-            format_op=format_op,
-            format_path=format_path,
-            format_value=format_value,
-        )
-
-    def _parse_structured_content(self, content: str, kind: str) -> Any:
-        return _parse_structured_content_impl(content, kind)
-
-    def _serialize_structured_content(self, data: Any, kind: str) -> str:
-        return _serialize_structured_content_impl(data, kind)
-
-    @staticmethod
-    def _structured_path_tokens(path_expr: str) -> list[str]:
-        return _structured_path_tokens_impl(path_expr)
-
-    def _mutate_structured_data(
-        self, data: Any, op: str, path_expr: str, value: Any
-    ) -> Any:
-        return _mutate_structured_data_impl(data, op, path_expr, value)
-
-    def _apply_section_edit(
-        self,
-        content: str,
-        *,
-        anchor_type: str | None,
-        anchor_value: str | None,
-        anchor_occurrence: int | None,
-        section_action: str | None,
-        section_content: str | None,
-    ) -> Any:
-        return _apply_section_edit_impl(
-            self,
-            content,
-            anchor_type=anchor_type,
-            anchor_value=anchor_value,
-            anchor_occurrence=anchor_occurrence,
-            section_action=section_action,
-            section_content=section_content,
-        )
-
-    def _apply_unified_patch(self, content: str, patch_text: str | None) -> Any:
-        return _apply_unified_patch_impl(self, content, patch_text)

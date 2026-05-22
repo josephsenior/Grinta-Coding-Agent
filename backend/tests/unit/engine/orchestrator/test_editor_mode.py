@@ -63,7 +63,7 @@ def _agent(tmp_path, responses: list[str]) -> Orchestrator:
 
 def _response(txn, content: str) -> str:
     return (
-        f'<file_edit transaction_id="{txn.transaction_id}">\n'
+        '<file_edit>\n'
         f'{content}'
         f'{txn.delimiter}\n'
         '</file_edit>\n'
@@ -135,7 +135,7 @@ async def test_valid_editor_response_gets_parsed_and_applied(tmp_path):
     txn = store.create_transaction(
         'editor_session',
         'app.py',
-        'replace_lines',
+        'replace_range',
         {'start_line': 2, 'end_line': 3, 'security_risk': 'LOW'},
     )
     agent = _agent(tmp_path, [_response(txn, '    return 42\n')])

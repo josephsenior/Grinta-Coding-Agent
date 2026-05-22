@@ -15,7 +15,7 @@ def _txn() -> EditTransaction:
         transaction_id='edit_abc123',
         session_id='s1',
         path='pkg/app.py',
-        operation='replace_lines',
+        operation='replace_range',
         delimiter='GRINTA_END_1234567890abcdef12345678',
         metadata={'start_line': 1, 'end_line': 2},
         status='pending_content',
@@ -25,7 +25,7 @@ def _txn() -> EditTransaction:
 def _block(content: str, txn: EditTransaction | None = None) -> str:
     txn = txn or _txn()
     return (
-        f'<file_edit transaction_id="{txn.transaction_id}">\n'
+        '<file_edit>\n'
         f'{content}'
         f'{txn.delimiter}\n'
         '</file_edit>\n'
@@ -64,17 +64,17 @@ def test_parse_rejects_missing_opening_tag():
     assert parsed.error_code == 'MISSING_OPEN_TAG'
 
 
-def test_parse_rejects_wrong_transaction_id():
+def test_parse_accepts_optional_transaction_id():
     txn = _txn()
-    text = _block('x\n', txn).replace(txn.transaction_id, 'edit_wrong')
+    text = f'<file_edit transaction_id="{txn.transaction_id}">\nx\n{txn.delimiter}\n</file_edit>\n'
     parsed = parse_editor_response(text, txn)
-    assert not parsed.ok
-    assert parsed.error_code == 'WRONG_TRANSACTION_ID'
+    assert parsed.ok
+    assert parsed.content == 'x\n'
 
 
 def test_parse_rejects_missing_delimiter():
     txn = _txn()
-    text = f'<file_edit transaction_id="{txn.transaction_id}">\nx\n</file_edit>\n'
+    text = '<file_edit>\nx\n</file_edit>\n'
     parsed = parse_editor_response(text, txn)
     assert not parsed.ok
     assert parsed.error_code == 'MISSING_DELIMITER'
@@ -82,7 +82,7 @@ def test_parse_rejects_missing_delimiter():
 
 def test_parse_rejects_missing_closing_tag():
     txn = _txn()
-    text = f'<file_edit transaction_id="{txn.transaction_id}">\nx\n{txn.delimiter}\n'
+    text = f'<file_edit>\nx\n{txn.delimiter}\n'
     parsed = parse_editor_response(text, txn)
     assert not parsed.ok
     assert parsed.error_code == 'MISSING_CLOSE_TAG'
@@ -199,6 +199,8 @@ def test_editor_mode_prompt_explicitly_requests_raw_plain_text() -> None:
     assert 'raw file content' in prompt
     assert 'Do not serialize it as JSON or a tool payload' in prompt
     assert '<current_target>' in prompt
+    assert '<file_edit>' in prompt
+    assert '<file_edit transaction_id=' not in prompt
 
 
 def test_prompt_assets_include_concise_file_edit_policy() -> None:

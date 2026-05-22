@@ -117,18 +117,7 @@ class FileEditAction(Action):
     runnable: ClassVar[bool] = True
     security_risk: ActionSecurityRisk = ActionSecurityRisk.UNKNOWN
     impl_source: FileEditSource = FileEditSource.FILE_EDITOR
-    # text_editor / FileEditor extended options (optional)
     edit_mode: str | None = None
-    format_kind: str | None = None
-    format_op: str | None = None
-    format_path: str | None = None
-    format_value: Any = None
-    anchor_type: str | None = None
-    anchor_value: str | None = None
-    anchor_occurrence: int | None = None
-    section_action: str | None = None
-    section_content: str | None = None
-    patch_text: str | None = None
     expected_hash: str | None = None
     expected_file_hash: str | None = None
     start_line: int | None = None

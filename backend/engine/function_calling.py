@@ -418,11 +418,11 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
             raise FunctionCallValidationError(
                 "[ERROR] text_editor command 'edit' requires 'edit_mode'. "
                 '[CAUSE] edit_mode was omitted from the tool call arguments. '
-                "[SUGGESTION] Provide one of: 'format', 'section', 'range', 'patch'. "
+                "[SUGGESTION] Provide 'range'. "
                 'Example: {"command": "edit", "edit_mode": "range", '
                 '"start_line": 1, "end_line": 10, "new_str": "..."}'
             )
-        valid_edit_modes = {'format', 'section', 'range', 'patch'}
+        valid_edit_modes = {'range'}
         if edit_mode not in valid_edit_modes:
             raise FunctionCallValidationError(
                 f"[ERROR] Unknown edit_mode '{edit_mode}'. "
@@ -1598,16 +1598,6 @@ _SYMBOL_EDITOR_BRIDGE_KEYS = (
     'preview',
     'confidence',
     'edit_mode',
-    'format_kind',
-    'format_op',
-    'format_path',
-    'format_value',
-    'anchor_type',
-    'anchor_value',
-    'anchor_occurrence',
-    'section_action',
-    'section_content',
-    'patch_text',
     'expected_hash',
     'expected_file_hash',
     'overwrite_existing',
@@ -1852,7 +1842,7 @@ def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
     # Validate command
     _VALID_FILE_EDITOR_COMMANDS = {
         'read', 'create', 'insert', 'undo',
-        'replace_lines', 'format_edit', 'section_edit', 'patch',
+        'replace_range',
         'edit_symbol', 'edit_symbols', 'rename_symbol', 'find_symbol',
         'normalize_indent', 'multi_edit',
     }
@@ -1917,14 +1907,14 @@ def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
         )
 
     # ── Line-range edit ────────────────────────────────────────────
-    if command == 'replace_lines':
+    if command == 'replace_range':
         content = _require_file_editor_content(normalized_args, command)
         start_line = normalized_args.get('start_line')
         end_line = normalized_args.get('end_line')
         if start_line is None:
-            raise FunctionCallValidationError('replace_lines requires start_line')
+            raise FunctionCallValidationError('replace_range requires start_line')
         if end_line is None:
-            raise FunctionCallValidationError('replace_lines requires end_line')
+            raise FunctionCallValidationError('replace_range requires end_line')
         return FileEditAction(
             path=path,
             command='edit',
@@ -1937,46 +1927,6 @@ def _handle_file_editor_tool(arguments: Mapping[str, Any]) -> Action:
         )
 
     # ── Structured-data edits ──────────────────────────────────────
-    if command == 'format_edit':
-        return FileEditAction(
-            path=path,
-            command='edit',
-            edit_mode='format',
-            format_kind=normalized_args.get('format_kind'),
-            format_op=normalized_args.get('format_op'),
-            format_path=normalized_args.get('format_path'),
-            format_value=normalized_args.get('format_value'),
-            impl_source=FileEditSource.FILE_EDITOR,
-        )
-
-    if command == 'section_edit':
-        section_action = normalized_args.get('section_action')
-        if section_action != 'delete':
-            content = _require_file_editor_content(normalized_args, command)
-        else:
-            content = cast(str, normalized_args.get('content', ''))
-        return FileEditAction(
-            path=path,
-            command='edit',
-            edit_mode='section',
-            anchor_type=normalized_args.get('anchor_type'),
-            anchor_value=normalized_args.get('anchor_value'),
-            anchor_occurrence=normalized_args.get('anchor_occurrence'),
-            section_action=section_action,
-            section_content=content,
-            impl_source=FileEditSource.FILE_EDITOR,
-        )
-
-    if command == 'patch':
-        content = _require_file_editor_content(normalized_args, command)
-        return FileEditAction(
-            path=path,
-            command='edit',
-            edit_mode='patch',
-            patch_text=content,
-            impl_source=FileEditSource.FILE_EDITOR,
-        )
-
     # ── Symbol-aware edits (Tree-sitter) ───────────────────────────
     if command in ('edit_symbol', 'edit_symbols', 'rename_symbol', 'find_symbol', 'normalize_indent'):
         return _handle_file_editor_symbol_command(command, path, normalized_args)
@@ -2059,7 +2009,7 @@ def _handle_file_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
     # Map unified operation names to internal command names
     _OP_MAP = {
         'create': 'replace_file',
-        'replace_lines': 'replace_range',
+        'replace_range': 'replace_range',
         'edit_symbol': 'edit_symbol_body',
         'replace_file': 'replace_file',
     }
@@ -2086,12 +2036,12 @@ def _handle_file_editor_multi_edit(arguments: Mapping[str, Any]) -> Action:
             converted['new_content'] = content
             if 'overwrite_existing' in item:
                 converted['overwrite_existing'] = item['overwrite_existing']
-        elif operation == 'replace_lines':
+        elif operation == 'replace_range':
             converted['new_code'] = content
             converted['start_line'] = item.get('start_line')
             converted['end_line'] = item.get('end_line')
             if converted['start_line'] is None or converted['end_line'] is None:
-                raise FunctionCallValidationError(f'multi_edit item {idx}: replace_lines requires start_line and end_line')
+                raise FunctionCallValidationError(f'multi_edit item {idx}: replace_range requires start_line and end_line')
         elif operation == 'edit_symbol':
             converted['symbol_name'] = item.get('symbol_name')
             converted['new_body'] = content

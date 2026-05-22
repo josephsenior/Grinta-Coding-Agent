@@ -318,8 +318,6 @@ CONTENT_ARG_NAMES: tuple[str, ...] = (
     'new_body',
     'content',
     'new_code',
-    'section_content',
-    'patch_text',
 )
 
 

@@ -299,7 +299,7 @@ def _render_system_capabilities(
         )
     else:
         multi_edit_line = (
-            '- **Atomic multi-file edits**: not exposed in this build — use `start_file_edit` `replace_lines` '
+            '- **Atomic multi-file edits**: not exposed in this build — use `start_file_edit` `replace_range` '
             'sequentially'
             + (
                 ' and take a `checkpoint` before the batch for coarse rollback.'
@@ -473,7 +473,7 @@ def _render_autonomy(
         "Plan, execute, and verify the user's task end-to-end. The runtime may "
         'interrupt a tool call to surface a user decision; treat that decision as '
         'authoritative and continue from where you stopped. On tool failure, pivot '
-        'to an alternative tool in the same turn (e.g. symbol lookup \u2192 `replace_lines` via `start_file_edit`) '
+        'to an alternative tool in the same turn (e.g. symbol lookup \u2192 `replace_range` via `start_file_edit`) '
         'and auto-retry recoverable errors before reporting back.'
         f'{cp_line}\n</AUTONOMY>'
     )
@@ -514,8 +514,8 @@ def _render_autonomy(
 
     lsp_avail = _lsp_available(config)
     error_recovery_pivot_lines = (
-        '- `search_code` \u2192 `lsp` (check locally with the language server; no shell grep)\n'
-        '- `lsp` \u2192 `search_code` (wider text search)'
+            '- `search_code` \u2192 `lsp` (check locally with the language server; no shell grep)\n'
+            '- `lsp` \u2192 `search_code` (wider text search)'
         if lsp_avail
         else ''
     )
@@ -623,9 +623,9 @@ def _render_examples(
         else 'If approved, keep the change surface small and verify immediately after the action.'
     )
     adjacent_tool_fallback = (
-        'symbol lookup → `start_file_edit` `replace_lines`; `lsp` → `search_code`'
+        'symbol lookup → `start_file_edit` `replace_range`; `lsp` → `search_code`'
         if lsp_available
-        else 'symbol lookup → `start_file_edit` `replace_lines`; refine the `search_code` query and read nearby files'
+        else 'symbol lookup → `start_file_edit` `replace_range`; refine the `search_code` query and read nearby files'
     )
     failure_escalation_step = (
         'After 3 failed attempts on the same sub-task, escalate via `communicate_with_user` with a 1-line post-mortem and a specific question.'

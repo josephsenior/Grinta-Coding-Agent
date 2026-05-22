@@ -424,16 +424,6 @@ class FileEditor(FileEditorEditOpsMixin):
         enable_linting: bool = False,
         dry_run: bool = False,
         edit_mode: str | None = None,
-        format_kind: str | None = None,
-        format_op: str | None = None,
-        format_path: str | None = None,
-        format_value: Any = None,
-        anchor_type: str | None = None,
-        anchor_value: str | None = None,
-        anchor_occurrence: int | None = None,
-        section_action: str | None = None,
-        section_content: str | None = None,
-        patch_text: str | None = None,
         expected_hash: str | None = None,
         expected_file_hash: str | None = None,
         overwrite_existing: bool = False,
@@ -452,17 +442,7 @@ class FileEditor(FileEditorEditOpsMixin):
             end_line: Optional end line number for range edit (1-indexed)
             enable_linting: Whether to enable linting (currently not implemented)
             dry_run: If True, compute preview result without writing changes
-            edit_mode: Sub-command mode when ``command`` is ``edit`` (e.g. format patch)
-            format_kind: Which structured format op applies (e.g. CSS, Prettier)
-            format_op: Format operation name (e.g. insert_rule)
-            format_path: JSON pointer or path within a structured file
-            format_value: New value for the format operation
-            anchor_type: Anchor strategy for section edits (e.g. line, regex)
-            anchor_value: Anchor string or pattern
-            anchor_occurrence: Which match to use when multiple anchors match
-            section_action: For section flow: add, remove, or replace
-            section_content: Replacement or inserted section text
-            patch_text: Full-file or diff patch when using patch-based flows
+            edit_mode: Sub-command mode when ``command`` is ``edit`` (range only)
             expected_hash: Optional client-supplied content hash (legacy)
             expected_file_hash: Optional per-file content hash for compare-and-swap
             **_: Additional keyword arguments (ignored)
@@ -489,24 +469,14 @@ class FileEditor(FileEditorEditOpsMixin):
                     view_range=view_range,
                     new_str=new_str,
                     insert_line=insert_line,
-                    start_line=start_line,
-                    end_line=end_line,
-                    dry_run=dry_run,
-                    edit_mode=edit_mode,
-                    format_kind=format_kind,
-                    format_op=format_op,
-                    format_path=format_path,
-                    format_value=format_value,
-                    anchor_type=anchor_type,
-                    anchor_value=anchor_value,
-                    anchor_occurrence=anchor_occurrence,
-                    section_action=section_action,
-                    section_content=section_content,
-                    patch_text=patch_text,
-                    expected_hash=expected_hash,
-                    expected_file_hash=expected_file_hash,
-                    overwrite_existing=overwrite_existing,
-                )
+            start_line=start_line,
+            end_line=end_line,
+            dry_run=dry_run,
+            edit_mode=edit_mode,
+            expected_hash=expected_hash,
+            expected_file_hash=expected_file_hash,
+            overwrite_existing=overwrite_existing,
+        )
 
         except PathValidationError as e:
             return ToolResult(output='', error=f'Path validation error: {e.message}')
@@ -527,16 +497,6 @@ class FileEditor(FileEditorEditOpsMixin):
         end_line: int | None,
         dry_run: bool,
         edit_mode: str | None,
-        format_kind: str | None,
-        format_op: str | None,
-        format_path: str | None,
-        format_value: Any,
-        anchor_type: str | None,
-        anchor_value: str | None,
-        anchor_occurrence: int | None,
-        section_action: str | None,
-        section_content: str | None,
-        patch_text: str | None,
         expected_hash: str | None,
         expected_file_hash: str | None,
         overwrite_existing: bool,
@@ -557,16 +517,6 @@ class FileEditor(FileEditorEditOpsMixin):
                     start_line,
                     end_line,
                     edit_mode=edit_mode,
-                    format_kind=format_kind,
-                    format_op=format_op,
-                    format_path=format_path,
-                    format_value=format_value,
-                    anchor_type=anchor_type,
-                    anchor_value=anchor_value,
-                    anchor_occurrence=anchor_occurrence,
-                    section_action=section_action,
-                    section_content=section_content,
-                    patch_text=patch_text,
                     expected_hash=expected_hash,
                     expected_file_hash=expected_file_hash,
                     dry_run=dry_run,
@@ -751,16 +701,6 @@ class FileEditor(FileEditorEditOpsMixin):
         end_line: int | None,
         *,
         edit_mode: str | None = None,
-        format_kind: str | None = None,
-        format_op: str | None = None,
-        format_path: str | None = None,
-        format_value: Any = None,
-        anchor_type: str | None = None,
-        anchor_value: str | None = None,
-        anchor_occurrence: int | None = None,
-        section_action: str | None = None,
-        section_content: str | None = None,
-        patch_text: str | None = None,
         expected_hash: str | None = None,
         expected_file_hash: str | None = None,
         dry_run: bool = False,
@@ -786,16 +726,6 @@ class FileEditor(FileEditorEditOpsMixin):
                 start_line,
                 end_line,
                 edit_mode=edit_mode,
-                format_kind=format_kind,
-                format_op=format_op,
-                format_path=format_path,
-                format_value=format_value,
-                anchor_type=anchor_type,
-                anchor_value=anchor_value,
-                anchor_occurrence=anchor_occurrence,
-                section_action=section_action,
-                section_content=section_content,
-                patch_text=patch_text,
                 expected_hash=expected_hash,
                 file_path=file_path,
             )

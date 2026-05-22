@@ -38,22 +38,19 @@ DEFAULT_MAX_CONTENT_SIZE = int(
     os.getenv('GRINTA_EDITOR_MODE_MAX_CONTENT_BYTES', '100000')
 )
 _SESSION_NONE_KEY = '__grinta_default_session__'
-_OPEN_TAG_RE = re.compile(r'^<file_edit\s+transaction_id="([^"]+)">$')
+_OPEN_TAG_RE = re.compile(r'^<file_edit(?:\s+transaction_id="([^"]+)")?>$')
 
 CONTENT_REQUIRED_OPERATIONS = frozenset(
     {
         'create',
         'insert',
-        'replace_lines',
-        'patch',
+        'replace_range',
     }
 )
 NO_CONTENT_OPERATIONS = frozenset(
     {
         'read',
         'undo',
-        'format_edit',
-        'section_edit',
         'find_symbol',
     }
 )
@@ -80,8 +77,6 @@ PROHIBITED_CONTENT_FIELDS = frozenset(
         'file_body',
         'file_text',
         'new_str',
-        'section_content',
-        'patch_text',
         'new_body',
         'new_code',
         'edits',
@@ -198,8 +193,6 @@ def get_transaction_store() -> EditTransactionStore:
 
 def operation_requires_content(operation: str, metadata: dict[str, Any] | None = None) -> bool:
     op = operation.strip().lower()
-    if op == 'section_edit':
-        return (metadata or {}).get('section_action') != 'delete'
     return op in CONTENT_REQUIRED_OPERATIONS
 
 
@@ -227,16 +220,14 @@ def validate_start_file_edit_metadata(
         raise FunctionCallValidationError(
             f"Operation '{op}' needs multiple or structure-aware payload handling and "
             'is not supported by the two-mode start_file_edit path yet. '
-            'Use replace_lines or patch with explicit file context.'
+            'Use replace_range with explicit file context or the AST tools.'
         )
     if not isinstance(path, str) or not path.strip():
         raise FunctionCallValidationError('start_file_edit requires path')
 
     required_by_operation = {
         'insert': ('insert_line',),
-        'replace_lines': ('start_line', 'end_line'),
-        'format_edit': ('format_kind', 'format_op'),
-        'section_edit': ('anchor_type', 'anchor_value', 'section_action'),
+        'replace_range': ('start_line', 'end_line'),
         'find_symbol': ('symbol_name',),
     }
     missing = [
@@ -266,7 +257,7 @@ def parse_editor_response(
             return ParseResult(
                 ok=False,
                 error_code='MISSING_OPEN_TAG',
-                error_message='Missing opening <file_edit transaction_id="..."> tag.',
+                error_message='Missing opening <file_edit> tag.',
             )
 
         open_line = lines[first].rstrip('\r\n')
@@ -278,22 +269,13 @@ def parse_editor_response(
             if open_line.strip().startswith('<file_edit'):
                 return ParseResult(
                     ok=False,
-                    error_code='WRONG_TRANSACTION_ID',
-                    error_message='Opening tag must include the current transaction_id exactly.',
+                    error_code='MISSING_OPEN_TAG',
+                    error_message='Opening tag must be on its own line.',
                 )
             return ParseResult(
                 ok=False,
                 error_code='MISSING_OPEN_TAG',
                 error_message='Opening tag must be the first non-whitespace line.',
-            )
-
-        if match.group(1) != txn.transaction_id:
-            return ParseResult(
-                ok=False,
-                error_code='WRONG_TRANSACTION_ID',
-                error_message=(
-                    f'Expected transaction_id {txn.transaction_id}, got {match.group(1)}.'
-                ),
             )
 
         close_idx = _find_delimiter_index(lines, first + 1, txn.delimiter)
@@ -452,10 +434,9 @@ def build_editor_mode_prompt(
         'Do not include code fences.',
         'Do not include commentary.',
         'Output exactly one file_edit block.',
-        'replace_lines overwrites the inclusive line range; it does not insert.',
+        'replace_range overwrites the inclusive line range; it does not insert.',
         '',
         'Transaction:',
-        f'- transaction_id: {txn.transaction_id}',
         f'- path: {txn.path}',
         f'- operation: {txn.operation}',
         f'- delimiter: {txn.delimiter}',
@@ -475,11 +456,12 @@ def build_editor_mode_prompt(
     lines.extend(
         [
             'Required output format:',
-            f'<file_edit transaction_id="{txn.transaction_id}">',
+            '<file_edit>',
             '[raw replacement content only]',
             txn.delimiter,
             '</file_edit>',
             '',
+            'Do not include transaction_id in the opening tag; the runtime handles it.',
             'The delimiter must appear exactly once, on its own line.',
             'The closing tag must immediately follow the delimiter line.',
             'Everything between opening tag and delimiter is raw file content.',
@@ -522,7 +504,7 @@ def build_file_edit_action_from_transaction(
             ),
             metadata,
         )
-    if op == 'replace_lines':
+    if op == 'replace_range':
         return _with_security(
             FileEditAction(
                 path=txn.path,
@@ -535,32 +517,6 @@ def build_file_edit_action_from_transaction(
             ),
             metadata,
         )
-    if op == 'section_edit':
-        return _with_security(
-            FileEditAction(
-                path=txn.path,
-                command='edit',
-                edit_mode='section',
-                anchor_type=metadata.get('anchor_type'),
-                anchor_value=metadata.get('anchor_value'),
-                anchor_occurrence=metadata.get('anchor_occurrence'),
-                section_action=metadata.get('section_action'),
-                section_content=content,
-            ),
-            metadata,
-        )
-    if op == 'patch':
-        return _with_security(
-            FileEditAction(
-                path=txn.path,
-                command='edit',
-                edit_mode='patch',
-                patch_text=content,
-                expected_file_hash=expected_file_hash,
-            ),
-            metadata,
-        )
-
     raise FunctionCallValidationError(
         f"Operation '{op}' does not accept editor-mode content."
     )
@@ -667,7 +623,7 @@ def build_target_context(
     lines = text.splitlines(keepends=True)
     if not lines:
         return ''
-    if txn.operation == 'replace_lines':
+    if txn.operation == 'replace_range':
         start = max(int(txn.metadata.get('start_line', 1)) - 1, 0)
         end = min(int(txn.metadata.get('end_line', start + 1)), len(lines))
         return ''.join(lines[start:end])

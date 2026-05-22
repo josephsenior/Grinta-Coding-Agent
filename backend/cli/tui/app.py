@@ -193,6 +193,13 @@ def _render_thinking_with_diff(text: str) -> Text:
     return Text(text or '', style="dim lightgray")
 
 
+def _preview_line_text(line: str, *, max_chars: int = 160) -> str:
+    """Render a file preview line without duplicating its content."""
+    if not line:
+        return ' '
+    return line[:max_chars] + ('...' if len(line) > max_chars else '')
+
+
 # ── Widget classes ────────────────────────────────────────────────────────
 
 
@@ -3412,7 +3419,7 @@ class TUIRenderer:
                 extra_parts = []
                 pad = len(str(file_text.count('\n') + 1)) + 1 if file_text else 1
                 for i, line in enumerate(file_text.splitlines()):
-                    display = line[:160] + ('...' if len(line) > 160 else (line if line else ' '))
+                    display = _preview_line_text(line)
                     extra_parts.append(encode_diff_line(f'+{i + 1:>{pad - 1}}| {display}', 'add'))
                 extra_content = '\n'.join(extra_parts) if extra_parts else None
                 added = file_text.count('\n') + 1 if file_text else 0
@@ -3425,7 +3432,7 @@ class TUIRenderer:
             extra_parts = []
             pad = len(str(content.count('\n') + 1)) + 1 if content else 1
             for i, line in enumerate(content.splitlines()):
-                display = line[:160] + ('...' if len(line) > 160 else (line if line else ' '))
+                display = _preview_line_text(line)
                 extra_parts.append(encode_diff_line(f'+{i + 1:>{pad - 1}}| {display}', 'add'))
             extra_content = '\n'.join(extra_parts) if extra_parts else None
             added = content.count('\n') + 1 if content else 0
