@@ -249,7 +249,7 @@ class ToolResultValidator(ToolInvocationMiddleware):
                     if missing_unix_tool or object_not_found:
                         return (
                             f"You attempted to use Unix tools ('{tool}') in PowerShell but they are missing or aliased incorrectly. "
-                            f'DO NOT use Unix tools here. ALWAYS use `search_code`, `start_file_edit` (operation=read), or native PowerShell cmdlets.'
+                            f'DO NOT use Unix tools here. ALWAYS use `search_code`, `read_file`, or native PowerShell cmdlets.'
                         )
 
             # Check Bash errors for PowerShell tools

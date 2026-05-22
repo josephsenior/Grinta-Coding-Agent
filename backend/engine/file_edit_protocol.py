@@ -40,22 +40,13 @@ DEFAULT_MAX_CONTENT_SIZE = int(
 _SESSION_NONE_KEY = '__grinta_default_session__'
 _OPEN_TAG_RE = re.compile(r'^<file_edit(?:\s+transaction_id="([^"]+)")?>$')
 
-CONTENT_REQUIRED_OPERATIONS = frozenset(
+CONTENT_REQUIRED_OPERATIONS = frozenset({'insert', 'replace_range'})
+UNSUPPORTED_START_FILE_EDIT_OPERATIONS = frozenset(
     {
         'create',
-        'insert',
-        'replace_range',
-    }
-)
-NO_CONTENT_OPERATIONS = frozenset(
-    {
         'read',
         'undo',
         'find_symbol',
-    }
-)
-UNSUPPORTED_START_FILE_EDIT_OPERATIONS = frozenset(
-    {
         'edit_symbol',
         'edit_symbols',
         'multi_edit',
@@ -65,7 +56,6 @@ UNSUPPORTED_START_FILE_EDIT_OPERATIONS = frozenset(
 )
 VALID_START_FILE_EDIT_OPERATIONS = (
     CONTENT_REQUIRED_OPERATIONS
-    | NO_CONTENT_OPERATIONS
     | UNSUPPORTED_START_FILE_EDIT_OPERATIONS
 )
 PROHIBITED_CONTENT_FIELDS = frozenset(
@@ -228,7 +218,6 @@ def validate_start_file_edit_metadata(
     required_by_operation = {
         'insert': ('insert_line',),
         'replace_range': ('start_line', 'end_line'),
-        'find_symbol': ('symbol_name',),
     }
     missing = [
         name
@@ -545,11 +534,9 @@ def start_file_edit_transaction(runtime: Any, action: StartFileEditAction) -> Ob
         validate_start_file_edit_metadata(operation, action.path, metadata)
         _validate_path_against_runtime(runtime, action.path)
         if not operation_requires_content(operation, metadata):
-            return ErrorObservation(
-                content=(
-                    f"start_file_edit operation '{operation}' does not require editor mode. "
-                    'It should have been executed directly by the dispatcher.'
-                )
+            raise FunctionCallValidationError(
+                f"start_file_edit operation '{operation}' is not supported. "
+                'Use the standalone read/create/find_symbol/undo tools instead.'
             )
         session_id = action.session_id or getattr(runtime, 'sid', None)
         txn = get_transaction_store().create_transaction(

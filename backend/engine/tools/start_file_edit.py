@@ -26,19 +26,11 @@ def create_start_file_edit_tool() -> ChatCompletionToolParam:
                 'type': 'string',
                 'description': 'File operation to perform.',
                 'enum': [
-                    'read',
-                    'create',
                     'insert',
-                    'undo',
                     'replace_range',
-                    'find_symbol',
                 ],
             },
             'path': get_path_param('Project-relative path to the target file.'),
-            'overwrite_existing': {
-                'type': 'boolean',
-                'description': 'Allow create to overwrite an existing file.',
-            },
             'insert_line': {
                 'type': 'integer',
                 'description': 'Line number after which insert content is placed.',
@@ -50,11 +42,6 @@ def create_start_file_edit_tool() -> ChatCompletionToolParam:
             'end_line': {
                 'type': 'integer',
                 'description': '1-based inclusive end line for replace_range.',
-            },
-            'view_range': {
-                'type': 'array',
-                'description': 'Optional line range [start, end] for read.',
-                'items': {'type': 'integer'},
             },
             'expected_file_hash': {
                 'type': 'string',
@@ -71,23 +58,6 @@ def create_start_file_edit_tool() -> ChatCompletionToolParam:
             'expected_hash': {
                 'type': 'string',
                 'description': 'Operation-specific hash guard when supported.',
-            },
-            'symbol_name': {
-                'type': 'string',
-                'description': 'Symbol name for find_symbol.',
-            },
-            'symbol_kind': {
-                'type': 'string',
-                'description': 'Optional symbol kind.',
-                'enum': ['function', 'class', 'method'],
-            },
-            'symbol_type': {
-                'type': 'string',
-                'description': 'Optional symbol type for find_symbol.',
-            },
-            'line_number': {
-                'type': 'integer',
-                'description': 'Optional disambiguation line for symbol edits.',
             },
             'security_risk': get_security_risk_param(),
         },
