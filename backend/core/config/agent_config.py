@@ -47,6 +47,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY,
     DEFAULT_AGENT_MIN_ITERATIONS,
     DEFAULT_AGENT_NAME,
+    DEFAULT_AGENT_MODE,
     DEFAULT_AGENT_NATIVE_BROWSER_ENABLED,
     DEFAULT_AGENT_PARALLEL_TOOL_SCHEDULING_ENABLED,
     DEFAULT_AGENT_PLAN_MODE_ENABLED,
@@ -100,6 +101,10 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_NAME,
         min_length=1,
         description='Name of the agent to use',
+    )
+    mode: str = Field(
+        default=DEFAULT_AGENT_MODE,
+        description="Run mode: 'agent' (autonomous/edit block) or 'chat'/'ask' (explanations/discussion)",
     )
     llm_config: LLMConfig | None = Field(
         default=None, description='LLM configuration for the agent'

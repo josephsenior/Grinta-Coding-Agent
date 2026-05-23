@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, cast
 from unittest.mock import Mock
 
 from backend.core.constants import (
-    DEFAULT_AGENT_APPLY_PATCH_MAX_RETRIES,
     DEFAULT_AGENT_MAX_CONSECUTIVE_NULL_ACTIONS,
     DEFAULT_AGENT_MAX_IDENTICAL_RETRIES,
     DEFAULT_AGENT_MAX_NULL_RECOVERY_ROUNDS,
@@ -97,7 +96,6 @@ _GROUNDING_MCP_TOOL_NAMES = frozenset(
 )
 _MUTATING_MCP_TOOL_NAMES = frozenset(
     {
-        'apply_patch',
         'create_directory',
         'create_file',
         'create_new_jupyter_notebook',
@@ -173,7 +171,6 @@ class ActionExecutionService:
     _MAX_NULL_RECOVERY_ROUNDS = DEFAULT_AGENT_MAX_NULL_RECOVERY_ROUNDS
     _MAX_REPAIR_ATTEMPTS = DEFAULT_AGENT_MAX_REPAIR_ATTEMPTS
     _MAX_IDENTICAL_RETRIES = DEFAULT_AGENT_MAX_IDENTICAL_RETRIES
-    _APPLY_PATCH_MAX_RETRIES = DEFAULT_AGENT_APPLY_PATCH_MAX_RETRIES
 
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
@@ -442,11 +439,6 @@ class ActionExecutionService:
         error_signature: str,
         max_identical_retries: int,
     ) -> int:
-        if (
-            '[APPLY_PATCH_CLASS:malformed_patch]' in error_signature
-            or '[APPLY_PATCH_CLASS:context_mismatch]' in error_signature
-        ):
-            return self._APPLY_PATCH_MAX_RETRIES
         return max_identical_retries
 
     @staticmethod

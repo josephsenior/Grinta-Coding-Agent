@@ -1276,6 +1276,119 @@ class OrchestratorExecutor:
     def _build_recoverable_tool_call_error_action(exc: Exception) -> Action:
         return _build_recoverable_tool_call_error_action_impl(exc)
 
+    # ------------------------------------------------------------------ #
+    # AGENT MODE GATING
+    # ------------------------------------------------------------------ #
+
+    def _get_agent_mode(self) -> str:
+        """Return the current mode string from planner config ('agent', 'chat', 'ask')."""
+        config = getattr(self._planner, '_config', None)
+        return str(getattr(config, 'mode', 'agent') or 'agent').lower()
+
+    def _get_current_delimiter_token(self) -> str:
+        """Return the per-turn delimiter token set by the orchestrator."""
+        agent = getattr(self._planner, '_agent', None)
+        token = getattr(agent, '_current_delimiter_token', None)
+        return str(token) if token else 'GRINTA_TOKEN'
+
+    def _gate_agent_mode_plain_text(self, actions: list[Action], response: ModelResponse) -> list[Action]:
+        """Enforce AGENT mode protocol on plain-text (MessageAction-only) responses.
+
+        If the LLM emitted only a MessageAction (no tool calls) and the active
+        mode is AGENT, the content must be a valid raw EDIT_FILE block.  Succesful
+        parse yields a FileEditAction via the existing transaction pipeline.  An
+        invalid block raises AgentModeProtocolError which the Orchestrator catches
+        to issue a compact retry or abort observation.
+
+        In ASK / CHAT mode this method is a no-op.
+        """
+        from backend.ledger.action.message import MessageAction as _MessageAction
+
+        mode = self._get_agent_mode()
+        if mode in ('chat', 'ask'):
+            # ASK mode: plain text is allowed — nothing to gate.
+            return actions
+
+        # Only intercept responses that resolved to a sole MessageAction.
+        # Responses with real tool-call actions bypass gating entirely.
+        if not actions or not all(isinstance(a, _MessageAction) for a in actions):
+            return actions
+
+        # Aggregate text from all MessageActions (usually just one).
+        plain_text = ''.join(
+            getattr(a, 'content', '') or '' for a in actions
+        ).strip()
+
+        if not plain_text:
+            # Empty text — let downstream fallback handle it.
+            return actions
+
+        from backend.engine.file_edit_protocol_agent_mode import (
+            AgentModeProtocolError,
+            parse_raw_edit_block,
+            validate_edit_command_metadata,
+        )
+
+        delimiter_token = self._get_current_delimiter_token()
+
+        # Attempt to parse as a raw EDIT_FILE block.
+        try:
+            parsed = parse_raw_edit_block(plain_text, delimiter_token)
+        except AgentModeProtocolError:
+            raise  # Bubbles to orchestrator retry/abort logic.
+
+        headers = parsed['headers']
+        content = parsed['content']
+
+        path = headers.get('path', '').strip()
+        command = headers.get('command', '').strip()
+        # Everything else in the headers is operation-specific metadata.
+        metadata: dict[str, Any] = {k: v for k, v in headers.items() if k not in ('path', 'command')}
+
+        try:
+            op = validate_edit_command_metadata(command, metadata)
+        except AgentModeProtocolError:
+            raise  # Already carries structured error details.
+
+        # Build a lightweight synthetic EditTransaction and convert to FileEditAction
+        # via the existing production pipeline (handles security risk, structured
+        # payloads for edit_symbol / edit_symbols / multi_edit, etc.).
+        from backend.engine.file_edit_protocol import (
+            EditTransaction,
+            build_file_edit_action_from_transaction,
+        )
+
+        txn = EditTransaction(
+            transaction_id='agent_mode_inline',
+            session_id=None,
+            path=path,
+            operation=op,
+            delimiter=delimiter_token,
+            metadata=metadata,
+            status='content_captured',
+        )
+
+        try:
+            action = build_file_edit_action_from_transaction(content, txn)
+        except Exception as exc:
+            raise AgentModeProtocolError(
+                f'EDIT_FILE block parsed successfully but could not be applied: {exc}',
+                {
+                    'error_code': 'EDIT_ACTION_BUILD_FAILED',
+                    'message': str(exc),
+                    'path': path,
+                    'command': command,
+                },
+            ) from exc
+
+        logger.info(
+            'AGENT_MODE: raw EDIT_FILE block converted to FileEditAction '
+            '(path=%s op=%s)',
+            path,
+            op,
+        )
+        return [action]
+
     def _response_to_actions(self, response: ModelResponse) -> list[Action]:
         mcp_tools = self._mcp_tools_provider()
         try:
@@ -1294,6 +1407,11 @@ class OrchestratorExecutor:
                 exc,
             )
             actions = [self._build_recoverable_tool_call_error_action(exc)]
+
+        # AGENT MODE GATE: intercept plain-text-only results and either convert
+        # them to a FileEditAction (valid EDIT_FILE block) or raise
+        # AgentModeProtocolError (invalid / missing edit block).
+        actions = self._gate_agent_mode_plain_text(actions, response)
 
         _, validated_actions = self._safety.apply(
             self._extract_response_text(response), actions

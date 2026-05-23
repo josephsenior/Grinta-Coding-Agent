@@ -109,6 +109,24 @@ class OrchestratorPlanner:
         self._add_editor_tools(tools)
         self._add_execute_mcp_tool_tool(tools)
 
+        mode = getattr(self._config, 'mode', 'agent')
+        if mode in ('chat', 'ask'):
+            forbidden_tool_names = {
+                'run',
+                'terminal_manager',
+                'debugger',
+                'create_file',
+                'undo_last_edit',
+                'rename_symbol',
+                'delegate_task',
+                'blackboard',
+                'checkpoint',
+                'call_tool_mcp',
+                'browser_tool',
+                'browse_interactive'
+            }
+            tools = [t for t in tools if (t.get('function') or {}).get('name') not in forbidden_tool_names]
+
         # Invalidate cached checked-tools when toolset is rebuilt
         self._checked_tools_cache = None
         return tools
@@ -274,7 +292,6 @@ class OrchestratorPlanner:
 
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):
-            from backend.engine.tools import create_start_file_edit_tool
             from backend.engine.tools.native_file_tools import (
                 create_create_file_tool,
                 create_rename_symbol_tool,
@@ -284,7 +301,6 @@ class OrchestratorPlanner:
             tools.append(create_create_file_tool())
             tools.append(create_undo_last_edit_tool())
             tools.append(create_rename_symbol_tool())
-            tools.append(create_start_file_edit_tool())
 
     def _add_execute_mcp_tool_tool(self, tools: list) -> None:
         """Add the MCP gateway proxy tool when MCP is enabled.
@@ -342,6 +358,9 @@ class OrchestratorPlanner:
         # tool selection heuristics see the original user/assistant content.
 
         messages = self._inject_turn_status(messages, state)
+        mode = getattr(self._config, 'mode', 'agent')
+        if mode not in ('chat', 'ask'):
+            messages = self._inject_agent_mode_instructions(messages, state)
         _maybe_log_prompt_metrics(messages)
         self._warn_if_degraded_emergency_prompt(messages)
 
@@ -519,3 +538,35 @@ class OrchestratorPlanner:
                     continue
                 return content
         return None
+
+    def _inject_agent_mode_instructions(self, messages: list, state: State) -> list:
+        token = getattr(self._agent, '_current_delimiter_token', None) or 'GRINTA_TOKEN'
+        instruction = (
+            "\n\n=== STRICTOR AGENT MODE PROTOCOL ===\n"
+            "You are running in AGENT MODE. In this mode, direct plain text prose/responses "
+            "are strictly forbidden. Do not write explanations, thoughts, or comments in direct prose. "
+            "Your output must be exactly one of the following:\n"
+            "1. A real tool/function call (using the native function calling mechanism).\n"
+            "2. A communicate_with_user tool call (to ask questions, clarify, or report blockers).\n"
+            "3. A finish tool call (to end the task successfully).\n"
+            "4. Exactly one valid EDIT_FILE block using the turn's delimiter token: {token}.\n\n"
+            "To edit an existing file, you must output exactly one valid EDIT_FILE block with this format (no markdown code fences around it):\n\n"
+            "EDIT_FILE\n"
+            "path: relative/path/to/file\n"
+            "command: command_name\n"
+            "metadata_key: metadata_value\n\n"
+            "RAW_LINES {token}\n"
+            "raw source content here\n"
+            "END_RAW_LINES {token}\n\n"
+            "EDIT_FILE block rules:\n"
+            "- path is required.\n"
+            "- command is required (must be exactly one of: insert, replace_range, edit_symbol, edit_symbols, multi_edit).\n"
+            "- All other metadata fields are command-specific.\n"
+            "- Use colon syntax (key: value) for headers.\n"
+            "- The content between RAW_LINES and END_RAW_LINES is literal raw source text (no escaping required, quotes/braces/indentation are preserved exactly).\n"
+            "- Do not add any text or explanation before or after the EDIT_FILE block.\n"
+            "- One edit block per response.\n"
+            "=====================================\n"
+        ).replace("{token}", token)
+        
+        return self._apply_control_message(messages, instruction)

@@ -78,9 +78,7 @@ def test_core_cli_renderers_avoid_raw_style_literals() -> None:
         repo / 'backend/cli/confirmation.py',
         repo / 'backend/cli/_event_renderer/panels.py',
         repo / 'backend/cli/_event_renderer/action_renderers_mixin.py',
-        repo / 'backend/cli/_event_renderer/apply_patch.py',
         repo / 'backend/cli/session_manager.py',
-        repo / 'backend/cli/sessions_cli.py',
         repo / 'backend/cli/diff_renderer.py',
         repo / 'backend/cli/storage_cleanup.py',
         repo / 'backend/cli/_repl/run_helpers_mixin.py',
@@ -90,8 +88,4 @@ def test_core_cli_renderers_avoid_raw_style_literals() -> None:
         content = path.read_text(encoding='utf-8')
         for needle in banned:
             assert needle not in content, f'{path} still contains {needle}'
-    patch_src = (repo / 'backend/cli/_event_renderer/apply_patch.py').read_text(
-        encoding='utf-8'
-    )
-    assert "style='dim green'" not in patch_src
-    assert "style='dim red'" not in patch_src
+

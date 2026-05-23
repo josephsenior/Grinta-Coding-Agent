@@ -331,10 +331,6 @@ class TestSummarizeToolArguments(unittest.TestCase):
         s = summarize_tool_arguments('analyze_project_structure', {})
         self.assertEqual(s, 'scan workspace')
 
-    def test_apply_patch(self) -> None:
-        s = summarize_tool_arguments('apply_patch', {'patch': 'diff --git a b\n...'})
-        self.assertEqual(s, 'apply patch')
-
     def test_delegate_task(self) -> None:
         s = summarize_tool_arguments('delegate_task', {'task_description': 'do X'})
         self.assertIn('do X', s)

@@ -125,10 +125,6 @@ NEW_BLOCK = '''    # Dispatch table for :meth:`_handle_observation` — maps obs
         content: str,
     ) -> tuple[str | None, str, list[Any] | None]:
         """Return ``(msg, result_kind, extra_lines)`` for the shell card."""
-        if is_internal and _is_apply_patch_activity(title, label):
-            return _compact_apply_patch_result(
-                exit_code=exit_code, label=label, content=content,
-            )
         # CmdOutputObservation defaults to exit_code=-1 when unknown; treat any
         # non-zero exit code (including -1) as a failure.
         if exit_code is not None and exit_code != 0:
