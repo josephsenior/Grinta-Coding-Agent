@@ -108,6 +108,7 @@ class TaskTrackingMixin:
         self, action: TaskTrackingAction, task_file_path: str, view_count: int = 1
     ) -> Observation:
         """Handle task view command — read and display task list."""
+        hydrated_task_list = list(getattr(action, 'task_list', []) or [])
         # After 2+ consecutive views without a plan update, give a strong directive
         # so the agent breaks out of the view loop and starts implementing.
         if view_count >= 2:
@@ -127,7 +128,7 @@ class TaskTrackingMixin:
             return TaskTrackingObservation(
                 content=content + intervention,
                 command=action.command,
-                task_list=[],
+                task_list=hydrated_task_list,
             )
         try:
             assert self.event_stream is not None
@@ -135,18 +136,18 @@ class TaskTrackingMixin:
             return TaskTrackingObservation(
                 content=content + '\n\n→ Now implement the first todo (⏳) task.',
                 command=action.command,
-                task_list=[],
+                task_list=hydrated_task_list,
             )
         except FileNotFoundError:
             return TaskTrackingObservation(
                 command=action.command,
-                task_list=[],
+                task_list=hydrated_task_list,
                 content='No task list found. Use the "update" command to create one.',
             )
         except Exception as e:
             return TaskTrackingObservation(
                 command=action.command,
-                task_list=[],
+                task_list=hydrated_task_list,
                 content=f'Failed to read the task list from session directory {task_file_path}. Error: {e!s}',
             )
 

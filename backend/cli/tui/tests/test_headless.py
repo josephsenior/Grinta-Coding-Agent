@@ -41,6 +41,7 @@ from backend.ledger.action.terminal import (
 from backend.ledger.observation.agent import AgentStateChangedObservation
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.terminal import TerminalObservation
+from backend.ledger.observation.task_tracking import TaskTrackingObservation
 
 
 @pytest.fixture
@@ -523,6 +524,49 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(mock_config, mo
         deletable = [row for row in rows if getattr(row, 'deletable', False)]
         assert any(getattr(row, 'item_id', '') == 'mcp:server-a' for row in deletable)
         assert any(getattr(row, 'item_id', '') == 'skill:skill-a' for row in deletable)
+
+
+@pytest.mark.asyncio
+async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._task_list = [
+            {'id': '1', 'description': 'Persist task panel', 'status': 'doing'}
+        ]
+        renderer._refresh_display()
+
+        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
+        assert tasks_widget._section_title == 'Tasks (1)'
+
+        renderer._process_event(
+            TaskTrackingObservation(
+                content='viewed',
+                command='view',
+                task_list=[],
+            )
+        )
+
+        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
+        assert tasks_widget._section_title == 'Tasks (1)'
 
 
 @pytest.mark.asyncio
