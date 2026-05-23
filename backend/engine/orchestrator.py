@@ -766,16 +766,9 @@ class Orchestrator(Agent):
                     "real tool, call communicate_with_user, call finish, or output exactly "
                     "one valid EDIT_FILE block using the required delimiter token."
                 )
-                from backend.ledger import EventSource
-                from backend.ledger.observation import ErrorObservation
-                error_obs = ErrorObservation(
-                    content=f"{msg}\n\nDetails:\n{exc.to_formatted_message()}",
-                    error_id="INVALID_AGENT_PROTOCOL"
-                )
-                self.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
                 from backend.ledger.action.agent import AgentThinkAction
                 return AgentThinkAction(
-                    thought=f"[PROTOCOL_ERROR] {msg}",
+                    thought=f"[PROTOCOL_ERROR] {msg}\n\nDetails:\n{exc.to_formatted_message()}",
                     suppress_cli=True,
                 )
             raise
@@ -853,16 +846,9 @@ class Orchestrator(Agent):
                     "real tool, call communicate_with_user, call finish, or output exactly "
                     "one valid EDIT_FILE block using the required delimiter token."
                 )
-                from backend.ledger import EventSource
-                from backend.ledger.observation import ErrorObservation
-                error_obs = ErrorObservation(
-                    content=f"{msg}\n\nDetails:\n{exc.to_formatted_message()}",
-                    error_id="INVALID_AGENT_PROTOCOL"
-                )
-                self.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
                 from backend.ledger.action.agent import AgentThinkAction
                 return AgentThinkAction(
-                    thought=f"[PROTOCOL_ERROR] {msg}",
+                    thought=f"[PROTOCOL_ERROR] {msg}\n\nDetails:\n{exc.to_formatted_message()}",
                     suppress_cli=True,
                 )
             raise
