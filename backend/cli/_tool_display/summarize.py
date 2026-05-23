@@ -302,11 +302,6 @@ def _summary_read_symbol(args: dict[str, Any]) -> str:
     return 'read symbol'
 
 
-def _summary_apply_patch(_args: dict[str, Any]) -> str:
-    # The ``patch`` argument is a multi-KB unified-diff blob; never display it.
-    return 'apply patch'
-
-
 def _summary_verify_file(args: dict[str, Any]) -> str:
     path = args.get('path') or args.get('file')
     if isinstance(path, str):
@@ -361,7 +356,7 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'lsp': _summary_lsp,
     'analyze_project_structure': _summary_analyze_project,
     'read_symbol': _summary_read_symbol,
-    'apply_patch': _summary_apply_patch,
+
     'verify_file_lines': _summary_verify_file,
     'delegate_task': _summary_delegate_task,
     'communicate_with_user': _summary_communicate,

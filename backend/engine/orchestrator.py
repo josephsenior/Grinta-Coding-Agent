@@ -169,6 +169,8 @@ class Orchestrator(Agent):
         self.pending_actions: deque[Action] = deque(maxlen=1000)
         self.deferred_actions: deque[Action] = deque()
         self._consecutive_context_errors = 0
+        self._current_delimiter_token: str | None = None
+        self._consecutive_invalid_protocol_outputs = 0
         self.event_stream: EventStream | None = None
 
         # Safety / hallucination systems
@@ -194,6 +196,7 @@ class Orchestrator(Agent):
             config=self.config,
             llm=self.llm,
             safety_manager=self.safety_manager,
+            agent=self,
         )
         self.tools = self.planner.build_toolset()
 
@@ -708,11 +711,19 @@ class Orchestrator(Agent):
                         return
             self.prompt_manager.set_prompt_tier('base')
 
+    def _generate_delimiter_token(self) -> str:
+        import secrets
+        token = f"GRINTA_{secrets.token_hex(3).upper()}"
+        self._current_delimiter_token = token
+        return token
+
     def _execute_llm_step(self, state: State, condensed: Any) -> Action:
         """Core logic to prepare messages, call LLM, and return the first action."""
         pending = self._handle_pending_action_from_condensation(state, condensed)
         if pending is not None:
             return pending
+
+        self._generate_delimiter_token()
 
         initial_user_message = self.memory_manager.get_initial_user_message(
             state.history
@@ -740,7 +751,34 @@ class Orchestrator(Agent):
         params = self.planner.build_llm_params(serialized_messages, state, self.tools)
         self._sync_executor_llm()
 
-        result = self.executor.execute(params, self.event_stream)
+        try:
+            result = self.executor.execute(params, self.event_stream)
+            self._consecutive_invalid_protocol_outputs = 0
+        except Exception as exc:
+            from backend.engine.file_edit_protocol_agent_mode import AgentModeProtocolError
+            if isinstance(exc, AgentModeProtocolError):
+                self._consecutive_invalid_protocol_outputs += 1
+                if self._consecutive_invalid_protocol_outputs >= 2:
+                    raise AgentRuntimeError(f"Continuous invalid protocol outputs: {exc.to_formatted_message()}")
+                
+                msg = (
+                    "In AGENT MODE, direct plain text is invalid. You must either call a "
+                    "real tool, call communicate_with_user, call finish, or output exactly "
+                    "one valid EDIT_FILE block using the required delimiter token."
+                )
+                from backend.ledger import EventSource
+                from backend.ledger.observation import ErrorObservation
+                error_obs = ErrorObservation(
+                    content=f"{msg}\n\nDetails:\n{exc.to_formatted_message()}",
+                    error_id="INVALID_AGENT_PROTOCOL"
+                )
+                self.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
+                from backend.ledger.action.agent import AgentThinkAction
+                return AgentThinkAction(
+                    thought=f"[PROTOCOL_ERROR] {msg}",
+                    suppress_cli=True,
+                )
+            raise
 
         try:
             if hasattr(state, 'ack_planning_directive'):
@@ -767,6 +805,8 @@ class Orchestrator(Agent):
         pending = self._handle_pending_action_from_condensation(state, condensed)
         if pending is not None:
             return pending
+
+        self._generate_delimiter_token()
 
         initial_user_message = self.memory_manager.get_initial_user_message(
             state.history
@@ -798,7 +838,34 @@ class Orchestrator(Agent):
         params = await asyncio.to_thread(_prepare_params)
         self._sync_executor_llm()
 
-        result = await self.executor.async_execute(params, self.event_stream)
+        try:
+            result = await self.executor.async_execute(params, self.event_stream)
+            self._consecutive_invalid_protocol_outputs = 0
+        except Exception as exc:
+            from backend.engine.file_edit_protocol_agent_mode import AgentModeProtocolError
+            if isinstance(exc, AgentModeProtocolError):
+                self._consecutive_invalid_protocol_outputs += 1
+                if self._consecutive_invalid_protocol_outputs >= 2:
+                    raise AgentRuntimeError(f"Continuous invalid protocol outputs: {exc.to_formatted_message()}")
+                
+                msg = (
+                    "In AGENT MODE, direct plain text is invalid. You must either call a "
+                    "real tool, call communicate_with_user, call finish, or output exactly "
+                    "one valid EDIT_FILE block using the required delimiter token."
+                )
+                from backend.ledger import EventSource
+                from backend.ledger.observation import ErrorObservation
+                error_obs = ErrorObservation(
+                    content=f"{msg}\n\nDetails:\n{exc.to_formatted_message()}",
+                    error_id="INVALID_AGENT_PROTOCOL"
+                )
+                self.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
+                from backend.ledger.action.agent import AgentThinkAction
+                return AgentThinkAction(
+                    thought=f"[PROTOCOL_ERROR] {msg}",
+                    suppress_cli=True,
+                )
+            raise
 
         # Ensure extra_data cleanup always runs, even if async_execute raises.
         try:

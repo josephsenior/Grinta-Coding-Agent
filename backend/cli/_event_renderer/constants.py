@@ -82,9 +82,6 @@ CMD_SUMMARY_PRIORITY_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r'enoent|eacces|eperm|fatal:|exception|traceback|error', re.IGNORECASE),
 )
 
-APPLY_PATCH_TITLE = 'apply patch'
-APPLY_PATCH_STATS_RE = re.compile(r'\[APPLY_PATCH_STATS\]\s*\+(\d+)\s*-(\d+)')
-
 # Exact command strings produced by ``backend/execution/browser/grinta_browser.py``
 # when it dispatches a ``CmdOutputObservation`` for a browser tool action.
 BROWSER_TOOL_COMMANDS = frozenset(

@@ -26,6 +26,7 @@ def _parse_bool_env(var: str, default: str = 'false') -> bool:
 
 # ── Core Identity & Limits ──────────────────────────────────────────
 DEFAULT_AGENT_NAME = 'Orchestrator'
+DEFAULT_AGENT_MODE = 'agent'
 DEFAULT_MAX_ITERATIONS = (
     10000  # effectively unlimited; circuit breaker handles termination
 )
@@ -267,9 +268,6 @@ DEFAULT_AGENT_MAX_NULL_RECOVERY_ROUNDS = 2
 DEFAULT_AGENT_MAX_REPAIR_ATTEMPTS = 3
 # Identical-error escalation: same error N+1 times -> ERROR state.
 DEFAULT_AGENT_MAX_IDENTICAL_RETRIES = 2
-# apply_patch malformed/context-mismatch errors get a tighter budget because
-# they almost never recover by simple retry.
-DEFAULT_AGENT_APPLY_PATCH_MAX_RETRIES = 1
 # Engine-level circuit breaker for ContextLimitError loops. > this -> raise.
 DEFAULT_AGENT_MAX_CONTEXT_LIMIT_ERRORS = 4
 # Engine-level escalation for repeated identical recoverable tool-call errors.

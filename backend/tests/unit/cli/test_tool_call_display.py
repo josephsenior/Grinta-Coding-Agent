@@ -27,10 +27,6 @@ class TestToolCallDisplay(unittest.TestCase):
         )
         self.assertIn('filesystem', s)
 
-    def test_summarize_apply_patch_omits_char_counts(self) -> None:
-        s = summarize_tool_arguments('apply_patch', {'patch': 'diff --git a b'})
-        self.assertEqual(s, 'apply patch')
-
     def test_summarize_terminal_manager_open(self) -> None:
         s = summarize_tool_arguments(
             'terminal_manager',

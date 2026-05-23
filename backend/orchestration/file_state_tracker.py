@@ -209,7 +209,6 @@ def _file_state_guard_enabled() -> bool:
 
 _READ_BEFORE_EDIT_COMMANDS: frozenset[str] = frozenset(
     {
-        'apply_patch',
         'insert_text',
         'edit',
         'str_replace',
@@ -224,7 +223,6 @@ _MUTATING_EDIT_COMMANDS: frozenset[str] = frozenset(
         'edit',
         'write',
         'str_replace',
-        'apply_patch',
         'create_file',
     }
 )
@@ -320,7 +318,7 @@ class FileStateMiddleware(ToolInvocationMiddleware):
         action = ctx.action
         action_cls = type(action).__name__
 
-        # Enforce read-before-edit for apply_patch and related file modifications
+        # Enforce read-before-edit for file modifications
         requires_read_check = False
         target_path = ''
         mutating_edit = False

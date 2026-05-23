@@ -447,8 +447,8 @@ CLR_SECONDARY_ERR = 'dim #fd8383'  # secondary row (error)
 # ── Diff colors ───────────────────────────────────────────────────────────────
 CLR_DIFF_ADD = '#54efae'  # added lines (bright green)
 CLR_DIFF_REM = '#fd8383'  # removed lines (soft red)
-CLR_DIFF_ADD_DIM = 'dim #54efae'  # apply_patch +N delta (secondary line)
-CLR_DIFF_REM_DIM = 'dim #fd8383'  # apply_patch -N delta
+CLR_DIFF_ADD_DIM = 'dim #54efae'  # added lines delta (secondary line)
+CLR_DIFF_REM_DIM = 'dim #fd8383'  # removed lines delta (secondary line)
 
 # ── Inline Rich markup (prefer these over raw [red] / [green] in prose) ───────
 MSG_STYLE_SUCCESS_MARK = 'bold #54efae'  # short ✓ success flashes (onboarding)

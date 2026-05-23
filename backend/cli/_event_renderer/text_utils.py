@@ -242,3 +242,36 @@ def truncate_activity_detail(text: str, limit: int) -> str:
     if len(collapsed) <= limit:
         return collapsed
     return collapsed[: max(limit - 1, 0)].rstrip() + '…'
+
+
+def summarize_cmd_failure(content: str) -> str:
+    """Pick the most actionable single-line failure summary."""
+    from backend.cli._event_renderer.constants import (
+        CMD_SUMMARY_NOISE_PATTERNS,
+        CMD_SUMMARY_PRIORITY_PATTERNS,
+    )
+
+    lines = [line.strip() for line in (content or '').splitlines() if line.strip()]
+    if not lines:
+        return ''
+
+    filtered = [
+        line
+        for line in lines
+        if not any(noise in line.lower() for noise in CMD_SUMMARY_NOISE_PATTERNS)
+    ]
+    candidates = filtered or lines
+    matched = _first_priority_match(candidates)
+    if matched is not None:
+        return matched
+    return candidates[-1][:160]
+
+
+def _first_priority_match(candidates: list[str]) -> str | None:
+    from backend.cli._event_renderer.constants import CMD_SUMMARY_PRIORITY_PATTERNS
+
+    for pattern in CMD_SUMMARY_PRIORITY_PATTERNS:
+        for line in reversed(candidates):
+            if pattern.search(line):
+                return line[:160]
+    return None
