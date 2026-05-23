@@ -559,24 +559,6 @@ class _SyntheticToolCall:
         self._mcp_tool_names: list[str] | None = None
 
 
-def _get_tool_definition_by_name(tool_name: str) -> dict | None:
-    """Look up the tool definition for a given tool name.
-
-    Returns the tool dict (with 'function.parameters' schema) or None if not found.
-    """
-    from backend.engine.tools.start_file_edit import create_start_file_edit_tool
-
-    tool_creators = {
-        'start_file_edit': create_start_file_edit_tool,
-    }
-    creator = tool_creators.get(tool_name)
-    if creator is None:
-        return None
-    try:
-        tool = creator()
-        return tool.get('function') if isinstance(tool, dict) else None
-    except Exception:
-        return None
 
 
 def _extract_file_edit_blocks(fn_body):
@@ -675,16 +657,8 @@ def _extract_xml_tool_calls_from_content(
                 _extract_and_validate_params as _validate_xml_params,
             )
 
-            # Look up the tool definition for schema-aware validation
-            tool_def = _get_tool_definition_by_name(fn_name)
+            tool_def = None
             param_body = fn_body
-            if fn_name == 'start_file_edit' and '<file_edit>' in fn_body:
-                param_body = re.sub(
-                    r'<file_edit>.*?</file_edit>',
-                    '',
-                    fn_body,
-                    flags=re.DOTALL | re.IGNORECASE,
-                )
             param_matches = list(_iter_parameter_matches(fn_body, param_body))
 
             if tool_def is not None and param_matches:
