@@ -7,6 +7,7 @@ stats, global stream registry, and helper methods.
 from __future__ import annotations
 
 import threading
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -102,6 +103,25 @@ class TestEventStreamInit:
 
         assert getattr(stream, '_sqlite_store', None) is None
         assert getattr(stream._persist, '_sqlite_store', None) is None
+
+    def test_session_lock_lives_in_agent_state_not_workspace_storage(
+        self, file_store, tmp_path, monkeypatch
+    ):
+        agent_root = tmp_path / 'agent-state'
+        monkeypatch.setattr(
+            'backend.ledger.stream.workspace_agent_state_dir',
+            lambda: agent_root,
+        )
+
+        stream = EventStream('lock-path-sid', file_store)
+        try:
+            assert stream._session_lock_path is not None
+            lock_path = stream._session_lock_path
+            assert lock_path.startswith(str(agent_root / 'locks'))
+            assert not lock_path.startswith(str(tmp_path / '.locks'))
+            assert not lock_path.startswith(str(Path(file_store.root) / '.locks'))
+        finally:
+            stream.close()
 
 
 # ---------------------------------------------------------------------------

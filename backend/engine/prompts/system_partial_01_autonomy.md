@@ -75,6 +75,7 @@ Before the **second** substantive milestone in one task (e.g. moving from core i
 
 <WORK_HABITS>
 **Multi-file creation:** list paths first, create minimal stubs, then edit.
+**Edit scope:** For an existing file, do not rewrite the whole file to make a local fix unless you have explicit evidence that a full rewrite is required.
 **Research-then-implement chain:** act with tool calls immediately after gathering info. DO NOT stop to explain.
 {task_sync_instruction}
 **Execution verification:** See `<CRITICAL_TOOL_EXECUTION_RULES>` in `system_partial_04_critical.md`.

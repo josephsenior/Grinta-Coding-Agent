@@ -557,6 +557,86 @@ async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
         tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
         assert tasks_widget._section_title == 'Tasks (1)'
 
+
+@pytest.mark.asyncio
+async def test_tui_task_sidebar_does_not_clear_on_ambiguous_empty_update_payload(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._task_list = [
+            {'id': '1', 'description': 'Persist task panel', 'status': 'doing'}
+        ]
+        renderer._refresh_display()
+
+        renderer._process_event(
+            TaskTrackingObservation(
+                content='task tracker sync complete',
+                command='update',
+                task_list=[],
+            )
+        )
+
+        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
+        assert tasks_widget._section_title == 'Tasks (1)'
+
+
+@pytest.mark.asyncio
+async def test_tui_task_sidebar_allows_explicit_empty_update_clear(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._task_list = [
+            {'id': '1', 'description': 'Persist task panel', 'status': 'doing'}
+        ]
+        renderer._refresh_display()
+
+        renderer._process_event(
+            TaskTrackingObservation(
+                content='✅ Plan updated with 0 tasks. Now begin implementing the first todo task.',
+                command='update',
+                task_list=[],
+            )
+        )
+
+        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
+        assert tasks_widget._section_title == 'Tasks (0)'
+
         renderer._process_event(
             TaskTrackingObservation(
                 content='viewed',
@@ -566,7 +646,7 @@ async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
         )
 
         tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
-        assert tasks_widget._section_title == 'Tasks (1)'
+        assert tasks_widget._section_title == 'Tasks (0)'
 
 
 @pytest.mark.asyncio

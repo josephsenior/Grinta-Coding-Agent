@@ -33,6 +33,7 @@ from backend.ledger.event_store import EventStore
 from backend.ledger.persistence import EventPersistence
 from backend.ledger.secret_masker import SecretMasker
 from backend.ledger.serialization.event import event_from_dict, event_to_dict
+from backend.core.workspace_resolution import workspace_agent_state_dir
 from backend.persistence.locations import get_conversation_dir
 from backend.utils.async_utils import (
     call_sync_from_async,
@@ -213,18 +214,7 @@ class EventStream(EventStore):
         self._session_lock_path: str | None = None
         self._session_lock_handle: Any = None
         try:
-            from backend.persistence.locations import get_conversation_dir
-
-            conv_dir = get_conversation_dir(sid, user_id)
-            store_root = getattr(file_store, 'root', None)
-            if isinstance(store_root, str):
-                lock_base = store_root
-            elif isinstance(store_root, os.PathLike):
-                root_path = os.fspath(store_root)
-                lock_base = root_path if isinstance(root_path, str) else conv_dir
-            else:
-                lock_base = conv_dir
-            lock_dir = os.path.join(lock_base, '.locks')
+            lock_dir = os.fspath(workspace_agent_state_dir() / 'locks')
             os.makedirs(lock_dir, exist_ok=True)
             self._session_lock_path = os.path.join(lock_dir, f'{sid}.lock')
             current_pid = os.getpid()

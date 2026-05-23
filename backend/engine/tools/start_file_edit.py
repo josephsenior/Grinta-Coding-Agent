@@ -10,7 +10,7 @@ from backend.engine.tools.common import (
 )
 from backend.inference.tool_names import START_FILE_EDIT_TOOL_NAME
 
-_DESCRIPTION = """Initiates a file edit transaction. Use this for file edits.
+_DESCRIPTION = """Initiates a file edit transaction. Use this for targeted file edits.
 
 Use metadata only. Never pass file content here; raw content is captured in FILE EDITOR MODE.
 """

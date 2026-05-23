@@ -512,15 +512,39 @@ class Orchestrator(Agent):
         return extract_response_text(response)
 
     def _build_editor_mode_messages(self, state: State, prompt: str) -> list[dict[str, Any]]:
-        return [
-            {'role': 'system', 'content': prompt},
-            {
-                'role': 'user',
-                'content': (
-                    'FILE EDITOR MODE is active. Output exactly one <file_edit> block with raw file text only.'
-                ),
-            },
-        ]
+        if not state.history:
+            return [
+                {'role': 'system', 'content': prompt},
+                {
+                    'role': 'user',
+                    'content': (
+                        'FILE EDITOR MODE is active. Output exactly one <file_edit> block with raw file text only.'
+                    ),
+                },
+            ]
+        try:
+            initial_user_message = self.memory_manager.get_initial_user_message(
+                state.history
+            )
+        except Exception:
+            initial_user_message = None
+        if initial_user_message is None:
+            return [
+                {'role': 'system', 'content': prompt},
+                {
+                    'role': 'user',
+                    'content': (
+                        'FILE EDITOR MODE is active. Output exactly one <file_edit> block with raw file text only.'
+                    ),
+                },
+            ]
+        messages = self.memory_manager.build_messages(
+            condensed_history=list(state.history),
+            initial_user_message=initial_user_message,
+            llm_config=self.llm.config,
+        )
+        serialized = message_serializer.serialize_messages(messages)
+        return [{'role': 'system', 'content': prompt}, *serialized]
 
     async def _astep_handle_context_limit_error(self, state: State) -> Action:
         """Condense/retry after ContextLimitError; may degrade or raise."""
