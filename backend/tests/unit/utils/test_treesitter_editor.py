@@ -530,6 +530,35 @@ class TestRenameSymbol:
         # lines_changed is the count of occurrences
         assert result.lines_changed >= 1
 
+    def test_rename_in_string_literals(
+        self, editor: TreeSitterEditor, tmp_path: Path
+    ) -> None:
+        """Rename of a symbol should also update occurrences in string literals."""
+        content = textwrap.dedent("""\
+            class EmailValidator:
+                \"\"\"EmailValidator validator.\"\"\"
+                name = "EmailValidator"
+
+            if __name__ == "__main__":
+                obj = EmailValidator()
+                print("EmailValidator")
+        """)
+        f = tmp_path / 'email_validator.py'
+        f.write_text(content, encoding='utf-8')
+        path = str(f)
+
+        result = editor.rename_symbol(path, 'EmailValidator', 'NewValidator')
+        assert result.success is True
+
+        new_content = open(path, encoding='utf-8').read()
+        assert 'class NewValidator' in new_content
+        assert 'class EmailValidator' not in new_content
+        assert '"""NewValidator validator."""' in new_content
+        assert 'name = "NewValidator"' in new_content
+        assert 'obj = NewValidator()' in new_content
+        assert 'print("NewValidator")' in new_content
+        assert result.lines_changed >= 5
+
 
 # ---------------------------------------------------------------------------
 # validate_syntax (public)
