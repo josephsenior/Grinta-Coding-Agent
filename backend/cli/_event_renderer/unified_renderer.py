@@ -452,7 +452,7 @@ class ActivityRenderer:
         )
 
     @staticmethod
-    def condensation(pruned_count: int = 0, count: int = 1) -> ActivityCard:
+    def condensation(pruned_count: int = 0, count: int = 1, result: str | None = None) -> ActivityCard:
         """Create an activity card for context condensation."""
         suffix = (
             'st'
@@ -468,6 +468,9 @@ class ActivityRenderer:
             verb=f'Compressed ({count}{suffix})',
             detail=detail,
             badge_category='tool',
+            extra_lines=[result] if result else None,
+            is_collapsible=bool(result),
+            start_collapsed=False,
         )
 
     @staticmethod

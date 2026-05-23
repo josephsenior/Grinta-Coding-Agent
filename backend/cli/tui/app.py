@@ -3543,12 +3543,6 @@ class TUIRenderer:
             if msg:
                 summary = status_type.replace('_', ' ').strip().title() if status_type else 'Runtime notice'
                 self._update_runtime_strip(summary, msg, active=False)
-        elif isinstance(event, CondensationAction):
-            self._update_runtime_strip(
-                'Context compacted',
-                'Compaction completed successfully',
-                active=False,
-            )
         elif isinstance(event, AgentThinkAction):
             source_tool = getattr(event, 'source_tool', '') or ''
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
@@ -3667,6 +3661,9 @@ class TUIRenderer:
                 'Context compressed successfully',
                 active=False,
             )
+            count = getattr(self, '_condensation_count', 1)
+            card = ActivityRenderer.condensation(count=count, result=event.content)
+            self._write_card(card)
         elif isinstance(event, DelegateTaskAction):
             task = getattr(event, 'task_description', '') or getattr(event, 'task', '') or ''
             worker = getattr(event, 'worker', '') or ''
@@ -3721,9 +3718,8 @@ class TUIRenderer:
                 Text(f'  [bold #91abec]Downloaded[/] {url}', style=NAVY_TEXT_PRIMARY)
             )
         elif isinstance(event, TaskTrackingObservation):
-            command = str(getattr(event, 'command', '') or '').strip().lower()
-            if event.task_list or command != 'view':
-                self._task_list = event.task_list
+            if self._should_replace_task_list_from_event(event):
+                self._task_list = list(getattr(event, 'task_list', []) or [])
                 self._refresh_display()
         elif isinstance(event, StreamingChunkAction):
             self._handle_streaming_chunk(event)
@@ -3738,13 +3734,37 @@ class TUIRenderer:
         elif isinstance(event, EscalateToHumanAction):
             self._tui.add_communicate_escalate(event)
         elif isinstance(event, TaskTrackingAction):
-            command = str(getattr(event, 'command', '') or '').strip().lower()
-            if event.task_list or command != 'view':
-                self._task_list = event.task_list
+            if self._should_replace_task_list_from_event(event):
+                self._task_list = list(getattr(event, 'task_list', []) or [])
                 self._refresh_display()
         else:
             name = type(event).__name__
             self._tui._write_log(Text(f'  [{name}]', style=NAVY_TEXT_MUTED))
+
+    def _should_replace_task_list_from_event(self, event: Any) -> bool:
+        """Ignore empty task payloads unless they clearly mean to clear the plan."""
+        command = str(getattr(event, 'command', '') or '').strip().lower()
+        task_list = list(getattr(event, 'task_list', []) or [])
+        if task_list:
+            return True
+        if command == 'view':
+            return False
+        if command == 'clear':
+            return True
+
+        content = str(getattr(event, 'content', '') or '').strip().lower()
+        thought = str(getattr(event, 'thought', '') or '').strip().lower()
+        explicit_clear_markers = (
+            'clearing the task list',
+            'plan updated with 0 tasks',
+            'cleared task list',
+            'cleared the task list',
+        )
+        if any(marker in content for marker in explicit_clear_markers):
+            return True
+        if any(marker in thought for marker in explicit_clear_markers):
+            return True
+        return not self._task_list
 
     def _extract_file_edit_diff(self, event: FileEditObservation) -> str | None:
         """Extract unified diff from a FileEditObservation for TUI display."""
