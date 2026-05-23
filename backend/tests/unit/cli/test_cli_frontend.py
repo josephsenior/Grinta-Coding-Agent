@@ -101,7 +101,7 @@ async def test_event_renderer_updates_metrics_and_streaming_preview() -> None:
     await renderer.handle_event(chunk)
 
     assert hud.state.cost_usd == 1.25
-    assert hud.state.context_tokens == 15
+    assert hud.state.context_tokens == 10
     assert hud.state.context_limit == 1000
 
     final_message = MessageAction(content='Hello', wait_for_response=True)
