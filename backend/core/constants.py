@@ -370,8 +370,7 @@ LOG_COLORS = {
 
 DISABLE_COLOR_PRINTING = False
 
-# ── Tool Names ──────────────────────────────────────────────────────
-START_FILE_EDIT_TOOL_NAME = 'start_file_edit'
+
 READ_FILE_TOOL_NAME = 'read_file'
 CREATE_FILE_TOOL_NAME = 'create_file'
 READ_SYMBOL_TOOL_NAME = 'read_symbol'

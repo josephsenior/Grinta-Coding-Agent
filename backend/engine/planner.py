@@ -14,8 +14,7 @@ ChatCompletionToolParam = Any
 
 # ── Hybrid XML/Native transport ──────────────────────────────────────────
 # File content is no longer routed through provider JSON arguments. Normal
-# tools remain native; file edits start with the metadata-only start_file_edit
-# tool and capture raw content in isolated EDITOR MODE.
+# tools remain native; file edits use EDIT_FILE blocks in AGENT mode.
 CODE_PAYLOAD_TOOLS: frozenset[str] = frozenset()
 
 if TYPE_CHECKING:
@@ -370,8 +369,7 @@ class OrchestratorPlanner:
         }
 
         # ── Tool routing ─────────────────────────────────────────────
-        # All normal tools are native provider function calls. File content is
-        # captured separately in EDITOR MODE after start_file_edit.
+        # All normal tools are native provider function calls.
         native_tools, xml_tools = self.partition_tools(tools)
 
         if self._llm_supports_function_calling():
@@ -400,27 +398,24 @@ class OrchestratorPlanner:
         """Append pseudo-XML tool format instructions to the system prompt.
 
         Editor tools are described using the same format that non-native models
-        already use, but file edits now route through the two-mode
-        ``start_file_edit`` protocol with raw content blocks.
+        already use, but file edits are routed through EDIT_FILE blocks
+        with raw content.
         """
         from backend.inference.fn_call_converter import (
             convert_tools_to_description,
-            format_file_editor_xml_examples_for_prompt,
         )
 
         formatted = convert_tools_to_description(xml_tools)
-        xml_examples = format_file_editor_xml_examples_for_prompt()
         # Build the suffix but replace the generic "one function at a time"
         # note with hybrid-specific guidance.
         suffix = (
             '\n\n<FILE_EDITING_TOOL_FORMAT>\n'
-            'The `start_file_edit` tool initiates a metadata-only edit transaction. '
-            'When the runtime enters FILE EDITOR MODE, emit one `<file_edit>` block '
-            'containing raw file content. Do NOT use the standard JSON tool calling '
+            'In AGENT mode, raw file content is emitted as an `EDIT_FILE` block '
+            '(not as JSON tool arguments). Use the `EDIT_FILE` block for edits '
+            'that require raw content. Do NOT use the standard JSON tool calling '
             'format for file content.\n'
             f'{formatted}\n'
             'Canonical examples (emit one block per message; copy parameter names exactly):\n\n'
-            f'{xml_examples}\n\n'
             'RULES:\n'
             '- You may include natural-language reasoning BEFORE the raw-content block.\n'
             '- Do NOT place any text AFTER the closing tag.\n'
@@ -430,7 +425,7 @@ class OrchestratorPlanner:
             '- One file-editing call per message.\n'
             '- For multi_edit: use nested raw-content blocks (NOT JSON arrays).\n'
             '- Each block: <path>, <operation>, <content>.\n'
-            '- Operations: insert, replace_range, edit_symbol.\n'
+            '- Operations: insert, replace_range, edit_symbol, multi_edit.\n'
             '</FILE_EDITING_TOOL_FORMAT>'
         )
 

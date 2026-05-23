@@ -421,7 +421,7 @@ def test_prompt_assets_include_concise_file_edit_policy() -> None:
     tools = (root / 'system_partial_02_tools.md').read_text(encoding='utf-8')
     examples = (root / 'system_partial_05_examples.md').read_text(encoding='utf-8')
 
-    assert 'After `start_file_edit`, the runtime enters FILE EDITOR MODE and expects raw content blocks, not JSON payloads.' in routing
+    assert 'Use EDIT_FILE blocks for code edits' in routing or 'EDIT_FILE' in routing
     assert 'Do not output `<file_edit>` blocks, do not manually write XML' in routing
     assert 'File Editing Policy' in tools
     assert 'Never pass multiline file content through JSON tool arguments.' in tools

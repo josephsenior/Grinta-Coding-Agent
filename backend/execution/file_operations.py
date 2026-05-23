@@ -85,7 +85,7 @@ def execute_file_editor(
         enriched_error = append_editor_recovery_guidance(
             result.error,
             path=path,
-            tool_name='start_file_edit',
+            tool_name='file_edit',
             content=file_text or new_str,
         )
         return (

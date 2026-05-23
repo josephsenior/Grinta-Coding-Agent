@@ -1,4 +1,4 @@
-"""Native public file/symbol tools that remain separate from start_file_edit."""
+"""Native public file/symbol tools for the agent."""
 
 from __future__ import annotations
 

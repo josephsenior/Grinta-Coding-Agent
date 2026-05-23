@@ -176,11 +176,8 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
     def test_format_repair_error_message_uses_current_tool_names(self):
         msg = self.service._format_repair_error_message(LLMNoActionError('no action'))
 
-        self.assertIn('start_file_edit', msg)
         self.assertIn('terminal_manager', msg)
         self.assertIn('communicate_with_user', msg)
-        self.assertNotIn('text_editor', msg)
-        self.assertNotIn('symbol_editor', msg)
 
     async def test_get_next_action_recovers_first_round_then_pauses(self):
         """Null-action loop uses two-round recovery before pausing.

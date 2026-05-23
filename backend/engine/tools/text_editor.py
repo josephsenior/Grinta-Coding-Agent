@@ -16,7 +16,7 @@ _DETAILED_TEXT_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
   - `range`: line-range replacement. Provide `start_line`, `end_line`, and `new_str` to replace a specific block.
 * `multi_edit`: atomic batch for text-style edits. Use this for coordinated non-symbol changes across one or more files. Supported per-item commands: `create_file`, `insert_text`, and `edit` with `edit_mode=range`. The whole batch commits or rolls back together.
 
-Default mental model: **`start_file_edit` for file edits**; use **minimal valid `file_text` on create**, then **`edit_mode=range`** or **`insert_text`** to extend. Avoid brittle string replacement.
+Default mental model: use **minimal valid `file_text` on create**, then **`edit_mode=range`** or **`insert_text`** to extend. For raw-content edits in AGENT mode, use an `EDIT_FILE` block. Avoid brittle string replacement.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
 

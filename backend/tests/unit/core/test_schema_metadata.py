@@ -81,7 +81,7 @@ class TestToolCallMetadataSchema:
 
     def test_with_model_response(self):
         m = ToolCallMetadataSchema(
-            function_name='start_file_edit',
+            function_name='execute_bash',
             tool_call_id='tc_002',
             total_calls_in_response=2,
             model_response={'id': 'resp_1'},

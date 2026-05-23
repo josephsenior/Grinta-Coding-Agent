@@ -27,7 +27,7 @@ def _python_comment_prefix_issue(content: str, path: str | None) -> EditorRecove
         return None
     return EditorRecoveryAdvice(
         kind='python_comment_prefix',
-        preferred_tool='start_file_edit',
+        preferred_tool='file_edit',
         next_action='replace_range',
         detail=(
             'Python file detected with `//` comment prefix. Python comments use `#`, '
@@ -96,7 +96,7 @@ def classify_editor_recovery(
     if 'large existing code file overwrite blocked' in lower:
         return EditorRecoveryAdvice(
             kind='full_file_overwrite_blocked',
-            preferred_tool='start_file_edit',
+            preferred_tool='edit_symbol',
             next_action='edit_symbol',
             detail=(
                 'Full-file overwrite was blocked on a large existing source file. Prefer a symbol-aware or '
@@ -107,7 +107,7 @@ def classify_editor_recovery(
     if 'syntax validation failed' in lower or 'syntax error after edit' in lower:
         return EditorRecoveryAdvice(
             kind='syntax_validation_failed',
-            preferred_tool='start_file_edit',
+            preferred_tool='file_edit',
             next_action='replace_range',
             detail=(
                 'The edit produced invalid syntax. Re-read the affected region, then do one surgical repair '
@@ -118,18 +118,18 @@ def classify_editor_recovery(
     if 'edit context mismatch' in lower or 'range edit context mismatch' in lower:
         return EditorRecoveryAdvice(
             kind='range_context_mismatch',
-            preferred_tool='start_file_edit',
+            preferred_tool='file_edit',
             next_action='replace_range',
             detail=(
                 'The edit context is stale or malformed. Re-read the file and retry once with '
-                '`start_file_edit(operation="replace_range")` using exact current line numbers.'
+                'a `replace_range` edit using exact current line numbers.'
             ),
         )
 
     if 'replace failed' in lower or 'start line' in lower or 'end_line must be' in lower:
         return EditorRecoveryAdvice(
             kind='range_edit_failed',
-            preferred_tool='start_file_edit',
+            preferred_tool='file_edit',
             next_action='replace_range',
             detail=(
                 'The range edit inputs are invalid or stale. Re-read the file to confirm line numbers, '

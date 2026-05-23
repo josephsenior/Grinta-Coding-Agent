@@ -63,11 +63,11 @@ class TestToolCallDisplay(unittest.TestCase):
 
     def test_format_invocation_line(self) -> None:
         icon, line = format_tool_invocation_line(
-            'start_file_edit',
-            {'command': 'read_file', 'path': 'src/a.py'},
+            'execute_bash',
+            {'command': 'npm test', 'cwd': 'x'},
         )
         self.assertIsInstance(icon, str)
-        self.assertIn('src/a.py', line)
+        self.assertIn('npm test', line)
         self.assertNotIn('{', line)
 
     def test_streaming_args_hint_partial(self) -> None:
@@ -82,16 +82,16 @@ class TestToolCallDisplay(unittest.TestCase):
         self.assertFalse(looks_like_streaming_tool_arguments('Hello {'))
 
     def test_redact_streamed_tool_call_markers(self) -> None:
-        raw = '[Tool call] start_file_edit({"operation":"replace_range","path":"a.txt","start_line":1,"end_line":1})'
+        raw = '[Tool call] execute_bash({"command":"pwd"})'
         self.assertEqual(redact_streamed_tool_call_markers(raw).strip(), '')
 
     def test_strip_tool_call_marker_lines_keeps_json_shape(self) -> None:
-        raw = '[Tool call] start_file_edit({"operation":"replace_range","path":"a.txt","start_line":1,"end_line":1})'
+        raw = '[Tool call] execute_bash({"command":"pwd"})'
 
     def test_redact_removes_friendly_tool_call_lines(self) -> None:
         friendly = flatten_tool_call_for_history(
-            'start_file_edit',
-            '{"command":"read_file","path":"axis-3/query_rag.py"}',
+            'execute_bash',
+            '{"command":"npm test"}',
         )
         raw = f'Intro line.\n{friendly}\n\nHello.'
         out = redact_streamed_tool_call_markers(raw).strip()
@@ -118,11 +118,11 @@ class TestToolCallDisplay(unittest.TestCase):
 
     def test_flatten_tool_call_for_history_no_raw_json(self) -> None:
         line = flatten_tool_call_for_history(
-            'start_file_edit',
-            '{"command":"create_file","path":"hello.txt"}',
+            'execute_bash',
+            '{"command":"npm test"}',
         )
         self.assertNotIn('{', line)
-        self.assertIn('hello.txt', line)
+        self.assertIn('npm test', line)
         self.assertTrue(line.startswith('[Tool call]'))
 
     def test_mcp_result_user_preview_extracts_text(self) -> None:

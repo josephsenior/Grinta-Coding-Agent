@@ -73,7 +73,7 @@ COMMANDS:
 
 NOTE:
 - Prefer this tool for code edits. It is the default editor for source files.
-- For non-code files or targeted line-range edits, use `start_file_edit` with `replace_range`.
+- For non-code files or targeted line-range edits, use the `edit` command with `edit_mode=range` or an `EDIT_FILE` block.
 
 FEATURES:
 - Language-agnostic: Works with ALL languages via Tree-sitter
@@ -84,7 +84,7 @@ FEATURES:
 
 BEST PRACTICES:
 1. Use `edit_symbol` or `edit_symbols` instead of line-based replacements when possible
-2. Use `start_file_edit` with `replace_range` for targeted text changes that don't map to a named symbol (imports, constants, comments)
+2. Use the `edit` command with `edit_mode=range` or an `EDIT_FILE` block for targeted text changes that don't map to a named symbol (imports, constants, comments)
 3. Use `find_symbol` first to verify symbol exists
 4. Trust the auto-indentation - it matches your file's style
 5. For typos, check error messages - they suggest corrections

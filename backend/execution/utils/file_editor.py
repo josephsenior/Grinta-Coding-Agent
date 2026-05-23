@@ -1075,7 +1075,7 @@ class FileEditor(FileEditorEditOpsMixin):
                 output='',
                 error=(
                     'Large existing code file overwrite blocked. '
-                    'Use start_file_edit with edit_symbol or replace_range for incremental changes, '
+                    'Use edit_symbol or replace_range for incremental changes, '
                     'or retry create_file with overwrite_existing=true if you intentionally want a full rewrite.'
                 ),
                 old_content=old_content,

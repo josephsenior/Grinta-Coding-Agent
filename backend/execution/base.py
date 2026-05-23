@@ -46,7 +46,6 @@ from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
     FileWriteAction,
-    StartFileEditAction,
     TaskTrackingAction,
     is_debugger_action,
 )
@@ -730,11 +729,6 @@ class Runtime(
 
         if isinstance(action, TaskTrackingAction):
             return self._handle_task_tracking_action(action)
-
-        if isinstance(action, StartFileEditAction):
-            from backend.engine.file_edit_protocol import start_file_edit_transaction
-
-            return start_file_edit_transaction(self, action)
 
         if is_debugger_action(action):
             if not self._agent_debugger_enabled():

@@ -808,7 +808,6 @@ def test_system_capabilities_mentions_both_atomic_batch_editors_when_available()
         parallel_tool_calls_provider_flag=False,
     )
     assert 'Atomic multi-file edits' in text
-    assert '`start_file_edit`' in text
 
 
 class TestBuildSystemPromptRenders:

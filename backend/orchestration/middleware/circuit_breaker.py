@@ -31,7 +31,6 @@ _PROGRESS_OBSERVATION_TYPES: tuple[str, ...] = (
 # model can pivot in the same turn instead of stopping to explain.
 # Keys are the name that appears in the tool_call_metadata.function_name field.
 _TOOL_FALLBACK_MAP: dict[str, list[str]] = {
-    'start_file_edit': ['search_code'],
     'search_code': ['lsp'],
     'lsp': ['search_code'],
 }
@@ -45,9 +44,7 @@ def _tool_name_for_action(action: object) -> str:
 
 
 def _effective_error_tool_name(tool_name: str, content: str) -> str:
-    if tool_name != 'start_file_edit':
-        return tool_name
-    return classify_file_edit_error_bucket(content)
+    return classify_file_edit_error_bucket(content) if tool_name in ('edit_symbol', 'edit_symbols') else tool_name
 
 
 def _fallback_tool(tool_name: str) -> str | None:

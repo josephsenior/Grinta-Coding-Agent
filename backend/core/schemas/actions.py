@@ -105,29 +105,6 @@ class FileEditActionSchema(ActionSchemaV1):
         return validate_non_empty_string(v, name='path')
 
 
-class StartFileEditActionSchema(ActionSchemaV1):
-    """Schema for StartFileEditAction."""
-
-    action_type: Literal['start_file_edit'] = Field(
-        ActionType.START_FILE_EDIT.value,
-        frozen=True,
-    )
-    runnable: bool = Field(True, frozen=True)
-    path: str = Field(..., min_length=1, description='Path to file to edit')
-    operation: str = Field(..., min_length=1, description='Edit operation')
-    metadata: dict[str, Any] = Field(default_factory=dict)
-    session_id: str | None = None
-    transaction_id: str | None = None
-    delimiter: str | None = None
-
-    @field_validator('path', 'operation')
-    @classmethod
-    def validate_non_empty(cls, v: str) -> str:
-        from backend.core.type_safety.type_safety import validate_non_empty_string
-
-        return validate_non_empty_string(v, name='start_file_edit field')
-
-
 class CmdRunActionSchema(ActionSchemaV1):
     """Schema for CmdRunAction."""
 
@@ -627,7 +604,6 @@ ActionSchemaUnion = (
     FileReadActionSchema
     | FileWriteActionSchema
     | FileEditActionSchema
-    | StartFileEditActionSchema
     | CmdRunActionSchema
     | MessageActionSchema
     | SystemMessageActionSchema

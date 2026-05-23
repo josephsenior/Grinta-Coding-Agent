@@ -283,11 +283,6 @@ class RuntimeExecutorIOAndTerminalMixin:
     def _resolve_workspace_file_path(self, path: str, working_dir: str) -> str:
         return _resolve_workspace_file_path_impl(self, path, working_dir)
 
-    async def start_file_edit(self, action) -> Observation:
-        from backend.engine.file_edit_protocol import start_file_edit_transaction
-
-        return start_file_edit_transaction(self, action)
-
     def _annotate_environment_errors(self, observation: CmdOutputObservation) -> None:
         _annotate_environment_errors_impl(self, observation)
 
@@ -1129,7 +1124,7 @@ class RuntimeExecutorIOAndTerminalMixin:
 
         if not action.command:
             return ErrorObservation(
-                'Legacy edit_file actions are no longer supported. Use start_file_edit or the dedicated file tools instead.'
+                'Legacy edit_file actions are no longer supported. Use the dedicated file tools instead.'
             )
 
         return self._edit_via_file_editor(action)

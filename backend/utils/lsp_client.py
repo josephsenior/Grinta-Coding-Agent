@@ -215,13 +215,13 @@ class LspResult:
                 'No code actions / quick-fixes available at this location. '
                 'Either the file is clean or the language server has no '
                 'suggestions for this range. Apply edits manually via '
-                '`start_file_edit`.'
+                'the file editing tools.'
             )
         lines = [
             f'Available code actions ({len(self.code_actions)}; ★ = preferred):',
             '(Discovery-only — no auto-apply yet. Implement the chosen fix '
-            'via `start_file_edit` and re-run `get_diagnostics` '
-            'to verify.)',
+             'and re-run `get_diagnostics` '
+             'to verify.)',
         ]
         for act in self.code_actions[:25]:
             lines.append(f'  {act}')
@@ -485,7 +485,7 @@ class LspClient:
 
         Returns a discovery-only list of suggested fixes (titles + kinds).
         We do NOT auto-apply WorkspaceEdits — the agent reads the list and
-        implements the chosen fix via ``start_file_edit``.
+        implements the chosen fix manually.
         This keeps the apply path visible and reviewable.
         """
         server_cmd = self._get_server_command(abs_path)

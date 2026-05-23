@@ -968,9 +968,8 @@ def _handle_edit_symbol_command(
     path: str,
     arguments: Mapping[str, Any],
     *,
-    tool_name: str = 'start_file_edit',
+    tool_name: str = 'edit_symbol',
 ) -> Action:
-    """Handle edit_symbol command."""
     symbol_name = cast(str | None, arguments.get('symbol_name'))
     new_body = cast(str | None, arguments.get('new_body'))
     line_number = cast(int | None, arguments.get('line_number'))
@@ -1958,8 +1957,7 @@ def response_to_actions(
 ) -> list[Action]:
     """Convert LLM response to agent actions.
 
-    Normal tools use provider-native tool calls. File content is captured by
-    the separate editor-mode protocol after ``start_file_edit``.
+    Normal tools use provider-native tool calls.
     """
     from backend.engine.planner import CODE_PAYLOAD_TOOLS
 
