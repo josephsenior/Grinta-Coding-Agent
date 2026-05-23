@@ -32,7 +32,6 @@ from backend.ledger.action import (
     FileReadAction,
     MessageAction,
     PlaybookFinishAction,
-    StartFileEditAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import CondensationRequestAction
@@ -339,121 +338,6 @@ class TestHandleStrReplaceEditorTool:
                     'security_risk': 'LOW',
                 }
             )
-
-
-class TestStartFileEditTransport:
-    def test_native_file_editor_call_is_rejected_as_internal_only(self):
-        response = _model_response(
-            tool_calls=[
-                _native_tool_call(
-                    'file_editor',
-                    {
-                        'command': 'create',
-                        'path': 'app.py',
-                        'content': 'print("hi")\n',
-                        'security_risk': 'LOW',
-                    },
-                )
-            ]
-        )
-
-        with pytest.raises(FunctionCallValidationError) as exc_info:
-            response_to_actions(response)
-
-        message = str(exc_info.value)
-        assert 'legacy file-edit tool is internal-only' in message.lower()
-        assert 'start_file_edit' in message
-
-    def test_start_file_edit_create_is_rejected(self):
-        response = _model_response(
-            tool_calls=[
-                _native_tool_call(
-                    'start_file_edit',
-                    {
-                        'operation': 'create',
-                        'path': 'app.py',
-                        'security_risk': 'LOW',
-                    },
-            )
-        ]
-        )
-
-        with pytest.raises(FunctionCallValidationError, match='not supported'):
-            response_to_actions(response)
-
-    def test_start_file_edit_rejects_native_content_payloads(self):
-        response = _model_response(
-            tool_calls=[
-                _native_tool_call(
-                    'start_file_edit',
-                    {
-                        'operation': 'create',
-                        'path': 'app.py',
-                        'content': 'print("hi")\n',
-                        'security_risk': 'LOW',
-                    },
-                )
-            ]
-        )
-
-        with pytest.raises(FunctionCallValidationError) as exc_info:
-            response_to_actions(response)
-
-        assert 'does not accept file content fields' in str(exc_info.value)
-
-    def test_start_file_edit_replace_range_requires_metadata(self):
-        response = _model_response(
-            tool_calls=[
-                _native_tool_call(
-                    'start_file_edit',
-                    {
-                        'operation': 'replace_range',
-                        'path': 'app.py',
-                        'start_line': 1,
-                        'security_risk': 'LOW',
-                    },
-                )
-            ]
-        )
-
-        with pytest.raises(FunctionCallValidationError) as exc_info:
-            response_to_actions(response)
-
-        assert 'end_line' in str(exc_info.value)
-
-    def test_xml_file_editor_block_is_plain_text_in_normal_mode(self):
-        response = _model_response(
-            content=(
-                '<function=start_file_edit>\n'
-                '<parameter=operation>replace_range</parameter>\n'
-                '<parameter=path>app.py</parameter>\n'
-                '<parameter=security_risk>LOW</parameter>\n'
-                '</function>'
-            )
-        )
-
-        action = response_to_actions(response)[0]
-
-        assert isinstance(action, MessageAction)
-        assert '<function=start_file_edit>' in action.content
-
-    def test_start_file_edit_read_is_rejected(self):
-        response = _model_response(
-            tool_calls=[
-                _native_tool_call(
-                    'start_file_edit',
-                    {
-                        'operation': 'read',
-                        'path': 'app.py',
-                        'security_risk': 'LOW',
-                    },
-                )
-            ]
-        )
-
-        with pytest.raises(FunctionCallValidationError, match='not supported'):
-            response_to_actions(response)
-
     def test_minimax_text_tool_call_is_converted_before_message_action(self):
         response = _model_response(
             content=(

@@ -29,7 +29,6 @@ class TestToolNames(TestCase):
             'READ_FILE_TOOL_NAME',
             'READ_SYMBOL_TOOL_NAME',
             'RENAME_SYMBOL_TOOL_NAME',
-            'START_FILE_EDIT_TOOL_NAME',
             'TASK_TRACKER_TOOL_NAME',
             'UNDO_LAST_EDIT_TOOL_NAME',
         ]
@@ -56,7 +55,6 @@ class TestToolNames(TestCase):
             READ_FILE_TOOL_NAME,
             READ_SYMBOL_TOOL_NAME,
             RENAME_SYMBOL_TOOL_NAME,
-            START_FILE_EDIT_TOOL_NAME,
             TASK_TRACKER_TOOL_NAME,
             UNDO_LAST_EDIT_TOOL_NAME,
         )
@@ -68,12 +66,11 @@ class TestToolNames(TestCase):
         self.assertIsNotNone(READ_FILE_TOOL_NAME)
         self.assertIsNotNone(READ_SYMBOL_TOOL_NAME)
         self.assertIsNotNone(RENAME_SYMBOL_TOOL_NAME)
-        self.assertIsNotNone(START_FILE_EDIT_TOOL_NAME)
         self.assertIsNotNone(TASK_TRACKER_TOOL_NAME)
         self.assertIsNotNone(UNDO_LAST_EDIT_TOOL_NAME)
 
     def test_all_list_length(self):
-        self.assertEqual(len(tool_names.__all__), 9)
+        self.assertEqual(len(tool_names.__all__), 8)
 
     def test_no_extra_exports(self):
         """Test that only expected constants are exported in __all__."""
@@ -96,7 +93,6 @@ class TestToolNames(TestCase):
         self.assertTrue(tool_names.READ_FILE_TOOL_NAME)
         self.assertTrue(tool_names.READ_SYMBOL_TOOL_NAME)
         self.assertTrue(tool_names.RENAME_SYMBOL_TOOL_NAME)
-        self.assertTrue(tool_names.START_FILE_EDIT_TOOL_NAME)
         self.assertTrue(tool_names.TASK_TRACKER_TOOL_NAME)
         self.assertTrue(tool_names.UNDO_LAST_EDIT_TOOL_NAME)
 

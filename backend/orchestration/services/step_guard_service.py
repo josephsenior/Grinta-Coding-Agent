@@ -419,17 +419,16 @@ class StepGuardService:
                 'MANDATORY NEXT ACTIONS:\n'
                 '1. If the error mentions a symbol, call `find_symbol` before editing again.\n'
                 '2. Re-read the affected file region to confirm the live code shape.\n'
-                '3. Retry exactly one targeted `start_file_edit` edit (`replace_range` or `edit_symbol`).\n'
-                '4. If that fails, switch to `start_file_edit` `replace_range` with fresh line numbers.\n'
+                '3. Retry exactly one targeted edit (`replace_range` or `edit_symbol`).\n'
+                '4. If that fails, switch to `replace_range` with fresh line numbers.\n'
                 'Do NOT emit another near-identical edit without new evidence.',
-                'STUCK RECOVERY: find_symbol or read the file region, then one targeted start_file_edit retry max.',
+                'STUCK RECOVERY: find_symbol or read the file region, then one targeted edit retry max.',
             )
 
         file_edit_hits = sum(
             1
             for content in recent_errors
-            if 'start_file_edit' in content.lower()
-            or 'range edit failed' in content.lower()
+            if 'range edit failed' in content.lower()
             or 'stale line range' in content.lower()
             or '[file_edit_guidance]' in content.lower()
         )
@@ -439,11 +438,11 @@ class StepGuardService:
             'STUCK LOOP DETECTED — repeated file-edit failures were detected.\n'
             'MANDATORY NEXT ACTIONS:\n'
             '1. Read the target file again with read_file to refresh exact context lines.\n'
-            '2. Prefer `start_file_edit` for the next code edit if the file is source code.\n'
+            '2. Use `edit_mode=range` or an EDIT_FILE block for the next code edit if the file is source code.\n'
             '3. Retry once with `replace_range` and corrected live context.\n'
             '4. If it fails again, switch tools instead of retrying the same edit shape.\n'
             'Do NOT emit another near-identical edit without new file evidence.',
-            'STUCK RECOVERY: refresh the file, then one start_file_edit retry max.',
+            'STUCK RECOVERY: refresh the file, then one targeted edit retry max.',
         )
 
     @staticmethod

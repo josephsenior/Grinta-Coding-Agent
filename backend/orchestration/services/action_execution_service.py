@@ -400,7 +400,7 @@ class ActionExecutionService:
             return (
                 'No tool call detected - the response contains text but no tool call.\n\n'
                 'Use the available native tool calls shown in the prompt. '
-                'For file edits use `start_file_edit`; for commands use `terminal_manager`; '
+                'For file edits use the file editing tools or EDIT_FILE blocks; for commands use `terminal_manager`; '
                 'for user clarification use `communicate_with_user`.'
             )
         return str(exc)
@@ -430,9 +430,8 @@ class ActionExecutionService:
         if cb_service is None:
             return
         error_lower = error_signature.lower()
-        if 'start_file_edit' in error_lower or '[start_file_edit' in error_lower:
-            bucket = classify_file_edit_error_bucket(str(exc))
-            cb_service.record_error(exc, tool_name=bucket)
+        bucket = classify_file_edit_error_bucket(str(exc))
+        cb_service.record_error(exc, tool_name=bucket)
 
     def _effective_retry_limit(
         self,

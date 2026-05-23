@@ -32,11 +32,10 @@ from backend.core.constants import (
 from backend.core.logger import app_logger as logger
 from backend.ledger.action import ActionSecurityRisk
 from backend.ledger.observation import ErrorObservation
-from backend.inference.tool_names import START_FILE_EDIT_TOOL_NAME
-
-# Per-tool keys for start_file_edit failures. Syntax validation rejects are
+# Per-tool keys for file edit failures. Syntax validation rejects are
 # tracked separately with higher trip thresholds than match/path/guard errors.
-START_FILE_EDIT_SYNTAX_TOOL_NAME = f'{START_FILE_EDIT_TOOL_NAME}_syntax'
+FILE_EDIT_BUCKET = 'file_edit'
+FILE_EDIT_SYNTAX_BUCKET = 'file_edit_syntax'
 
 _PER_TOOL_ERRORS_MAX = 100
 
@@ -45,12 +44,12 @@ def classify_file_edit_error_bucket(content: str) -> str:
     """Map file-edit error text to a circuit-breaker per-tool bucket.
 
     Syntax validation failures are common while iterating on generated code;
-    they use ``START_FILE_EDIT_SYNTAX_TOOL_NAME`` and higher ``check()``
+    they use ``FILE_EDIT_SYNTAX_BUCKET`` and higher ``check()``
     thresholds than deterministic match failures.
     """
     if 'syntax validation failed' in (content or '').lower():
-        return START_FILE_EDIT_SYNTAX_TOOL_NAME
-    return START_FILE_EDIT_TOOL_NAME
+        return FILE_EDIT_SYNTAX_BUCKET
+    return FILE_EDIT_BUCKET
 
 
 @dataclass
@@ -268,9 +267,9 @@ class CircuitBreaker:
             )
 
         # 2.5 Deterministic same-tool failures (file-edit taxonomy)
-        str_replace_hard = self.get_tool_error_count(START_FILE_EDIT_TOOL_NAME)
+        str_replace_hard = self.get_tool_error_count(FILE_EDIT_BUCKET)
         str_replace_syntax = self.get_tool_error_count(
-            START_FILE_EDIT_SYNTAX_TOOL_NAME
+            FILE_EDIT_SYNTAX_BUCKET
         )
 
         # Syntax rejects: much higher budget than match-not-found / path /
@@ -332,7 +331,7 @@ class CircuitBreaker:
             tool_name: Optional tool name for per-tool tracking
 
         """
-        if tool_name != START_FILE_EDIT_SYNTAX_TOOL_NAME:
+        if tool_name != FILE_EDIT_SYNTAX_BUCKET:
             self.consecutive_errors += 1
         self.recent_errors.append(str(error))
         self.recent_actions_success.append(False)
@@ -364,66 +363,15 @@ class CircuitBreaker:
             self.consecutive_errors = max(0, self.consecutive_errors - decay)
         self.recent_actions_success.append(True)
         if tool_name and tool_name not in (
-            START_FILE_EDIT_TOOL_NAME,
-            START_FILE_EDIT_SYNTAX_TOOL_NAME,
+            FILE_EDIT_BUCKET,
+            FILE_EDIT_SYNTAX_BUCKET,
         ):
-            if decay <= 0:
-                self._per_tool_errors.pop(tool_name, None)
-            else:
-                cur = self._per_tool_errors.get(tool_name, 0)
-                if cur <= decay:
-                    self._per_tool_errors.pop(tool_name, None)
-                else:
-                    self._per_tool_errors[tool_name] = cur - decay
-        elif tool_name in (
-            START_FILE_EDIT_TOOL_NAME,
-            START_FILE_EDIT_SYNTAX_TOOL_NAME,
-        ):
-            if decay <= 0:
-                self._per_tool_errors.pop(START_FILE_EDIT_TOOL_NAME, None)
-                self._per_tool_errors.pop(START_FILE_EDIT_SYNTAX_TOOL_NAME, None)
-            else:
-                for key in (
-                    START_FILE_EDIT_TOOL_NAME,
-                    START_FILE_EDIT_SYNTAX_TOOL_NAME,
-                ):
-                    cur = self._per_tool_errors.get(key, 0)
-                    if cur <= decay:
-                        self._per_tool_errors.pop(key, None)
-                    else:
-                        self._per_tool_errors[key] = cur - decay
-
-    def get_tool_error_count(self, tool_name: str) -> int:
-        """Return consecutive error count for a specific tool type."""
-        return self._per_tool_errors.get(tool_name, 0)
-
-    def record_high_risk_action(self, risk_level: ActionSecurityRisk) -> None:
-        """Record a high-risk action.
-
-        Args:
-            risk_level: Risk level of the action
-
-        """
-        if risk_level == ActionSecurityRisk.HIGH:
-            self.high_risk_action_count += 1
-
-    def record_stuck_detection(self) -> None:
-        """Record a stuck loop detection."""
-        self.stuck_detection_count += 1
-        logger.warning('Stuck detection #%s recorded', self.stuck_detection_count)
-
-    def record_progress_signal(self, note: str) -> None:
-        """Proactively decrement the stuck loop detection count when LLM signals progress."""
-        old_count = self.stuck_detection_count
-        self.stuck_detection_count = max(
-            0, self.stuck_detection_count - DEFAULT_STUCK_PROGRESS_SIGNAL_DECREMENT
-        )
-        logger.info(
-            'Progress signal received: %r. Reduced stuck_detection_count from %d to %d.',
-            note,
-            old_count,
-            self.stuck_detection_count,
-        )
+            logger.info(
+                'Progress signal received: %r. Reduced stuck_detection_count from %d to %d.',
+                note,
+                old_count,
+                self.stuck_detection_count,
+            )
 
     def adapt(self, complexity: float, max_iterations: int) -> None:
         """Adapt thresholds to task complexity and iteration budget.

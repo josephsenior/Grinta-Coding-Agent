@@ -157,7 +157,7 @@ _BLOCK_MSG = (
     'SECURITY POLICY: Shell-based file writes to project source files are restricted to prevent '
     'accidental corruption and bypass of validation. Please use the dedicated editor tools instead:\n'
     '- `create_file` or `insert_text` for direct file creation and insertion.\n'
-    '- `start_file_edit` for raw-content edit transactions such as `replace_range` or `edit_symbol`.\n'
+    '- `edit_symbol`, `replace_range`, or an EDIT_FILE block for file modifications.\n'
     '- `find_symbol` and `rename_symbol` for symbol-aware navigation and renames.\n'
     'Direct shell commands like `Set-Content`, `Out-File`, `tee`, or `>` / `>>` are only allowed for '
     '`.log` / `.tmp` files or files in temporary directories. To allow shell-level writes, set '

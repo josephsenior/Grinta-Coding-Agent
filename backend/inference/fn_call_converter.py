@@ -57,7 +57,6 @@ from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_names import (
     CREATE_FILE_TOOL_NAME,
     FINISH_TOOL_NAME,
-    START_FILE_EDIT_TOOL_NAME,
 )
 from backend.inference.tool_result_format import (
     TOOL_RESULT_BLOCK_PREFIX,
@@ -178,10 +177,6 @@ TOOL_EXAMPLES = {
     'create_file': {
         'create': "\nASSISTANT:\nThere is no app.py in the current directory. Let me create it:\n<function=create_file>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=security_risk>LOW</parameter>\n<parameter=file_text>\nfrom flask import Flask\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    numbers = list(range(1, 11))\n    return str(numbers)\n\nif __name__ == '__main__':\n    app.run(port=5000)\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [create_file]:\nFile created successfully at: /workspace/app.py",
     },
-    'start_file_edit': {
-        'replace_range': "\nASSISTANT:\nLet me start a line-range edit:\n<function=start_file_edit>\n<parameter=operation>replace_range</parameter>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=security_risk>LOW</parameter>\n<parameter=start_line>7</parameter>\n<parameter=end_line>7</parameter>\n</function>\n",
-        'edit_symbol': "\nASSISTANT:\nLet me start a symbol edit:\n<function=start_file_edit>\n<parameter=operation>edit_symbol</parameter>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=security_risk>LOW</parameter>\n<parameter=symbol_name>index</parameter>\n</function>\n",
-    },
     'browser': {
         'view_page': "\nASSISTANT:\nLet me check how the page looks in the browser:\n<function=browser>\n<parameter=code>\ngoto('http://127.0.0.1:5000')\nnoop(1000)  # Wait for page to load\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [browser]:\n[Browser shows the numbers in a table format]\n",
     },
@@ -190,32 +185,11 @@ TOOL_EXAMPLES = {
     },
 }
 
-_FILE_EDITOR_XML_BLOCK_RE = re.compile(
-    r'<function=start_file_edit>.*?</function>',
-    re.DOTALL | re.IGNORECASE,
-)
-
 # Commands injected into hybrid FILE_EDITING_TOOL_FORMAT (beyond the inline create stub).
 FILE_EDITOR_PROMPT_XML_COMMANDS: tuple[str, ...] = (
     'replace_range',
     'edit_symbol',
 )
-
-
-def format_file_editor_xml_examples_for_prompt(
-    commands: tuple[str, ...] | None = None,
-) -> str:
-    """Return pseudo-XML call blocks from TOOL_EXAMPLES for hybrid prompt injection."""
-    keys = commands or FILE_EDITOR_PROMPT_XML_COMMANDS
-    examples = TOOL_EXAMPLES.get('start_file_edit', {})
-    sections: list[str] = []
-    for key in keys:
-        raw = examples.get(key, '')
-        match = _FILE_EDITOR_XML_BLOCK_RE.search(raw)
-        if not match:
-            continue
-        sections.append(f'### Example: command={key}\n{match.group(0).strip()}\n')
-    return '\n'.join(sections)
 
 
 def get_example_for_tools(tools: list[dict]) -> str:
@@ -289,7 +263,6 @@ def _get_tool_name_mapping() -> dict[str, str]:
         'execute_bash': TERMINAL_EXAMPLE_KEY,
         'execute_powershell': TERMINAL_EXAMPLE_KEY,
         CREATE_FILE_TOOL_NAME: 'create_file',
-        START_FILE_EDIT_TOOL_NAME: 'start_file_edit',
         FINISH_TOOL_NAME: 'finish',
     }
 
@@ -342,7 +315,6 @@ class ExampleStepBuilder:
         self._add_server_run_step()
         self._add_page_view_step()
         self._add_server_kill_step()
-        self._add_file_edit_step()
         self._add_server_rerun_step()
         self._add_finish_step()
         return self.example
@@ -378,11 +350,6 @@ class ExampleStepBuilder:
         """Add server kill step if terminal command tool is available."""
         if self._has_terminal_tool():
             self.example += TOOL_EXAMPLES[TERMINAL_EXAMPLE_KEY]['kill_server']
-
-    def _add_file_edit_step(self) -> None:
-        """Add file edit step based on available editors."""
-        if 'start_file_edit' in self.available_tools:
-            self.example += TOOL_EXAMPLES['start_file_edit']['replace_range']
 
     def _add_server_rerun_step(self) -> None:
         """Add server rerun step if terminal command tool is available."""

@@ -848,14 +848,14 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
                     'new_body': action.new_str,
                     'line_number': payload.get('line_number'),
                 },
-                tool_name='start_file_edit',
+                tool_name='edit_symbol',
             )
         elif command == 'edit_symbols':
             outcome = _handle_edit_symbols_command(
                 editor,
                 str(resolved),
                 {'edits': payload.get('edits')},
-                tool_name='start_file_edit',
+                tool_name='edit_symbols',
             )
         else:
             return ErrorObservation(f'Unsupported structured file edit command: {command}')

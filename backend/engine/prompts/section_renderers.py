@@ -293,13 +293,13 @@ def _render_system_capabilities(
     if multi_edit_available:
         multi_edit_line = (
             '- **Atomic multi-file edits**: AVAILABLE. '
-            '`start_file_edit` is the preferred path for file edits; '
-            'atomic multi-edit is not part of the editor-mode protocol. '
+            'Use EDIT_FILE blocks in AGENT mode for raw-content edits; '
+            'atomic multi-edit is available via the `multi_edit` command. '
             'Use it instead of sequential edits when the changes must succeed as a unit.'
         )
     else:
         multi_edit_line = (
-            '- **Atomic multi-file edits**: not exposed in this build — use `start_file_edit` `replace_range` '
+            '- **Atomic multi-file edits**: not exposed in this build — use `replace_range` via tool calls or EDIT_FILE blocks '
             'sequentially'
             + (
                 ' and take a `checkpoint` before the batch for coarse rollback.'
@@ -391,7 +391,7 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
             '- **Language servers (LSP / `lsp`)**: detected on PATH → '
             f'{", ".join(lsp_available)}. Use `lsp` for definition / '
             'references / hover / diagnostics on these languages. '
-            'For file edits use `start_file_edit`; `lsp` is read-only. For file reads use `read_file`.'
+            'For file edits use tool calls or EDIT_FILE blocks in AGENT mode; `lsp` is read-only. For file reads use `read_file`.'
         )
     else:
         lsp_line = (
@@ -434,7 +434,7 @@ def _render_security(cli_mode: bool = True) -> str:
     return (
         '# 🔐 Security Risk Policy\n'
         '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
-        '`browser`, `start_file_edit`, and the file tools `read_file`, `create_file`, '
+        '`browser`, and the file tools `read_file`, `create_file`, '
         '`undo_last_edit`, `find_symbol`, `read_symbol`, and `rename_symbol`. '
         'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
         'The server may escalate your risk label; it never lowers it. Missing or invalid values '
@@ -475,7 +475,7 @@ def _render_autonomy(
         "Plan, execute, and verify the user's task end-to-end. The runtime may "
         'interrupt a tool call to surface a user decision; treat that decision as '
         'authoritative and continue from where you stopped. On tool failure, pivot '
-        'to an alternative tool in the same turn (e.g. symbol lookup \u2192 `replace_range` via `start_file_edit`) '
+        'to an alternative tool in the same turn (e.g. symbol lookup \u2192 file edit via EDIT_FILE block or tool call) '
         'and auto-retry recoverable errors before reporting back.'
         f'{cp_line}\n</AUTONOMY>'
     )

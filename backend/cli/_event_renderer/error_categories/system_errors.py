@@ -25,7 +25,7 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
             summary='A range edit is missing start_line or end_line.',
             steps=(
                 'Add both start_line and end_line as integers (1-based, inclusive), plus the replacement content.',
-                'Use `start_file_edit` with `operation="replace_range"` and those line bounds.',
+                'Use `replace_range` via tool call or EDIT_FILE block with those line bounds.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-TE-001',
@@ -36,8 +36,8 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='A legacy edit command is missing its edit_mode.',
             steps=(
-                'Use `start_file_edit` instead of the retired edit command.',
-                'For line edits, use `operation="replace_range"` with start_line and end_line.',
+                'Use the `edit` command with `edit_mode=range` or an EDIT_FILE block instead of the retired edit format.',
+                'For line edits, use `replace_range` with start_line and end_line.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-TE-002',
@@ -48,7 +48,7 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='The edit arguments did not match a valid file-edit path.',
             steps=(
-                'If using `start_file_edit`, check that the operation and required metadata are present.',
+                'Check that the operation and required metadata are present.',
                 'Re-read the file first, then retry with the correct parameter set.',
             ),
             omit_summary_in_recovery=False,
@@ -62,7 +62,7 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
             steps=(
                 'Provide all three: start_line (int, 1-based), end_line (int, inclusive), '
                 'and the replacement source text.',
-                'Use `start_file_edit` with `operation="replace_range"` and the target path.',
+                'Use `replace_range` via tool call or EDIT_FILE block with the target path.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-SE-001',

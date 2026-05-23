@@ -62,7 +62,6 @@ class ActionType(str, Enum):
     READ = 'read'
     WRITE = 'write'
     EDIT = 'edit'
-    START_FILE_EDIT = 'start_file_edit'
     RUN = 'run'
     TERMINAL_RUN = 'terminal_run'
     TERMINAL_INPUT = 'terminal_input'

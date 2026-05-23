@@ -105,7 +105,6 @@ def _deserialize_action(data: dict[str, Any]) -> ActionSchemaUnion:
         MessageActionSchema,
         NullActionSchema,
         PlaybookFinishActionSchema,
-        StartFileEditActionSchema,
         SystemMessageActionSchema,
     )
 
@@ -117,7 +116,6 @@ def _deserialize_action(data: dict[str, Any]) -> ActionSchemaUnion:
         'read': FileReadActionSchema,
         'write': FileWriteActionSchema,
         'edit': FileEditActionSchema,
-        'start_file_edit': StartFileEditActionSchema,
         'run': CmdRunActionSchema,
         'message': MessageActionSchema,
         'system': SystemMessageActionSchema,

@@ -521,14 +521,6 @@ def _enforce_xml_compliance(
 
 
 def _xml_format_error_example(tool_name: str) -> str:
-    if tool_name == 'start_file_edit':
-        return (
-            f'  <function={tool_name}>\n'
-            f'  <parameter=operation>replace_range</parameter>\n'
-            f'  <parameter=path>/path/to/file</parameter>\n'
-            f'  <parameter=security_risk>LOW</parameter>\n'
-            f'  </function>'
-        )
     return (
         f'  <function={tool_name}>\n'
         f'  <parameter=command>command_name</parameter>\n'
