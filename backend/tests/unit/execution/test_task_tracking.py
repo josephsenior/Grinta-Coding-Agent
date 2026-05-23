@@ -68,7 +68,7 @@ class TestTaskTrackingMixin(TestCase):
         self.mixin.event_stream.file_store.read.assert_called_once()
         result_obs = cast(TaskTrackingObservation, result)
         self.assertIn('On disk', result_obs.content)
-        self.assertEqual(result_obs.task_list, [])
+        self.assertEqual(result_obs.task_list, hydrated)
 
     def test_handle_task_tracking_view_command(self):
         """Test handling task view command."""
@@ -86,6 +86,7 @@ class TestTaskTrackingMixin(TestCase):
             result.content,
             stored_content + '\n\n→ Now implement the first todo (⏳) task.',
         )
+        self.assertEqual(result_obs.task_list, [])
         self.mixin.event_stream.file_store.read.assert_called_once()
 
     def test_handle_task_tracking_unknown_command(self):
@@ -175,6 +176,20 @@ class TestTaskTrackingMixin(TestCase):
             stored_content + '\n\n→ Now implement the first todo (⏳) task.',
         )
         self.assertEqual(result_obs.task_list, [])
+
+    def test_handle_task_view_action_preserves_hydrated_task_list(self):
+        """View responses should carry the hydrated plan so UI sidebars do not clear."""
+        hydrated = [{'id': '1', 'description': 'Persisted task', 'status': 'doing'}]
+        action = TaskTrackingAction(command='view', task_list=hydrated)
+        task_file_path = '/path/to/TASKS.md'
+        stored_content = '# Task List\n\n1. 🔄 Persisted task\n'
+        self.mixin.event_stream.file_store.read.return_value = stored_content
+
+        result = self.mixin._handle_task_view_action(action, task_file_path)
+
+        self.assertIsInstance(result, TaskTrackingObservation)
+        result_obs = cast(TaskTrackingObservation, result)
+        self.assertEqual(result_obs.task_list, hydrated)
 
     def test_handle_task_view_action_file_not_found(self):
         """Test task view action when file doesn't exist."""

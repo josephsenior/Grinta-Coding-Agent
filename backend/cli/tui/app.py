@@ -3721,7 +3721,8 @@ class TUIRenderer:
                 Text(f'  [bold #91abec]Downloaded[/] {url}', style=NAVY_TEXT_PRIMARY)
             )
         elif isinstance(event, TaskTrackingObservation):
-            if event.task_list:
+            command = str(getattr(event, 'command', '') or '').strip().lower()
+            if event.task_list or command != 'view':
                 self._task_list = event.task_list
                 self._refresh_display()
         elif isinstance(event, StreamingChunkAction):
@@ -3737,7 +3738,8 @@ class TUIRenderer:
         elif isinstance(event, EscalateToHumanAction):
             self._tui.add_communicate_escalate(event)
         elif isinstance(event, TaskTrackingAction):
-            if event.task_list is not None:
+            command = str(getattr(event, 'command', '') or '').strip().lower()
+            if event.task_list or command != 'view':
                 self._task_list = event.task_list
                 self._refresh_display()
         else:
