@@ -738,7 +738,13 @@ class TreeSitterEditor:
         for node in reversed(occurrences):
             start_byte = node.start_byte
             end_byte = node.end_byte
-            new_code = new_code[:start_byte] + new_name + new_code[end_byte:]
+            if node.type in ('string', 'string_content', 'comment'):
+                node_slice = new_code[start_byte:end_byte]
+                updated = node_slice.replace(old_name, new_name)
+                if updated != node_slice:
+                    new_code = new_code[:start_byte] + updated + new_code[end_byte:]
+            else:
+                new_code = new_code[:start_byte] + new_name + new_code[end_byte:]
 
         # Normalize CRLF -> LF early so validation sees a consistent EOL style
         new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
@@ -1203,10 +1209,14 @@ class TreeSitterEditor:
                 node: Tree-sitter node to visit
 
             """
-            # Check if this is an identifier matching our symbol
+            node_text = file_bytes[node.start_byte : node.end_byte].decode('utf-8')
+
             if node.type in ['identifier', 'name', 'property_identifier']:
-                node_text = file_bytes[node.start_byte : node.end_byte].decode('utf-8')
                 if node_text == symbol_name:
+                    occurrences.append(node)
+
+            elif node.type in ('string', 'string_content', 'comment'):
+                if symbol_name in node_text:
                     occurrences.append(node)
 
             # Recurse
