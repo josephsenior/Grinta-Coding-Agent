@@ -47,7 +47,6 @@ from backend.engine.tools import (
     create_undo_last_edit_tool,
 
     create_finish_tool,
-    create_start_file_edit_tool,
     create_summarize_context_tool,
 )
 from backend.engine.tools.symbol_editor_tool import create_symbol_editor_tool
@@ -95,7 +94,6 @@ from backend.inference.tool_names import (
     FIND_SYMBOL_TOOL_NAME,
     READ_FILE_TOOL_NAME,
     RENAME_SYMBOL_TOOL_NAME,
-    START_FILE_EDIT_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
 )
@@ -108,7 +106,6 @@ from backend.ledger.action import (
     FileReadAction,
     MessageAction,
     PlaybookFinishAction,
-    StartFileEditAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import CondensationRequestAction
@@ -1900,44 +1897,6 @@ def _handle_communicate_tool(arguments: Mapping[str, Any]) -> Action:
 
 
 
-def _handle_start_file_edit_tool(arguments: Mapping[str, Any]) -> Action:
-    """Handle metadata-only file edit transaction starter."""
-    from backend.engine.file_edit_protocol import (
-        reject_content_fields,
-        validate_start_file_edit_metadata,
-    )
-
-    tool_name = cast(
-        str, create_start_file_edit_tool().get('function', {}).get('name', '')
-    )
-    operation = require_tool_argument(arguments, 'operation', tool_name)
-    operation = str(operation).strip().lower()
-    normalized_args = dict(arguments)
-    reject_content_fields(normalized_args)
-    validate_security_risk(normalized_args, tool_name)
-
-    path = normalized_args.get('path')
-    if operation == 'multi_edit' and not path:
-        path = '<batch>'
-    if not path:
-        raise FunctionCallValidationError(
-            f'Missing required argument "path" in tool call {tool_name}'
-        )
-    path = str(path)
-    metadata = {
-        k: v
-        for k, v in normalized_args.items()
-        if k not in {'operation', 'path'}
-    }
-    validate_start_file_edit_metadata(operation, path, metadata)
-
-    action = StartFileEditAction(
-        path=path,
-        operation=operation,
-        metadata=metadata,
-    )
-    set_security_risk(action, normalized_args)
-    return action
 
 
 
@@ -1966,7 +1925,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         cast(
             str, create_find_symbol_tool().get('function', {}).get('name', '')
         ): _handle_find_symbol_tool,
-        START_FILE_EDIT_TOOL_NAME: _handle_start_file_edit_tool,
         cast(
             str, create_summarize_context_tool().get('function', {}).get('name', '')
         ): _handle_summarize_context_tool,

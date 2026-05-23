@@ -22,7 +22,6 @@ from .meta_cognition import (
 )
 from .read_symbol import create_read_symbol_tool
 from .search_code import create_search_code_tool
-from .start_file_edit import create_start_file_edit_tool
 from .task_tracker import create_task_tracker_tool
 from .terminal_manager import create_terminal_manager_tool
 
@@ -43,7 +42,6 @@ __all__ = [
     'create_analyze_project_structure_tool',
     'create_read_symbol_tool',
     'create_search_code_tool',
-    'create_start_file_edit_tool',
     'create_cmd_run_tool',
     'create_browser_tool',
     'create_task_tracker_tool',
