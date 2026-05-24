@@ -103,7 +103,7 @@ def _filter_sessions_fuzzy(
     sessions: list[tuple[str, dict[str, Any], int]],
     search_term: str,
 ) -> list[tuple[str, dict[str, Any], int]]:
-    """Filter sessions using fuzzy matching on title and model."""
+    """Filter sessions using fuzzy matching on id, title, and model."""
     try:
         from rapidfuzz import fuzz
     except ImportError:
@@ -111,7 +111,8 @@ def _filter_sessions_fuzzy(
         return [
             s
             for s in sessions
-            if search_lower in str(s[1].get('title', '') or '').lower()
+            if search_lower in s[0].lower()
+            or search_lower in str(s[1].get('title', '') or '').lower()
             or search_lower in str(s[1].get('name', '') or '').lower()
             or search_lower in str(s[1].get('llm_model', '') or '').lower()
         ]
@@ -121,12 +122,14 @@ def _filter_sessions_fuzzy(
 
     for session in sessions:
         sid, meta, count = session
+        sid_lower = sid.lower()
         title = str(meta.get('title') or meta.get('name') or '').lower()
         model = str(meta.get('llm_model') or '').lower()
 
+        sid_score = fuzz.partial_ratio(search_lower, sid_lower)
         title_score = fuzz.partial_ratio(search_lower, title)
         model_score = fuzz.partial_ratio(search_lower, model)
-        max_score = max(title_score, model_score)
+        max_score = max(sid_score, title_score, model_score)
 
         if max_score > 50:
             scored.append((int(100 - max_score), session))

@@ -530,8 +530,13 @@ GrintaHelpDialog {
     border: round #1e293b;
     padding: 2 4;
     width: 92;
-    max-height: 36;
+    height: auto;
+    max-height: 42;
     align: center middle;
+}
+
+#sessions-dialog {
+    max-height: 40;
 }
 
 #settings-dialog .title,
@@ -614,13 +619,14 @@ GrintaHelpDialog {
 }
 
 #sessions-table {
-    height: 14;
+    height: 12;
     margin-bottom: 1;
     border: none;
 }
 
 #sessions-preview {
-    height: 12;
+    height: auto;
+    max-height: 10;
     border: round #1e293b;
     padding: 1 2;
     background: #060a14;
