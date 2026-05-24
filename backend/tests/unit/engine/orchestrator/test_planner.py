@@ -360,13 +360,13 @@ class TestBuildLlmParams:
         )
         assert 'File API mental model' in joined
         assert '`read`' in joined
+        assert 'find_symbols' in joined
         assert '`create`' in joined
         assert 'replace_string' in joined
         stale_tool_names = (
             'read_file',
             'read_range',
             'read_symbol',
-            'find_symbols',
             'create_file',
             'replace_symbol',
             'insert_symbol',

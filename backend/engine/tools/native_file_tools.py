@@ -16,6 +16,7 @@ from backend.engine.tools.common import (
 from backend.inference.tool_names import (
     CREATE_TOOL_NAME,
     EDIT_SYMBOLS_TOOL_NAME,
+    FIND_SYMBOLS_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
     READ_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
@@ -26,15 +27,15 @@ def create_read_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=READ_TOOL_NAME,
         description=(
-            'Read file, line range, symbol content, or symbol candidates. '
-            'For symbols, path is optional; unique symbols may be auto-resolved, '
-            'and ambiguous symbols return candidates.'
+            'Read a file, line range, or one or more symbol bodies. Symbol reads are '
+            'read-only: path is optional, unique symbols may be auto-resolved, and '
+            'ambiguous symbols return candidates instead of guessed content.'
         ),
         properties={
             'type': {
                 'type': 'string',
-                'enum': ['file', 'range', 'symbol', 'symbols'],
-                'description': 'Read kind: file, range, symbol body, or symbol candidates.',
+                'enum': ['file', 'range', 'symbols'],
+                'description': 'Read kind: complete file, line range, or one/more symbol bodies.',
             },
             'path': get_path_param('Optional project-relative path. Required for file/range reads.'),
             'start_line': {
@@ -47,15 +48,33 @@ def create_read_tool() -> ChatCompletionToolParam:
             },
             'symbol_id': {
                 'type': 'string',
-                'description': 'Optional stable symbol id returned by read(type="symbols").',
+                'description': 'Optional stable symbol id returned by find_symbols or read(type="symbols").',
             },
             'symbol_name': {
                 'type': 'string',
-                'description': 'Symbol name for type=symbol or type=symbols.',
+                'description': 'Single symbol name for type=symbols when symbols[] is omitted.',
             },
             'query': {
                 'type': 'string',
                 'description': 'Alias for symbol_name when type=symbols.',
+            },
+            'symbols': {
+                'type': 'array',
+                'description': (
+                    'One or more symbol targets for type=symbols. Each item may be an object '
+                    'with symbol_id or symbol_name plus optional path/kind/parent/occurrence.'
+                ),
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                        'symbol_id': {'type': 'string'},
+                        'symbol_name': {'type': 'string'},
+                        'path': {'type': 'string'},
+                        'symbol_kind': {'type': 'string'},
+                        'parent_symbol': {'type': 'string'},
+                        'occurrence': {'type': 'integer'},
+                    },
+                },
             },
             'symbol_kind': {
                 'type': 'string',
@@ -76,6 +95,35 @@ def create_read_tool() -> ChatCompletionToolParam:
             'security_risk': get_security_risk_param(),
         },
         required=['type', 'security_risk'],
+    )
+
+
+def create_find_symbols_tool() -> ChatCompletionToolParam:
+    return create_tool_definition(
+        name=FIND_SYMBOLS_TOOL_NAME,
+        description=(
+            'Discover matching code symbols without reading full symbol bodies or modifying files. '
+            'Use this when you know a symbol name but need candidate paths, parents, kinds, or line ranges.'
+        ),
+        properties={
+            'query': {
+                'type': 'string',
+                'description': 'Symbol name or substring to find.',
+            },
+            'path': get_path_param(
+                'Optional project-relative file path to search. If omitted, searches common source files.'
+            ),
+            'symbol_kind': {
+                'type': 'string',
+                'description': 'Optional kind filter: function, class, or method.',
+            },
+            'include_private': {
+                'type': 'boolean',
+                'description': 'Whether to include private/underscore-prefixed symbols.',
+            },
+            'security_risk': get_security_risk_param(),
+        },
+        required=['query', 'security_risk'],
     )
 
 
@@ -230,6 +278,7 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
 __all__ = [
     'create_create_tool',
     'create_edit_symbols_tool',
+    'create_find_symbols_tool',
     'create_multiedit_tool',
     'create_read_tool',
     'create_replace_string_tool',

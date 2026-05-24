@@ -127,6 +127,7 @@ class TestFeatureFlagToolPresence:
         names = _build_toolset(enable_editor=True)
         public_file_tools = {
             'read',
+            'find_symbols',
             'create',
             'replace_string',
             'edit_symbols',
@@ -141,7 +142,6 @@ class TestFeatureFlagToolPresence:
             'overwrite_file',
             'read_file',
             'read_range',
-            'find_symbols',
             'read_symbol',
             'create_file',
             'create_symbol',

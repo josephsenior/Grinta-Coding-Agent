@@ -12,6 +12,7 @@ from .lsp_query import create_lsp_query_tool
 from .native_file_tools import (
     create_create_tool,
     create_edit_symbols_tool,
+    create_find_symbols_tool,
     create_multiedit_tool,
     create_read_tool,
     create_replace_string_tool,
@@ -33,6 +34,7 @@ __all__ = [
     'create_lsp_query_tool',
     'create_create_tool',
     'create_edit_symbols_tool',
+    'create_find_symbols_tool',
     'create_multiedit_tool',
     'create_read_tool',
     'create_replace_string_tool',
