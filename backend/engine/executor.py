@@ -1296,15 +1296,16 @@ class OrchestratorExecutor:
 
         mode = self._get_agent_mode()
         if mode in ('chat', 'ask'):
-            # ASK mode: plain text is allowed — nothing to gate.
             return actions
 
-        # Only intercept responses that resolved to a sole MessageAction.
-        # Responses with real tool-call actions bypass gating entirely.
         if not actions or not all(isinstance(a, _MessageAction) for a in actions):
             return actions
 
-        return actions
+        logger.warning(
+            'Agent mode plain-text gate: blocking plain text response in agent mode. '
+            'The model must use tool calls (communicate_with_user, finish, or work tools).'
+        )
+        return []
 
     def _response_to_actions(self, response: ModelResponse) -> list[Action]:
         mcp_tools = self._mcp_tools_provider()
