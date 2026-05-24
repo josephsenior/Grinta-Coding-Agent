@@ -35,19 +35,19 @@ def test_should_compact_when_over_max() -> None:
     assert c.should_compact(View(events=[_event(1)])) is False
 
 
-def test_get_compaction_prunes_middle_events() -> None:
+async def test_get_compaction_prunes_middle_events() -> None:
     c = AmortizedPruningCompactor(max_size=6, keep_first=1)
     events = [_event(i) for i in range(10)]
     view = View(events=events)
-    comp = c.get_compaction(view)
+    comp = await c.get_compaction(view)
     assert isinstance(comp, Compaction)
     assert len(comp.action.pruned_event_ids) >= 1  # type: ignore[arg-type]
 
 
-def test_compact_returns_view_when_under_threshold() -> None:
+async def test_compact_returns_view_when_under_threshold() -> None:
     c = AmortizedPruningCompactor(max_size=100, keep_first=0)
     v = View(events=[_event(1)])
-    out = c.compact(v)
+    out = await c.compact(v)
     assert out is v
 
 

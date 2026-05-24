@@ -166,7 +166,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             msg = 'LLM must support function calling to use StructuredSummaryCompactor'
             raise ValueError(msg)
 
-    def get_compaction(self, view: View) -> Compaction:
+    async def get_compaction(self, view: View) -> Compaction:
         """Generate condensation from view by summarizing pruned events.
 
         If the LLM call fails (network, rate-limit, provider outage), fall
@@ -181,7 +181,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
 
         # Get summary from LLM, with degraded fallback
         try:
-            summary = self._get_llm_summary(prompt)
+            summary = await self._get_llm_summary(prompt)
             summary_text = str(summary)
         except Exception as e:
             logger.warning(
@@ -290,12 +290,12 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
 
         return base_prompt
 
-    def _get_llm_summary(self, prompt: str) -> StateSummary:
+    async def _get_llm_summary(self, prompt: str) -> StateSummary:
         """Get summary from LLM using tool calling."""
         assert self.llm is not None, 'LLM required for structured summary compactor'
         messages = [Message(role='user', content=[TextContent(text=prompt)])]
 
-        response = self.llm.completion(
+        response = await self.llm.acompletion(
             messages=self.llm.format_messages_for_llm(messages),
             tools=[StateSummary.tool_description()],
             tool_choice={

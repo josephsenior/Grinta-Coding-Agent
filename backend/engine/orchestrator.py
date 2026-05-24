@@ -349,7 +349,8 @@ class Orchestrator(Agent):
             )
             if shrunk == 0 and dropped == 0:
                 return None
-            condensed = self.memory_manager.condense_history(state)
+            self._emit_compaction_status()
+            condensed = await self.memory_manager.condense_history(state)
             return await self._execute_llm_step_async(state, condensed)
         except ContextLimitError:
             logger.error('Graceful degradation insufficient — context still overflows')
@@ -359,6 +360,21 @@ class Orchestrator(Agent):
                 'Graceful degradation raised unexpectedly: %s', exc, exc_info=True
             )
             return None
+
+    def _emit_compaction_status(self) -> None:
+        """Emit a compaction status event so the TUI shows progress."""
+        if self.event_stream is None:
+            return
+        try:
+            from backend.ledger.observation import StatusObservation
+
+            status = StatusObservation(
+                content='Compacting context...',
+                status_type='compaction',
+            )
+            self.event_stream.add_event(status, EventSource.AGENT)
+        except Exception:
+            logger.debug('Failed to emit compaction status', exc_info=True)
 
     def _reset_step_recovery_counters(self) -> None:
         """Clear context-limit and recoverable tool-call replay counters."""
@@ -379,7 +395,8 @@ class Orchestrator(Agent):
             self._reset_step_recovery_counters()
             return pending
 
-        condensed = self.memory_manager.condense_history(state)
+        self._emit_compaction_status()
+        condensed = await self.memory_manager.condense_history(state)
         action = await self._execute_llm_step_async(state, condensed)
         self._reset_step_recovery_counters()
         return action
@@ -405,7 +422,8 @@ class Orchestrator(Agent):
             ) from None
 
         try:
-            condensed = self.memory_manager.condense_history(state)
+            self._emit_compaction_status()
+            condensed = await self.memory_manager.condense_history(state)
             action = await self._execute_llm_step_async(state, condensed)
             self._consecutive_context_errors = 0
             return action

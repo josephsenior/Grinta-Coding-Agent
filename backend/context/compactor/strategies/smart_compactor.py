@@ -72,7 +72,7 @@ class SmartCompactor(BaseLLMCompactor):
             'recency_bonus_window': getattr(config, 'recency_bonus_window', 20),
         }
 
-    def get_compaction(self, view: View) -> Compaction:
+    async def get_compaction(self, view: View) -> Compaction:
         """Apply LLM-assisted condensation.
 
         Args:
@@ -92,7 +92,7 @@ class SmartCompactor(BaseLLMCompactor):
         essential_event_ids = self._identify_essential_events(events)
 
         # Score importance of remaining events
-        importance_scores = self._score_event_importance(events, essential_event_ids)
+        importance_scores = await self._score_event_importance(events, essential_event_ids)
 
         # Determine which events to keep
         events_to_keep = self._select_events_to_keep(
@@ -230,7 +230,7 @@ class SmartCompactor(BaseLLMCompactor):
         legacy_content = getattr(event, 'content', '') or ''
         return f'{task_json}\n{event.thought or ""}\n{legacy_content}'
 
-    def _score_event_importance(
+    async def _score_event_importance(
         self,
         events: list[Event],
         essential_ids: set[int],
@@ -261,7 +261,7 @@ class SmartCompactor(BaseLLMCompactor):
         batch_size = 20
         for i in range(0, len(events_to_score), batch_size):
             batch = events_to_score[i : i + batch_size]
-            batch_scores = self._score_event_batch_with_llm(batch)
+            batch_scores = await self._score_event_batch_with_llm(batch)
             scores.update(batch_scores)
 
         return scores
@@ -295,7 +295,7 @@ class SmartCompactor(BaseLLMCompactor):
             return 0.6
         return 0.5
 
-    def _score_event_batch_with_llm(self, events: list[Event]) -> dict[int, float]:
+    async def _score_event_batch_with_llm(self, events: list[Event]) -> dict[int, float]:
         """Score a batch of events using LLM.
 
         Args:
@@ -314,7 +314,7 @@ class SmartCompactor(BaseLLMCompactor):
             prompt = self._create_scoring_prompt(events)
 
             # Get LLM response
-            response = self.llm.completion(
+            response = await self.llm.acompletion(
                 messages=[{'role': 'user', 'content': prompt}],
                 temperature=0.3,
             )

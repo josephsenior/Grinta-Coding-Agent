@@ -51,7 +51,7 @@ class RecentEventsCompactor(Compactor):
         self.max_events = max_events
         super().__init__()
 
-    def compact(self, view: View) -> View | Compaction:
+    async def compact(self, view: View) -> View | Compaction:
         """Keep only the most recent events (up to `max_events`)."""
         head = view[: self.keep_first]
         tail_length = max(0, self.max_events - len(head))

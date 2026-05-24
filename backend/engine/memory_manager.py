@@ -100,7 +100,7 @@ class ContextMemoryManager:
             return False
         return len(action.pruned) == 0
 
-    def _maybe_force_compaction_under_memory_pressure(
+    async def _maybe_force_compaction_under_memory_pressure(
         self,
         state: State,
         history: list,
@@ -125,14 +125,14 @@ class ContextMemoryManager:
                 memory_pressure,
             )
             try:
-                forced = self.compactor.get_compaction(condensation_result)
+                forced = await self.compactor.get_compaction(condensation_result)
                 condensation_result = forced
             except Exception as exc:
                 logger.warning('Forced compaction failed: %s', exc)
         state.ack_memory_pressure(source='ContextMemoryManager')
         return condensation_result
 
-    def condense_history(self, state: State) -> CondensedHistory:
+    async def condense_history(self, state: State) -> CondensedHistory:
         history = list(getattr(state, 'history', []))
         if not self.compactor:
             return CondensedHistory(history, None)
@@ -153,9 +153,9 @@ class ContextMemoryManager:
             if action:
                 action.is_prewarmed = True
         else:
-            condensation_result = self.compactor.compacted_history(state)
+            condensation_result = await self.compactor.compacted_history(state)
 
-        condensation_result = self._maybe_force_compaction_under_memory_pressure(  # type: ignore[assignment]
+        condensation_result = await self._maybe_force_compaction_under_memory_pressure(  # type: ignore[assignment]
             state, history, condensation_result
         )
         memory_pressure = self._memory_pressure_signal(state)

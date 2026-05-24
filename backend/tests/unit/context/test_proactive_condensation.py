@@ -119,14 +119,14 @@ class TestFileEventsPreserved(unittest.TestCase):
 
         return events
 
-    def test_file_events_not_pruned(self):
+    async def test_file_events_not_pruned(self):
         """File action events are kept, so no manifest needed."""
         file_actions = {3: 'src/app/page.tsx', 5: 'src/app/layout.tsx'}
         events = self._build_real_events(20, file_actions)
 
         condenser = ConversationWindowCompactor(max_events=10)
         view = _make_view(events, unhandled=True)
-        condensation = condenser.get_compaction(view)
+        condensation = await condenser.get_compaction(view)
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])
@@ -143,13 +143,13 @@ class TestFileEventsPreserved(unittest.TestCase):
         self.assertNotIn(3, pruned)
         self.assertNotIn(5, pruned)
 
-    def test_no_summary_generated(self):
+    async def test_no_summary_generated(self):
         """Summary/manifest is no longer generated (events preserved directly)."""
         file_actions = {3: 'b.tsx', 4: 'a.tsx'}
         events = self._build_real_events(20, file_actions)
         condenser = ConversationWindowCompactor(max_events=10)
         view = _make_view(events, unhandled=True)
-        condensation = condenser.get_compaction(view)
+        condensation = await condenser.get_compaction(view)
         action = condensation.action
         self.assertIsNone(action.summary)
         self.assertIsNone(action.summary_offset)

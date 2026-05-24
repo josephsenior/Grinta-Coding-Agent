@@ -14,7 +14,7 @@ from backend.context.view import View
 class NoOpCompactor(Compactor):
     """A compactor that does nothing to the event sequence."""
 
-    def compact(self, view: View) -> View | Compaction:
+    async def compact(self, view: View) -> View | Compaction:
         """Returns the list of events unchanged."""
         return view
 

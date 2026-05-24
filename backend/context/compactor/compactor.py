@@ -121,7 +121,7 @@ class Compactor(ABC):
             self.write_metadata(state)
 
     @abstractmethod
-    def compact(self, view: View) -> View | Compaction:
+    async def compact(self, view: View) -> View | Compaction:
         """Compact a sequence of events into a potentially smaller list.
 
         New compactor strategies should override this method to implement their own compaction logic. Call `self.add_metadata` in the implementation to record any relevant per-compaction diagnostic information.
@@ -134,14 +134,14 @@ class Compactor(ABC):
 
         """
 
-    def compacted_history(self, state: State) -> View | Compaction:
+    async def compacted_history(self, state: State) -> View | Compaction:
         """Compact the state's history."""
         model_name = self.llm.config.model if hasattr(self, 'llm') else 'unknown'
         self._llm_metadata = state.to_llm_metadata(
             model_name=model_name, agent_name='compactor'
         )
         with self.metadata_batch(state):
-            return self.compact(state.view)
+            return await self.compact(state.view)
 
     @property
     def llm_metadata(self) -> dict[str, Any]:
@@ -217,7 +217,7 @@ class RollingCompactor(Compactor, ABC):
         """Determine if a view should be compacted."""
 
     @abstractmethod
-    def get_compaction(self, view: View) -> View | Compaction:
+    async def get_compaction(self, view: View) -> View | Compaction:
         """Get the compaction from a view."""
 
 
@@ -485,7 +485,7 @@ class BaseLLMCompactor(RollingCompactor, ABC):
             return True
         return False
 
-    def compact(self, view: View) -> View | Compaction:
+    async def compact(self, view: View) -> View | Compaction:
         """Compact, then compact further if thresholds are exceeded."""
         compacted = self._compactor.compact(view.events)
         if len(compacted) < len(view.events):
@@ -501,7 +501,7 @@ class BaseLLMCompactor(RollingCompactor, ABC):
             budget,
         )
         if should or budget:
-            return self.get_compaction(view)
+            return await self.get_compaction(view)
         return view
 
 
