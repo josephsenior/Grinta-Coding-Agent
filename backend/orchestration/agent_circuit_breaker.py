@@ -336,6 +336,26 @@ class CircuitBreaker:
         """Record a stuck loop detection event."""
         self.stuck_detection_count += 1
 
+    def record_progress_signal(self, note: str = '') -> None:
+        """Reduce stuck-detection pressure when a progress observation is received.
+
+        This is the sole mechanism for reducing ``stuck_detection_count``.
+        ``record_success`` handles only error-counter and per-tool decay;
+        it does **not** touch stuck detection. Only observation types listed
+        in ``_PROGRESS_OBSERVATION_TYPES`` (file edits, task tracking
+        updates, agent delegation, lsp queries) trigger this call.
+        """
+        decay = max(0, getattr(self.config, 'error_decay_per_success', 0))
+        if decay <= 0:
+            self.stuck_detection_count = 0
+        else:
+            self.stuck_detection_count = max(0, self.stuck_detection_count - decay)
+        logger.info(
+            'Progress signal received from %s. stuck_detection_count reduced to %d.',
+            note,
+            self.stuck_detection_count,
+        )
+
     def record_error(self, error: Exception, tool_name: str = '') -> None:
         """Record an error occurrence.
 
@@ -387,15 +407,6 @@ class CircuitBreaker:
                     self._per_tool_errors.pop(tool_name, None)
                 else:
                     self._per_tool_errors[tool_name] = new_count
-            old_stuck = self.stuck_detection_count
-            self.stuck_detection_count = max(0, self.stuck_detection_count - decay)
-            logger.info(
-                'Progress signal received. Reduced per-tool error count from %d to %d, stuck_detection_count from %d to %d.',
-                old_count,
-                self._per_tool_errors.get(tool_name, 0),
-                old_stuck,
-                self.stuck_detection_count,
-            )
 
     def adapt(self, complexity: float, max_iterations: int) -> None:
         """Adapt thresholds to task complexity and iteration budget.
