@@ -14,8 +14,10 @@ from backend.core.content_escape_repair import (
     RepairReport,
     _ext,
     has_literal_escape_residue,
+    looks_serialized_payload,
     repair_arguments_in_place,
     repair_literal_escapes,
+    validate_content_payloads,
 )
 
 
@@ -223,3 +225,35 @@ class TestRepairArgumentsInPlace:
         assert ('symbol_edits[0].new_body', 2) in changes
         assert args['edits'][0]['new_body'] == '<div class="foo">\n  hi\n</div>'  # type: ignore[index]
         assert args['symbol_edits'][0]['new_body'] == '<span>\n  hi\n</span>'  # type: ignore[index]
+
+
+class TestSerializedPayloadGuard:
+    def test_detects_quoted_json_string_payload(self) -> None:
+        assert looks_serialized_payload('"def hello():\\n    print(\\"hi\\")\\n"')
+
+    def test_detects_literal_newline_dominated_payload(self) -> None:
+        assert looks_serialized_payload('a\\nb\\nc\\nd')
+
+    def test_detects_markdown_fenced_payload(self) -> None:
+        assert looks_serialized_payload('```python\nprint("hi")\n```')
+
+    def test_allows_legitimate_small_escape_literals(self) -> None:
+        assert not looks_serialized_payload('print("line1\\nline2")\n')
+
+    def test_validate_content_payloads_recurses_operations(self) -> None:
+        import pytest
+
+        with pytest.raises(Exception) as excinfo:
+            validate_content_payloads(
+                {
+                    'operations': [
+                        {
+                            'command': 'replace_string',
+                            'path': 'demo.py',
+                            'new_string': '"def hello():\\n    print(\\"hi\\")\\n"',
+                        }
+                    ]
+                }
+            )
+        assert 'CONTENT_APPEARS_SERIALIZED' in str(excinfo.value)
+        assert 'operations[0].new_string' in str(excinfo.value)

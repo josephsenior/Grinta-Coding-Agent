@@ -213,31 +213,6 @@ def _compose_write_success_message(
     return output_msg
 
 
-def _attempt_escape_repair_at_disk_write(content: str, file_path: Path) -> str:
-    """Scrub literal escape residue before bytes hit disk (no-op if repair unavailable)."""
-    try:
-        from backend.core.content_escape_repair import repair_literal_escapes
-        from backend.core.logger import app_logger as _disk_logger
-
-        report = repair_literal_escapes(content, file_path)
-        if report.changed:
-            _disk_logger.warning(
-                '[escape_repair:disk] %s: scrubbed %d literal escape sequences '
-                'at write time (upstream repair missed this path)',
-                file_path,
-                report.replacements,
-            )
-            return report.content
-    except Exception:
-        try:
-            from backend.core.logger import app_logger as _disk_logger
-
-            _disk_logger.debug('escape_repair disk safety-net failed', exc_info=True)
-        except Exception:
-            pass
-    return content
-
-
 def _normalize_newlines_for_metadata(content: str, meta: _FileReadMeta) -> str:
     if meta.newline == 'crlf':
         content = content.replace('\r\n', '\n')
@@ -272,33 +247,6 @@ _GLOBAL_UNDO_HISTORY: dict[str, deque[str | None]] = defaultdict(
 )
 _GLOBAL_FILE_LOCKS: dict[str, threading.RLock] = {}
 _GLOBAL_FILE_LOCKS_GUARD = threading.Lock()
-_LARGE_CODE_OVERWRITE_LINE_THRESHOLD = 200
-_CODE_FILE_SUFFIXES = frozenset(
-    {
-        '.py',
-        '.pyi',
-        '.js',
-        '.jsx',
-        '.ts',
-        '.tsx',
-        '.go',
-        '.rs',
-        '.java',
-        '.kt',
-        '.kts',
-        '.c',
-        '.cc',
-        '.cpp',
-        '.cxx',
-        '.h',
-        '.hpp',
-        '.cs',
-        '.php',
-        '.rb',
-        '.swift',
-        '.scala',
-    }
-)
 
 
 def _canonical_lock_key(file_path: Path) -> str:
@@ -418,6 +366,8 @@ class FileEditor(FileEditorEditOpsMixin):
         file_text: str | Sentinel | None = MISSING,
         view_range: list[int] | None = None,
         new_str: str | Sentinel | None = MISSING,
+        old_string: str | None = None,
+        replace_all: bool = False,
         insert_line: int | None = None,
         start_line: int | None = None,
         end_line: int | None = None,
@@ -432,11 +382,13 @@ class FileEditor(FileEditorEditOpsMixin):
         """Execute a file editor command.
 
         Args:
-            command: Command to execute ("read_file", "insert_text", "create_file", "undo_last_edit", "edit", "write").
+            command: Command to execute ("read_file", "replace_string", "insert_text", "create_file", "undo_last_edit", "edit", "write").
             path: File path (relative to workspace_root or absolute)
             file_text: Optional file content for write/edit operations (use MISSING if not provided)
             view_range: Optional [start_line, end_line] for view command (1-indexed)
             new_str: Optional replacement string (for edit operations, use MISSING if not provided)
+            old_string: Exact string to replace for replace_string.
+            replace_all: Replace every exact old_string occurrence when true.
             insert_line: Optional line number to insert at (1-indexed)
             start_line: Optional start line number for range edit (1-indexed)
             end_line: Optional end line number for range edit (1-indexed)
@@ -468,15 +420,17 @@ class FileEditor(FileEditorEditOpsMixin):
                     file_text=file_text,
                     view_range=view_range,
                     new_str=new_str,
+                    old_string=old_string,
+                    replace_all=replace_all,
                     insert_line=insert_line,
-            start_line=start_line,
-            end_line=end_line,
-            dry_run=dry_run,
-            edit_mode=edit_mode,
-            expected_hash=expected_hash,
-            expected_file_hash=expected_file_hash,
-            overwrite_existing=overwrite_existing,
-        )
+                    start_line=start_line,
+                    end_line=end_line,
+                    dry_run=dry_run,
+                    edit_mode=edit_mode,
+                    expected_hash=expected_hash,
+                    expected_file_hash=expected_file_hash,
+                    overwrite_existing=overwrite_existing,
+                )
 
         except PathValidationError as e:
             return ToolResult(output='', error=f'Path validation error: {e.message}')
@@ -492,6 +446,8 @@ class FileEditor(FileEditorEditOpsMixin):
         file_text: str | Sentinel | None,
         view_range: list[int] | None,
         new_str: str | Sentinel | None,
+        old_string: str | None,
+        replace_all: bool,
         insert_line: int | None,
         start_line: int | None,
         end_line: int | None,
@@ -505,6 +461,15 @@ class FileEditor(FileEditorEditOpsMixin):
         try:
             if command == 'read_file':
                 return self._handle_view(file_path, view_range, path)
+            if command == 'replace_string':
+                return self._handle_replace_string(
+                    file_path,
+                    old_string,
+                    self._extract_content(MISSING, new_str),
+                    replace_all=replace_all,
+                    expected_file_hash=expected_file_hash,
+                    dry_run=dry_run,
+                )
             if command in (
                 'edit',
                 'insert_text',
@@ -753,6 +718,110 @@ class FileEditor(FileEditorEditOpsMixin):
                 error=f'Error editing file: {e}',
                 old_content=None,
                 new_content=None,
+            )
+
+    def _handle_replace_string(
+        self,
+        file_path: Path,
+        old_string: str | None,
+        new_string: str,
+        *,
+        replace_all: bool,
+        expected_file_hash: str | None,
+        dry_run: bool,
+    ) -> ToolResult:
+        """Replace exact text occurrences using the safe edit pipeline."""
+        try:
+            if old_string is None or old_string == '':
+                return ToolResult(
+                    output='',
+                    error='replace_string old_string must not be empty.',
+                    error_code='EMPTY_OLD_STRING',
+                    retryable=False,
+                    operation='replace_string',
+                )
+            preflight = self._preflight_content_guard(file_path, new_string)
+            if preflight is not None:
+                return ToolResult(
+                    output='',
+                    error=preflight,
+                    error_code='CONTENT_APPEARS_SERIALIZED'
+                    if 'CONTENT_APPEARS_SERIALIZED' in preflight
+                    else 'CONTENT_PREFLIGHT_FAILED',
+                    retryable=False,
+                    operation='replace_string',
+                )
+            if not file_path.exists():
+                return ToolResult(
+                    output='',
+                    error=f'File not found: {file_path}',
+                    error_code='FILE_NOT_FOUND',
+                    retryable=False,
+                    operation='replace_string',
+                )
+
+            old_content = self._read_file(file_path)
+            hash_error = self._check_file_hash_guard(
+                file_path, old_content, expected_file_hash
+            )
+            if hash_error:
+                return hash_error
+
+            newline = '\r\n' if '\r\n' in old_content else '\n'
+            old_match = old_string.replace('\r\n', '\n').replace('\r', '\n')
+            new_replacement = new_string.replace('\r\n', '\n').replace('\r', '\n')
+            if newline == '\r\n':
+                old_match = old_match.replace('\n', '\r\n')
+                new_replacement = new_replacement.replace('\n', '\r\n')
+
+            match_count = old_content.count(old_match)
+            if match_count == 0:
+                return ToolResult(
+                    output='',
+                    error='replace_string old_string was not found exactly.',
+                    old_content=old_content,
+                    new_content=old_content,
+                    error_code='OLD_STRING_NOT_FOUND',
+                    retryable=True,
+                    operation='replace_string',
+                    metadata={'match_count': 0},
+                )
+            if match_count > 1 and not replace_all:
+                return ToolResult(
+                    output='',
+                    error=(
+                        'replace_string old_string matched multiple occurrences. '
+                        'Make old_string more specific or set replace_all=true.'
+                    ),
+                    old_content=old_content,
+                    new_content=old_content,
+                    error_code='OLD_STRING_NOT_UNIQUE',
+                    retryable=True,
+                    operation='replace_string',
+                    metadata={'match_count': match_count},
+                )
+
+            new_content = old_content.replace(
+                old_match,
+                new_replacement,
+                -1 if replace_all else 1,
+            )
+            return self._finalize_edit_result(
+                file_path,
+                old_content,
+                new_content,
+                dry_run,
+                target_kind='exact_string',
+            )
+        except Exception as e:
+            return ToolResult(
+                output='',
+                error=f'Error replacing string: {e}',
+                old_content=None,
+                new_content=None,
+                error_code='REPLACE_STRING_ERROR',
+                retryable=True,
+                operation='replace_string',
             )
 
     def _check_file_hash_guard(
@@ -1018,17 +1087,6 @@ class FileEditor(FileEditorEditOpsMixin):
             ),
         )
 
-    def _is_large_existing_code_file(
-        self, file_path: Path, old_content: str | None
-    ) -> bool:
-        if old_content is None:
-            return False
-        if file_path.suffix.lower() not in _CODE_FILE_SUFFIXES:
-            return False
-        return old_content.count('\n') + (1 if old_content else 0) >= (
-            _LARGE_CODE_OVERWRITE_LINE_THRESHOLD
-        )
-
     def _handle_write_maybe_short_circuit(
         self,
         *,
@@ -1041,8 +1099,20 @@ class FileEditor(FileEditorEditOpsMixin):
         overwrite_existing: bool,
     ) -> ToolResult | None:
         """Early exits before validation / disk write."""
-        # create_file now overwrites existing files (was changed from silent-success behavior).
-        # The 'write' command is the explicit overwrite option.
+        if is_create and file_existed:
+            return ToolResult(
+                output='',
+                error=(
+                    'File already exists. Use replace_symbol or replace_string '
+                    'for modifications.'
+                ),
+                old_content=old_content,
+                new_content=content,
+                error_code='CREATE_FILE_ALREADY_EXISTS',
+                retryable=False,
+                operation='create_file',
+            )
+
         if dry_run:
             return ToolResult(
                 output='Preview generated (no changes applied)',
@@ -1064,29 +1134,6 @@ class FileEditor(FileEditorEditOpsMixin):
                 old_content=old_content,
                 new_content=content,
                 operation='write_noop',
-            )
-        if (
-            is_create
-            and file_existed
-            and not overwrite_existing
-            and self._is_large_existing_code_file(file_path, old_content)
-        ):
-            return ToolResult(
-                output='',
-                error=(
-                    'Large existing code file overwrite blocked. '
-                    'Use edit_symbol or replace_range for incremental changes, '
-                    'or retry create_file with overwrite_existing=true if you intentionally want a full rewrite.'
-                ),
-                old_content=old_content,
-                new_content=content,
-                error_code='FULL_FILE_OVERWRITE_REQUIRES_EXPLICIT_CONFIRMATION',
-                retryable=False,
-                operation='create_file',
-                metadata={
-                    'requires_explicit_overwrite': True,
-                    'line_threshold': _LARGE_CODE_OVERWRITE_LINE_THRESHOLD,
-                },
             )
         return None
 
@@ -1290,8 +1337,6 @@ class FileEditor(FileEditorEditOpsMixin):
         if meta is None:
             meta = _FileReadMeta(encoding='utf-8', newline='lf', had_bom=False)
 
-        # Last-chance safety net: scrub literal escape residue before bytes hit disk.
-        content = _attempt_escape_repair_at_disk_write(content, file_path)
         content = _normalize_newlines_for_metadata(content, meta)
         data = _encode_disk_payload(content, meta)
 

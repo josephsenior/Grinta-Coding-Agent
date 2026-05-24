@@ -24,8 +24,8 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='A range edit is missing start_line or end_line.',
             steps=(
-                'Add both start_line and end_line as integers (1-based, inclusive), plus the replacement content.',
-                'Use `replace_range` via tool call or EDIT_FILE block with those line bounds.',
+                'Use the public file API instead: `replace_string` for exact text or `replace_symbol` for one code symbol.',
+                'Re-read the target context if you need a more specific exact anchor.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-TE-001',
@@ -36,8 +36,8 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='A legacy edit command is missing its edit_mode.',
             steps=(
-                'Use the `edit` command with `edit_mode=range` or an EDIT_FILE block instead of the retired edit format.',
-                'For line edits, use `replace_range` with start_line and end_line.',
+                'The legacy range-edit format is no longer model-facing.',
+                'Use `replace_string`, `replace_symbol`, `insert_symbol`, `edit_symbols`, or `multiedit`.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-TE-002',
@@ -60,9 +60,8 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='replace_range is missing required parameters.',
             steps=(
-                'Provide all three: start_line (int, 1-based), end_line (int, inclusive), '
-                'and the replacement source text.',
-                'Use `replace_range` via tool call or EDIT_FILE block with the target path.',
+                'The legacy replace_range command is not model-facing.',
+                'Use `replace_string` for exact text replacement or `replace_symbol` for a complete code symbol replacement.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-SE-001',

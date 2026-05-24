@@ -689,6 +689,8 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         file_text=action.file_text,
         view_range=action.view_range,
         new_str=action.new_str,
+        old_string=getattr(action, 'old_string', None),
+        replace_all=bool(getattr(action, 'replace_all', False)),
         insert_line=action.insert_line,
         start_line=getattr(action, 'start_line', None),
         end_line=getattr(action, 'end_line', None),

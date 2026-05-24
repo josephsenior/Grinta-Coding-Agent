@@ -11,10 +11,14 @@ from .finish import create_finish_tool
 from .lsp_query import create_lsp_query_tool
 from .native_file_tools import (
     create_create_file_tool,
-    create_find_symbol_tool,
+    create_edit_symbols_tool,
+    create_find_symbols_tool,
+    create_insert_symbol_tool,
+    create_multiedit_tool,
     create_read_file_tool,
-    create_rename_symbol_tool,
-    create_undo_last_edit_tool,
+    create_read_range_tool,
+    create_replace_string_tool,
+    create_replace_symbol_tool,
 )
 from .memory_manager import create_memory_manager_tool
 from .meta_cognition import (
@@ -33,10 +37,14 @@ __all__ = [
     'create_finish_tool',
     'create_lsp_query_tool',
     'create_create_file_tool',
-    'create_find_symbol_tool',
+    'create_edit_symbols_tool',
+    'create_find_symbols_tool',
+    'create_insert_symbol_tool',
+    'create_multiedit_tool',
     'create_read_file_tool',
-    'create_rename_symbol_tool',
-    'create_undo_last_edit_tool',
+    'create_read_range_tool',
+    'create_replace_string_tool',
+    'create_replace_symbol_tool',
     'create_memory_manager_tool',
     'create_debugger_tool',
     'create_analyze_project_structure_tool',

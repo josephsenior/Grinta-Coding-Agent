@@ -28,15 +28,9 @@ if TYPE_CHECKING:
 READ_SYMBOL_TOOL_NAME = 'read_symbol'
 
 _DESCRIPTION = """
-Retrieve the full source of named symbols or files in one call.
-
-Each entity is formatted as 'path/file.ext:Symbol' (top-level), 'path/file.ext:Class.method'
-(method), or just 'path/file.ext' (whole file). Backed by tree-sitter so it works for
-Python, JS/TS, Go, Rust, Java, C/C++, Ruby, PHP, and more.
-
-Prefer this over `read_file` when you know the symbol name and want its definition without
-loading the entire file. For text/regex search use `search_code`. For LSP-grade go-to-def,
-hover, or references, use `lsp`.
+Read one exact symbol body/content. Use symbol_id from find_symbols when
+available, or provide path plus symbol_name. If the target is ambiguous, the
+tool returns candidates instead of guessing.
 """.strip()
 
 
@@ -46,16 +40,32 @@ def create_read_symbol_tool() -> ChatCompletionToolParam:
         name=READ_SYMBOL_TOOL_NAME,
         description=_DESCRIPTION,
         properties={
-            'entity_names': {
-                'type': 'array',
-                'items': {'type': 'string'},
-                'description': (
-                    "List of entities to fetch. Format: 'path/file.py:Symbol', "
-                    "'path/file.py:Class.method', or 'path/file.py' for whole file."
-                ),
+            'symbol_id': {
+                'type': 'string',
+                'description': 'Optional symbol id returned by find_symbols.',
+            },
+            'path': {
+                'type': 'string',
+                'description': 'Project-relative source file path.',
+            },
+            'symbol_name': {
+                'type': 'string',
+                'description': 'Symbol name. Use Class.method for methods when helpful.',
+            },
+            'symbol_kind': {
+                'type': 'string',
+                'description': 'Optional kind filter: function, class, or method.',
+            },
+            'parent_symbol': {
+                'type': 'string',
+                'description': 'Optional parent/container symbol for disambiguation.',
+            },
+            'occurrence': {
+                'type': 'integer',
+                'description': 'Optional 1-based occurrence index if candidates were returned.',
             },
         },
-        required=['entity_names'],
+        required=[],
     )
 
 
