@@ -9,6 +9,7 @@ from backend.inference import tool_names
 EXPECTED_EXPORTS = [
     'CREATE_TOOL_NAME',
     'EDIT_SYMBOLS_TOOL_NAME',
+    'FIND_SYMBOLS_TOOL_NAME',
     'FINISH_TOOL_NAME',
     'MULTIEDIT_TOOL_NAME',
     'READ_TOOL_NAME',
@@ -51,6 +52,7 @@ class TestToolNames(TestCase):
         from backend.inference.tool_names import (
             CREATE_TOOL_NAME,
             EDIT_SYMBOLS_TOOL_NAME,
+            FIND_SYMBOLS_TOOL_NAME,
             FINISH_TOOL_NAME,
             MULTIEDIT_TOOL_NAME,
             READ_TOOL_NAME,
@@ -61,6 +63,7 @@ class TestToolNames(TestCase):
         # Verify all imports succeeded
         self.assertIsNotNone(CREATE_TOOL_NAME)
         self.assertIsNotNone(EDIT_SYMBOLS_TOOL_NAME)
+        self.assertIsNotNone(FIND_SYMBOLS_TOOL_NAME)
         self.assertIsNotNone(FINISH_TOOL_NAME)
         self.assertIsNotNone(MULTIEDIT_TOOL_NAME)
         self.assertIsNotNone(READ_TOOL_NAME)

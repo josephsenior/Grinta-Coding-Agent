@@ -372,6 +372,7 @@ DISABLE_COLOR_PRINTING = False
 
 
 READ_TOOL_NAME = 'read'
+FIND_SYMBOLS_TOOL_NAME = 'find_symbols'
 CREATE_TOOL_NAME = 'create'
 REPLACE_STRING_TOOL_NAME = 'replace_string'
 EDIT_SYMBOLS_TOOL_NAME = 'edit_symbols'

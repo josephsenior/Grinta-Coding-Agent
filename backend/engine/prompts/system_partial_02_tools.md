@@ -3,7 +3,8 @@ Editor `path` values create parent dirs where appropriate and normalize safely. 
 Edit the user path directly; no shadow copies; remove temp files when done.
 
 **File API mental model**
-- Context: `read` for file, range, symbol content, or symbol candidates.
+- Discovery: `find_symbols` returns candidates.
+- Context: `read` for file, range, or symbol bodies. `read(type="symbols")` returns each target as resolved, ambiguous, or not_found.
 - New files/symbols: `create`; file creation must not modify existing files.
 - Code: `edit_symbols` for modifying/deleting existing symbols; `create` with `type="symbol"` for one complete addition.
 - Text/config/docs: `replace_string`; add by anchor -> anchor + content, delete with `new_string=""`.
@@ -11,6 +12,8 @@ Edit the user path directly; no shadow copies; remove temp files when done.
 - Never write source via shell. Use real newlines/quotes, not serialized JSON strings.
 
 **Examples**
+- Find candidates: `find_symbols(query="authenticate")`.
+- Read symbols: `read(type="symbols", symbols=[{{"symbol_name": "authenticate_user"}}, {{"symbol_name": "UserService"}}])`.
 - README/config add: `replace_string("## Usage\n", "## Usage\n\nExample:\n...")`.
 - Delete: `replace_string(old_string="old config block", new_string="")`.
 - Add function: `create(type="symbol", target_symbol="login", position="after", content="def logout(...):\n    ...")`.

@@ -228,181 +228,24 @@ class InputBar(Horizontal):
     """Bottom input row with border and prompt."""
 
 
-class AutonomyTabs(Static):
-    """Compact autonomy selector for the HUD."""
-
-    can_focus = True
-    _OPTIONS = [
-        ('conservative', 'Conservative'),
-        ('balanced', 'Balanced'),
-        ('full', 'Full'),
-    ]
-
-    class Changed(Message):
-        def __init__(self, value: str) -> None:
-            super().__init__()
-            self.value = value
-
-    def __init__(self, value: str = 'balanced', *, id: str | None = None) -> None:
-        super().__init__(id=id)
-        self._value = value if value in {name for name, _ in self._OPTIONS} else 'balanced'
-        self._spans: list[tuple[int, int, str]] = []
-
-    @property
-    def value(self) -> str:
-        return self._value
-
-    @value.setter
-    def value(self, new_value: str) -> None:
-        self.set_value(new_value)
-
-    def on_mount(self) -> None:
-        self._refresh()
-
-    def _refresh(self) -> None:
-        parts: list[str] = []
-        spans: list[tuple[int, int, str]] = []
-        cursor = 0
-        for index, (name, label) in enumerate(self._OPTIONS):
-            if index > 0:
-                sep = ' '
-                parts.append(sep)
-                cursor += len(sep)
-            segment_plain = label
-            start = cursor
-            end = cursor + len(segment_plain)
-            spans.append((start, end, name))
-            if name == self._value:
-                parts.append(f'[bold #e9eefc on #1e3a70] {label} [/]')
-            else:
-                parts.append(f'[#8f9fc1]{label}[/]')
-            cursor = end
-        self._spans = spans
-        self.update(''.join(parts))
-
-    def set_value(self, new_value: str, *, emit: bool = True) -> None:
-        normalized = (new_value or '').strip().lower()
-        if normalized not in {name for name, _ in self._OPTIONS}:
-            return
-        if normalized == self._value:
-            return
-        self._value = normalized
-        self._refresh()
-        if emit:
-            self.post_message(self.Changed(normalized))
-
-    def on_click(self, event: events.Click) -> None:
-        for start, end, value in self._spans:
-            if start <= event.x <= end:
-                self.set_value(value)
-                event.prevent_default()
-                event.stop()
-                return
-
-    def on_key(self, event: events.Key) -> None:
-        order = [name for name, _ in self._OPTIONS]
-        index = order.index(self._value)
-        if event.key in ('left', 'up'):
-            self.set_value(order[(index - 1) % len(order)])
-            event.prevent_default()
-            event.stop()
-        elif event.key in ('right', 'down', 'enter', 'space'):
-            self.set_value(order[(index + 1) % len(order)])
-            event.prevent_default()
-            event.stop()
-
-
-class ModeTabs(Static):
-    """Agent / Chat mode selector for the HUD."""
-
-    can_focus = True
-    _OPTIONS = [
-        ('agent', 'Agent'),
-        ('chat', 'Chat'),
-    ]
-
-    class Changed(Message):
-        def __init__(self, value: str) -> None:
-            super().__init__()
-            self.value = value
-
-    def __init__(self, value: str = 'agent', *, id: str | None = None) -> None:
-        super().__init__(id=id)
-        self._value = value if value in {name for name, _ in self._OPTIONS} else 'agent'
-        self._spans: list[tuple[int, int, str]] = []
-
-    @property
-    def value(self) -> str:
-        return self._value
-
-    @value.setter
-    def value(self, new_value: str) -> None:
-        self.set_value(new_value)
-
-    def on_mount(self) -> None:
-        self._refresh()
-
-    def _refresh(self) -> None:
-        parts: list[str] = []
-        spans: list[tuple[int, int, str]] = []
-        cursor = 0
-        for index, (name, label) in enumerate(self._OPTIONS):
-            if index > 0:
-                sep = ' '
-                parts.append(sep)
-                cursor += len(sep)
-            segment_plain = label
-            start = cursor
-            end = cursor + len(segment_plain)
-            spans.append((start, end, name))
-            if name == self._value:
-                parts.append(f'[bold #e9eefc on #1e3a70] {label} [/]')
-            else:
-                parts.append(f'[#8f9fc1]{label}[/]')
-            cursor = end
-        self._spans = spans
-        self.update(''.join(parts))
-
-    def set_value(self, new_value: str, *, emit: bool = True) -> None:
-        normalized = (new_value or '').strip().lower()
-        if normalized not in {name for name, _ in self._OPTIONS}:
-            return
-        if normalized == self._value:
-            return
-        self._value = normalized
-        self._refresh()
-        if emit:
-            self.post_message(self.Changed(normalized))
-
-    def on_click(self, event: events.Click) -> None:
-        for start, end, value in self._spans:
-            if start <= event.x <= end:
-                self.set_value(value)
-                event.prevent_default()
-                event.stop()
-                return
-
-    def on_key(self, event: events.Key) -> None:
-        order = [name for name, _ in self._OPTIONS]
-        index = order.index(self._value)
-        if event.key in ('left', 'up'):
-            self.set_value(order[(index - 1) % len(order)])
-            event.prevent_default()
-            event.stop()
-        elif event.key in ('right', 'down', 'enter', 'space'):
-            self.set_value(order[(index + 1) % len(order)])
-            event.prevent_default()
-            event.stop()
-
-
 class HUD(Vertical):
     """Multi-line status bar at the very bottom."""
 
     def compose(self) -> ComposeResult:
         yield Label(id='hud-line-1')
         with Horizontal(id='hud-line-2-row'):
-            yield AutonomyTabs(id='hud-autonomy')
-            yield ModeTabs(id='hud-mode')
+            yield Select(
+                [(c.capitalize(), c) for c in ('conservative', 'balanced', 'full')],
+                value='balanced',
+                id='hud-autonomy',
+                allow_blank=False,
+            )
+            yield Select(
+                [(c.capitalize(), c) for c in ('agent', 'chat')],
+                value='agent',
+                id='hud-mode',
+                allow_blank=False,
+            )
             yield Label(id='hud-line-2')
 
 
@@ -1196,16 +1039,21 @@ class GrintaScreen(Screen):
         hud_bar.query_one('#hud-line-1', Label).update(line1)
         hud_bar.query_one('#hud-line-2', Label).update(line2)
         try:
-            autonomy_tabs = hud_bar.query_one('#hud-autonomy', AutonomyTabs)
-            if autonomy_tabs.value != autonomy:
-                autonomy_tabs.set_value(autonomy, emit=False)
+            autonomy_select = hud_bar.query_one('#hud-autonomy', Select)
+            if autonomy_select.value != autonomy:
+                autonomy_select.value = autonomy
         except Exception:
             pass
         try:
-            mode_tabs = hud_bar.query_one('#hud-mode', ModeTabs)
+            mode_select = hud_bar.query_one('#hud-mode', Select)
             current_mode = self._config.get_agent_config().mode
-            if mode_tabs.value != current_mode:
-                mode_tabs.set_value(current_mode, emit=False)
+            if mode_select.value != current_mode:
+                mode_select.value = current_mode
+        except Exception:
+            pass
+        try:
+            autonomy_select = hud_bar.query_one('#hud-autonomy')
+            autonomy_select.display = (self._config.get_agent_config().mode == 'agent')
         except Exception:
             pass
 
@@ -1764,8 +1612,13 @@ class GrintaScreen(Screen):
             except Exception:
                 pass
 
-    def on_autonomy_tabs_changed(self, event: AutonomyTabs.Changed) -> None:
-        self._apply_autonomy_level(event.value)
+    def on_select_changed(self, event: Select.Changed) -> None:
+        event.stop()
+        widget_id = event.select.id
+        if widget_id == 'hud-autonomy':
+            self._apply_autonomy_level(event.value)
+        elif widget_id == 'hud-mode':
+            self._apply_mode(event.value)
 
     def _apply_autonomy_level(self, new_level: str) -> None:
         level = (new_level or '').strip().lower()
@@ -1784,9 +1637,6 @@ class GrintaScreen(Screen):
         self._render_hud_bar()
         self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
 
-    def on_mode_tabs_changed(self, event: ModeTabs.Changed) -> None:
-        self._apply_mode(event.value)
-
     def _apply_mode(self, new_mode: str) -> None:
         mode = (new_mode or '').strip().lower()
         if mode not in {'agent', 'chat'}:
@@ -1804,7 +1654,15 @@ class GrintaScreen(Screen):
                     except Exception:
                         _tui_logger.debug('Failed to rebuild toolset on mode change', exc_info=True)
         self._render_hud_bar()
+        self._toggle_autonomy_tabs_visibility(mode)
         self.notify(f'Mode: {mode}', severity='information', timeout=2.0)
+
+    def _toggle_autonomy_tabs_visibility(self, mode: str) -> None:
+        try:
+            autonomy_tabs = self.query_one('#hud-autonomy')
+            autonomy_tabs.display = (mode == 'agent')
+        except Exception:
+            pass
 
     def on_sidebar_row_selected(self, event: Any) -> None:
         """Handle SidebarRow selected events and notify the user."""

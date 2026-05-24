@@ -165,6 +165,7 @@ class OrchestratorPlanner:
         )
         from backend.engine.tools.finish import create_finish_tool
         from backend.engine.tools.native_file_tools import (
+            create_find_symbols_tool,
             create_read_tool,
         )
         from backend.engine.tools.memory_manager import (
@@ -182,6 +183,7 @@ class OrchestratorPlanner:
         tools.append(create_note_tool())
         tools.append(create_recall_tool())
         tools.append(create_read_tool())
+        tools.append(create_find_symbols_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
         """Add task_tracker and search_code tools."""
@@ -399,7 +401,8 @@ class OrchestratorPlanner:
             'matching the registered schemas.\n'
             f'{formatted}\n'
             'RULES:\n'
-            '- read inspects file, range, symbol content, or symbol candidates.\n'
+            '- find_symbols discovers symbol candidates without reading full bodies.\n'
+            '- read inspects file, range, or one/more symbol bodies.\n'
             '- create creates a new file or a new code symbol.\n'
             '- edit_symbols modifies or deletes existing symbols.\n'
             '- replace_string performs exact one-file text replacement, insertion, or deletion.\n'
@@ -522,7 +525,8 @@ class OrchestratorPlanner:
             "2. A communicate_with_user tool call (to ask questions, clarify, or report blockers).\n"
             "3. A finish tool call (to end the task successfully).\n\n"
             "File API mental model:\n"
-            "- `read` inspects file, range, symbol content, or symbol candidates.\n"
+            "- `find_symbols` discovers symbol candidates without reading full bodies.\n"
+            "- `read` inspects file, range, or one/more symbol bodies.\n"
             "- `create` creates new files or new symbols; file creation must not modify existing files.\n"
             "- `edit_symbols` modifies or deletes existing code symbols.\n"
             "- `replace_string` for exact text replacement, insertion by anchor, and deletion.\n"

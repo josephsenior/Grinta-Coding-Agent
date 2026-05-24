@@ -42,6 +42,7 @@ from backend.engine.tools import (
     create_cmd_run_tool,
     create_create_tool,
     create_edit_symbols_tool,
+    create_find_symbols_tool,
     create_multiedit_tool,
     create_read_tool,
     create_replace_string_tool,
@@ -87,6 +88,7 @@ from backend.engine.tools.terminal_manager import (
 from backend.inference.tool_names import (
     CREATE_TOOL_NAME,
     EDIT_SYMBOLS_TOOL_NAME,
+    FIND_SYMBOLS_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
     READ_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
@@ -507,11 +509,11 @@ def _parse_symbol_id(symbol_id: str) -> tuple[str, str, int, int]:
         end_line = int(end_raw)
     except Exception as exc:
         raise FunctionCallValidationError(
-            f'Invalid symbol_id {symbol_id!r}; use an id returned by read(type="symbols").'
+            f'Invalid symbol_id {symbol_id!r}; use an id returned by find_symbols or read(type="symbols").'
         ) from exc
     if not raw_path or not raw_name or start_line < 1 or end_line < start_line:
         raise FunctionCallValidationError(
-            f'Invalid symbol_id {symbol_id!r}; use an id returned by read(type="symbols").'
+            f'Invalid symbol_id {symbol_id!r}; use an id returned by find_symbols or read(type="symbols").'
         )
     return raw_path, raw_name, start_line, end_line
 
@@ -586,7 +588,7 @@ def _resolve_symbol_candidates(
 
 def _symbol_action_ambiguity_error(symbol_name: str, candidates: list[dict[str, Any]]) -> str:
     return (
-        f"Symbol '{symbol_name}' is ambiguous. Use read(type=\"symbols\") output "
+        f"Symbol '{symbol_name}' is ambiguous. Use find_symbols or read(type=\"symbols\") output "
         f'to choose a parent_symbol or occurrence.\n'
         + json.dumps({'candidates': candidates}, indent=2)
     )
@@ -1687,12 +1689,14 @@ def _read_symbol_payload(
     safe_path: Path,
     content: str,
     candidate: dict[str, Any],
+    target: str | None = None,
 ) -> dict[str, Any]:
     lines = content.splitlines(keepends=True)
     body = ''.join(lines[candidate['start_line'] - 1 : candidate['end_line']])
     return {
         'type': 'symbol',
-        'status': 'ok',
+        'status': 'resolved',
+        'target': target or candidate.get('name'),
         **candidate,
         'file_rev': _sha256_text(content),
         'symbol_hash': _sha256_text(body),
@@ -1701,38 +1705,37 @@ def _read_symbol_payload(
     }
 
 
-def _read_symbol_candidates_payload(
+def _resolve_read_symbol_target(
+    target: Mapping[str, Any],
     *,
-    symbol_name: str,
-    candidates: list[dict[str, Any]],
-    status: str,
+    default_path: str | None,
+    default_symbol_kind: str | None,
 ) -> dict[str, Any]:
-    return {
-        'type': 'symbol',
-        'status': status,
-        'symbol_name': symbol_name,
-        'candidates': candidates,
-    }
-
-
-def _handle_read_symbol_public(arguments: Mapping[str, Any]) -> AgentThinkAction:
-    symbol_id = str(arguments.get('symbol_id') or '').strip()
-    path = str(arguments.get('path') or '').strip()
-    symbol_name = str(arguments.get('symbol_name') or arguments.get('query') or '').strip()
-    symbol_kind = cast(str | None, arguments.get('symbol_kind'))
-    parent_symbol = cast(str | None, arguments.get('parent_symbol'))
-    occurrence = _coerce_optional_int(arguments.get('occurrence'), 'occurrence')
-
+    symbol_id = str(target.get('symbol_id') or '').strip()
+    path = str(target.get('path') or default_path or '').strip()
+    symbol_name = str(
+        target.get('symbol_name')
+        or target.get('name')
+        or target.get('query')
+        or ''
+    ).strip()
+    symbol_kind = cast(str | None, target.get('symbol_kind') or default_symbol_kind)
+    parent_symbol = cast(str | None, target.get('parent_symbol'))
+    occurrence = _coerce_optional_int(target.get('occurrence'), 'occurrence')
     requested_start: int | None = None
     requested_end: int | None = None
+
     if symbol_id:
         path, symbol_name, requested_start, requested_end = _parse_symbol_id(symbol_id)
         occurrence = None
 
+    display_target = symbol_id or symbol_name
     if not symbol_name:
-        raise FunctionCallValidationError(
-            'read type=symbol requires symbol_id or symbol_name.'
-        )
+        return {
+            'status': 'not_found',
+            'target': display_target,
+            'message': 'Symbol target requires symbol_id or symbol_name.',
+        }
 
     if path:
         safe_path, content, candidates = _resolve_symbol_candidates(
@@ -1743,13 +1746,18 @@ def _handle_read_symbol_public(arguments: Mapping[str, Any]) -> AgentThinkAction
             occurrence=occurrence,
         )
     else:
+        lookup_name = symbol_name.rsplit('.', 1)[-1]
+        if not parent_symbol and '.' in symbol_name:
+            maybe_parent, _, maybe_name = symbol_name.rpartition('.')
+            parent_symbol = maybe_parent or None
+            lookup_name = maybe_name
         candidates = _filter_symbol_candidates(
             _find_symbol_candidates(
-                symbol_name,
+                lookup_name,
                 symbol_kind=symbol_kind,
                 include_private=True,
             ),
-            symbol_name=symbol_name,
+            symbol_name=lookup_name,
             parent_symbol=parent_symbol,
             occurrence=occurrence,
         )
@@ -1765,36 +1773,94 @@ def _handle_read_symbol_public(arguments: Mapping[str, Any]) -> AgentThinkAction
         ]
 
     if not candidates:
-        payload = _read_symbol_candidates_payload(
-            symbol_name=symbol_name,
-            candidates=[],
-            status='not_found',
-        )
-        return AgentThinkAction(thought='[READ]\n' + json.dumps(payload, indent=2))
+        return {
+            'status': 'not_found',
+            'target': display_target,
+            'symbol_name': symbol_name,
+            'message': f"Symbol '{symbol_name}' was not found.",
+        }
     if len(candidates) > 1:
-        payload = _read_symbol_candidates_payload(
-            symbol_name=symbol_name,
-            candidates=candidates,
-            status='ambiguous',
-        )
-        return AgentThinkAction(thought='[READ]\n' + json.dumps(payload, indent=2))
+        return {
+            'status': 'ambiguous',
+            'target': display_target,
+            'symbol_name': symbol_name,
+            'message': f"Symbol '{symbol_name}' is ambiguous.",
+            'candidates': candidates,
+        }
 
     candidate = candidates[0]
     if not path:
         safe_path = _safe_workspace_path(str(candidate['path']), must_exist=True)
         content = _read_text_for_tool(safe_path)
-    payload = _read_symbol_payload(
+    return _read_symbol_payload(
         safe_path=safe_path,
         content=content,
         candidate=candidate,
+        target=display_target,
     )
-    return AgentThinkAction(thought='[READ]\n' + json.dumps(payload, indent=2))
+
+
+def _coerce_read_symbol_targets(arguments: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    raw_symbols = arguments.get('symbols')
+    if isinstance(raw_symbols, list):
+        targets: list[Mapping[str, Any]] = []
+        for index, raw in enumerate(raw_symbols):
+            if isinstance(raw, str):
+                if raw.strip():
+                    targets.append({'symbol_name': raw.strip()})
+                continue
+            if isinstance(raw, Mapping):
+                targets.append(raw)
+                continue
+            raise FunctionCallValidationError(
+                f'read type=symbols symbols[{index}] must be a string or object.'
+            )
+        if targets:
+            return targets
+
+    symbol_id = str(arguments.get('symbol_id') or '').strip()
+    symbol_name = str(arguments.get('symbol_name') or arguments.get('query') or '').strip()
+    if symbol_id or symbol_name:
+        return [
+            {
+                'symbol_id': symbol_id,
+                'symbol_name': symbol_name,
+                'path': arguments.get('path'),
+                'symbol_kind': arguments.get('symbol_kind'),
+                'parent_symbol': arguments.get('parent_symbol'),
+                'occurrence': arguments.get('occurrence'),
+            }
+        ]
+    raise FunctionCallValidationError(
+        'read type=symbols requires symbols[], symbol_id, or symbol_name.'
+    )
 
 
 def _handle_read_symbols_public(arguments: Mapping[str, Any]) -> AgentThinkAction:
-    query = str(arguments.get('query') or arguments.get('symbol_name') or '').strip()
+    raw_path = str(arguments.get('path') or '').strip()
+    symbol_kind = cast(str | None, arguments.get('symbol_kind'))
+    targets = _coerce_read_symbol_targets(arguments)
+    results = [
+        _resolve_read_symbol_target(
+            target,
+            default_path=raw_path or None,
+            default_symbol_kind=symbol_kind,
+        )
+        for target in targets
+    ]
+    payload = {
+        'type': 'symbols',
+        'status': 'ok',
+        'results': results,
+    }
+    return AgentThinkAction(thought='[READ]\n' + json.dumps(payload, indent=2))
+
+
+def _handle_find_symbols_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
+    validate_security_risk(arguments, FIND_SYMBOLS_TOOL_NAME)
+    query = str(require_tool_argument(arguments, 'query', FIND_SYMBOLS_TOOL_NAME)).strip()
     if not query:
-        raise FunctionCallValidationError('read type=symbols requires query or symbol_name.')
+        raise FunctionCallValidationError('find_symbols query must not be empty.')
     raw_path = str(arguments.get('path') or '').strip()
     symbol_kind = cast(str | None, arguments.get('symbol_kind'))
     include_private = parse_bool_argument(arguments.get('include_private', False))
@@ -1811,7 +1877,7 @@ def _handle_read_symbols_public(arguments: Mapping[str, Any]) -> AgentThinkActio
         'query': query,
         'candidates': candidates,
     }
-    return AgentThinkAction(thought='[READ]\n' + json.dumps(payload, indent=2))
+    return AgentThinkAction(thought='[FIND_SYMBOLS]\n' + json.dumps(payload, indent=2))
 
 
 def _handle_read_tool(arguments: Mapping[str, Any]) -> Action:
@@ -1824,12 +1890,10 @@ def _handle_read_tool(arguments: Mapping[str, Any]) -> Action:
         return action
     if read_type == 'range':
         return _handle_read_range_public(arguments)
-    if read_type == 'symbol':
-        return _handle_read_symbol_public(arguments)
     if read_type == 'symbols':
         return _handle_read_symbols_public(arguments)
     raise FunctionCallValidationError(
-        "read type must be one of 'file', 'range', 'symbol', or 'symbols'."
+        "read type must be one of 'file', 'range', or 'symbols'."
     )
 
 
@@ -1838,7 +1902,7 @@ def _coerce_insert_position(value: object) -> str:
     valid = {'before', 'after', 'inside_start', 'inside_end'}
     if position not in valid:
         raise FunctionCallValidationError(
-            f"insert_symbol position must be one of {sorted(valid)}."
+            f"create type=symbol position must be one of {sorted(valid)}."
         )
     return position
 
@@ -2803,6 +2867,9 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         cast(
             str, create_read_tool().get('function', {}).get('name', '')
         ): _handle_read_tool,
+        cast(
+            str, create_find_symbols_tool().get('function', {}).get('name', '')
+        ): _handle_find_symbols_tool,
         cast(
             str, create_create_tool().get('function', {}).get('name', '')
         ): _handle_create_tool,

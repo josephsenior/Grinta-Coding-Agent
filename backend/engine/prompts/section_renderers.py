@@ -66,12 +66,12 @@ def _explore_hint(_config: Any = None) -> str:
     """Return the canonical layout-discovery tool hint."""
     if _lsp_available(_config):
         return (
-            '`search_code` for text/symbol search, `read` to fetch a '
-            'specific symbol/file body, `lsp` for definitions/references '
+            '`search_code` for text search, `find_symbols` for symbol candidates, '
+            '`read` to fetch a specific symbol/file body, `lsp` for definitions/references '
             '(LSP), `analyze_project_structure` for tree layout'
         )
     return (
-        '`search_code` for text/symbol search, `read` to fetch a '
+        '`search_code` for text search, `find_symbols` for symbol candidates, `read` to fetch a '
         'specific symbol/file body, `analyze_project_structure` for tree layout'
     )
 
@@ -433,7 +433,7 @@ def _render_security(cli_mode: bool = True) -> str:
     return (
         '# 🔐 Security Risk Policy\n'
         '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
-        '`browser`, and the file tools `read`, `create`, `replace_string`, `edit_symbols`, and `multiedit`. '
+        '`browser`, and the file tools `read`, `find_symbols`, `create`, `replace_string`, `edit_symbols`, and `multiedit`. '
         'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
         'The server may escalate your risk label; it never lowers it. Missing or invalid values '
         'fail the call.\n\n'

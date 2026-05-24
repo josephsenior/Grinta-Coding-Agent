@@ -9,10 +9,9 @@ from types import SimpleNamespace
 import pytest
 from rich.console import Console as RichConsole
 from rich.markdown import Markdown
-from textual.widgets import Label, TextArea
+from textual.widgets import Label, Select, TextArea
 
 from backend.cli.tui.app import (
-    AutonomyTabs,
     HUD,
     GrintaHelpDialog,
     GrintaScreen,
@@ -484,8 +483,8 @@ async def test_tui_hud_autonomy_selector_updates_controller(mock_config):
             autonomy_controller=SimpleNamespace(autonomy_level='balanced')
         )
         s._controller = controller  # type: ignore[assignment]
-        autonomy = s.query_one('#hud-autonomy', AutonomyTabs)
-        autonomy.set_value('full')
+        autonomy = s.query_one('#hud-autonomy', Select)
+        autonomy.value = 'full'
         await pilot.pause()
 
         assert controller.autonomy_controller.autonomy_level == 'full'
