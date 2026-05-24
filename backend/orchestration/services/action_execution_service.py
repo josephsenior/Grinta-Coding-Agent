@@ -43,9 +43,7 @@ from backend.ledger.action import (
 from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.action.empty import NullActionReason
 from backend.ledger.observation import ErrorObservation
-from backend.orchestration.agent_circuit_breaker import (
-    classify_file_edit_error_bucket,
-)
+
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
@@ -420,19 +418,6 @@ class ActionExecutionService:
         )
         return True
 
-    def _record_repair_error_for_circuit_breaker(
-        self,
-        controller: object,
-        exc: Exception,
-        error_signature: str,
-    ) -> None:
-        cb_service = getattr(controller, 'circuit_breaker_service', None)
-        if cb_service is None:
-            return
-        error_lower = error_signature.lower()
-        bucket = classify_file_edit_error_bucket(str(exc))
-        cb_service.record_error(exc, tool_name=bucket)
-
     def _effective_retry_limit(
         self,
         error_signature: str,
@@ -473,11 +458,6 @@ class ActionExecutionService:
         error_logged = self._publish_repair_error_observation(exc, error_logged)
 
         controller = self._context.get_controller()
-        self._record_repair_error_for_circuit_breaker(
-            controller,
-            exc,
-            error_signature,
-        )
 
         effective_max_retries = self._effective_retry_limit(
             error_signature,
