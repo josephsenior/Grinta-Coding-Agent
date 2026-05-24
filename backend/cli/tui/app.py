@@ -568,7 +568,7 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
     def on_mount(self) -> None:
         table = self.query_one('#sessions-table', DataTable)
         table.cursor_type = 'row'
-        table.add_columns('#', 'Session ID', 'Title', 'Model', 'Events', 'Updated')
+        table.add_columns('#', 'Session ID', 'Title', 'Events', 'Updated')
         self._refresh_table()
         if self._delete_targets:
             deleted, errors = self._delete_sessions(self._delete_targets)
@@ -623,6 +623,11 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         self._update_preview(event.cursor_row)
 
+    def on_data_table_row_double_clicked(self, event: DataTable.RowDoubleClicked) -> None:
+        sid = self._current_session_id()
+        if sid:
+            self.dismiss(sid)
+
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == 'sessions-search':
             self._search = event.value.strip()
@@ -666,9 +671,8 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
         self._visible_entries = entries[: self._limit]
         for i, (sid, meta, event_count) in enumerate(self._visible_entries, 1):
             title = str(meta.get('title') or meta.get('name') or '—')
-            model = str(meta.get('llm_model') or '—')[:24]
             updated = str(meta.get('last_updated_at') or meta.get('created_at') or '—')[:19]
-            table.add_row(str(i), sid[:12], title, model, str(event_count), updated, key=sid)
+            table.add_row(str(i), sid[:12], title, str(event_count), updated, key=sid)
 
         if self._visible_entries:
             table.move_cursor(row=0, column=0, animate=False, scroll=False)
@@ -708,27 +712,42 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
             self.query_one('#sessions-preview', Static).update('')
             return
         sid, meta, event_count = self._visible_entries[row_index]
-        cost = meta.get('accumulated_cost') or 0
-        branch = str(meta.get('selected_branch') or '—')
-        repo = str(meta.get('selected_repository') or '—')
-        trigger = str(meta.get('trigger') or '—')
-        total_tokens = meta.get('total_tokens') or 0
-        prompt_tokens = meta.get('prompt_tokens') or 0
-        completion_tokens = meta.get('completion_tokens') or 0
-        preview = Text.from_markup(
-            f'[bold]ID:[/] {sid}\n'
-            f'[bold]Title:[/] {str(meta.get("title") or meta.get("name") or "—")}\n'
-            f'[bold]Model:[/] {str(meta.get("llm_model") or "—")}\n'
-            f'[bold]Repository:[/] {repo}\n'
-            f'[bold]Branch:[/] {branch}\n'
-            f'[bold]Trigger:[/] {trigger}\n'
-            f'[bold]Events:[/] {event_count}\n'
-            f'[bold]Cost:[/] {f"${float(cost):.4f}" if cost else "—"}\n'
-            f'[bold]Tokens:[/] {int(total_tokens):,} total'
-            f'  [{NAVY_TEXT_DIM}](p:{int(prompt_tokens):,} c:{int(completion_tokens):,})[/]\n'
-            f'[bold]Updated:[/] {str(meta.get("last_updated_at") or meta.get("created_at") or "—")[:19]}'
-        )
-        self.query_one('#sessions-preview', Static).update(preview)
+        lines = []
+        lines.append(f'[bold]ID:[/] {sid}')
+        title = str(meta.get('title') or meta.get('name') or '')
+        if title:
+            lines.append(f'[bold]Title:[/] {title}')
+        model = str(meta.get('llm_model') or '')
+        if model:
+            lines.append(f'[bold]Model:[/] {model}')
+        repo = str(meta.get('selected_repository') or '')
+        if repo:
+            lines.append(f'[bold]Repository:[/] {repo}')
+        branch = str(meta.get('selected_branch') or '')
+        if branch:
+            lines.append(f'[bold]Branch:[/] {branch}')
+        trigger = str(meta.get('trigger') or '')
+        if trigger:
+            lines.append(f'[bold]Trigger:[/] {trigger}')
+        lines.append(f'[bold]Events:[/] {event_count}')
+        cost = float(meta.get('accumulated_cost') or 0)
+        if cost:
+            lines.append(f'[bold]Cost:[/] ${cost:.4f}')
+        total_tokens = int(meta.get('total_tokens') or 0)
+        if total_tokens:
+            prompt_tokens = int(meta.get('prompt_tokens') or 0)
+            completion_tokens = int(meta.get('completion_tokens') or 0)
+            lines.append(
+                f'[bold]Tokens:[/] {total_tokens:,} total'
+                f'  [{NAVY_TEXT_DIM}](p:{prompt_tokens:,} c:{completion_tokens:,})[/]'
+            )
+        updated = str(meta.get('last_updated_at') or meta.get('created_at') or '')
+        if updated:
+            lines.append(f'[bold]Updated:[/] {updated[:19]}')
+        created = str(meta.get('created_at') or '')
+        if created and str(meta.get('last_updated_at') or '') != created:
+            lines.append(f'[bold]Created:[/] {created[:19]}')
+        self.query_one('#sessions-preview', Static).update('\n'.join(lines))
 
     def _delete_sessions(self, targets: list[str]) -> tuple[int, list[str]]:
         from backend.cli.session_manager import _resolve_target
