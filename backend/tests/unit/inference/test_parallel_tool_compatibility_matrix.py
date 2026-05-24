@@ -208,4 +208,4 @@ def test_system_capabilities_parallel_native_all_on_renders_enabled() -> None:
     )
     assert 'Parallel tool scheduling' in text
     assert 'ENABLED for read-only batches' in text
-    assert 'read_file' in text and 'search_code' in text
+    assert '`read`' in text and 'search_code' in text

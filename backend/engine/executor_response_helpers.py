@@ -72,7 +72,7 @@ def build_recoverable_tool_call_error_action(exc: Exception) -> Action:
                 'Please re-issue the same tool call with the complete, valid '
                 'JSON arguments. If the file body is very large, consider '
                 'splitting it: create a minimal stub first, then extend with '
-                'insert_text or edit_mode calls.'
+                'replace_string or symbol edits.'
             )
         )
 

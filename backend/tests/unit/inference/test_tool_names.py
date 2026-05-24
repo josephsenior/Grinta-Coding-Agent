@@ -7,17 +7,12 @@ from unittest import TestCase
 from backend.inference import tool_names
 
 EXPECTED_EXPORTS = [
-    'CREATE_FILE_TOOL_NAME',
+    'CREATE_TOOL_NAME',
     'EDIT_SYMBOLS_TOOL_NAME',
     'FINISH_TOOL_NAME',
-    'FIND_SYMBOLS_TOOL_NAME',
-    'INSERT_SYMBOL_TOOL_NAME',
     'MULTIEDIT_TOOL_NAME',
-    'READ_FILE_TOOL_NAME',
-    'READ_RANGE_TOOL_NAME',
-    'READ_SYMBOL_TOOL_NAME',
+    'READ_TOOL_NAME',
     'REPLACE_STRING_TOOL_NAME',
-    'REPLACE_SYMBOL_TOOL_NAME',
     'TASK_TRACKER_TOOL_NAME',
 ]
 
@@ -54,32 +49,22 @@ class TestToolNames(TestCase):
     def test_import_from_tool_names(self):
         """Test that constants can be imported from tool_names."""
         from backend.inference.tool_names import (
-            CREATE_FILE_TOOL_NAME,
+            CREATE_TOOL_NAME,
             EDIT_SYMBOLS_TOOL_NAME,
             FINISH_TOOL_NAME,
-            FIND_SYMBOLS_TOOL_NAME,
-            INSERT_SYMBOL_TOOL_NAME,
             MULTIEDIT_TOOL_NAME,
-            READ_FILE_TOOL_NAME,
-            READ_RANGE_TOOL_NAME,
-            READ_SYMBOL_TOOL_NAME,
+            READ_TOOL_NAME,
             REPLACE_STRING_TOOL_NAME,
-            REPLACE_SYMBOL_TOOL_NAME,
             TASK_TRACKER_TOOL_NAME,
         )
 
         # Verify all imports succeeded
-        self.assertIsNotNone(CREATE_FILE_TOOL_NAME)
+        self.assertIsNotNone(CREATE_TOOL_NAME)
         self.assertIsNotNone(EDIT_SYMBOLS_TOOL_NAME)
         self.assertIsNotNone(FINISH_TOOL_NAME)
-        self.assertIsNotNone(FIND_SYMBOLS_TOOL_NAME)
-        self.assertIsNotNone(INSERT_SYMBOL_TOOL_NAME)
         self.assertIsNotNone(MULTIEDIT_TOOL_NAME)
-        self.assertIsNotNone(READ_FILE_TOOL_NAME)
-        self.assertIsNotNone(READ_RANGE_TOOL_NAME)
-        self.assertIsNotNone(READ_SYMBOL_TOOL_NAME)
+        self.assertIsNotNone(READ_TOOL_NAME)
         self.assertIsNotNone(REPLACE_STRING_TOOL_NAME)
-        self.assertIsNotNone(REPLACE_SYMBOL_TOOL_NAME)
         self.assertIsNotNone(TASK_TRACKER_TOOL_NAME)
 
     def test_all_list_length(self):
@@ -107,8 +92,5 @@ class TestToolNames(TestCase):
         """Test that tool_names module is consistent with core.constants."""
         from backend.core import constants as core_constants
 
-        self.assertEqual(
-            tool_names.CREATE_FILE_TOOL_NAME, core_constants.CREATE_FILE_TOOL_NAME
-        )
         for name in EXPECTED_EXPORTS:
             self.assertEqual(getattr(tool_names, name), getattr(core_constants, name))

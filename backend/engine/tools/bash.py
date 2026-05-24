@@ -43,7 +43,7 @@ def windows_drive_glued_hint() -> str:
 _DETAILED_BASH_DESCRIPTION = (
     'Execute a {shell} command in a persistent shell session.\n\n'
     '* **Discovery & reading project files:** use `search_code` or '
-    '`read_file`—not `cat`/`grep`/`find` for source and config under the repo.\n'
+    '`read`—not `cat`/`grep`/`find` for source and config under the repo.\n'
     '* One shell command payload per tool call. Chain subcommands with `&&` or `;` when needed.\n'
     '* This rule applies to shell syntax only; it does not define global tool-call batching policy.\n'
     '* Persistent: env vars, venvs, cwd persist between calls.\n'
@@ -51,14 +51,14 @@ _DETAILED_BASH_DESCRIPTION = (
     '* Long-running: background with `cmd > out.log 2>&1 &`, or set `timeout`.\n'
     '* Exit code `-1`: process still running. Set `is_input=true` to send input, '
     'empty string for more logs, or `C-c`/`C-d`/`C-z` to interrupt.\n'
-    '* Do NOT create/write files with this tool — use `create_file`, `replace_string`, `replace_symbol`, `insert_symbol`, `edit_symbols`, or `multiedit` instead.\n'
+    '* Do NOT create/write files with this tool — use `create`, `replace_string`, `edit_symbols`, or `multiedit` instead.\n'
     '* Shell cwd is the **project root** (see runtime). Prefer relative paths (`dir/file`, `./script`). '
     'There is no `/workspace` alias — use real relative or absolute paths.\n'
     '* In bash, never glue a folder name to a Windows drive letter: use `dir/C:/path` or quotes, '
     'not `dirC:/path`.\n'
 )
 _SHORT_BASH_DESCRIPTION = (
-    'Execute a {shell} command. Prefer `search_code` / `analyze_project_structure` / `read_file` '
+    'Execute a {shell} command. Prefer `search_code` / `analyze_project_structure` / `read` '
     'for repo reads—not cat/grep. Chain with `&&`/`;`. '
     'Background long-running commands with `cmd > out.log 2>&1 &`. '
     'Exit code -1 means still running — set is_input=true to interact. '

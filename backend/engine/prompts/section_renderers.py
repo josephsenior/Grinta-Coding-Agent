@@ -66,12 +66,12 @@ def _explore_hint(_config: Any = None) -> str:
     """Return the canonical layout-discovery tool hint."""
     if _lsp_available(_config):
         return (
-            '`search_code` for text/symbol search, `read_symbol` to fetch a '
+            '`search_code` for text/symbol search, `read` to fetch a '
             'specific symbol/file body, `lsp` for definitions/references '
             '(LSP), `analyze_project_structure` for tree layout'
         )
     return (
-        '`search_code` for text/symbol search, `read_symbol` to fetch a '
+        '`search_code` for text/symbol search, `read` to fetch a '
         'specific symbol/file body, `analyze_project_structure` for tree layout'
     )
 
@@ -86,7 +86,7 @@ def _repo_discovery_contract(
     if not is_windows:
         return (
             'Repo/source intelligence: follow `<TOOL_ROUTING_LADDER>` and use '
-            '`read_file`—avoid improvised `find`/`grep`/`cat` tree walks; '
+            '`read`—avoid improvised `find`/`grep`/`cat` tree walks; '
             '`<SHELL_IDENTITY>` governs allowed shell usage.'
         )
     if windows_with_bash:
@@ -276,7 +276,7 @@ def _render_system_capabilities(
     if parallel_enabled and parallel_tool_calls_provider_flag and fc_mode == 'native':
         parallel_line = (
             '- **Parallel tool scheduling**: ENABLED for read-only batches '
-            '(`read_file`, `search_code`, `lsp`).\n'
+            '(`read`, `search_code`, `lsp`).\n'
             '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
             'Emit independent reads in a single assistant turn to run them concurrently.\n'
             '  - **Constraint**: Writes, edits, and shell commands always run sequentially.'
@@ -299,7 +299,7 @@ def _render_system_capabilities(
     else:
         multi_edit_line = (
             '- **Atomic multi-file edits**: not exposed in this build — use targeted '
-            '`replace_symbol`, `insert_symbol`, or `replace_string` tool calls sequentially'
+            '`create`, `edit_symbols`, or `replace_string` tool calls sequentially'
             + (
                 ' and take a `checkpoint` before the batch for coarse rollback.'
                 if checkpoints_on
@@ -390,13 +390,13 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
             '- **Language servers (LSP / `lsp`)**: detected on PATH → '
             f'{", ".join(lsp_available)}. Use `lsp` for definition / '
             'references / hover / diagnostics on these languages. '
-            'For file edits use the public file API tools; `lsp` is read-only. For file reads use `read_file`, `read_range`, or `read_symbol`.'
+            'For file edits use the public file API tools; `lsp` is read-only. For file reads use `read`.'
         )
     else:
         lsp_line = (
             '- **Language servers (LSP)**: none detected on the host. The LSP '
             'navigation tool is hidden from your toolset; fall back to '
-            '`search_code` + `read_file` for navigation. To enable it the user can install e.g. '
+            '`search_code` + `read` for navigation. To enable it the user can install e.g. '
             '`pip install python-lsp-server`, `npm i -g typescript-language-server`, '
             '`rustup component add rust-analyzer`.'
         )
@@ -433,8 +433,7 @@ def _render_security(cli_mode: bool = True) -> str:
     return (
         '# 🔐 Security Risk Policy\n'
         '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
-        '`browser`, and the file tools `read_file`, `read_range`, `read_symbol`, `find_symbols`, '
-        '`create_file`, `replace_symbol`, `insert_symbol`, `replace_string`, `edit_symbols`, and `multiedit`. '
+        '`browser`, and the file tools `read`, `create`, `replace_string`, `edit_symbols`, and `multiedit`. '
         'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
         'The server may escalate your risk label; it never lowers it. Missing or invalid values '
         'fail the call.\n\n'
@@ -474,7 +473,7 @@ def _render_autonomy(
         "Plan, execute, and verify the user's task end-to-end. The runtime may "
         'interrupt a tool call to surface a user decision; treat that decision as '
         'authoritative and continue from where you stopped. On tool failure, pivot '
-        'to an alternative tool in the same turn (e.g. `find_symbols` \u2192 `replace_symbol`, or `read_range` \u2192 `replace_string`) '
+        'to an alternative tool in the same turn (e.g. `read` \u2192 `edit_symbols`, or `read` \u2192 `replace_string`) '
         'and auto-retry recoverable errors before reporting back.'
         f'{cp_line}\n</AUTONOMY>'
     )

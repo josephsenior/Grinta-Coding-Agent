@@ -8,10 +8,10 @@
 </DECISION_FRAMEWORK>
 
 <TOOL_ROUTING_LADDER>
-- **Search & Explore:** Prefer `search_code`, `find_symbols`, `read_symbol`, `read_range`, or `analyze_project_structure`.
-- **Read & Edit:** Use native tool calls only. Use `read_file`/`read_range`/`read_symbol`/`find_symbols` for context, `create_file` only for new files, `replace_symbol` for one existing code symbol, `insert_symbol` for one new code symbol, `replace_string` for exact text edits/additions/deletions, `edit_symbols` for coordinated symbol edits in one file, and `multiedit` for atomic multi-file refactors.
-- **Edit scope:** Prefer the smallest intent-level operation that solves the problem. Do not overwrite existing files; do not use shell commands to write source files.
-- **NORMAL MODE:** Do not output XML file-edit blocks, raw editor blocks, heredocs, patches, or serialized code payloads.
+- **Search & Explore:** Prefer `search_code`, `read`, or `analyze_project_structure`.
+- **Read & Edit:** Use native tool calls only. `read` inspects file/range/symbol context; `create` creates a new file or symbol; `edit_symbols` modifies/deletes existing symbols; `replace_string` performs exact one-file text replacement/addition/deletion; `multiedit` performs atomic multi-file refactors.
+- **Edit scope:** Prefer the smallest intent-level operation that solves the problem. `create` must not modify existing files; do not use shell commands to write source files.
+- **NORMAL MODE:** Use the registered file tools only; do not invent alternate file-edit formats or serialized code payloads.
 - **Shell & Execution:** Use the terminal strictly for build/test/git/processes.
 </TOOL_ROUTING_LADDER>
 

@@ -12,8 +12,8 @@ from backend.inference.llm_utils import check_tools
 
 ChatCompletionToolParam = Any
 
-# All public file tools use native provider tool calls. Legacy raw/XML editor
-# blocks are intentionally not part of the model-facing path.
+# All public file tools use native provider tool calls. Legacy free-form file
+# transports are intentionally not part of the model-facing path.
 CODE_PAYLOAD_TOOLS: frozenset[str] = frozenset()
 
 if TYPE_CHECKING:
@@ -113,9 +113,7 @@ class OrchestratorPlanner:
                 'run',
                 'terminal_manager',
                 'debugger',
-                'create_file',
-                'replace_symbol',
-                'insert_symbol',
+                'create',
                 'replace_string',
                 'edit_symbols',
                 'multiedit',
@@ -138,10 +136,10 @@ class OrchestratorPlanner:
     def partition_tools(
         self, tools: list[ChatCompletionToolParam]
     ) -> tuple[list[ChatCompletionToolParam], list[ChatCompletionToolParam]]:
-        """Return native tools only; raw editor/XML file transports are disabled."""
+        """Return native tools only; raw file transports are disabled."""
         if not self._llm_supports_function_calling():
             # Non-native models still use the generic tool-call text fallback,
-            # but no file-specific raw editor block is injected.
+            # but no file-specific free-form file block is injected.
             return [], tools
 
         native: list[ChatCompletionToolParam] = []
@@ -167,9 +165,7 @@ class OrchestratorPlanner:
         )
         from backend.engine.tools.finish import create_finish_tool
         from backend.engine.tools.native_file_tools import (
-            create_find_symbols_tool,
-            create_read_file_tool,
-            create_read_range_tool,
+            create_read_tool,
         )
         from backend.engine.tools.memory_manager import (
             create_memory_manager_tool,
@@ -185,15 +181,10 @@ class OrchestratorPlanner:
             tools.append(create_memory_manager_tool())
         tools.append(create_note_tool())
         tools.append(create_recall_tool())
-        tools.append(create_read_file_tool())
-        tools.append(create_read_range_tool())
-        tools.append(create_find_symbols_tool())
+        tools.append(create_read_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
-        """Add task_tracker, search_code and read_symbol tools."""
-        from backend.engine.tools.read_symbol import (
-            create_read_symbol_tool,
-        )
+        """Add task_tracker and search_code tools."""
         from backend.engine.tools.search_code import (
             create_search_code_tool,
         )
@@ -204,7 +195,6 @@ class OrchestratorPlanner:
         if getattr(self._config, 'enable_task_tracker_tool', False):
             tools.append(create_task_tracker_tool())
         tools.append(create_search_code_tool())
-        tools.append(create_read_symbol_tool())
 
     def _add_terminal_and_special_tools(self, tools: list) -> None:
         """Add terminal, optional feature tools (web search, delegate, etc.), and meta-cognition tools."""
@@ -292,17 +282,13 @@ class OrchestratorPlanner:
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):
             from backend.engine.tools.native_file_tools import (
-                create_create_file_tool,
+                create_create_tool,
                 create_edit_symbols_tool,
-                create_insert_symbol_tool,
                 create_multiedit_tool,
                 create_replace_string_tool,
-                create_replace_symbol_tool,
             )
 
-            tools.append(create_create_file_tool())
-            tools.append(create_replace_symbol_tool())
-            tools.append(create_insert_symbol_tool())
+            tools.append(create_create_tool())
             tools.append(create_replace_string_tool())
             tools.append(create_edit_symbols_tool())
             tools.append(create_multiedit_tool())
@@ -410,16 +396,14 @@ class OrchestratorPlanner:
         suffix = (
             '\n\n<TOOL_CALL_FORMAT>\n'
             'Use the available tools by emitting valid tool calls with arguments '
-            'matching the registered schemas. Do not output XML file-edit blocks, '
-            'raw editor blocks, heredocs, or patches for file changes.\n'
+            'matching the registered schemas.\n'
             f'{formatted}\n'
             'RULES:\n'
-            '- Use create_file only for new files.\n'
-            '- Use replace_string for exact text replacement, insertion by anchor, and deletion.\n'
-            '- Use replace_symbol for one existing code symbol.\n'
-            '- Use insert_symbol for one new code symbol.\n'
-            '- Use edit_symbols for coordinated symbol edits in one file.\n'
-            '- Use multiedit for atomic multi-file refactoring.\n'
+            '- read inspects file, range, symbol content, or symbol candidates.\n'
+            '- create creates a new file or a new code symbol.\n'
+            '- edit_symbols modifies or deletes existing symbols.\n'
+            '- replace_string performs exact one-file text replacement, insertion, or deletion.\n'
+            '- multiedit performs atomic multi-file refactoring.\n'
             '</TOOL_CALL_FORMAT>'
         )
 
@@ -538,16 +522,12 @@ class OrchestratorPlanner:
             "2. A communicate_with_user tool call (to ask questions, clarify, or report blockers).\n"
             "3. A finish tool call (to end the task successfully).\n\n"
             "File API mental model:\n"
-            "- read_file/read_range/read_symbol/find_symbols for context.\n"
-            "- create_file only for new files; never overwrite existing files.\n"
-            "- replace_symbol for modifying one existing code symbol.\n"
-            "- insert_symbol for adding one new code symbol.\n"
-            "- replace_string for exact text replacement, insertion by anchor, and deletion.\n"
-            "- edit_symbols for robust AST-based edits to multiple symbols in one file.\n"
-            "- multiedit for atomic multi-file refactoring.\n\n"
-            "Do not use shell commands to write source files. Do not output XML "
-            "file-edit blocks, raw editor blocks, heredocs, patches, range mutations, "
-            "or create_file calls for existing files.\n"
+            "- `read` inspects file, range, symbol content, or symbol candidates.\n"
+            "- `create` creates new files or new symbols; file creation must not modify existing files.\n"
+            "- `edit_symbols` modifies or deletes existing code symbols.\n"
+            "- `replace_string` for exact text replacement, insertion by anchor, and deletion.\n"
+            "- `multiedit` for atomic multi-file refactoring.\n\n"
+            "Do not use shell commands to write source files. Use only the registered file tools.\n"
             "=====================================\n"
         )
         
