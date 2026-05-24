@@ -26,6 +26,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_RECOVERABLE_TOOL_ERROR_THRESHOLD,
 )
 from backend.core.contracts.state import State
+from backend.ledger.observation.task_tracking import TaskTrackingObservation
 from backend.core.errors import (
     AgentRuntimeError,
     ContextLimitError,
@@ -607,6 +608,7 @@ class Orchestrator(Agent):
         self._sync_executor_llm()
 
         try:
+            self.executor._has_active_tasks = self._has_active_tasks_in_state(state)
             result = self.executor.execute(params, self.event_stream)
             self._consecutive_invalid_protocol_outputs = 0
         except Exception:
@@ -670,6 +672,7 @@ class Orchestrator(Agent):
         self._sync_executor_llm()
 
         try:
+            self.executor._has_active_tasks = self._has_active_tasks_in_state(state)
             result = await self.executor.async_execute(params, self.event_stream)
             self._consecutive_invalid_protocol_outputs = 0
         except Exception:
@@ -734,6 +737,17 @@ class Orchestrator(Agent):
         ):
             with contextlib.suppress(Exception):
                 self.executor._llm = self.llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
+
+    @staticmethod
+    def _has_active_tasks_in_state(state: State) -> bool:
+        """Check if state history contains any task in 'todo' or 'doing' status."""
+        for event in getattr(state, 'history', []):
+            if isinstance(event, TaskTrackingObservation):
+                for task in getattr(event, 'task_list', []):
+                    status = (task.get('status') or '').lower()
+                    if status in ('todo', 'doing'):
+                        return True
+        return False
 
     def _build_fallback_action(self, result) -> Action:
         """Create a message action when the LLM returns no tool calls.

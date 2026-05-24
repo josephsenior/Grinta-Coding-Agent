@@ -155,6 +155,7 @@ class OrchestratorExecutor:
         self._step_cancelled = False
         self._active_stream_task: asyncio.Task[Any] | None = None
         self._active_stream_iter: Any | None = None
+        self._has_active_tasks: bool = False
 
     def cancel_step(self) -> None:
         """Signal the current (or next) streaming step to abort early."""
@@ -1288,9 +1289,8 @@ class OrchestratorExecutor:
     def _gate_agent_mode_plain_text(self, actions: list[Action], response: ModelResponse) -> list[Action]:
         """Enforce AGENT mode protocol on plain-text (MessageAction-only) responses.
 
-        Raw/editor-block file transports are intentionally not supported. File
-        edits must arrive as native tool calls, and plain-text messages remain
-        plain text for the normal response parser/safety layers.
+        Blocks plain text only when there are active tasks (todo/doing).
+        Without active tasks the agent is free to chat — no tool calls required.
         """
         from backend.ledger.action.message import MessageAction as _MessageAction
 
@@ -1299,6 +1299,9 @@ class OrchestratorExecutor:
             return actions
 
         if not actions or not all(isinstance(a, _MessageAction) for a in actions):
+            return actions
+
+        if not self._has_active_tasks:
             return actions
 
         logger.warning(
