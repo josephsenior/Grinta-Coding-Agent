@@ -550,41 +550,6 @@ class _SyntheticToolCall:
         self.function = _SyntheticFunction(name, arguments)
         self._mcp_tool_names: list[str] | None = None
 
-
-
-
-def _extract_file_edit_blocks(fn_body):
-    import re
-    edits = []
-    pat = re.compile('<file_edit>(.*?)</file_edit>', re.DOTALL)
-    for m in pat.finditer(fn_body):
-        block = m.group(1)
-        edit = {}
-        pm = re.search('<path>(.*?)</path>', block, re.DOTALL)
-        if pm: edit['path'] = pm.group(1).strip()
-        pm = re.search('<operation>(.*?)</operation>', block, re.DOTALL)
-        if pm: edit['operation'] = pm.group(1).strip()
-        pm = re.search('<symbol_name>(.*?)</symbol_name>', block, re.DOTALL)
-        if pm: edit['symbol_name'] = pm.group(1).strip()
-        pm = re.search('<start_line>(.*?)</start_line>', block, re.DOTALL)
-        if pm:
-            try: edit['start_line'] = int(pm.group(1).strip())
-            except ValueError: pass
-        pm = re.search('<end_line>(.*?)</end_line>', block, re.DOTALL)
-        if pm:
-            try: edit['end_line'] = int(pm.group(1).strip())
-            except ValueError: pass
-        pm = re.search('<content>(.*?)</content>', block, re.DOTALL)
-        if pm:
-            c = pm.group(1)
-            if c.startswith(chr(10)): c = c[1:]
-            if c.endswith(chr(10)): c = c[:-1]
-            edit['content'] = c
-        if edit: edits.append(edit)
-    return edits
-
-
-
 def _extract_xml_tool_calls_from_content(
     content_text: str, xml_tool_names: frozenset[str]
 ) -> list[Any]:
@@ -674,12 +639,6 @@ def _extract_xml_tool_calls_from_content(
                     if pv.endswith(chr(10)):
                         pv = pv[:-1]
                     params[pn] = pv
-
-            # Handle multi_edit: extract nested <file_edit> blocks
-            if params.get('command') == 'multi_edit':
-                file_edits = _extract_file_edit_blocks(fn_body)
-                if file_edits:
-                    params['file_edits'] = file_edits
 
             if is_unclosed:
                 params["__xml_syntax_error__"] = "Unclosed <function> tag. Use </function> to close."

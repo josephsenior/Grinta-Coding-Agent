@@ -35,7 +35,7 @@ They used **Search-and-Replace Blocks** (`str_replace`).
 
 It turns out, LLMs are incredible at semantic pattern matching but terrible at counting. If you tell an LLM _"Find this exact block of code, and replace it with this new block"_, it can do that with extremely high fidelity. You don't need line numbers. You don't need `@@ -120,4 +125,5 @@`. You just provide the literal string.
 
-We introduced `str_replace_editor` and `ast_code_editor` (for AST logic). The success rate skyrocketed. Our agent stopped arguing with the parser and started writing code.
+We introduced exact replacement and AST-aware symbol editing. The success rate skyrocketed. Our agent stopped arguing with the parser and started writing code.
 
 ## The Final Decision
 
@@ -47,13 +47,8 @@ The era of Unified Diffs in our engine is over. The era of AST and semantic sear
 
 ## 2026 Update: Non-Code Reliability Layer
 
-After deploying `str_replace_editor`, we found a second-order reliability gap: non-code files are often ambiguous for raw substring replacement.
+After deploying exact replacement, we found a second-order reliability gap: non-code files are often ambiguous unless the replacement is anchored carefully.
 
-We now treat raw replace as a compatibility fallback and prefer explicit edit modes for non-code work:
-
-- `format` (JSON/YAML/TOML parser mutate + serialize)
-- `section` (anchor-bounded edits)
-- `range` (line interval edits with optional hash guard)
-- `patch` (strict-context hunk apply)
-
-This preserves the original lesson (avoid line-math-first tooling for LLMs) while adding deterministic constraints where plain text can drift.
+The current API keeps the lesson but simplifies the surface: `replace_string`
+handles exact non-code edits, `edit_symbols` handles code structure, and
+`multiedit` handles coordinated multi-file work.

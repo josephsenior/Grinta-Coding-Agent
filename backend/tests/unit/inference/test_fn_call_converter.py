@@ -744,7 +744,7 @@ class TestXmlParserRegression:
     """Regression tests for XML parser issues.
 
     Tests the specific bugs reported:
-    1. Trailing text false positives when file_edit blocks are stripped
+    1. Trailing text after parsed tool calls
     2. Content containing pseudo-tags, quotes, braces
     3. Consecutive valid calls with multiline content
     4. Trailing prose outside XML block
@@ -775,13 +775,8 @@ class TestXmlParserRegression:
             for tc in result[0].get('tool_calls', [])
         ]
 
-    def test_trailing_text_false_positive_with_file_edit_blocks(self):
-        """Regression: trailing text error when file_edit blocks are stripped.
-
-        Previously the parser used positions from the modified param_body
-        but checked trailing against fn_body, causing false positives
-        when multi_edit had nested file_edit blocks.
-        """
+    def test_trailing_text_false_positive_after_tool_call(self):
+        """Regression: trailing text after a parsed tool call is tolerated."""
         tools = [self._make_sample_tool()]
         content = (
             '<function=execute_bash>\n'

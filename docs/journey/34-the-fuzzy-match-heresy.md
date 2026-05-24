@@ -25,7 +25,7 @@ Every patch we added to fix `apply_patch` just made the engine more brittle. The
 
 It turns out, LLMs are incredible at semantic pattern matching but terrible at counting. If you tell an LLM *"Find this exact block of code, and replace it with this new block"*, it can do that with extremely high fidelity. You don't need line numbers. You don't need `@@ -120,4 +125,5 @@`. You just provide the literal string.
 
-We introduced `str_replace_editor` (and later integrated AST capabilities). The success rate skyrocketed. Our agent stopped arguing with the parser and started writing code.
+We introduced exact replacement and AST-aware symbol editing. The success rate skyrocketed. Our agent stopped arguing with the parser and started writing code.
 
 | Unified Diff Payload (Brittle, Line-Math Intensive) | Search-and-Replace Block Payload (Semantic, Reliable) |
 |---|---|

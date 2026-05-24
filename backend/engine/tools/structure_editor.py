@@ -237,7 +237,7 @@ class StructureEditor:
         if os.path.exists(path):
             return EditResult(
                 success=False,
-                message=f'File already exists: {path}. Use replace_range or edit_function to modify it.',
+                message=f'File already exists: {path}. Use edit_symbols or replace_string to modify it.',
             )
 
         try:
@@ -461,13 +461,13 @@ class StructureEditor:
                 if new_content == old_content:
                     return EditResult(
                         success=False,
-                        message='Edit verification failed after edit_symbol: file content did not change on disk.',
+                        message='Edit verification failed after symbol edit: file content did not change on disk.',
                     )
                 if self.find_symbol(path, function_name) is None:
                     return EditResult(
                         success=False,
                         message=(
-                            'Edit verification failed after edit_symbol: '
+                            'Edit verification failed after symbol edit: '
                             f"symbol '{function_name}' could not be resolved after the write."
                         ),
                     )
@@ -666,7 +666,7 @@ class StructureEditor:
                 if os.path.exists(path):
                     with open(path, encoding='utf-8') as f:
                         old_content = f.read()
-                global_undo_manager.push(path, old_content, 'structure_edit')
+                global_undo_manager.push(path, old_content, 'symbol_edit')
             except Exception as e:
                 logger.warning('Failed to save undo history: %s', e)
 
@@ -724,7 +724,7 @@ class StructureEditor:
 
             final_content = self._write_and_clean_file(path, new_content)
             verified, verify_msg = self._verify_disk_content(
-                path, final_content, operation='replace_range'
+                path, final_content, operation='line span replacement'
             )
             if not verified:
                 return EditResult(

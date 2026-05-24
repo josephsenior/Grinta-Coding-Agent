@@ -1103,7 +1103,7 @@ class FileEditor(FileEditorEditOpsMixin):
             return ToolResult(
                 output='',
                 error=(
-                    'File already exists. Use replace_symbol or replace_string '
+                    'File already exists. Use edit_symbols or replace_string '
                     'for modifications.'
                 ),
                 old_content=old_content,

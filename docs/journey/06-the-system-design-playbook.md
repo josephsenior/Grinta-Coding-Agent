@@ -153,9 +153,9 @@ In earlier versions, file editing alone had at least ten different tools. There 
 
 The model was constantly confused. Should it use `edit_file` or `str_replace`? What about `append_to_file`? What about `write_new_file`? The overlap was enormous, and the LLM would regularly pick the wrong one, then hallucinate the parameters for the tool it chose.
 
-I crushed all of those into a single `str_replace_editor` that exposes four commands behind one tool definition: `read_file`, `create_file`, `insert_text`, and `undo_last_edit`, plus structured `edit_mode` options. One tool. One schema. One mental model. The model learns a single interaction pattern and uses the `command` parameter to express intent.
+I crushed those choices into a compact file API: `read`, `find_symbols`, `create`, `edit_symbols`, `replace_string`, and `multiedit`. One small surface. One schema family. One mental model. The model chooses intent instead of choosing an editing transport.
 
-The details inside that tool matter. For code, `ast_code_editor` line/symbol tools and `edit_mode=range|patch` avoid brittle substring matching. Multi-file edits are sequential tool calls; checkpoints cover rollback when atomicity matters. `undo_last_edit` gives the model a bounded session-scoped undo instead of requiring checkpoint rollbacks for small mistakes.
+The details inside that surface matter. For code, `edit_symbols` avoids brittle substring matching. For prose and config, `replace_string` stays exact. Multi-file edits go through `multiedit` so rollback is part of the operation rather than a hope after the fact.
 
 That level of design — making the tool smart enough that the model does not need to learn a library of alternatives — is what reduces hallucination in practice. The tool does not assume the model will always provide perfect input. It normalizes whitespace when matching, provides clear error messages when a match fails, and validates paths against the project root to prevent writes outside the workspace.
 
@@ -185,7 +185,7 @@ Together, those three tools replaced an entire multi-agent team with something c
 
 What remained were only the tools that form the *nervous system of the agent*.
 
-I kept them native because they require zero RPC overhead. They need synchronous access to the workspace state, the circuit breakers, and the safety gates. When the agent updates the `task_tracker`, it is not just writing to a JSON file — it is synchronously triggering the validation service to update the ledger and check whether the agent should be allowed to finish. When the agent calls `bash`, the command analyzer immediately classifies the command against over forty threat patterns across critical, high, and medium severity tiers before the command ever reaches the shell. When the agent calls `str_replace_editor`, the tool validates the path against the project root, checks for writes to sensitive paths like `.ssh/` or `.env`, and for Python files, even runs an AST parse on the content to catch obviously broken output before it reaches disk.
+I kept them native because they require zero RPC overhead. They need synchronous access to the workspace state, the circuit breakers, and the safety gates. When the agent updates the `task_tracker`, it is not just writing to a JSON file — it is synchronously triggering the validation service to update the ledger and check whether the agent should be allowed to finish. When the agent calls `bash`, the command analyzer immediately classifies the command against over forty threat patterns across critical, high, and medium severity tiers before the command ever reaches the shell. When the agent uses the file API, the runtime validates the path against the project root, checks for writes to sensitive paths like `.ssh/` or `.env`, and for Python files, even runs an AST parse on the content to catch obviously broken output before it reaches disk.
 
 Those safety gates cannot tolerate network latency. They cannot tolerate RPC failures. They cannot tolerate the ambiguity of an external server silently dropping a validation check because of a timeout. If a tool fundamentally alters or observes the agent's run-state, it must be native.
 
@@ -252,7 +252,7 @@ The system prompt is composed from five static Markdown partials:
 
 2. **`autonomy`** — The runtime operating mode. Grinta supports three levels: `full` (execute all steps without asking), `balanced` (ask for risky actions), and `conservative` (confirm everything). The confirmation gate enforces those differences at runtime while the prompt keeps a single mode-agnostic autonomy block.
 
-3. **`tools`** — Tool usage discipline and fallback patterns. This is where the prompt enforces the philosophy: prefer structured tools over raw shell commands for file operations, do not use `cat` or `grep` for source code reading, do not create files with shell redirection when `str_replace_editor` exists.
+3. **`tools`** — Tool usage discipline and fallback patterns. This is where the prompt enforces the philosophy: prefer structured tools over raw shell commands for file operations, do not use `cat` or `grep` for source code reading, do not create files with shell redirection when `create` exists.
 
 4. **`tail`** — The closing behavioral instructions. Turn limits, budget reminders, and final rules that need to survive in the model's attention because they appear at the end of the system message.
 
@@ -448,7 +448,7 @@ A detail that reveals a lot about how the system thinks at runtime is the tool a
 This is not a static list. It is a layered assembly:
 
 1. **Core tools** always present: `bash`, `think`, `finish`, the task tracker, the memory tools.
-2. **Edit and search tools**: `str_replace_editor`, `search_code`, code structure exploration.
+2. **Edit and search tools**: `read`, `find_symbols`, `replace_string`, `edit_symbols`, `multiedit`, `search_code`, code structure exploration.
 3. **Terminal and special tools**: the terminal manager, checkpoint/rollback, delegation.
 4. **Optional feature tools**: LSP query (if the language server is available), signal progress (for external integrations), the blackboard (for state sharing).
 5. **Meta-cognition tools**: a communication tool for expressing uncertainty or asking the user for clarification. This is crucial because the model should always have a way to say "I am not sure" without being forced to guess.
