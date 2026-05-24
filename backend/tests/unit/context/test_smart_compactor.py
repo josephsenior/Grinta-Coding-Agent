@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -231,32 +231,32 @@ class TestHeuristicScoring:
 
 
 class TestScoreEventImportance:
-    def test_falls_back_to_heuristic_without_llm(self):
+    async def test_falls_back_to_heuristic_without_llm(self):
         sc = SmartCompactor(llm=None)
         events = [_event(i) for i in range(5)]
         essential: set[int] = {0}
-        scores = sc._score_event_importance(events, essential)
+        scores = await sc._score_event_importance(events, essential)
         # Essential events should not be scored
         assert 0 not in scores
         # Non-essential should have scores
         for eid in [1, 2, 3, 4]:
             assert eid in scores
 
-    def test_empty_non_essential(self):
+    async def test_empty_non_essential(self):
         sc = SmartCompactor(llm=None)
         events = [_event(0)]
         essential: set[int] = {0}
-        scores = sc._score_event_importance(events, essential)
+        scores = await sc._score_event_importance(events, essential)
         assert scores == {}
 
-    def test_batches_llm_scoring_for_non_essential_events(self):
+    async def test_batches_llm_scoring_for_non_essential_events(self):
         sc = SmartCompactor(llm=MagicMock())
         events = [_event(i) for i in range(25)]
-        sc._score_event_batch_with_llm = MagicMock(  # type: ignore[method-assign]
+        sc._score_event_batch_with_llm = AsyncMock(  # type: ignore[method-assign]
             side_effect=lambda batch: {event.id: 0.9 for event in batch}
         )
 
-        scores = sc._score_event_importance(events, {0})
+        scores = await sc._score_event_importance(events, {0})
 
         assert 0 not in scores
         assert scores[1] == 0.9
@@ -308,15 +308,15 @@ class TestSelectEventsToKeep:
 
 
 class TestGetCompaction:
-    def test_small_history_returns_empty(self):
+    async def test_small_history_returns_empty(self):
         sc = SmartCompactor(llm=None, keep_first=5)
         events = [_event(i) for i in range(3)]
         view = _view(events)
-        result = sc.get_compaction(view)
+        result = await sc.get_compaction(view)
         assert isinstance(result, Compaction)
         assert result.action.pruned_event_ids == []
 
-    def test_large_history_prunes_some(self):
+    async def test_large_history_prunes_some(self):
         sc = SmartCompactor(
             llm=None,
             max_size=50,
@@ -328,7 +328,7 @@ class TestGetCompaction:
         # Make first one a user message
         events[0] = _event(0, MessageAction, EventSource.USER, 'do something')
         view = _view(events)
-        result = sc.get_compaction(view)
+        result = await sc.get_compaction(view)
         assert isinstance(result, Compaction)
         # Should keep first events + recent + high importance.
         # Should prune at least some middle events.
@@ -447,29 +447,29 @@ class TestParseLlmScores:
 
 
 class TestScoreEventBatchWithLlm:
-    def test_returns_empty_without_llm(self):
+    async def test_returns_empty_without_llm(self):
         sc = SmartCompactor(llm=None)
-        assert sc._score_event_batch_with_llm([_event(1)]) == {}
+        assert await sc._score_event_batch_with_llm([_event(1)]) == {}
 
-    def test_returns_parsed_scores_on_success(self):
+    async def test_returns_parsed_scores_on_success(self):
         llm = MagicMock()
         response = MagicMock()
         response.choices = [MagicMock()]
         response.choices[0].message.content = '[0.4]'
-        llm.completion.return_value = response
+        llm.acompletion = AsyncMock(return_value=response)
         sc = SmartCompactor(llm=llm)
 
-        scores = sc._score_event_batch_with_llm([_event(1)])
+        scores = await sc._score_event_batch_with_llm([_event(1)])
 
         assert scores[1] == pytest.approx(0.4)
 
-    def test_falls_back_to_heuristics_on_completion_error(self):
+    async def test_falls_back_to_heuristics_on_completion_error(self):
         llm = MagicMock()
-        llm.completion.side_effect = RuntimeError('boom')
+        llm.acompletion = AsyncMock(side_effect=RuntimeError('boom'))
         sc = SmartCompactor(llm=llm)
         events = [_event(1)]
 
-        scores = sc._score_event_batch_with_llm(events)
+        scores = await sc._score_event_batch_with_llm(events)
 
         assert scores[1] == 0.5
 

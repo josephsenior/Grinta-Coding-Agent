@@ -324,11 +324,11 @@ class HUDBar:
         # was already incremented (e.g. by _handle_streaming_chunk).
         self.state.llm_calls = max(self.state.llm_calls, resolved_calls)
 
-        if self._has_usage_signal(accumulated_usage):
-            self._apply_object_accumulated_usage(accumulated_usage)
-            return
         if usages:
             self._apply_object_latest_usage(usages[-1])
+            return
+        if self._has_usage_signal(accumulated_usage):
+            self._apply_object_accumulated_usage(accumulated_usage)
 
     def _apply_object_accumulated_usage(self, accumulated_usage: Any) -> None:
         prompt_tokens = int(getattr(accumulated_usage, 'prompt_tokens', 0) or 0)
@@ -361,14 +361,15 @@ class HUDBar:
         )
         self.state.llm_calls = max(self.state.llm_calls, resolved_calls)
 
-        if isinstance(accumulated_usage, dict) and self._apply_dict_accumulated_usage(
-            accumulated_usage,
-        ):
-            return
         if usages:
             latest = usages[-1] if isinstance(usages, list) else usages
             if isinstance(latest, dict):
                 self._apply_dict_latest_usage(latest)
+                return
+        if isinstance(accumulated_usage, dict) and self._apply_dict_accumulated_usage(
+            accumulated_usage,
+        ):
+            return
 
     def _apply_dict_accumulated_usage(
         self,

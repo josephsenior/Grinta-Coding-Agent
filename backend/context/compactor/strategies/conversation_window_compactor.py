@@ -78,7 +78,7 @@ class ConversationWindowCompactor(RollingCompactor):
     def _recent_ids(self, events: list[Any]) -> set[int]:
         return {event.id for event in events[-self._max_events :]}
 
-    def get_compaction(self, view: View) -> Compaction:
+    async def get_compaction(self, view: View) -> Compaction:
         """Build a Compaction that prunes low-importance old events."""
         events = view.events
         file_action_ids = self._file_action_ids(events)
@@ -89,10 +89,10 @@ class ConversationWindowCompactor(RollingCompactor):
 
         return Compaction(action=self._create_condensation_action(pruned_ids))
 
-    def compact(self, view: View) -> View | Compaction:
+    async def compact(self, view: View) -> View | Compaction:
         """Delegate to get_compaction when needed; otherwise return the view unchanged."""
         if self.should_compact(view):
-            return self.get_compaction(view)
+            return await self.get_compaction(view)
         return view
 
     # ------------------------------------------------------------------

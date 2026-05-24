@@ -65,13 +65,13 @@ class CompactorPipeline(Compactor):
             for compactor in self.compactors:
                 compactor.write_metadata(state)
 
-    def compact(self, view: View) -> View | Compaction:
+    async def compact(self, view: View) -> View | Compaction:
         """Sequentially run compactors until one returns a compaction."""
         result: View | Compaction = view
         for compactor in self.compactors:
             if isinstance(result, Compaction):
                 break
-            result = compactor.compact(result)
+            result = await compactor.compact(result)
         return result
 
     @classmethod

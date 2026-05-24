@@ -39,13 +39,13 @@ class AmortizedPruningCompactor(RollingCompactor):
         self.keep_first = keep_first
         super().__init__()
 
-    def compact(self, view: View) -> View | Compaction:
+    async def compact(self, view: View) -> View | Compaction:
         """Compact, then condense if thresholds are exceeded."""
         if self.should_compact(view):
-            return self.get_compaction(view)
+            return await self.get_compaction(view)
         return view
 
-    def get_compaction(self, view: View) -> Compaction:
+    async def get_compaction(self, view: View) -> Compaction:
         """Generate condensation by keeping head and tail events.
 
         Args:

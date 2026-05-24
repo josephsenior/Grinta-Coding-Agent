@@ -71,7 +71,7 @@ class TestGetCompactionMetadata:
 class ConcreteCompactor(Compactor):
     """Non-abstract compactor for testing."""
 
-    def compact(self, view):
+    async def compact(self, view):
         return view
 
 
@@ -120,7 +120,7 @@ class TestCompactorMetadata:
         assert len(meta) == 1
         assert meta[0]['ctx'] == 'test'
 
-    def test_compacted_history_populates_llm_metadata(self):
+    async def test_compacted_history_populates_llm_metadata(self):
         llm = MagicMock()
         llm.config.model = 'openai/gpt-4'
         c = ConcreteLLMCompactor(llm=llm, max_size=100, keep_first=1)
@@ -128,7 +128,7 @@ class TestCompactorMetadata:
         state.view = View(events=_make_events(2))
         state.to_llm_metadata.return_value = {'model': 'openai/gpt-4'}
 
-        result = c.compacted_history(state)
+        result = await c.compacted_history(state)
 
         assert result == state.view
         assert c.llm_metadata == {'model': 'openai/gpt-4'}
@@ -155,7 +155,7 @@ class TestCompactorRegistry:
             pass
 
         class DummyCompactor(Compactor):
-            def compact(self, view):
+            async def compact(self, view):
                 return view
 
             @classmethod
@@ -204,7 +204,7 @@ class TestCompactorRegistry:
 class ConcreteLLMCompactor(BaseLLMCompactor):
     """Non-abstract LLM compactor for testing."""
 
-    def get_compaction(self, view):
+    async def get_compaction(self, view):
         return Compaction(
             action=MagicMock(
                 pruned_events_start_id=0,
@@ -426,7 +426,7 @@ class TestBaseLLMCompactor:
         ):
             assert c._exceeds_token_budget(View(events=_make_events(2))) is False
 
-    def test_compact_returns_view_or_compaction_based_on_thresholds(self):
+    async def test_compact_returns_view_or_compaction_based_on_thresholds(self):
         c = ConcreteLLMCompactor(llm=None, max_size=10)
         compacted_events = _make_events(2)
         view = View(events=_make_events(3))
@@ -436,7 +436,7 @@ class TestBaseLLMCompactor:
             patch.object(c, 'should_compact', return_value=False),
             patch.object(c, '_exceeds_token_budget', return_value=False),
         ):
-            result = c.compact(view)
+            result = await c.compact(view)
             assert isinstance(result, View)
             assert result.events == compacted_events
 
@@ -452,7 +452,7 @@ class TestBaseLLMCompactor:
             patch.object(c, '_exceeds_token_budget', return_value=False),
             patch.object(c, 'get_compaction', return_value=compaction),
         ):
-            assert c.compact(view) is compaction
+            assert await c.compact(view) is compaction
 
 
 # ===================================================================

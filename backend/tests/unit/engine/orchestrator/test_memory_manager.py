@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, cast
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -159,31 +159,31 @@ class TestCondenseHistory:
         state.view = MagicMock(unhandled_condensation_request=False)
         return state
 
-    def test_no_compactor_returns_all_history(self):
+    async def test_no_compactor_returns_all_history(self):
         m = _make_manager()
         events = [MagicMock(), MagicMock()]
         state = self._make_state_with_history(events)
-        result = m.condense_history(state)
+        result = await m.condense_history(state)
         assert isinstance(result, CondensedHistory)
         assert result.events == events
         assert result.pending_action is None
 
-    def test_compactor_view_result_returns_view_events(self):
+    async def test_compactor_view_result_returns_view_events(self):
         m = _make_manager()
         from backend.context.view import View
 
         mock_compactor = MagicMock()
         view = MagicMock(spec=View)
         view.events = cast(list[Event], [MagicMock(), MagicMock()])
-        mock_compactor.compacted_history.return_value = view
+        mock_compactor.compacted_history = AsyncMock(return_value=view)
         m.compactor = mock_compactor
 
         state = self._make_state_with_history()
-        result = m.condense_history(state)
+        result = await m.condense_history(state)
         assert result.events == view.events
         assert result.pending_action is None
 
-    def test_compactor_non_view_result_returns_action(self):
+    async def test_compactor_non_view_result_returns_action(self):
         m = _make_manager()
 
         mock_compactor = MagicMock()
@@ -191,48 +191,48 @@ class TestCondenseHistory:
         # Not a View instance → will reach the else branch
         cast(Any, condensation).__class__ = object  # NOT a View
         condensation.action = MagicMock(name='action')
-        mock_compactor.compacted_history.return_value = condensation
+        mock_compactor.compacted_history = AsyncMock(return_value=condensation)
         m.compactor = mock_compactor
 
         state = self._make_state_with_history()
-        result = m.condense_history(state)
+        result = await m.condense_history(state)
         assert result.events == []
         assert result.pending_action is condensation.action
 
-    def test_memory_pressure_not_set_skips_forced_condensation(self):
+    async def test_memory_pressure_not_set_skips_forced_condensation(self):
         m = _make_manager()
         from backend.context.view import View
 
         mock_compactor = MagicMock()
         view = MagicMock(spec=View)
         view.events = []
-        mock_compactor.compacted_history.return_value = view
+        mock_compactor.compacted_history = AsyncMock(return_value=view)
         m.compactor = mock_compactor
 
         state = self._make_state_with_history()
         state.extra_data = {}  # no memory_pressure key
-        result = m.condense_history(state)
+        result = await m.condense_history(state)
         assert isinstance(result, CondensedHistory)
 
-    def test_memory_pressure_cleared_when_compactor_returns_compaction(self):
+    async def test_memory_pressure_cleared_when_compactor_returns_compaction(self):
         m = _make_manager()
 
         mock_compactor = MagicMock()
         condensation = MagicMock()
         cast(Any, condensation).__class__ = object
         condensation.action = MagicMock(name='action')
-        mock_compactor.compacted_history.return_value = condensation
+        mock_compactor.compacted_history = AsyncMock(return_value=condensation)
         m.compactor = mock_compactor
 
         state = self._make_state_with_history([MagicMock()])
         state.turn_signals.memory_pressure = 'CRITICAL'
 
-        result = m.condense_history(state)
+        result = await m.condense_history(state)
 
         state.ack_memory_pressure.assert_called_once_with(source='ContextMemoryManager')
         assert result.pending_action is condensation.action
 
-    def test_short_history_skips_forced_compaction_under_memory_pressure(self):
+    async def test_short_history_skips_forced_compaction_under_memory_pressure(self):
         m = _make_manager()
         from backend.context.compactor.compactor import RollingCompactor
         from backend.context.view import View
@@ -241,38 +241,38 @@ class TestCondenseHistory:
         fake_view.events = [MagicMock()]
 
         fake_compactor = MagicMock(spec=RollingCompactor)
-        fake_compactor.compacted_history.return_value = fake_view
-        fake_compactor.get_compaction.return_value = MagicMock()
+        fake_compactor.compacted_history = AsyncMock(return_value=fake_view)
+        fake_compactor.get_compaction = AsyncMock(return_value=MagicMock())
         m.compactor = fake_compactor
 
         state = self._make_state_with_history([MagicMock() for _ in range(5)])
         state.turn_signals.memory_pressure = 'CRITICAL'
 
-        result = m.condense_history(state)
+        result = await m.condense_history(state)
 
         fake_compactor.get_compaction.assert_not_called()
         state.ack_memory_pressure.assert_called_once_with(source='ContextMemoryManager')
         assert result.events == fake_view.events
 
-    def test_noop_condensation_without_request_returns_history(self):
+    async def test_noop_condensation_without_request_returns_history(self):
         m = _make_manager()
 
         mock_compactor = MagicMock()
         condensation = MagicMock()
         cast(Any, condensation).__class__ = object
         condensation.action = CondensationAction(pruned_event_ids=[])
-        mock_compactor.compacted_history.return_value = condensation
+        mock_compactor.compacted_history = AsyncMock(return_value=condensation)
         m.compactor = mock_compactor
 
         history = [MagicMock(), MagicMock()]
         state = self._make_state_with_history(history)
 
-        result = m.condense_history(state)
+        result = await m.condense_history(state)
 
         assert result.events == history
         assert result.pending_action is None
 
-    def test_noop_condensation_request_is_still_returned(self):
+    async def test_noop_condensation_request_is_still_returned(self):
         m = _make_manager()
 
         mock_compactor = MagicMock()
@@ -280,13 +280,13 @@ class TestCondenseHistory:
         cast(Any, condensation).__class__ = object
         action = CondensationAction(pruned_event_ids=[])
         condensation.action = action
-        mock_compactor.compacted_history.return_value = condensation
+        mock_compactor.compacted_history = AsyncMock(return_value=condensation)
         m.compactor = mock_compactor
 
         state = self._make_state_with_history([MagicMock()])
         state.view.unhandled_condensation_request = True
 
-        result = m.condense_history(state)
+        result = await m.condense_history(state)
 
         assert result.pending_action is action
 

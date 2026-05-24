@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -210,7 +210,7 @@ class TestParseLlmResponse:
 
 
 class TestGetCompaction:
-    def test_returns_compaction_with_correct_events_dropped(self):
+    async def test_returns_compaction_with_correct_events_dropped(self):
         """Events between keep_first and tail should be dropped; summary replaces them."""
         llm = _make_llm()
         condenser = StructuredSummaryCompactor(llm=llm, max_size=10, keep_first=2)
@@ -226,16 +226,16 @@ class TestGetCompaction:
                 'pending_tasks': 'tests',
             }
         )
-        llm.completion.return_value = response
+        llm.acompletion = AsyncMock(return_value=response)
 
         with patch.object(condenser, '_add_response_metadata'):
-            result = condenser.get_compaction(view)
+            result = await condenser.get_compaction(view)
 
         assert isinstance(result, Compaction)
         assert result.action.pruned_events_start_id is not None
         assert result.action.pruned_events_end_id is not None
 
-    def test_llm_receives_previous_summary_in_prompt(self):
+    async def test_llm_receives_previous_summary_in_prompt(self):
         """When a summary event exists at keep_first, it is passed to the LLM."""
         llm = _make_llm()
         condenser = StructuredSummaryCompactor(llm=llm, max_size=10, keep_first=2)
@@ -257,13 +257,13 @@ class TestGetCompaction:
                 'pending_tasks': 'todo',
             }
         )
-        llm.completion.return_value = response
+        llm.acompletion = AsyncMock(return_value=response)
 
         with patch.object(condenser, '_add_response_metadata'):
-            condenser.get_compaction(view)
+            await condenser.get_compaction(view)
 
         # The prompt passed to the LLM should contain the previous summary text
-        call_kwargs = llm.completion.call_args
+        call_kwargs = llm.acompletion.call_args
         messages = call_kwargs[1]['messages'] if call_kwargs[1] else call_kwargs[0][0]
         prompt_text = str(messages)
         assert 'I remember everything' in prompt_text

@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections import deque
 from pathlib import Path
 from typing import Any, cast
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -263,7 +263,7 @@ class TestMemoryPressureMonitor:
 class TestMemoryPressureCompactorWiring:
     """Test that memory_pressure flag in state.extra_data forces condensation."""
 
-    def test_no_compactor_returns_full_history(self):
+    async def test_no_compactor_returns_full_history(self):
         from backend.engine.memory_manager import (
             ContextMemoryManager,
         )
@@ -274,11 +274,11 @@ class TestMemoryPressureCompactorWiring:
         mgr.compactor = None
 
         state = _mock_state(history=['e1', 'e2', 'e3'])
-        result = mgr.condense_history(state)
+        result = await mgr.condense_history(state)
         assert result.events == ['e1', 'e2', 'e3']
         assert result.pending_action is None
 
-    def test_compactor_returns_view_without_pressure(self):
+    async def test_compactor_returns_view_without_pressure(self):
         from backend.context.view import View
         from backend.engine.memory_manager import (
             ContextMemoryManager,
@@ -290,14 +290,14 @@ class TestMemoryPressureCompactorWiring:
         fake_view = MagicMock(spec=View)
         fake_view.events = ['condensed']
         fake_compactor = MagicMock()
-        fake_compactor.compacted_history.return_value = fake_view
+        fake_compactor.compacted_history = AsyncMock(return_value=fake_view)
         mgr.compactor = fake_compactor
 
         state = _mock_state()
-        result = mgr.condense_history(state)
+        result = await mgr.condense_history(state)
         assert result.events == ['condensed']
 
-    def test_memory_pressure_forces_condensation(self):
+    async def test_memory_pressure_forces_condensation(self):
         """When memory_pressure is set and the compactor returns a View,
         force compaction via get_compaction on RollingCompactor.
         """
@@ -318,23 +318,23 @@ class TestMemoryPressureCompactorWiring:
         fake_condensation.action = MagicMock()
 
         fake_compactor = MagicMock(spec=RollingCompactor)
-        fake_compactor.compacted_history.return_value = fake_view
-        fake_compactor.get_compaction.return_value = fake_condensation
+        fake_compactor.compacted_history = AsyncMock(return_value=fake_view)
+        fake_compactor.get_compaction = AsyncMock(return_value=fake_condensation)
         mgr.compactor = fake_compactor
 
         state = _mock_state(history=[f'event-{index}' for index in range(30)])
         state.turn_signals.memory_pressure = 'CRITICAL'
-        result = mgr.condense_history(state)
+        result = await mgr.condense_history(state)
 
         # Should have called get_compaction to force compaction
-        fake_compactor.get_compaction.assert_called_once_with(fake_view)
+        fake_compactor.get_compaction.assert_awaited_once_with(fake_view)
         # Memory pressure flag should be consumed
         pressure1: str | None = state.turn_signals.memory_pressure
         assert pressure1 is None
         # Result should reflect the forced condensation
         assert result.pending_action is fake_condensation.action
 
-    def test_memory_pressure_cleared_even_on_failure(self):
+    async def test_memory_pressure_cleared_even_on_failure(self):
         """Memory pressure flag is consumed even if forced condensation fails."""
         from backend.context.compactor.compactor import RollingCompactor
         from backend.context.view import View
@@ -349,13 +349,13 @@ class TestMemoryPressureCompactorWiring:
         fake_view.events = ['e1']
 
         fake_compactor = MagicMock(spec=RollingCompactor)
-        fake_compactor.compacted_history.return_value = fake_view
-        fake_compactor.get_compaction.side_effect = RuntimeError('compactor failed')
+        fake_compactor.compacted_history = AsyncMock(return_value=fake_view)
+        fake_compactor.get_compaction = AsyncMock(side_effect=RuntimeError('compactor failed'))
         mgr.compactor = fake_compactor
 
         state = _mock_state()
         state.turn_signals.memory_pressure = 'WARNING'
-        result = mgr.condense_history(state)
+        result = await mgr.condense_history(state)
 
         # Flag should still be consumed
         pressure2: str | None = state.turn_signals.memory_pressure
@@ -363,7 +363,7 @@ class TestMemoryPressureCompactorWiring:
         # Falls back to returning the original view
         assert result.events == ['e1']
 
-    def test_non_rolling_compactor_ignores_pressure(self):
+    async def test_non_rolling_compactor_ignores_pressure(self):
         """If compactor is not a RollingCompactor, memory pressure is still cleared
         but no forced compaction is attempted.
         """
@@ -380,12 +380,12 @@ class TestMemoryPressureCompactorWiring:
 
         # Plain compactor (not RollingCompactor)
         fake_compactor = MagicMock()
-        fake_compactor.compacted_history.return_value = fake_view
+        fake_compactor.compacted_history = AsyncMock(return_value=fake_view)
         mgr.compactor = fake_compactor
 
         state = _mock_state()
         state.turn_signals.memory_pressure = 'CRITICAL'
-        result = mgr.condense_history(state)
+        result = await mgr.condense_history(state)
 
         # Flag consumed
         pressure3: str | None = state.turn_signals.memory_pressure
@@ -395,7 +395,7 @@ class TestMemoryPressureCompactorWiring:
 
 
 class TestLongSessionCompactionInvariants:
-    def test_repeated_compaction_preserves_task_roots_and_recovery_artifacts(
+    async def test_repeated_compaction_preserves_task_roots_and_recovery_artifacts(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ):
         def fake_workspace_agent_state_dir(project_root: str | None = None) -> Path:
@@ -466,7 +466,7 @@ class TestLongSessionCompactionInvariants:
             *filler_events,
         ]
 
-        first = manager.condense_history(state)
+        first = await manager.condense_history(state)
         assert first.pending_action is not None
         first.pending_action.id = 11
         first.pending_action.source = EventSource.AGENT
@@ -478,7 +478,7 @@ class TestLongSessionCompactionInvariants:
             filler.source = EventSource.AGENT
             state.history.append(filler)
 
-        second = manager.condense_history(state)
+        second = await manager.condense_history(state)
         assert second.pending_action is not None
         second.pending_action.id = 17
         second.pending_action.source = EventSource.AGENT

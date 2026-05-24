@@ -80,14 +80,14 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
 
         return events
 
-    def test_file_write_events_preserved(self):
+    async def test_file_write_events_preserved(self):
         """FileWriteAction events in the pruned region should be kept."""
         # Create 30 events with a file write at index 5 (early, would normally be pruned).
         events = self._build_events(30, file_indices={5: 'src/page.tsx'})
 
         condenser = ConversationWindowCompactor(max_events=20)
         view = _view(events, unhandled=True)
-        condensation = condenser.get_compaction(view)
+        condensation = await condenser.get_compaction(view)
         action = condensation.action
 
         # Event 5 should NOT be pruned.
@@ -104,7 +104,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
             )
         self.assertNotIn(5, pruned, 'FileWriteAction at id=5 should be preserved')
 
-    def test_file_edit_events_preserved(self):
+    async def test_file_edit_events_preserved(self):
         """FileEditAction events should also be preserved."""
         events = self._build_events(30)
         # Replace event at index 4 with a FileEditAction
@@ -114,7 +114,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
 
         condenser = ConversationWindowCompactor(max_events=20)
         view = _view(events, unhandled=True)
-        condensation = condenser.get_compaction(view)
+        condensation = await condenser.get_compaction(view)
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])
@@ -130,7 +130,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
             )
         self.assertNotIn(4, pruned, 'FileEditAction at id=4 should be preserved')
 
-    def test_paired_observation_preserved(self):
+    async def test_paired_observation_preserved(self):
         """Observation paired to a preserved file action should also be kept."""
         events = self._build_events(
             30,
@@ -140,7 +140,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
 
         condenser = ConversationWindowCompactor(max_events=20)
         view = _view(events, unhandled=True)
-        condensation = condenser.get_compaction(view)
+        condensation = await condenser.get_compaction(view)
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])
@@ -157,14 +157,14 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         self.assertNotIn(5, pruned, 'FileWriteAction should be preserved')
         self.assertNotIn(6, pruned, 'Paired observation should be preserved')
 
-    def test_multiple_file_actions_preserved(self):
+    async def test_multiple_file_actions_preserved(self):
         """All file action events should be preserved, not just one."""
         file_indices = {3: 'a.tsx', 5: 'b.tsx', 7: 'c.tsx', 9: 'd.tsx'}
         events = self._build_events(30, file_indices=file_indices)
 
         condenser = ConversationWindowCompactor(max_events=20)
         view = _view(events, unhandled=True)
-        condensation = condenser.get_compaction(view)
+        condensation = await condenser.get_compaction(view)
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])
@@ -183,13 +183,13 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
                 eid, pruned, f'File action at id={eid} should be preserved'
             )
 
-    def test_non_file_events_still_pruned(self):
+    async def test_non_file_events_still_pruned(self):
         """Regular MessageAction events in the pruned region should still be dropped."""
         events = self._build_events(30, file_indices={5: 'page.tsx'})
 
         condenser = ConversationWindowCompactor(max_events=20)
         view = _view(events, unhandled=True)
-        condensation = condenser.get_compaction(view)
+        condensation = await condenser.get_compaction(view)
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])
@@ -215,12 +215,12 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
             'Some regular events should be pruned',
         )
 
-    def test_no_file_actions_no_change(self):
+    async def test_no_file_actions_no_change(self):
         """Without file actions, behavior is unchanged from before."""
         events = self._build_events(30)
         condenser = ConversationWindowCompactor(max_events=20)
         view = _view(events, unhandled=True)
-        condensation = condenser.get_compaction(view)
+        condensation = await condenser.get_compaction(view)
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])

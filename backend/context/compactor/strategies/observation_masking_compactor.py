@@ -54,7 +54,7 @@ class ObservationMaskingCompactor(Compactor):
         self.attention_window = attention_window
         super().__init__()
 
-    def compact(self, view: View) -> View | Compaction:
+    async def compact(self, view: View) -> View | Compaction:
         """Replace the content of observations outside of the attention window with a placeholder."""
         results: list[Event] = []
         for i, event in enumerate(view):

@@ -23,7 +23,7 @@ def _make_orchestrator() -> Orchestrator:
     """Return a bare Orchestrator with only the attributes the method touches."""
     orch = object.__new__(Orchestrator)
     memory_manager = MagicMock()
-    setattr(memory_manager, 'condense_history', MagicMock(return_value=MagicMock()))
+    setattr(memory_manager, 'condense_history', AsyncMock(return_value=MagicMock()))
     orch.memory_manager = memory_manager
     setattr(orch, '_execute_llm_step_async', AsyncMock(return_value=MagicMock()))
     return orch

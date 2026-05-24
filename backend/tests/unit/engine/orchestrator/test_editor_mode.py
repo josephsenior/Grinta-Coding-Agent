@@ -29,7 +29,7 @@ class FakeLLM:
 
 
 class EmptyMemory:
-    def condense_history(self, _state):
+    async def condense_history(self, _state):
         return SimpleNamespace(events=[], pending_action=None)
 
     def get_initial_user_message(self, _history):

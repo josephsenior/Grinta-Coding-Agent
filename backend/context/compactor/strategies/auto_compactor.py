@@ -39,7 +39,7 @@ class AutoCompactor(Compactor):
         self._cached_delegate: Compactor | None = None
         self._cached_config_type: str | None = None
 
-    def compact(self, view: View) -> View | Compaction:
+    async def compact(self, view: View) -> View | Compaction:
         """Select the best compactor for the current event stream and delegate."""
         events = list(view.events)
         config = select_compactor_config(
@@ -58,7 +58,7 @@ class AutoCompactor(Compactor):
         delegate = self._cached_delegate
         if delegate is None:
             raise RuntimeError('Compactor.from_config returned None')
-        return delegate.compact(view)
+        return await delegate.compact(view)
 
     @classmethod
     def from_config(cls, config: Any, llm_registry: LLMRegistry) -> AutoCompactor:

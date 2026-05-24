@@ -1115,9 +1115,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                     state_copy.history = list(history) if history else []
 
                     async def _run_bg():
-                        return await asyncio.to_thread(
-                            compactor.compacted_history, state_copy
-                        )
+                        return await compactor.compacted_history(state_copy)
 
                     self.memory_pressure.start_prewarm(_run_bg)
                     logger.debug('Kicked off background condensation pre-warm')

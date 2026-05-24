@@ -122,7 +122,7 @@ class CondensedHistoryResult(Protocol):
 class MemoryManagerProtocol(Protocol):
     """History condensation and LLM message construction."""
 
-    def condense_history(self, state: State) -> CondensedHistoryResult:
+    async def condense_history(self, state: State) -> CondensedHistoryResult:
         """Return condensed events and an optional pending action."""
         ...
 
