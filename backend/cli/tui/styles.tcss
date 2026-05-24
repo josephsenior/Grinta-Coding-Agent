@@ -243,6 +243,18 @@ HUD,
     background: #0d162a;
 }
 
+#hud-mode {
+    width: 18;
+    height: 1;
+    margin-right: 2;
+    background: #0a1525;
+    color: #8f9fc1;
+}
+
+#hud-mode:focus {
+    background: #0d162a;
+}
+
 /* ── Textual Generic Controls Design System ──────────────── */
 
 /* Inputs & Textareas */

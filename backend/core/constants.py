@@ -371,13 +371,8 @@ LOG_COLORS = {
 DISABLE_COLOR_PRINTING = False
 
 
-READ_FILE_TOOL_NAME = 'read_file'
-READ_RANGE_TOOL_NAME = 'read_range'
-READ_SYMBOL_TOOL_NAME = 'read_symbol'
-FIND_SYMBOLS_TOOL_NAME = 'find_symbols'
-CREATE_FILE_TOOL_NAME = 'create_file'
-REPLACE_SYMBOL_TOOL_NAME = 'replace_symbol'
-INSERT_SYMBOL_TOOL_NAME = 'insert_symbol'
+READ_TOOL_NAME = 'read'
+CREATE_TOOL_NAME = 'create'
 REPLACE_STRING_TOOL_NAME = 'replace_string'
 EDIT_SYMBOLS_TOOL_NAME = 'edit_symbols'
 MULTIEDIT_TOOL_NAME = 'multiedit'

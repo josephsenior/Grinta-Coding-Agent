@@ -55,7 +55,7 @@ from backend.core.errors import (
 logger = logging.getLogger(__name__)
 from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_names import (
-    CREATE_FILE_TOOL_NAME,
+    CREATE_TOOL_NAME,
     FINISH_TOOL_NAME,
 )
 from backend.inference.tool_result_format import (
@@ -262,7 +262,7 @@ def _get_tool_name_mapping() -> dict[str, str]:
         get_terminal_tool_name(): TERMINAL_EXAMPLE_KEY,
         'execute_bash': TERMINAL_EXAMPLE_KEY,
         'execute_powershell': TERMINAL_EXAMPLE_KEY,
-        CREATE_FILE_TOOL_NAME: 'create_file',
+        CREATE_TOOL_NAME: 'create',
         FINISH_TOOL_NAME: 'finish',
     }
 

@@ -359,7 +359,23 @@ class TestBuildLlmParams:
             if isinstance(m.get('content'), str)
         )
         assert 'File API mental model' in joined
+        assert '`read`' in joined
+        assert '`create`' in joined
         assert 'replace_string' in joined
+        stale_tool_names = (
+            'read_file',
+            'read_range',
+            'read_symbol',
+            'find_symbols',
+            'create_file',
+            'replace_symbol',
+            'insert_symbol',
+            'append_text',
+            'section_edit',
+            'raw editor',
+            'XML file-edit',
+        )
+        assert all(name not in joined for name in stale_tool_names)
 
     def test_injects_control_message_before_last_user(self):
         p = _make_planner()

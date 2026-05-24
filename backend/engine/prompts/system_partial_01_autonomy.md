@@ -52,7 +52,7 @@ Do not edit in batches without one; checkpoint.save.name="batch before X".
 Read errors quickly. If path is uncertain: {path_discovery_hint}
 
 On tool failure:
-- symbol edit error → locate the symbol with `find_symbols`, `read_symbol`, or `search_code`, then retry with a more specific `replace_symbol`/`insert_symbol`/`edit_symbols` call
+- symbol edit error → locate the symbol with `read` or `search_code`, then retry with a more specific `edit_symbols` or `create` call
 - `replace_string` ambiguity → re-read nearby context and make `old_string` more specific, or use `replace_all=true` only when every exact occurrence must change
 - multi-file edit failure → split the refactor only if atomicity is not required; otherwise fix the failing `multiedit` operation and retry
 {error_recovery_pivot_lines}

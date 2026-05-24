@@ -126,13 +126,8 @@ class TestFeatureFlagToolPresence:
     def test_editor_enabled(self):
         names = _build_toolset(enable_editor=True)
         public_file_tools = {
-            'read_file',
-            'read_range',
-            'find_symbols',
-            'read_symbol',
-            'create_file',
-            'replace_symbol',
-            'insert_symbol',
+            'read',
+            'create',
             'replace_string',
             'edit_symbols',
             'multiedit',
@@ -144,6 +139,14 @@ class TestFeatureFlagToolPresence:
             'section_edit',
             'raw_write',
             'overwrite_file',
+            'read_file',
+            'read_range',
+            'find_symbols',
+            'read_symbol',
+            'create_file',
+            'create_symbol',
+            'replace_symbol',
+            'insert_symbol',
             'insert_text',
             'append_text',
             'undo_last_edit',
@@ -159,9 +162,7 @@ class TestFeatureFlagToolPresence:
 
     def test_editor_disabled(self):
         names = _build_toolset(enable_editor=False)
-        assert 'create_file' not in names
-        assert 'replace_symbol' not in names
-        assert 'insert_symbol' not in names
+        assert 'create' not in names
         assert 'replace_string' not in names
         assert 'edit_symbols' not in names
         assert 'multiedit' not in names

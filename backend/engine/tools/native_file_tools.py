@@ -1,7 +1,7 @@
 """Native public file tools for the agent.
 
 The public file editing API is intentionally small. Do not expose new mutation
-tools to the model unless they fit the Read/Create/Replace/Insert/AST-Multiedit
+tools to the model unless they fit the Read/Create/Edit-Symbols/Replace/Multiedit
 policy.
 """
 
@@ -14,113 +14,48 @@ from backend.engine.tools.common import (
     get_security_risk_param,
 )
 from backend.inference.tool_names import (
-    CREATE_FILE_TOOL_NAME,
+    CREATE_TOOL_NAME,
     EDIT_SYMBOLS_TOOL_NAME,
-    FIND_SYMBOLS_TOOL_NAME,
-    INSERT_SYMBOL_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
-    READ_FILE_TOOL_NAME,
-    READ_RANGE_TOOL_NAME,
+    READ_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
-    REPLACE_SYMBOL_TOOL_NAME,
 )
 
 
-def create_read_file_tool() -> ChatCompletionToolParam:
+def create_read_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
-        name=READ_FILE_TOOL_NAME,
+        name=READ_TOOL_NAME,
         description=(
-            'Read a complete small or medium-sized file. For large files or '
-            'known locations, prefer read_range or read_symbol.'
+            'Read file, line range, symbol content, or symbol candidates. '
+            'For symbols, path is optional; unique symbols may be auto-resolved, '
+            'and ambiguous symbols return candidates.'
         ),
         properties={
-            'path': get_path_param('Project-relative path to read.'),
-            'security_risk': get_security_risk_param(),
-        },
-        required=['path', 'security_risk'],
-    )
-
-
-def create_read_range_tool() -> ChatCompletionToolParam:
-    return create_tool_definition(
-        name=READ_RANGE_TOOL_NAME,
-        description='Read a specific inclusive line range from a file. Read-only.',
-        properties={
-            'path': get_path_param('Project-relative path to read.'),
+            'type': {
+                'type': 'string',
+                'enum': ['file', 'range', 'symbol', 'symbols'],
+                'description': 'Read kind: file, range, symbol body, or symbol candidates.',
+            },
+            'path': get_path_param('Optional project-relative path. Required for file/range reads.'),
             'start_line': {
                 'type': 'integer',
-                'description': '1-based inclusive start line.',
+                'description': '1-based inclusive start line for type=range.',
             },
             'end_line': {
                 'type': 'integer',
-                'description': '1-based inclusive end line. Use -1 for EOF.',
+                'description': '1-based inclusive end line for type=range. Use -1 for EOF.',
             },
-            'security_risk': get_security_risk_param(),
-        },
-        required=['path', 'start_line', 'end_line', 'security_risk'],
-    )
-
-
-def create_find_symbols_tool() -> ChatCompletionToolParam:
-    return create_tool_definition(
-        name=FIND_SYMBOLS_TOOL_NAME,
-        description=(
-            'Discover matching code symbols without modifying files. Use this '
-            'when you know a symbol name but not the exact occurrence.'
-        ),
-        properties={
-            'query': {
+            'symbol_id': {
                 'type': 'string',
-                'description': 'Symbol name or substring to find.',
+                'description': 'Optional stable symbol id returned by read(type="symbols").',
             },
-            'path': get_path_param(
-                'Optional project-relative file path to search. If omitted, searches common source files.'
-            ),
-            'symbol_kind': {
-                'type': 'string',
-                'description': 'Optional kind filter: function, class, or method.',
-            },
-            'include_private': {
-                'type': 'boolean',
-                'description': 'Whether to include private/underscore-prefixed symbols.',
-            },
-            'security_risk': get_security_risk_param(),
-        },
-        required=['query', 'security_risk'],
-    )
-
-
-def create_create_file_tool() -> ChatCompletionToolParam:
-    return create_tool_definition(
-        name=CREATE_FILE_TOOL_NAME,
-        description=(
-            'Create a new file with raw content. Never overwrites existing files; '
-            'if the file exists, use replace_symbol or replace_string.'
-        ),
-        properties={
-            'path': get_path_param('Project-relative path to create.'),
-            'content': {
-                'type': 'string',
-                'description': 'Raw full file content. Use real newlines, not JSON-escaped \\n text.',
-            },
-            'security_risk': get_security_risk_param(),
-        },
-        required=['path', 'content', 'security_risk'],
-    )
-
-
-def create_replace_symbol_tool() -> ChatCompletionToolParam:
-    return create_tool_definition(
-        name=REPLACE_SYMBOL_TOOL_NAME,
-        description=(
-            'Replace or delete one existing code symbol. new_content must be '
-            'the complete replacement symbol text, not a patch or changed lines.'
-        ),
-        properties={
-            'path': get_path_param('Project-relative source file path.'),
             'symbol_name': {
                 'type': 'string',
-                'description': 'Name of the symbol to replace. Use Class.method for methods when helpful.',
+                'description': 'Symbol name for type=symbol or type=symbols.',
+            },
+            'query': {
+                'type': 'string',
+                'description': 'Alias for symbol_name when type=symbols.',
             },
             'symbol_kind': {
                 'type': 'string',
@@ -132,31 +67,39 @@ def create_replace_symbol_tool() -> ChatCompletionToolParam:
             },
             'occurrence': {
                 'type': 'integer',
-                'description': 'Optional 1-based occurrence index if candidates were previously returned.',
+                'description': 'Optional 1-based occurrence index after candidate discovery.',
             },
-            'new_content': {
-                'type': 'string',
-                'description': 'Complete replacement symbol text. Empty string deletes the symbol when syntax remains valid.',
+            'include_private': {
+                'type': 'boolean',
+                'description': 'Whether type=symbols includes private/underscore-prefixed symbols.',
             },
             'security_risk': get_security_risk_param(),
         },
-        required=['path', 'symbol_name', 'new_content', 'security_risk'],
+        required=['type', 'security_risk'],
     )
 
 
-def create_insert_symbol_tool() -> ChatCompletionToolParam:
+def create_create_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
-        name=INSERT_SYMBOL_TOOL_NAME,
+        name=CREATE_TOOL_NAME,
         description=(
-            'Insert one complete new code symbol before, after, or inside an '
-            'existing symbol. Use this for adding functions, methods, classes, '
-            'handlers, or components.'
+            'Create a new file or a new code symbol. type=file never overwrites. '
+            'type=symbol inserts a complete new symbol relative to an existing symbol.'
         ),
         properties={
-            'path': get_path_param('Project-relative source file path.'),
+            'type': {
+                'type': 'string',
+                'enum': ['file', 'symbol'],
+                'description': 'Creation kind.',
+            },
+            'path': get_path_param('Project-relative target path.'),
+            'content': {
+                'type': 'string',
+                'description': 'Raw file content or complete symbol text. Use real newlines.',
+            },
             'target_symbol': {
                 'type': 'string',
-                'description': 'Existing symbol used as the structural insertion anchor.',
+                'description': 'Existing symbol anchor for type=symbol.',
             },
             'target_kind': {
                 'type': 'string',
@@ -166,18 +109,18 @@ def create_insert_symbol_tool() -> ChatCompletionToolParam:
                 'type': 'string',
                 'description': 'Optional parent/container symbol for disambiguation.',
             },
+            'occurrence': {
+                'type': 'integer',
+                'description': 'Optional 1-based occurrence index after candidate discovery.',
+            },
             'position': {
                 'type': 'string',
                 'enum': ['before', 'after', 'inside_start', 'inside_end'],
-                'description': 'Where to insert relative to the target symbol.',
-            },
-            'content': {
-                'type': 'string',
-                'description': 'Complete raw symbol text to insert.',
+                'description': 'Where type=symbol inserts relative to target_symbol.',
             },
             'security_risk': get_security_risk_param(),
         },
-        required=['path', 'target_symbol', 'position', 'content', 'security_risk'],
+        required=['type', 'path', 'content', 'security_risk'],
     )
 
 
@@ -185,9 +128,9 @@ def create_replace_string_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=REPLACE_STRING_TOOL_NAME,
         description=(
-            'Exact text replacement for code and non-code. Use for generic '
-            'text edits, additions by replacing an anchor with anchor plus new '
-            'content, and deletions by replacing with an empty string.'
+            'Exact text replacement in one file. Use for generic text edits, '
+            'additions by replacing an anchor with anchor plus new content, and '
+            'deletions by replacing with an empty string.'
         ),
         properties={
             'path': get_path_param('Project-relative path to edit.'),
@@ -213,30 +156,34 @@ def create_edit_symbols_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=EDIT_SYMBOLS_TOOL_NAME,
         description=(
-            'AST-aware batch edit for multiple symbols in one file. Use when '
-            'editing several symbols together or when a single AST-aware batch '
-            'is cleaner than many replace_symbol calls.'
+            'AST-aware edit/delete for one or more existing symbols. Writes must be anchored '
+            'by symbol_id, path+symbol, or a globally unique symbol name; ambiguous targets reject with candidates.'
         ),
         properties={
-            'path': get_path_param('Project-relative source file path.'),
+            'path': get_path_param('Optional project-relative source file path. Strongly preferred for writes.'),
             'edits': {
                 'type': 'array',
-                'description': 'Symbol replacements to apply atomically within the file.',
+                'description': 'Symbol replacements/deletions to apply atomically.',
                 'items': {
                     'type': 'object',
                     'properties': {
+                        'symbol_id': {'type': 'string'},
+                        'path': {'type': 'string'},
                         'symbol_name': {'type': 'string'},
+                        'symbol_kind': {'type': 'string'},
+                        'parent_symbol': {'type': 'string'},
+                        'occurrence': {'type': 'integer'},
                         'new_content': {
                             'type': 'string',
-                            'description': 'Replacement content for the symbol edit. Use real newlines, not escaped \\n text.',
+                            'description': 'Complete replacement symbol text; empty string deletes when syntax remains valid.',
                         },
                     },
-                    'required': ['symbol_name', 'new_content'],
+                    'required': ['new_content'],
                 },
             },
             'security_risk': get_security_risk_param(),
         },
-        required=['path', 'edits', 'security_risk'],
+        required=['edits', 'security_risk'],
     )
 
 
@@ -244,30 +191,34 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=MULTIEDIT_TOOL_NAME,
         description=(
-            'Atomic multi-file refactoring. Use for coordinated changes across '
-            'files, such as implementation plus tests. Not for casual single-file edits.'
+            'Atomic multi-file refactoring. Operations use the same capabilities as '
+            'create, edit_symbols, and replace_string. Not for casual single-file edits.'
         ),
         properties={
             'operations': {
                 'type': 'array',
-                'description': (
-                    'Atomic operations. Supported commands: create_file, replace_string, '
-                    'and replace_symbol.'
-                ),
+                'description': 'Atomic operations. Supported commands: create, edit_symbols, replace_string.',
                 'items': {
                     'type': 'object',
                     'properties': {
                         'command': {'type': 'string'},
+                        'type': {'type': 'string'},
                         'path': {'type': 'string'},
                         'content': {'type': 'string'},
+                        'target_symbol': {'type': 'string'},
+                        'target_kind': {'type': 'string'},
+                        'position': {'type': 'string'},
                         'old_string': {'type': 'string'},
                         'new_string': {'type': 'string'},
                         'replace_all': {'type': 'boolean'},
                         'symbol_name': {'type': 'string'},
                         'symbol_kind': {'type': 'string'},
+                        'parent_symbol': {'type': 'string'},
+                        'occurrence': {'type': 'integer'},
                         'new_content': {'type': 'string'},
+                        'edits': {'type': 'array'},
                     },
-                    'required': ['command', 'path'],
+                    'required': ['command'],
                 },
             },
             'security_risk': get_security_risk_param(),
@@ -277,13 +228,9 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
 
 
 __all__ = [
-    'create_create_file_tool',
+    'create_create_tool',
     'create_edit_symbols_tool',
-    'create_find_symbols_tool',
-    'create_insert_symbol_tool',
     'create_multiedit_tool',
-    'create_read_file_tool',
-    'create_read_range_tool',
+    'create_read_tool',
     'create_replace_string_tool',
-    'create_replace_symbol_tool',
 ]
