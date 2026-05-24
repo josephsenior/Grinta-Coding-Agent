@@ -323,6 +323,19 @@ class CircuitBreaker:
             action='continue',
         )
 
+    def get_tool_error_count(self, tool_name: str) -> int:
+        """Return the current error count for a given tool bucket."""
+        return self._per_tool_errors.get(tool_name, 0)
+
+    def record_high_risk_action(self, security_risk: ActionSecurityRisk) -> None:
+        """Record a high-risk action attempt."""
+        if security_risk == ActionSecurityRisk.HIGH:
+            self.high_risk_action_count += 1
+
+    def record_stuck_detection(self) -> None:
+        """Record a stuck loop detection event."""
+        self.stuck_detection_count += 1
+
     def record_error(self, error: Exception, tool_name: str = '') -> None:
         """Record an error occurrence.
 
@@ -362,14 +375,25 @@ class CircuitBreaker:
         else:
             self.consecutive_errors = max(0, self.consecutive_errors - decay)
         self.recent_actions_success.append(True)
-        if tool_name and tool_name not in (
-            FILE_EDIT_BUCKET,
-            FILE_EDIT_SYNTAX_BUCKET,
-        ):
+        if tool_name:
+            if tool_name == FILE_EDIT_BUCKET:
+                self._per_tool_errors.pop(FILE_EDIT_SYNTAX_BUCKET, None)
+            old_count = self._per_tool_errors.get(tool_name, 0)
+            if decay <= 0:
+                self._per_tool_errors[tool_name] = 0
+            else:
+                new_count = max(0, old_count - decay)
+                if new_count <= 0:
+                    self._per_tool_errors.pop(tool_name, None)
+                else:
+                    self._per_tool_errors[tool_name] = new_count
+            old_stuck = self.stuck_detection_count
+            self.stuck_detection_count = max(0, self.stuck_detection_count - decay)
             logger.info(
-                'Progress signal received: %r. Reduced stuck_detection_count from %d to %d.',
-                note,
+                'Progress signal received. Reduced per-tool error count from %d to %d, stuck_detection_count from %d to %d.',
                 old_count,
+                self._per_tool_errors.get(tool_name, 0),
+                old_stuck,
                 self.stuck_detection_count,
             )
 

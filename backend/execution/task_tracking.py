@@ -61,6 +61,8 @@ class TaskTrackingMixin:
             return self._handle_task_view_action(
                 action, task_file_path, view_count=count
             )
+        if action.command == 'update_status':
+            return self._handle_task_update_status_action(action, task_file_path)
         return NullObservation('')
 
     # ------------------------------------------------------------------
@@ -150,6 +152,19 @@ class TaskTrackingMixin:
                 task_list=hydrated_task_list,
                 content=f'Failed to read the task list from session directory {task_file_path}. Error: {e!s}',
             )
+
+    def _handle_task_update_status_action(
+        self, action: TaskTrackingAction, task_file_path: str
+    ) -> Observation:
+        """Handle task update_status command — status is applied to active_plan.json by the tool handler."""
+        thought = (getattr(action, 'thought', '') or '').strip()
+        self._consecutive_task_view_count = 0
+        msg = thought if thought else '✅ Task status updated.'
+        return TaskTrackingObservation(
+            content=msg,
+            command=action.command,
+            task_list=action.task_list,
+        )
 
     # ------------------------------------------------------------------
     # Helpers
