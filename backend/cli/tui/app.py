@@ -212,16 +212,55 @@ class InfoSidebar(VerticalScroll):
 
 
 class Transcript(VerticalScroll):
-    """Scrollable conversation transcript container."""
+    """Scrollable conversation transcript container with auto-scroll awareness."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._user_scrolled_away = False
+
+    def compose(self) -> ComposeResult:
+        yield Static(id='scroll-badge', classes='-hidden')
+
+    def on_mount(self) -> None:
+        self._scroll_badge = self.query_one('#scroll-badge', Static)
+
+    def _was_at_bottom(self, threshold: int = 3) -> bool:
+        return self.max_scroll_y - self.scroll_y <= threshold
+
+    def on_scroll(self, _event: Widget.Scroll) -> None:
+        if not self._scroll_badge:
+            return
+        if self._was_at_bottom():
+            if self._user_scrolled_away:
+                self._user_scrolled_away = False
+                self._scroll_badge.add_class('-hidden')
+        else:
+            if not self._user_scrolled_away:
+                self._user_scrolled_away = True
+                self._scroll_badge.remove_class('-hidden')
+
+    def append_widget(self, widget: Static | Container) -> None:
+        """Mount a widget and auto-scroll unless user scrolled up."""
+        self.mount(widget)
+        if not self._user_scrolled_away:
+            self.scroll_end(animate=False)
 
     def write(self, renderable: Any) -> None:
         """Compatibility method for RichLog interface."""
-        self.mount(Static(renderable))
+        self.append_widget(Static(renderable))
+
+    def force_scroll_end(self) -> None:
+        """Scroll to bottom regardless of user scroll state."""
+        self._user_scrolled_away = False
+        self._scroll_badge.add_class('-hidden')
         self.scroll_end(animate=False)
 
     def clear(self) -> None:
         """Compatibility method for RichLog interface."""
         self.remove_children()
+        self._user_scrolled_away = False
+        self.mount(Static('', id='scroll-badge', classes='-hidden'))
+        self._scroll_badge = self.query_one('#scroll-badge', Static)
 
 
 class InputBar(Horizontal):
@@ -793,6 +832,8 @@ class GrintaScreen(Screen):
         Binding('end', 'scroll_end', 'Bottom', show=False),
         Binding('ctrl+b', 'toggle_sidebar', 'Toggle Sidebar', show=True),
         Binding('f1', 'show_help', 'Help', show=True),
+        Binding('ctrl+j', 'focus_next_card', 'Next Card', show=False),
+        Binding('ctrl+k', 'focus_prev_card', 'Prev Card', show=False),
     ]
 
     def __init__(
@@ -935,6 +976,7 @@ class GrintaScreen(Screen):
                     action_label='[+] Add',
                     id='sidebar-skills',
                 )
+        yield Static(id='command-suggestions', classes='-hidden')
         with InputBar(id='input-bar'):
             yield Static(id='spinner', classes='-hidden')
             yield TextArea(id='input', show_line_numbers=False)
@@ -1261,8 +1303,7 @@ class GrintaScreen(Screen):
             return
         from backend.cli.tui.widgets.activity_card import UserMessage
         widget = UserMessage(text)
-        display.mount(widget)
-        display.scroll_end(animate=False)
+        display.append_widget(widget)
 
     def add_agent_message(self, text: str) -> None:
         """Agent response."""
@@ -1275,8 +1316,7 @@ class GrintaScreen(Screen):
             return
         from backend.cli.tui.widgets.activity_card import AgentMessage
         widget = AgentMessage(text)
-        display.mount(widget)
-        display.scroll_end(animate=False)
+        display.append_widget(widget)
 
     def add_thinking(self, text: str) -> None:
         """Real-time thinking/reasoning — update live display."""
@@ -1607,7 +1647,65 @@ class GrintaScreen(Screen):
         self.show_help()
 
     def _scroll_to_bottom(self) -> None:
-        self._get_display().scroll_end(animate=False)
+        self._get_display().force_scroll_end()
+
+    def _find_focusable_cards(self) -> list[Widget]:
+        """Return all ActivityCard widgets in the transcript in DOM order."""
+        from backend.cli.tui.widgets.activity_card import ActivityCard
+        display = self._get_display()
+        return [c for c in display.query(ActivityCard) if c.display]
+
+    def action_focus_next_card(self) -> None:
+        """Move keyboard focus to the next ActivityCard in the transcript."""
+        if self.focused and self.focused is self.query_one('#input', TextArea):
+            return
+        cards = self._find_focusable_cards()
+        if not cards:
+            return
+        focused = self.screen.focused
+        start = 0
+        if focused in cards:
+            start = (cards.index(focused) + 1) % len(cards)
+        cards[start].focus()
+
+    def action_focus_prev_card(self) -> None:
+        """Move keyboard focus to the previous ActivityCard in the transcript."""
+        if self.focused and self.focused is self.query_one('#input', TextArea):
+            return
+        cards = self._find_focusable_cards()
+        if not cards:
+            return
+        focused = self.screen.focused
+        start = -1
+        if focused in cards:
+            start = cards.index(focused) - 1
+        cards[start].focus()
+
+    def _update_command_suggestions(self, text: str) -> None:
+        try:
+            suggestions = self.query_one('#command-suggestions', Static)
+        except Exception:
+            return
+        stripped = _strip_ansi(text).strip()
+        if not stripped.startswith('/'):
+            suggestions.add_class('-hidden')
+            return
+        try:
+            parts = shlex.split(stripped)
+        except ValueError:
+            suggestions.add_class('-hidden')
+            return
+        if not parts:
+            suggestions.add_class('-hidden')
+            return
+        cmd = parts[0].lower()
+        matches = [name for name in self._SLASH_HINTS if name.startswith(cmd)]
+        if not matches:
+            suggestions.add_class('-hidden')
+            return
+        markup = '  '.join(f'[#eacb8a]{m}[/]' for m in matches)
+        suggestions.update(f'Commands: {markup}  [#54597b]Tab/^Space to complete[/]')
+        suggestions.remove_class('-hidden')
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         if event.text_area.id == 'input':
@@ -1616,6 +1714,7 @@ class GrintaScreen(Screen):
                 event.text_area.text = text
                 return
             self._update_command_hint(text)
+            self._update_command_suggestions(text)
             line_count = len(text.split('\n')) if text else 1
             desired_textarea_height = max(3, min(6, line_count))
             desired_input_bar_height = desired_textarea_height + 1
@@ -2732,10 +2831,9 @@ class TUIRenderer:
         else:
             from textual.widget import Widget
             if isinstance(renderable, Widget):
-                display.mount(renderable)
+                display.append_widget(renderable)
             else:
-                display.mount(Static(renderable))
-            display.scroll_end(animate=False)
+                display.append_widget(Static(renderable))
         self._refresh_display()
 
     def update_live_thinking(self, text: str) -> None:
@@ -2758,11 +2856,12 @@ class TUIRenderer:
         if not self._live_thinking_widget:
             from backend.cli.tui.widgets.activity_card import ThinkingIndicator
             self._live_thinking_widget = ThinkingIndicator()
-            display.mount(self._live_thinking_widget)
+            display.append_widget(self._live_thinking_widget)
             self._live_thinking_widget.start()
 
         self._live_thinking_widget.set_thoughts(text)
-        display.scroll_end(animate=False)
+        if not display._user_scrolled_away:
+            display.scroll_end(animate=False)
 
     def update_live_response(self, text: str) -> None:
         """Update the in-flight assistant response in-place."""
@@ -2788,10 +2887,11 @@ class TUIRenderer:
         if not self._live_response_widget:
             from backend.cli.tui.widgets.activity_card import AgentMessage
             self._live_response_widget = AgentMessage(text)
-            display.mount(self._live_response_widget)
+            display.append_widget(self._live_response_widget)
         else:
             self._live_response_widget.update_message(text)
-        display.scroll_end(animate=False)
+            if not display._user_scrolled_away:
+                display.scroll_end(animate=False)
 
     def clear_live_response(self) -> None:
         """Clear the in-flight response preview widget."""
@@ -2831,8 +2931,7 @@ class TUIRenderer:
                     lines = [f'[bold #5eead4]Thinking:[/]']
                     for thought in thoughts:
                         lines.append(f'  [rgb(150,154,189)]│ {thought}[/]')
-                    display.mount(Static('\n'.join(lines)))
-                    display.scroll_end(animate=False)
+                    display.append_widget(Static('\n'.join(lines)))
             self._live_thinking_dirty = False
 
             self._live_thinking = ''
@@ -3087,8 +3186,7 @@ class TUIRenderer:
             )
 
         display = self._tui._get_display()
-        display.mount(widget)
-        display.scroll_end(animate=False)
+        display.append_widget(widget)
 
     def _write_tui_file_card(self, verb: str, path: str, extra_content: str | None, delta: str) -> None:
         from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
@@ -3098,8 +3196,7 @@ class TUIRenderer:
         )
         self._tui.set_last_tool_status(f'{verb} {path}')
         display = self._tui._get_display()
-        display.mount(widget)
-        display.scroll_end(animate=False)
+        display.append_widget(widget)
 
     def _upsert_terminal_session_card(
         self,
@@ -3133,8 +3230,7 @@ class TUIRenderer:
                 collapsed=False,
             )
             display = self._tui._get_display()
-            display.mount(widget)
-            display.scroll_end(animate=False)
+            display.append_widget(widget)
             if session_id:
                 self._terminal_cards_by_session[session_key] = widget
             else:

@@ -165,11 +165,26 @@ SidebarRow:focus {
     border-left: solid #91abec;
 }
 
+/* ── Command Suggestions ────────────────────────────── */
+#command-suggestions {
+    width: 100%;
+    height: 1;
+    background: #0a1525;
+    color: #8f9fc1;
+    padding: 0 2;
+    text-style: bold;
+    border-top: solid #15233c;
+}
+
+#command-suggestions.-hidden {
+    display: none;
+}
+
 /* ── InputBar ──────────────────────────────────────── */
 InputBar {
     height: 4;
     background: #08101d;
-    border-top: solid #1b233a;
+    border-top: solid #2a3a5a;
     padding: 0 2;
     layout: horizontal;
 }
@@ -669,6 +684,21 @@ AgentMessage {
     background: #080c16;
     border: none;
     color: #cbd5e1;
+}
+
+/* ── Scroll badge ──────────────────────────────────── */
+#scroll-badge {
+    dock: bottom;
+    width: 100%;
+    height: 1;
+    background: #0d1a30;
+    color: #5eead4;
+    text-align: center;
+    text-style: bold;
+}
+
+#scroll-badge.-hidden {
+    display: none;
 }
 
 /* ── Utility ───────────────────────────────────────── */
