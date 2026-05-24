@@ -124,7 +124,10 @@ class OrchestratorPlanner:
                 'checkpoint',
                 'call_tool_mcp',
                 'browser_tool',
-                'browse_interactive'
+                'browse_interactive',
+                'communicate_with_user',
+                'finish',
+                'task_tracker',
             }
             tools = [t for t in tools if (t.get('function') or {}).get('name') not in forbidden_tool_names]
 
