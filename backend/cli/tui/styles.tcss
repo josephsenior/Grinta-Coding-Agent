@@ -223,60 +223,136 @@ HUD,
 }
 
 #hud-line-2-row {
-    height: auto;
+    height: 1;
     layout: horizontal;
     align-vertical: middle;
-    margin-top: 0;
+    margin: 0;
     border-top: solid #15233c;
-    padding-top: 0;
+    padding: 0;
 }
 
 #hud-autonomy {
-    width: 22;
+    width: 20;
     margin-right: 1;
-    background: #0a1525;
-    color: #8f9fc1;
+    background: transparent;
     border: none;
+    padding: 0;
+    min-height: 1;
+    height: 1;
 }
 
 #hud-autonomy > .select {
     background: #0a1525;
     color: #8f9fc1;
-    border: none;
+    border-left: tall #3a5a8c;
     padding: 0 2;
+    margin: 0;
     min-height: 1;
+    height: 1;
+    content-align: center middle;
 }
 
 #hud-autonomy > .select:focus {
-    background: #0d162a;
+    background: #122542;
+    border-left: tall #5a8acc;
 }
 
 #hud-autonomy > .select > .select-label {
+    color: #6a8ab8;
+    padding: 0;
+    margin: 0;
+    text-style: bold;
+}
+
+#hud-autonomy > .select > .select-list-container {
+    background: #0d1a30;
+    border: solid #2a4a7a;
+    padding: 0;
+    margin: 0;
+}
+
+#hud-autonomy > .select > .select-list-container > .select-list {
+    background: #0d1a30;
+    padding: 0;
+    margin: 0;
+}
+
+#hud-autonomy > .select > .select-list-container > .select-list > .select-list-item {
+    background: #0d1a30;
     color: #8f9fc1;
+    padding: 0 2;
+    margin: 0;
+}
+
+#hud-autonomy > .select > .select-list-container > .select-list > .select-list-item:hover {
+    background: #1a3055;
+}
+
+#hud-autonomy > .select > .select-list-container > .select-list > .select-list-item-highlighted {
+    background: #1a3055;
+    color: #e9eefc;
 }
 
 #hud-mode {
-    width: 16;
+    width: 14;
     margin-right: 1;
-    background: #0a1525;
-    color: #8f9fc1;
+    background: transparent;
     border: none;
+    padding: 0;
+    min-height: 1;
+    height: 1;
 }
 
 #hud-mode > .select {
     background: #0a1525;
     color: #8f9fc1;
-    border: none;
+    border-left: tall #5a4a3a;
     padding: 0 2;
+    margin: 0;
     min-height: 1;
+    height: 1;
+    content-align: center middle;
 }
 
 #hud-mode > .select:focus {
-    background: #0d162a;
+    background: #122542;
+    border-left: tall #9a7a4a;
 }
 
 #hud-mode > .select > .select-label {
+    color: #b88a5a;
+    padding: 0;
+    margin: 0;
+    text-style: bold;
+}
+
+#hud-mode > .select > .select-list-container {
+    background: #0d1a30;
+    border: solid #5a3a2a;
+    padding: 0;
+    margin: 0;
+}
+
+#hud-mode > .select > .select-list-container > .select-list {
+    background: #0d1a30;
+    padding: 0;
+    margin: 0;
+}
+
+#hud-mode > .select > .select-list-container > .select-list > .select-list-item {
+    background: #0d1a30;
     color: #8f9fc1;
+    padding: 0 2;
+    margin: 0;
+}
+
+#hud-mode > .select > .select-list-container > .select-list > .select-list-item:hover {
+    background: #1a3055;
+}
+
+#hud-mode > .select > .select-list-container > .select-list > .select-list-item-highlighted {
+    background: #1a3055;
+    color: #e9eefc;
 }
 
 /* ── Textual Generic Controls Design System ──────────────── */

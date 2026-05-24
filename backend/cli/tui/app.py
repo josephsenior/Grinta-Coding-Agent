@@ -1008,11 +1008,6 @@ class GrintaScreen(Screen):
         if workspace:
             line1_parts.append(f'[#bbc8e8]ws: {workspace}[/]')
         line1_parts.append(f'[{NAVY_TEXT_SECONDARY}]{model_display}[/]')
-        elapsed = max(0, int(time.monotonic() - self._phase_started_at))
-        phase_compact = (self._phase_label or '').strip()
-        if phase_compact and phase_compact.lower() != display_state.lower():
-            line1_parts.append(f'[{NAVY_TEXT_DIM}]Phase: {phase_compact}[/]')
-        line1_parts.append(f'[{NAVY_TEXT_DIM}]Elapsed: {elapsed}s[/]')
         line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
         line1_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
         line1 = '  |  '.join(line1_parts)
