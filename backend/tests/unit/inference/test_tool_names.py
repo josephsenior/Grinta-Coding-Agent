@@ -6,6 +6,21 @@ from unittest import TestCase
 
 from backend.inference import tool_names
 
+EXPECTED_EXPORTS = [
+    'CREATE_FILE_TOOL_NAME',
+    'EDIT_SYMBOLS_TOOL_NAME',
+    'FINISH_TOOL_NAME',
+    'FIND_SYMBOLS_TOOL_NAME',
+    'INSERT_SYMBOL_TOOL_NAME',
+    'MULTIEDIT_TOOL_NAME',
+    'READ_FILE_TOOL_NAME',
+    'READ_RANGE_TOOL_NAME',
+    'READ_SYMBOL_TOOL_NAME',
+    'REPLACE_STRING_TOOL_NAME',
+    'REPLACE_SYMBOL_TOOL_NAME',
+    'TASK_TRACKER_TOOL_NAME',
+]
+
 
 class TestToolNames(TestCase):
     """Test tool_names module constants."""
@@ -22,17 +37,7 @@ class TestToolNames(TestCase):
 
     def test_all_exports_in_all_list(self):
         """Test that __all__ contains all expected exports."""
-        expected_exports = [
-            'CREATE_FILE_TOOL_NAME',
-            'FINISH_TOOL_NAME',
-            'FIND_SYMBOL_TOOL_NAME',
-            'READ_FILE_TOOL_NAME',
-            'READ_SYMBOL_TOOL_NAME',
-            'RENAME_SYMBOL_TOOL_NAME',
-            'TASK_TRACKER_TOOL_NAME',
-            'UNDO_LAST_EDIT_TOOL_NAME',
-        ]
-        self.assertEqual(set(tool_names.__all__), set(expected_exports))
+        self.assertEqual(set(tool_names.__all__), set(EXPECTED_EXPORTS))
 
     def test_finish_tool_name_value(self):
         """Test FINISH_TOOL_NAME has expected value from constants."""
@@ -50,27 +55,35 @@ class TestToolNames(TestCase):
         """Test that constants can be imported from tool_names."""
         from backend.inference.tool_names import (
             CREATE_FILE_TOOL_NAME,
+            EDIT_SYMBOLS_TOOL_NAME,
             FINISH_TOOL_NAME,
-            FIND_SYMBOL_TOOL_NAME,
+            FIND_SYMBOLS_TOOL_NAME,
+            INSERT_SYMBOL_TOOL_NAME,
+            MULTIEDIT_TOOL_NAME,
             READ_FILE_TOOL_NAME,
+            READ_RANGE_TOOL_NAME,
             READ_SYMBOL_TOOL_NAME,
-            RENAME_SYMBOL_TOOL_NAME,
+            REPLACE_STRING_TOOL_NAME,
+            REPLACE_SYMBOL_TOOL_NAME,
             TASK_TRACKER_TOOL_NAME,
-            UNDO_LAST_EDIT_TOOL_NAME,
         )
 
         # Verify all imports succeeded
         self.assertIsNotNone(CREATE_FILE_TOOL_NAME)
+        self.assertIsNotNone(EDIT_SYMBOLS_TOOL_NAME)
         self.assertIsNotNone(FINISH_TOOL_NAME)
-        self.assertIsNotNone(FIND_SYMBOL_TOOL_NAME)
+        self.assertIsNotNone(FIND_SYMBOLS_TOOL_NAME)
+        self.assertIsNotNone(INSERT_SYMBOL_TOOL_NAME)
+        self.assertIsNotNone(MULTIEDIT_TOOL_NAME)
         self.assertIsNotNone(READ_FILE_TOOL_NAME)
+        self.assertIsNotNone(READ_RANGE_TOOL_NAME)
         self.assertIsNotNone(READ_SYMBOL_TOOL_NAME)
-        self.assertIsNotNone(RENAME_SYMBOL_TOOL_NAME)
+        self.assertIsNotNone(REPLACE_STRING_TOOL_NAME)
+        self.assertIsNotNone(REPLACE_SYMBOL_TOOL_NAME)
         self.assertIsNotNone(TASK_TRACKER_TOOL_NAME)
-        self.assertIsNotNone(UNDO_LAST_EDIT_TOOL_NAME)
 
     def test_all_list_length(self):
-        self.assertEqual(len(tool_names.__all__), 8)
+        self.assertEqual(len(tool_names.__all__), len(EXPECTED_EXPORTS))
 
     def test_no_extra_exports(self):
         """Test that only expected constants are exported in __all__."""
@@ -87,14 +100,8 @@ class TestToolNames(TestCase):
 
     def test_tool_names_are_non_empty_strings(self):
         """Test that all tool names are non-empty strings."""
-        self.assertTrue(tool_names.FINISH_TOOL_NAME)
-        self.assertTrue(tool_names.CREATE_FILE_TOOL_NAME)
-        self.assertTrue(tool_names.FIND_SYMBOL_TOOL_NAME)
-        self.assertTrue(tool_names.READ_FILE_TOOL_NAME)
-        self.assertTrue(tool_names.READ_SYMBOL_TOOL_NAME)
-        self.assertTrue(tool_names.RENAME_SYMBOL_TOOL_NAME)
-        self.assertTrue(tool_names.TASK_TRACKER_TOOL_NAME)
-        self.assertTrue(tool_names.UNDO_LAST_EDIT_TOOL_NAME)
+        for name in EXPECTED_EXPORTS:
+            self.assertTrue(getattr(tool_names, name))
 
     def test_tool_names_consistency_with_core_constants(self):
         """Test that tool_names module is consistent with core.constants."""
@@ -103,23 +110,5 @@ class TestToolNames(TestCase):
         self.assertEqual(
             tool_names.CREATE_FILE_TOOL_NAME, core_constants.CREATE_FILE_TOOL_NAME
         )
-        self.assertEqual(tool_names.FINISH_TOOL_NAME, core_constants.FINISH_TOOL_NAME)
-        self.assertEqual(
-            tool_names.FIND_SYMBOL_TOOL_NAME, core_constants.FIND_SYMBOL_TOOL_NAME
-        )
-        self.assertEqual(
-            tool_names.READ_FILE_TOOL_NAME, core_constants.READ_FILE_TOOL_NAME
-        )
-        self.assertEqual(
-            tool_names.READ_SYMBOL_TOOL_NAME, core_constants.READ_SYMBOL_TOOL_NAME
-        )
-        self.assertEqual(
-            tool_names.RENAME_SYMBOL_TOOL_NAME, core_constants.RENAME_SYMBOL_TOOL_NAME
-        )
-        self.assertEqual(
-            tool_names.TASK_TRACKER_TOOL_NAME, core_constants.TASK_TRACKER_TOOL_NAME
-        )
-        self.assertEqual(
-            tool_names.UNDO_LAST_EDIT_TOOL_NAME,
-            core_constants.UNDO_LAST_EDIT_TOOL_NAME,
-        )
+        for name in EXPECTED_EXPORTS:
+            self.assertEqual(getattr(tool_names, name), getattr(core_constants, name))

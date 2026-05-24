@@ -400,7 +400,7 @@ class ActionExecutionService:
             return (
                 'No tool call detected - the response contains text but no tool call.\n\n'
                 'Use the available native tool calls shown in the prompt. '
-                'For file edits use the file editing tools or EDIT_FILE blocks; for commands use `terminal_manager`; '
+                'For file edits use the public file API tools; for commands use `terminal_manager`; '
                 'for user clarification use `communicate_with_user`.'
             )
         return str(exc)

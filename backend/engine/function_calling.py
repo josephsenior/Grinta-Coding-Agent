@@ -41,10 +41,14 @@ from backend.engine.function_calling_helpers import (
 from backend.engine.tools import (
     create_cmd_run_tool,
     create_create_file_tool,
-    create_find_symbol_tool,
+    create_edit_symbols_tool,
+    create_find_symbols_tool,
+    create_insert_symbol_tool,
+    create_multiedit_tool,
     create_read_file_tool,
-    create_rename_symbol_tool,
-    create_undo_last_edit_tool,
+    create_read_range_tool,
+    create_replace_string_tool,
+    create_replace_symbol_tool,
 
     create_finish_tool,
     create_summarize_context_tool,
@@ -79,7 +83,6 @@ from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engine.tools.note import build_note_action, build_recall_action
 from backend.engine.tools.read_symbol import (
     READ_SYMBOL_TOOL_NAME,
-    build_read_symbol_action,
 )
 from backend.engine.tools.search_code import (
     SEARCH_CODE_TOOL_NAME,
@@ -91,11 +94,15 @@ from backend.engine.tools.terminal_manager import (
 )
 from backend.inference.tool_names import (
     CREATE_FILE_TOOL_NAME,
-    FIND_SYMBOL_TOOL_NAME,
+    EDIT_SYMBOLS_TOOL_NAME,
+    FIND_SYMBOLS_TOOL_NAME,
+    INSERT_SYMBOL_TOOL_NAME,
+    MULTIEDIT_TOOL_NAME,
     READ_FILE_TOOL_NAME,
-    RENAME_SYMBOL_TOOL_NAME,
+    READ_RANGE_TOOL_NAME,
+    REPLACE_STRING_TOOL_NAME,
+    REPLACE_SYMBOL_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
-    UNDO_LAST_EDIT_TOOL_NAME,
 )
 from backend.ledger.action import (
     Action,
@@ -293,11 +300,288 @@ def _handle_search_code_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     )
 
 
+def _workspace_root() -> Path:
+    try:
+        from backend.core.workspace_resolution import require_effective_workspace_root
+
+        return Path(require_effective_workspace_root()).resolve()
+    except Exception:
+        return Path.cwd().resolve()
+
+
+def _safe_workspace_path(path: str, *, must_exist: bool = False) -> Path:
+    from backend.core.type_safety.path_validation import SafePath
+
+    return SafePath.validate(
+        path,
+        workspace_root=_workspace_root(),
+        must_exist=must_exist,
+        must_be_relative=True,
+    ).path
+
+
+def _relative_display_path(path: Path) -> str:
+    root = _workspace_root()
+    try:
+        return str(path.resolve().relative_to(root))
+    except ValueError:
+        return str(path)
+
+
+def _sha256_text(content: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+
+def _read_text_for_tool(path: Path) -> str:
+    return path.read_text(encoding='utf-8')
+
+
+def _guard_content_arguments(arguments: Mapping[str, Any]) -> None:
+    from backend.core.content_escape_repair import validate_content_payloads
+
+    validate_content_payloads(dict(arguments))
+
+
+def _symbol_id(path: str, name: str, start_line: int, end_line: int) -> str:
+    return f'{path}:{start_line}-{end_line}:{name}'
+
+
+def _symbol_preview(content: str, start_line: int, end_line: int) -> str:
+    lines = content.splitlines()
+    if not lines:
+        return ''
+    selected = lines[start_line - 1 : min(end_line, start_line + 2)]
+    return '\n'.join(selected)[:240]
+
+
+def _candidate_from_location(location: Any, content: str, display_path: str) -> dict[str, Any]:
+    name = str(getattr(location, 'symbol_name', '') or '')
+    start_line = int(getattr(location, 'line_start', 0) or 0)
+    end_line = int(getattr(location, 'line_end', 0) or 0)
+    return {
+        'symbol_id': _symbol_id(display_path, name, start_line, end_line),
+        'name': name,
+        'kind': getattr(location, 'node_type', None),
+        'parent': getattr(location, 'parent_name', None),
+        'path': display_path,
+        'start_line': start_line,
+        'end_line': end_line,
+        'signature': _symbol_preview(content, start_line, end_line),
+    }
+
+
+def _node_kind(node_type: str) -> str:
+    if 'class' in node_type:
+        return 'class'
+    if 'method' in node_type:
+        return 'method'
+    return 'function'
+
+
+def _find_symbol_candidates_in_file(
+    path: Path,
+    query: str,
+    *,
+    symbol_kind: str | None = None,
+    include_private: bool = False,
+) -> list[dict[str, Any]]:
+    from backend.utils.treesitter_editor import TreeSitterEditor
+
+    editor = TreeSitterEditor()
+    parse_result = editor.parse_file(str(path), use_cache=False)
+    if not parse_result:
+        return []
+    tree, file_bytes, language = parse_result
+    content = file_bytes.decode('utf-8', errors='replace')
+    display_path = _relative_display_path(path)
+    query_lower = query.lower()
+    kind_filter = (symbol_kind or '').strip().lower()
+    candidates: list[dict[str, Any]] = []
+
+    class_types = {
+        'class_definition',
+        'class_declaration',
+        'class_specifier',
+    }
+    function_types = {
+        'function_definition',
+        'function_declaration',
+        'function',
+        'method_definition',
+        'method_declaration',
+        'constructor_declaration',
+        'function_item',
+        'method',
+        'singleton_method',
+    }
+    target_types = class_types | function_types
+
+    def visit(node: Any, parent_name: str | None = None) -> None:
+        next_parent = parent_name
+        if node.type in target_types:
+            name_node = editor.get_name_node(node)
+            if name_node is not None:
+                name = file_bytes[name_node.start_byte : name_node.end_byte].decode(
+                    'utf-8', errors='replace'
+                )
+                kind = _node_kind(str(node.type))
+                if (
+                    query_lower in name.lower()
+                    and (include_private or not name.startswith('_'))
+                    and (not kind_filter or kind == kind_filter)
+                ):
+                    location = type(
+                        '_Location',
+                        (),
+                        {
+                            'symbol_name': name,
+                            'node_type': node.type,
+                            'parent_name': parent_name,
+                            'line_start': node.start_point[0] + 1,
+                            'line_end': node.end_point[0] + 1,
+                        },
+                    )()
+                    candidates.append(
+                        _candidate_from_location(location, content, display_path)
+                    )
+                if kind == 'class':
+                    next_parent = name
+        for child in getattr(node, 'children', []) or []:
+            visit(child, next_parent)
+
+    visit(tree.root_node)
+    return candidates
+
+
+def _resolve_symbol_candidates(
+    *,
+    path: str,
+    symbol_name: str,
+    symbol_kind: str | None = None,
+    parent_symbol: str | None = None,
+    occurrence: int | None = None,
+) -> tuple[Path, str, list[dict[str, Any]]]:
+    safe_path = _safe_workspace_path(path, must_exist=True)
+    content = _read_text_for_tool(safe_path)
+    lookup_name = symbol_name
+    if not parent_symbol and '.' in lookup_name:
+        maybe_parent, _, maybe_name = lookup_name.rpartition('.')
+        parent_symbol = maybe_parent or None
+        lookup_name = maybe_name
+    if parent_symbol and '.' not in lookup_name:
+        lookup_name = f'{parent_symbol}.{lookup_name}'
+
+    candidates = _find_symbol_candidates_in_file(
+        safe_path,
+        lookup_name.split('.')[-1],
+        symbol_kind=symbol_kind,
+        include_private=True,
+    )
+    if parent_symbol:
+        candidates = [c for c in candidates if c.get('parent') == parent_symbol]
+    candidates = [c for c in candidates if c.get('name') == lookup_name.split('.')[-1]]
+
+    if occurrence is not None:
+        if occurrence < 1 or occurrence > len(candidates):
+            raise FunctionCallValidationError(
+                f'Occurrence {occurrence} is out of range for {symbol_name}; '
+                f'{len(candidates)} candidate(s) found.'
+            )
+        candidates = [candidates[occurrence - 1]]
+
+    return safe_path, content, candidates
+
+
+def _symbol_action_ambiguity_error(symbol_name: str, candidates: list[dict[str, Any]]) -> str:
+    return (
+        f"Symbol '{symbol_name}' is ambiguous. Use read_symbol/find_symbols output "
+        f'to choose a parent_symbol or occurrence.\n'
+        + json.dumps({'candidates': candidates}, indent=2)
+    )
+
+
+def _single_symbol_candidate(
+    *,
+    path: str,
+    symbol_name: str,
+    symbol_kind: str | None = None,
+    parent_symbol: str | None = None,
+    occurrence: int | None = None,
+) -> tuple[Path, str, dict[str, Any]]:
+    safe_path, content, candidates = _resolve_symbol_candidates(
+        path=path,
+        symbol_name=symbol_name,
+        symbol_kind=symbol_kind,
+        parent_symbol=parent_symbol,
+        occurrence=occurrence,
+    )
+    if not candidates:
+        raise FunctionCallValidationError(f"Symbol '{symbol_name}' not found in {path}.")
+    if len(candidates) > 1:
+        raise FunctionCallValidationError(
+            _symbol_action_ambiguity_error(symbol_name, candidates)
+        )
+    return safe_path, content, candidates[0]
+
+
 def _handle_read_symbol_tool(
     arguments: Mapping[str, Any],
 ) -> AgentThinkAction:
-    """Handle READ_SYMBOL_TOOL: fetch symbol/file source via tree-sitter."""
-    return build_read_symbol_action(dict(arguments))
+    """Handle READ_SYMBOL_TOOL: fetch one exact symbol body."""
+    symbol_id = str(arguments.get('symbol_id') or '').strip()
+    path = str(arguments.get('path') or '').strip()
+    symbol_name = str(arguments.get('symbol_name') or '').strip()
+    symbol_kind = cast(str | None, arguments.get('symbol_kind'))
+    parent_symbol = cast(str | None, arguments.get('parent_symbol'))
+    occurrence = cast(int | None, arguments.get('occurrence'))
+
+    if symbol_id:
+        try:
+            raw_path, rest = symbol_id.rsplit(':', 1)
+            range_part, _, raw_name = rest.partition(':')
+            start_raw, _, end_raw = range_part.partition('-')
+            path = raw_path
+            symbol_name = raw_name or symbol_name
+            occurrence = None
+            requested_start = int(start_raw)
+            requested_end = int(end_raw)
+        except Exception as exc:
+            raise FunctionCallValidationError(
+                f'Invalid symbol_id {symbol_id!r}; use an id returned by find_symbols.'
+            ) from exc
+    else:
+        requested_start = requested_end = None
+
+    if not path or not symbol_name:
+        raise FunctionCallValidationError(
+            'read_symbol requires either symbol_id or path plus symbol_name.'
+        )
+
+    safe_path, content, candidate = _single_symbol_candidate(
+        path=path,
+        symbol_name=symbol_name,
+        symbol_kind=symbol_kind,
+        parent_symbol=parent_symbol,
+        occurrence=occurrence,
+    )
+    if requested_start is not None and (
+        candidate['start_line'] != requested_start or candidate['end_line'] != requested_end
+    ):
+        raise FunctionCallValidationError(
+            'symbol_id no longer matches the current file. Re-run find_symbols.'
+        )
+    lines = content.splitlines(keepends=True)
+    body = ''.join(lines[candidate['start_line'] - 1 : candidate['end_line']])
+    payload = {
+        **candidate,
+        'file_rev': _sha256_text(content),
+        'symbol_hash': _sha256_text(body),
+        'content': body,
+        'path': _relative_display_path(safe_path),
+    }
+    return AgentThinkAction(thought='[READ_SYMBOL]\n' + json.dumps(payload, indent=2))
 
 
 def _handle_checkpoint_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
@@ -1345,7 +1629,32 @@ def _handle_undo_last_edit_command(
 def _handle_read_file_tool(arguments: Mapping[str, Any]) -> Action:
     validate_security_risk(arguments, READ_FILE_TOOL_NAME)
     path = require_tool_argument(arguments, 'path', READ_FILE_TOOL_NAME)
-    action = _handle_read_file_command(str(path), arguments)
+    action = _handle_read_file_command(str(path), {})
+    set_security_risk(action, arguments)
+    return action
+
+
+def _handle_read_range_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, READ_RANGE_TOOL_NAME)
+    path = require_tool_argument(arguments, 'path', READ_RANGE_TOOL_NAME)
+    start_line = require_tool_argument(arguments, 'start_line', READ_RANGE_TOOL_NAME)
+    end_line = require_tool_argument(arguments, 'end_line', READ_RANGE_TOOL_NAME)
+    try:
+        start_i = int(start_line)
+        end_i = int(end_line)
+    except (TypeError, ValueError) as exc:
+        raise FunctionCallValidationError(
+            'read_range requires integer start_line and end_line.'
+        ) from exc
+    if start_i < 1:
+        raise FunctionCallValidationError('read_range start_line must be >= 1.')
+    if end_i != -1 and end_i < start_i:
+        raise FunctionCallValidationError(
+            'read_range end_line must be >= start_line, or -1 for EOF.'
+        )
+    action = _handle_read_file_command(
+        str(path), {'view_range': [start_i, end_i], 'security_risk': arguments.get('security_risk')}
+    )
     set_security_risk(action, arguments)
     return action
 
@@ -1353,51 +1662,266 @@ def _handle_read_file_tool(arguments: Mapping[str, Any]) -> Action:
 def _handle_create_file_tool(arguments: Mapping[str, Any]) -> Action:
     validate_security_risk(arguments, CREATE_FILE_TOOL_NAME)
     path = require_tool_argument(arguments, 'path', CREATE_FILE_TOOL_NAME)
-    require_tool_argument(arguments, 'file_text', CREATE_FILE_TOOL_NAME)
+    content = require_tool_argument(arguments, 'content', CREATE_FILE_TOOL_NAME)
     normalized_args = dict(arguments)
-    from backend.core.content_escape_repair import repair_arguments_in_place
-
-    repair_arguments_in_place(normalized_args, str(path))
+    _guard_content_arguments(normalized_args)
+    normalized_args['file_text'] = str(content)
+    normalized_args['overwrite_existing'] = False
     action = _handle_create_file_command(str(path), normalized_args)
     set_security_risk(action, arguments)
     return action
 
 
-def _handle_undo_last_edit_tool(arguments: Mapping[str, Any]) -> Action:
-    validate_security_risk(arguments, UNDO_LAST_EDIT_TOOL_NAME)
-    path = require_tool_argument(arguments, 'path', UNDO_LAST_EDIT_TOOL_NAME)
-    action = _handle_undo_last_edit_command(str(path), arguments)
-    set_security_risk(action, arguments)
-    return action
+def _handle_find_symbols_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
+    validate_security_risk(arguments, FIND_SYMBOLS_TOOL_NAME)
+    query = str(require_tool_argument(arguments, 'query', FIND_SYMBOLS_TOOL_NAME)).strip()
+    if not query:
+        raise FunctionCallValidationError('find_symbols query must not be empty.')
+    raw_path = str(arguments.get('path') or '').strip()
+    symbol_kind = cast(str | None, arguments.get('symbol_kind'))
+    include_private = parse_bool_argument(arguments.get('include_private', False))
+
+    paths: list[Path]
+    if raw_path:
+        paths = [_safe_workspace_path(raw_path, must_exist=True)]
+    else:
+        root = _workspace_root()
+        suffixes = {'.py', '.js', '.jsx', '.ts', '.tsx', '.go', '.rs', '.java', '.rb', '.php'}
+        paths = [
+            p for p in root.rglob('*')
+            if p.is_file() and p.suffix.lower() in suffixes and '.git' not in p.parts
+        ][:200]
+
+    candidates: list[dict[str, Any]] = []
+    for candidate_path in paths:
+        candidates.extend(
+            _find_symbol_candidates_in_file(
+                candidate_path,
+                query,
+                symbol_kind=symbol_kind,
+                include_private=include_private,
+            )
+        )
+
+    payload = {'query': query, 'candidates': candidates}
+    return AgentThinkAction(thought='[FIND_SYMBOLS]\n' + json.dumps(payload, indent=2))
 
 
-def _handle_rename_symbol_tool(arguments: Mapping[str, Any]) -> Action:
-    validate_security_risk(arguments, RENAME_SYMBOL_TOOL_NAME)
-    path = require_tool_argument(arguments, 'path', RENAME_SYMBOL_TOOL_NAME)
-    normalized_args = dict(arguments)
-    from backend.core.content_escape_repair import repair_arguments_in_place
-    from backend.engine.tools.structure_editor import StructureEditor
-
-    repair_arguments_in_place(normalized_args, str(path))
-    editor = StructureEditor()
-    action = _handle_rename_symbol_command(
-        editor, str(path), normalized_args, tool_name=RENAME_SYMBOL_TOOL_NAME
+def _handle_replace_symbol_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, REPLACE_SYMBOL_TOOL_NAME)
+    path = str(require_tool_argument(arguments, 'path', REPLACE_SYMBOL_TOOL_NAME))
+    symbol_name = str(
+        require_tool_argument(arguments, 'symbol_name', REPLACE_SYMBOL_TOOL_NAME)
+    )
+    new_content = str(
+        require_tool_argument(arguments, 'new_content', REPLACE_SYMBOL_TOOL_NAME)
+    )
+    _guard_content_arguments(dict(arguments))
+    occurrence = cast(int | None, arguments.get('occurrence'))
+    safe_path, content, candidate = _single_symbol_candidate(
+        path=path,
+        symbol_name=symbol_name,
+        symbol_kind=cast(str | None, arguments.get('symbol_kind')),
+        parent_symbol=cast(str | None, arguments.get('parent_symbol')),
+        occurrence=occurrence,
+    )
+    action = FileEditAction(
+        path=_relative_display_path(safe_path),
+        command='edit',
+        edit_mode='range',
+        start_line=int(candidate['start_line']),
+        end_line=int(candidate['end_line']),
+        new_str=new_content,
+        expected_file_hash=_sha256_text(content),
+        impl_source=FileEditSource.FILE_EDITOR,
     )
     set_security_risk(action, arguments)
     return action
 
 
-def _handle_find_symbol_tool(arguments: Mapping[str, Any]) -> Action:
-    validate_security_risk(arguments, FIND_SYMBOL_TOOL_NAME)
-    path = require_tool_argument(arguments, 'path', FIND_SYMBOL_TOOL_NAME)
-    normalized_args = dict(arguments)
-    from backend.core.content_escape_repair import repair_arguments_in_place
-    from backend.engine.tools.structure_editor import StructureEditor
+def _coerce_insert_position(value: object) -> str:
+    position = str(value or '').strip().lower()
+    valid = {'before', 'after', 'inside_start', 'inside_end'}
+    if position not in valid:
+        raise FunctionCallValidationError(
+            f"insert_symbol position must be one of {sorted(valid)}."
+        )
+    return position
 
-    repair_arguments_in_place(normalized_args, str(path))
-    editor = StructureEditor()
-    action = _handle_find_symbol_command(
-        editor, str(path), normalized_args, tool_name=FIND_SYMBOL_TOOL_NAME
+
+def _insert_line_for_symbol(candidate: dict[str, Any], position: str) -> int:
+    start = int(candidate['start_line'])
+    end = int(candidate['end_line'])
+    if position == 'before':
+        return start
+    if position == 'after':
+        return end + 1
+    if position == 'inside_start':
+        return start + 1
+    return end
+
+
+def _handle_insert_symbol_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, INSERT_SYMBOL_TOOL_NAME)
+    path = str(require_tool_argument(arguments, 'path', INSERT_SYMBOL_TOOL_NAME))
+    target_symbol = str(
+        require_tool_argument(arguments, 'target_symbol', INSERT_SYMBOL_TOOL_NAME)
+    )
+    content_to_insert = str(
+        require_tool_argument(arguments, 'content', INSERT_SYMBOL_TOOL_NAME)
+    )
+    _guard_content_arguments(dict(arguments))
+    position = _coerce_insert_position(arguments.get('position'))
+    safe_path, content, candidate = _single_symbol_candidate(
+        path=path,
+        symbol_name=target_symbol,
+        symbol_kind=cast(str | None, arguments.get('target_kind')),
+        parent_symbol=cast(str | None, arguments.get('parent_symbol')),
+    )
+    action = FileEditAction(
+        path=_relative_display_path(safe_path),
+        command='insert_text',
+        insert_line=_insert_line_for_symbol(candidate, position),
+        new_str=content_to_insert,
+        expected_file_hash=_sha256_text(content),
+        impl_source=FileEditSource.FILE_EDITOR,
+    )
+    set_security_risk(action, arguments)
+    return action
+
+
+def _handle_replace_string_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, REPLACE_STRING_TOOL_NAME)
+    path = str(require_tool_argument(arguments, 'path', REPLACE_STRING_TOOL_NAME))
+    old_string = str(
+        require_tool_argument(arguments, 'old_string', REPLACE_STRING_TOOL_NAME)
+    )
+    new_string = str(
+        require_tool_argument(arguments, 'new_string', REPLACE_STRING_TOOL_NAME)
+    )
+    if old_string == '':
+        raise FunctionCallValidationError('replace_string old_string must not be empty.')
+    _guard_content_arguments(dict(arguments))
+    safe_path = _safe_workspace_path(path, must_exist=True)
+    content = _read_text_for_tool(safe_path)
+    action = FileEditAction(
+        path=_relative_display_path(safe_path),
+        command='replace_string',
+        old_string=old_string,
+        new_str=new_string,
+        replace_all=parse_bool_argument(arguments.get('replace_all', False)),
+        expected_file_hash=_sha256_text(content),
+        impl_source=FileEditSource.FILE_EDITOR,
+    )
+    set_security_risk(action, arguments)
+    return action
+
+
+def _normalize_edit_symbols_public_edits(edits: object) -> list[dict[str, str]]:
+    if not isinstance(edits, list) or not edits:
+        raise FunctionCallValidationError('edit_symbols requires a non-empty edits array.')
+    normalized: list[dict[str, str]] = []
+    for index, item in enumerate(edits):
+        if not isinstance(item, Mapping):
+            raise FunctionCallValidationError(f'edit_symbols edits[{index}] must be an object.')
+        symbol_name = item.get('symbol_name')
+        new_content = item.get('new_content')
+        if not isinstance(symbol_name, str) or not symbol_name.strip():
+            raise FunctionCallValidationError(
+                f'edit_symbols edits[{index}] requires symbol_name.'
+            )
+        if not isinstance(new_content, str):
+            raise FunctionCallValidationError(
+                f'edit_symbols edits[{index}] requires new_content.'
+            )
+        normalized.append({'symbol_name': symbol_name, 'new_body': new_content})
+    return normalized
+
+
+def _handle_edit_symbols_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, EDIT_SYMBOLS_TOOL_NAME)
+    path = str(require_tool_argument(arguments, 'path', EDIT_SYMBOLS_TOOL_NAME))
+    _guard_content_arguments(dict(arguments))
+    edits = _normalize_edit_symbols_public_edits(arguments.get('edits'))
+    safe_path = _safe_workspace_path(path, must_exist=True)
+    action = FileEditAction(
+        path=_relative_display_path(safe_path),
+        command='edit_symbols',
+        structured_payload={'edits': edits},
+        impl_source=FileEditSource.FILE_EDITOR,
+    )
+    set_security_risk(action, arguments)
+    return action
+
+
+def _normalize_multiedit_operations(arguments: Mapping[str, Any]) -> list[dict[str, Any]]:
+    raw_ops = arguments.get('operations')
+    if not isinstance(raw_ops, list) or not raw_ops:
+        raise FunctionCallValidationError('multiedit requires a non-empty operations array.')
+    normalized: list[dict[str, Any]] = []
+    for index, raw in enumerate(raw_ops):
+        if not isinstance(raw, Mapping):
+            raise FunctionCallValidationError(f'multiedit operations[{index}] must be an object.')
+        command = str(raw.get('command') or '').strip().lower()
+        path = raw.get('path')
+        if not isinstance(path, str) or not path.strip():
+            raise FunctionCallValidationError(f'multiedit operations[{index}] requires path.')
+        if command == 'create_file':
+            content = raw.get('content')
+            if not isinstance(content, str):
+                raise FunctionCallValidationError(
+                    f'multiedit operations[{index}] create_file requires content.'
+                )
+            normalized.append({'path': path, 'command': 'create_file', 'content': content})
+        elif command == 'replace_string':
+            old_string = raw.get('old_string')
+            new_string = raw.get('new_string')
+            if not isinstance(old_string, str) or not isinstance(new_string, str):
+                raise FunctionCallValidationError(
+                    f'multiedit operations[{index}] replace_string requires old_string and new_string.'
+                )
+            normalized.append(
+                {
+                    'path': path,
+                    'command': 'replace_string',
+                    'old_string': old_string,
+                    'new_string': new_string,
+                    'replace_all': parse_bool_argument(raw.get('replace_all', False)),
+                }
+            )
+        elif command == 'replace_symbol':
+            symbol_name = raw.get('symbol_name')
+            new_content = raw.get('new_content')
+            if not isinstance(symbol_name, str) or not isinstance(new_content, str):
+                raise FunctionCallValidationError(
+                    f'multiedit operations[{index}] replace_symbol requires symbol_name and new_content.'
+                )
+            normalized.append(
+                {
+                    'path': path,
+                    'command': 'replace_symbol',
+                    'symbol_name': symbol_name,
+                    'symbol_kind': raw.get('symbol_kind'),
+                    'new_content': new_content,
+                }
+            )
+        else:
+            raise FunctionCallValidationError(
+                f"multiedit operations[{index}] command {command!r} is unsupported. "
+                "Use create_file, replace_string, or replace_symbol."
+            )
+    return normalized
+
+
+def _handle_multiedit_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, MULTIEDIT_TOOL_NAME)
+    _guard_content_arguments(dict(arguments))
+    operations = _normalize_multiedit_operations(arguments)
+    action = FileEditAction(
+        path='.',
+        command='multi_edit',
+        structured_payload={'file_edits': operations},
+        impl_source=FileEditSource.FILE_EDITOR,
     )
     set_security_risk(action, arguments)
     return action
@@ -1470,7 +1994,8 @@ def _parse_multi_edit_operation(
         else:
             raise FunctionCallValidationError(
                 f'multi_edit item {idx}: unable to infer command. '
-                "Use 'replace_file', 'replace_range', or 'edit_symbol'."
+                "Use create_file, replace_string, replace_symbol, replace_file, "
+                "replace_range, or edit_symbol."
             )
     return item_command, dict(raw_item)
 
@@ -1484,13 +2009,91 @@ def _apply_multi_edit_operation(
     temp_editor: Any,
     structure_editor: Any,
 ) -> None:
+    if item_command == 'create_file':
+        content = item.get('content', item.get('file_text'))
+        if not isinstance(content, str):
+            raise FunctionCallValidationError(
+                "multi_edit create_file requires 'content' (string)."
+            )
+        result = temp_editor(command='create_file', path=rel_path, file_text=content)
+        if result.error:
+            _multi_edit_raise(
+                f'❌ multi_edit create_file failed for {rel_path}: {result.error}',
+                path=rel_path,
+            )
+        return
+
+    if item_command == 'replace_string':
+        old_string = item.get('old_string')
+        new_string = item.get('new_string')
+        if not isinstance(old_string, str) or not isinstance(new_string, str):
+            raise FunctionCallValidationError(
+                "multi_edit replace_string requires 'old_string' and 'new_string'."
+            )
+        result = temp_editor(
+            command='replace_string',
+            path=rel_path,
+            old_string=old_string,
+            new_str=new_string,
+            replace_all=parse_bool_argument(item.get('replace_all', False)),
+        )
+        if result.error:
+            _multi_edit_raise(
+                f'❌ multi_edit replace_string failed for {rel_path}: {result.error}',
+                path=rel_path,
+            )
+        return
+
+    if item_command == 'replace_symbol':
+        symbol_name = item.get('symbol_name')
+        new_content = item.get('new_content')
+        if not isinstance(symbol_name, str) or not isinstance(new_content, str):
+            raise FunctionCallValidationError(
+                "multi_edit replace_symbol requires 'symbol_name' and 'new_content'."
+            )
+        candidates = _find_symbol_candidates_in_file(
+            temp_path,
+            symbol_name,
+            symbol_kind=cast(str | None, item.get('symbol_kind')),
+            include_private=True,
+        )
+        candidates = [c for c in candidates if c.get('name') == symbol_name]
+        parent_symbol = item.get('parent_symbol')
+        if isinstance(parent_symbol, str) and parent_symbol.strip():
+            candidates = [
+                c for c in candidates if c.get('parent') == parent_symbol.strip()
+            ]
+        if not candidates:
+            raise FunctionCallValidationError(
+                f"multi_edit replace_symbol could not find symbol {symbol_name!r} in {rel_path}."
+            )
+        if len(candidates) > 1:
+            raise FunctionCallValidationError(
+                _symbol_action_ambiguity_error(symbol_name, candidates)
+            )
+        candidate = candidates[0]
+        result = temp_editor(
+            command='edit',
+            path=rel_path,
+            edit_mode='range',
+            start_line=int(candidate['start_line']),
+            end_line=int(candidate['end_line']),
+            new_str=new_content,
+        )
+        if result.error:
+            _multi_edit_raise(
+                f'❌ multi_edit replace_symbol failed for {rel_path}: {result.error}',
+                path=rel_path,
+            )
+        return
+
     if item_command == 'replace_file':
         new_content = item.get('new_content')
         if not isinstance(new_content, str):
             raise FunctionCallValidationError(
                 "multi_edit replace_file requires 'new_content' (string)."
             )
-        result = temp_editor(command='create_file', path=rel_path, file_text=new_content)
+        result = temp_editor(command='write', path=rel_path, file_text=new_content)
         if result.error:
             _multi_edit_raise(
                 f'❌ multi_edit replace_file failed for {rel_path}: {result.error}',
@@ -1544,7 +2147,8 @@ def _apply_multi_edit_operation(
 
     raise FunctionCallValidationError(
         f"multi_edit item command {item_command!r} is unsupported. "
-        "Use 'replace_file', 'replace_range', or 'edit_symbol'."
+        "Use create_file, replace_string, replace_symbol, replace_file, "
+        "replace_range, or edit_symbol."
     )
 
 
@@ -1558,6 +2162,7 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     raw_edits = arguments.get('file_edits')
     if not isinstance(raw_edits, list) or not raw_edits:
         raise FunctionCallValidationError("multi_edit requires a non-empty 'file_edits' array.")
+    _guard_content_arguments({'file_edits': raw_edits})
     if len(raw_edits) > _MAX_MULTI_EDIT_FILES:
         raise FunctionCallValidationError(
             f'multi_edit supports at most {_MAX_MULTI_EDIT_FILES} files per call '
@@ -1908,17 +2513,30 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             str, create_read_file_tool().get('function', {}).get('name', '')
         ): _handle_read_file_tool,
         cast(
+            str, create_read_range_tool().get('function', {}).get('name', '')
+        ): _handle_read_range_tool,
+        READ_SYMBOL_TOOL_NAME: _handle_read_symbol_tool,
+        cast(
+            str, create_find_symbols_tool().get('function', {}).get('name', '')
+        ): _handle_find_symbols_tool,
+        cast(
             str, create_create_file_tool().get('function', {}).get('name', '')
         ): _handle_create_file_tool,
         cast(
-            str, create_undo_last_edit_tool().get('function', {}).get('name', '')
-        ): _handle_undo_last_edit_tool,
+            str, create_replace_symbol_tool().get('function', {}).get('name', '')
+        ): _handle_replace_symbol_tool,
         cast(
-            str, create_rename_symbol_tool().get('function', {}).get('name', '')
-        ): _handle_rename_symbol_tool,
+            str, create_insert_symbol_tool().get('function', {}).get('name', '')
+        ): _handle_insert_symbol_tool,
         cast(
-            str, create_find_symbol_tool().get('function', {}).get('name', '')
-        ): _handle_find_symbol_tool,
+            str, create_replace_string_tool().get('function', {}).get('name', '')
+        ): _handle_replace_string_tool,
+        cast(
+            str, create_edit_symbols_tool().get('function', {}).get('name', '')
+        ): _handle_edit_symbols_tool,
+        cast(
+            str, create_multiedit_tool().get('function', {}).get('name', '')
+        ): _handle_multiedit_tool,
         cast(
             str, create_summarize_context_tool().get('function', {}).get('name', '')
         ): _handle_summarize_context_tool,
@@ -1929,7 +2547,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         ),
         RECALL_TOOL_NAME: lambda args: build_recall_action(cast(str, args['key'])),
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
-        READ_SYMBOL_TOOL_NAME: _handle_read_symbol_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
         DELEGATE_TASK_TOOL_NAME: lambda args: build_delegate_task_action(dict(args)),
         CODE_INTELLIGENCE_TOOL_NAME: lambda args: build_lsp_query_action(dict(args)),
@@ -1988,8 +2605,9 @@ def _process_single_tool_call(tool_call: Any, arguments: dict[str, Any]) -> Acti
     tool_name = cast(str, tool_call.function.name)
     if tool_name == 'file_editor':
         raise FunctionCallValidationError(
-            'The legacy file-edit tool has been removed. Use the EDIT_FILE raw block protocol '
-            'in AGENT mode for file edits.'
+            'The legacy file_editor tool has been removed. Use read_file, read_range, '
+            'read_symbol, find_symbols, create_file, replace_symbol, insert_symbol, '
+            'replace_string, edit_symbols, or multiedit.'
         )
     if "__xml_syntax_error__" in arguments:
         from backend.engine.common import _check_format_error_retry_guard

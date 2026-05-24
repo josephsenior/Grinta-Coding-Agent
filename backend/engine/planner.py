@@ -12,9 +12,8 @@ from backend.inference.llm_utils import check_tools
 
 ChatCompletionToolParam = Any
 
-# ── Hybrid XML/Native transport ──────────────────────────────────────────
-# File content is no longer routed through provider JSON arguments. Normal
-# tools remain native; file edits use EDIT_FILE blocks in AGENT mode.
+# All public file tools use native provider tool calls. Legacy raw/XML editor
+# blocks are intentionally not part of the model-facing path.
 CODE_PAYLOAD_TOOLS: frozenset[str] = frozenset()
 
 if TYPE_CHECKING:
@@ -115,8 +114,11 @@ class OrchestratorPlanner:
                 'terminal_manager',
                 'debugger',
                 'create_file',
-                'undo_last_edit',
-                'rename_symbol',
+                'replace_symbol',
+                'insert_symbol',
+                'replace_string',
+                'edit_symbols',
+                'multiedit',
                 'delegate_task',
                 'blackboard',
                 'checkpoint',
@@ -133,17 +135,10 @@ class OrchestratorPlanner:
     def partition_tools(
         self, tools: list[ChatCompletionToolParam]
     ) -> tuple[list[ChatCompletionToolParam], list[ChatCompletionToolParam]]:
-        """Split tools into native (JSON) and XML (raw-text) groups.
-
-        Code-heavy tools are routed through the pseudo-XML transport so that
-        code payloads are carried as raw text between tags — no JSON escaping.
-        All other tools use native provider function calling for the benefits
-        of constrained decoding.
-
-        Returns ``(native_tools, xml_tools)``.
-        """
+        """Return native tools only; raw editor/XML file transports are disabled."""
         if not self._llm_supports_function_calling():
-            # Non-native models: everything already goes through XML
+            # Non-native models still use the generic tool-call text fallback,
+            # but no file-specific raw editor block is injected.
             return [], tools
 
         native: list[ChatCompletionToolParam] = []
@@ -169,8 +164,9 @@ class OrchestratorPlanner:
         )
         from backend.engine.tools.finish import create_finish_tool
         from backend.engine.tools.native_file_tools import (
-            create_find_symbol_tool,
+            create_find_symbols_tool,
             create_read_file_tool,
+            create_read_range_tool,
         )
         from backend.engine.tools.memory_manager import (
             create_memory_manager_tool,
@@ -187,7 +183,8 @@ class OrchestratorPlanner:
         tools.append(create_note_tool())
         tools.append(create_recall_tool())
         tools.append(create_read_file_tool())
-        tools.append(create_find_symbol_tool())
+        tools.append(create_read_range_tool())
+        tools.append(create_find_symbols_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
         """Add task_tracker, search_code and read_symbol tools."""
@@ -293,13 +290,19 @@ class OrchestratorPlanner:
         if getattr(self._config, 'enable_editor', True):
             from backend.engine.tools.native_file_tools import (
                 create_create_file_tool,
-                create_rename_symbol_tool,
-                create_undo_last_edit_tool,
+                create_edit_symbols_tool,
+                create_insert_symbol_tool,
+                create_multiedit_tool,
+                create_replace_string_tool,
+                create_replace_symbol_tool,
             )
 
             tools.append(create_create_file_tool())
-            tools.append(create_undo_last_edit_tool())
-            tools.append(create_rename_symbol_tool())
+            tools.append(create_replace_symbol_tool())
+            tools.append(create_insert_symbol_tool())
+            tools.append(create_replace_string_tool())
+            tools.append(create_edit_symbols_tool())
+            tools.append(create_multiedit_tool())
 
     def _add_execute_mcp_tool_tool(self, tools: list) -> None:
         """Add the MCP gateway proxy tool when MCP is enabled.
@@ -395,38 +398,26 @@ class OrchestratorPlanner:
     def _inject_xml_tool_descriptions(
         messages: list, xml_tools: list[ChatCompletionToolParam]
     ) -> list:
-        """Append pseudo-XML tool format instructions to the system prompt.
-
-        Editor tools are described using the same format that non-native models
-        already use, but file edits are routed through EDIT_FILE blocks
-        with raw content.
-        """
+        """Append generic text fallback tool descriptions for non-native models."""
         from backend.inference.fn_call_converter import (
             convert_tools_to_description,
         )
 
         formatted = convert_tools_to_description(xml_tools)
-        # Build the suffix but replace the generic "one function at a time"
-        # note with hybrid-specific guidance.
         suffix = (
-            '\n\n<FILE_EDITING_TOOL_FORMAT>\n'
-            'In AGENT mode, raw file content is emitted as an `EDIT_FILE` block '
-            '(not as JSON tool arguments). Use the `EDIT_FILE` block for edits '
-            'that require raw content. Do NOT use the standard JSON tool calling '
-            'format for file content.\n'
+            '\n\n<TOOL_CALL_FORMAT>\n'
+            'Use the available tools by emitting valid tool calls with arguments '
+            'matching the registered schemas. Do not output XML file-edit blocks, '
+            'raw editor blocks, heredocs, or patches for file changes.\n'
             f'{formatted}\n'
-            'Canonical examples (emit one block per message; copy parameter names exactly):\n\n'
             'RULES:\n'
-            '- You may include natural-language reasoning BEFORE the raw-content block.\n'
-            '- Do NOT place any text AFTER the closing tag.\n'
-            '- Code between tags is written exactly as it should appear in the file.\n'
-            '- Always include <parameter=security_risk>LOW|MEDIUM|HIGH</parameter>.\n'
-            '- Use the raw-content editor block for file writes; metadata-only for the starter call.\n'
-            '- One file-editing call per message.\n'
-            '- For multi_edit: use nested raw-content blocks (NOT JSON arrays).\n'
-            '- Each block: <path>, <operation>, <content>.\n'
-            '- Operations: insert, replace_range, edit_symbol, multi_edit.\n'
-            '</FILE_EDITING_TOOL_FORMAT>'
+            '- Use create_file only for new files.\n'
+            '- Use replace_string for exact text replacement, insertion by anchor, and deletion.\n'
+            '- Use replace_symbol for one existing code symbol.\n'
+            '- Use insert_symbol for one new code symbol.\n'
+            '- Use edit_symbols for coordinated symbol edits in one file.\n'
+            '- Use multiedit for atomic multi-file refactoring.\n'
+            '</TOOL_CALL_FORMAT>'
         )
 
         msgs = list(messages)
@@ -535,7 +526,6 @@ class OrchestratorPlanner:
         return None
 
     def _inject_agent_mode_instructions(self, messages: list, state: State) -> list:
-        token = getattr(self._agent, '_current_delimiter_token', None) or 'GRINTA_TOKEN'
         instruction = (
             "\n\n=== STRICTOR AGENT MODE PROTOCOL ===\n"
             "You are running in AGENT MODE. In this mode, direct plain text prose/responses "
@@ -543,25 +533,19 @@ class OrchestratorPlanner:
             "Your output must be exactly one of the following:\n"
             "1. A real tool/function call (using the native function calling mechanism).\n"
             "2. A communicate_with_user tool call (to ask questions, clarify, or report blockers).\n"
-            "3. A finish tool call (to end the task successfully).\n"
-            "4. Exactly one valid EDIT_FILE block using the turn's delimiter token: {token}.\n\n"
-            "To edit an existing file, you must output exactly one valid EDIT_FILE block with this format (no markdown code fences around it):\n\n"
-            "EDIT_FILE\n"
-            "path: relative/path/to/file\n"
-            "command: command_name\n"
-            "metadata_key: metadata_value\n\n"
-            "RAW_LINES {token}\n"
-            "raw source content here\n"
-            "END_RAW_LINES {token}\n\n"
-            "EDIT_FILE block rules:\n"
-            "- path is required.\n"
-            "- command is required (must be exactly one of: insert, replace_range, edit_symbol, edit_symbols, multi_edit).\n"
-            "- All other metadata fields are command-specific.\n"
-            "- Use colon syntax (key: value) for headers.\n"
-            "- The content between RAW_LINES and END_RAW_LINES is literal raw source text (no escaping required, quotes/braces/indentation are preserved exactly).\n"
-            "- Do not add any text or explanation before or after the EDIT_FILE block.\n"
-            "- One edit block per response.\n"
+            "3. A finish tool call (to end the task successfully).\n\n"
+            "File API mental model:\n"
+            "- read_file/read_range/read_symbol/find_symbols for context.\n"
+            "- create_file only for new files; never overwrite existing files.\n"
+            "- replace_symbol for modifying one existing code symbol.\n"
+            "- insert_symbol for adding one new code symbol.\n"
+            "- replace_string for exact text replacement, insertion by anchor, and deletion.\n"
+            "- edit_symbols for robust AST-based edits to multiple symbols in one file.\n"
+            "- multiedit for atomic multi-file refactoring.\n\n"
+            "Do not use shell commands to write source files. Do not output XML "
+            "file-edit blocks, raw editor blocks, heredocs, patches, range mutations, "
+            "or create_file calls for existing files.\n"
             "=====================================\n"
-        ).replace("{token}", token)
+        )
         
         return self._apply_control_message(messages, instruction)

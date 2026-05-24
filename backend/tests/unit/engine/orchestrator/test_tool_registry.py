@@ -125,19 +125,46 @@ class TestFeatureFlagToolPresence:
 
     def test_editor_enabled(self):
         names = _build_toolset(enable_editor=True)
-        assert 'create_file' in names
-        assert 'undo_last_edit' in names
-        assert 'rename_symbol' in names
-        assert 'read_file' in names
-        assert 'read_symbol' in names
-        assert 'find_symbol' in names
+        public_file_tools = {
+            'read_file',
+            'read_range',
+            'find_symbols',
+            'read_symbol',
+            'create_file',
+            'replace_symbol',
+            'insert_symbol',
+            'replace_string',
+            'edit_symbols',
+            'multiedit',
+        }
+        hidden_file_tools = {
+            'apply_patch',
+            'patch',
+            'replace_range',
+            'section_edit',
+            'raw_write',
+            'overwrite_file',
+            'insert_text',
+            'append_text',
+            'undo_last_edit',
+            'rename_symbol',
+            'find_symbol',
+            'text_editor',
+            'symbol_editor',
+            'file_editor',
+        }
+        assert public_file_tools <= names
+        assert hidden_file_tools.isdisjoint(names)
         self._assert_dispatch_covered(names)
 
     def test_editor_disabled(self):
         names = _build_toolset(enable_editor=False)
         assert 'create_file' not in names
-        assert 'undo_last_edit' not in names
-        assert 'rename_symbol' not in names
+        assert 'replace_symbol' not in names
+        assert 'insert_symbol' not in names
+        assert 'replace_string' not in names
+        assert 'edit_symbols' not in names
+        assert 'multiedit' not in names
 
     def test_checkpoints_enabled(self):
         names = _build_toolset(enable_checkpoints=True)

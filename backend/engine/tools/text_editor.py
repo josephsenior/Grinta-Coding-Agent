@@ -9,14 +9,14 @@ from backend.engine.tools.common import (
 )
 _DETAILED_TEXT_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
 * `read_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
-* `create_file`: create a new file or fully overwrite an existing file with the given content. Requires `file_text` — full-file body. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call. On large existing source files, full overwrite is blocked unless you explicitly set `overwrite_existing=true`.
+* `create_file`: create a new file with the given content. Never overwrites existing files.
 * `insert_text`: insert `new_str` after `insert_line`.
 * `undo_last_edit`: revert the last successful edit/write to this file in the current session (bounded history). Prefer checkpoint/rollback for large reversions.
 * `edit_mode`: deterministic non-code editing primitives:
   - `range`: line-range replacement. Provide `start_line`, `end_line`, and `new_str` to replace a specific block.
 * `multi_edit`: atomic batch for text-style edits. Use this for coordinated non-symbol changes across one or more files. Supported per-item commands: `create_file`, `insert_text`, and `edit` with `edit_mode=range`. The whole batch commits or rolls back together.
 
-Default mental model: use **minimal valid `file_text` on create**, then **`edit_mode=range`** or **`insert_text`** to extend. For raw-content edits in AGENT mode, use an `EDIT_FILE` block. Avoid brittle string replacement.
+Default mental model: this schema is an internal compatibility layer. Model-facing edits must use `create_file`, `replace_string`, `replace_symbol`, `insert_symbol`, `edit_symbols`, or `multiedit`.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
 
@@ -34,7 +34,7 @@ If the tool reports `Syntax validation failed` with a hint about literal escape 
 _SHORT_TEXT_EDITOR_DESCRIPTION = (
     'File reading, creation, and editing tool. '
     'Commands: read_file, create_file, insert_text, undo_last_edit, multi_edit. '
-    'create_file creates new files OR overwrites existing files, but large existing source files require overwrite_existing=true. '
+    'create_file creates new files only and never overwrites existing files. '
     'Use edit_mode=range for deterministic edits. '
     'Use project-relative paths.\n'
 )
@@ -87,8 +87,7 @@ def create_text_editor_tool(
             },
             'overwrite_existing': {
                 'description': (
-                    'Optional safety override for `create_file`. Required when intentionally fully rewriting '
-                    'a large existing source-code file; otherwise prefer `edit_mode=range`.'
+                    'Deprecated internal field. create_file never overwrites existing files.'
                 ),
                 'type': 'boolean',
             },

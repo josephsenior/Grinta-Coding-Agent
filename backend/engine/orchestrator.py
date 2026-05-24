@@ -607,23 +607,7 @@ class Orchestrator(Agent):
         try:
             result = self.executor.execute(params, self.event_stream)
             self._consecutive_invalid_protocol_outputs = 0
-        except Exception as exc:
-            from backend.engine.file_edit_protocol_agent_mode import AgentModeProtocolError
-            if isinstance(exc, AgentModeProtocolError):
-                self._consecutive_invalid_protocol_outputs += 1
-                if self._consecutive_invalid_protocol_outputs >= 2:
-                    raise AgentRuntimeError(f"Continuous invalid protocol outputs: {exc.to_formatted_message()}")
-                
-                msg = (
-                    "In AGENT MODE, direct plain text is invalid. You must either call a "
-                    "real tool, call communicate_with_user, call finish, or output exactly "
-                    "one valid EDIT_FILE block using the required delimiter token."
-                )
-                from backend.ledger.action.agent import AgentThinkAction
-                return AgentThinkAction(
-                    thought=f"[PROTOCOL_ERROR] {msg}\n\nDetails:\n{exc.to_formatted_message()}",
-                    suppress_cli=True,
-                )
+        except Exception:
             raise
 
         try:
@@ -686,23 +670,7 @@ class Orchestrator(Agent):
         try:
             result = await self.executor.async_execute(params, self.event_stream)
             self._consecutive_invalid_protocol_outputs = 0
-        except Exception as exc:
-            from backend.engine.file_edit_protocol_agent_mode import AgentModeProtocolError
-            if isinstance(exc, AgentModeProtocolError):
-                self._consecutive_invalid_protocol_outputs += 1
-                if self._consecutive_invalid_protocol_outputs >= 2:
-                    raise AgentRuntimeError(f"Continuous invalid protocol outputs: {exc.to_formatted_message()}")
-                
-                msg = (
-                    "In AGENT MODE, direct plain text is invalid. You must either call a "
-                    "real tool, call communicate_with_user, call finish, or output exactly "
-                    "one valid EDIT_FILE block using the required delimiter token."
-                )
-                from backend.ledger.action.agent import AgentThinkAction
-                return AgentThinkAction(
-                    thought=f"[PROTOCOL_ERROR] {msg}\n\nDetails:\n{exc.to_formatted_message()}",
-                    suppress_cli=True,
-                )
+        except Exception:
             raise
 
         # Ensure extra_data cleanup always runs, even if async_execute raises.

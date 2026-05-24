@@ -51,7 +51,7 @@ _DETAILED_BASH_DESCRIPTION = (
     '* Long-running: background with `cmd > out.log 2>&1 &`, or set `timeout`.\n'
     '* Exit code `-1`: process still running. Set `is_input=true` to send input, '
     'empty string for more logs, or `C-c`/`C-d`/`C-z` to interrupt.\n'
-    '* Do NOT create/write files with this tool — use `create_file` or an `EDIT_FILE` block instead.\n'
+    '* Do NOT create/write files with this tool — use `create_file`, `replace_string`, `replace_symbol`, `insert_symbol`, `edit_symbols`, or `multiedit` instead.\n'
     '* Shell cwd is the **project root** (see runtime). Prefer relative paths (`dir/file`, `./script`). '
     'There is no `/workspace` alias — use real relative or absolute paths.\n'
     '* In bash, never glue a folder name to a Windows drive letter: use `dir/C:/path` or quotes, '

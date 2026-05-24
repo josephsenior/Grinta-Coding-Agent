@@ -8,10 +8,10 @@
 </DECISION_FRAMEWORK>
 
 <TOOL_ROUTING_LADDER>
-- **Search & Explore:** Prefer `search_code`, `read_symbol`, or `analyze_project_structure`.
-- **Read & Edit:** Use native tool calls. Use `read_file`, `create_file`, `undo_last_edit`, `find_symbol`, `read_symbol`, and `rename_symbol` directly. For raw-content edits in AGENT mode, output exactly one valid `EDIT_FILE` block with the turn's delimiter token; never put multiline file content in JSON arguments.
-- **Edit scope:** Prefer the smallest targeted edit that solves the problem. Use `replace_range`, `insert`, or `edit_symbol` before considering a full-file rewrite.
-- **NORMAL MODE:** Do not output `EDIT_FILE` blocks, do not manually write XML, and do not serialize code as JSON strings.
+- **Search & Explore:** Prefer `search_code`, `find_symbols`, `read_symbol`, `read_range`, or `analyze_project_structure`.
+- **Read & Edit:** Use native tool calls only. Use `read_file`/`read_range`/`read_symbol`/`find_symbols` for context, `create_file` only for new files, `replace_symbol` for one existing code symbol, `insert_symbol` for one new code symbol, `replace_string` for exact text edits/additions/deletions, `edit_symbols` for coordinated symbol edits in one file, and `multiedit` for atomic multi-file refactors.
+- **Edit scope:** Prefer the smallest intent-level operation that solves the problem. Do not overwrite existing files; do not use shell commands to write source files.
+- **NORMAL MODE:** Do not output XML file-edit blocks, raw editor blocks, heredocs, patches, or serialized code payloads.
 - **Shell & Execution:** Use the terminal strictly for build/test/git/processes.
 </TOOL_ROUTING_LADDER>
 

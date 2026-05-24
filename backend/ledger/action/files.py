@@ -71,9 +71,11 @@ class FileEditAction(Action):
 
     Attributes:
         path (str): The path to the file being edited.
-        command (str): The editing command to be performed (read_file, create_file, insert_text, undo_last_edit, edit).
+        command (str): The editing command to be performed (read_file, create_file, replace_string, insert_text, undo_last_edit, edit).
         file_text (str): The content of the file to be created (used with 'create_file').
         new_str (str): The replacement text (used with 'insert_text' or range edits).
+        old_string (str): Exact string to replace (used with 'replace_string').
+        replace_all (bool): Whether to replace all exact old_string occurrences.
         insert_line (int): The line number after which to insert new_str (used with 'insert_text').
         thought (str): The reasoning behind the edit action.
         action (str): The type of action being performed (always ActionType.EDIT).
@@ -90,6 +92,8 @@ class FileEditAction(Action):
     command: str = ''
     file_text: str | None = None
     new_str: str | None = None
+    old_string: str | None = None
+    replace_all: bool = False
     insert_line: int | None = None
     view_range: list[int] | None = None
     thought: str = ''
@@ -115,6 +119,10 @@ class FileEditAction(Action):
             ret += f'Created File with Text:\n```\n{self.file_text}\n```\n'
         elif self.command == 'insert_text':
             ret += f'Insert Line: {self.insert_line}\n'
+            ret += f'New String: ```\n{self.new_str}\n```\n'
+        elif self.command == 'replace_string':
+            ret += f'Replace All: {self.replace_all}\n'
+            ret += f'Old String: ```\n{self.old_string}\n```\n'
             ret += f'New String: ```\n{self.new_str}\n```\n'
         elif self.command == 'edit' and self.edit_mode == 'range':
             ret += f'Range: [L{self.start_line}:L{self.end_line}]\n'

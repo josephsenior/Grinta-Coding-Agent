@@ -178,7 +178,7 @@ class TestFileEditorWrite:
         assert 'Placeholder example content detected' in result.error
         assert not (Path(self.tmpdir) / 'placeholder.py').exists()
 
-    def test_large_existing_code_file_overwrite_requires_explicit_flag(self):
+    def test_create_file_rejects_any_existing_file(self):
         existing = Path(self.tmpdir) / 'big.py'
         existing.write_text(''.join(f'line_{i} = {i}\n' for i in range(250)))
         result = self.editor(
@@ -187,13 +187,11 @@ class TestFileEditorWrite:
             file_text='print("rewritten")\n',
         )
         assert result.error is not None
-        assert (
-            result.error_code
-            == 'FULL_FILE_OVERWRITE_REQUIRES_EXPLICIT_CONFIRMATION'
-        )
-        assert 'overwrite_existing=true' in result.error
+        assert result.error_code == 'CREATE_FILE_ALREADY_EXISTS'
+        assert 'File already exists' in result.error
+        assert 'replace_symbol or replace_string' in result.error
 
-    def test_large_existing_code_file_overwrite_allows_explicit_flag(self):
+    def test_create_file_rejects_existing_even_with_overwrite_existing(self):
         existing = Path(self.tmpdir) / 'big.py'
         existing.write_text(''.join(f'line_{i} = {i}\n' for i in range(250)))
         result = self.editor(
@@ -202,8 +200,30 @@ class TestFileEditorWrite:
             file_text='print("rewritten")\n',
             overwrite_existing=True,
         )
+        assert result.error is not None
+        assert result.error_code == 'CREATE_FILE_ALREADY_EXISTS'
+        assert existing.read_text().startswith('line_0 = 0')
+
+    def test_write_still_overwrites_existing_file(self):
+        existing = Path(self.tmpdir) / 'big.py'
+        existing.write_text('old\n')
+        result = self.editor(
+            command='write',
+            path='big.py',
+            file_text='print("rewritten")\n',
+        )
         assert result.error is None
         assert existing.read_text() == 'print("rewritten")\n'
+
+    def test_create_file_rejects_obvious_serialized_payload(self):
+        result = self.editor(
+            command='create_file',
+            path='serialized.py',
+            file_text='"def hello():\\n    print(\\"hi\\")\\n"',
+        )
+        assert result.error is not None
+        assert 'CONTENT_APPEARS_SERIALIZED' in result.error
+        assert not (Path(self.tmpdir) / 'serialized.py').exists()
 
     def test_syntax_warning_includes_content_excerpt(self, monkeypatch):
         # Rich feedback: the WARNING text should carry a pointer-style excerpt
@@ -295,6 +315,106 @@ class TestFileEditorEdit:
     def test_unknown_command(self):
         result = self.editor(command='delete', path='x.txt')
         assert result.error is not None
+
+
+# ---------------------------------------------------------------------------
+# FileEditor — replace_string
+# ---------------------------------------------------------------------------
+
+
+class TestFileEditorReplaceString:
+    """Tests for exact string replacement."""
+
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.editor = FileEditor(workspace_root=self.tmpdir)
+
+    def _write(self, name: str, content: str) -> Path:
+        p = Path(self.tmpdir) / name
+        p.write_text(content)
+        return p
+
+    def test_replaces_unique_exact_string(self):
+        path = self._write('doc.md', 'alpha\nbeta\ngamma\n')
+        result = self.editor(
+            command='replace_string',
+            path='doc.md',
+            old_string='beta\n',
+            new_str='BETA\n',
+        )
+        assert result.error is None
+        assert path.read_text() == 'alpha\nBETA\ngamma\n'
+        assert result.metadata['target_kind'] == 'exact_string'
+
+    def test_inserts_by_replacing_anchor_with_anchor_plus_content(self):
+        path = self._write('README.md', '## Usage\n\nold\n')
+        result = self.editor(
+            command='replace_string',
+            path='README.md',
+            old_string='## Usage\n',
+            new_str='## Usage\n\nExample:\nrun grinta\n',
+        )
+        assert result.error is None
+        assert path.read_text() == '## Usage\n\nExample:\nrun grinta\n\nold\n'
+
+    def test_deletes_by_replacing_with_empty_string(self):
+        path = self._write('config.txt', 'keep\nobsolete\nkeep2\n')
+        result = self.editor(
+            command='replace_string',
+            path='config.txt',
+            old_string='obsolete\n',
+            new_str='',
+        )
+        assert result.error is None
+        assert path.read_text() == 'keep\nkeep2\n'
+
+    def test_rejects_missing_old_string(self):
+        path = self._write('doc.md', 'alpha\n')
+        result = self.editor(
+            command='replace_string',
+            path='doc.md',
+            old_string='missing',
+            new_str='x',
+        )
+        assert result.error is not None
+        assert result.error_code == 'OLD_STRING_NOT_FOUND'
+        assert path.read_text() == 'alpha\n'
+
+    def test_rejects_multiple_matches_without_replace_all(self):
+        path = self._write('doc.md', 'x\nx\n')
+        result = self.editor(
+            command='replace_string',
+            path='doc.md',
+            old_string='x\n',
+            new_str='y\n',
+        )
+        assert result.error is not None
+        assert result.error_code == 'OLD_STRING_NOT_UNIQUE'
+        assert path.read_text() == 'x\nx\n'
+
+    def test_replace_all_replaces_every_exact_occurrence(self):
+        path = self._write('doc.md', 'x\nx\n')
+        result = self.editor(
+            command='replace_string',
+            path='doc.md',
+            old_string='x\n',
+            new_str='y\n',
+            replace_all=True,
+        )
+        assert result.error is None
+        assert path.read_text() == 'y\ny\n'
+
+    def test_rejects_obvious_serialized_new_string(self):
+        path = self._write('demo.py', 'def hello():\n    pass\n')
+        result = self.editor(
+            command='replace_string',
+            path='demo.py',
+            old_string='def hello():\n    pass\n',
+            new_str='"def hello():\\n    print(\\"hi\\")\\n"',
+        )
+        assert result.error is not None
+        assert 'CONTENT_APPEARS_SERIALIZED' in result.error
+        assert path.read_text() == 'def hello():\n    pass\n'
 
 
 # ---------------------------------------------------------------------------

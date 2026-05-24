@@ -318,7 +318,88 @@ CONTENT_ARG_NAMES: tuple[str, ...] = (
     'new_body',
     'content',
     'new_code',
+    'new_content',
+    'new_string',
 )
+
+
+SERIALIZED_PAYLOAD_ERROR = (
+    'CONTENT_APPEARS_SERIALIZED:\n'
+    'The content contains literal JSON escape sequences like \\n or \\".\n'
+    'Use real newlines and real quotes. Do not serialize the file content as a JSON string.'
+)
+
+
+def looks_serialized_payload(content: str) -> bool:
+    r"""Conservatively detect obvious JSON-serialized file payloads.
+
+    This intentionally catches only high-confidence cases. A few legitimate
+    source string literals containing ``"\n"`` must not block an edit.
+    """
+    if not isinstance(content, str) or not content:
+        return False
+
+    stripped = content.strip()
+    if not stripped:
+        return False
+
+    if stripped.startswith('```') and stripped.endswith('```') and len(stripped) > 6:
+        return True
+
+    quoted = (
+        (stripped.startswith('"') and stripped.endswith('"'))
+        or (stripped.startswith("'") and stripped.endswith("'"))
+    )
+    literal_newlines = content.count('\\n')
+    real_newlines = content.count('\n')
+    escaped_quotes = content.count('\\"')
+
+    if quoted and (literal_newlines > 0 or escaped_quotes > 0):
+        return True
+
+    if literal_newlines >= 3 and real_newlines <= 1:
+        return True
+    if literal_newlines >= 6 and literal_newlines >= (real_newlines + 1) * 3:
+        return True
+    if escaped_quotes >= 4 and real_newlines <= 1:
+        return True
+
+    return False
+
+
+def serialized_payload_error(field_name: str | None = None) -> str:
+    if not field_name:
+        return SERIALIZED_PAYLOAD_ERROR
+    return f'{SERIALIZED_PAYLOAD_ERROR}\nField: {field_name}'
+
+
+def raise_if_serialized_payload(content: str, field_name: str | None = None) -> None:
+    if not looks_serialized_payload(content):
+        return
+    from backend.core.errors import FunctionCallValidationError
+
+    raise FunctionCallValidationError(serialized_payload_error(field_name))
+
+
+def validate_content_payloads(arguments: object) -> None:
+    """Reject obvious serialized content payloads in nested tool arguments."""
+    if not isinstance(arguments, dict):
+        return
+    for name in CONTENT_ARG_NAMES:
+        value = arguments.get(name)
+        if isinstance(value, str):
+            raise_if_serialized_payload(value, name)
+    for batch_key in ('edits', 'symbol_edits', 'operations', 'file_edits'):
+        batch = arguments.get(batch_key)
+        if not isinstance(batch, list):
+            continue
+        for index, item in enumerate(batch):
+            if not isinstance(item, dict):
+                continue
+            for name in CONTENT_ARG_NAMES:
+                value = item.get(name)
+                if isinstance(value, str):
+                    raise_if_serialized_payload(value, f'{batch_key}[{index}].{name}')
 
 
 def repair_arguments_in_place(

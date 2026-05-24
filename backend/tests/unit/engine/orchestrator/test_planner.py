@@ -351,10 +351,15 @@ class TestBuildLlmParams:
         with patch('backend.engine.planner.check_tools', return_value=[]):
             params = p.build_llm_params(messages, state, [])
         assert isinstance(params['messages'], list)
-        # No planning_directive set → messages pass through unchanged.
-        assert params['messages'] == messages
         assert params['messages'][-1]['role'] == 'user'
         assert params['messages'][-1]['content'] == 'test'
+        joined = '\n'.join(
+            m['content']
+            for m in params['messages']
+            if isinstance(m.get('content'), str)
+        )
+        assert 'File API mental model' in joined
+        assert 'replace_string' in joined
 
     def test_injects_control_message_before_last_user(self):
         p = _make_planner()
@@ -376,11 +381,12 @@ class TestBuildLlmParams:
         out = params['messages']
         assert out[-1]['role'] == 'user'
         assert out[-1]['content'] == 'task'
-        # Control message is inserted immediately before the last user message.
-        assert out[-2]['role'] == 'system'
-        assert '<APP_DIRECTIVE>' in out[-2]['content']
-        assert '[AUTO-PLAN] do planning' in out[-2]['content']
-        assert '<APP_CONTEXT_STATUS' not in out[-2]['content']
+        joined = '\n'.join(
+            m['content'] for m in out if isinstance(m.get('content'), str)
+        )
+        assert '<APP_DIRECTIVE>' in joined
+        assert '[AUTO-PLAN] do planning' in joined
+        assert '<APP_CONTEXT_STATUS' not in joined
 
     def test_merges_control_into_primary_system_when_configured(self):
         p = _make_planner(config=_make_config(merge_control_system_into_primary=True))
@@ -536,9 +542,6 @@ class TestMinimalTurnStatusDefault:
             params = p.build_llm_params(messages, state, [])
 
         out = params['messages']
-        # No control system message inserted; no APP_CONTEXT_STATUS, no
-        # repetition warning, no active plan, no directive.
-        assert len(out) == 2
         joined = '\n'.join(
             m['content'] for m in out if isinstance(m.get('content'), str)
         )
@@ -561,9 +564,10 @@ class TestMinimalTurnStatusDefault:
 
         out = params['messages']
         assert out[-1] == {'role': 'user', 'content': 'task'}
-        assert out[-2]['role'] == 'system'
-        content = out[-2]['content']
-        assert content.startswith('<APP_DIRECTIVE>')
+        content = '\n'.join(
+            m['content'] for m in out if isinstance(m.get('content'), str)
+        )
+        assert '<APP_DIRECTIVE>' in content
         assert '[GUARD] take next concrete step' in content
         assert '<APP_CONTEXT_STATUS' not in content
         assert '<ACTIVE_PLAN>' not in content

@@ -97,6 +97,17 @@ class FileEditorEditOpsMixin:
 
     @staticmethod
     def _preflight_content_guard(file_path: Path, content: str) -> str | None:
+        try:
+            from backend.core.content_escape_repair import (
+                looks_serialized_payload,
+                serialized_payload_error,
+            )
+
+            if looks_serialized_payload(content):
+                return serialized_payload_error('content')
+        except Exception:
+            pass
+
         placeholder_lines = {
             'your code here -- raw text, no json escaping needed',
             'full file contents here -- raw text, no json escaping',
