@@ -595,7 +595,7 @@ def _stream_chunks_to_tool_args(chunks: list[str]) -> str:
                                     'index': 0,
                                     'id': 'call_x',
                                     'function': {
-                                        'name': 'text_editor',
+                                        'name': 'read',
                                         'arguments': piece,
                                     },
                                 }

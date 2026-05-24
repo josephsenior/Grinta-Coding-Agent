@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Model-facing file API:** public editing tools are consolidated to
+  `read`, `find_symbols`, `create`, `edit_symbols`, `replace_string`, and
+  `multiedit`. Legacy public editor factories and compatibility handlers were
+  removed; lower-level editor primitives remain internal.
 - **CI:** `py-tests` required jobs on Linux and Windows run the full
   `backend/tests/unit` corpus (fast PR gates), not a fixed nine-file slice.
   [docs/CI.md](docs/CI.md) documents the tiers.
@@ -42,10 +46,10 @@ before the final `1.0.0` cut.
 
 ### Added
 
-- **`read_symbol_definition` tool restored** (tree-sitter-backed). Lets the
-  agent fetch a single named symbol (`path:Symbol` or `path:Class.method`)
-  or a whole file in one call, replacing the previous 2-3 call dance of
-  `search_code` + `read_file`. Backed by the already-core
+- **Symbol-aware reading restored** (tree-sitter-backed). Lets the
+  agent fetch named symbols or a whole file through the public file API,
+  replacing the previous multi-call dance of code search plus file reads.
+  Backed by the already-core
   `backend.utils.treesitter_editor.TreeSitterEditor.find_symbol()`. Wired
   through `planner.py`, `function_calling.py`, and the CLI display layer.
 - **README** rewritten with a multi-line pitch and an 11-row competitor
@@ -159,8 +163,8 @@ before the final `1.0.0` cut.
 - **GraphRAG** subsystem (`backend/context/graph_rag.py`,
   `graph_store.py`) and its dependent tools (`explore_tree_structure`,
   `read_symbol_definition`). The four remaining retrieval primitives
-  (`search_code` via ripgrep, `symbol_editor` via tree-sitter,
-  `lsp` via LSP, `read_file`) cover the same surface
+  (`search_code` via ripgrep, `find_symbols` / `read` via tree-sitter,
+  `lsp` via LSP) cover the same surface
   without the index-maintenance cost.
 - **`ReRanker`** class and the cross-encoder rerank step from
   `EnhancedVectorStore` — over-engineered for a CLI agent's recall
@@ -220,8 +224,8 @@ HTTP server.
   ambiguous recovery.
 - Trimmed base dependencies: `asyncpg` and `libtmux` moved to optional
   groups; `python-socketio` removed from base runtime.
-- Consolidated editor tools — `str_replace_editor` is the primary editor;
-  `ultimate_editor.py` and `universal_editor.py` are deprecated.
+- Consolidated editor tools around a smaller public file API;
+  older experimental editor modules are deprecated.
 - Broke up `action_execution_server.py` (1944 → 4 focused modules),
   `conversation_memory.py` (1709 → 4 focused modules), and `config/utils.py`
   (43 KB → 4 focused modules).
@@ -233,9 +237,9 @@ HTTP server.
 
 ### Deprecated
 
-- `ultimate_editor.py` — use `str_replace_editor` instead.
-- `universal_editor.py` — use `str_replace_editor` or `atomic_refactor`
-  instead.
+- `ultimate_editor.py` — use the public file API instead.
+- `universal_editor.py` — use the public file API or `atomic_refactor`
+  internally instead.
 
 ### Removed
 

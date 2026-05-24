@@ -14,7 +14,7 @@ So I went heretical. The default editor is now tolerant by construction, and the
 
 ## The Failure Mode That Forced the Issue
 
-I was running the agent on a Windows checkout of a project that had been edited on Linux. The file had mixed `\n` and `\r\n` endings — common, ugly, real. The agent read three lines around a function it wanted to change. Everything in its reasoning trace was correct. The `replace_text` call used the exact substring it had just read.
+I was running the agent on a Windows checkout of a project that had been edited on Linux. The file had mixed `\n` and `\r\n` endings — common, ugly, real. The agent read three lines around a function it wanted to change. Everything in its reasoning trace was correct. The exact replacement used the substring it had just read.
 
 The editor rejected it. *Substring not found.*
 
@@ -63,7 +63,7 @@ The compromise I landed on: **match-time tolerance is generous, write-time trans
 
 Tolerance is fine until the day it is not. The day it is not is the day the agent edits a Python file, the syntax breaks, and three turns later the agent is debugging a runtime error that does not exist because the source no longer parses.
 
-So every successful edit on a supported language passes through a **tree-sitter syntax check** before the observation goes back to the model. The check lives in the auto-check middleware, not in the editor itself, which matters: middleware is the layer where every action has to walk past on its way out of the runtime, so there is no editor variant — `replace_text`, `insert_text`, `multi_edit`, `create_file` — that can sneak past it.
+So every successful edit on a supported language passes through a **tree-sitter syntax check** before the observation goes back to the model. The check lives in the auto-check middleware, not in the editor itself, which matters: middleware is the layer where every action has to walk past on its way out of the runtime, so no public file operation can sneak past it.
 
 If the post-edit AST contains an `ERROR` or `MISSING` node, the observation that comes back to the agent is not “edit applied successfully.” It is a structured warning with the exact line, column, and a 60-character snippet of the broken region. The agent sees the receipt the same turn it made the edit. No silent corruption.
 

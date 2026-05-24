@@ -10,7 +10,7 @@ In my Textual UI phase, I tried throwing spinning loaders everywhere. But spinni
 
 To build user trust, I had to stream the agent's intermediate steps. And because I use an event-sourced architecture, the UI streams every tool execution in real-time. You don't see "Thinking..." you see:
 
-- `[TOOL] read_file(tests/conftest.py)`
+- `[TOOL] read(type="file", path="tests/conftest.py")`
 - `[TOOL] run_command(pytest tests/)`
 - `[LLM] The test failed because of a missing fixture. I need to edit conftest.py.`
 
@@ -20,7 +20,7 @@ The UI (`backend/cli/reasoning_display.py`, `layout_tokens.py`) makes the invisi
 
 Trust is also about blast radius. I've watched an agent confidently type `rm -rf` in what it thought was a scratch directory. It wasn't.
 
-This is why `backend/cli/confirmation.py` became a core part of the system. High-risk commands run through a middleware validation check before execution. Dangerous shell segments or high-impact editor operations (`str_replace_editor` / `ast_code_editor`) can pause the execution loop entirely, presenting a prompt to the user: "The agent wants to delete this file. Allow? [Y/N]".
+This is why `backend/cli/confirmation.py` became a core part of the system. High-risk commands run through a middleware validation check before execution. Dangerous shell segments or high-impact file operations can pause the execution loop entirely, presenting a prompt to the user: "The agent wants to delete this file. Allow? [Y/N]".
 
 This bridges the latency veil perfectly. The human knows what the machine intends to do before disaster happens.
 

@@ -325,7 +325,7 @@ NEW_BLOCK = '''    # Dispatch table for :meth:`_handle_observation` — maps obs
 
     @staticmethod
     def _file_read_result_message(content: str, n_lines: int) -> str:
-        """``text_editor view`` on a directory returns ``Directory contents of …:``
+        """Directory reads return ``Directory contents of …:``
         followed by entries; report entries instead of lines for that case."""
         if not content.startswith(_DIRECTORY_VIEW_PREFIX):
             return f'{n_lines:,} lines' if n_lines else 'empty file'

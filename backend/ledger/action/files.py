@@ -67,13 +67,13 @@ class FileWriteAction(Action):
 
 @dataclass
 class FileEditAction(Action):
-    """Edits a file using canonical file-editor commands.
+    """Edits a file using canonical internal file-editor commands.
 
     Attributes:
         path (str): The path to the file being edited.
-        command (str): The editing command to be performed (read_file, create_file, replace_string, insert_text, undo_last_edit, edit).
-        file_text (str): The content of the file to be created (used with 'create_file').
-        new_str (str): The replacement text (used with 'insert_text' or range edits).
+        command (str): Internal runtime command produced by the public file API.
+        file_text (str): The content of a new file.
+        new_str (str): Replacement or insertion text for internal editor operations.
         old_string (str): Exact string to replace (used with 'replace_string').
         replace_all (bool): Whether to replace all exact old_string occurrences.
         insert_line (int): The line number after which to insert new_str (used with 'insert_text').
@@ -129,6 +129,6 @@ class FileEditAction(Action):
             ret += f'New String: ```\n{self.new_str}\n```\n'
         elif self.command == 'undo_last_edit':
             ret += 'Undo Edit\n'
-        elif self.command in {'edit_symbol', 'edit_symbols', 'multi_edit'}:
+        elif self.command == 'multi_edit':
             ret += f'Structured Payload: {self.structured_payload}\n'
         return ret

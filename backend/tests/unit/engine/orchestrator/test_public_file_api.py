@@ -273,17 +273,17 @@ def test_edit_symbols_replaces_one_or_more_symbols(monkeypatch, tmp_path):
         'file_edits': [
             {
                 'path': 'mod.py',
-                'command': 'replace_range',
+                'operation': 'symbol_body_replacement',
                 'start_line': 4,
                 'end_line': 5,
-                'new_code': 'def b():\n    return 20\n',
+                'content': 'def b():\n    return 20\n',
             },
             {
                 'path': 'mod.py',
-                'command': 'replace_range',
+                'operation': 'symbol_body_replacement',
                 'start_line': 1,
                 'end_line': 2,
-                'new_code': 'def a():\n    return 10\n',
+                'content': 'def a():\n    return 10\n',
             },
         ]
     }
@@ -369,12 +369,12 @@ def test_multiedit_public_action_normalizes_new_public_operations_and_guards_con
     assert action.command == 'multi_edit'
     assert action.structured_payload['file_edits'][0] == {
         'path': 'a.py',
-        'command': 'create_file',
+        'operation': 'create_file',
         'content': 'A = 1\n',
     }
-    assert action.structured_payload['file_edits'][1]['command'] == 'create_symbol'
-    assert action.structured_payload['file_edits'][2]['command'] == 'replace_string'
-    assert action.structured_payload['file_edits'][3]['command'] == 'replace_range'
+    assert action.structured_payload['file_edits'][1]['operation'] == 'create_symbol'
+    assert action.structured_payload['file_edits'][2]['operation'] == 'replace_string'
+    assert action.structured_payload['file_edits'][3]['operation'] == 'symbol_body_replacement'
 
     with pytest.raises(FunctionCallValidationError, match='CONTENT_APPEARS_SERIALIZED'):
         _handle_multiedit_tool(
@@ -418,13 +418,13 @@ def test_multiedit_commits_no_changes_when_one_operation_fails(monkeypatch, tmp_
                 'file_edits': [
                     {
                         'path': 'a.py',
-                        'command': 'replace_string',
+                        'operation': 'replace_string',
                         'old_string': 'A = 1\n',
                         'new_string': 'A = 2\n',
                     },
                     {
                         'path': 'b.py',
-                        'command': 'replace_string',
+                        'operation': 'replace_string',
                         'old_string': 'missing',
                         'new_string': 'B = 2\n',
                     },

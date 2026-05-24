@@ -14,7 +14,7 @@ can paste into the REPL after `START_HERE.ps1` (Windows) or `./start_here.sh`
 Expected behaviour:
 
 * `read` + `grep_search` to find current callers
-* one or two `text_editor` actions
+* one or two `edit_symbols` or `replace_string` actions
 * one `terminal_run` invocation that exits 0
 * `/cost` afterwards reports a small (< $0.05 with default model) spend
 

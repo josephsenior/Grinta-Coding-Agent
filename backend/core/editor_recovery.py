@@ -27,11 +27,11 @@ def _python_comment_prefix_issue(content: str, path: str | None) -> EditorRecove
         return None
     return EditorRecoveryAdvice(
         kind='python_comment_prefix',
-        preferred_tool='file_edit',
-        next_action='replace_range',
+        preferred_tool='replace_string',
+        next_action='replace_string',
         detail=(
             'Python file detected with `//` comment prefix. Python comments use `#`, '
-            'so repair the affected lines with a targeted range edit instead of retrying the same write.'
+            'so repair the affected text with exact replacement instead of retrying the same write.'
         ),
     )
 
@@ -52,30 +52,30 @@ def classify_editor_recovery(
     if 'symbol ' in lower and 'not found' in lower:
         return EditorRecoveryAdvice(
             kind='symbol_not_found',
-            preferred_tool='find_symbol',
-            next_action='find_symbol',
+            preferred_tool='find_symbols',
+            next_action='find_symbols',
             detail=(
-                'The symbol lookup failed. Call `find_symbol` first to verify the live '
-                'symbol name and location before retrying the edit.'
+                'The symbol lookup failed. Call `find_symbols` first to verify the live '
+                'symbol name and candidates before retrying the edit.'
             ),
         )
 
     if 'file_unexpectedly_modified' in lower or 'file changed on disk since it was read' in lower:
         return EditorRecoveryAdvice(
             kind='stale_file_context',
-            preferred_tool='read_file',
-            next_action='read_file',
+            preferred_tool='read',
+            next_action='read',
             detail=(
                 'The file changed since the last read. Refresh the exact file contents with '
-                '`read_file` before issuing another edit.'
+                '`read` before issuing another edit.'
             ),
         )
 
     if 'file hash guard failed' in lower:
         return EditorRecoveryAdvice(
             kind='stale_file_context',
-            preferred_tool='read_file',
-            next_action='read_file',
+            preferred_tool='read',
+            next_action='read',
             detail=(
                 'The file contents no longer match the last verified read. Re-read the file, '
                 'then retry one smaller edit with fresh context.'
@@ -85,8 +85,8 @@ def classify_editor_recovery(
     if 'edit verification failed' in lower:
         return EditorRecoveryAdvice(
             kind='edit_verification_failed',
-            preferred_tool='read_file',
-            next_action='read_file',
+            preferred_tool='read',
+            next_action='read',
             detail=(
                 'The write completed but verification did not prove the intended change landed cleanly. '
                 'Refresh the file state, then retry once with a smaller, more targeted edit.'
@@ -96,52 +96,52 @@ def classify_editor_recovery(
     if 'large existing code file overwrite blocked' in lower:
         return EditorRecoveryAdvice(
             kind='full_file_overwrite_blocked',
-            preferred_tool='edit_symbol',
-            next_action='edit_symbol',
+            preferred_tool='edit_symbols',
+            next_action='edit_symbols',
             detail=(
-                'Full-file overwrite was blocked on a large existing source file. Prefer a symbol-aware or '
-                'line-range edit, and only use overwrite mode when you intentionally mean to replace the entire file.'
+                'Full-file overwrite was blocked on a large existing source file. Prefer edit_symbols '
+                'for code or replace_string for exact text changes.'
             ),
         )
 
     if 'syntax validation failed' in lower or 'syntax error after edit' in lower:
         return EditorRecoveryAdvice(
             kind='syntax_validation_failed',
-            preferred_tool='file_edit',
-            next_action='replace_range',
+            preferred_tool='read',
+            next_action='read',
             detail=(
                 'The edit produced invalid syntax. Re-read the affected region, then do one surgical repair '
-                'with a symbol-aware or line-range edit instead of repeating the same full write.'
+                'with edit_symbols or replace_string instead of repeating the same full write.'
             ),
         )
 
     if 'edit context mismatch' in lower or 'range edit context mismatch' in lower:
         return EditorRecoveryAdvice(
             kind='range_context_mismatch',
-            preferred_tool='file_edit',
-            next_action='replace_range',
+            preferred_tool='read',
+            next_action='read',
             detail=(
                 'The edit context is stale or malformed. Re-read the file and retry once with '
-                'a `replace_range` edit using exact current line numbers.'
+                'edit_symbols or exact replace_string content.'
             ),
         )
 
     if 'replace failed' in lower or 'start line' in lower or 'end_line must be' in lower:
         return EditorRecoveryAdvice(
             kind='range_edit_failed',
-            preferred_tool='file_edit',
-            next_action='replace_range',
+            preferred_tool='read',
+            next_action='read',
             detail=(
                 'The range edit inputs are invalid or stale. Re-read the file to confirm line numbers, '
-                'then retry one smaller line-bounded edit.'
+                'then retry one smaller edit through edit_symbols or replace_string.'
             ),
         )
 
     if 'multi_edit transaction rolled back' in lower:
         return EditorRecoveryAdvice(
             kind='atomic_batch_failed',
-            preferred_tool='multi_edit',
-            next_action='multi_edit',
+            preferred_tool='multiedit',
+            next_action='multiedit',
             detail=(
                 'The atomic batch failed pre-commit. Inspect the failing item, fix that specific edit, '
                 'then retry the whole batch as one transaction.'

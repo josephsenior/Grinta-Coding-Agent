@@ -279,7 +279,7 @@ class TestUndoLastEdit:
     def test_undo_write_error(self, editor, tmp_path):
         f = tmp_path / 'canundo.py'
         f.write_text('x = 1\n')
-        global_undo_manager.push(str(f), 'original = True\n', 'symbol_editor')
+        global_undo_manager.push(str(f), 'original = True\n', 'symbol_edit')
         result = editor.undo_last_edit(str(f))
         assert result.success is True
 
@@ -403,7 +403,10 @@ class TestReplaceCodeRange:
         monkeypatch.setattr(
             editor_no_validate,
             '_verify_disk_content',
-            lambda *_args, **_kwargs: (False, 'Edit verification failed after replace_range'),
+            lambda *_args, **_kwargs: (
+                False,
+                'Edit verification failed after line span replacement',
+            ),
         )
         result = editor_no_validate.replace_code_range(str(f), 2, 2, 'b = 99')
         assert result.success is False

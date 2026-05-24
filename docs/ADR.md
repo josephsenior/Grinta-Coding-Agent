@@ -406,6 +406,6 @@ semantics cleanly without implying that only world-state mutations matter.
 - ✅ Deterministic edits with stronger constraints than raw substring replacement
 - ✅ Better behavior under text drift and repeated phrases
 - ✅ Clear failure modes for ambiguous anchors/hunks
-- ✅ `replace_text`, `view_and_replace`, and `batch_replace` removed from tool surface; prefer `ast_code_editor`, `edit_mode`, and sequential edits + checkpoints for multi-file work
+- ✅ Legacy text-editor variants removed from the tool surface; prefer `replace_string`, `edit_symbols`, and `multiedit` for file work
 - ⚠️ More implementation complexity in file-editor runtime
 - ⚠️ Additional parser dependency risk for YAML/TOML paths

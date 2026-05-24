@@ -15,12 +15,10 @@ from backend.core.errors import (
 )
 from backend.engine.function_calling import (
     _handle_cmd_run_tool,
-    _handle_edit_symbol_command,
     _handle_finish_tool,
     _handle_mcp_tool,
     _handle_summarize_context_tool,
     _handle_task_tracker_tool,
-    _handle_text_editor_tool,
     _process_single_tool_call,
     combine_thought,
     response_to_actions,
@@ -28,8 +26,6 @@ from backend.engine.function_calling import (
 )
 from backend.ledger.action import (
     CmdRunAction,
-    FileEditAction,
-    FileReadAction,
     MessageAction,
     PlaybookFinishAction,
     TaskTrackingAction,
@@ -183,184 +179,6 @@ class TestHandleFinishTool:
     def test_missing_message_raises(self):
         with pytest.raises(FunctionCallValidationError, match='message'):
             _handle_finish_tool({})
-
-
-# ---------------------------------------------------------------------------
-# _handle_text_editor_tool
-# ---------------------------------------------------------------------------
-
-
-class TestHandleStrReplaceEditorTool:
-    def test_canonical_read_file_command_returns_file_read_action(self):
-        action = _handle_text_editor_tool(
-            {'command': 'read_file', 'path': 'f.py', 'security_risk': 'LOW'}
-        )
-        assert isinstance(action, FileReadAction)
-        assert action.path == 'f.py'
-
-    def test_legacy_view_alias_is_rejected(self):
-        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
-            _handle_text_editor_tool(
-                {'command': 'view', 'path': 'f.py', 'security_risk': 'LOW'}
-            )
-
-    def test_file_path_alias_is_rejected(self):
-        with pytest.raises(FunctionCallValidationError, match='path'):
-            _handle_text_editor_tool(
-                {'command': 'read_file', 'file_path': 'f.py', 'security_risk': 'LOW'}
-            )
-
-    def test_view_with_range(self):
-        action = _handle_text_editor_tool(
-            {
-                'command': 'read_file',
-                'path': 'f.py',
-                'view_range': [1, 10],
-                'security_risk': 'LOW',
-            }
-        )
-        assert isinstance(action, FileReadAction)
-
-    def test_missing_command_raises(self):
-        with pytest.raises(FunctionCallValidationError, match='command'):
-            _handle_text_editor_tool({'path': 'f.py'})
-
-    def test_missing_path_raises(self):
-        with pytest.raises(FunctionCallValidationError, match='path'):
-            _handle_text_editor_tool({'command': 'create_file'})
-
-    def test_create_file_command_returns_file_edit_action(self):
-        action = _handle_text_editor_tool(
-            {
-                'command': 'create_file',
-                'path': 'new.py',
-                'file_text': 'content',
-                'security_risk': 'LOW',
-            }
-        )
-        assert isinstance(action, FileEditAction)
-        assert action.overwrite_existing is False
-
-    def test_create_file_accepts_overwrite_existing(self):
-        action = _handle_text_editor_tool(
-            {
-                'command': 'create_file',
-                'path': 'new.py',
-                'file_text': 'content',
-                'overwrite_existing': True,
-                'security_risk': 'LOW',
-            }
-        )
-        assert isinstance(action, FileEditAction)
-        assert action.overwrite_existing is True
-
-    def test_unexpected_arg_raises(self):
-        with pytest.raises(FunctionCallValidationError):
-            _handle_text_editor_tool(
-                {
-                    'command': 'create_file',
-                    'path': 'x.py',
-                    'totally_unknown_arg': 'val',
-                }
-            )
-
-    def test_view_and_replace_command_rejected(self, tmp_path):
-        target = tmp_path / 'sample.txt'
-        target.write_text('hello world\n', encoding='utf-8')
-        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
-            _handle_text_editor_tool(
-                {
-                    'command': 'view_and_replace',
-                    'path': str(target),
-                    'old_str': 'world',
-                    'new_str': 'team',
-                    'security_risk': 'LOW',
-                }
-            )
-
-    def test_batch_replace_command_rejected(self, tmp_path):
-        target = tmp_path / 'a.py'
-        target.write_text('x\n', encoding='utf-8')
-        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
-            _handle_text_editor_tool(
-                {
-                    'command': 'batch_replace',
-                    'path': str(target),
-                    'edits': [{'path': 'a.py', 'old_str': 'x', 'new_str': 'y'}],
-                    'security_risk': 'LOW',
-                }
-            )
-
-    def test_multi_edit_command_returns_message_action(self):
-        with patch(
-            'backend.engine.function_calling._handle_text_editor_multi_edit'
-        ) as handle_multi:
-            handle_multi.return_value = MessageAction(content='ok')
-            action = _handle_text_editor_tool(
-                {
-                    'command': 'multi_edit',
-                    'file_edits': [
-                        {'path': 'a.md', 'command': 'create_file', 'file_text': 'x'}
-                    ],
-                    'security_risk': 'LOW',
-                }
-            )
-        assert isinstance(action, MessageAction)
-
-    def test_range_missing_start_line_raises(self):
-        with pytest.raises(
-            FunctionCallValidationError,
-            match='start_line',
-        ):
-            _handle_text_editor_tool(
-                {
-                    'command': 'edit',
-                    'path': 'f.py',
-                    'edit_mode': 'range',
-                    'end_line': 5,
-                    'new_str': 'x',
-                    'security_risk': 'LOW',
-                }
-            )
-
-    def test_range_missing_end_line_raises(self):
-        with pytest.raises(
-            FunctionCallValidationError,
-            match='end_line',
-        ):
-            _handle_text_editor_tool(
-                {
-                    'command': 'edit',
-                    'path': 'f.py',
-                    'edit_mode': 'range',
-                    'start_line': 1,
-                    'new_str': 'x',
-                    'security_risk': 'LOW',
-                }
-            )
-    def test_minimax_text_tool_call_is_converted_before_message_action(self):
-        response = _model_response(
-            content=(
-                '<minimax:tool_call>'
-                '{"name":"task_tracker","arguments":{"command":"view"}}'
-                '</minimax:tool_call>'
-            )
-        )
-
-        action = response_to_actions(response)[0]
-
-        assert isinstance(action, TaskTrackingAction)
-        assert action.command == 'view'
-
-    def test_minimax_text_tool_call_shape_error_does_not_become_message_action(self):
-        response = _model_response(
-            content='<minimax:tool_call name="task_tracker">update</minimax:tool_call>'
-        )
-
-        with pytest.raises(FunctionCallValidationError) as exc_info:
-            response_to_actions(response)
-
-        assert 'task_list' in str(exc_info.value)
 
 
 # ---------------------------------------------------------------------------
@@ -554,149 +372,6 @@ class TestProcessSingleToolCall:
             _process_single_tool_call(tc, {})
 
 
-# ---------------------------------------------------------------------------
-# _validate_structure_editor_args (via _handle_ast_code_editor_tool)
-# ---------------------------------------------------------------------------
-
-
-class TestValidateStructureEditorArgs:
-    """Tests for missing command / path validation."""
-
-    def test_missing_command_raises(self):
-        from backend.engine.function_calling import _handle_symbol_editor_tool
-
-        with pytest.raises(FunctionCallValidationError, match='command'):
-            _handle_symbol_editor_tool({'file_path': 'x.py'})
-
-    def test_missing_path_raises(self):
-        from backend.engine.function_calling import _handle_symbol_editor_tool
-
-        with pytest.raises(FunctionCallValidationError, match='path'):
-            _handle_symbol_editor_tool({'command': 'edit_symbol'})
-
-    def test_canonical_path_with_read_file_command(self):
-        from backend.engine.function_calling import _handle_symbol_editor_tool
-
-        result = _handle_symbol_editor_tool(
-            {
-                'command': 'read_file',
-                'path': 'x.py',
-                'security_risk': 'LOW',
-            }
-        )
-        assert isinstance(result, FileReadAction)
-        assert result.path == 'x.py'
-
-    def test_edit_not_valid_for_symbol_editor(self):
-        """Edit is not a structure-edit command."""
-        from backend.engine.function_calling import _handle_symbol_editor_tool
-
-        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
-            _handle_symbol_editor_tool(
-                {
-                    'command': 'edit',
-                    'path': 'x.py',
-                    'old_str': 'old',
-                    'new_str': 'new',
-                    'security_risk': 'LOW',
-                }
-            )
-
-    def test_unknown_command_raises_validation_error(self):
-        from backend.engine.function_calling import _handle_symbol_editor_tool
-
-        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
-            _handle_symbol_editor_tool(
-                {
-                    'command': 'totally_unknown_cmd',
-                    'path': 'x.py',
-                    'security_risk': 'LOW',
-                }
-            )
-
-    def test_str_replace_alias_is_rejected(self):
-        from backend.engine.function_calling import _handle_symbol_editor_tool
-
-        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
-            _handle_symbol_editor_tool(
-                {
-                    'command': 'str_replace',
-                    'path': 'x.py',
-                    'old_str': 'old',
-                    'new_str': 'new',
-                    'security_risk': 'LOW',
-                }
-            )
-
-
-class TestEditSymbolsBatch:
-    def test_edit_symbols_applies_multiple(self, tmp_path):
-        from backend.engine.function_calling import _handle_symbol_editor_tool
-
-        py = tmp_path / 'm.py'
-        py.write_text(
-            'def a():\n    return 1\n\ndef b():\n    return 2\n',
-            encoding='utf-8',
-        )
-        result = _handle_symbol_editor_tool(
-            {
-                'command': 'edit_symbols',
-                'path': str(py),
-                'edits': [
-                    {'symbol_name': 'a', 'new_body': '    return 10'},
-                    {'symbol_name': 'b', 'new_body': '    return 20'},
-                ],
-                'security_risk': 'LOW',
-            }
-        )
-        from backend.ledger.action import FileReadAction
-
-        assert isinstance(result, FileReadAction)
-        assert result.thought is not None
-        assert '10' in py.read_text(encoding='utf-8')
-        assert '20' in py.read_text(encoding='utf-8')
-
-    def test_edit_symbols_restores_on_failure(self, tmp_path):
-        from backend.core.errors import ToolExecutionError
-        from backend.engine.function_calling import _handle_symbol_editor_tool
-
-        original = 'def a():\n    return 1\n\ndef b():\n    return 2\n'
-        py = tmp_path / 'm.py'
-        py.write_text(original, encoding='utf-8')
-        with pytest.raises(ToolExecutionError, match='nope_not_a_symbol'):
-            _handle_symbol_editor_tool(
-                {
-                    'command': 'edit_symbols',
-                    'path': str(py),
-                    'edits': [
-                        {'symbol_name': 'a', 'new_body': '    return 99'},
-                        {'symbol_name': 'nope_not_a_symbol', 'new_body': '    pass'},
-                    ],
-                    'security_risk': 'LOW',
-                }
-            )
-        # File must be restored to original after failure
-        assert py.read_text(encoding='utf-8') == original
-
-    def test_edit_symbols_rejects_duplicate_symbols(self, tmp_path):
-        from backend.engine.function_calling import _handle_symbol_editor_tool
-
-        py = tmp_path / 'm.py'
-        py.write_text('def a():\n    return 1\n', encoding='utf-8')
-        with pytest.raises(FunctionCallValidationError, match='duplicate'):
-            _handle_symbol_editor_tool(
-                {
-                    'command': 'edit_symbols',
-                    'path': str(py),
-                    'edits': [
-                        {'symbol_name': 'a', 'new_body': '    return 2'},
-                        {'symbol_name': 'a', 'new_body': '    return 3'},
-                    ],
-                    'security_risk': 'LOW',
-                }
-            )
-
-
 class TestMultiEditCommand:
     def test_multi_edit_writes_workspace_scoped_paths(self, tmp_path):
         from backend.engine.function_calling import _handle_multi_edit_command
@@ -705,8 +380,12 @@ class TestMultiEditCommand:
             '',
             {
                 'file_edits': [
-                    {'path': 'src/a.py', 'new_content': 'A = 1\n'},
-                    {'path': '/workspace/src/b.py', 'new_content': 'B = 2\n'},
+                    {'path': 'src/a.py', 'operation': 'create_file', 'content': 'A = 1\n'},
+                    {
+                        'path': '/workspace/src/b.py',
+                        'operation': 'create_file',
+                        'content': 'B = 2\n',
+                    },
                 ]
             },
         )
@@ -723,7 +402,11 @@ class TestMultiEditCommand:
                 '',
                 {
                     'file_edits': [
-                        {'path': '../outside.py', 'new_content': 'print(1)\n'}
+                        {
+                            'path': '../outside.py',
+                            'operation': 'create_file',
+                            'content': 'print(1)\n',
+                        }
                     ]
                 },
             )
@@ -737,13 +420,17 @@ class TestMultiEditCommand:
             '',
             {
                 'file_edits': [
-                    {'path': 'src/a.py', 'new_content': 'A = 1\nB = 2\n'},
+                    {
+                        'path': 'src/a.py',
+                        'operation': 'create_file',
+                        'content': 'A = 1\nB = 2\n',
+                    },
                     {
                         'path': '/workspace/src/a.py',
-                        'command': 'replace_range',
+                        'operation': 'symbol_body_replacement',
                         'start_line': 2,
                         'end_line': 2,
-                        'new_code': 'B = 99\n',
+                        'content': 'B = 99\n',
                     },
                 ]
             },
@@ -765,9 +452,10 @@ class TestMultiEditCommand:
                 'file_edits': [
                     {
                         'path': 'src/m.py',
-                        'command': 'edit_symbol',
-                        'symbol_name': 'a',
-                        'new_body': '    return 42',
+                        'operation': 'symbol_body_replacement',
+                        'start_line': 1,
+                        'end_line': 2,
+                        'content': 'def a():\n    return 42\n',
                     }
                 ]
             },
@@ -775,229 +463,6 @@ class TestMultiEditCommand:
 
         assert isinstance(action, MessageAction)
         assert 'return 42' in py.read_text(encoding='utf-8')
-
-
-# ---------------------------------------------------------------------------
-# _handle_edit_symbol_command (imported directly)
-# ---------------------------------------------------------------------------
-
-
-class TestHandleEditFunctionCommand:
-    def _make_editor(self, success=True, message='ok'):
-        editor = MagicMock()
-        result = MagicMock()
-        result.success = success
-        result.message = message
-        editor.edit_function.return_value = result
-        return editor
-
-    def test_success_returns_file_read_action(self):
-        editor = self._make_editor(success=True)
-        result = _handle_edit_symbol_command(
-            editor, 'foo.py', {'symbol_name': 'my_fn', 'new_body': 'return 1'}
-        )
-        assert isinstance(result, FileReadAction)
-
-    def test_failure_raises_tool_execution_error(self):
-        from backend.core.errors import ToolExecutionError
-
-        editor = self._make_editor(success=False, message='parse error')
-        with pytest.raises(ToolExecutionError, match='parse error'):
-            _handle_edit_symbol_command(
-                editor, 'foo.py', {'symbol_name': 'my_fn', 'new_body': 'return 1'}
-            )
-
-    def test_missing_symbol_name_raises(self):
-        with pytest.raises(FunctionCallValidationError, match='symbol_name'):
-            _handle_edit_symbol_command(
-                MagicMock(), 'foo.py', {'new_body': 'return 1'}
-            )
-
-    def test_missing_new_body_raises(self):
-        with pytest.raises(FunctionCallValidationError, match='new_body'):
-            _handle_edit_symbol_command(
-                MagicMock(), 'foo.py', {'symbol_name': 'fn'}
-            )
-
-
-# ---------------------------------------------------------------------------
-# _handle_rename_symbol_command
-# ---------------------------------------------------------------------------
-
-
-class TestHandleRenameSymbolCommand:
-    def _make_editor(self, success=True, message='renamed'):
-        editor = MagicMock()
-        result = MagicMock()
-        result.success = success
-        result.message = message
-        editor.rename_symbol.return_value = result
-        return editor
-
-    def test_success_returns_file_read_action(self):
-        from backend.engine.function_calling import _handle_rename_symbol_command
-
-        editor = self._make_editor(success=True)
-        result = _handle_rename_symbol_command(
-            editor, 'f.py', {'old_name': 'foo', 'new_name': 'bar'}
-        )
-        assert isinstance(result, FileReadAction)
-
-    def test_failure_raises_tool_execution_error(self):
-        from backend.core.errors import ToolExecutionError
-        from backend.engine.function_calling import _handle_rename_symbol_command
-
-        editor = self._make_editor(success=False, message='not found')
-        with pytest.raises(ToolExecutionError, match='not found'):
-            _handle_rename_symbol_command(
-                editor, 'f.py', {'old_name': 'foo', 'new_name': 'bar'}
-            )
-
-    def test_missing_old_name_raises(self):
-        from backend.engine.function_calling import _handle_rename_symbol_command
-
-        with pytest.raises(FunctionCallValidationError):
-            _handle_rename_symbol_command(MagicMock(), 'f.py', {'new_name': 'bar'})
-
-    def test_missing_new_name_raises(self):
-        from backend.engine.function_calling import _handle_rename_symbol_command
-
-        with pytest.raises(FunctionCallValidationError):
-            _handle_rename_symbol_command(MagicMock(), 'f.py', {'old_name': 'foo'})
-
-
-# ---------------------------------------------------------------------------
-# _handle_find_symbol_command
-# ---------------------------------------------------------------------------
-
-
-class TestHandleFindSymbolCommand:
-    def test_found_symbol_returns_file_read_action(self):
-        from backend.engine.function_calling import _handle_find_symbol_command
-
-        editor = MagicMock()
-        sym = MagicMock()
-        sym.node_type = 'function'
-        sym.line_start = 10
-        sym.line_end = 20
-        sym.parent_name = 'MyClass'
-        editor.find_symbol.return_value = sym
-        result = _handle_find_symbol_command(editor, 'f.py', {'symbol_name': 'my_fn'})
-        assert isinstance(result, FileReadAction)
-        assert 'my_fn' in result.thought
-
-    def test_not_found_raises_tool_execution_error(self):
-        from backend.core.errors import ToolExecutionError
-        from backend.engine.function_calling import _handle_find_symbol_command
-
-        editor = MagicMock()
-        editor.errors.symbol_not_found.return_value = MagicMock(
-            message='Did you mean ghost_real?'
-        )
-        editor._get_available_symbols.return_value = ['ghost_real']
-        editor.find_symbol.return_value = None
-        with pytest.raises(ToolExecutionError, match='find_symbol'):
-            _handle_find_symbol_command(editor, 'f.py', {'symbol_name': 'ghost'})
-
-    def test_missing_symbol_name_raises(self):
-        from backend.engine.function_calling import _handle_find_symbol_command
-
-        with pytest.raises(FunctionCallValidationError, match='symbol_name'):
-            _handle_find_symbol_command(MagicMock(), 'f.py', {})
-
-    def test_found_symbol_without_parent_omits_parent_line(self):
-        from backend.engine.function_calling import _handle_find_symbol_command
-
-        editor = MagicMock()
-        sym = MagicMock()
-        sym.node_type = 'class'
-        sym.line_start = 1
-        sym.line_end = 5
-        sym.parent_name = None
-        editor.find_symbol.return_value = sym
-        result = _handle_find_symbol_command(editor, 'f.py', {'symbol_name': 'Klass'})
-        assert 'Parent' not in result.thought
-
-
-# ---------------------------------------------------------------------------
-# _handle_replace_range_command
-# ---------------------------------------------------------------------------
-
-
-class TestHandleReplaceRangeCommand:
-    def _make_editor(self, success=True):
-        editor = MagicMock()
-        r = MagicMock()
-        r.success = success
-        r.message = 'replaced' if success else 'error'
-        editor.replace_code_range.return_value = r
-        return editor
-
-    def test_success_returns_file_read_action(self):
-        from backend.engine.function_calling import _handle_replace_range_command
-
-        editor = self._make_editor(success=True)
-        result = _handle_replace_range_command(
-            editor, 'f.py', {'start_line': 1, 'end_line': 5, 'new_code': 'pass'}
-        )
-        assert isinstance(result, FileReadAction)
-
-    def test_failure_raises_tool_execution_error(self):
-        from backend.core.errors import ToolExecutionError
-        from backend.engine.function_calling import _handle_replace_range_command
-
-        editor = self._make_editor(success=False)
-        with pytest.raises(ToolExecutionError, match='Replace failed'):
-            _handle_replace_range_command(
-                editor, 'f.py', {'start_line': 1, 'end_line': 5, 'new_code': 'pass'}
-            )
-
-    def test_missing_start_line_raises(self):
-        from backend.engine.function_calling import _handle_replace_range_command
-
-        with pytest.raises(FunctionCallValidationError, match='start_line'):
-            _handle_replace_range_command(
-                MagicMock(), 'f.py', {'end_line': 5, 'new_code': 'x'}
-            )
-
-    def test_missing_new_code_raises(self):
-        from backend.engine.function_calling import _handle_replace_range_command
-
-        with pytest.raises(FunctionCallValidationError):
-            _handle_replace_range_command(
-                MagicMock(), 'f.py', {'start_line': 1, 'end_line': 5}
-            )
-
-
-# ---------------------------------------------------------------------------
-# _handle_normalize_indent_command
-# ---------------------------------------------------------------------------
-
-
-class TestHandleNormalizeIndentCommand:
-    def _make_editor(self, success=True):
-        editor = MagicMock()
-        r = MagicMock()
-        r.success = success
-        r.message = 'ok' if success else 'fail'
-        editor.normalize_file_indent.return_value = r
-        return editor
-
-    def test_success_returns_file_read_action(self):
-        from backend.engine.function_calling import _handle_normalize_indent_command
-
-        editor = self._make_editor(success=True)
-        result = _handle_normalize_indent_command(
-            editor, 'f.py', {'style': 'spaces', 'size': 4}
-        )
-        assert isinstance(result, FileReadAction)
-
-    def test_failure_returns_message_action(self):
-        from backend.engine.function_calling import _handle_normalize_indent_command
-
-        editor = self._make_editor(success=False)
-        result = _handle_normalize_indent_command(editor, 'f.py', {})
-        assert isinstance(result, MessageAction)
 
 
 # ---------------------------------------------------------------------------

@@ -24,7 +24,7 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='A range edit is missing start_line or end_line.',
             steps=(
-                'Use the public file API instead: `replace_string` for exact text or `replace_symbol` for one code symbol.',
+                'Use the public file API instead: `replace_string` for exact text or `edit_symbols` for code symbols.',
                 'Re-read the target context if you need a more specific exact anchor.',
             ),
             omit_summary_in_recovery=False,
@@ -37,7 +37,7 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
             summary='A legacy edit command is missing its edit_mode.',
             steps=(
                 'The legacy range-edit format is no longer model-facing.',
-                'Use `replace_string`, `replace_symbol`, `insert_symbol`, `edit_symbols`, or `multiedit`.',
+                'Use `create`, `replace_string`, `edit_symbols`, or `multiedit`.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-TE-002',
@@ -53,18 +53,6 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-TE-003',
-        ),
-    ),
-    _GuidanceRule(
-        _has('replace_range requires'),
-        ErrorGuidance(
-            summary='replace_range is missing required parameters.',
-            steps=(
-                'The legacy replace_range command is not model-facing.',
-                'Use `replace_string` for exact text replacement or `replace_symbol` for a complete code symbol replacement.',
-            ),
-            omit_summary_in_recovery=False,
-            error_code='ERR-SE-001',
         ),
     ),
     _GuidanceRule(

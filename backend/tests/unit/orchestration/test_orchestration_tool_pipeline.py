@@ -207,7 +207,7 @@ class TestCircuitBreakerMiddlewarePipeline:
         mw = CircuitBreakerMiddleware(controller)
         action = MagicMock()
         action.tool_call_metadata = MagicMock(
-            function_name='edit_symbol'
+            function_name='edit_symbols'
         )
         ctx = ToolInvocationContext(
             controller=controller, action=action, state=MagicMock()
@@ -233,7 +233,7 @@ class TestCircuitBreakerMiddlewarePipeline:
         mw = CircuitBreakerMiddleware(controller)
         action = MagicMock()
         action.tool_call_metadata = MagicMock(
-            function_name='edit_symbol'
+            function_name='edit_symbols'
         )
         ctx = ToolInvocationContext(
             controller=controller, action=action, state=MagicMock()

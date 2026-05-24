@@ -174,8 +174,8 @@ TOOL_EXAMPLES = {
         'kill_server': '\nUSER: Now kill the server, make it display the numbers in a table format.\n\nASSISTANT:\nSure! Let me stop the server first:\n<function=execute_bash>\n<parameter=command>\nkill 124\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\n[1]+  Terminated              python3 app.py > server.log 2>&1\n',
         'run_server_again': '\nASSISTANT:\nRunning the updated file:\n<function=execute_bash>\n<parameter=command>\npython3 app.py > server.log 2>&1 &\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\n[1] 126\n\nASSISTANT:\nThe server is running on port 5000 with PID 126. You can access the list of numbers in a table format by visiting http://127.0.0.1:5000.\n',
     },
-    'create_file': {
-        'create': "\nASSISTANT:\nThere is no app.py in the current directory. Let me create it:\n<function=create_file>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=security_risk>LOW</parameter>\n<parameter=file_text>\nfrom flask import Flask\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    numbers = list(range(1, 11))\n    return str(numbers)\n\nif __name__ == '__main__':\n    app.run(port=5000)\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [create_file]:\nFile created successfully at: /workspace/app.py",
+    'create': {
+        'file': "\nASSISTANT:\nThere is no app.py in the current directory. Let me create it:\n<function=create>\n<parameter=type>file</parameter>\n<parameter=path>app.py</parameter>\n<parameter=security_risk>LOW</parameter>\n<parameter=content>\nfrom flask import Flask\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    numbers = list(range(1, 11))\n    return str(numbers)\n\nif __name__ == '__main__':\n    app.run(port=5000)\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [create]:\nFile created successfully at: app.py",
     },
     'browser': {
         'view_page': "\nASSISTANT:\nLet me check how the page looks in the browser:\n<function=browser>\n<parameter=code>\ngoto('http://127.0.0.1:5000')\nnoop(1000)  # Wait for page to load\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [browser]:\n[Browser shows the numbers in a table format]\n",
@@ -184,13 +184,6 @@ TOOL_EXAMPLES = {
         'example': '\nASSISTANT:\nThe server is running on port 5000 with PID 126. You can access the list of numbers in a table format by visiting http://127.0.0.1:5000. Let me know if you have any further requests!\n<function=finish>\n<parameter=message>The task has been completed. The web server is running and displaying numbers 1-10 in a table format at http://127.0.0.1:5000.</parameter>\n</function>\n',
     },
 }
-
-# Commands injected into hybrid FILE_EDITING_TOOL_FORMAT (beyond the inline create stub).
-FILE_EDITOR_PROMPT_XML_COMMANDS: tuple[str, ...] = (
-    'replace_range',
-    'edit_symbol',
-)
-
 
 def get_example_for_tools(tools: list[dict]) -> str:
     """Generate an in-context learning example based on available tools."""
@@ -333,8 +326,8 @@ class ExampleStepBuilder:
 
     def _add_file_creation_step(self) -> None:
         """Add file creation step based on available editors."""
-        if 'create_file' in self.available_tools:
-            self.example += TOOL_EXAMPLES['create_file']['create']
+        if CREATE_TOOL_NAME in self.available_tools:
+            self.example += TOOL_EXAMPLES['create']['file']
 
     def _add_server_run_step(self) -> None:
         """Add server run step if terminal command tool is available."""
@@ -1022,10 +1015,8 @@ def _iter_parameter_matches(
 
     Args:
         fn_body: The full function body text that was iterated for matches.
-        param_body: Optional alternate body to use for trailing text check.
-                    If None, fn_body is used. This allows callers to pass a
-                    modified body (e.g., with <file_edit> blocks stripped)
-                    while still getting correct trailing detection.
+        param_body: Optional alternate body to use for trailing text checks.
+                    If None, fn_body is used.
     """
     iterated_body = param_body if param_body is not None else fn_body
 

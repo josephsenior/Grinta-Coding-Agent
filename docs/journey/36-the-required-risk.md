@@ -12,7 +12,7 @@ This chapter is about closing that gap and the surrounding cleanup it forced: ma
 
 ## Mandatory `security_risk`
 
-The change is small in code and significant in posture. On every call to `execute_bash`, `execute_powershell`, `text_editor`, `symbol_editor`, and `browser`, the model must include a `security_risk` field with a value in `{LOW, MEDIUM, HIGH}`. Missing the field, sending an unrecognized value, or sending null all fail the tool call before it reaches the executor. The error that comes back to the model is structured and instructive: the field’s name, the allowed values, and the definition of each tier.
+The change is small in code and significant in posture. On every model-facing tool call that can inspect, execute, or mutate project state, the model must include a `security_risk` field with a value in `{LOW, MEDIUM, HIGH}`. Missing the field, sending an unrecognized value, or sending null all fail the tool call before it reaches the executor. The error that comes back to the model is structured and instructive: the field’s name, the allowed values, and the definition of each tier.
 
 The system prompt’s `🔐 Security Risk Policy` section now states the rule in plain language and lists the three tiers with examples (LOW: read-only / scoped reads; MEDIUM: project-scoped edits or execution; HIGH: system-level or untrusted operations). It also tells the model two things that the schema cannot:
 

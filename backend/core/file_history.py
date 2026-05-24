@@ -12,7 +12,7 @@ class UndoSnapshot:
     """A snapshot of file content with metadata."""
 
     content: str | None  # None means file didn't exist
-    editor: Literal['file_edit', 'structure_edit']
+    editor: Literal['file_edit', 'symbol_edit']
     timestamp: float
 
 
@@ -28,7 +28,7 @@ class UndoHistoryManager:
         self,
         path: str,
         snapshot: str | None,
-        editor: Literal['file_edit', 'structure_edit'],
+        editor: Literal['file_edit', 'symbol_edit'],
     ) -> None:
         """Record a file snapshot before modification."""
         import time

@@ -189,7 +189,7 @@ class TestFileEditorWrite:
         assert result.error is not None
         assert result.error_code == 'CREATE_FILE_ALREADY_EXISTS'
         assert 'File already exists' in result.error
-        assert 'replace_symbol or replace_string' in result.error
+        assert 'edit_symbols or replace_string' in result.error
 
     def test_create_file_rejects_existing_even_with_overwrite_existing(self):
         existing = Path(self.tmpdir) / 'big.py'

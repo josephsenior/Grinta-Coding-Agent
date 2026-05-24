@@ -44,8 +44,11 @@ def _tool_name_for_action(action: object) -> str:
     return getattr(tcm, 'function_name', '') or ''
 
 
+_FILE_EDIT_TOOL_NAMES = {'create', 'replace_string', 'edit_symbols', 'multiedit'}
+
+
 def _effective_error_tool_name(tool_name: str, content: str) -> str:
-    return classify_file_edit_error_bucket(content) if tool_name in ('edit_symbol', 'edit_symbols') else tool_name
+    return classify_file_edit_error_bucket(content) if tool_name in _FILE_EDIT_TOOL_NAMES else tool_name
 
 
 def _fallback_tool(tool_name: str) -> str | None:
@@ -71,7 +74,7 @@ def _record_success_progress(
     # Map edit tool names to the file-edit bucket so successes decay the same
     # per-tool counter that errors increment. Otherwise edit errors never
     # decay within a turn (key mismatch: error → 'file_edit', success → 'edit_symbols').
-    if tool_name in ('edit_symbol', 'edit_symbols'):
+    if tool_name in _FILE_EDIT_TOOL_NAMES:
         tool_name = FILE_EDIT_BUCKET
     record_success(tool_name=tool_name)
     obs_type = type(observation).__name__
