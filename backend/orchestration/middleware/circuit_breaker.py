@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backend.orchestration.agent_circuit_breaker import (
+    FILE_EDIT_BUCKET,
     classify_file_edit_error_bucket,
 )
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
@@ -67,6 +68,11 @@ def _record_success_progress(
     service: object, tool_name: str, observation: Observation
 ) -> None:
     record_success = getattr(service, 'record_success')
+    # Map edit tool names to the file-edit bucket so successes decay the same
+    # per-tool counter that errors increment. Otherwise edit errors never
+    # decay within a turn (key mismatch: error → 'file_edit', success → 'edit_symbols').
+    if tool_name in ('edit_symbol', 'edit_symbols'):
+        tool_name = FILE_EDIT_BUCKET
     record_success(tool_name=tool_name)
     obs_type = type(observation).__name__
     if obs_type in _PROGRESS_OBSERVATION_TYPES:
