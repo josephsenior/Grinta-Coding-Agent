@@ -133,7 +133,8 @@ class TestFeatureFlagToolPresence:
             'edit_symbols',
             'multiedit',
         }
-        hidden_file_tools = {
+        assert public_file_tools <= names
+        assert {
             'apply_patch',
             'patch',
             'replace_range',
@@ -151,13 +152,10 @@ class TestFeatureFlagToolPresence:
             'append_text',
             'undo_last_edit',
             'rename_symbol',
-            'find_symbol',
+            'file_editor',
             'text_editor',
             'symbol_editor',
-            'file_editor',
-        }
-        assert public_file_tools <= names
-        assert hidden_file_tools.isdisjoint(names)
+        }.isdisjoint(names)
         self._assert_dispatch_covered(names)
 
     def test_editor_disabled(self):

@@ -363,19 +363,16 @@ class TestBuildLlmParams:
         assert 'find_symbols' in joined
         assert '`create`' in joined
         assert 'replace_string' in joined
-        stale_tool_names = (
-            'read_file',
-            'read_range',
-            'read_symbol',
-            'create_file',
-            'replace_symbol',
-            'insert_symbol',
-            'append_text',
-            'section_edit',
-            'raw editor',
-            'XML file-edit',
-        )
-        assert all(name not in joined for name in stale_tool_names)
+        assert 'read_file' not in joined
+        assert 'read_range' not in joined
+        assert 'read_symbol' not in joined
+        assert 'create_file' not in joined
+        assert 'replace_symbol' not in joined
+        assert 'insert_symbol' not in joined
+        assert 'append_text' not in joined
+        assert 'section_edit' not in joined
+        assert 'raw editor' not in joined
+        assert 'XML file-edit' not in joined
 
     def test_injects_control_message_before_last_user(self):
         p = _make_planner()

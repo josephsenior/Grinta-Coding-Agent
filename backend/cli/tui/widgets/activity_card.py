@@ -618,10 +618,8 @@ class ThinkingIndicator(Static):
 
         elapsed = int(time.monotonic() - self._start_time) if self._start_time else 0
 
-        lines: list[str] = []
-        lines.append(f'[bold #5eead4]Thinking:[/] [dim]({elapsed}s)[/dim]')
-
-        for thought in self._thoughts:
-            lines.append(f'  [rgb(150,154,189)]│ {thought}[/]')
-
-        self.update('\n'.join(lines))
+        thoughts = '  |  '.join(self._thoughts)
+        self.update(
+            f'[bold #5eead4]Thinking:[/] [dim]({elapsed}s)[/dim]'
+            f'  [rgb(150,154,189)]{thoughts}[/]'
+        )
