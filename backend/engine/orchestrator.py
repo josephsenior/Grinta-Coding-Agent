@@ -397,7 +397,7 @@ class Orchestrator(Agent):
             return pending
 
         condensed = await self.memory_manager.condense_history(state)
-        if condensed.action is not None:
+        if condensed.pending_action is not None:
             self._emit_compaction_status()
         action = await self._execute_llm_step_async(state, condensed)
         self._reset_step_recovery_counters()
@@ -425,7 +425,7 @@ class Orchestrator(Agent):
 
         try:
             condensed = await self.memory_manager.condense_history(state)
-            if condensed.action is not None:
+            if condensed.pending_action is not None:
                 self._emit_compaction_status()
             action = await self._execute_llm_step_async(state, condensed)
             self._consecutive_context_errors = 0
