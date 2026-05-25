@@ -2928,10 +2928,13 @@ class TUIRenderer:
             if thoughts and self._live_thinking_dirty:
                 display = self._tui._get_display()
                 if type(display).__name__ != 'MagicMock':
-                    lines = [f'[bold #5eead4]Thinking:[/]']
-                    for thought in thoughts:
-                        lines.append(f'  [rgb(150,154,189)]│ {thought}[/]')
-                    display.append_widget(Static('\n'.join(lines)))
+                    content = '  |  '.join(thoughts)
+                    display.append_widget(
+                        Static(
+                            f'[bold #5eead4]Thinking:[/]'
+                            f'  [rgb(150,154,189)]{content}[/]'
+                        )
+                    )
             self._live_thinking_dirty = False
 
             self._live_thinking = ''
