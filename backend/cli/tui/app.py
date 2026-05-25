@@ -1070,7 +1070,7 @@ class GrintaScreen(Screen):
         line1_parts.append(f'[{state_color}]● {display_state}[/]')
         if workspace:
             line1_parts.append(f'[#bbc8e8]ws: {workspace}[/]')
-        line1_parts.append(f'[{NAVY_TEXT_SECONDARY}]{model_display}[/]')
+        line1_parts.append(f'[{NAVY_TEXT_SECONDARY}]Model: {model_display}[/]')
         line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
         line1_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
         line1 = '  '.join(line1_parts)
@@ -1084,7 +1084,8 @@ class GrintaScreen(Screen):
                 f'[{NAVY_TEXT_PRIMARY}]{self._last_tool_status}[/]'
             )
         )
-        line2 = f'{activity_or_hint}'
+        help_hint = f'  [#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
+        line2 = f'{activity_or_hint}{help_hint}'
 
         hud_bar = self.query_one('#hud-bar', HUD)
         hud_bar.query_one('#hud-line-1', Label).update(line1)
