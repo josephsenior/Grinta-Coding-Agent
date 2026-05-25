@@ -273,12 +273,14 @@ class HUD(Vertical):
     def compose(self) -> ComposeResult:
         yield Label(id='hud-line-1')
         with Horizontal(id='hud-line-2-row'):
+            yield Label('[#6a7a9a]Autonomy:[/]', id='hud-label-autonomy')
             yield Select(
                 [(c.capitalize(), c) for c in ('conservative', 'balanced', 'full')],
                 value='balanced',
                 id='hud-autonomy',
                 allow_blank=False,
             )
+            yield Label('[#7a6a4a]Mode:[/]', id='hud-label-mode')
             yield Select(
                 [(c.capitalize(), c) for c in ('agent', 'chat')],
                 value='agent',
@@ -1071,7 +1073,7 @@ class GrintaScreen(Screen):
         line1_parts.append(f'[{NAVY_TEXT_SECONDARY}]{model_display}[/]')
         line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
         line1_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
-        line1 = '  |  '.join(line1_parts)
+        line1 = '  '.join(line1_parts)
 
         activity_or_hint = (
             f'[{NAVY_TEXT_SECONDARY}]Hint:[/] '
@@ -1082,14 +1084,7 @@ class GrintaScreen(Screen):
                 f'[{NAVY_TEXT_PRIMARY}]{self._last_tool_status}[/]'
             )
         )
-        line2 = (
-            f'{activity_or_hint}'
-            f'  |  [#54597b]Keys:[/] '
-            f'[#eacb8a bold]Ctrl+B[/] [#969aad]Sidebar[/]  |  '
-            f'[#eacb8a bold]Ctrl+L[/] [#969aad]Clear[/]  |  '
-            f'[#eacb8a bold]Ctrl+C[/] [#969aad]Interrupt[/]  |  '
-            f'[#eacb8a bold]F1[/] [#969aad]Help[/]'
-        )
+        line2 = f'{activity_or_hint}'
 
         hud_bar = self.query_one('#hud-bar', HUD)
         hud_bar.query_one('#hud-line-1', Label).update(line1)
@@ -1108,8 +1103,9 @@ class GrintaScreen(Screen):
         except Exception:
             pass
         try:
-            autonomy_select = hud_bar.query_one('#hud-autonomy')
-            autonomy_select.display = (self._config.get_agent_config().mode == 'agent')
+            is_agent = self._config.get_agent_config().mode == 'agent'
+            hud_bar.query_one('#hud-autonomy').display = is_agent
+            hud_bar.query_one('#hud-label-autonomy').display = is_agent
         except Exception:
             pass
 
