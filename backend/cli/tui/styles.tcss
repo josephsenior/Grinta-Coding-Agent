@@ -239,7 +239,7 @@ HUD,
 }
 
 #hud-line-2-row {
-    height: 1;
+    height: 2;
     layout: horizontal;
     align-vertical: middle;
     margin: 0;
@@ -257,54 +257,52 @@ HUD,
     height: 1;
 }
 
-#hud-autonomy > .select {
+#hud-autonomy SelectCurrent {
     background: #0a1525;
     color: #8f9fc1;
+    border: none;
     border-left: tall #3a5a8c;
-    padding: 0 2;
-    margin: 0;
-    min-height: 1;
+    padding: 0 1;
     height: 1;
-    content-align: center middle;
+    min-height: 1;
 }
 
-#hud-autonomy > .select:focus {
+#hud-autonomy SelectCurrent:focus {
     background: #122542;
     border-left: tall #5a8acc;
 }
 
-#hud-autonomy > .select > .select-label {
+#hud-autonomy SelectCurrent #label {
     color: #6a8ab8;
     padding: 0;
     margin: 0;
+    height: 1;
     text-style: bold;
 }
 
-#hud-autonomy > .select > .select-list-container {
+#hud-autonomy SelectCurrent .arrow {
+    height: 1;
+    padding: 0;
+    margin: 0;
+}
+
+#hud-autonomy SelectOverlay {
     background: #0d1a30;
     border: solid #2a4a7a;
-    padding: 0;
-    margin: 0;
 }
 
-#hud-autonomy > .select > .select-list-container > .select-list {
-    background: #0d1a30;
-    padding: 0;
-    margin: 0;
-}
-
-#hud-autonomy > .select > .select-list-container > .select-list > .select-list-item {
+#hud-autonomy SelectOverlay .option-list--option {
     background: #0d1a30;
     color: #8f9fc1;
     padding: 0 2;
     margin: 0;
 }
 
-#hud-autonomy > .select > .select-list-container > .select-list > .select-list-item:hover {
+#hud-autonomy SelectOverlay .option-list--option:hover {
     background: #1a3055;
 }
 
-#hud-autonomy > .select > .select-list-container > .select-list > .select-list-item-highlighted {
+#hud-autonomy SelectOverlay .option-list--option-highlighted {
     background: #1a3055;
     color: #e9eefc;
 }
@@ -319,54 +317,52 @@ HUD,
     height: 1;
 }
 
-#hud-mode > .select {
+#hud-mode SelectCurrent {
     background: #0a1525;
     color: #8f9fc1;
+    border: none;
     border-left: tall #5a4a3a;
-    padding: 0 2;
-    margin: 0;
-    min-height: 1;
+    padding: 0 1;
     height: 1;
-    content-align: center middle;
+    min-height: 1;
 }
 
-#hud-mode > .select:focus {
+#hud-mode SelectCurrent:focus {
     background: #122542;
     border-left: tall #9a7a4a;
 }
 
-#hud-mode > .select > .select-label {
+#hud-mode SelectCurrent #label {
     color: #b88a5a;
     padding: 0;
     margin: 0;
+    height: 1;
     text-style: bold;
 }
 
-#hud-mode > .select > .select-list-container {
+#hud-mode SelectCurrent .arrow {
+    height: 1;
+    padding: 0;
+    margin: 0;
+}
+
+#hud-mode SelectOverlay {
     background: #0d1a30;
     border: solid #5a3a2a;
-    padding: 0;
-    margin: 0;
 }
 
-#hud-mode > .select > .select-list-container > .select-list {
-    background: #0d1a30;
-    padding: 0;
-    margin: 0;
-}
-
-#hud-mode > .select > .select-list-container > .select-list > .select-list-item {
+#hud-mode SelectOverlay .option-list--option {
     background: #0d1a30;
     color: #8f9fc1;
     padding: 0 2;
     margin: 0;
 }
 
-#hud-mode > .select > .select-list-container > .select-list > .select-list-item:hover {
+#hud-mode SelectOverlay .option-list--option:hover {
     background: #1a3055;
 }
 
-#hud-mode > .select > .select-list-container > .select-list > .select-list-item-highlighted {
+#hud-mode SelectOverlay .option-list--option-highlighted {
     background: #1a3055;
     color: #e9eefc;
 }
