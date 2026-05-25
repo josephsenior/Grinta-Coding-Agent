@@ -617,9 +617,10 @@ class ThinkingIndicator(Static):
         import time
 
         elapsed = int(time.monotonic() - self._start_time) if self._start_time else 0
+        dots = '.' * ((elapsed % 4))
 
         thoughts = '  '.join(self._thoughts)
         self.update(
-            f'[bold #5eead4]Thinking:[/] [dim]({elapsed}s)[/dim]'
+            f'[bold #5eead4]Thinking:[/] [dim]({elapsed}s){dots}[/dim]'
             f'  [rgb(150,154,189)]{thoughts}[/]'
         )
