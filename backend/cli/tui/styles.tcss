@@ -196,6 +196,7 @@ InputBar TextArea {
     padding: 0 1;
     width: 100%;
     height: 3;
+    overflow-y: auto;
     transition: background 150ms, border 150ms;
 }
 

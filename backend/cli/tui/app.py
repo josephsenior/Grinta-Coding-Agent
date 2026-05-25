@@ -1715,15 +1715,6 @@ class GrintaScreen(Screen):
                 return
             self._update_command_hint(text)
             self._update_command_suggestions(text)
-            line_count = len(text.split('\n')) if text else 1
-            desired_textarea_height = max(3, min(6, line_count))
-            desired_input_bar_height = desired_textarea_height + 1
-
-            event.text_area.styles.height = desired_textarea_height
-            try:
-                self.query_one('#input-bar', InputBar).styles.height = desired_input_bar_height
-            except Exception:
-                pass
 
     def on_select_changed(self, event: Select.Changed) -> None:
         event.stop()
