@@ -41,8 +41,8 @@ Tool result line syntax is shared via :mod:`backend.inference.tool_result_format
 import copy
 import hashlib
 import json
-import re
 import logging
+import re
 from collections.abc import Iterable
 from threading import Lock
 from typing import Any, NoReturn
@@ -51,8 +51,6 @@ from backend.core.errors import (
     FunctionCallConversionError,
     FunctionCallValidationError,
 )
-
-logger = logging.getLogger(__name__)
 from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_names import (
     CREATE_TOOL_NAME,
@@ -64,6 +62,8 @@ from backend.inference.tool_result_format import (
     decode_tool_result_payload,
     encode_tool_result_payload,
 )
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT_SUFFIX_TEMPLATE = '\nYou have access to the following functions:\n\n{description}\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<function=example_function_name>\n<parameter=example_parameter_1>value_1</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format, start with <function= and end with </function>\n- Required parameters MUST be specified\n- In this fallback parser mode, call one function at a time\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after.\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>\n'
 STOP_WORDS = ['</function']
@@ -125,18 +125,18 @@ def _check_retry_guard(
     Returns (should_continue, reason). If should_continue is False, reason
     explains why the retry was blocked.
     """
-    key = f"{tool_name}:{error_code}"
+    key = f'{tool_name}:{error_code}'
     with _RETRY_GUARD_LOCK:
         if len(_RETRY_GUARD) > _RETRY_GUARD_MAX_ENTRIES:
             _RETRY_GUARD.clear()
         if key in _RETRY_GUARD and _RETRY_GUARD[key] == raw_hash:
             return False, (
-                f"Retry guard triggered: {tool_name} with same "
-                f"hash {raw_hash} and error {error_code}. "
-                "Stop auto-retry and report as system/tool error."
+                f'Retry guard triggered: {tool_name} with same '
+                f'hash {raw_hash} and error {error_code}. '
+                'Stop auto-retry and report as system/tool error.'
             )
         _RETRY_GUARD[key] = raw_hash
-    return True, ""
+    return True, ''
 
 
 def _log_xml_parser_diagnostics(
@@ -181,9 +181,10 @@ TOOL_EXAMPLES = {
         'view_page': "\nASSISTANT:\nLet me check how the page looks in the browser:\n<function=browser>\n<parameter=code>\ngoto('http://127.0.0.1:5000')\nnoop(1000)  # Wait for page to load\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [browser]:\n[Browser shows the numbers in a table format]\n",
     },
     'finish': {
-        'example': '\nASSISTANT:\nThe server is running on port 5000 with PID 126. You can access the list of numbers in a table format by visiting http://127.0.0.1:5000. Let me know if you have any further requests!\n<function=finish>\n<parameter=message>The task has been completed. The web server is running and displaying numbers 1-10 in a table format at http://127.0.0.1:5000.</parameter>\n</function>\n',
+        'example': '\nASSISTANT:\n<function=finish>\n<parameter=status>completed</parameter>\n<parameter=summary>The server is running on port 5000 and displays numbers 1-10 in a table.</parameter>\n<parameter=actions_taken>["Started the updated server", "Verified the page URL"]</parameter>\n<parameter=verification>{"status":"passed","details":"Opened http://127.0.0.1:5000 and confirmed the table rendered."}</parameter>\n<parameter=remaining_items>[]</parameter>\n<parameter=next_step>No further action needed.</parameter>\n</function>\n',
     },
 }
+
 
 def get_example_for_tools(tools: list[dict]) -> str:
     """Generate an in-context learning example based on available tools."""

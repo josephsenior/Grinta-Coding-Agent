@@ -230,7 +230,11 @@ def _summary_rename_symbol(args: dict[str, Any]) -> str:
     path = _arg_str(args, 'path')
     old_name = _arg_str(args, 'old_name')
     new_name = _arg_str(args, 'new_name')
-    bits = [b for b in (path, f'{old_name} → {new_name}' if old_name and new_name else '') if b]
+    bits = [
+        b
+        for b in (path, f'{old_name} → {new_name}' if old_name and new_name else '')
+        if b
+    ]
     return ' · '.join(bits) if bits else 'rename…'
 
 
@@ -247,7 +251,7 @@ def _summary_think(args: dict[str, Any]) -> str:
 
 
 def _summary_finish(args: dict[str, Any]) -> str:
-    msg = _arg_str(args, 'message')
+    msg = _arg_str(args, 'summary', 'message')
     return _trunc(msg, 120) if msg else 'done'
 
 
@@ -356,7 +360,6 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'lsp': _summary_lsp,
     'analyze_project_structure': _summary_analyze_project,
     'read_symbol': _summary_read_symbol,
-
     'verify_file_lines': _summary_verify_file,
     'delegate_task': _summary_delegate_task,
     'communicate_with_user': _summary_communicate,

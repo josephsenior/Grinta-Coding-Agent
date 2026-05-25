@@ -9,6 +9,7 @@ from backend.ledger import EventSource
 from backend.ledger.action import (
     Action,
     AgentRejectAction,
+    AgentThinkAction,
     ChangeAgentStateAction,
     CmdRunAction,
     FileReadAction,
@@ -16,6 +17,7 @@ from backend.ledger.action import (
     PlaybookFinishAction,
     TaskTrackingAction,
 )
+from backend.ledger.action.agent import ClarificationRequestAction
 from backend.ledger.observation import Observation
 from backend.orchestration.services.event_router_service import (
     EventRouterService,
@@ -44,6 +46,11 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.state.start_id = 0
         self.mock_controller.state.history = []
         self.mock_controller.state.extra_data = {}
+
+        def _set_extra(key, value, source=''):
+            self.mock_controller.state.extra_data[key] = value
+
+        self.mock_controller.state.set_extra.side_effect = _set_extra
         self.mock_controller.event_stream = MagicMock()
         self.mock_controller.get_agent_state = MagicMock(
             return_value=AgentState.RUNNING
@@ -338,6 +345,180 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             AgentState.RUNNING
         )
 
+    async def test_plan_user_message_records_active_run_mode_and_starts_run(self):
+        action = MessageAction(content='Plan a safe refactor')
+        action.source = EventSource.USER
+        action.id = 901
+        self.mock_controller.agent = SimpleNamespace(
+            config=SimpleNamespace(mode='plan')
+        )
+        self.mock_controller.get_agent_state.return_value = (
+            AgentState.AWAITING_USER_INPUT
+        )
+
+        with patch('backend.orchestration.services.event_router_service.RecallAction'):
+            await self.service._handle_message_action(action)
+
+        self.assertEqual(
+            self.mock_controller.state.extra_data['active_run_mode'],
+            'plan',
+        )
+        self.mock_controller.set_agent_state_to.assert_called_once_with(
+            AgentState.RUNNING
+        )
+
+    async def test_chat_user_message_does_not_create_active_run_mode(self):
+        action = MessageAction(content='Explain this')
+        action.source = EventSource.USER
+        action.id = 902
+        self.mock_controller.agent = SimpleNamespace(
+            config=SimpleNamespace(mode='chat')
+        )
+        self.mock_controller.state.extra_data['active_run_mode'] = 'plan'
+
+        with patch('backend.orchestration.services.event_router_service.RecallAction'):
+            await self.service._handle_message_action(action)
+
+        self.assertNotIn('active_run_mode', self.mock_controller.state.extra_data)
+
+    async def test_plan_communicate_pauses_even_with_full_autonomy(self):
+        self.mock_controller.agent = SimpleNamespace(
+            config=SimpleNamespace(mode='plan')
+        )
+        self.mock_controller.autonomy_controller = SimpleNamespace(
+            autonomy_level='full'
+        )
+        action = ClarificationRequestAction(question='Which module?')
+
+        await self.service._handle_meta_cognition_action(action)
+
+        self.mock_controller.set_agent_state_to.assert_called_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+
+    async def test_plan_user_response_resumes_same_plan_run(self):
+        action = MessageAction(content='Use the auth module')
+        action.source = EventSource.USER
+        action.id = 903
+        self.mock_controller.agent = SimpleNamespace(
+            config=SimpleNamespace(mode='plan')
+        )
+        self.mock_controller.state.extra_data['active_run_mode'] = 'plan'
+        self.mock_controller.get_agent_state.return_value = (
+            AgentState.AWAITING_USER_INPUT
+        )
+
+        with patch('backend.orchestration.services.event_router_service.RecallAction'):
+            await self.service._handle_message_action(action)
+
+        self.assertEqual(
+            self.mock_controller.state.extra_data['active_run_mode'],
+            'plan',
+        )
+        self.mock_controller.set_agent_state_to.assert_called_once_with(
+            AgentState.RUNNING
+        )
+
+    async def test_plan_mode_integration_smoke_read_clarify_resume_finish(self):
+        from backend.core.errors import FunctionCallValidationError
+        from backend.engine.function_calling import (
+            _handle_finish_tool,
+            _process_single_tool_call,
+        )
+        from backend.inference.tool_names import CREATE_TOOL_NAME, READ_TOOL_NAME
+
+        self.mock_controller.agent = SimpleNamespace(
+            config=SimpleNamespace(mode='plan')
+        )
+        self.mock_controller.get_agent_state.return_value = (
+            AgentState.AWAITING_USER_INPUT
+        )
+
+        user_action = MessageAction(content='Plan this change')
+        user_action.source = EventSource.USER
+        user_action.id = 904
+        with patch('backend.orchestration.services.event_router_service.RecallAction'):
+            await self.service._handle_message_action(user_action)
+
+        self.assertEqual(
+            self.mock_controller.state.extra_data['active_run_mode'],
+            'plan',
+        )
+        self.mock_controller.set_agent_state_to.assert_any_call(AgentState.RUNNING)
+
+        read_call = SimpleNamespace(function=SimpleNamespace(name=READ_TOOL_NAME))
+        read_action = _process_single_tool_call(
+            read_call,
+            {
+                'type': 'file',
+                'path': 'backend/core/interaction_modes.py',
+                'security_risk': 'LOW',
+            },
+            mode='plan',
+        )
+        self.assertIsInstance(read_action, FileReadAction)
+
+        search_call = SimpleNamespace(function=SimpleNamespace(name='search_code'))
+        search_action = _process_single_tool_call(
+            search_call,
+            {
+                'pattern': 'PLAN_MODE',
+                'path': 'backend/core',
+                'max_results': 1,
+            },
+            mode='plan',
+        )
+        self.assertIsInstance(search_action, AgentThinkAction)
+
+        create_call = SimpleNamespace(function=SimpleNamespace(name=CREATE_TOOL_NAME))
+        with self.assertRaises(FunctionCallValidationError):
+            _process_single_tool_call(
+                create_call,
+                {'type': 'file', 'path': 'demo.txt', 'content': 'x'},
+                mode='plan',
+            )
+
+        self.mock_controller.set_agent_state_to.reset_mock()
+        await self.service._handle_meta_cognition_action(
+            ClarificationRequestAction(question='Which module?')
+        )
+        self.mock_controller.set_agent_state_to.assert_called_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+
+        self.mock_controller.set_agent_state_to.reset_mock()
+        answer_action = MessageAction(content='Use backend/engine')
+        answer_action.source = EventSource.USER
+        answer_action.id = 905
+        with patch('backend.orchestration.services.event_router_service.RecallAction'):
+            await self.service._handle_message_action(answer_action)
+
+        self.assertEqual(
+            self.mock_controller.state.extra_data['active_run_mode'],
+            'plan',
+        )
+        self.mock_controller.set_agent_state_to.assert_called_once_with(
+            AgentState.RUNNING
+        )
+
+        finish_action = _handle_finish_tool(
+            {
+                'status': 'completed',
+                'summary': 'Plan produced.',
+                'plan': ['Inspect the engine.', 'Apply a focused change.'],
+                'assumptions': [],
+                'next_step': 'Switch to Agent Mode to execute.',
+            },
+            mode='plan',
+        )
+        self.mock_controller.set_agent_state_to.reset_mock()
+        await self.service._handle_finish_action(finish_action)
+
+        self.mock_controller.set_agent_state_to.assert_called_once_with(
+            AgentState.FINISHED
+        )
+        self.assertNotIn('active_run_mode', self.mock_controller.state.extra_data)
+
     async def test_handle_task_tracking_action_uses_canonical_plan_payloads(self):
         """Live plan updates should keep the canonical task payload shape intact."""
         action = TaskTrackingAction(
@@ -367,6 +548,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
     async def test_handle_finish_action_success(self):
         """Test _handle_finish_action marks task as finished."""
         action = PlaybookFinishAction(outputs={'result': 'success'})
+        self.mock_controller.state.extra_data['active_run_mode'] = 'plan'
 
         await self.service._handle_finish_action(action)
 
@@ -382,6 +564,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
 
         # Should log audit
         self.mock_controller.log_task_audit.assert_called_once_with(status='success')
+        self.assertNotIn('active_run_mode', self.mock_controller.state.extra_data)
 
     async def test_handle_finish_action_validation_fails(self):
         """Test _handle_finish_action skips finish when validation fails."""

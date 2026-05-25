@@ -46,8 +46,8 @@ from backend.core.constants import (
     DEFAULT_AGENT_MEMORY_MAX_THREADS,
     DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY,
     DEFAULT_AGENT_MIN_ITERATIONS,
-    DEFAULT_AGENT_NAME,
     DEFAULT_AGENT_MODE,
+    DEFAULT_AGENT_NAME,
     DEFAULT_AGENT_NATIVE_BROWSER_ENABLED,
     DEFAULT_AGENT_PARALLEL_TOOL_SCHEDULING_ENABLED,
     DEFAULT_AGENT_PLAN_MODE_ENABLED,
@@ -67,6 +67,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_WARNING_FIRST_TRIP_ENABLED,
     DEFAULT_AGENT_WARNING_FIRST_TRIP_LIMIT,
 )
+from backend.core.interaction_modes import VALID_INTERACTION_MODES
 from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
@@ -104,7 +105,10 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     mode: str = Field(
         default=DEFAULT_AGENT_MODE,
-        description="Run mode: 'agent' (autonomous/edit block) or 'chat'/'ask' (explanations/discussion)",
+        description=(
+            "Run mode: 'chat'/'ask' (discussion), 'plan' (read-only planning), "
+            "or 'agent' (execution/editing)."
+        ),
     )
     llm_config: LLMConfig | None = Field(
         default=None, description='LLM configuration for the agent'
@@ -387,6 +391,16 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         from backend.core.type_safety.type_safety import validate_non_empty_string
 
         return validate_non_empty_string(v, name='field')
+
+    @field_validator('mode')
+    @classmethod
+    def validate_mode_choice(cls, value: str) -> str:
+        """Validate and normalize the interaction mode."""
+        normalized = value.strip().lower()
+        if normalized not in VALID_INTERACTION_MODES:
+            allowed = ', '.join(sorted(VALID_INTERACTION_MODES))
+            raise ValueError(f'mode must be one of: {allowed}')
+        return normalized
 
     @field_validator('autonomy_level')
     @classmethod

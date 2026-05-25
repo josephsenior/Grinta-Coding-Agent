@@ -21,7 +21,6 @@ from backend.engine.function_calling import (
     _handle_task_tracker_tool,
     _process_single_tool_call,
     combine_thought,
-    response_to_actions,
     set_security_risk,
 )
 from backend.ledger.action import (
@@ -171,14 +170,25 @@ class TestHandleCmdRunTool:
 
 
 class TestHandleFinishTool:
-    def test_creates_playbook_finish_action(self):
-        action = _handle_finish_tool({'message': 'Done!'})
+    def test_creates_agent_playbook_finish_action(self):
+        action = _handle_finish_tool(
+            {
+                'status': 'completed',
+                'summary': 'Done!',
+                'actions_taken': ['Implemented the task'],
+                'verification': {'status': 'not_run', 'details': 'Not needed'},
+                'remaining_items': [],
+                'next_step': 'None',
+            },
+            mode='agent',
+        )
         assert isinstance(action, PlaybookFinishAction)
         assert action.final_thought == 'Done!'
+        assert action.outputs['verification']['status'] == 'not_run'
 
-    def test_missing_message_raises(self):
-        with pytest.raises(FunctionCallValidationError, match='message'):
-            _handle_finish_tool({})
+    def test_missing_agent_field_raises(self):
+        with pytest.raises(FunctionCallValidationError, match='actions_taken'):
+            _handle_finish_tool({'status': 'completed', 'summary': 'Done!'})
 
 
 # ---------------------------------------------------------------------------
@@ -353,8 +363,49 @@ class TestProcessSingleToolCall:
 
         tool_name = create_finish_tool()['function']['name']
         tc = self._make_tool_call(tool_name)
-        action = _process_single_tool_call(tc, {'message': 'done'})
+        action = _process_single_tool_call(
+            tc,
+            {
+                'status': 'completed',
+                'summary': 'done',
+                'actions_taken': ['Finished'],
+                'verification': {'status': 'not_run', 'details': 'No tests run'},
+                'remaining_items': [],
+                'next_step': 'None',
+            },
+        )
         assert isinstance(action, PlaybookFinishAction)
+
+    def test_dispatches_plan_finish_with_plan_payload(self):
+        from backend.engine.tools.finish import create_finish_tool
+
+        tool_name = create_finish_tool('plan')['function']['name']
+        tc = self._make_tool_call(tool_name)
+        action = _process_single_tool_call(
+            tc,
+            {
+                'status': 'completed',
+                'summary': 'Plan ready',
+                'plan': ['Inspect', 'Implement', 'Verify'],
+                'assumptions': [],
+                'next_step': 'Switch to Agent Mode',
+            },
+            mode='plan',
+        )
+        assert isinstance(action, PlaybookFinishAction)
+        assert action.outputs['plan'] == ['Inspect', 'Implement', 'Verify']
+
+    def test_plan_mode_rejects_mutation_tool_call(self):
+        from backend.engine.tools.native_file_tools import create_create_tool
+
+        tool_name = create_create_tool()['function']['name']
+        tc = self._make_tool_call(tool_name)
+        with pytest.raises(FunctionCallValidationError, match='Plan Mode'):
+            _process_single_tool_call(
+                tc,
+                {'type': 'file', 'path': 'new.py', 'content': 'print(1)'},
+                mode='plan',
+            )
 
     def test_dispatches_mcp_tool(self):
         tc = self._make_tool_call('some_mcp_tool', mcp_names=['some_mcp_tool'])
@@ -380,7 +431,11 @@ class TestMultiEditCommand:
             '',
             {
                 'file_edits': [
-                    {'path': 'src/a.py', 'operation': 'create_file', 'content': 'A = 1\n'},
+                    {
+                        'path': 'src/a.py',
+                        'operation': 'create_file',
+                        'content': 'A = 1\n',
+                    },
                     {
                         'path': '/workspace/src/b.py',
                         'operation': 'create_file',
@@ -437,7 +492,9 @@ class TestMultiEditCommand:
         )
 
         assert isinstance(action, MessageAction)
-        assert (tmp_path / 'src' / 'a.py').read_text(encoding='utf-8') == 'A = 1\nB = 99\n'
+        assert (tmp_path / 'src' / 'a.py').read_text(
+            encoding='utf-8'
+        ) == 'A = 1\nB = 99\n'
 
     def test_multi_edit_supports_symbol_body_edit(self, tmp_path):
         from backend.engine.function_calling import _handle_multi_edit_command

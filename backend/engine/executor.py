@@ -21,6 +21,11 @@ from backend.core.constants import (
     DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
 )
 from backend.core.errors import ModelProviderError
+from backend.core.interaction_modes import (
+    PLAN_MODE,
+    is_chat_mode,
+    normalize_interaction_mode,
+)
 from backend.core.logger import app_logger as logger
 from backend.engine import function_calling as _function_calling_module  # noqa: F401
 from backend.engine.executor_response_helpers import (
@@ -156,6 +161,7 @@ class OrchestratorExecutor:
         self._active_stream_task: asyncio.Task[Any] | None = None
         self._active_stream_iter: Any | None = None
         self._has_active_tasks: bool = False
+        self._active_run_mode: str = ''
 
     def cancel_step(self) -> None:
         """Signal the current (or next) streaming step to abort early."""
@@ -1282,11 +1288,19 @@ class OrchestratorExecutor:
     # ------------------------------------------------------------------ #
 
     def _get_agent_mode(self) -> str:
-        """Return the current mode string from planner config ('agent', 'chat', 'ask')."""
+        """Return the active mode string from run state or planner config."""
+        active_mode = normalize_interaction_mode(
+            getattr(self, '_active_run_mode', None),
+            default='',
+        )
+        if active_mode:
+            return active_mode
         config = getattr(self._planner, '_config', None)
-        return str(getattr(config, 'mode', 'agent') or 'agent').lower()
+        return normalize_interaction_mode(getattr(config, 'mode', 'agent'))
 
-    def _gate_agent_mode_plain_text(self, actions: list[Action], response: ModelResponse) -> list[Action]:
+    def _gate_agent_mode_plain_text(
+        self, actions: list[Action], response: ModelResponse
+    ) -> list[Action]:
         """Enforce AGENT mode protocol on plain-text (MessageAction-only) responses.
 
         Blocks plain text only when there are active tasks (todo/doing).
@@ -1295,11 +1309,30 @@ class OrchestratorExecutor:
         from backend.ledger.action.message import MessageAction as _MessageAction
 
         mode = self._get_agent_mode()
-        if mode in ('chat', 'ask'):
+        if is_chat_mode(mode):
             return actions
 
         if not actions or not all(isinstance(a, _MessageAction) for a in actions):
             return actions
+
+        if mode == PLAN_MODE:
+            from backend.ledger.action import AgentThinkAction
+
+            logger.warning(
+                'Plan mode plain-text gate: blocking plain text response. '
+                'The model must use inspection tools, communicate_with_user, or finish.'
+            )
+            return [
+                AgentThinkAction(
+                    thought=(
+                        '[PLAN_MODE_PROTOCOL_ERROR] Plain text assistant output is not allowed '
+                        'during an active Plan Mode run. Use read/search/inspection tools, '
+                        'communicate_with_user for clarification, or finish with status, '
+                        'summary, plan, assumptions, and next_step.'
+                    ),
+                    suppress_cli=True,
+                )
+            ]
 
         if not self._has_active_tasks:
             return actions
@@ -1318,6 +1351,7 @@ class OrchestratorExecutor:
                     response,
                     mcp_tool_names=list(mcp_tools.keys()),
                     mcp_tools=mcp_tools,
+                    mode=self._get_agent_mode(),
                 )
             )
         except Exception as exc:

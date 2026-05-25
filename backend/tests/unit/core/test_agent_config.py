@@ -91,6 +91,19 @@ class TestAgentConfigValidation:
         cfg = AgentConfig(autonomy_level=' FULL ')
         assert cfg.autonomy_level == 'full'
 
+    @pytest.mark.parametrize('mode', ['chat', 'plan', 'agent'])
+    def test_visible_modes_are_valid(self, mode):
+        cfg = AgentConfig(mode=mode)
+        assert cfg.mode == mode
+
+    def test_legacy_ask_mode_remains_valid_chat_alias(self):
+        cfg = AgentConfig(mode='ASK')
+        assert cfg.mode == 'ask'
+
+    def test_invalid_mode_rejected(self):
+        with pytest.raises(ValidationError, match='mode must be one of'):
+            AgentConfig(mode='execute')
+
     def test_memory_max_threads_min(self):
         with pytest.raises(ValidationError):
             AgentConfig(memory_max_threads=0)

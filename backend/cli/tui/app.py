@@ -21,19 +21,18 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
-from rich import box
 from rich.console import Group
 from rich.markdown import Markdown
-from rich.panel import Panel
 from rich.rule import Rule
 from rich.text import Text
-from textual import work
+from textual import events, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.css.query import NoMatches
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
+from textual.widget import Widget
 from textual.widgets import (
     Button,
     Checkbox,
@@ -42,7 +41,6 @@ from textual.widgets import (
     Label,
     ListItem,
     ListView,
-    RichLog,
     Select,
     Static,
     TextArea,
@@ -74,12 +72,14 @@ _TUI_HISTORY_RENDER_LIMIT = _bounded_int_env(
     minimum=200,
 )
 
-from backend import __version__ as GRINTA_VERSION
+from backend.cli._event_renderer.panels import task_panel_signature
+from backend.cli._event_renderer.text_utils import (
+    sanitize_visible_transcript_text,
+)
 from backend.cli._event_renderer.unified_renderer import (
     ActivityCard,
     ActivityRenderer,
 )
-from backend.cli._event_renderer.panels import task_panel_signature
 from backend.cli.config_manager import AppConfig
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
@@ -87,18 +87,18 @@ from backend.cli.theme import (
     NAVY_BORDER,
     NAVY_BRAND,
     NAVY_ERROR,
+    NAVY_GREEN_ACCENT,
     NAVY_READY,
+    NAVY_RED_ACCENT,
     NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
     NAVY_TEXT_PRIMARY,
     NAVY_TEXT_SECONDARY,
     NAVY_TEXT_TERTIARY,
     NAVY_WAITING,
+    NAVY_YELLOW_ACCENT,
 )
 from backend.cli.transcript import strip_tool_result_validation_annotations
-from backend.cli._event_renderer.text_utils import (
-    sanitize_visible_transcript_text,
-)
 from backend.cli.tui.widgets.activity_card import encode_diff_line
 from backend.core.bootstrap.agent_control_loop import run_agent_until_done
 from backend.core.bootstrap.main import (
@@ -107,14 +107,21 @@ from backend.core.bootstrap.main import (
 )
 from backend.core.bootstrap.setup import (
     create_controller,
-    generate_sid,
     create_memory,
     create_runtime,
+    generate_sid,
 )
 from backend.core.enums import AgentState, EventSource
+from backend.core.interaction_modes import (
+    AGENT_MODE,
+    CHAT_MODE,
+    PLAN_MODE,
+    VISIBLE_INTERACTION_MODES,
+    is_chat_mode,
+    normalize_interaction_mode,
+)
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventStream, EventStreamSubscriber
-from backend.ledger.observation import StatusObservation
 from backend.ledger.action import (
     AgentThinkAction,
     BrowseInteractiveAction,
@@ -178,9 +185,7 @@ def _strip_ansi(text: str) -> str:
     return _rich_text(text).plain
 
 
-_TERMINAL_MOUSE_REPORT_RE = re.compile(
-    r'(?:\x1b)?\[\<\d{1,4};\d{1,4};\d{1,4}[mM]'
-)
+_TERMINAL_MOUSE_REPORT_RE = re.compile(r'(?:\x1b)?\[\<\d{1,4};\d{1,4};\d{1,4}[mM]')
 
 
 def _strip_terminal_control_literals(text: str) -> str:
@@ -192,7 +197,7 @@ def _strip_terminal_control_literals(text: str) -> str:
 
 def _render_thinking_with_diff(text: str) -> Text:
     """Render thinking text as plain muted text."""
-    return Text(text or '', style="dim lightgray")
+    return Text(text or '', style='dim lightgray')
 
 
 def _preview_line_text(line: str, *, max_chars: int = 160) -> str:
@@ -243,7 +248,12 @@ class Transcript(VerticalScroll):
 
     def append_widget(self, widget: Static | Container) -> None:
         """Mount a widget and auto-scroll unless user scrolled up."""
+        widget.styles.offset = (0, -1)
         self.mount(widget)
+        try:
+            widget.animate('offset', (0, 0), duration=0.2)
+        except Exception:
+            widget.styles.offset = (0, 0)
         if not self._user_scrolled_away:
             self.scroll_end(animate=False)
 
@@ -265,8 +275,110 @@ class Transcript(VerticalScroll):
         self._scroll_badge = self.query_one('#scroll-badge', Static)
 
 
+_WELCOME_SUGGESTIONS = [
+    'Explain this codebase',
+    'Analyze this repository and produce an implementation plan',
+    'Plan a safe refactor of this module',
+    'Run tests and fix failures',
+    'Inspect the project and propose a testing strategy',
+]
+
+
+class WelcomeWidget(Vertical):
+    """Empty-state welcome panel with interactive task suggestions."""
+
+    def compose(self) -> ComposeResult:
+        yield Static('Describe a task for the current workspace.', id='welcome-header')
+        yield Static(
+            'Use up/down + Enter, or click a starter task.', id='welcome-subheader'
+        )
+        for text in _WELCOME_SUGGESTIONS:
+            yield Static('', classes='welcome-item')
+
+    def on_mount(self) -> None:
+        self._selected = 0
+        self._items = list(self.query('.welcome-item'))
+        self._cascade_timers: list[Any] = []
+        for item in self._items:
+            item.display = False
+        self._cascade(0)
+
+    def on_unmount(self) -> None:
+        for timer in self._cascade_timers:
+            try:
+                timer.stop()
+            except Exception:
+                pass
+        self._cascade_timers.clear()
+
+    def _cascade(self, idx: int) -> None:
+        if idx >= len(self._items):
+            self._highlight(0)
+            return
+        self._items[idx].display = True
+        timer = self.set_timer(0.15, lambda i=idx: self._cascade(i + 1))
+        self._cascade_timers.append(timer)
+
+    def _highlight(self, idx: int) -> None:
+        for i, item in enumerate(self._items):
+            if i == idx:
+                item.update(f'  ▶ [#5eead4 bold]{_WELCOME_SUGGESTIONS[i]}[/]')
+            else:
+                item.update(f'  ▸ [#8ea2c8]{_WELCOME_SUGGESTIONS[i]}[/]')
+        self._selected = idx
+
+    def highlight_prev(self) -> None:
+        if self._selected > 0:
+            self._highlight(self._selected - 1)
+
+    def highlight_next(self) -> None:
+        if self._selected < len(self._items) - 1:
+            self._highlight(self._selected + 1)
+
+    def select_current(self) -> str | None:
+        if 0 <= self._selected < len(self._items):
+            return _WELCOME_SUGGESTIONS[self._selected]
+        return None
+
+    def on_click(self, event: events.Click) -> None:
+        target = event.widget
+        if target is None:
+            return
+        for i, item in enumerate(self._items):
+            if target is item:
+                self._highlight(i)
+                text = self.select_current()
+                if text:
+                    event.prevent_default()
+                    event.stop()
+                    screen = getattr(self, 'screen', None)
+                    if screen and hasattr(screen, '_handle_welcome_click'):
+                        screen._handle_welcome_click(text)
+                break
+
+
 class InputBar(Horizontal):
     """Bottom input row with border and prompt."""
+
+
+class PromptTextArea(TextArea):
+    """Input area that routes arrow navigation to welcome suggestions when idle."""
+
+    def on_key(self, event: events.Key) -> None:
+        screen = getattr(self, 'screen', None)
+        if (
+            event.key in {'up', 'down'}
+            and bool(screen)
+            and getattr(screen, '_welcome_visible', False)
+            and not self.text.strip()
+        ):
+            if event.key == 'up' and hasattr(screen, 'action_focus_prev_card'):
+                screen.action_focus_prev_card()
+            elif event.key == 'down' and hasattr(screen, 'action_focus_next_card'):
+                screen.action_focus_next_card()
+            event.prevent_default()
+            event.stop()
+            return
 
 
 class HUD(Vertical):
@@ -275,18 +387,18 @@ class HUD(Vertical):
     def compose(self) -> ComposeResult:
         yield Label(id='hud-line-1')
         with Horizontal(id='hud-line-2-row'):
+            yield Label('[#7a6a4a]Mode:[/]', id='hud-label-mode')
+            yield Select(
+                [(c.capitalize(), c) for c in VISIBLE_INTERACTION_MODES],
+                value=AGENT_MODE,
+                id='hud-mode',
+                allow_blank=False,
+            )
             yield Label('[#6a7a9a]Autonomy:[/]', id='hud-label-autonomy')
             yield Select(
                 [(c.capitalize(), c) for c in ('conservative', 'balanced', 'full')],
                 value='balanced',
                 id='hud-autonomy',
-                allow_blank=False,
-            )
-            yield Label('[#7a6a4a]Mode:[/]', id='hud-label-mode')
-            yield Select(
-                [(c.capitalize(), c) for c in ('agent', 'chat')],
-                value='agent',
-                id='hud-mode',
                 allow_blank=False,
             )
             yield Label(id='hud-line-2')
@@ -325,7 +437,9 @@ class GrintaConfirmDialog(ModalScreen[str | None]):
                     yield Button(
                         label,
                         id=f'confirm-{key}',
-                        variant='primary' if i == (self._recommended or 0) else 'default',
+                        variant='primary'
+                        if i == (self._recommended or 0)
+                        else 'default',
                     )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -411,10 +525,14 @@ class GrintaAddSkillDialog(ModalScreen[dict[str, str] | None]):
         name = self.query_one('#skill-name', Input).value.strip()
         content = self.query_one('#skill-content', TextArea).text.strip()
         if not name:
-            self.query_one('#settings-feedback', Label).update('[#f05757]Skill name required.[/]')
+            self.query_one('#settings-feedback', Label).update(
+                '[#f05757]Skill name required.[/]'
+            )
             return
         if not content:
-            self.query_one('#settings-feedback', Label).update('[#f05757]Content required.[/]')
+            self.query_one('#settings-feedback', Label).update(
+                '[#f05757]Content required.[/]'
+            )
             return
         self.dismiss({'name': name, 'content': content})
 
@@ -432,7 +550,10 @@ class GrintaAddMCPDialog(ModalScreen[dict[str, str] | None]):
             yield Label('[bold]Add MCP Server[/]', classes='title')
             yield Label('Server Name', classes='field-label')
             yield Input(id='mcp-name')
-            yield Label('Command or URL (e.g. npx -y @modelcontextprotocol/server-postgres)', classes='field-label')
+            yield Label(
+                'Command or URL (e.g. npx -y @modelcontextprotocol/server-postgres)',
+                classes='field-label',
+            )
             yield Input(id='mcp-command')
             yield Label('', id='settings-feedback')
             with Horizontal(id='settings-buttons'):
@@ -455,7 +576,9 @@ class GrintaAddMCPDialog(ModalScreen[dict[str, str] | None]):
         name = self.query_one('#mcp-name', Input).value.strip()
         cmd = self.query_one('#mcp-command', Input).value.strip()
         if not name or not cmd:
-            self.query_one('#settings-feedback', Label).update('[#f05757]Name and command required.[/]')
+            self.query_one('#settings-feedback', Label).update(
+                '[#f05757]Name and command required.[/]'
+            )
             return
         self.dismiss({'name': name, 'command': cmd})
 
@@ -486,10 +609,13 @@ class GrintaSettingsDialog(ModalScreen[dict[str, Any] | None]):
             yield Label(f'Current API key: {masked_key}', id='settings-current-key')
             yield Label('Model', classes='field-label')
             yield Input(value=current_model, id='settings-model')
-            yield Label('API key (leave blank to keep current key)', classes='field-label')
+            yield Label(
+                'API key (leave blank to keep current key)', classes='field-label'
+            )
             yield Input(password=True, id='settings-api-key')
             yield Label(
-                'Budget per task (blank/unlimited to keep unlimited)', classes='field-label'
+                'Budget per task (blank/unlimited to keep unlimited)',
+                classes='field-label',
             )
             yield Input(value=budget_value, id='settings-budget')
             yield Checkbox(
@@ -534,7 +660,9 @@ class GrintaSettingsDialog(ModalScreen[dict[str, Any] | None]):
             try:
                 budget_value = float(budget_raw)
             except ValueError:
-                self._set_feedback('Budget must be numeric, unlimited, or empty.', error=True)
+                self._set_feedback(
+                    'Budget must be numeric, unlimited, or empty.', error=True
+                )
                 return
             if budget_value < 0:
                 self._set_feedback('Budget cannot be negative.', error=True)
@@ -591,14 +719,18 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
         with Vertical(id='sessions-dialog'):
             yield Label('[bold]Sessions[/]', classes='title')
             with Horizontal(id='sessions-filters'):
-                yield Input(value=self._search, placeholder='Search…', id='sessions-search')
+                yield Input(
+                    value=self._search, placeholder='Search…', id='sessions-search'
+                )
                 yield Select(
                     options=options,
                     value=self._sort_by,
                     allow_blank=False,
                     id='sessions-sort',
                 )
-                yield Input(value=str(self._limit), restrict=r'\d*', id='sessions-limit')
+                yield Input(
+                    value=str(self._limit), restrict=r'\d*', id='sessions-limit'
+                )
                 yield Button('Refresh', id='sessions-refresh')
             yield DataTable(id='sessions-table')
             yield Static('', id='sessions-preview')
@@ -615,7 +747,9 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
         self._refresh_table()
         if self._delete_targets:
             deleted, errors = self._delete_sessions(self._delete_targets)
-            self._set_feedback(f'Deleted {deleted} session(s). {" ".join(errors)}'.strip())
+            self._set_feedback(
+                f'Deleted {deleted} session(s). {" ".join(errors)}'.strip()
+            )
             self._refresh_table()
         if self._preview_target:
             self._select_target(self._preview_target)
@@ -666,7 +800,9 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         self._update_preview(event.cursor_row)
 
-    def on_data_table_row_double_clicked(self, event: DataTable.RowDoubleClicked) -> None:
+    def on_data_table_row_double_clicked(
+        self, event: DataTable.RowDoubleClicked
+    ) -> None:
         sid = self._current_session_id()
         if sid:
             self.dismiss(sid)
@@ -714,7 +850,9 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
         self._visible_entries = entries[: self._limit]
         for i, (sid, meta, event_count) in enumerate(self._visible_entries, 1):
             title = str(meta.get('title') or meta.get('name') or '—')
-            updated = str(meta.get('last_updated_at') or meta.get('created_at') or '—')[:19]
+            updated = str(meta.get('last_updated_at') or meta.get('created_at') or '—')[
+                :19
+            ]
             table.add_row(str(i), sid[:12], title, str(event_count), updated, key=sid)
 
         if self._visible_entries:
@@ -724,7 +862,9 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
         else:
             self.query_one('#sessions-preview', Static).update('')
             if self._search:
-                self._set_feedback(f'No sessions matching "{self._search}".', error=True)
+                self._set_feedback(
+                    f'No sessions matching "{self._search}".', error=True
+                )
             else:
                 self._set_feedback('No sessions found.', error=True)
 
@@ -836,8 +976,10 @@ class GrintaScreen(Screen):
         Binding('end', 'scroll_end', 'Bottom', show=False),
         Binding('ctrl+b', 'toggle_sidebar', 'Toggle Sidebar', show=True),
         Binding('f1', 'show_help', 'Help', show=True),
-        Binding('ctrl+j', 'focus_next_card', 'Next Card', show=False),
-        Binding('ctrl+k', 'focus_prev_card', 'Prev Card', show=False),
+        Binding('ctrl+j', 'focus_next_card', 'Next Card', show=False, priority=True),
+        Binding('ctrl+k', 'focus_prev_card', 'Prev Card', show=False, priority=True),
+        Binding('ctrl+p', 'history_prev', 'History Prev', show=False),
+        Binding('ctrl+n', 'history_next', 'History Next', show=False),
     ]
 
     def __init__(
@@ -888,6 +1030,9 @@ class GrintaScreen(Screen):
         self._runtime_meta = 'Idle'
         self._runtime_active = False
         self._hud_tick = None
+        self._command_history: list[str] = []
+        self._history_index: int = -1
+        self._welcome_visible = False
 
     _STATE_LABELS = {
         'starting': 'Starting…',
@@ -954,44 +1099,50 @@ class GrintaScreen(Screen):
 
     def compose(self) -> ComposeResult:
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
+
         with Horizontal(id='app-layout'):
             with Vertical(id='left-column'):
                 yield Transcript(id='main-display')
                 yield ListView(id='suggestions-list', classes='-hidden')
                 with InputBar(id='input-bar'):
-                    yield Static(id='spinner', classes='-hidden')
-                    yield TextArea(id='input', show_line_numbers=False)
+                    yield Label(id='input-hint')
+                    with Horizontal(id='input-row'):
+                        yield Static(id='spinner', classes='-hidden')
+                        yield PromptTextArea(id='input', show_line_numbers=False)
                 yield HUD(id='hud-bar')
-            with InfoSidebar(id='sidebar-container'):
-                yield CollapsibleSection(
-                    title="Tasks (0)",
-                    content="No tasks yet",
-                    collapsed=False,
-                    accent_color='#91abec',
-                    id='sidebar-tasks',
-                )
-                yield CollapsibleSection(
-                    title="MCP Servers (0)",
-                    content="No MCP servers configured",
-                    collapsed=False,
-                    accent_color='#eacb8a',
-                    action_label='[+] Add',
-                    id='sidebar-mcp',
-                )
-                yield CollapsibleSection(
-                    title="Skills",
-                    content="No skills available",
-                    collapsed=True,
-                    accent_color='#7a849c',
-                    action_label='[+] Add',
-                    id='sidebar-skills',
-                )
+            with Vertical(id='sidebar'):
+                with InfoSidebar(id='sidebar-container'):
+                    yield CollapsibleSection(
+                        title='Tasks (0)',
+                        content='No tasks yet',
+                        collapsed=False,
+                        accent_color='#91abec',
+                        id='sidebar-tasks',
+                    )
+                    yield CollapsibleSection(
+                        title='MCP Servers (0)',
+                        content='No MCP servers configured',
+                        collapsed=False,
+                        accent_color='#eacb8a',
+                        action_label='+',
+                        id='sidebar-mcp',
+                    )
+                    yield CollapsibleSection(
+                        title='Skills',
+                        content='No skills available',
+                        collapsed=True,
+                        accent_color='#7a849c',
+                        action_label='+',
+                        id='sidebar-skills',
+                    )
+                yield Static(id='sidebar-footer', markup=False)
 
     def on_mount(self) -> None:
         _tui_logger.debug('on_mount: GrintaScreen mounted')
         self._is_unmounted = False
 
         self._render_hud_bar()
+        self._update_input_identity()
         self._hud_tick = self.set_interval(1.0, self._refresh_runtime_feedback)
         ta = self.query_one('#input', TextArea)
         ta.text = ''
@@ -999,10 +1150,15 @@ class GrintaScreen(Screen):
         self._get_display().scroll_home(animate=False)
         _tui_logger.debug('on_mount: done')
         self._start_background_bootstrap()
+        self.set_timer(0.5, self._show_welcome)
 
     def on_renderer_drain_requested(self, _message: RendererDrainRequested) -> None:
         if self._renderer is not None:
             self._renderer.drain_events()
+        if not self._welcome_visible:
+            return
+        if self._transcript_has_real_content():
+            self._hide_welcome()
 
     def _start_background_bootstrap(self) -> None:
         async def _bg():
@@ -1053,8 +1209,7 @@ class GrintaScreen(Screen):
 
         cost = hud.state.cost_usd or 0
         used = hud.state.context_tokens
-        calls = hud.state.llm_calls
-
+        limit = hud.state.context_limit
         # Restore Model and Autonomy
         _, model_short = HUDBar.describe_model(hud.state.model)
         model_display = model_short if model_short != '(not set)' else '(not set)'
@@ -1069,21 +1224,32 @@ class GrintaScreen(Screen):
         except Exception:
             pass
         line1_parts = []
-        line1_parts.append(f'[#91abec bold]GRINTA[/]')
+        line1_parts.append('[#91abec bold]GRINTA[/]')
         line1_parts.append(f'[{state_color}]● {display_state}[/]')
-        if workspace:
-            line1_parts.append(f'[#bbc8e8]ws: {workspace}[/]')
         line1_parts.append(f'[{NAVY_TEXT_SECONDARY}]Model: {model_display}[/]')
-        line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
+        if limit > 0:
+            pct = min(100, used * 100 // limit)
+            ctx_color = (
+                NAVY_GREEN_ACCENT
+                if pct < 80
+                else NAVY_YELLOW_ACCENT
+                if pct < 95
+                else NAVY_RED_ACCENT
+            )
+            line1_parts.append(
+                f'[{NAVY_TEXT_DIM}]Tok: {used:,} [{ctx_color}]({pct}%)[/][/]'
+            )
+        else:
+            line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
         line1_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
-        line1 = '  '.join(line1_parts)
-
-        activity = (
+        line1_parts.append(
             f'[{NAVY_TEXT_SECONDARY}]Now:[/] '
             f'[{NAVY_TEXT_PRIMARY}]{self._last_tool_status}[/]'
         )
-        help_hint = f'  [#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
-        line2 = f'{activity}{help_hint}'
+        line1 = '  '.join(line1_parts)
+
+        help_hint = r'  [#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
+        line2 = help_hint
 
         hud_bar = self.query_one('#hud-bar', HUD)
         hud_bar.query_one('#hud-line-1', Label).update(line1)
@@ -1096,17 +1262,54 @@ class GrintaScreen(Screen):
             pass
         try:
             mode_select = hud_bar.query_one('#hud-mode', Select)
-            current_mode = self._config.get_agent_config().mode
+            current_mode = normalize_interaction_mode(
+                self._config.get_agent_config().mode
+            )
+            if current_mode not in VISIBLE_INTERACTION_MODES:
+                current_mode = CHAT_MODE if is_chat_mode(current_mode) else AGENT_MODE
             if mode_select.value != current_mode:
                 mode_select.value = current_mode
         except Exception:
             pass
         try:
-            is_agent = self._config.get_agent_config().mode == 'agent'
+            current_mode = normalize_interaction_mode(
+                self._config.get_agent_config().mode
+            )
+            is_agent = current_mode == AGENT_MODE
             hud_bar.query_one('#hud-autonomy').display = is_agent
             hud_bar.query_one('#hud-label-autonomy').display = is_agent
         except Exception:
             pass
+        try:
+            footer = self.query_one('#sidebar-footer', Static)
+            sidebar = self.query_one('#sidebar')
+            budget = max(18, int(getattr(sidebar.size, 'width', 28)) - 2)
+            workspace_display = HUDBar.ellipsize_path(workspace, budget)
+            footer.update(workspace_display)
+        except Exception:
+            pass
+
+    def _update_input_identity(self, mode: str | None = None) -> None:
+        """Update InputBar border title and hint based on mode."""
+        if mode is None:
+            mode = self._config.get_agent_config().mode
+        mode = normalize_interaction_mode(mode)
+        try:
+            bar = self.query_one('#input-bar', InputBar)
+            hint = self.query_one('#input-hint', Label)
+            ta = self.query_one('#input', TextArea)
+        except Exception:
+            return
+        if is_chat_mode(mode):
+            bar.border_title = ' Chat '
+            hint.update('Ask about the codebase or architecture...')
+        elif mode == PLAN_MODE:
+            bar.border_title = ' Plan '
+            hint.update('Describe what Grinta should inspect and plan...')
+        else:
+            bar.border_title = ' Agent task '
+            hint.update('Describe a task for Grinta to execute...')
+        hint.display = not bool(ta.text.strip())
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         lst = self.query_one('#suggestions-list', ListView)
@@ -1177,7 +1380,9 @@ class GrintaScreen(Screen):
         meta: str = '',
         active: bool = True,
     ) -> None:
-        summary_text = re.sub(r'\s+', ' ', (summary or '').strip()) or 'No retry activity'
+        summary_text = (
+            re.sub(r'\s+', ' ', (summary or '').strip()) or 'No retry activity'
+        )
         if len(summary_text) > 120:
             summary_text = summary_text[:117] + '...'
         meta_text = re.sub(r'\s+', ' ', (meta or '').strip()) or 'Idle'
@@ -1197,7 +1402,9 @@ class GrintaScreen(Screen):
         meta: str = '',
         active: bool = False,
     ) -> None:
-        summary_text = re.sub(r'\s+', ' ', (summary or '').strip()) or 'No runtime notices'
+        summary_text = (
+            re.sub(r'\s+', ' ', (summary or '').strip()) or 'No runtime notices'
+        )
         if len(summary_text) > 120:
             summary_text = summary_text[:117] + '...'
         meta_text = re.sub(r'\s+', ' ', (meta or '').strip()) or 'Idle'
@@ -1218,7 +1425,9 @@ class GrintaScreen(Screen):
         active: bool = False,
         has_error: bool = False,
     ) -> None:
-        summary_text = re.sub(r'\s+', ' ', (summary or '').strip()) or 'No delegated work'
+        summary_text = (
+            re.sub(r'\s+', ' ', (summary or '').strip()) or 'No delegated work'
+        )
         if len(summary_text) > 120:
             summary_text = summary_text[:117] + '...'
         meta_text = re.sub(r'\s+', ' ', (meta or '').strip()) or 'Idle'
@@ -1247,9 +1456,17 @@ class GrintaScreen(Screen):
             else:
                 cmd = parts[0].lower()
                 if cmd in self._SLASH_HINTS:
-                    if cmd == '/sessions' and len(parts) > 1 and parts[-1].startswith('--'):
-                        hint = 'Sessions flags: --limit --search --sort --preview --delete'
-                    elif cmd == '/help' and len(parts) > 1 and parts[-1].startswith('--'):
+                    if (
+                        cmd == '/sessions'
+                        and len(parts) > 1
+                        and parts[-1].startswith('--')
+                    ):
+                        hint = (
+                            'Sessions flags: --limit --search --sort --preview --delete'
+                        )
+                    elif (
+                        cmd == '/help' and len(parts) > 1 and parts[-1].startswith('--')
+                    ):
                         hint = 'Help flags: --all or --search <term>'
                     else:
                         hint = self._SLASH_HINTS[cmd]
@@ -1272,9 +1489,10 @@ class GrintaScreen(Screen):
 
     def _get_sidebar(self) -> Any:
         try:
-            return self.query_one('#sidebar-container')
+            return self.query_one('#sidebar')
         except Exception:
             from unittest.mock import MagicMock
+
             return MagicMock()
 
     @staticmethod
@@ -1309,6 +1527,7 @@ class GrintaScreen(Screen):
             display.write(text)
             return
         from backend.cli.tui.widgets.activity_card import UserMessage
+
         widget = UserMessage(text)
         display.append_widget(widget)
 
@@ -1322,6 +1541,7 @@ class GrintaScreen(Screen):
             display.write(text)
             return
         from backend.cli.tui.widgets.activity_card import AgentMessage
+
         widget = AgentMessage(text)
         display.append_widget(widget)
 
@@ -1397,7 +1617,6 @@ class GrintaScreen(Screen):
 
     def add_communicate_clarification(self, action: ClarificationRequestAction) -> None:
         """Agent asks a question — show question and options in a callout panel."""
-        from rich.console import Group
         from rich.text import Text
 
         from backend.cli.layout_tokens import DECISION_PANEL_ACCENT_STYLE
@@ -1428,7 +1647,6 @@ class GrintaScreen(Screen):
 
     def add_communicate_uncertainty(self, action: UncertaintyAction) -> None:
         """Agent expresses uncertainty."""
-        from rich.console import Group
         from rich.text import Text
 
         from backend.cli.layout_tokens import DECISION_PANEL_ACCENT_STYLE
@@ -1455,7 +1673,6 @@ class GrintaScreen(Screen):
 
     def add_communicate_proposal(self, action: ProposalAction) -> None:
         """Agent proposes a plan."""
-        from rich.console import Group
         from rich.text import Text
 
         from backend.cli.layout_tokens import DECISION_PANEL_ACCENT_STYLE
@@ -1505,8 +1722,6 @@ class GrintaScreen(Screen):
         self._write_log(panel)
 
     def add_divider(self) -> None:
-        from rich.rule import Rule
-
         self._write_log(Rule(style=NAVY_BORDER))
 
     def clear_transcript(self) -> None:
@@ -1639,7 +1854,7 @@ class GrintaScreen(Screen):
 
     def action_toggle_sidebar(self) -> None:
         """Toggle sidebar visibility."""
-        sidebar = self.query_one('#sidebar-container', InfoSidebar)
+        sidebar = self.query_one('#sidebar')
         if sidebar.has_class('-hidden'):
             sidebar.remove_class('-hidden')
             transcript = self.query_one('#main-display', Transcript)
@@ -1653,17 +1868,51 @@ class GrintaScreen(Screen):
         """Show help information."""
         self.show_help()
 
+    def action_history_prev(self) -> None:
+        """Navigate backward through command history."""
+        if not self._command_history:
+            return
+        ta = self.query_one('#input', TextArea)
+        if self._history_index == -1:
+            self._history_index = len(self._command_history) - 1
+        elif self._history_index > 0:
+            self._history_index -= 1
+        ta.text = self._command_history[self._history_index]
+        ta.cursor = (len(ta.text.splitlines()), 0)
+
+    def action_history_next(self) -> None:
+        """Navigate forward through command history."""
+        ta = self.query_one('#input', TextArea)
+        if self._history_index == -1:
+            return
+        self._history_index -= 1
+        if self._history_index < 0:
+            self._history_index = -1
+            ta.text = ''
+        else:
+            ta.text = self._command_history[self._history_index]
+        ta.cursor = (len(ta.text.splitlines()), 0)
+
     def _scroll_to_bottom(self) -> None:
         self._get_display().force_scroll_end()
 
     def _find_focusable_cards(self) -> list[Widget]:
         """Return all ActivityCard widgets in the transcript in DOM order."""
         from backend.cli.tui.widgets.activity_card import ActivityCard
+
         display = self._get_display()
         return [c for c in display.query(ActivityCard) if c.display]
 
     def action_focus_next_card(self) -> None:
-        """Move keyboard focus to the next ActivityCard in the transcript."""
+        """Move keyboard focus to the next ActivityCard or suggestion."""
+        if self._welcome_visible:
+            ta = self.query_one('#input', TextArea)
+            if not ta.text.strip():
+                try:
+                    self.query_one(WelcomeWidget).highlight_next()
+                except Exception:
+                    pass
+                return
         if self.focused and self.focused is self.query_one('#input', TextArea):
             return
         cards = self._find_focusable_cards()
@@ -1676,7 +1925,15 @@ class GrintaScreen(Screen):
         cards[start].focus()
 
     def action_focus_prev_card(self) -> None:
-        """Move keyboard focus to the previous ActivityCard in the transcript."""
+        """Move keyboard focus to the previous ActivityCard or suggestion."""
+        if self._welcome_visible:
+            ta = self.query_one('#input', TextArea)
+            if not ta.text.strip():
+                try:
+                    self.query_one(WelcomeWidget).highlight_prev()
+                except Exception:
+                    pass
+                return
         if self.focused and self.focused is self.query_one('#input', TextArea):
             return
         cards = self._find_focusable_cards()
@@ -1729,6 +1986,114 @@ class GrintaScreen(Screen):
                 event.text_area.text = text
                 return
             self._update_suggestions_list(text)
+            try:
+                hint = self.query_one('#input-hint', Label)
+                hint.display = not bool(text.strip())
+            except Exception:
+                pass
+            if self._welcome_visible and text.strip():
+                self._hide_welcome()
+            self._resize_input_bar()
+
+    _INPUT_HEIGHT_FRACTION = 0.3
+    _MIN_INPUT_HEIGHT = 6
+
+    def _resize_input_bar(self) -> None:
+        try:
+            ta = self.query_one('#input', TextArea)
+            bar = self.query_one('#input-bar', InputBar)
+        except Exception:
+            return
+        line_count = ta.text.count('\n') + 1
+        max_total = max(
+            self._MIN_INPUT_HEIGHT,
+            int(self.size.height * self._INPUT_HEIGHT_FRACTION),
+        )
+        non_content = 3
+        max_content = max_total - non_content
+        content_rows = min(max(line_count, 2), max_content)
+        bar.styles.height = non_content + content_rows
+
+    def on_focus(self, event: events.Focus) -> None:
+        if event.control and event.control.id == 'input':
+            try:
+                self.query_one('#input-bar', InputBar).remove_class('-blurred')
+            except Exception:
+                pass
+
+    def on_blur(self, event: events.Blur) -> None:
+        if event.control and event.control.id == 'input':
+            try:
+                self.query_one('#input-bar', InputBar).add_class('-blurred')
+            except Exception:
+                pass
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._resize_input_bar()
+
+    def _transcript_has_real_content(self) -> bool:
+        """True when transcript has non-welcome, non-badge visible content."""
+        try:
+            display = self._get_display()
+        except Exception:
+            return False
+        for child in display.children:
+            if not getattr(child, 'display', True):
+                continue
+            if getattr(child, 'id', None) == 'scroll-badge':
+                continue
+            if isinstance(child, WelcomeWidget):
+                continue
+            return True
+        return False
+
+    def _show_welcome(self) -> None:
+        if self._welcome_visible or self._is_unmounted:
+            return
+        try:
+            if self._transcript_has_real_content():
+                return
+            display = self._get_display()
+            existing = display.query(WelcomeWidget)
+            if existing:
+                return
+            display.mount(WelcomeWidget())
+            self._welcome_visible = True
+        except Exception:
+            pass
+
+    def _hide_welcome(self) -> None:
+        if not self._welcome_visible:
+            return
+        try:
+            widget = self.query_one(WelcomeWidget)
+            widget.remove()
+            self._welcome_visible = False
+        except Exception:
+            self._welcome_visible = False
+
+    def action_welcome_select(self) -> None:
+        if not self._welcome_visible:
+            return
+        ta = self.query_one('#input', TextArea)
+        if ta.text.strip():
+            return
+        try:
+            text = self.query_one(WelcomeWidget).select_current()
+        except Exception:
+            return
+        if text:
+            ta.text = text
+            self._hide_welcome()
+            self.action_submit_input()
+
+    def _handle_welcome_click(self, text: str) -> None:
+        if not self._welcome_visible:
+            return
+        ta = self.query_one('#input', TextArea)
+        ta.text = text
+        self._hide_welcome()
+        self.action_submit_input()
 
     def on_select_changed(self, event: Select.Changed) -> None:
         event.stop()
@@ -1756,8 +2121,8 @@ class GrintaScreen(Screen):
         self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
 
     def _apply_mode(self, new_mode: str) -> None:
-        mode = (new_mode or '').strip().lower()
-        if mode not in {'agent', 'chat'}:
+        mode = normalize_interaction_mode(new_mode, default='')
+        if mode not in set(VISIBLE_INTERACTION_MODES):
             return
         agent_config = self._config.get_agent_config()
         agent_config.mode = mode
@@ -1770,21 +2135,27 @@ class GrintaScreen(Screen):
                     try:
                         agent.tools = planner.build_toolset()
                     except Exception:
-                        _tui_logger.debug('Failed to rebuild toolset on mode change', exc_info=True)
+                        _tui_logger.debug(
+                            'Failed to rebuild toolset on mode change', exc_info=True
+                        )
         self._render_hud_bar()
+        self._update_input_identity(mode)
         self._toggle_autonomy_tabs_visibility(mode)
         self.notify(f'Mode: {mode}', severity='information', timeout=2.0)
 
     def _toggle_autonomy_tabs_visibility(self, mode: str) -> None:
+        mode = normalize_interaction_mode(mode)
         try:
             autonomy_tabs = self.query_one('#hud-autonomy')
-            autonomy_tabs.display = (mode == 'agent')
+            autonomy_tabs.display = mode == AGENT_MODE
+            self.query_one('#hud-label-autonomy').display = mode == AGENT_MODE
         except Exception:
             pass
 
     def on_sidebar_row_selected(self, event: Any) -> None:
         """Handle SidebarRow selected events and notify the user."""
         from backend.cli.tui.widgets.collapsible import SidebarRow
+
         if not isinstance(event, SidebarRow.Selected):
             return
         item_id = event.item_id
@@ -1792,7 +2163,7 @@ class GrintaScreen(Screen):
             return
         if item_id.startswith('task:'):
             task_id = item_id.split(':', 1)[1]
-            desc = "Unknown task"
+            desc = 'Unknown task'
             tasks = task_panel_signature(
                 self._renderer._task_list if self._renderer else []
             )
@@ -1800,25 +2171,26 @@ class GrintaScreen(Screen):
                 if tid == task_id:
                     desc = description or desc
                     break
-            self.notify(f"Task {task_id}: {desc}", severity="info", timeout=3.0)
+            self.notify(f'Task {task_id}: {desc}', severity='info', timeout=3.0)
         elif item_id.startswith('mcp:'):
             mcp_name = item_id.split(':', 1)[1]
             self.notify(
-                f"MCP Server: {mcp_name}  |  Press Delete to remove",
-                severity="info",
+                f'MCP Server: {mcp_name}  |  Press Delete to remove',
+                severity='info',
                 timeout=3.0,
             )
         elif item_id.startswith('skill:'):
             skill_name = item_id.split(':', 1)[1]
             self.notify(
-                f"Playbook Skill: {skill_name}.md  |  Press Delete to remove",
-                severity="info",
+                f'Playbook Skill: {skill_name}.md  |  Press Delete to remove',
+                severity='info',
                 timeout=3.0,
             )
 
     async def on_sidebar_row_delete_requested(self, event: Any) -> None:
         """Handle SidebarRow delete events."""
         from backend.cli.tui.widgets.collapsible import SidebarRow
+
         if not isinstance(event, SidebarRow.DeleteRequested) or not event.item_id:
             return
         item_id = event.item_id
@@ -1826,8 +2198,8 @@ class GrintaScreen(Screen):
             skill_name = item_id[6:]
             result = await self.app.push_screen_wait(
                 GrintaConfirmDialog(
-                    title="Delete Skill",
-                    body=f"Are you sure you want to delete {skill_name}.md?",
+                    title='Delete Skill',
+                    body=f'Are you sure you want to delete {skill_name}.md?',
                     options=[('cancel', 'Cancel'), ('delete', 'Delete')],
                 )
             )
@@ -1837,7 +2209,7 @@ class GrintaScreen(Screen):
             mcp_name = item_id.split(':', 1)[1]
             result = await self.app.push_screen_wait(
                 GrintaConfirmDialog(
-                    title="Delete MCP Server",
+                    title='Delete MCP Server',
                     body=f"Are you sure you want to remove the server '{mcp_name}'?",
                     options=[('cancel', 'Cancel'), ('delete', 'Remove')],
                 )
@@ -1861,6 +2233,7 @@ class GrintaScreen(Screen):
 
     def _delete_mcp_server(self, name: str) -> None:
         from backend.cli.config_manager import remove_mcp_server
+
         try:
             remove_mcp_server(name)
             self.notify(f'MCP Server removed: {name}', severity='information')
@@ -1871,7 +2244,6 @@ class GrintaScreen(Screen):
     @work
     async def on_collapsible_section_action_clicked(self, event: Any) -> None:
         """Handle [+] Add clicks on sidebar sections."""
-        from backend.cli.tui.widgets.collapsible import CollapsibleSection
         if not event.control:
             return
 
@@ -1899,12 +2271,14 @@ class GrintaScreen(Screen):
 
     def _add_mcp_server(self, name: str, command: str) -> None:
         from backend.cli.config_manager import add_mcp_server
+
         try:
             add_mcp_server(name, command=command)
             self.notify(f'MCP Server added: {name}', severity='information')
             self._last_sidebar_state = None  # Force full refresh next tick
         except Exception as e:
             self.notify(f'Failed to add MCP server: {e}', severity='error')
+
     # ── Input handling ──────────────────────────────────────────────────────
 
     def action_complete_command(self) -> None:
@@ -1967,8 +2341,15 @@ class GrintaScreen(Screen):
         text = _strip_ansi(clean_text).strip()
         _tui_logger.debug(f'action_submit_input: text_len={len(text)}')
         if not text:
-            _tui_logger.debug('action_submit_input: empty text, ignoring')
+            if self._welcome_visible:
+                _tui_logger.debug('action_submit_input: routing to welcome select')
+                self.action_welcome_select()
+            else:
+                _tui_logger.debug('action_submit_input: empty text, ignoring')
             return
+        if not self._command_history or self._command_history[-1] != text:
+            self._command_history.append(text)
+        self._history_index = -1
         _tui_logger.debug('action_submit_input: creating task for _handle_input')
         try:
             task = asyncio.create_task(self._handle_input(text))
@@ -2286,7 +2667,9 @@ class GrintaScreen(Screen):
         self._agent_task = None
         if old_task is not None and not old_task.done():
             old_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError, Exception):
+            with contextlib.suppress(
+                asyncio.CancelledError, asyncio.TimeoutError, Exception
+            ):
                 await asyncio.wait_for(old_task, timeout=5.0)
 
         old_controller = self._controller
@@ -2842,6 +3225,7 @@ class TUIRenderer:
             display.write(renderable)
         else:
             from textual.widget import Widget
+
             if isinstance(renderable, Widget):
                 display.append_widget(renderable)
             else:
@@ -2867,6 +3251,7 @@ class TUIRenderer:
 
         if not self._live_thinking_widget:
             from backend.cli.tui.widgets.activity_card import ThinkingIndicator
+
             self._live_thinking_widget = ThinkingIndicator()
             display.append_widget(self._live_thinking_widget)
             self._live_thinking_widget.start()
@@ -2898,6 +3283,7 @@ class TUIRenderer:
 
         if not self._live_response_widget:
             from backend.cli.tui.widgets.activity_card import AgentMessage
+
             self._live_response_widget = AgentMessage(text)
             display.append_widget(self._live_response_widget)
         else:
@@ -2976,11 +3362,12 @@ class TUIRenderer:
 
     def _refresh_display(self) -> None:
         """Refresh derived sidebar state; transcript writes are incremental."""
-        from backend.cli.theme import STYLE_DEFAULT, STYLE_DIM
-        from backend.core.task_status import TASK_STATUS_PANEL_STYLES
-        from backend.cli._event_renderer.sidebar import _load_playbook_skills
-        from backend.cli.tui.widgets.collapsible import CollapsibleSection
         from rich.text import Text
+
+        from backend.cli._event_renderer.sidebar import _load_playbook_skills
+        from backend.cli.theme import STYLE_DEFAULT, STYLE_DIM
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+        from backend.core.task_status import TASK_STATUS_PANEL_STYLES
 
         mcp_count = self._hud.state.mcp_servers
         skill_count = self._hud.bundled_skill_count
@@ -3012,7 +3399,6 @@ class TUIRenderer:
                 tasks_widget = self._tui.query_one('#sidebar-tasks', CollapsibleSection)
                 task_items = []
                 for task_id, status, desc in task_signature:
-
                     status_style = TASK_STATUS_PANEL_STYLES.get(status, 'dim')
                     status_icon = Text('●', style=f'bold {status_style}')
                     body = Text()
@@ -3024,9 +3410,9 @@ class TUIRenderer:
                     row_text.append(status_icon)
                     row_text.append(' ')
                     row_text.append(body)
-                    task_items.append((row_text, f"task:{task_id}"))
+                    task_items.append((row_text, f'task:{task_id}'))
 
-                tasks_widget.set_title(f"Tasks ({len(task_signature)})")
+                tasks_widget.set_title(f'Tasks ({len(task_signature)})')
                 tasks_widget.set_items(task_items)
             except Exception:
                 pass
@@ -3044,16 +3430,20 @@ class TUIRenderer:
                         row_text.append('● ', style='bold #eacb8a')
                         row_text.append(name, style='#c8d4e8')
                         row_text.append(f' ({server_type})', style='#54597b')
-                        mcp_items.append((row_text, f"mcp:{name}", True))
+                        mcp_items.append((row_text, f'mcp:{name}', True))
 
-                mcp_widget.set_title(f"MCP Servers ({len(mcp_servers) if mcp_servers else 0})")
+                mcp_widget.set_title(
+                    f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})'
+                )
                 mcp_widget.set_items(mcp_items)
             except Exception:
                 pass
 
             # 3. Update Skills Section
             try:
-                skills_widget = self._tui.query_one('#sidebar-skills', CollapsibleSection)
+                skills_widget = self._tui.query_one(
+                    '#sidebar-skills', CollapsibleSection
+                )
                 skills_list = _load_playbook_skills()
                 skill_items = []
                 if skills_list:
@@ -3061,9 +3451,9 @@ class TUIRenderer:
                         row_text = Text()
                         row_text.append('● ', style='bold #7a849c')
                         row_text.append(skill, style='#a1acc2')
-                        skill_items.append((row_text, f"skill:{skill}", True))
+                        skill_items.append((row_text, f'skill:{skill}', True))
 
-                skills_widget.set_title(f"Skills ({len(skills_list)})")
+                skills_widget.set_title(f'Skills ({len(skills_list)})')
                 skills_widget.set_items(skill_items)
             except Exception:
                 pass
@@ -3071,7 +3461,6 @@ class TUIRenderer:
             self._last_sidebar_state = current_state
 
     def _write_lines(self, lines: list[Any]) -> None:
-        from rich.console import Group
         from rich.text import Text
 
         items = []
@@ -3100,7 +3489,9 @@ class TUIRenderer:
     def _clear_retry_strip(self, meta: str = 'Idle') -> None:
         self._tui.clear_retry_status(meta=meta)
 
-    def _update_runtime_strip(self, summary: str, meta: str, *, active: bool = False) -> None:
+    def _update_runtime_strip(
+        self, summary: str, meta: str, *, active: bool = False
+    ) -> None:
         self._tui.set_runtime_status(summary, meta=meta, active=active)
 
     def _clear_runtime_strip(self, meta: str = 'Idle') -> None:
@@ -3146,7 +3537,9 @@ class TUIRenderer:
             )
             return
 
-        self._tui.set_worker_status('No delegated work', meta='Idle', active=False, has_error=False)
+        self._tui.set_worker_status(
+            'No delegated work', meta='Idle', active=False, has_error=False
+        )
 
     def _write_card(self, card: ActivityCard) -> None:
         """Write an activity card to the transcript using native ActivityCard widget."""
@@ -3162,7 +3555,10 @@ class TUIRenderer:
                 extra_parts.append(f'{indent}{extra.text}')
             extra_content = '\n'.join(extra_parts)
 
-        from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
+        from backend.cli.tui.widgets.activity_card import (
+            ActivityCard as TUIActivityCard,
+        )
+
         widget = TUIActivityCard(
             verb=card.verb,
             detail=card.detail,
@@ -3203,11 +3599,20 @@ class TUIRenderer:
         display = self._tui._get_display()
         display.append_widget(widget)
 
-    def _write_tui_file_card(self, verb: str, path: str, extra_content: str | None, delta: str) -> None:
-        from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
+    def _write_tui_file_card(
+        self, verb: str, path: str, extra_content: str | None, delta: str
+    ) -> None:
+        from backend.cli.tui.widgets.activity_card import (
+            ActivityCard as TUIActivityCard,
+        )
+
         detail = f'{path}  {delta}' if delta else path
         widget = TUIActivityCard(
-            verb=verb, detail=detail, badge_category='files', extra_content=extra_content, collapsed=False,
+            verb=verb,
+            detail=detail,
+            badge_category='files',
+            extra_content=extra_content,
+            collapsed=False,
         )
         self._tui.set_last_tool_status(f'{verb} {path}')
         display = self._tui._get_display()
@@ -3225,7 +3630,9 @@ class TUIRenderer:
         processing: bool = True,
         collapse_after_update: bool = False,
     ) -> None:
-        from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
+        from backend.cli.tui.widgets.activity_card import (
+            ActivityCard as TUIActivityCard,
+        )
 
         session_key = session_id or 'terminal'
         widget = self._terminal_cards_by_session.get(session_key)
@@ -3284,7 +3691,9 @@ class TUIRenderer:
             )
 
     def _create_shell_command_card(self, command: str) -> Any:
-        from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
+        from backend.cli.tui.widgets.activity_card import (
+            ActivityCard as TUIActivityCard,
+        )
 
         card = ActivityRenderer.shell_command(command)
         widget = TUIActivityCard(
@@ -3323,7 +3732,9 @@ class TUIRenderer:
         if queue is not None and not queue:
             self._pending_shell_cards_by_command.pop(command, None)
 
-        card = ActivityRenderer.shell_command(command, output=output, exit_code=exit_code)
+        card = ActivityRenderer.shell_command(
+            command, output=output, exit_code=exit_code
+        )
         if widget is None:
             self._write_card(card)
             return
@@ -3516,10 +3927,14 @@ class TUIRenderer:
                 pad = len(str(file_text.count('\n') + 1)) + 1 if file_text else 1
                 for i, line in enumerate(file_text.splitlines()):
                     display = _preview_line_text(line)
-                    extra_parts.append(encode_diff_line(f'+{i + 1:>{pad - 1}}| {display}', 'add'))
+                    extra_parts.append(
+                        encode_diff_line(f'+{i + 1:>{pad - 1}}| {display}', 'add')
+                    )
                 extra_content = '\n'.join(extra_parts) if extra_parts else None
                 added = file_text.count('\n') + 1 if file_text else 0
-                self._write_tui_file_card('Created', path, extra_content, f'[bold #54efae]+{added}[/]')
+                self._write_tui_file_card(
+                    'Created', path, extra_content, f'[bold #54efae]+{added}[/]'
+                )
             else:
                 card = ActivityRenderer.file_edit(verb, path, line_range)
                 self._write_card(card)
@@ -3529,10 +3944,14 @@ class TUIRenderer:
             pad = len(str(content.count('\n') + 1)) + 1 if content else 1
             for i, line in enumerate(content.splitlines()):
                 display = _preview_line_text(line)
-                extra_parts.append(encode_diff_line(f'+{i + 1:>{pad - 1}}| {display}', 'add'))
+                extra_parts.append(
+                    encode_diff_line(f'+{i + 1:>{pad - 1}}| {display}', 'add')
+                )
             extra_content = '\n'.join(extra_parts) if extra_parts else None
             added = content.count('\n') + 1 if content else 0
-            self._write_tui_file_card('Created', event.path, extra_content, f'[bold #54efae]+{added}[/]')
+            self._write_tui_file_card(
+                'Created', event.path, extra_content, f'[bold #54efae]+{added}[/]'
+            )
         elif isinstance(event, FileReadObservation):
             pass
         elif isinstance(event, FileEditObservation):
@@ -3637,7 +4056,11 @@ class TUIRenderer:
                 return
             msg = (event.content or '').strip()
             if msg:
-                summary = status_type.replace('_', ' ').strip().title() if status_type else 'Runtime notice'
+                summary = (
+                    status_type.replace('_', ' ').strip().title()
+                    if status_type
+                    else 'Runtime notice'
+                )
                 self._update_runtime_strip(summary, msg, active=False)
         elif isinstance(event, AgentThinkAction):
             source_tool = getattr(event, 'source_tool', '') or ''
@@ -3761,11 +4184,17 @@ class TUIRenderer:
             card = ActivityRenderer.condensation(count=count, result=event.content)
             self._write_card(card)
         elif isinstance(event, DelegateTaskAction):
-            task = getattr(event, 'task_description', '') or getattr(event, 'task', '') or ''
+            task = (
+                getattr(event, 'task_description', '')
+                or getattr(event, 'task', '')
+                or ''
+            )
             worker = getattr(event, 'worker', '') or ''
             if getattr(event, 'parallel_tasks', None):
                 for item in list(getattr(event, 'parallel_tasks', []) or []):
-                    task_desc = self._summarize_worker_task(str(item.get('task_description') or 'delegated task'))
+                    task_desc = self._summarize_worker_task(
+                        str(item.get('task_description') or 'delegated task')
+                    )
                     self._active_worker_tasks.append(task_desc)
             else:
                 self._active_worker_tasks.append(self._summarize_worker_task(task))
@@ -3776,7 +4205,11 @@ class TUIRenderer:
             content = (event.content or '').strip()
             success = bool(getattr(event, 'success', True))
             error_message = (getattr(event, 'error_message', '') or '').strip()
-            resolved_task = self._active_worker_tasks.pop(0) if self._active_worker_tasks else 'delegated task'
+            resolved_task = (
+                self._active_worker_tasks.pop(0)
+                if self._active_worker_tasks
+                else 'delegated task'
+            )
             if success:
                 self._worker_completed += 1
                 if resolved_task:

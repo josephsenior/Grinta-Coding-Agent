@@ -27,6 +27,7 @@
 | `address_pr_comments.md` | `/address_pr_comments` workflow |
 | `agent_memory.md` | `/remember` — lessons.md vs vector recall |
 | `api.md` | `/api` — REST/FastAPI patterns |
+| `architecture.md` | `/architecture` and `/adr` — architectural decision workflow |
 | `audit.md` | `/audit` — inspect event streams and session traces |
 | `ci.md` | `/ci` — CI triage and stabilization workflow |
 | `code-review.md` | `/codereview` and `/codereview-roasted` |
@@ -36,8 +37,11 @@
 | `documentation.md` | `/docs` |
 | `feature.md` | `/feature` |
 | `hardened.md` | `/hardened` — safer execution in semi-trusted repos |
+| `incident.md` | `/incident` and `/oncall` — live issue triage and recovery |
+| `migration.md` | `/migration` and `/upgrade` — staged upgrade workflow |
 | `orch-debug.md` | `/orch-debug` — orchestration-level debugging |
 | `perf.md` | `/perf` — token, cost, and performance workflow |
+| `premerge.md` | `/premerge` and `/shipcheck` — final quality gate before merge |
 | `react.md` | `/react` |
 | `recover.md` | `/recover` — recover after stuck/circuit-breaker events |
 | `release.md` | `/release` — release readiness and rollout workflow |

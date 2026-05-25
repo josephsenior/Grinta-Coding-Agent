@@ -19,11 +19,30 @@ class TestCreateFinishTool:
         tool = create_finish_tool()
         assert tool['function']['name'] == FINISH_TOOL_NAME
 
-    def test_has_message_param(self):
+    def test_agent_finish_has_execution_params(self):
         tool = create_finish_tool()
         params = tool['function']['parameters']
-        assert 'message' in params['properties']
-        assert 'message' in params['required']
+        assert set(params['required']) == {
+            'status',
+            'summary',
+            'actions_taken',
+            'verification',
+            'remaining_items',
+            'next_step',
+        }
+        assert 'plan' not in params['properties']
+
+    def test_plan_finish_has_plan_params(self):
+        tool = create_finish_tool('plan')
+        params = tool['function']['parameters']
+        assert set(params['required']) == {
+            'status',
+            'summary',
+            'plan',
+            'assumptions',
+            'next_step',
+        }
+        assert 'actions_taken' not in params['properties']
 
     def test_description_nonempty(self):
         tool = create_finish_tool()
@@ -44,7 +63,11 @@ class TestCreateTaskTrackerTool:
         params = tool['function']['parameters']
         assert 'command' in params['properties']
         assert 'command' in params['required']
-        assert params['properties']['command']['enum'] == ['view', 'update', 'update_status']
+        assert params['properties']['command']['enum'] == [
+            'view',
+            'update',
+            'update_status',
+        ]
 
     def test_has_task_list_param(self):
         tool = create_task_tracker_tool()

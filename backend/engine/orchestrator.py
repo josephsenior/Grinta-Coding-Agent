@@ -26,7 +26,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_RECOVERABLE_TOOL_ERROR_THRESHOLD,
 )
 from backend.core.contracts.state import State
-from backend.ledger.observation.task_tracking import TaskTrackingObservation
 from backend.core.errors import (
     AgentRuntimeError,
     ContextLimitError,
@@ -38,6 +37,7 @@ from backend.core.errors import (
     ModelProviderError,
     ToolExecutionError,
 )
+from backend.core.interaction_modes import normalize_interaction_mode
 from backend.core.logger import app_logger as logger
 from backend.engine import message_serializer
 from backend.engine import prompt_role_debug as _prompt_role_debug
@@ -54,7 +54,6 @@ from backend.engine.contracts import (
     SafetyManagerProtocol,
 )
 from backend.engine.executor import OrchestratorExecutor
-from backend.engine.executor_response_helpers import extract_response_text
 from backend.engine.memory_manager import ContextMemoryManager
 from backend.engine.planner import OrchestratorPlanner
 from backend.engine.safety import OrchestratorSafetyManager
@@ -67,6 +66,7 @@ from backend.inference.llm_registry import LLMRegistry
 from backend.ledger.action import AgentThinkAction, MessageAction, PlaybookFinishAction
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import EventSource
+from backend.ledger.observation.task_tracking import TaskTrackingObservation
 from backend.orchestration.agent import Agent
 from backend.utils.prompt import OrchestratorPromptManager, PromptManager
 
@@ -569,7 +569,8 @@ class Orchestrator(Agent):
 
     def _generate_delimiter_token(self) -> str:
         import secrets
-        token = f"GRINTA_{secrets.token_hex(3).upper()}"
+
+        token = f'GRINTA_{secrets.token_hex(3).upper()}'
         self._current_delimiter_token = token
         return token
 
@@ -609,6 +610,7 @@ class Orchestrator(Agent):
 
         try:
             self.executor._has_active_tasks = self._has_active_tasks_in_state(state)
+            self.executor._active_run_mode = self._active_run_mode_for_state(state)
             result = self.executor.execute(params, self.event_stream)
             self._consecutive_invalid_protocol_outputs = 0
         except Exception:
@@ -673,6 +675,7 @@ class Orchestrator(Agent):
 
         try:
             self.executor._has_active_tasks = self._has_active_tasks_in_state(state)
+            self.executor._active_run_mode = self._active_run_mode_for_state(state)
             result = await self.executor.async_execute(params, self.event_stream)
             self._consecutive_invalid_protocol_outputs = 0
         except Exception:
@@ -748,6 +751,14 @@ class Orchestrator(Agent):
                     if status in ('todo', 'doing'):
                         return True
         return False
+
+    def _active_run_mode_for_state(self, state: State) -> str:
+        extra = getattr(state, 'extra_data', {}) or {}
+        if isinstance(extra, dict):
+            active_mode = extra.get('active_run_mode')
+            if active_mode:
+                return normalize_interaction_mode(active_mode)
+        return normalize_interaction_mode(getattr(self.config, 'mode', 'agent'))
 
     def _build_fallback_action(self, result) -> Action:
         """Create a message action when the LLM returns no tool calls.

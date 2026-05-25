@@ -27,6 +27,11 @@ from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
 )
+from backend.core.interaction_modes import (
+    PLAN_MODE,
+    PLAN_MODE_ALLOWED_TOOLS,
+    normalize_interaction_mode,
+)
 from backend.core.logger import app_logger as logger
 from backend.engine.common import (
     common_response_to_actions,
@@ -43,10 +48,10 @@ from backend.engine.tools import (
     create_create_tool,
     create_edit_symbols_tool,
     create_find_symbols_tool,
+    create_finish_tool,
     create_multiedit_tool,
     create_read_tool,
     create_replace_string_tool,
-    create_finish_tool,
     create_summarize_context_tool,
 )
 from backend.engine.tools.analyze_project_structure import (
@@ -196,17 +201,114 @@ def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
     return action
 
 
-def _handle_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAction:
-    """Handle FinishTool tool call."""
-    tool_name = cast(str, create_finish_tool().get('function', {}).get('name', ''))
-    message = require_tool_argument(arguments, 'message', tool_name)
-    outputs: dict[str, Any] = {}
-    if 'completed' in arguments:
-        outputs['completed'] = arguments['completed']
-    if 'blocked_by' in arguments:
-        outputs['blocked_by'] = arguments['blocked_by']
-    if 'next_steps' in arguments:
-        outputs['next_steps'] = arguments['next_steps']
+_FINISH_STATUSES = {'completed', 'blocked', 'failed'}
+
+
+def _finish_tool_name(mode: str = 'agent') -> str:
+    return cast(str, create_finish_tool(mode).get('function', {}).get('name', ''))
+
+
+def _require_finish_string(
+    arguments: Mapping[str, Any],
+    field: str,
+    tool_name: str,
+) -> str:
+    value = require_tool_argument(arguments, field, tool_name)
+    if not isinstance(value, str) or not value.strip():
+        raise FunctionCallValidationError(
+            f'Missing required non-empty string argument "{field}" for tool call {tool_name}'
+        )
+    return value.strip()
+
+
+def _require_finish_list(
+    arguments: Mapping[str, Any],
+    field: str,
+    tool_name: str,
+) -> list[Any]:
+    value = require_tool_argument(arguments, field, tool_name)
+    if not isinstance(value, list):
+        raise FunctionCallValidationError(
+            f'Argument "{field}" for tool call {tool_name} must be a list.'
+        )
+    return value
+
+
+def _require_finish_dict(
+    arguments: Mapping[str, Any],
+    field: str,
+    tool_name: str,
+) -> dict[str, Any]:
+    value = require_tool_argument(arguments, field, tool_name)
+    if not isinstance(value, Mapping):
+        raise FunctionCallValidationError(
+            f'Argument "{field}" for tool call {tool_name} must be an object.'
+        )
+    return dict(value)
+
+
+def _require_finish_status(arguments: Mapping[str, Any], tool_name: str) -> str:
+    status = _require_finish_string(arguments, 'status', tool_name).lower()
+    if status not in _FINISH_STATUSES:
+        allowed = ', '.join(sorted(_FINISH_STATUSES))
+        raise FunctionCallValidationError(
+            f'Invalid finish status {status!r}; expected one of: {allowed}.'
+        )
+    return status
+
+
+def _handle_plan_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAction:
+    tool_name = _finish_tool_name(PLAN_MODE)
+    status = _require_finish_status(arguments, tool_name)
+    summary = _require_finish_string(arguments, 'summary', tool_name)
+    plan = _require_finish_list(arguments, 'plan', tool_name)
+    assumptions = _require_finish_list(arguments, 'assumptions', tool_name)
+    next_step = _require_finish_string(arguments, 'next_step', tool_name)
+
+    if status == 'completed' and not any(str(step).strip() for step in plan):
+        raise FunctionCallValidationError(
+            'Plan Mode finish with status="completed" requires a non-empty plan.'
+        )
+
+    outputs = {
+        'status': status,
+        'summary': summary,
+        'plan': plan,
+        'assumptions': assumptions,
+        'next_step': next_step,
+    }
+    return PlaybookFinishAction(final_thought=summary, outputs=outputs)
+
+
+def _handle_agent_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAction:
+    tool_name = _finish_tool_name('agent')
+    status = _require_finish_status(arguments, tool_name)
+    summary = _require_finish_string(arguments, 'summary', tool_name)
+    actions_taken = _require_finish_list(arguments, 'actions_taken', tool_name)
+    verification = _require_finish_dict(arguments, 'verification', tool_name)
+    remaining_items = _require_finish_list(arguments, 'remaining_items', tool_name)
+    next_step = _require_finish_string(arguments, 'next_step', tool_name)
+
+    verification_status = str(verification.get('status') or '').strip()
+    verification_details = str(verification.get('details') or '').strip()
+    if not verification_status or not verification_details:
+        raise FunctionCallValidationError(
+            'Agent Mode finish verification requires non-empty status and details.'
+        )
+    if status == 'completed' and not any(str(item).strip() for item in actions_taken):
+        raise FunctionCallValidationError(
+            'Agent Mode finish with status="completed" requires non-empty actions_taken.'
+        )
+
+    outputs: dict[str, Any] = {
+        'status': status,
+        'summary': summary,
+        'actions_taken': actions_taken,
+        'verification': verification,
+        'remaining_items': remaining_items,
+        'next_step': next_step,
+    }
+
     lessons = arguments.get('lessons_learned')
     if lessons:
         outputs['lessons_learned'] = lessons
@@ -220,7 +322,17 @@ def _handle_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAction:
         except Exception as exc:
             # Persistence is best-effort; never block finish on scratchpad I/O.
             logger.debug('Failed to persist finish lessons: %s', exc, exc_info=True)
-    return PlaybookFinishAction(final_thought=message, outputs=outputs)
+    return PlaybookFinishAction(final_thought=summary, outputs=outputs)
+
+
+def _handle_finish_tool(
+    arguments: Mapping[str, Any],
+    mode: str = 'agent',
+) -> PlaybookFinishAction:
+    """Handle the mode-aware finish tool call."""
+    if normalize_interaction_mode(mode) == PLAN_MODE:
+        return _handle_plan_finish_tool(arguments)
+    return _handle_agent_finish_tool(arguments)
 
 
 def _handle_memory_manager_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
@@ -344,19 +456,31 @@ def _symbol_preview(content: str, start_line: int, end_line: int) -> str:
     return '\n'.join(selected)[:240]
 
 
-def _candidate_from_location(location: Any, content: str, display_path: str) -> dict[str, Any]:
+def _candidate_from_location(
+    location: Any, content: str, display_path: str
+) -> dict[str, Any]:
     name = str(getattr(location, 'symbol_name', '') or '')
+    parent = getattr(location, 'parent_name', None)
     start_line = int(getattr(location, 'line_start', 0) or 0)
     end_line = int(getattr(location, 'line_end', 0) or 0)
+    kind = getattr(location, 'node_type', None)
+    symbol_kind = str(getattr(location, 'symbol_kind', '') or '') or _node_kind(
+        str(kind or '')
+    )
+    qualified_name = f'{parent}.{name}' if parent else name
+    preview = _symbol_preview(content, start_line, end_line)
     return {
         'symbol_id': _symbol_id(display_path, name, start_line, end_line),
         'name': name,
-        'kind': getattr(location, 'node_type', None),
-        'parent': getattr(location, 'parent_name', None),
+        'qualified_name': qualified_name,
+        'kind': kind,
+        'symbol_kind': symbol_kind,
+        'parent': parent,
         'path': display_path,
         'start_line': start_line,
         'end_line': end_line,
-        'signature': _symbol_preview(content, start_line, end_line),
+        'signature': preview,
+        'preview': preview,
     }
 
 
@@ -431,7 +555,10 @@ def _find_symbol_candidates_in_file(
                 name = file_bytes[name_node.start_byte : name_node.end_byte].decode(
                     'utf-8', errors='replace'
                 )
-                kind = _node_kind(str(node.type))
+                base_kind = _node_kind(str(node.type))
+                kind = (
+                    'method' if parent_name and base_kind == 'function' else base_kind
+                )
                 if (
                     query_lower in name.lower()
                     and (include_private or not name.startswith('_'))
@@ -443,6 +570,7 @@ def _find_symbol_candidates_in_file(
                         {
                             'symbol_name': name,
                             'node_type': node.type,
+                            'symbol_kind': kind,
                             'parent_name': parent_name,
                             'line_start': node.start_point[0] + 1,
                             'line_end': node.end_point[0] + 1,
@@ -486,16 +614,24 @@ def _find_symbol_candidates(
     symbol_kind: str | None = None,
     include_private: bool = False,
 ) -> list[dict[str, Any]]:
+    lookup_query = query.rsplit('.', 1)[-1]
     candidates: list[dict[str, Any]] = []
     for candidate_path in _candidate_paths_for_symbol_search(path):
         candidates.extend(
             _find_symbol_candidates_in_file(
                 candidate_path,
-                query,
+                lookup_query,
                 symbol_kind=symbol_kind,
                 include_private=include_private,
             )
         )
+    if '.' in query:
+        query_lower = query.lower()
+        candidates = [
+            candidate
+            for candidate in candidates
+            if query_lower in str(candidate.get('qualified_name') or '').lower()
+        ]
     return candidates
 
 
@@ -532,9 +668,18 @@ def _filter_symbol_candidates(
     parent_symbol: str | None = None,
     occurrence: int | None = None,
 ) -> list[dict[str, Any]]:
-    filtered = [c for c in candidates if c.get('name') == symbol_name]
+    filtered = [
+        c
+        for c in candidates
+        if c.get('name') == symbol_name or c.get('qualified_name') == symbol_name
+    ]
     if parent_symbol:
-        filtered = [c for c in filtered if c.get('parent') == parent_symbol]
+        filtered = [
+            c
+            for c in filtered
+            if c.get('parent') == parent_symbol
+            or str(c.get('qualified_name') or '').startswith(f'{parent_symbol}.')
+        ]
     if occurrence is not None:
         if occurrence < 1 or occurrence > len(filtered):
             raise FunctionCallValidationError(
@@ -560,8 +705,6 @@ def _resolve_symbol_candidates(
         maybe_parent, _, maybe_name = lookup_name.rpartition('.')
         parent_symbol = maybe_parent or None
         lookup_name = maybe_name
-    if parent_symbol and '.' not in lookup_name:
-        lookup_name = f'{parent_symbol}.{lookup_name}'
 
     candidates = _find_symbol_candidates_in_file(
         safe_path,
@@ -569,9 +712,11 @@ def _resolve_symbol_candidates(
         symbol_kind=symbol_kind,
         include_private=True,
     )
-    if parent_symbol:
-        candidates = [c for c in candidates if c.get('parent') == parent_symbol]
-    candidates = [c for c in candidates if c.get('name') == lookup_name.split('.')[-1]]
+    candidates = _filter_symbol_candidates(
+        candidates,
+        symbol_name=lookup_name.split('.')[-1],
+        parent_symbol=parent_symbol,
+    )
 
     if occurrence is not None:
         if occurrence < 1 or occurrence > len(candidates):
@@ -584,10 +729,12 @@ def _resolve_symbol_candidates(
     return safe_path, content, candidates
 
 
-def _symbol_action_ambiguity_error(symbol_name: str, candidates: list[dict[str, Any]]) -> str:
+def _symbol_action_ambiguity_error(
+    symbol_name: str, candidates: list[dict[str, Any]]
+) -> str:
     return (
-        f"Symbol '{symbol_name}' is ambiguous. Use find_symbols or read(type=\"symbols\") output "
-        f'to choose a parent_symbol or occurrence.\n'
+        f'Symbol \'{symbol_name}\' is ambiguous. Use find_symbols or read(type="symbols") output '
+        f'to retry with path, qualified_name, and symbol_kind.\n'
         + json.dumps({'candidates': candidates}, indent=2)
     )
 
@@ -608,7 +755,9 @@ def _single_symbol_candidate(
         occurrence=occurrence,
     )
     if not candidates:
-        raise FunctionCallValidationError(f"Symbol '{symbol_name}' not found in {path}.")
+        raise FunctionCallValidationError(
+            f"Symbol '{symbol_name}' not found in {path}."
+        )
     if len(candidates) > 1:
         raise FunctionCallValidationError(
             _symbol_action_ambiguity_error(symbol_name, candidates)
@@ -850,7 +999,7 @@ def _build_symbol_insert_action(path: str, arguments: Mapping[str, Any]) -> Acti
     insert_line = arguments.get('insert_line')
     if new_str is None or insert_line is None:
         raise FunctionCallValidationError(
-            "create type=symbol requires resolved insertion text and insertion line."
+            'create type=symbol requires resolved insertion text and insertion line.'
         )
     return FileEditAction(
         path=path,
@@ -879,7 +1028,11 @@ def _handle_read_range_public(arguments: Mapping[str, Any]) -> Action:
             'read type=range end_line must be >= start_line, or -1 for EOF.'
         )
     action = _build_read_file_action(
-        str(path), {'view_range': [start_i, end_i], 'security_risk': arguments.get('security_risk')}
+        str(path),
+        {
+            'view_range': [start_i, end_i],
+            'security_risk': arguments.get('security_risk'),
+        },
     )
     set_security_risk(action, arguments)
     return action
@@ -915,7 +1068,8 @@ def _resolve_read_symbol_target(
     symbol_id = str(target.get('symbol_id') or '').strip()
     path = str(target.get('path') or default_path or '').strip()
     symbol_name = str(
-        target.get('symbol_name')
+        target.get('qualified_name')
+        or target.get('symbol_name')
         or target.get('name')
         or target.get('query')
         or ''
@@ -935,7 +1089,7 @@ def _resolve_read_symbol_target(
         return {
             'status': 'not_found',
             'target': display_target,
-            'message': 'Symbol target requires symbol_id or symbol_name.',
+            'message': 'Symbol target requires qualified_name, symbol_name, or symbol_id.',
         }
 
     if path:
@@ -1001,14 +1155,16 @@ def _resolve_read_symbol_target(
     )
 
 
-def _coerce_read_symbol_targets(arguments: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+def _coerce_read_symbol_targets(
+    arguments: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
     raw_symbols = arguments.get('symbols')
     if isinstance(raw_symbols, list):
         targets: list[Mapping[str, Any]] = []
         for index, raw in enumerate(raw_symbols):
             if isinstance(raw, str):
                 if raw.strip():
-                    targets.append({'symbol_name': raw.strip()})
+                    targets.append({'qualified_name': raw.strip()})
                 continue
             if isinstance(raw, Mapping):
                 targets.append(raw)
@@ -1020,11 +1176,15 @@ def _coerce_read_symbol_targets(arguments: Mapping[str, Any]) -> list[Mapping[st
             return targets
 
     symbol_id = str(arguments.get('symbol_id') or '').strip()
-    symbol_name = str(arguments.get('symbol_name') or arguments.get('query') or '').strip()
-    if symbol_id or symbol_name:
+    qualified_name = str(arguments.get('qualified_name') or '').strip()
+    symbol_name = str(
+        arguments.get('symbol_name') or arguments.get('query') or ''
+    ).strip()
+    if symbol_id or qualified_name or symbol_name:
         return [
             {
                 'symbol_id': symbol_id,
+                'qualified_name': qualified_name,
                 'symbol_name': symbol_name,
                 'path': arguments.get('path'),
                 'symbol_kind': arguments.get('symbol_kind'),
@@ -1033,7 +1193,7 @@ def _coerce_read_symbol_targets(arguments: Mapping[str, Any]) -> list[Mapping[st
             }
         ]
     raise FunctionCallValidationError(
-        'read type=symbols requires symbols[], symbol_id, or symbol_name.'
+        'read type=symbols requires symbols[], qualified_name, symbol_id, or symbol_name.'
     )
 
 
@@ -1059,7 +1219,9 @@ def _handle_read_symbols_public(arguments: Mapping[str, Any]) -> AgentThinkActio
 
 def _handle_find_symbols_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     validate_security_risk(arguments, FIND_SYMBOLS_TOOL_NAME)
-    query = str(require_tool_argument(arguments, 'query', FIND_SYMBOLS_TOOL_NAME)).strip()
+    query = str(
+        require_tool_argument(arguments, 'query', FIND_SYMBOLS_TOOL_NAME)
+    ).strip()
     if not query:
         raise FunctionCallValidationError('find_symbols query must not be empty.')
     raw_path = str(arguments.get('path') or '').strip()
@@ -1083,7 +1245,9 @@ def _handle_find_symbols_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
 
 def _handle_read_tool(arguments: Mapping[str, Any]) -> Action:
     validate_security_risk(arguments, READ_TOOL_NAME)
-    read_type = str(require_tool_argument(arguments, 'type', READ_TOOL_NAME)).strip().lower()
+    read_type = (
+        str(require_tool_argument(arguments, 'type', READ_TOOL_NAME)).strip().lower()
+    )
     if read_type == 'file':
         path = require_tool_argument(arguments, 'path', READ_TOOL_NAME)
         action = _build_read_file_action(str(path), {})
@@ -1103,7 +1267,7 @@ def _coerce_insert_position(value: object) -> str:
     valid = {'before', 'after', 'inside_start', 'inside_end'}
     if position not in valid:
         raise FunctionCallValidationError(
-            f"create type=symbol position must be one of {sorted(valid)}."
+            f'create type=symbol position must be one of {sorted(valid)}.'
         )
     return position
 
@@ -1122,8 +1286,12 @@ def _insert_line_for_symbol(candidate: dict[str, Any], position: str) -> int:
 
 def _handle_create_symbol_public(arguments: Mapping[str, Any]) -> Action:
     path = str(require_tool_argument(arguments, 'path', CREATE_TOOL_NAME))
-    target_symbol = str(require_tool_argument(arguments, 'target_symbol', CREATE_TOOL_NAME))
-    content_to_insert = str(require_tool_argument(arguments, 'content', CREATE_TOOL_NAME))
+    target_symbol = str(
+        require_tool_argument(arguments, 'target_symbol', CREATE_TOOL_NAME)
+    )
+    content_to_insert = str(
+        require_tool_argument(arguments, 'content', CREATE_TOOL_NAME)
+    )
     position = _coerce_insert_position(
         require_tool_argument(arguments, 'position', CREATE_TOOL_NAME)
     )
@@ -1149,7 +1317,9 @@ def _handle_create_symbol_public(arguments: Mapping[str, Any]) -> Action:
 
 def _handle_create_tool(arguments: Mapping[str, Any]) -> Action:
     validate_security_risk(arguments, CREATE_TOOL_NAME)
-    create_type = str(require_tool_argument(arguments, 'type', CREATE_TOOL_NAME)).strip().lower()
+    create_type = (
+        str(require_tool_argument(arguments, 'type', CREATE_TOOL_NAME)).strip().lower()
+    )
     normalized_args = dict(arguments)
     _guard_content_arguments(normalized_args)
     if create_type == 'file':
@@ -1180,7 +1350,9 @@ def _handle_replace_string_tool(arguments: Mapping[str, Any]) -> Action:
         require_tool_argument(arguments, 'new_string', REPLACE_STRING_TOOL_NAME)
     )
     if old_string == '':
-        raise FunctionCallValidationError('replace_string old_string must not be empty.')
+        raise FunctionCallValidationError(
+            'replace_string old_string must not be empty.'
+        )
     _guard_content_arguments(dict(arguments))
     safe_path = _safe_workspace_path(path, must_exist=True)
     content = _read_text_for_tool(safe_path)
@@ -1211,20 +1383,26 @@ def _resolve_public_symbol_edit(
 
     symbol_id = str(item.get('symbol_id') or '').strip()
     raw_path = str(item.get('path') or default_path or '').strip()
-    symbol_name = str(item.get('symbol_name') or '').strip()
+    symbol_name = str(
+        item.get('qualified_name') or item.get('symbol_name') or ''
+    ).strip()
     symbol_kind = cast(str | None, item.get('symbol_kind'))
     parent_symbol = cast(str | None, item.get('parent_symbol'))
-    occurrence = _coerce_optional_int(item.get('occurrence'), f'edits[{index}].occurrence')
+    occurrence = _coerce_optional_int(
+        item.get('occurrence'), f'edits[{index}].occurrence'
+    )
     requested_start: int | None = None
     requested_end: int | None = None
 
     if symbol_id:
-        raw_path, symbol_name, requested_start, requested_end = _parse_symbol_id(symbol_id)
+        raw_path, symbol_name, requested_start, requested_end = _parse_symbol_id(
+            symbol_id
+        )
         occurrence = None
 
     if not symbol_name:
         raise FunctionCallValidationError(
-            f'edit_symbols edits[{index}] requires symbol_id or symbol_name.'
+            f'edit_symbols edits[{index}] requires qualified_name, symbol_name, or symbol_id.'
         )
 
     if raw_path:
@@ -1236,13 +1414,18 @@ def _resolve_public_symbol_edit(
             occurrence=occurrence,
         )
     else:
+        lookup_name = symbol_name.rsplit('.', 1)[-1]
+        if not parent_symbol and '.' in symbol_name:
+            maybe_parent, _, maybe_name = symbol_name.rpartition('.')
+            parent_symbol = maybe_parent or None
+            lookup_name = maybe_name
         candidates = _filter_symbol_candidates(
             _find_symbol_candidates(
-                symbol_name,
+                lookup_name,
                 symbol_kind=symbol_kind,
                 include_private=True,
             ),
-            symbol_name=symbol_name,
+            symbol_name=lookup_name,
             parent_symbol=parent_symbol,
             occurrence=occurrence,
         )
@@ -1259,7 +1442,7 @@ def _resolve_public_symbol_edit(
     if not candidates:
         target = symbol_id or symbol_name
         raise FunctionCallValidationError(
-            f"edit_symbols edits[{index}] could not find symbol {target!r}."
+            f'edit_symbols edits[{index}] could not find symbol {target!r}.'
         )
     if len(candidates) > 1:
         raise FunctionCallValidationError(
@@ -1284,11 +1467,15 @@ def _normalize_edit_symbols_public_edits(
     default_path: str | None = None,
 ) -> list[dict[str, Any]]:
     if not isinstance(edits, list) or not edits:
-        raise FunctionCallValidationError('edit_symbols requires a non-empty edits array.')
+        raise FunctionCallValidationError(
+            'edit_symbols requires a non-empty edits array.'
+        )
     normalized: list[dict[str, Any]] = []
     for index, item in enumerate(edits):
         if not isinstance(item, Mapping):
-            raise FunctionCallValidationError(f'edit_symbols edits[{index}] must be an object.')
+            raise FunctionCallValidationError(
+                f'edit_symbols edits[{index}] must be an object.'
+            )
         normalized.append(
             _resolve_public_symbol_edit(
                 item=item,
@@ -1321,20 +1508,28 @@ def _handle_edit_symbols_tool(arguments: Mapping[str, Any]) -> Action:
     return action
 
 
-def _normalize_multiedit_operations(arguments: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _normalize_multiedit_operations(
+    arguments: Mapping[str, Any],
+) -> list[dict[str, Any]]:
     raw_ops = arguments.get('operations')
     if not isinstance(raw_ops, list) or not raw_ops:
-        raise FunctionCallValidationError('multiedit requires a non-empty operations array.')
+        raise FunctionCallValidationError(
+            'multiedit requires a non-empty operations array.'
+        )
     normalized: list[dict[str, Any]] = []
     for index, raw in enumerate(raw_ops):
         if not isinstance(raw, Mapping):
-            raise FunctionCallValidationError(f'multiedit operations[{index}] must be an object.')
+            raise FunctionCallValidationError(
+                f'multiedit operations[{index}] must be an object.'
+            )
         command = str(raw.get('command') or '').strip().lower()
         path = raw.get('path')
         if command == 'create':
             create_type = str(raw.get('type') or '').strip().lower()
             if not isinstance(path, str) or not path.strip():
-                raise FunctionCallValidationError(f'multiedit operations[{index}] create requires path.')
+                raise FunctionCallValidationError(
+                    f'multiedit operations[{index}] create requires path.'
+                )
             content = raw.get('content')
             if not isinstance(content, str):
                 raise FunctionCallValidationError(
@@ -1393,6 +1588,7 @@ def _normalize_multiedit_operations(arguments: Mapping[str, Any]) -> list[dict[s
                     {
                         'symbol_id': raw.get('symbol_id'),
                         'path': raw.get('path'),
+                        'qualified_name': raw.get('qualified_name'),
                         'symbol_name': raw.get('symbol_name'),
                         'symbol_kind': raw.get('symbol_kind'),
                         'parent_symbol': raw.get('parent_symbol'),
@@ -1408,8 +1604,8 @@ def _normalize_multiedit_operations(arguments: Mapping[str, Any]) -> list[dict[s
             )
         else:
             raise FunctionCallValidationError(
-                f"multiedit operations[{index}] command {command!r} is unsupported. "
-                "Use create, replace_string, or edit_symbols."
+                f'multiedit operations[{index}] command {command!r} is unsupported. '
+                'Use create, replace_string, or edit_symbols.'
             )
     return normalized
 
@@ -1471,10 +1667,15 @@ def _parse_multi_edit_operation(
     idx: int,
 ) -> tuple[str, dict[str, Any]]:
     operation = str(raw_item.get('operation') or '').strip().lower()
-    allowed = {'create_file', 'create_symbol', 'replace_string', 'symbol_body_replacement'}
+    allowed = {
+        'create_file',
+        'create_symbol',
+        'replace_string',
+        'symbol_body_replacement',
+    }
     if operation not in allowed:
         raise FunctionCallValidationError(
-            f"multi_edit item {idx}: unsupported internal operation {operation!r}. "
+            f'multi_edit item {idx}: unsupported internal operation {operation!r}. '
             f'Allowed operations: {sorted(allowed)}.'
         )
     return operation, dict(raw_item)
@@ -1552,7 +1753,7 @@ def _apply_multi_edit_operation(
             candidates = [candidates[occurrence - 1]]
         if not candidates:
             raise FunctionCallValidationError(
-                f"multi_edit create_symbol could not find target symbol {target_symbol!r} in {rel_path}."
+                f'multi_edit create_symbol could not find target symbol {target_symbol!r} in {rel_path}.'
             )
         if len(candidates) > 1:
             raise FunctionCallValidationError(
@@ -1596,7 +1797,7 @@ def _apply_multi_edit_operation(
         return
 
     raise FunctionCallValidationError(
-        f"multi_edit internal operation {operation!r} is unsupported."
+        f'multi_edit internal operation {operation!r} is unsupported.'
     )
 
 
@@ -1609,7 +1810,9 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     """
     raw_edits = arguments.get('file_edits')
     if not isinstance(raw_edits, list) or not raw_edits:
-        raise FunctionCallValidationError("multi_edit requires a non-empty 'file_edits' array.")
+        raise FunctionCallValidationError(
+            "multi_edit requires a non-empty 'file_edits' array."
+        )
     _guard_content_arguments({'file_edits': raw_edits})
     if len(raw_edits) > _MAX_MULTI_EDIT_FILES:
         raise FunctionCallValidationError(
@@ -1621,7 +1824,9 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     seen_paths: set[str] = set()
     for idx, item in enumerate(raw_edits):
         if not isinstance(item, Mapping):
-            raise FunctionCallValidationError(f'multi_edit item {idx} must be an object.')
+            raise FunctionCallValidationError(
+                f'multi_edit item {idx} must be an object.'
+            )
         item_path = item.get('path')
         if not isinstance(item_path, str) or not item_path.strip():
             raise FunctionCallValidationError(
@@ -1634,11 +1839,13 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
         parsed.append((canonical_path, display_path, operation, normalized_item))
 
     try:
-        from backend.engine.tools.atomic_refactor import AtomicRefactor
         from backend.core.workspace_resolution import require_effective_workspace_root
+        from backend.engine.tools.atomic_refactor import AtomicRefactor
         from backend.execution.utils.file_editor import FileEditor, _file_lock_for_path
     except Exception as e:  # pragma: no cover - defensive import guard
-        _multi_edit_raise(f'❌ multi_edit unavailable: AtomicRefactor import failed: {e}')
+        _multi_edit_raise(
+            f'❌ multi_edit unavailable: AtomicRefactor import failed: {e}'
+        )
 
     workspace_root = require_effective_workspace_root()
     refactor = AtomicRefactor()
@@ -1649,7 +1856,9 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
         with ExitStack() as stack:
             for item_path in sorted(seen_paths):
                 stack.enter_context(_file_lock_for_path(Path(item_path)))
-            with tempfile.TemporaryDirectory(prefix='grinta-multi-edit-') as temp_root_str:
+            with tempfile.TemporaryDirectory(
+                prefix='grinta-multi-edit-'
+            ) as temp_root_str:
                 temp_root = Path(temp_root_str)
                 temp_editor = FileEditor(workspace_root=str(temp_root))
                 temp_paths: dict[str, Path] = {}
@@ -1687,7 +1896,9 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             for item_path, old_content in original_snapshots.items():
                 real_path = Path(item_path)
                 disk_now = (
-                    real_path.read_text(encoding='utf-8') if real_path.exists() else None
+                    real_path.read_text(encoding='utf-8')
+                    if real_path.exists()
+                    else None
                 )
                 if disk_now != old_content:
                     _multi_edit_raise(
@@ -1697,7 +1908,9 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
 
             for item_path, final_content in final_contents.items():
                 operation = 'modify' if Path(item_path).exists() else 'create'
-                refactor.add_file_edit(transaction, item_path, final_content, operation=operation)
+                refactor.add_file_edit(
+                    transaction, item_path, final_content, operation=operation
+                )
             result = refactor.commit(transaction, validate=False)
     except FunctionCallValidationError:
         raise
@@ -1707,7 +1920,9 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             refactor.rollback(transaction)
         except Exception:
             pass
-        _multi_edit_raise(f'❌ multi_edit failed before commit: {e}. No files modified.')
+        _multi_edit_raise(
+            f'❌ multi_edit failed before commit: {e}. No files modified.'
+        )
 
     if result.success:
         paths = sorted(
@@ -1784,12 +1999,6 @@ def _handle_communicate_tool(arguments: Mapping[str, Any]) -> Action:
         )
 
 
-
-
-
-
-
-
 def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     """Create dispatch map for tool handlers."""
     return {
@@ -1846,6 +2055,7 @@ def response_to_actions(
     response: ModelResponse,
     mcp_tool_names: list[str] | None = None,
     mcp_tools: dict[str, Any] | None = None,
+    mode: str = 'agent',
 ) -> list[Action]:
     """Convert LLM response to agent actions.
 
@@ -1854,7 +2064,7 @@ def response_to_actions(
     from backend.engine.planner import CODE_PAYLOAD_TOOLS
 
     def process_with_mcp_tools(tc: Any, args: dict[str, Any]) -> Action:
-        return _process_single_tool_call(tc, args)
+        return _process_single_tool_call(tc, args, mode=mode)
 
     return common_response_to_actions(
         response=response,
@@ -1877,24 +2087,40 @@ def _get_tool_dispatch_map() -> dict[str, ToolHandler]:
     return _tool_dispatch_map
 
 
-def _process_single_tool_call(tool_call: Any, arguments: dict[str, Any]) -> Action:
+def _process_single_tool_call(
+    tool_call: Any,
+    arguments: dict[str, Any],
+    *,
+    mode: str = 'agent',
+) -> Action:
     """Process a single tool call and return the corresponding action."""
     logger.debug('Tool call in function_calling.py: %s', tool_call)
     tool_dispatch = _get_tool_dispatch_map()
 
     tool_name = cast(str, tool_call.function.name)
+    normalized_mode = normalize_interaction_mode(mode)
+    if normalized_mode == PLAN_MODE and tool_name not in PLAN_MODE_ALLOWED_TOOLS:
+        raise FunctionCallValidationError(
+            f'Tool `{tool_name}` is not available in Plan Mode. '
+            'Plan Mode is read-only; use inspection tools, communicate_with_user, or finish.'
+        )
     if tool_name == 'file_editor':
         raise FunctionCallValidationError(
             'The legacy file_editor tool has been removed. Use read, create, '
             'replace_string, edit_symbols, or multiedit.'
         )
-    if "__xml_syntax_error__" in arguments:
+    if '__xml_syntax_error__' in arguments:
         from backend.engine.common import _check_format_error_retry_guard
+
         serialized_args = json.dumps(arguments, sort_keys=True, ensure_ascii=False)
-        error_sig = f"xml_syntax_error:{arguments['__xml_syntax_error__']}"
-        allowed, reason = _check_format_error_retry_guard(tool_name, serialized_args, error_sig)
+        error_sig = f'xml_syntax_error:{arguments["__xml_syntax_error__"]}'
+        allowed, reason = _check_format_error_retry_guard(
+            tool_name, serialized_args, error_sig
+        )
         if not allowed:
-            logger.error('FORMAT_ERROR retry guard in _process_single_tool_call: %s', reason)
+            logger.error(
+                'FORMAT_ERROR retry guard in _process_single_tool_call: %s', reason
+            )
             raise FunctionCallValidationError(
                 f'[FORMAT_ERROR] Retry guard stopped repeated FORMAT_ERROR for '
                 f'tool `{tool_name}` after multiple attempts.\n'
@@ -1902,11 +2128,13 @@ def _process_single_tool_call(tool_call: Any, arguments: dict[str, Any]) -> Acti
                 f'[SYSTEM_ACTION] Report this as a system/tool error.'
             )
         raise FunctionCallValidationError(
-            f"Malformed XML tool call for {tool_name}: "
-            f"{arguments['__xml_syntax_error__']}"
+            f'Malformed XML tool call for {tool_name}: '
+            f'{arguments["__xml_syntax_error__"]}'
         )
     mcp_tool_names = cast(list[str] | None, getattr(tool_call, '_mcp_tool_names', None))
 
+    if tool_name == _finish_tool_name(normalized_mode):
+        return _handle_finish_tool(arguments, mode=normalized_mode)
     if tool_name in tool_dispatch:
         return tool_dispatch[tool_name](arguments)
     if mcp_tool_names and tool_name in mcp_tool_names:
