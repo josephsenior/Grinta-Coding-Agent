@@ -2916,7 +2916,7 @@ class TUIRenderer:
             if thoughts and self._live_thinking_dirty:
                 display = self._tui._get_display()
                 if type(display).__name__ != 'MagicMock':
-                    content = '  |  '.join(thoughts)
+                    content = '  '.join(thoughts)
                     display.append_widget(
                         Static(
                             f'[bold #5eead4]Thinking:[/]'
