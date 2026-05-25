@@ -951,9 +951,14 @@ class GrintaScreen(Screen):
 
     def compose(self) -> ComposeResult:
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
-        with Horizontal(id='main-layout'):
-            with Vertical(id='transcript-column'):
+        with Horizontal(id='app-layout'):
+            with Vertical(id='left-column'):
                 yield Transcript(id='main-display')
+                yield Static(id='command-suggestions', classes='-hidden')
+                with InputBar(id='input-bar'):
+                    yield Static(id='spinner', classes='-hidden')
+                    yield TextArea(id='input', show_line_numbers=False)
+                yield HUD(id='hud-bar')
             with InfoSidebar(id='sidebar-container'):
                 yield CollapsibleSection(
                     title="Tasks (0)",
@@ -978,11 +983,6 @@ class GrintaScreen(Screen):
                     action_label='[+] Add',
                     id='sidebar-skills',
                 )
-        yield Static(id='command-suggestions', classes='-hidden')
-        with InputBar(id='input-bar'):
-            yield Static(id='spinner', classes='-hidden')
-            yield TextArea(id='input', show_line_numbers=False)
-        yield HUD(id='hud-bar')
 
     def on_mount(self) -> None:
         _tui_logger.debug('on_mount: GrintaScreen mounted')

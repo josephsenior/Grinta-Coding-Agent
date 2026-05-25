@@ -7,12 +7,12 @@ Screen {
 
 
 /* ── Layout Containers ──────────────────────────────── */
-#main-layout {
+#app-layout {
     layout: horizontal;
-    height: 1fr;
+    height: 100%;
 }
 
-#transcript-column {
+#left-column {
     width: 75%;
     height: 100%;
     background: #060a14;
