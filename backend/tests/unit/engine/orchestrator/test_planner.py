@@ -525,6 +525,29 @@ class TestBuildLlmParams:
             )
             assert '<FIRST_TURN_ORIENTATION>' not in joined
 
+    def test_plan_mode_prompt_policy_is_read_only_and_structured(self):
+        p = _make_planner(config=_make_config(mode='plan'))
+        state = _make_state()
+        messages = [{'role': 'user', 'content': 'Plan a refactor'}]
+
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            params = p.build_llm_params(messages, state, [])
+
+        joined = '\n'.join(
+            m['content']
+            for m in params['messages']
+            if isinstance(m.get('content'), str)
+        )
+        assert 'PLAN MODE' in joined
+        assert 'read-only agent run' in joined
+        assert 'communicate_with_user is for questions' in joined
+        assert 'finish(status=' in joined
+        assert 'Do not modify files or project state' in joined
+        assert 'Direct plain text prose/responses are strictly forbidden' in joined
+        assert 'status, summary, plan, assumptions, next_step' in joined
+        assert 'open_questions_or_blockers' not in joined
+        assert 'You are running in AGENT MODE' not in joined
+
 
 class TestMinimalTurnStatusDefault:
     """Verify that nothing is injected unless a guard sets planning_directive."""

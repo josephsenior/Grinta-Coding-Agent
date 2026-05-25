@@ -3,28 +3,32 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 from rich.console import Console as RichConsole
 from rich.markdown import Markdown
-from textual.widgets import Label, Select, TextArea
+from textual.widgets import Label, Select, Static, TextArea
 
+from backend.cli._event_renderer.unified_renderer import ActivityRenderer
+from backend.cli.hud import HUDBar
+from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.tui.app import (
     HUD,
     GrintaHelpDialog,
     GrintaScreen,
     GrintaSessionsDialog,
     InputBar,
+    RendererDrainRequested,
+    WelcomeWidget,
     _strip_terminal_control_literals,
 )
-from backend.cli.hud import HUDBar
-from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.tui.main import GrintaTUIApp
-from backend.cli._event_renderer.unified_renderer import ActivityRenderer
 from backend.cli.tui.widgets.activity_card import (
     ActivityCard as TUIActivityCard,
+)
+from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
     DiffLine,
     TurnCompletion,
@@ -39,8 +43,8 @@ from backend.ledger.action.terminal import (
 )
 from backend.ledger.observation.agent import AgentStateChangedObservation
 from backend.ledger.observation.commands import CmdOutputObservation
-from backend.ledger.observation.terminal import TerminalObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
+from backend.ledger.observation.terminal import TerminalObservation
 
 
 @pytest.fixture
@@ -173,6 +177,105 @@ async def test_tui_typing(mock_config):
 
         await pilot.press(*'hello world')
         assert ta.text == 'hello world'
+
+
+@pytest.mark.asyncio
+async def test_tui_welcome_arrow_navigation_works_with_input_focus(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._show_welcome()
+        await pilot.pause(1.1)
+
+        welcome = s.query_one(WelcomeWidget)
+        assert welcome.select_current() == 'Explain this codebase'
+
+        await pilot.press('down')
+        await pilot.pause()
+        assert (
+            welcome.select_current()
+            == 'Analyze this repository and produce an implementation plan'
+        )
+
+        await pilot.press('up')
+        await pilot.pause()
+        assert welcome.select_current() == 'Explain this codebase'
+
+
+@pytest.mark.asyncio
+async def test_tui_welcome_click_submits_selected_suggestion(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        submit_mock = MagicMock()
+        s.action_submit_input = submit_mock  # type: ignore[method-assign]
+        s._show_welcome()
+        await pilot.pause(1.1)
+
+        welcome = s.query_one(WelcomeWidget)
+        items = list(welcome.query('.welcome-item'))
+        assert len(items) == 5
+
+        clicked = await pilot.click(items[1], offset=(1, 0))
+        await pilot.pause()
+
+        ta = s.query_one('#input', TextArea)
+        assert clicked
+        assert ta.text == 'Analyze this repository and produce an implementation plan'
+        assert s._welcome_visible is False
+        submit_mock.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_tui_sidebar_footer_shows_workspace_path(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        footer = s.query_one('#sidebar-footer', Static)
+        rendered = str(footer.renderable)
+        workspace_line = rendered.strip()
+        assert workspace_line
+        assert any(sep in workspace_line for sep in ('/', '\\', '~'))
+
+
+@pytest.mark.asyncio
+async def test_tui_welcome_persists_until_real_transcript_content(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._show_welcome()
+        await pilot.pause(0.2)
+        assert s._welcome_visible is True
+
+        s.on_renderer_drain_requested(RendererDrainRequested())
+        await pilot.pause()
+        assert s._welcome_visible is True
+
+        s._get_display().mount(Static('boot complete'))
+        await pilot.pause()
+        s.on_renderer_drain_requested(RendererDrainRequested())
+        await pilot.pause()
+        assert s._welcome_visible is False
 
 
 def test_tui_strips_leaked_mouse_reports_from_input_text() -> None:
@@ -347,7 +450,9 @@ async def test_tui_sessions_modal_resume_handoff(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_sessions_preview_shows_extended_metadata(mock_config, monkeypatch, tmp_path):
+async def test_tui_sessions_preview_shows_extended_metadata(
+    mock_config, monkeypatch, tmp_path
+):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -374,9 +479,17 @@ async def test_tui_sessions_preview_shows_extended_metadata(mock_config, monkeyp
 
     from backend.cli import session_manager
 
-    monkeypatch.setattr(session_manager, '_find_sessions_root', lambda _config=None: tmp_path)
-    monkeypatch.setattr(session_manager, '_list_session_entries', lambda root, sort_by='updated': fake_entries)
-    monkeypatch.setattr(session_manager, '_filter_sessions_fuzzy', lambda sessions, search: sessions)
+    monkeypatch.setattr(
+        session_manager, '_find_sessions_root', lambda _config=None: tmp_path
+    )
+    monkeypatch.setattr(
+        session_manager,
+        '_list_session_entries',
+        lambda root, sort_by='updated': fake_entries,
+    )
+    monkeypatch.setattr(
+        session_manager, '_filter_sessions_fuzzy', lambda sessions, search: sessions
+    )
 
     async with app.run_test(size=(120, 36)) as pilot:
         await pilot.pause()
@@ -407,7 +520,7 @@ async def test_tui_inline_command_hint_updates(mock_config):
         await pilot.pause()
 
         hint = s.query_one('#hud-line-2', Label)
-        assert 'Hint:' in str(hint.renderable)
+        assert 'Help' in str(hint.renderable)
 
 
 @pytest.mark.asyncio
@@ -466,7 +579,7 @@ async def test_tui_update_hud_state(mock_config):
         stats = s.query_one('#hud-line-1', Label)
         activity = s.query_one('#hud-line-2', Label)
         assert 'Running' in str(stats.renderable)
-        assert 'Keys:' in str(activity.renderable)
+        assert 'Help' in str(activity.renderable)
 
 
 @pytest.mark.asyncio
@@ -492,7 +605,86 @@ async def test_tui_hud_autonomy_selector_updates_controller(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(mock_config, monkeypatch):
+async def test_tui_mode_switch_supports_chat_plan_agent(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    agent_config = SimpleNamespace(mode='agent')
+    mock_config.get_agent_config.return_value = agent_config
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        mode_select = s.query_one('#hud-mode', Select)
+        for mode in ('chat', 'plan', 'agent'):
+            mode_select.value = mode
+            await pilot.pause()
+            assert agent_config.mode == mode
+
+
+@pytest.mark.asyncio
+async def test_tui_autonomy_visibility_follows_mode(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    agent_config = SimpleNamespace(mode='agent')
+    mock_config.get_agent_config.return_value = agent_config
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        autonomy = s.query_one('#hud-autonomy', Select)
+        autonomy_label = s.query_one('#hud-label-autonomy', Label)
+
+        s._apply_mode('chat')
+        await pilot.pause()
+        assert autonomy.display is False
+        assert autonomy_label.display is False
+
+        s._apply_mode('plan')
+        await pilot.pause()
+        assert autonomy.display is False
+        assert autonomy_label.display is False
+
+        s._apply_mode('agent')
+        await pilot.pause()
+        assert autonomy.display is True
+        assert autonomy_label.display is True
+
+
+@pytest.mark.asyncio
+async def test_tui_composer_placeholder_changes_by_mode(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    agent_config = SimpleNamespace(mode='agent')
+    mock_config.get_agent_config.return_value = agent_config
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        hint = s.query_one('#input-hint', Label)
+
+        s._apply_mode('chat')
+        await pilot.pause()
+        assert 'Ask about the codebase or architecture...' in str(hint.renderable)
+
+        s._apply_mode('plan')
+        await pilot.pause()
+        assert 'Describe what Grinta should inspect and plan...' in str(hint.renderable)
+
+        s._apply_mode('agent')
+        await pilot.pause()
+        assert 'Describe a task for Grinta to execute...' in str(hint.renderable)
+
+
+@pytest.mark.asyncio
+async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
+    mock_config, monkeypatch
+):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -501,6 +693,7 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(mock_config, mo
     )
 
     from backend.cli._event_renderer import sidebar as sidebar_module
+
     monkeypatch.setattr(sidebar_module, '_load_playbook_skills', lambda: ['skill-a'])
 
     async with app.run_test(size=(120, 36)) as pilot:
@@ -670,8 +863,12 @@ async def test_tui_terminal_session_reuses_single_card(mock_config):
 
         renderer._process_event(TerminalRunAction(command='npm run dev'))
         renderer._process_event(TerminalReadAction(session_id='term-1'))
-        renderer._process_event(TerminalObservation(session_id='term-1', content='ready'))
-        renderer._process_event(TerminalInputAction(session_id='term-1', input='status'))
+        renderer._process_event(
+            TerminalObservation(session_id='term-1', content='ready')
+        )
+        renderer._process_event(
+            TerminalInputAction(session_id='term-1', input='status')
+        )
         await pilot.pause()
 
         cards = s.query(TUIActivityCard).results()
@@ -813,7 +1010,9 @@ async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_con
         final_stream.source = EventSource.AGENT
         renderer._process_event(final_stream)
 
-        final_message = MessageAction(content='<function_calls></function_calls>\nFinal answer.')
+        final_message = MessageAction(
+            content='<function_calls></function_calls>\nFinal answer.'
+        )
         final_message.source = EventSource.AGENT
         renderer._process_event(final_message)
 
@@ -1132,11 +1331,12 @@ async def test_tui_drain_events_noop_when_empty(mock_config, monkeypatch):
     """Verify drain_events is safe to call with no pending events."""
     console = RichConsole()
     loop = asyncio.get_running_loop()
-    
+
     # Prevent _bootstrap from failing and exiting the app
     from backend.cli.tui.app import GrintaScreen
+
     monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
-    
+
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
 
     async with app.run_test(size=(120, 36)) as pilot:

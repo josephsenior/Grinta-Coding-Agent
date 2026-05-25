@@ -3,6 +3,12 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
+from backend.core.interaction_modes import (
+    PLAN_MODE,
+    PLAN_MODE_ALLOWED_TOOLS,
+    is_chat_mode,
+    normalize_interaction_mode,
+)
 from backend.core.logger import app_logger as logger
 from backend.inference.catalog_loader import (
     supports_function_calling,
@@ -107,8 +113,27 @@ class OrchestratorPlanner:
         self._add_editor_tools(tools)
         self._add_execute_mcp_tool_tool(tools)
 
-        mode = getattr(self._config, 'mode', 'agent')
-        if mode in ('chat', 'ask'):
+        tools = self._filter_tools_for_mode(tools, self._current_mode())
+
+        # Invalidate cached checked-tools when toolset is rebuilt
+        self._checked_tools_cache = None
+        return tools
+
+    def _current_mode(self) -> str:
+        return normalize_interaction_mode(getattr(self._config, 'mode', 'agent'))
+
+    @staticmethod
+    def _tool_name(tool: ChatCompletionToolParam) -> str:
+        return str((tool.get('function') or {}).get('name') or '')
+
+    def _filter_tools_for_mode(
+        self,
+        tools: list[ChatCompletionToolParam],
+        mode: str,
+    ) -> list[ChatCompletionToolParam]:
+        if mode == PLAN_MODE:
+            return self._filter_plan_mode_tools(tools)
+        if is_chat_mode(mode):
             forbidden_tool_names = {
                 'run',
                 'terminal_manager',
@@ -127,11 +152,32 @@ class OrchestratorPlanner:
                 'finish',
                 'task_tracker',
             }
-            tools = [t for t in tools if (t.get('function') or {}).get('name') not in forbidden_tool_names]
-
-        # Invalidate cached checked-tools when toolset is rebuilt
-        self._checked_tools_cache = None
+            return [
+                tool
+                for tool in tools
+                if self._tool_name(tool) not in forbidden_tool_names
+            ]
         return tools
+
+    def _filter_plan_mode_tools(
+        self,
+        tools: list[ChatCompletionToolParam],
+    ) -> list[ChatCompletionToolParam]:
+        filtered = [
+            tool
+            for tool in tools
+            if self._tool_name(tool) in PLAN_MODE_ALLOWED_TOOLS
+            and self._tool_name(tool) != 'finish'
+        ]
+        present = {self._tool_name(tool) for tool in filtered}
+        from backend.engine.tools.finish import create_finish_tool
+
+        filtered.append(create_finish_tool(PLAN_MODE))
+        if 'communicate_with_user' not in present:
+            from backend.engine.tools.meta_cognition import create_communicate_tool
+
+            filtered.append(create_communicate_tool())
+        return filtered
 
     def partition_tools(
         self, tools: list[ChatCompletionToolParam]
@@ -164,18 +210,18 @@ class OrchestratorPlanner:
             create_summarize_context_tool,
         )
         from backend.engine.tools.finish import create_finish_tool
+        from backend.engine.tools.memory_manager import (
+            create_memory_manager_tool,
+        )
         from backend.engine.tools.native_file_tools import (
             create_find_symbols_tool,
             create_read_tool,
-        )
-        from backend.engine.tools.memory_manager import (
-            create_memory_manager_tool,
         )
         from backend.engine.tools.note import create_note_tool, create_recall_tool
 
         tools.append(create_cmd_run_tool())
         if getattr(self._config, 'enable_finish', True):
-            tools.append(create_finish_tool())
+            tools.append(create_finish_tool(self._current_mode()))
         if getattr(self._config, 'enable_condensation_request', False):
             tools.append(create_summarize_context_tool())
         if getattr(self._config, 'enable_working_memory', True):
@@ -351,9 +397,10 @@ class OrchestratorPlanner:
         # tool selection heuristics see the original user/assistant content.
 
         messages = self._inject_turn_status(messages, state)
-        mode = getattr(self._config, 'mode', 'agent')
-        if mode not in ('chat', 'ask'):
-            messages = self._inject_agent_mode_instructions(messages, state)
+        mode = self._active_mode_for_state(state)
+        tools = self._filter_tools_for_mode(tools, mode)
+        if not is_chat_mode(mode):
+            messages = self._inject_mode_instructions(messages, state, mode)
         _maybe_log_prompt_metrics(messages)
         self._warn_if_degraded_emergency_prompt(messages)
 
@@ -515,24 +562,69 @@ class OrchestratorPlanner:
                 return content
         return None
 
+    def _active_mode_for_state(self, state: State | None) -> str:
+        extra = getattr(state, 'extra_data', {}) if state is not None else {}
+        if isinstance(extra, dict):
+            active_mode = extra.get('active_run_mode')
+            if active_mode:
+                return normalize_interaction_mode(active_mode)
+        return self._current_mode()
+
+    def _inject_mode_instructions(
+        self,
+        messages: list,
+        state: State,
+        mode: str,
+    ) -> list:
+        if mode == PLAN_MODE:
+            return self._inject_plan_mode_instructions(messages, state)
+        return self._inject_agent_mode_instructions(messages, state)
+
+    def _inject_plan_mode_instructions(self, messages: list, state: State) -> list:
+        instruction = (
+            '\n\n=== STRICT PLAN MODE PROTOCOL ===\n'
+            'You are running in PLAN MODE. Plan Mode is a read-only agent run. '
+            'Your job is to inspect the project and produce a concrete execution plan. '
+            'Direct plain text prose/responses are strictly forbidden while this run is active.\n\n'
+            'Your output must be exactly one of the following:\n'
+            '1. A read-only inspection tool call, such as read, find_symbols, search_code, '
+            'analyze_project_structure, lsp, or recall.\n'
+            '2. A communicate_with_user tool call when clarification is needed before '
+            'a useful plan can be produced.\n'
+            '3. A finish tool call with the final structured plan.\n\n'
+            'Do not modify files or project state. Do not use create, edit_symbols, '
+            'replace_string, multiedit, shell commands, formatters, installers, migrations, '
+            'git operations, MCP tools, browser tools, checkpoints, task_tracker, note, '
+            'or memory write tools.\n\n'
+            'communicate_with_user is for questions that allow the run to continue. '
+            "finish(status='blocked') is for ending the run when planning cannot continue.\n\n"
+            'Plan Mode finish requires exactly these universal fields: status, summary, '
+            "plan, assumptions, next_step. For status='completed', plan must be non-empty.\n"
+            '=================================\n'
+        )
+        return self._apply_control_message(messages, instruction)
+
     def _inject_agent_mode_instructions(self, messages: list, state: State) -> list:
         instruction = (
-            "\n\n=== STRICTOR AGENT MODE PROTOCOL ===\n"
-            "You are running in AGENT MODE. In this mode, direct plain text prose/responses "
-            "are strictly forbidden. Do not write explanations, thoughts, or comments in direct prose. "
-            "Your output must be exactly one of the following:\n"
-            "1. A real tool/function call (using the native function calling mechanism).\n"
-            "2. A communicate_with_user tool call (to ask questions, clarify, or report blockers).\n"
-            "3. A finish tool call (to end the task successfully).\n\n"
-            "File API mental model:\n"
-            "- `find_symbols` discovers symbol candidates without reading full bodies.\n"
-            "- `read` inspects file, range, or one/more symbol bodies.\n"
-            "- `create` creates new files or new symbols; file creation must not modify existing files.\n"
-            "- `edit_symbols` modifies or deletes existing code symbols.\n"
-            "- `replace_string` for exact text replacement, insertion by anchor, and deletion.\n"
-            "- `multiedit` for atomic multi-file refactoring.\n\n"
-            "Do not use shell commands to write source files. Use only the registered file tools.\n"
-            "=====================================\n"
+            '\n\n=== STRICTOR AGENT MODE PROTOCOL ===\n'
+            'You are running in AGENT MODE. In this mode, direct plain text prose/responses '
+            'are strictly forbidden. Do not write explanations, thoughts, or comments in direct prose. '
+            'Your output must be exactly one of the following:\n'
+            '1. A real tool/function call (using the native function calling mechanism).\n'
+            '2. A communicate_with_user tool call (to ask questions, clarify, or report blockers).\n'
+            '3. A finish tool call (to end the task successfully).\n\n'
+            'Agent Mode finish requires exactly these universal fields: status, summary, '
+            'actions_taken, verification, remaining_items, next_step. If no verification '
+            "was run, use verification.status='not_run' and explain honestly in details.\n\n"
+            'File API mental model:\n'
+            '- `find_symbols` discovers symbol candidates without reading full bodies.\n'
+            '- `read` inspects file, range, or one/more symbol bodies.\n'
+            '- `create` creates new files or new symbols; file creation must not modify existing files.\n'
+            '- `edit_symbols` modifies or deletes existing code symbols.\n'
+            '- `replace_string` for exact text replacement, insertion by anchor, and deletion.\n'
+            '- `multiedit` for atomic multi-file refactoring.\n\n'
+            'Do not use shell commands to write source files. Use only the registered file tools.\n'
+            '=====================================\n'
         )
-        
+
         return self._apply_control_message(messages, instruction)

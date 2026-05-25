@@ -107,8 +107,15 @@ def test_find_symbols_discovers_candidates_and_read_symbols_reports_ambiguity(
 
     assert candidates['type'] == 'symbols'
     assert len(candidates['candidates']) == 2
+    assert {item['qualified_name'] for item in candidates['candidates']} == {
+        'A.run',
+        'B.run',
+    }
+    assert {item['symbol_kind'] for item in candidates['candidates']} == {'method'}
+    assert all('content' not in item for item in candidates['candidates'])
     assert ambiguous['results'][0]['status'] == 'ambiguous'
     assert len(ambiguous['results'][0]['candidates']) == 2
+    assert 'content' not in ambiguous['results'][0]
 
 
 def test_read_symbols_resolves_each_requested_symbol_independently(
@@ -144,6 +151,35 @@ def test_read_symbols_resolves_each_requested_symbol_independently(
     assert payload['results'][0]['content'] == 'def authenticate_user():\n    return True\n'
     assert len(payload['results'][1]['candidates']) == 2
     assert "Symbol 'MissingService' was not found." == payload['results'][2]['message']
+
+
+def test_read_symbols_accepts_qualified_names_without_path(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+    (tmp_path / 'auth.py').write_text(
+        'class UserService:\n'
+        '    def login(self):\n'
+        '        return "user"\n\n'
+        'class AdminService:\n'
+        '    def login(self):\n'
+        '        return "admin"\n',
+        encoding='utf-8',
+    )
+
+    payload = _payload(
+        _handle_read_tool(
+            {
+                'type': 'symbols',
+                'symbols': [{'qualified_name': 'UserService.login'}],
+                'security_risk': 'LOW',
+            }
+        )
+    )
+    result = payload['results'][0]
+
+    assert result['status'] == 'resolved'
+    assert result['qualified_name'] == 'UserService.login'
+    assert result['symbol_kind'] == 'method'
+    assert 'return "user"' in result['content']
 
 
 def test_create_file_public_action_never_overwrites_and_rejects_serialized(
@@ -310,6 +346,46 @@ def test_edit_symbols_rejects_ambiguous_write_target(monkeypatch, tmp_path):
                 'security_risk': 'LOW',
             }
         )
+
+
+def test_edit_symbols_accepts_path_qualified_name_and_kind(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+    (tmp_path / 'auth.py').write_text(
+        'class UserService:\n'
+        '    def login(self):\n'
+        '        return "user"\n\n'
+        'class AdminService:\n'
+        '    def login(self):\n'
+        '        return "admin"\n',
+        encoding='utf-8',
+    )
+
+    action = _handle_edit_symbols_tool(
+        {
+            'edits': [
+                {
+                    'path': 'auth.py',
+                    'qualified_name': 'AdminService.login',
+                    'symbol_kind': 'method',
+                    'new_content': '    def login(self):\n        return "root"\n',
+                }
+            ],
+            'security_risk': 'LOW',
+        }
+    )
+
+    assert action.command == 'multi_edit'
+    assert action.structured_payload == {
+        'file_edits': [
+            {
+                'path': 'auth.py',
+                'operation': 'symbol_body_replacement',
+                'start_line': 6,
+                'end_line': 7,
+                'content': '    def login(self):\n        return "root"\n',
+            }
+        ]
+    }
 
 
 def test_edit_symbols_rejects_serialized_payload(monkeypatch, tmp_path):

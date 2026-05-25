@@ -19,6 +19,7 @@ def _make_config(**kwargs):
     cfg.enable_working_memory = True
     cfg.enable_browsing = True
     cfg.enable_debugger = True
+    cfg.mode = 'agent'
     cfg.mcp.servers = []
 
     for k, v in kwargs.items():
@@ -288,3 +289,73 @@ class TestFeatureFlagToolPresence:
                 enable_debugger=True,
             )
         self._assert_dispatch_covered(names)
+
+
+class TestModeToolVisibility:
+    def test_plan_mode_exposes_only_read_only_plus_terminal_lifecycle_tools(self):
+        from unittest.mock import patch
+
+        with patch(
+            'backend.utils.runtime_detect.has_any_lsp_server', return_value=True
+        ):
+            names = _build_toolset(
+                mode='plan',
+                enable_finish=False,
+                enable_meta_cognition=False,
+                enable_terminal=True,
+                enable_editor=True,
+                enable_task_tracker_tool=True,
+                enable_mcp=True,
+                enable_browsing=True,
+                enable_debugger=True,
+                enable_checkpoints=True,
+                enable_working_memory=True,
+            )
+
+        assert {
+            'read',
+            'find_symbols',
+            'search_code',
+            'analyze_project_structure',
+            'lsp',
+            'recall',
+            'communicate_with_user',
+            'finish',
+        } <= names
+        assert {
+            'create',
+            'edit_symbols',
+            'replace_string',
+            'multiedit',
+            'run',
+            'terminal_manager',
+            'debugger',
+            'call_mcp_tool',
+            'browser_tool',
+            'checkpoint',
+            'task_tracker',
+            'note',
+            'memory_manager',
+            'delegate_task',
+            'blackboard',
+        }.isdisjoint(names)
+
+    def test_agent_mode_still_exposes_execution_tools(self):
+        names = _build_toolset(
+            mode='agent',
+            enable_terminal=True,
+            enable_editor=True,
+            enable_meta_cognition=True,
+            enable_finish=True,
+        )
+        assert {'create', 'edit_symbols', 'replace_string', 'multiedit'} <= names
+        assert {'terminal_manager', 'communicate_with_user', 'finish'} <= names
+
+    def test_chat_mode_hides_finish_and_communicate(self):
+        names = _build_toolset(
+            mode='chat',
+            enable_finish=True,
+            enable_meta_cognition=True,
+        )
+        assert 'finish' not in names
+        assert 'communicate_with_user' not in names

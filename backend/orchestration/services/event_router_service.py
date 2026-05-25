@@ -10,6 +10,10 @@ import asyncio
 import os as _os
 from typing import TYPE_CHECKING
 
+from backend.core.interaction_modes import (
+    CHAT_MODE_NAMES,
+    normalize_interaction_mode,
+)
 from backend.core.schemas import AgentState
 from backend.core.task_status import ACTIVE_TASK_STATUSES
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber, RecallType
@@ -478,6 +482,7 @@ class EventRouterService:
         if not await self._ctrl.task_validation_service.handle_finish(action):
             return
         self._ctrl.state.set_outputs(action.outputs, source='EventRouterService.finish')
+        self._ctrl.state.extra_data.pop('active_run_mode', None)
         await self._ctrl.set_agent_state_to(AgentState.FINISHED)
         await self._ctrl.log_task_audit(status='success')
         await self._run_critics()
@@ -547,9 +552,7 @@ class EventRouterService:
         )
         return True
 
-    async def _intercept_protocol_message_handoff(
-        self, action: MessageAction
-    ) -> bool:
+    async def _intercept_protocol_message_handoff(self, action: MessageAction) -> bool:
         guidance = (
             'Protocol error: assistant message returned during active task execution.'
         )
@@ -601,6 +604,17 @@ class EventRouterService:
         )
         recall_type = self._recall_type_for_user_message(action)
         recall_action = RecallAction(query=action.content, recall_type=recall_type)
+        agent = getattr(self._ctrl, 'agent', None)
+        config = getattr(agent, 'config', None)
+        mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+        if mode in CHAT_MODE_NAMES:
+            self._ctrl.state.extra_data.pop('active_run_mode', None)
+        else:
+            self._ctrl.state.set_extra(
+                'active_run_mode',
+                mode,
+                source='EventRouterService.user_message',
+            )
 
         # Assign stream id before pending so pending always references a stable id.
         self._ctrl.event_stream.add_event(recall_action, EventSource.USER)
@@ -612,9 +626,11 @@ class EventRouterService:
         import asyncio
         import uuid
 
-        from backend.core.constants import DELEGATE_WORKER_TIMEOUT_SECONDS, MAX_DELEGATION_DEPTH
         from backend.core.config.agent_config import AgentConfig
-        from backend.core.errors import FunctionCallValidationError
+        from backend.core.constants import (
+            DELEGATE_WORKER_TIMEOUT_SECONDS,
+            MAX_DELEGATION_DEPTH,
+        )
         from backend.orchestration.agent import Agent
         from backend.orchestration.blackboard import Blackboard
         from backend.orchestration.conversation_stats import ConversationStats
@@ -905,7 +921,9 @@ class EventRouterService:
                         )
                         if getattr(event, 'id', None) in mapping:
                             return True
-                        pipeline = getattr(worker_controller, 'operation_pipeline', None)
+                        pipeline = getattr(
+                            worker_controller, 'operation_pipeline', None
+                        )
                         if pipeline is None:
                             pipeline = getattr(worker_controller, 'tool_pipeline', None)
                         if pipeline is None:
@@ -913,7 +931,9 @@ class EventRouterService:
                         ctx = pipeline.create_context(event, worker_controller.state)
                         ctx.action_id = event.id
                         if hasattr(worker_controller, '_action_contexts_by_event_id'):
-                            worker_controller._action_contexts_by_event_id[event.id] = ctx
+                            worker_controller._action_contexts_by_event_id[event.id] = (
+                                ctx
+                            )
                         await pipeline.run_execute(ctx)
                         if getattr(ctx, 'blocked', False):
                             worker_controller.handle_blocked_invocation(event, ctx)
@@ -951,14 +971,18 @@ class EventRouterService:
                             )
                             should_emit = True
                             if callable(process_observation):
-                                should_emit = bool(process_observation(observation, event))
+                                should_emit = bool(
+                                    process_observation(observation, event)
+                                )
                             else:
                                 attach_observation_cause(
                                     observation,
                                     event,
                                     context='worker_runtime_bridge',
                                 )
-                                observation.tool_call_metadata = event.tool_call_metadata
+                                observation.tool_call_metadata = (
+                                    event.tool_call_metadata
+                                )
                             if not should_emit:
                                 return
                             source = event.source or EventSource.AGENT
@@ -1285,7 +1309,12 @@ class EventRouterService:
             else AutonomyLevel.BALANCED.value
         )
 
-        if autonomy_level != AutonomyLevel.FULL.value:
+        agent = getattr(self._ctrl, 'agent', None)
+        config = getattr(agent, 'config', None)
+        mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+        should_pause = mode == 'plan' or autonomy_level != AutonomyLevel.FULL.value
+
+        if should_pause:
             self._ctrl.log(
                 'info',
                 'Meta-cognition action requires user input, pausing agent.',

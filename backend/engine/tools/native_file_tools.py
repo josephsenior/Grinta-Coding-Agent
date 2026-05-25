@@ -48,11 +48,15 @@ def create_read_tool() -> ChatCompletionToolParam:
             },
             'symbol_id': {
                 'type': 'string',
-                'description': 'Optional stable symbol id returned by find_symbols or read(type="symbols").',
+                'description': 'Optional internal precision target returned by symbol discovery.',
+            },
+            'qualified_name': {
+                'type': 'string',
+                'description': 'Human-readable symbol target such as AuthService.login.',
             },
             'symbol_name': {
                 'type': 'string',
-                'description': 'Single symbol name for type=symbols when symbols[] is omitted.',
+                'description': 'Single unqualified symbol name for type=symbols when symbols[] is omitted.',
             },
             'query': {
                 'type': 'string',
@@ -62,12 +66,13 @@ def create_read_tool() -> ChatCompletionToolParam:
                 'type': 'array',
                 'description': (
                     'One or more symbol targets for type=symbols. Each item may be an object '
-                    'with symbol_id or symbol_name plus optional path/kind/parent/occurrence.'
+                    'with qualified_name or symbol_name plus optional path/kind/parent/occurrence.'
                 ),
                 'items': {
                     'type': 'object',
                     'properties': {
                         'symbol_id': {'type': 'string'},
+                        'qualified_name': {'type': 'string'},
                         'symbol_name': {'type': 'string'},
                         'path': {'type': 'string'},
                         'symbol_kind': {'type': 'string'},
@@ -103,7 +108,7 @@ def create_find_symbols_tool() -> ChatCompletionToolParam:
         name=FIND_SYMBOLS_TOOL_NAME,
         description=(
             'Discover matching code symbols without reading full symbol bodies or modifying files. '
-            'Use this when you know a symbol name but need candidate paths, parents, kinds, or line ranges.'
+            'Use this when you know a symbol name but need candidate paths, qualified names, kinds, or line ranges.'
         ),
         properties={
             'query': {
@@ -205,7 +210,8 @@ def create_edit_symbols_tool() -> ChatCompletionToolParam:
         name=EDIT_SYMBOLS_TOOL_NAME,
         description=(
             'AST-aware edit/delete for one or more existing symbols. Writes must be anchored '
-            'by symbol_id, path+symbol, or a globally unique symbol name; ambiguous targets reject with candidates.'
+            'by path+qualified_name+symbol_kind when possible, or another uniquely resolving target. '
+            'Ambiguous targets reject with candidates.'
         ),
         properties={
             'path': get_path_param('Optional project-relative source file path. Strongly preferred for writes.'),
@@ -217,6 +223,7 @@ def create_edit_symbols_tool() -> ChatCompletionToolParam:
                     'properties': {
                         'symbol_id': {'type': 'string'},
                         'path': {'type': 'string'},
+                        'qualified_name': {'type': 'string'},
                         'symbol_name': {'type': 'string'},
                         'symbol_kind': {'type': 'string'},
                         'parent_symbol': {'type': 'string'},
@@ -259,6 +266,7 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
                         'old_string': {'type': 'string'},
                         'new_string': {'type': 'string'},
                         'replace_all': {'type': 'boolean'},
+                        'qualified_name': {'type': 'string'},
                         'symbol_name': {'type': 'string'},
                         'symbol_kind': {'type': 'string'},
                         'parent_symbol': {'type': 'string'},

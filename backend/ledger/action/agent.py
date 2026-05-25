@@ -48,6 +48,49 @@ class PlaybookFinishAction(Action):
         if summary:
             sections.append(summary)
 
+        plan = self.outputs.get('plan')
+        if isinstance(plan, list):
+            items = [str(item).strip() for item in plan if str(item).strip()]
+            if items:
+                sections.append(
+                    'Plan:\n'
+                    + '\n'.join(f'{i}. {item}' for i, item in enumerate(items, 1))
+                )
+
+        assumptions = self.outputs.get('assumptions')
+        if isinstance(assumptions, list):
+            items = [str(item).strip() for item in assumptions if str(item).strip()]
+            if items:
+                sections.append(
+                    'Assumptions:\n' + '\n'.join(f'- {item}' for item in items)
+                )
+
+        actions_taken = self.outputs.get('actions_taken')
+        if isinstance(actions_taken, list):
+            items = [str(item).strip() for item in actions_taken if str(item).strip()]
+            if items:
+                sections.append(
+                    'Actions taken:\n' + '\n'.join(f'- {item}' for item in items)
+                )
+
+        verification = self.outputs.get('verification')
+        if isinstance(verification, dict):
+            status = str(verification.get('status') or '').strip()
+            details = str(verification.get('details') or '').strip()
+            if status or details:
+                body = (
+                    f'{status}: {details}' if status and details else status or details
+                )
+                sections.append(f'Verification:\n- {body}')
+
+        remaining_items = self.outputs.get('remaining_items')
+        if isinstance(remaining_items, list):
+            items = [str(item).strip() for item in remaining_items if str(item).strip()]
+            if items:
+                sections.append(
+                    'Remaining items:\n' + '\n'.join(f'- {item}' for item in items)
+                )
+
         completed = self.outputs.get('completed')
         if isinstance(completed, list):
             items = [str(item).strip() for item in completed if str(item).strip()]
@@ -67,6 +110,10 @@ class PlaybookFinishAction(Action):
                 sections.append(
                     'Next steps:\n' + '\n'.join(f'- {item}' for item in items)
                 )
+
+        next_step = str(self.outputs.get('next_step') or '').strip()
+        if next_step:
+            sections.append(f'Next step:\n- {next_step}')
 
         return sections
 

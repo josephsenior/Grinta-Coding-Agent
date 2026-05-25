@@ -18,15 +18,20 @@ Screen {
     background: #060a14;
 }
 
-#sidebar-container {
+#sidebar {
     width: 25%;
     height: 100%;
+    layout: vertical;
     background: #080c18;
     border-left: solid #1e293b;
 }
 
-#sidebar-container.-hidden {
+#sidebar.-hidden {
     display: none;
+}
+
+#sidebar-container {
+    height: 1fr;
 }
 
 /* ── Transcript ────────────────────────────────────── */
@@ -44,7 +49,7 @@ Transcript {
 
 #main-display {
     width: 100%;
-    height: 100%;
+    height: 1fr;
     background: #060a14;
     color: #e9e9e9;
     scrollbar-color: #33405d #161e31;
@@ -154,15 +159,23 @@ SidebarRow {
     height: auto;
 }
 
+#sidebar-footer {
+    height: 3;
+    padding: 1 1 0 1;
+    border-top: solid #15233c;
+    color: #8f9fc1;
+    text-style: bold;
+}
+
 SidebarRow:hover {
     background: #101c36;
     color: #e9e9e9;
 }
 
 SidebarRow:focus {
-    background: #15274d;
-    color: #ffffff;
-    border-left: solid #91abec;
+    background: #0e1a30;
+    color: #e9eefc;
+    border-left: solid #5eead4;
 }
 
 /* ── Command Suggestions ────────────────────────────── */
@@ -201,37 +214,84 @@ SidebarRow:focus {
     background: #1a3055;
 }
 
+/* ── Welcome Widget ─────────────────────────────────── */
+WelcomeWidget {
+    width: 100%;
+    height: auto;
+    padding: 3 4 2 4;
+    margin: 2 1 0 0;
+    background: #07101d;
+    border-left: heavy #32527a;
+}
+
+#welcome-header {
+    height: 1;
+    color: #c8d4e8;
+    text-style: bold;
+}
+
+#welcome-subheader {
+    height: 1;
+    color: #6f83aa;
+    margin: 0 0 2 0;
+}
+
+.welcome-item {
+    height: 1;
+    padding: 0 0 0 2;
+    margin: 0 0 1 0;
+}
+
+.welcome-item:hover {
+    background: #0f1c31;
+}
+
 /* ── InputBar ──────────────────────────────────────── */
 InputBar {
-    height: 4;
+    height: 6;
     background: #08101d;
-    border-top: solid #2a3a5a;
+    border: solid #1f6d64;
+    padding: 0;
+    layout: vertical;
+}
+
+InputBar.-blurred {
+    border: solid #15233c;
+}
+
+#input-hint {
+    height: 1;
     padding: 0 2;
+    color: #6a7a9a;
+    text-style: italic;
+}
+
+#input-row {
     layout: horizontal;
+    height: 1fr;
 }
 
 InputBar TextArea {
     background: #0b1628;
     color: #c8d4e8;
-    border: round #15233c;
-    padding: 0 1;
-    width: 100%;
-    height: 3;
+    border: none;
+    padding: 0 2;
+    width: 1fr;
+    height: 1fr;
     overflow-y: auto;
-    transition: background 150ms, border 150ms;
+    transition: background 150ms;
 }
 
 InputBar TextArea:focus {
     background: #12223a;
-    border: round #43548b;
 }
 
 #spinner {
     width: 3;
-    height: 3;
+    height: 1fr;
     content-align: center middle;
     color: #91abec;
-    margin-right: 1;
+    margin-right: 0;
 }
 
 #spinner.-hidden {
@@ -286,22 +346,20 @@ HUD,
 }
 
 #hud-autonomy SelectCurrent {
-    background: #0a1525;
-    color: #8f9fc1;
+    background: #3a5a8c;
+    color: #060a14;
     border: none;
-    border-left: tall #3a5a8c;
-    padding: 0 1;
+    padding: 0 2;
     height: 1;
     min-height: 1;
 }
 
 #hud-autonomy SelectCurrent:focus {
-    background: #122542;
-    border-left: tall #5a8acc;
+    background: #5a8acc;
 }
 
 #hud-autonomy SelectCurrent #label {
-    color: #6a8ab8;
+    color: #060a14;
     padding: 0;
     margin: 0;
     height: 1;
@@ -312,6 +370,7 @@ HUD,
     height: 1;
     padding: 0;
     margin: 0;
+    color: #060a14;
 }
 
 #hud-autonomy SelectOverlay {
@@ -346,22 +405,20 @@ HUD,
 }
 
 #hud-mode SelectCurrent {
-    background: #0a1525;
-    color: #8f9fc1;
+    background: #1f6d64;
+    color: #060a14;
     border: none;
-    border-left: tall #5a4a3a;
-    padding: 0 1;
+    padding: 0 2;
     height: 1;
     min-height: 1;
 }
 
 #hud-mode SelectCurrent:focus {
-    background: #122542;
-    border-left: tall #9a7a4a;
+    background: #2a9d8f;
 }
 
 #hud-mode SelectCurrent #label {
-    color: #b88a5a;
+    color: #060a14;
     padding: 0;
     margin: 0;
     height: 1;
@@ -372,6 +429,7 @@ HUD,
     height: 1;
     padding: 0;
     margin: 0;
+    color: #060a14;
 }
 
 #hud-mode SelectOverlay {

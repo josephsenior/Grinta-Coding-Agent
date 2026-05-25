@@ -159,12 +159,89 @@ class TestHandleCmdRunTool:
 class TestHandleFinishTool:
     """Tests for _handle_finish_tool."""
 
-    def test_basic_finish(self):
-        action = _handle_finish_tool({'message': 'Task complete'})
+    def test_agent_finish_accepts_execution_payload(self):
+        action = _handle_finish_tool(
+            {
+                'status': 'completed',
+                'summary': 'Task complete',
+                'actions_taken': ['Changed the implementation'],
+                'verification': {'status': 'passed', 'details': 'pytest passed'},
+                'remaining_items': [],
+                'next_step': 'Ship it',
+            },
+            mode='agent',
+        )
         assert isinstance(action, PlaybookFinishAction)
         assert action.final_thought == 'Task complete'
+        assert action.outputs['actions_taken'] == ['Changed the implementation']
 
-    def test_missing_message_raises(self):
-        with pytest.raises(FunctionCallValidationError, match='message'):
-            _handle_finish_tool({})
+    def test_plan_finish_accepts_plan_payload(self):
+        action = _handle_finish_tool(
+            {
+                'status': 'completed',
+                'summary': 'Plan ready',
+                'plan': ['Inspect files', 'Make the change', 'Run tests'],
+                'assumptions': ['Existing behavior stays stable'],
+                'next_step': 'Switch to Agent Mode',
+            },
+            mode='plan',
+        )
+        assert isinstance(action, PlaybookFinishAction)
+        assert action.final_thought == 'Plan ready'
+        assert action.outputs['plan'] == [
+            'Inspect files',
+            'Make the change',
+            'Run tests',
+        ]
 
+    def test_plan_finish_rejects_missing_required_fields(self):
+        with pytest.raises(FunctionCallValidationError, match='summary'):
+            _handle_finish_tool(
+                {
+                    'status': 'completed',
+                    'plan': ['Do it'],
+                    'assumptions': [],
+                    'next_step': 'Switch to Agent Mode',
+                },
+                mode='plan',
+            )
+
+    def test_plan_finish_blocked_allows_empty_plan(self):
+        action = _handle_finish_tool(
+            {
+                'status': 'blocked',
+                'summary': 'Target subsystem is unclear',
+                'plan': [],
+                'assumptions': [],
+                'next_step': 'Clarify the target subsystem',
+            },
+            mode='plan',
+        )
+        assert action.outputs['status'] == 'blocked'
+        assert action.outputs['plan'] == []
+
+    def test_plan_finish_completed_requires_non_empty_plan(self):
+        with pytest.raises(FunctionCallValidationError, match='non-empty plan'):
+            _handle_finish_tool(
+                {
+                    'status': 'completed',
+                    'summary': 'Plan ready',
+                    'plan': [],
+                    'assumptions': [],
+                    'next_step': 'Switch to Agent Mode',
+                },
+                mode='plan',
+            )
+
+    def test_agent_finish_rejects_plan_payload(self):
+        with pytest.raises(FunctionCallValidationError, match='actions_taken'):
+            _handle_finish_tool(
+                {
+                    'status': 'completed',
+                    'summary': 'Plan ready',
+                    'plan': ['Do it'],
+                    'assumptions': [],
+                    'next_step': 'Switch to Agent Mode',
+                },
+                mode='agent',
+            )
