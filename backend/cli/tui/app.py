@@ -40,6 +40,8 @@ from textual.widgets import (
     DataTable,
     Input,
     Label,
+    ListItem,
+    ListView,
     RichLog,
     Select,
     Static,
@@ -867,6 +869,7 @@ class GrintaScreen(Screen):
         self._bootstrapping: asyncio.Event | None = None
         self._bootstrap_task: asyncio.Task[Any] | None = None
         self._is_unmounted = False
+        self._suggestion_matches: list[str] = []
         self._command_hint = ''
         self._phase_label = 'Ready'
         self._phase_started_at = time.monotonic()
@@ -954,7 +957,7 @@ class GrintaScreen(Screen):
         with Horizontal(id='app-layout'):
             with Vertical(id='left-column'):
                 yield Transcript(id='main-display')
-                yield Static(id='command-suggestions', classes='-hidden')
+                yield ListView(id='suggestions-list', classes='-hidden')
                 with InputBar(id='input-bar'):
                     yield Static(id='spinner', classes='-hidden')
                     yield TextArea(id='input', show_line_numbers=False)
@@ -1075,17 +1078,12 @@ class GrintaScreen(Screen):
         line1_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
         line1 = '  '.join(line1_parts)
 
-        activity_or_hint = (
-            f'[{NAVY_TEXT_SECONDARY}]Hint:[/] '
-            f'[{NAVY_TEXT_PRIMARY}]{self._command_hint}[/]'
-            if self._command_hint
-            else (
-                f'[{NAVY_TEXT_SECONDARY}]Now:[/] '
-                f'[{NAVY_TEXT_PRIMARY}]{self._last_tool_status}[/]'
-            )
+        activity = (
+            f'[{NAVY_TEXT_SECONDARY}]Now:[/] '
+            f'[{NAVY_TEXT_PRIMARY}]{self._last_tool_status}[/]'
         )
         help_hint = f'  [#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
-        line2 = f'{activity_or_hint}{help_hint}'
+        line2 = f'{activity}{help_hint}'
 
         hud_bar = self.query_one('#hud-bar', HUD)
         hud_bar.query_one('#hud-line-1', Label).update(line1)
@@ -1109,6 +1107,18 @@ class GrintaScreen(Screen):
             hud_bar.query_one('#hud-label-autonomy').display = is_agent
         except Exception:
             pass
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        lst = self.query_one('#suggestions-list', ListView)
+        if lst.has_class('-hidden') or not self._suggestion_matches:
+            return
+        selected = lst.index if lst.index is not None else 0
+        ta = self.query_one('#input', TextArea)
+        if 0 <= selected < len(self._suggestion_matches):
+            ta.text = self._suggestion_matches[selected] + ' '
+        lst.add_class('-hidden')
+        self._suggestion_matches = []
+        ta.focus()
 
     def _refresh_runtime_feedback(self) -> None:
         if not self._is_unmounted:
@@ -1678,31 +1688,39 @@ class GrintaScreen(Screen):
             start = cards.index(focused) - 1
         cards[start].focus()
 
-    def _update_command_suggestions(self, text: str) -> None:
+    def _update_suggestions_list(self, text: str) -> None:
         try:
-            suggestions = self.query_one('#command-suggestions', Static)
+            lst = self.query_one('#suggestions-list', ListView)
         except Exception:
             return
         stripped = _strip_ansi(text).strip()
         if not stripped.startswith('/'):
-            suggestions.add_class('-hidden')
+            lst.add_class('-hidden')
+            self._suggestion_matches = []
             return
         try:
             parts = shlex.split(stripped)
         except ValueError:
-            suggestions.add_class('-hidden')
+            lst.add_class('-hidden')
+            self._suggestion_matches = []
             return
         if not parts:
-            suggestions.add_class('-hidden')
+            lst.add_class('-hidden')
+            self._suggestion_matches = []
             return
         cmd = parts[0].lower()
         matches = [name for name in self._SLASH_HINTS if name.startswith(cmd)]
         if not matches:
-            suggestions.add_class('-hidden')
+            lst.add_class('-hidden')
+            self._suggestion_matches = []
             return
-        markup = '  '.join(f'[#eacb8a]{m}[/]' for m in matches)
-        suggestions.update(f'Commands: {markup}  [#54597b]Tab/^Space to complete[/]')
-        suggestions.remove_class('-hidden')
+        self._suggestion_matches = matches
+        lst.clear()
+        for name in matches:
+            hint = self._SLASH_HINTS[name]
+            lst.append(ListItem(Label(f'[#eacb8a]{name}[/]  [#54597b]{hint}[/]')))
+        lst.index = 0
+        lst.remove_class('-hidden')
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         if event.text_area.id == 'input':
@@ -1710,8 +1728,7 @@ class GrintaScreen(Screen):
             if text != event.text_area.text:
                 event.text_area.text = text
                 return
-            self._update_command_hint(text)
-            self._update_command_suggestions(text)
+            self._update_suggestions_list(text)
 
     def on_select_changed(self, event: Select.Changed) -> None:
         event.stop()
@@ -1895,6 +1912,17 @@ class GrintaScreen(Screen):
         raw = _strip_ansi(ta.text)
         if not raw.strip().startswith('/'):
             return
+
+        lst = self.query_one('#suggestions-list', ListView)
+        if not lst.has_class('-hidden') and self._suggestion_matches:
+            selected = lst.index if lst.index is not None else 0
+            if 0 <= selected < len(self._suggestion_matches):
+                ta.text = self._suggestion_matches[selected] + ' '
+            lst.add_class('-hidden')
+            self._suggestion_matches = []
+            ta.focus()
+            return
+
         try:
             parts = shlex.split(raw.strip())
         except ValueError:
@@ -1910,8 +1938,6 @@ class GrintaScreen(Screen):
                 return
             if len(matches) == 1:
                 ta.text = matches[0] + ' '
-            else:
-                self.add_system_message('Suggestions: ' + ', '.join(matches))
             return
 
         if cmd == '/sessions' and parts[-1].startswith('--'):
@@ -1920,16 +1946,12 @@ class GrintaScreen(Screen):
             if len(matches) == 1:
                 prefix = raw.rstrip()
                 ta.text = prefix[: -len(parts[-1])] + matches[0] + ' '
-            elif matches:
-                self.add_system_message('Sessions flags: ' + ', '.join(matches))
         elif cmd == '/help' and parts[-1].startswith('--'):
             flags = ['--all', '--search']
             matches = [flag for flag in flags if flag.startswith(parts[-1])]
             if len(matches) == 1:
                 prefix = raw.rstrip()
                 ta.text = prefix[: -len(parts[-1])] + matches[0] + ' '
-            elif matches:
-                self.add_system_message('Help flags: ' + ', '.join(matches))
 
     def action_submit_input(self) -> None:
         _tui_logger.debug(
@@ -1981,7 +2003,9 @@ class GrintaScreen(Screen):
 
             ta = self.query_one('#input', TextArea)
             ta.clear()
-            self._update_command_hint('')
+            lst = self.query_one('#suggestions-list', ListView)
+            lst.add_class('-hidden')
+            self._suggestion_matches = []
             ta.focus()
             self._scroll_to_bottom()
 

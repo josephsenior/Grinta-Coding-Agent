@@ -166,18 +166,39 @@ SidebarRow:focus {
 }
 
 /* ── Command Suggestions ────────────────────────────── */
-#command-suggestions {
+#suggestions-list {
     width: 100%;
-    height: 2;
-    background: #0a1525;
-    color: #8f9fc1;
-    padding: 0 2;
-    text-style: bold;
+    max-height: 6;
+    height: auto;
+    background: #0d1a30;
     border-top: solid #15233c;
+    border-bottom: solid #15233c;
+    padding: 0;
+    margin: 0;
 }
 
-#command-suggestions.-hidden {
+#suggestions-list.-hidden {
     display: none;
+}
+
+#suggestions-list > ListItem {
+    height: 1;
+    padding: 0 2;
+    margin: 0;
+    background: #0a1525;
+    color: #8f9fc1;
+}
+
+#suggestions-list > ListItem:hover {
+    background: #1a3055;
+}
+
+#suggestions-list > ListItem:focus {
+    background: #1a3055;
+}
+
+#suggestions-list > ListItem.-highlighted {
+    background: #1a3055;
 }
 
 /* ── InputBar ──────────────────────────────────────── */
