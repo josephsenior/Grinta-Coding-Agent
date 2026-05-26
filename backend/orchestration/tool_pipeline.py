@@ -137,6 +137,7 @@ def __getattr__(name: str) -> Any:
         'ContextWindowMiddleware',
         'CostQuotaMiddleware',
         'LoggingMiddleware',
+        'PostEditDiagnosticsMiddleware',
         'ProgressPolicyMiddleware',
         'SafetyValidatorMiddleware',
         'TelemetryMiddleware',

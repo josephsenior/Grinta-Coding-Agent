@@ -424,8 +424,12 @@ class TestProcessSingleToolCall:
 
 
 class TestMultiEditCommand:
-    def test_multi_edit_writes_workspace_scoped_paths(self, tmp_path):
+    def test_multi_edit_edits_workspace_scoped_paths(self, tmp_path):
         from backend.engine.function_calling import _handle_multi_edit_command
+
+        (tmp_path / 'src').mkdir()
+        (tmp_path / 'src' / 'a.py').write_text('A = 0\n', encoding='utf-8')
+        (tmp_path / 'src' / 'b.py').write_text('B = 0\n', encoding='utf-8')
 
         action = _handle_multi_edit_command(
             '',
@@ -433,13 +437,15 @@ class TestMultiEditCommand:
                 'file_edits': [
                     {
                         'path': 'src/a.py',
-                        'operation': 'create_file',
-                        'content': 'A = 1\n',
+                        'operation': 'replace_string',
+                        'old_string': 'A = 0\n',
+                        'new_string': 'A = 1\n',
                     },
                     {
-                        'path': '/workspace/src/b.py',
-                        'operation': 'create_file',
-                        'content': 'B = 2\n',
+                        'path': 'src/b.py',
+                        'operation': 'replace_string',
+                        'old_string': 'B = 0\n',
+                        'new_string': 'B = 2\n',
                     },
                 ]
             },
@@ -459,8 +465,9 @@ class TestMultiEditCommand:
                     'file_edits': [
                         {
                             'path': '../outside.py',
-                            'operation': 'create_file',
-                            'content': 'print(1)\n',
+                            'operation': 'replace_string',
+                            'old_string': 'old',
+                            'new_string': 'new',
                         }
                     ]
                 },
@@ -471,17 +478,22 @@ class TestMultiEditCommand:
     def test_multi_edit_allows_sequential_duplicate_path_operations(self, tmp_path):
         from backend.engine.function_calling import _handle_multi_edit_command
 
+        py = tmp_path / 'src' / 'a.py'
+        py.parent.mkdir(parents=True, exist_ok=True)
+        py.write_text('A = 0\nB = 2\n', encoding='utf-8')
+
         action = _handle_multi_edit_command(
             '',
             {
                 'file_edits': [
                     {
                         'path': 'src/a.py',
-                        'operation': 'create_file',
-                        'content': 'A = 1\nB = 2\n',
+                        'operation': 'replace_string',
+                        'old_string': 'A = 0\n',
+                        'new_string': 'A = 1\n',
                     },
                     {
-                        'path': '/workspace/src/a.py',
+                        'path': 'src/a.py',
                         'operation': 'symbol_body_replacement',
                         'start_line': 2,
                         'end_line': 2,

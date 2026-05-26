@@ -70,6 +70,34 @@ def test_strip_and_failure_signature_and_terminal_mode_hints() -> None:
     ]
 
 
+def test_combined_structured_edit_diff_tracks_snapshot_changes(tmp_path) -> None:
+    target = tmp_path / 'demo.txt'
+    target.write_text('old\n', encoding='utf-8')
+    snapshots = {target: ('old\n', 'demo.txt')}
+
+    target.write_text('new\n', encoding='utf-8')
+
+    diff = h._combined_structured_edit_diff(snapshots)
+    assert diff is not None
+    assert '--- demo.txt' in diff
+    assert '+++ demo.txt' in diff
+    assert '-old' in diff
+    assert '+new' in diff
+
+
+def test_structured_edit_verification_reports_python_compile_failure(tmp_path) -> None:
+    target = tmp_path / 'demo.py'
+    target.write_text('return 1\n', encoding='utf-8')
+    snapshots = {target: ('def ok():\n    return 1\n', 'demo.py')}
+
+    text, files, ok = h._structured_edit_verification_receipt(snapshots)
+
+    assert ok is False
+    assert 'syntax=failed' in text
+    assert files[0]['syntax'] == 'failed'
+    assert "'return' outside function" in files[0]['syntax_detail']
+
+
 def test_workspace_resolution_and_path_validation() -> None:
     ex = _executor()
     assert h.resolve_effective_cwd(ex, None) == Path('C:/ws').resolve()

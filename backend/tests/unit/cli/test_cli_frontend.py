@@ -15,9 +15,9 @@ import pytest
 from rich.console import Console
 from rich.text import Text
 
-from backend.cli.confirmation import _risk_label
 from backend.cli._event_renderer.panels import task_panel_signature
 from backend.cli._event_renderer.sidebar import build_task_list_panel
+from backend.cli.confirmation import _risk_label
 from backend.cli.diff_renderer import DiffPanel
 from backend.cli.event_renderer import CLIEventRenderer
 from backend.cli.hud import HUDBar
@@ -27,7 +27,6 @@ from backend.cli.main import (
     show_grinta_splash,
 )
 from backend.cli.reasoning_display import ReasoningDisplay
-from backend.cli.tui.app import _render_thinking_with_diff
 from backend.cli.repl import (
     Repl,
     _build_command_completer,
@@ -36,11 +35,11 @@ from backend.cli.repl import (
     _prompt_toolkit_available,
     _supports_prompt_session,
 )
+from backend.cli.tui.app import _render_thinking_with_diff
 from backend.core.config import AppConfig
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 from backend.core.enums import ActionSecurityRisk, AgentState, EventSource
 from backend.inference.metrics import Metrics, ResponseLatency, TokenUsage
-from backend.orchestration.state.state import PlanStep
 from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
@@ -54,6 +53,7 @@ from backend.ledger.observation import (
     ErrorObservation,
     TaskTrackingObservation,
 )
+from backend.orchestration.state.state import PlanStep
 from backend.persistence.locations import get_project_local_data_root
 
 
@@ -157,7 +157,7 @@ async def test_event_renderer_repeats_identical_file_read_rows() -> None:
     renderer.start_live()
     r1 = FileReadAction(path='pkg/a.py')
     r1.source = EventSource.AGENT
-    other = FileEditAction(path='pkg/b.py', command='insert_text')
+    other = FileEditAction(path='pkg/b.py', command='replace_string')
     other.source = EventSource.AGENT
     r2 = FileReadAction(path='pkg/a.py')
     r2.source = EventSource.AGENT
@@ -359,6 +359,37 @@ def test_hud_tracks_llm_call_count() -> None:
     assert hud.state.cost_usd == 0.5
 
 
+def test_hud_displays_accumulated_tokens_while_preserving_context_pressure() -> None:
+    hud = HUDBar()
+    metrics = Metrics()
+    metrics.add_token_usage(
+        prompt_tokens=100,
+        completion_tokens=50,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        context_window=4096,
+        response_id='resp-1',
+    )
+    metrics.add_token_usage(
+        prompt_tokens=200,
+        completion_tokens=80,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        context_window=8192,
+        response_id='resp-2',
+    )
+
+    hud.update_from_llm_metrics(metrics)
+
+    assert hud.state.total_tokens == 430
+    assert hud.state.context_tokens == 200
+    assert hud.state.context_limit == 8192
+
+    rendered = hud._format().plain
+    assert '430' in rendered
+    assert '200/8.2K' in rendered or '430 · 200/8192' in rendered
+
+
 def test_hud_marks_estimated_token_usage() -> None:
     hud = HUDBar()
     metrics = Metrics()
@@ -451,9 +482,9 @@ def test_diff_panel_new_xml_file_shows_plain_preview() -> None:
 
 def test_thinking_render_is_plain_text() -> None:
     """Thinking blocks should stay plain text and not become syntax-highlighted."""
-    text = _render_thinking_with_diff("```xml\n<root>\n  <item>value</item>\n</root>\n```")
+    text = _render_thinking_with_diff('```xml\n<root>\n  <item>value</item>\n</root>\n```')
     assert isinstance(text, Text)
-    assert text.plain == "```xml\n<root>\n  <item>value</item>\n</root>\n```"
+    assert text.plain == '```xml\n<root>\n  <item>value</item>\n</root>\n```'
 
 
 def test_diff_panel_existing_file_with_groups() -> None:

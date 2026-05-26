@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -10,6 +11,7 @@ from backend.core.errors import FunctionCallValidationError
 from backend.engine.function_calling import (
     _handle_cmd_run_tool,
     _handle_finish_tool,
+    _process_single_tool_call,
     combine_thought,
     set_security_risk,
 )
@@ -244,4 +246,16 @@ class TestHandleFinishTool:
                     'next_step': 'Switch to Agent Mode',
                 },
                 mode='agent',
+            )
+
+
+class TestModeToolValidation:
+    def test_chat_mode_rejects_mutating_tool_call(self):
+        tool_call = SimpleNamespace(function=SimpleNamespace(name='create'))
+
+        with pytest.raises(FunctionCallValidationError, match='Chat Mode'):
+            _process_single_tool_call(
+                tool_call,
+                {'type': 'file', 'path': 'demo.txt', 'content': 'x'},
+                mode='chat',
             )

@@ -28,8 +28,10 @@ from backend.core.errors import (
     FunctionCallValidationError,
 )
 from backend.core.interaction_modes import (
+    CHAT_MODE_ALLOWED_TOOLS,
     PLAN_MODE,
     PLAN_MODE_ALLOWED_TOOLS,
+    is_chat_mode,
     normalize_interaction_mode,
 )
 from backend.core.logger import app_logger as logger
@@ -1524,44 +1526,7 @@ def _normalize_multiedit_operations(
             )
         command = str(raw.get('command') or '').strip().lower()
         path = raw.get('path')
-        if command == 'create':
-            create_type = str(raw.get('type') or '').strip().lower()
-            if not isinstance(path, str) or not path.strip():
-                raise FunctionCallValidationError(
-                    f'multiedit operations[{index}] create requires path.'
-                )
-            content = raw.get('content')
-            if not isinstance(content, str):
-                raise FunctionCallValidationError(
-                    f'multiedit operations[{index}] create requires content.'
-                )
-            if create_type == 'file':
-                normalized.append(
-                    {'path': path, 'operation': 'create_file', 'content': content}
-                )
-            elif create_type == 'symbol':
-                target_symbol = raw.get('target_symbol')
-                if not isinstance(target_symbol, str) or not target_symbol.strip():
-                    raise FunctionCallValidationError(
-                        f'multiedit operations[{index}] create type=symbol requires target_symbol.'
-                    )
-                normalized.append(
-                    {
-                        'path': path,
-                        'operation': 'create_symbol',
-                        'target_symbol': target_symbol,
-                        'target_kind': raw.get('target_kind'),
-                        'parent_symbol': raw.get('parent_symbol'),
-                        'occurrence': raw.get('occurrence'),
-                        'position': _coerce_insert_position(raw.get('position')),
-                        'content': content,
-                    }
-                )
-            else:
-                raise FunctionCallValidationError(
-                    f"multiedit operations[{index}] create type must be 'file' or 'symbol'."
-                )
-        elif command == 'replace_string':
+        if command == 'replace_string':
             if not isinstance(path, str) or not path.strip():
                 raise FunctionCallValidationError(
                     f'multiedit operations[{index}] replace_string requires path.'
@@ -1605,7 +1570,7 @@ def _normalize_multiedit_operations(
         else:
             raise FunctionCallValidationError(
                 f'multiedit operations[{index}] command {command!r} is unsupported. '
-                'Use create, replace_string, or edit_symbols.'
+                'Use replace_string or edit_symbols.'
             )
     return normalized
 
@@ -1668,8 +1633,6 @@ def _parse_multi_edit_operation(
 ) -> tuple[str, dict[str, Any]]:
     operation = str(raw_item.get('operation') or '').strip().lower()
     allowed = {
-        'create_file',
-        'create_symbol',
         'replace_string',
         'symbol_body_replacement',
     }
@@ -1689,20 +1652,6 @@ def _apply_multi_edit_operation(
     item: dict[str, Any],
     temp_editor: Any,
 ) -> None:
-    if operation == 'create_file':
-        content = item.get('content')
-        if not isinstance(content, str):
-            raise FunctionCallValidationError(
-                "multi_edit create_file operation requires 'content' (string)."
-            )
-        result = temp_editor(command='create_file', path=rel_path, file_text=content)
-        if result.error:
-            _multi_edit_raise(
-                f'❌ multi_edit create_file failed for {rel_path}: {result.error}',
-                path=rel_path,
-            )
-        return
-
     if operation == 'replace_string':
         old_string = item.get('old_string')
         new_string = item.get('new_string')
@@ -1720,55 +1669,6 @@ def _apply_multi_edit_operation(
         if result.error:
             _multi_edit_raise(
                 f'❌ multi_edit replace_string failed for {rel_path}: {result.error}',
-                path=rel_path,
-            )
-        return
-
-    if operation == 'create_symbol':
-        target_symbol = item.get('target_symbol')
-        content = item.get('content')
-        if not isinstance(target_symbol, str) or not isinstance(content, str):
-            raise FunctionCallValidationError(
-                "multi_edit create_symbol operation requires 'target_symbol' and 'content'."
-            )
-        candidates = _find_symbol_candidates_in_file(
-            temp_path,
-            target_symbol,
-            symbol_kind=cast(str | None, item.get('target_kind')),
-            include_private=True,
-        )
-        candidates = [c for c in candidates if c.get('name') == target_symbol]
-        parent_symbol = item.get('parent_symbol')
-        if isinstance(parent_symbol, str) and parent_symbol.strip():
-            candidates = [
-                c for c in candidates if c.get('parent') == parent_symbol.strip()
-            ]
-        occurrence = _coerce_optional_int(item.get('occurrence'), 'occurrence')
-        if occurrence is not None:
-            if occurrence < 1 or occurrence > len(candidates):
-                raise FunctionCallValidationError(
-                    f'Occurrence {occurrence} is out of range for {target_symbol}; '
-                    f'{len(candidates)} candidate(s) found.'
-                )
-            candidates = [candidates[occurrence - 1]]
-        if not candidates:
-            raise FunctionCallValidationError(
-                f'multi_edit create_symbol could not find target symbol {target_symbol!r} in {rel_path}.'
-            )
-        if len(candidates) > 1:
-            raise FunctionCallValidationError(
-                _symbol_action_ambiguity_error(target_symbol, candidates)
-            )
-        position = _coerce_insert_position(item.get('position'))
-        result = temp_editor(
-            command='insert_text',
-            path=rel_path,
-            insert_line=_insert_line_for_symbol(candidates[0], position),
-            new_str=content,
-        )
-        if result.error:
-            _multi_edit_raise(
-                f'❌ multi_edit create_symbol failed for {rel_path}: {result.error}',
                 path=rel_path,
             )
         return
@@ -2099,6 +1999,15 @@ def _process_single_tool_call(
 
     tool_name = cast(str, tool_call.function.name)
     normalized_mode = normalize_interaction_mode(mode)
+    mcp_tool_names = cast(list[str] | None, getattr(tool_call, '_mcp_tool_names', None))
+    if is_chat_mode(normalized_mode):
+        if tool_name not in CHAT_MODE_ALLOWED_TOOLS or (
+            mcp_tool_names and tool_name in mcp_tool_names
+        ):
+            raise FunctionCallValidationError(
+                f'Tool `{tool_name}` is not available in Chat Mode. '
+                'Chat Mode is read-only; use plain text or inspection tools only.'
+            )
     if normalized_mode == PLAN_MODE and tool_name not in PLAN_MODE_ALLOWED_TOOLS:
         raise FunctionCallValidationError(
             f'Tool `{tool_name}` is not available in Plan Mode. '
@@ -2131,8 +2040,6 @@ def _process_single_tool_call(
             f'Malformed XML tool call for {tool_name}: '
             f'{arguments["__xml_syntax_error__"]}'
         )
-    mcp_tool_names = cast(list[str] | None, getattr(tool_call, '_mcp_tool_names', None))
-
     if tool_name == _finish_tool_name(normalized_mode):
         return _handle_finish_tool(arguments, mode=normalized_mode)
     if tool_name in tool_dispatch:

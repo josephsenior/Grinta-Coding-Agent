@@ -115,9 +115,12 @@ class LspLocation:
     file: str
     line: int  # 1-based
     column: int  # 1-based
+    message: str = ''
+    severity: int | None = None
 
     def __str__(self) -> str:
-        return f'{self.file}:{self.line}:{self.column}'
+        base = f'{self.file}:{self.line}:{self.column}'
+        return f'{base} - {self.message}' if self.message else base
 
 
 @dataclass
@@ -300,6 +303,8 @@ class LspClient:
         line: int = 1,
         column: int = 1,
         symbol: str = '',
+        *,
+        process_timeout: float | None = None,
     ) -> LspResult:
         """Execute a single LSP query and return structured results."""
         # For non-python, we don't have AST fallbacks, so we check server availability
@@ -329,7 +334,9 @@ class LspClient:
                 return LspResult(available=False)
 
         try:
-            return self._run_query(command, file, line, column, symbol)
+            return self._run_query(
+                command, file, line, column, symbol, process_timeout=process_timeout
+            )
         except Exception as exc:
             logger.warning('LspClient query failed: %s', exc)
             return LspResult(available=True, error=str(exc))
@@ -341,6 +348,8 @@ class LspClient:
         line: int,
         column: int,
         symbol: str,
+        *,
+        process_timeout: float | None = None,
     ) -> LspResult:
         abs_path = str(Path(file).resolve())
         try:
@@ -358,7 +367,9 @@ class LspClient:
         elif command == 'hover':
             return self._query_hover(abs_path, uri, source, lsp_line, lsp_col)
         elif command in ('diagnostics', 'get_diagnostics'):
-            return self._query_diagnostics(abs_path, uri, source)
+            return self._query_diagnostics(
+                abs_path, uri, source, process_timeout=process_timeout
+            )
         elif command == 'code_action':
             return self._query_code_actions(abs_path, uri, source, lsp_line, lsp_col)
         elif command in ('find_definition', 'find_references'):
@@ -368,7 +379,13 @@ class LspClient:
         else:
             return LspResult(available=True, error=f'Unknown command: {command}')
 
-    def _rpc(self, messages: list[dict], server_cmd: list[str]) -> list[dict]:
+    def _rpc(
+        self,
+        messages: list[dict],
+        server_cmd: list[str],
+        *,
+        process_timeout: float = 15.0,
+    ) -> list[dict]:
         """Send LSP messages and collect responses using a subprocess."""
         frames: list[bytes] = []
         for message in messages:
@@ -380,7 +397,7 @@ class LspClient:
             result = _run_lsp_subprocess(
                 server_cmd,
                 stdin_data=payload,
-                process_timeout=15.0,
+                process_timeout=process_timeout,
             )
             if result.timed_out:
                 logger.warning('%s subprocess timed out', server_cmd[0])
@@ -439,7 +456,14 @@ class LspClient:
 
     # ── Command implementations ─────────────────────────────────────────
 
-    def _query_diagnostics(self, abs_path: str, uri: str, source: str) -> LspResult:
+    def _query_diagnostics(
+        self,
+        abs_path: str,
+        uri: str,
+        source: str,
+        *,
+        process_timeout: float | None = None,
+    ) -> LspResult:
         """Query LSP for diagnostics (errors/warnings)."""
         server_cmd = self._get_server_command(abs_path)
         if not server_cmd:
@@ -452,7 +476,9 @@ class LspClient:
         # We also send a shutdown to ensure we get all responses
         msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 99, 'params': {}})
 
-        responses = self._rpc(msgs, server_cmd)
+        responses = self._rpc(
+            msgs, server_cmd, process_timeout=process_timeout or 15.0
+        )
 
         errors = []
         for resp in responses:
@@ -466,6 +492,8 @@ class LspClient:
                                 file=abs_path,
                                 line=start.get('line', 0) + 1,
                                 column=start.get('character', 0) + 1,
+                                message=str(diag.get('message') or ''),
+                                severity=diag.get('severity'),
                             )
                         )
                         # We hijack LspLocation for diagnostics temporarily

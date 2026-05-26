@@ -9,6 +9,9 @@ from backend.orchestration.middleware.circuit_breaker import CircuitBreakerMiddl
 from backend.orchestration.middleware.context_window import ContextWindowMiddleware
 from backend.orchestration.middleware.cost_quota import CostQuotaMiddleware
 from backend.orchestration.middleware.logging_mw import LoggingMiddleware
+from backend.orchestration.middleware.post_edit_diagnostics import (
+    PostEditDiagnosticsMiddleware,
+)
 from backend.orchestration.middleware.progress_policy import ProgressPolicyMiddleware
 from backend.orchestration.middleware.safety_validator import SafetyValidatorMiddleware
 from backend.orchestration.middleware.telemetry import TelemetryMiddleware
@@ -20,6 +23,7 @@ __all__ = [
     'ContextWindowMiddleware',
     'CostQuotaMiddleware',
     'LoggingMiddleware',
+    'PostEditDiagnosticsMiddleware',
     'ProgressPolicyMiddleware',
     'SafetyValidatorMiddleware',
     'TelemetryMiddleware',

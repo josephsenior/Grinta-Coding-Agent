@@ -326,8 +326,8 @@ class ExampleStepBuilder:
             self.example += TOOL_EXAMPLES[TERMINAL_EXAMPLE_KEY]['check_dir']
 
     def _add_file_creation_step(self) -> None:
-        """Add file creation step based on available editors."""
-        if CREATE_TOOL_NAME in self.available_tools:
+        """Add file creation step when create is available."""
+        if 'create' in self.available_tools:
             self.example += TOOL_EXAMPLES['create']['file']
 
     def _add_server_run_step(self) -> None:

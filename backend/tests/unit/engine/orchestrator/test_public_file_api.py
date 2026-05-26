@@ -402,24 +402,16 @@ def test_edit_symbols_rejects_serialized_payload(monkeypatch, tmp_path):
         )
 
 
-def test_multiedit_public_action_normalizes_new_public_operations_and_guards_content(
+def test_multiedit_public_action_normalizes_supported_operations_and_guards_content(
     monkeypatch, tmp_path
 ):
     _use_tmp_workspace(monkeypatch, tmp_path)
     (tmp_path / 'mod.py').write_text('def login():\n    return True\n', encoding='utf-8')
+    (tmp_path / 'README.md').write_text('old\n', encoding='utf-8')
 
     action = _handle_multiedit_tool(
         {
             'operations': [
-                {'command': 'create', 'type': 'file', 'path': 'a.py', 'content': 'A = 1\n'},
-                {
-                    'command': 'create',
-                    'type': 'symbol',
-                    'path': 'mod.py',
-                    'target_symbol': 'login',
-                    'position': 'after',
-                    'content': 'def logout():\n    return True\n',
-                },
                 {
                     'command': 'replace_string',
                     'path': 'README.md',
@@ -444,13 +436,13 @@ def test_multiedit_public_action_normalizes_new_public_operations_and_guards_con
     assert isinstance(action, FileEditAction)
     assert action.command == 'multi_edit'
     assert action.structured_payload['file_edits'][0] == {
-        'path': 'a.py',
-        'operation': 'create_file',
-        'content': 'A = 1\n',
+        'operation': 'replace_string',
+        'path': 'README.md',
+        'old_string': 'old',
+        'new_string': 'new',
+        'replace_all': False,
     }
-    assert action.structured_payload['file_edits'][1]['operation'] == 'create_symbol'
-    assert action.structured_payload['file_edits'][2]['operation'] == 'replace_string'
-    assert action.structured_payload['file_edits'][3]['operation'] == 'symbol_body_replacement'
+    assert action.structured_payload['file_edits'][1]['operation'] == 'symbol_body_replacement'
 
     with pytest.raises(FunctionCallValidationError, match='CONTENT_APPEARS_SERIALIZED'):
         _handle_multiedit_tool(
@@ -471,7 +463,7 @@ def test_multiedit_public_action_normalizes_new_public_operations_and_guards_con
 def test_multiedit_rejects_old_public_aliases(monkeypatch, tmp_path):
     _use_tmp_workspace(monkeypatch, tmp_path)
 
-    with pytest.raises(FunctionCallValidationError, match='Use create, replace_string, or edit_symbols'):
+    with pytest.raises(FunctionCallValidationError, match='Use replace_string or edit_symbols'):
         _handle_multiedit_tool(
             {
                 'operations': [

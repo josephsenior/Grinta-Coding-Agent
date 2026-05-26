@@ -11,6 +11,17 @@ CHAT_MODE_NAMES = frozenset({CHAT_MODE, ASK_MODE})
 VISIBLE_INTERACTION_MODES = (CHAT_MODE, PLAN_MODE, AGENT_MODE)
 VALID_INTERACTION_MODES = frozenset({*VISIBLE_INTERACTION_MODES, ASK_MODE})
 
+CHAT_MODE_ALLOWED_TOOLS = frozenset(
+    {
+        'analyze_project_structure',
+        'find_symbols',
+        'lsp',
+        'read',
+        'recall',
+        'search_code',
+    }
+)
+
 PLAN_MODE_ALLOWED_TOOLS = frozenset(
     {
         'analyze_project_structure',

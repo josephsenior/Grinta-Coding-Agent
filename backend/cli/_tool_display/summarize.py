@@ -208,35 +208,32 @@ def _summary_read_file(args: dict[str, Any]) -> str:
     return path
 
 
-def _summary_create_file(args: dict[str, Any]) -> str:
+def _summary_create(args: dict[str, Any]) -> str:
     path = _arg_str(args, 'path')
-    return f'{path} · new file' if path else 'new file'
+    create_type = _arg_str(args, 'type')
+    if path and create_type:
+        return f'{path} · new {create_type}'
+    return path or 'create'
 
 
-def _summary_insert_text(args: dict[str, Any]) -> str:
+def _summary_replace_string(args: dict[str, Any]) -> str:
     path = _arg_str(args, 'path')
-    insert_line = args.get('insert_line')
-    if path and insert_line is not None:
-        return f'{path} · after line {insert_line}'
-    return path or 'insert…'
+    return path or 'replace string'
 
 
-def _summary_undo_last_edit(args: dict[str, Any]) -> str:
+def _summary_edit_symbols(args: dict[str, Any]) -> str:
     path = _arg_str(args, 'path')
-    return f'{path} · undo' if path else 'undo'
+    edits = args.get('edits')
+    if isinstance(edits, list) and edits:
+        return f'{path} · {len(edits)} symbol edit(s)' if path else f'{len(edits)} symbol edit(s)'
+    return path or 'edit symbols'
 
 
-def _summary_rename_symbol(args: dict[str, Any]) -> str:
-    path = _arg_str(args, 'path')
-    old_name = _arg_str(args, 'old_name')
-    new_name = _arg_str(args, 'new_name')
-    bits = [
-        b
-        for b in (path, f'{old_name} → {new_name}' if old_name and new_name else '')
-        if b
-    ]
-    return ' · '.join(bits) if bits else 'rename…'
-
+def _summary_multiedit(args: dict[str, Any]) -> str:
+    operations = args.get('operations')
+    if isinstance(operations, list):
+        return f'{len(operations)} operation(s)'
+    return 'batch edit'
 
 def _summary_find_symbol(args: dict[str, Any]) -> str:
     path = _arg_str(args, 'path')
@@ -346,10 +343,10 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'execute_bash': _summary_shell,
     'execute_powershell': _summary_shell,
     'read_file': _summary_read_file,
-    'create_file': _summary_create_file,
-    'insert_text': _summary_insert_text,
-    'undo_last_edit': _summary_undo_last_edit,
-    'rename_symbol': _summary_rename_symbol,
+    'create': _summary_create,
+    'replace_string': _summary_replace_string,
+    'edit_symbols': _summary_edit_symbols,
+    'multiedit': _summary_multiedit,
     'find_symbol': _summary_find_symbol,
     'think': _summary_think,
     'agent_think': _summary_think,

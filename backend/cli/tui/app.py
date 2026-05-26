@@ -185,14 +185,27 @@ def _strip_ansi(text: str) -> str:
     return _rich_text(text).plain
 
 
-_TERMINAL_MOUSE_REPORT_RE = re.compile(r'(?:\x1b)?\[\<\d{1,4};\d{1,4};\d{1,4}[mM]')
+_TERMINAL_MOUSE_REPORT_RE = re.compile(
+    r'(?:\x1b)?\[(?:<)?\d{1,7};\d{1,7};\d{1,7}[mM]'
+)
+_TERMINAL_ORPHAN_PARAM_TOKEN_RE = re.compile(
+    r'(?:^|(?<=[^\w]))(?:\[?\d+(?:;\d+){2,}[OI]?_){2,}'
+)
 
 
 def _strip_terminal_control_literals(text: str) -> str:
     """Remove terminal mouse reports that some consoles leak as input text."""
     if not text:
         return text
-    return _TERMINAL_MOUSE_REPORT_RE.sub('', text)
+    text = _TERMINAL_MOUSE_REPORT_RE.sub('', text)
+    return _TERMINAL_ORPHAN_PARAM_TOKEN_RE.sub('', text)
+
+
+def _sanitize_terminal_display_text(text: str) -> str:
+    """Strip terminal control traffic before rendering PTY output in Textual."""
+    if not text:
+        return text
+    return _strip_terminal_control_literals(_strip_ansi(text))
 
 
 def _render_thinking_with_diff(text: str) -> Text:
@@ -1246,6 +1259,26 @@ class GrintaScreen(Screen):
         '/quit': '/quit',
     }
 
+    def _active_agent_name(self) -> str:
+        name = getattr(self._config, 'default_agent', None)
+        return name.strip() if isinstance(name, str) and name.strip() else 'agent'
+
+    def _active_agent_config(self) -> Any | None:
+        getter = getattr(self._config, 'get_agent_config', None)
+        if not callable(getter):
+            return None
+        try:
+            return getter(self._active_agent_name())
+        except TypeError:
+            return getter()
+
+    def _active_interaction_mode(self) -> str:
+        agent_config = self._active_agent_config()
+        return normalize_interaction_mode(
+            getattr(agent_config, 'mode', AGENT_MODE),
+            default=AGENT_MODE,
+        )
+
     def compose(self) -> ComposeResult:
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
@@ -1415,9 +1448,7 @@ class GrintaScreen(Screen):
             pass
         try:
             mode_select = hud_bar.query_one('#hud-mode', Select)
-            current_mode = normalize_interaction_mode(
-                self._config.get_agent_config().mode
-            )
+            current_mode = self._active_interaction_mode()
             if current_mode not in VISIBLE_INTERACTION_MODES:
                 current_mode = CHAT_MODE if is_chat_mode(current_mode) else AGENT_MODE
             if mode_select.value != current_mode:
@@ -1425,9 +1456,7 @@ class GrintaScreen(Screen):
         except Exception:
             pass
         try:
-            current_mode = normalize_interaction_mode(
-                self._config.get_agent_config().mode
-            )
+            current_mode = self._active_interaction_mode()
             is_agent = current_mode == AGENT_MODE
             hud_bar.query_one('#hud-autonomy').display = is_agent
             hud_bar.query_one('#hud-label-autonomy').display = is_agent
@@ -1437,7 +1466,7 @@ class GrintaScreen(Screen):
     def _update_input_identity(self, mode: str | None = None) -> None:
         """Update InputBar border title and hint based on mode."""
         if mode is None:
-            mode = self._config.get_agent_config().mode
+            mode = self._active_interaction_mode()
         mode = normalize_interaction_mode(mode)
         try:
             bar = self.query_one('#input-bar', InputBar)
@@ -2287,13 +2316,20 @@ class GrintaScreen(Screen):
         mode = normalize_interaction_mode(new_mode, default='')
         if mode not in set(VISIBLE_INTERACTION_MODES):
             return
-        agent_config = self._config.get_agent_config()
-        agent_config.mode = mode
+        agent_config = self._active_agent_config()
+        if agent_config is not None:
+            agent_config.mode = mode
         controller = self._controller
         if controller is not None:
             agent = getattr(controller, 'agent', None)
             if agent is not None:
+                running_config = getattr(agent, 'config', None)
+                if running_config is not None:
+                    running_config.mode = mode
                 planner = getattr(agent, 'planner', None)
+                planner_config = getattr(planner, '_config', None)
+                if planner_config is not None:
+                    planner_config.mode = mode
                 if planner is not None and hasattr(planner, 'build_toolset'):
                     try:
                         agent.tools = planner.build_toolset()
@@ -2301,6 +2337,10 @@ class GrintaScreen(Screen):
                         _tui_logger.debug(
                             'Failed to rebuild toolset on mode change', exc_info=True
                         )
+            state = getattr(controller, 'state', None)
+            extra_data = getattr(state, 'extra_data', None)
+            if is_chat_mode(mode) and isinstance(extra_data, dict):
+                extra_data.pop('active_run_mode', None)
         self._render_hud_bar()
         self._update_input_identity(mode)
         self._toggle_autonomy_tabs_visibility(mode)
@@ -3325,11 +3365,9 @@ class TUIRenderer:
     """Rich-driven renderer for Textual — manages history and real-time display."""
 
     _FILE_EDIT_VERBS: dict[str, tuple[str, bool]] = {
-        'read_file': ('Read', False),
         'create_file': ('Created', False),
-        'insert_text': ('Inserted', True),
-        'undo_last_edit': ('Reverted', False),
-        'write': ('Wrote', False),
+        'replace_string': ('Edited', False),
+        'multi_edit': ('Edited', False),
     }
 
     def __init__(
@@ -3817,7 +3855,7 @@ class TUIRenderer:
 
     def _remember_terminal_command(self, session_id: str, command: str) -> None:
         """Remember the most relevant command for a terminal session."""
-        clean_command = (command or '').strip()
+        clean_command = _sanitize_terminal_display_text(command or '').strip()
         if not clean_command:
             return
         if session_id:
@@ -4233,7 +4271,9 @@ class TUIRenderer:
             exit_code = getattr(event, 'exit_code', None)
             cmd = getattr(event, 'command', '') or ''
             if output:
-                output = strip_tool_result_validation_annotations(output)
+                output = _sanitize_terminal_display_text(
+                    strip_tool_result_validation_annotations(output)
+                ).strip()
             if output or exit_code is not None:
                 self._complete_shell_command_card(
                     cmd,
@@ -4334,7 +4374,9 @@ class TUIRenderer:
             )
         elif isinstance(event, TerminalInputAction):
             session_id = getattr(event, 'session_id', '') or ''
-            submitted = getattr(event, 'input', '') or ''
+            submitted = _sanitize_terminal_display_text(
+                getattr(event, 'input', '') or ''
+            )
             detail = self._terminal_card_detail(session_id, submitted)
             self._upsert_terminal_session_card(
                 session_id=session_id,
@@ -4362,7 +4404,7 @@ class TUIRenderer:
                 processing=True,
             )
         elif isinstance(event, TerminalObservation):
-            content = (event.content or '').strip()
+            content = event.content or ''
             session_id = getattr(event, 'session_id', '') or ''
             exit_code = getattr(event, 'exit_code', None)
             state = getattr(event, 'state', None)
@@ -4380,7 +4422,9 @@ class TUIRenderer:
                 else ('err' if exit_code is not None and exit_code != 0 else 'neutral')
             )
             if content:
-                content = strip_tool_result_validation_annotations(content)
+                content = _sanitize_terminal_display_text(
+                    strip_tool_result_validation_annotations(content)
+                ).strip()
             self._upsert_terminal_session_card(
                 session_id=session_id,
                 verb='Output',
@@ -4529,6 +4573,19 @@ class TUIRenderer:
 
     def _extract_file_edit_diff(self, event: FileEditObservation) -> str | None:
         """Extract unified diff from a FileEditObservation for TUI display."""
+        explicit_diff = getattr(event, 'diff', None)
+        if isinstance(explicit_diff, str) and explicit_diff.strip():
+            return explicit_diff
+
+        content = getattr(event, 'content', None)
+        if isinstance(content, str) and content:
+            marker = '[EDIT_DIFF]'
+            marker_index = content.find(marker)
+            if marker_index != -1:
+                embedded = content[marker_index + len(marker) :].strip()
+                if embedded:
+                    return embedded
+
         try:
             from backend.execution.utils.diff import get_diff
 

@@ -123,6 +123,7 @@ def is_context_window_error(error_str: str, exc: Exception) -> bool:
         or 'please reduce the length of either one' in lowered
         or 'the request exceeds the available context size' in lowered
         or 'context length exceeded' in lowered
+        or 'context window exceeds limit' in lowered
         or ('sambanovaexception' in lowered and 'maximum context length' in lowered)
         or isinstance(exc, ContextWindowExceededError)
     )

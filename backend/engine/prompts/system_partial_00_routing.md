@@ -9,10 +9,8 @@
 
 <TOOL_ROUTING_LADDER>
 - **Search & Explore:** Prefer `search_code`, `find_symbols`, `read`, or `analyze_project_structure`.
-- **Read & Edit:** Use native tool calls only. `find_symbols` discovers symbol candidates; `read` inspects file/range/symbol content; `create` creates a new file or symbol; `edit_symbols` modifies/deletes existing symbols; `replace_string` performs exact one-file text replacement/addition/deletion; `multiedit` performs atomic multi-file refactors.
-- **Edit scope:** Prefer the smallest intent-level operation that solves the problem. `create` must not modify existing files; do not use shell commands to write source files.
-- **NORMAL MODE:** Use the registered file tools only; do not invent alternate file-edit formats or serialized code payloads.
-- **Shell & Execution:** Use the terminal strictly for build/test/git/processes.
+{read_and_edit_ladder}
+{shell_and_execution_ladder}
 </TOOL_ROUTING_LADDER>
 
 <CROSS_SESSION_LEARNING>

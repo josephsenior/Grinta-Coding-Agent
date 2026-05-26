@@ -210,11 +210,14 @@ LANGUAGE_EXTENSIONS = {
 
 
 def _format_python_ast_syntax_error(code: str, file_path: str) -> str | None:
-    """If ``code`` is invalid Python, return a rich message; otherwise ``None``."""
-    import ast
+    """If ``code`` is invalid Python, return a rich message; otherwise ``None``.
 
+    ``compile(..., "exec")`` catches the full interpreter syntax phase, including
+    errors that ``ast.parse`` accepts (for example ``return`` outside a function,
+    duplicate arguments, or ``await`` outside async code).
+    """
     try:
-        ast.parse(code, filename=file_path)
+        compile(code, file_path, 'exec')
     except SyntaxError as e:
         return _render_python_syntax_error(e, code, file_path)
     return None
@@ -226,7 +229,7 @@ def _render_python_syntax_error(e: SyntaxError, code: str, file_path: str) -> st
     msg = (e.msg or 'invalid syntax').strip()
     lines = code.splitlines()
     parts: list[str] = [
-        f'Python syntax error at {file_path}:{lineno}:{offset}',
+        f'Python syntax error at {file_path}: line {lineno}:{offset}',
         f'Parser message: {msg}',
     ]
     if e.lineno and 1 <= e.lineno <= len(lines):
@@ -704,76 +707,6 @@ class TreeSitterEditor:
                 success=False, message=f'Error: {e}', original_code=original_code
             )
 
-    def rename_symbol(self, file_path: str, old_name: str, new_name: str) -> EditResult:
-        """Rename a symbol throughout a file (works for ANY language).
-
-        Args:
-            file_path: Path to the file
-            old_name: Current symbol name
-            new_name: New symbol name
-
-        Returns:
-            EditResult with success status
-
-        """
-        parse_result = self.parse_file(file_path, use_cache=False)
-        if not parse_result:
-            return EditResult(success=False, message=f'Failed to parse {file_path}')
-
-        tree, file_bytes, language = parse_result
-        original_code = file_bytes.decode('utf-8')
-
-        # Find all occurrences of the symbol
-        occurrences = self._find_all_symbol_occurrences(
-            tree, file_bytes, old_name, language
-        )
-
-        if not occurrences:
-            return EditResult(
-                success=False, message=f"Symbol '{old_name}' not found in {file_path}"
-            )
-
-        # Replace all occurrences (from end to start to preserve positions)
-        new_code = original_code
-        for node in reversed(occurrences):
-            start_byte = node.start_byte
-            end_byte = node.end_byte
-            if node.type in ('string', 'string_content', 'comment'):
-                node_slice = new_code[start_byte:end_byte]
-                updated = node_slice.replace(old_name, new_name)
-                if updated != node_slice:
-                    new_code = new_code[:start_byte] + updated + new_code[end_byte:]
-            else:
-                new_code = new_code[:start_byte] + new_name + new_code[end_byte:]
-
-        # Normalize CRLF -> LF early so validation sees a consistent EOL style
-        new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
-
-        # Validate
-        validation_result = self.validate_syntax(new_code, file_path, language)
-        if not validation_result[0]:
-            return EditResult(
-                success=False,
-                message=f'Rename created syntax error: {validation_result[1]}',
-                syntax_valid=False,
-                original_code=original_code,
-            )
-
-        # Write back
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(new_code)
-
-        self.tree_cache.pop(file_path, None)
-        self.file_cache.pop(file_path, None)
-
-        return EditResult(
-            success=True,
-            message=f"✓ Renamed '{old_name}' → '{new_name}' ({len(occurrences)} occurrences in {language})",
-            modified_code=new_code,
-            lines_changed=len(occurrences),
-            original_code=original_code,
-        )
-
     def _find_function_node(
         self,
         tree: TreeType,
@@ -1195,36 +1128,6 @@ class TreeSitterEditor:
                 return True
 
         return False
-
-    def _find_all_symbol_occurrences(
-        self, tree: TreeType, file_bytes: bytes, symbol_name: str, language: str
-    ) -> list[NodeType]:
-        """Find all nodes that match the symbol name."""
-        occurrences = []
-
-        def visit(node: NodeType):
-            """Recursively visit AST nodes to find symbol occurrences.
-
-            Args:
-                node: Tree-sitter node to visit
-
-            """
-            node_text = file_bytes[node.start_byte : node.end_byte].decode('utf-8')
-
-            if node.type in ['identifier', 'name', 'property_identifier']:
-                if node_text == symbol_name:
-                    occurrences.append(node)
-
-            elif node.type in ('string', 'string_content', 'comment'):
-                if symbol_name in node_text:
-                    occurrences.append(node)
-
-            # Recurse
-            for child in node.children:
-                visit(child)
-
-        visit(tree.root_node)
-        return occurrences
 
     def get_supported_languages(self) -> list[str]:
         """Get list of all supported languages."""

@@ -542,7 +542,11 @@ class LLM(RetryMixin, DebugMixin):
         # Some providers (including OpenAI-compatible gateways) treat explicit
         # `null` values differently than omitted parameters. In particular,
         # sending `max_tokens: null` can result in empty completions.
-        if self.config.max_output_tokens is not None:
+        if (
+            self.config.max_output_tokens is not None
+            and 'max_tokens' not in call_kwargs
+            and 'max_completion_tokens' not in call_kwargs
+        ):
             call_kwargs['max_tokens'] = self.config.max_output_tokens
         if self.config.top_p is not None:
             call_kwargs['top_p'] = self.config.top_p

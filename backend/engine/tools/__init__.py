@@ -9,6 +9,10 @@ from .debugger import create_debugger_tool
 from .delegate_task import create_delegate_task_tool
 from .finish import create_finish_tool
 from .lsp_query import create_lsp_query_tool
+from .memory_manager import create_memory_manager_tool
+from .meta_cognition import (
+    create_communicate_tool,
+)
 from .native_file_tools import (
     create_create_tool,
     create_edit_symbols_tool,
@@ -16,10 +20,6 @@ from .native_file_tools import (
     create_multiedit_tool,
     create_read_tool,
     create_replace_string_tool,
-)
-from .memory_manager import create_memory_manager_tool
-from .meta_cognition import (
-    create_communicate_tool,
 )
 from .search_code import create_search_code_tool
 from .task_tracker import create_task_tracker_tool

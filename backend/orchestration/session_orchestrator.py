@@ -223,10 +223,11 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         7. RollbackMiddleware - creates checkpoints before risky operations for recovery
         8. DestructiveCommandMiddleware - high-priority checkpoints before shell destructive ops
         9. PreExecDiffMiddleware - computes diff before action executes for user preview
-        10. AutoCheckMiddleware - runs auto-checks after tool execution
-        11. FileStateMiddleware - tracks file modifications for state management
-        12. LoggingMiddleware, TelemetryMiddleware - observability (always last in execute)
-        13. ToolResultValidator - validates results after all observe() hooks complete
+        10. AutoCheckMiddleware - runs syntax auto-checks after tool execution
+        11. PostEditDiagnosticsMiddleware - runs bounded LSP diagnostics after edits
+        12. FileStateMiddleware - tracks file modifications for state management
+        13. LoggingMiddleware, TelemetryMiddleware - observability (always last in execute)
+        14. ToolResultValidator - validates results after all observe() hooks complete
         """
         from backend.orchestration.file_state_tracker import FileStateMiddleware
         from backend.orchestration.middleware.destructive_command import (
@@ -241,6 +242,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             ContextWindowMiddleware,
             CostQuotaMiddleware,
             LoggingMiddleware,
+            PostEditDiagnosticsMiddleware,
             ProgressPolicyMiddleware,
             SafetyValidatorMiddleware,
             TelemetryMiddleware,
@@ -258,6 +260,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             DestructiveCommandMiddleware(),
             PreExecDiffMiddleware(),
             AutoCheckMiddleware(),
+            PostEditDiagnosticsMiddleware(),
         ]
         file_state_mw = FileStateMiddleware()
         middlewares.append(file_state_mw)
@@ -523,6 +526,29 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
                 main_loop.call_soon_threadsafe(self._create_step_task)
             else:
                 self._create_step_task()
+
+    def schedule_step_soon(self) -> None:
+        """Schedule a fresh ``step()`` on the main loop after the current turn unwinds.
+
+        Unlike calling ``step()`` inline from within an active step task, this
+        defers re-entry until the event loop regains control. That avoids the
+        race where ``step()`` only flips ``_step_pending`` while the current
+        task is still running and the flag is then cleared during ``_step()``
+        shutdown.
+        """
+        if self._closed:
+            return
+
+        main_loop = get_main_event_loop()
+        if main_loop is not None and main_loop.is_running():
+            main_loop.call_soon_threadsafe(self.step)
+            return
+
+        with contextlib.suppress(RuntimeError):
+            asyncio.get_running_loop().call_soon(self.step)
+            return
+
+        self.step()
 
     def _create_step_task(self) -> None:
         """Create the step task on the current (main) running loop.
@@ -842,6 +868,9 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             return
 
         await self.action_execution.execute_action(action)
+        extra_data = getattr(self.state, 'extra_data', None)
+        if isinstance(extra_data, dict):
+            extra_data.pop('__survivable_error_consecutive', None)
 
         # P1-B: When the agent returns a MessageAction with wait_for_response,
         # the state must be transitioned to AWAITING_USER_INPUT synchronously
@@ -1144,14 +1173,16 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
 
                     # Notify the TUI that compaction is blocking execution
                     try:
-                        from backend.ledger.observation import StatusObservation
                         from backend.ledger import EventSource
+                        from backend.ledger.observation import StatusObservation
 
                         compaction_status = StatusObservation(
                             content='Compacting context...',
                             status_type='compaction',
                         )
-                        self.event_stream.add_event(compaction_status, EventSource.AGENT)
+                        self.event_stream.add_event(
+                            compaction_status, EventSource.AGENT
+                        )
                     except Exception:
                         pass  # Never let UI notification crash the compaction path
 

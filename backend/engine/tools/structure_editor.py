@@ -158,9 +158,6 @@ class StructureEditor:
         new_body="    return data.strip().lower()"
     )
 
-    # Rename across the entire file
-    result = editor.rename_symbol("myfile.py", "old_name", "new_name")
-
     # Multi-file refactoring (atomic - all succeed or all fail)
     with editor.begin_refactoring() as refactor:
         refactor.edit_file("file1.py", new_content="...")
@@ -483,62 +480,6 @@ class StructureEditor:
         # Provide smart error message if failed
         if not result.success and 'not found' in result.message.lower():
             self._enrich_error_with_symbol_suggestions(path, function_name, result)
-
-        return result
-
-    def rename_symbol(self, path: str, old_name: str, new_name: str) -> EditResult:
-        """Rename a symbol throughout a file.
-
-        Args:
-            path: Path to the file
-            old_name: Current symbol name
-            new_name: New symbol name
-
-        Returns:
-            EditResult with success status
-
-        """
-        logger.info("Renaming '%s' → '%s' in %s", old_name, new_name, path)
-
-        # Read old content before edit for context window
-        old_content = None
-        try:
-            with open(path, encoding='utf-8') as f:
-                old_content = f.read()
-        except Exception:
-            pass
-
-        result = self.universal.rename_symbol(path, old_name, new_name)
-
-        # Add context window on success
-        if result.success and old_content is not None:
-            try:
-                with open(path, encoding='utf-8') as f:
-                    new_content = f.read()
-                if new_content == old_content:
-                    return EditResult(
-                        success=False,
-                        message='Edit verification failed after rename_symbol: file content did not change on disk.',
-                    )
-                context_window = _format_context_window(old_content, new_content)
-                if context_window:
-                    result.message += '\n\n' + context_window
-            except Exception:
-                pass
-
-        # Clean whitespace if successful
-        if result.success and self.config.clean_whitespace:
-            language = self.universal.detect_language(path)
-            try:
-                with open(path, encoding='utf-8') as f:
-                    content = f.read()
-
-                cleaned = self.whitespace.clean_whitespace(content, language=language)
-
-                with open(path, 'w', encoding='utf-8') as f:
-                    f.write(cleaned)
-            except Exception as e:
-                logger.warning('Whitespace cleanup failed: %s', e)
 
         return result
 

@@ -36,6 +36,10 @@
 | `debug.md` | `/debug` |
 | `documentation.md` | `/docs` |
 | `feature.md` | `/feature` |
+| `git-wizard.md` | `/git` — commit surgery, rebase, bisect, reflog salvage |
+| `json-jitsu.md` | `/json` — jq recipes, filtering, aggregation, transformation |
+| `log-fu.md` | `/logs` — log analysis, timing, rate tracking, grep patterns |
+| `net-diag.md` | `/net` — DNS, TLS, HTTP, connectivity diagnostics |
 | `hardened.md` | `/hardened` — safer execution in semi-trusted repos |
 | `incident.md` | `/incident` and `/oncall` — live issue triage and recovery |
 | `migration.md` | `/migration` and `/upgrade` — staged upgrade workflow |

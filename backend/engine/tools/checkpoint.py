@@ -7,9 +7,7 @@ durable progress snapshot that survives condensation.
 
 **Roadmap (product):** hybrid checkpoints — implicit pre-risk snapshots before
 large edits/commands plus **manual** ``checkpoint`` for named milestones;
-``checkpoint(revert)`` is the coarse undo. Once auto-checkpoint coverage
-is trusted, consider deprecating per-editor ``undo_last_edit`` in favor of this
-unified rollback story.
+``checkpoint(revert)`` is the coarse undo once auto-checkpoint coverage is trusted.
 """
 
 from __future__ import annotations
@@ -397,7 +395,9 @@ def _view_checkpoints() -> AgentThinkAction:
         if rollback_id:
             try:
                 from backend.core.rollback.rollback_manager import RollbackManager
-                from backend.core.workspace_resolution import require_effective_workspace_root
+                from backend.core.workspace_resolution import (
+                    require_effective_workspace_root,
+                )
 
                 manager = RollbackManager(
                     workspace_path=str(require_effective_workspace_root()),

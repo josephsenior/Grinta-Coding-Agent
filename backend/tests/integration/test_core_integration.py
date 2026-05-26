@@ -457,6 +457,7 @@ class TestLongSessionCompactionInvariants:
             filler_events.append(filler)
 
         state = State(session_id='long-session')
+        state.iteration_flag = MagicMock(current_value=7, max_value=100)
         state.history = [
             system,
             user,
@@ -494,6 +495,7 @@ class TestLongSessionCompactionInvariants:
         assert '<RESTORED_CONTEXT>' in restored
         assert 'src/main.py' in restored
         assert 'AssertionError: parser still fails' in restored
+        assert 'iteration: 7/100' in restored
 
         working_memory = get_working_memory_prompt_block()
         assert 'Keep the parser fix moving forward.' in working_memory

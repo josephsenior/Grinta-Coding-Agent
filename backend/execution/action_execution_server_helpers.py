@@ -758,6 +758,71 @@ def _record_runtime_undo_snapshot(
     executor.file_editor._push_undo_snapshot(resolved_path, snapshot)
 
 
+def _combined_structured_edit_diff(
+    snapshots: dict[Path, tuple[str | None, str]],
+) -> str | None:
+    """Build one unified diff for a structured edit that may touch many files."""
+    from backend.execution.file_operations import truncate_diff
+
+    chunks: list[str] = []
+    for resolved_path, (old_content, display_path) in snapshots.items():
+        new_content = _read_existing_text(resolved_path)
+        if old_content == new_content:
+            continue
+        diff = get_diff(old_content or '', new_content or '', display_path)
+        if diff:
+            chunks.append(diff)
+    if not chunks:
+        return None
+    return truncate_diff('\n'.join(chunks))
+
+
+def _structured_edit_verification_receipt(
+    snapshots: dict[Path, tuple[str | None, str]],
+) -> tuple[str, list[dict[str, Any]], bool]:
+    """Verify structured edits after commit and return an agent-visible receipt."""
+    from backend.utils.syntax_check import check_syntax
+
+    file_receipts: list[dict[str, Any]] = []
+    lines = ['[EDIT_VERIFICATION]']
+    all_ok = True
+
+    for resolved_path, (old_content, display_path) in snapshots.items():
+        new_content = _read_existing_text(resolved_path)
+        disk_ok = new_content is not None
+        changed = old_content != new_content
+        syntax_status = 'skipped'
+        syntax_detail = ''
+
+        if new_content is not None:
+            syntax_result = check_syntax(display_path, new_content)
+            syntax_status = syntax_result.status
+            syntax_detail = syntax_result.detail
+
+        file_ok = disk_ok and syntax_status != 'failed'
+        all_ok = all_ok and file_ok
+        receipt = {
+            'path': display_path,
+            'absolute_path': str(resolved_path),
+            'disk_write': 'passed' if disk_ok else 'failed',
+            'changed': changed,
+            'syntax': syntax_status,
+        }
+        if syntax_detail:
+            receipt['syntax_detail'] = syntax_detail[:1000]
+        file_receipts.append(receipt)
+        lines.append(
+            f"- {display_path}: disk_write={receipt['disk_write']} "
+            f"changed={'yes' if changed else 'no'} syntax={syntax_status}"
+        )
+
+    if not snapshots:
+        lines.append('- no file snapshots available for verification')
+        all_ok = False
+
+    return '\n'.join(lines), file_receipts, all_ok
+
+
 def _structured_payload_dict(action: Any) -> dict[str, Any]:
     payload = getattr(action, 'structured_payload', None)
     if not isinstance(payload, dict):
@@ -775,7 +840,7 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
     payload = _structured_payload_dict(action)
 
     if command == 'multi_edit':
-        original_snapshots: dict[Path, str | None] = {}
+        original_snapshots: dict[Path, tuple[str | None, str]] = {}
         for item in payload.get('file_edits') or []:
             if not isinstance(item, dict):
                 continue
@@ -783,9 +848,11 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
             if not isinstance(item_path, str) or not item_path.strip():
                 continue
             resolved_item_path = _resolve_structured_edit_path(executor, item_path)
-            original_snapshots.setdefault(
-                resolved_item_path, _read_existing_text(resolved_item_path)
-            )
+            if resolved_item_path not in original_snapshots:
+                original_snapshots[resolved_item_path] = (
+                    _read_existing_text(resolved_item_path),
+                    item_path.strip(),
+                )
         try:
             outcome = _handle_multi_edit_command(
                 action.path,
@@ -803,29 +870,42 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
             }
             return obs
 
-        for resolved_item_path, original_content in original_snapshots.items():
+        for resolved_item_path, (original_content, _display_path) in original_snapshots.items():
             _record_runtime_undo_snapshot(executor, resolved_item_path, original_content)
 
+        diff = _combined_structured_edit_diff(original_snapshots)
+        verification_text, file_receipts, verification_passed = (
+            _structured_edit_verification_receipt(original_snapshots)
+        )
         summary = (
             outcome.content
             if isinstance(outcome, MessageAction)
             else getattr(outcome, 'thought', '') or getattr(outcome, 'content', '')
         )
+        content = f'{summary}\n\n{verification_text}' if summary else verification_text
+        if diff:
+            content = f'{summary}\n\n[EDIT_DIFF]\n{diff}' if summary else f'[EDIT_DIFF]\n{diff}'
+            content += f'\n\n{verification_text}'
         obs = FileEditObservation(
-            content=summary,
+            content=content,
             path=action.path,
-            prev_exist=None,
+            prev_exist=True,
             old_content=None,
             new_content=None,
+            diff=diff,
             impl_source=FileEditSource.FILE_EDITOR,
         )
         obs.tool_result = {
             'tool': 'file_edit',
-            'ok': True,
-            'error_code': None,
-            'retryable': False,
+            'ok': verification_passed,
+            'error_code': None
+            if verification_passed
+            else 'STRUCTURED_EDIT_VERIFICATION_FAILED',
+            'retryable': not verification_passed,
             'operation': command,
             'payload': payload,
+            'files': file_receipts,
+            'verification_passed': verification_passed,
         }
         return obs
 

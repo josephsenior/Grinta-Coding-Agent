@@ -147,11 +147,9 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
     _FILE_EDIT_VERBS: dict[str, tuple[str, bool]] = {
         # cmd → (verb, include_stats)
-        'read_file': ('Read', False),
         'create_file': ('Created', False),
-        'insert_text': ('Inserted', True),
-        'undo_last_edit': ('Reverted', False),
-        'write': ('Wrote', False),
+        'replace_string': ('Edited', False),
+        'multi_edit': ('Edited', False),
     }
 
     def _handle_agent_action(self, action: Action) -> None:

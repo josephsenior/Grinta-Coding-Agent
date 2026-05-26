@@ -212,6 +212,7 @@ _READ_BEFORE_EDIT_COMMANDS: frozenset[str] = frozenset(
         'insert_text',
         'edit',
         'str_replace',
+        'replace_string',
         # `create_file` and `write` supply the entire file body — no anchor
         # text can mismatch — so they do not require a prior read.
     }
@@ -223,6 +224,7 @@ _MUTATING_EDIT_COMMANDS: frozenset[str] = frozenset(
         'edit',
         'write',
         'str_replace',
+        'replace_string',
         'create_file',
     }
 )
@@ -371,11 +373,24 @@ class FileStateMiddleware(ToolInvocationMiddleware):
         action = ctx.action
         action_cls = type(action).__name__
         mutated_path: str = ''
+        observation_failed = False
+
+        if observation is None:
+            return
+
+        try:
+            from backend.ledger.observation import ErrorObservation
+
+            observation_failed = isinstance(observation, ErrorObservation)
+        except Exception:
+            observation_failed = False
 
         try:
             if action_cls == 'FileEditAction':
                 path = getattr(action, 'path', '')
                 command = getattr(action, 'command', '') or 'write'
+                if observation_failed:
+                    return
                 if command == 'create_file':
                     self._tracker.record(path, 'created')
                     mutated_path = path
@@ -387,10 +402,14 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                     self._tracker.invalidate_read_snapshot(path)
                     mutated_path = path
             elif action_cls == 'FileReadAction':
+                if observation_failed:
+                    return
                 path = getattr(action, 'path', '')
                 self._tracker.record(path, 'read')
                 self._tracker.record_read_snapshot_from_disk(path)
             elif action_cls == 'FileWriteAction':
+                if observation_failed:
+                    return
                 path = getattr(action, 'path', '')
                 self._tracker.record(path, 'created')
                 self._tracker.invalidate_read_snapshot(path)

@@ -11,11 +11,13 @@ from backend.core.schemas import AgentState
 from backend.inference.exceptions import (
     APIConnectionError,
     AuthenticationError,
+    ContextWindowExceededError,
     InternalServerError,
     RateLimitError,
     ServiceUnavailableError,
     Timeout,
 )
+from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.observation import ErrorObservation
 from backend.orchestration.services.recovery_service import RecoveryService
 
@@ -41,6 +43,10 @@ def ctrl(mock_context):
     c.retry_service = MagicMock()
     c.retry_service.schedule_retry_after_failure = AsyncMock(return_value=False)
     c.get_agent_state = MagicMock(return_value=AgentState.RUNNING)
+    c.schedule_step_soon = MagicMock()
+    c.event_stream = MagicMock()
+    c.agent = MagicMock()
+    c.agent.config = MagicMock(enable_history_truncation=True)
     c.state = MagicMock()
     c.state.extra_data = {}
     return c
@@ -338,3 +344,37 @@ class TestTaskReconciliationDirective:
         await svc.react_to_exception(RuntimeError('tool failed'))
 
         state.set_planning_directive.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_survivable_error_defers_retry_via_schedule_step_soon(
+        self,
+        mock_context,
+        ctrl,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(
+            'backend.orchestration.services.recovery_service.asyncio.sleep',
+            AsyncMock(),
+        )
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(RuntimeError('tool failed'))
+
+        ctrl.schedule_step_soon.assert_called_once_with()
+        ctrl.retry_service.schedule_retry_after_failure.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_context_window_overflow_queues_compaction_and_deferred_step(
+        self,
+        mock_context,
+        ctrl,
+    ):
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(ContextWindowExceededError('too large'))
+
+        ctrl.schedule_step_soon.assert_called_once_with()
+        emitted_events = [call.args[0] for call in mock_context.emit_event.call_args_list]
+        assert any(
+            isinstance(event, CondensationRequestAction) for event in emitted_events
+        )
+        mock_context.set_agent_state.assert_not_awaited()

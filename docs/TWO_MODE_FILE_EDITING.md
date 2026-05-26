@@ -4,10 +4,10 @@ Grinta now exposes a single native tool-call surface for file and code work:
 
 - `read` inspects files, ranges, or one or more symbol bodies.
 - `find_symbols` discovers symbol candidates without reading full bodies.
-- `create` creates new files or inserts new symbols.
+- `create` creates new files or new symbols.
 - `edit_symbols` modifies or deletes existing symbols.
 - `replace_string` performs exact one-file text replacement, insertion by anchor, and deletion.
-- `multiedit` stages coordinated multi-file changes and commits them atomically.
+- `multiedit` stages coordinated `edit_symbols` / `replace_string` changes and commits them atomically.
 
 The model should choose intent, not transport format. Raw editor modes and
 file-edit blocks are not part of the public protocol. The runtime remains

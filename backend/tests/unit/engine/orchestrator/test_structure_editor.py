@@ -328,23 +328,6 @@ class TestEditFunction:
 
 
 # ---------------------------------------------------------------------------
-# rename_symbol
-# ---------------------------------------------------------------------------
-
-
-class TestRenameSymbol:
-    def test_rename_function(self, editor, py_file):
-        result = editor.rename_symbol(py_file, 'greet', 'welcome')
-        assert result.success is True
-        content = open(py_file, encoding='utf-8').read()
-        assert 'def welcome' in content
-
-    def test_rename_nonexistent(self, editor, py_file):
-        result = editor.rename_symbol(py_file, 'no_such', 'new_name')
-        assert result.success is False
-
-
-# ---------------------------------------------------------------------------
 # find_symbol
 # ---------------------------------------------------------------------------
 

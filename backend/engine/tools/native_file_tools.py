@@ -1,8 +1,8 @@
 """Native public file tools for the agent.
 
-The public file editing API is intentionally small. Do not expose new mutation
-tools to the model unless they fit the Read/Create/Edit-Symbols/Replace/Multiedit
-policy.
+The public file API separates creation from editing: ``create`` creates new
+files/symbols, while editing existing content is limited to ``replace_string``,
+``edit_symbols``, and ``multiedit``.
 """
 
 from __future__ import annotations
@@ -246,23 +246,18 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=MULTIEDIT_TOOL_NAME,
         description=(
-            'Atomic multi-file refactoring. Operations use the same capabilities as '
-            'create, edit_symbols, and replace_string. Not for casual single-file edits.'
+            'Atomic multi-file refactoring. Operations use replace_string and '
+            'edit_symbols. Not for casual single-file edits.'
         ),
         properties={
             'operations': {
                 'type': 'array',
-                'description': 'Atomic operations. Supported commands: create, edit_symbols, replace_string.',
+                'description': 'Atomic operations. Supported commands: edit_symbols, replace_string.',
                 'items': {
                     'type': 'object',
                     'properties': {
                         'command': {'type': 'string'},
-                        'type': {'type': 'string'},
                         'path': {'type': 'string'},
-                        'content': {'type': 'string'},
-                        'target_symbol': {'type': 'string'},
-                        'target_kind': {'type': 'string'},
-                        'position': {'type': 'string'},
                         'old_string': {'type': 'string'},
                         'new_string': {'type': 'string'},
                         'replace_all': {'type': 'boolean'},

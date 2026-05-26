@@ -15,6 +15,7 @@ import pytest
 from backend.core.enums import LifecyclePhase
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
+from backend.ledger.action import MessageAction, PlaybookFinishAction
 from backend.orchestration.action_scheduler import ActionScheduler
 from backend.orchestration.orchestration_config import OrchestrationConfig
 from backend.orchestration.session_orchestrator import (
@@ -24,7 +25,6 @@ from backend.orchestration.session_orchestrator import (
     TRAFFIC_CONTROL_REMINDER,
     SessionOrchestrator,
 )
-from backend.ledger.action import MessageAction, PlaybookFinishAction
 
 
 def _noop_init(self: SessionOrchestrator, *args: object, **kwargs: object) -> None:
@@ -319,13 +319,14 @@ def test_default_operation_pipeline_order_is_stable() -> None:
         'DestructiveCommandMiddleware',
         'PreExecDiffMiddleware',
         'AutoCheckMiddleware',
+        'PostEditDiagnosticsMiddleware',
         'FileStateMiddleware',
         'LoggingMiddleware',
         'TelemetryMiddleware',
         'ToolResultValidator',
     ]
     assert ctrl._rollback_middleware.__class__.__name__ == 'RollbackMiddleware'
-    assert ctrl._file_state_tracker is middlewares[10].tracker
+    assert ctrl._file_state_tracker is middlewares[11].tracker
 
 
 # ── Service aliasing ────────────────────────────────────────────────
@@ -1531,6 +1532,41 @@ class TestStepDispatch(unittest.TestCase):
         mock_loop.call_soon_threadsafe.assert_called_once_with(
             self.ctrl._create_step_task
         )
+
+    def test_schedule_step_soon_uses_main_loop_to_reenter_step(self):
+        """Deferred retries should queue a fresh step on the main loop."""
+        mock_loop = MagicMock()
+        mock_loop.is_running.return_value = True
+
+        with (
+            patch(
+                'backend.orchestration.session_orchestrator.get_main_event_loop',
+                return_value=mock_loop,
+            ),
+            patch.object(self.ctrl, 'step') as mock_step,
+        ):
+            self.ctrl.schedule_step_soon()
+
+        mock_loop.call_soon_threadsafe.assert_called_once_with(mock_step)
+
+    def test_schedule_step_soon_falls_back_to_current_loop(self):
+        """When no captured main loop exists, defer via the current running loop."""
+        mock_loop = MagicMock()
+
+        with (
+            patch(
+                'backend.orchestration.session_orchestrator.get_main_event_loop',
+                return_value=None,
+            ),
+            patch(
+                'backend.orchestration.session_orchestrator.asyncio.get_running_loop',
+                return_value=mock_loop,
+            ),
+            patch.object(self.ctrl, 'step') as mock_step,
+        ):
+            self.ctrl.schedule_step_soon()
+
+        mock_loop.call_soon.assert_called_once_with(mock_step)
 
     def test_create_step_task_guards_reentry(self):
         """_create_step_task should set _step_pending if a task appeared between scheduling."""

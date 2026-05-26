@@ -205,6 +205,14 @@ def _render_routing(
     windows_with_bash: bool = False,
     shell_is_powershell: bool = False,
 ) -> str:
+    from backend.core.interaction_modes import (
+        is_chat_mode,
+        is_plan_mode,
+        normalize_interaction_mode,
+    )
+    mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+    can_edit = not (is_chat_mode(mode) or is_plan_mode(mode))
+
     explore = _explore_hint(config)
     lsp_available = _lsp_available(config)
     meta_cognition_on = getattr(config, 'enable_meta_cognition', False)
@@ -238,6 +246,18 @@ def _render_routing(
         condensation_on=condensation_on,
         meta_cognition_on=meta_cognition_on,
     )
+
+    if not can_edit:
+        read_and_edit_ladder = ''
+        shell_and_execution_ladder = ''
+    else:
+        read_and_edit_ladder = (
+            '- **Read & Edit:** Use native tool calls only. `find_symbols` discovers symbol candidates; `read` inspects file/range/symbol content; `create` creates new files/symbols; `edit_symbols` modifies/deletes existing symbols; `replace_string` performs exact one-file text replacement/addition/deletion; `multiedit` performs atomic multi-file refactors with `replace_string` and `edit_symbols` operations.\n'
+            '- **Edit scope:** Prefer the smallest intent-level operation that solves the problem. Do not use shell commands to write source files.\n'
+            '- **NORMAL MODE:** Use the registered file tools only; do not invent alternate file-edit formats or serialized code payloads.'
+        )
+        shell_and_execution_ladder = '- **Shell & Execution:** Use the terminal strictly for build/test/git/processes.'
+
     return render_partial(
         'system_partial_00_routing.md',
         ambiguous_intent_instruction=memory_kw['ambiguous_intent_instruction'],
@@ -252,6 +272,8 @@ def _render_routing(
         repetition_recovery_options=memory_kw['repetition_recovery_options'],
         surviving_state_facts=memory_kw['surviving_state_facts'],
         tool_call_batching_mode=tool_call_batching_mode,
+        read_and_edit_ladder=read_and_edit_ladder,
+        shell_and_execution_ladder=shell_and_execution_ladder,
     )
 
 
@@ -299,7 +321,7 @@ def _render_system_capabilities(
     else:
         multi_edit_line = (
             '- **Atomic multi-file edits**: not exposed in this build — use targeted '
-            '`create`, `edit_symbols`, or `replace_string` tool calls sequentially'
+            '`edit_symbols` or `replace_string` tool calls sequentially'
             + (
                 ' and take a `checkpoint` before the batch for coarse rollback.'
                 if checkpoints_on
@@ -539,6 +561,14 @@ def _render_tool_reference(
     windows_with_bash: bool,
     shell_is_powershell: bool,
 ) -> str:
+    from backend.core.interaction_modes import (
+        is_chat_mode,
+        is_plan_mode,
+        normalize_interaction_mode,
+    )
+    mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+    can_edit = not (is_chat_mode(mode) or is_plan_mode(mode))
+
     explore = _explore_hint(config)
     confirm_cmd = (
         _path_uncertainty_hint(
@@ -560,11 +590,46 @@ def _render_tool_reference(
     checkpoint_rollback_hint = (
         '; use **checkpoint** for coarse rollback' if checkpoints else ''
     )
+
+    if not can_edit:
+        editor_ops = (
+            '<EDITOR_AND_FILE_OPERATIONS>\n'
+            f'Editor `path` values normalize safely. {confirm_cmd}\n'
+            '**File API mental model**\n'
+            '- Context: `read` for file, range, or symbol bodies.\n'
+            '- Discovery: `find_symbols` returns candidates.\n'
+            '</EDITOR_AND_FILE_OPERATIONS>'
+        )
+    else:
+        editor_ops = (
+            '<EDITOR_AND_FILE_OPERATIONS>\n'
+            f'Editor `path` values normalize safely. {confirm_cmd}\n'
+            'Edit the user path directly; no shadow copies; remove temp files when done.\n\n'
+            '**File API mental model**\n'
+            '- Discovery: `find_symbols` returns candidates.\n'
+            '- Context: `read` for file, range, or symbol bodies. `read(type="symbols")` returns each target as resolved, ambiguous, or not_found.\n'
+            '- Creation: `create(type="file")` for new files; `create(type="symbol")` for new symbols anchored to existing code.\n'
+            '- Code: `edit_symbols` for modifying/deleting existing symbols; prefer `path` + `qualified_name` + `symbol_kind` for write targets.\n'
+            '- Text/config/docs: `replace_string`; add by anchor -> anchor + content, delete with `new_string=""`.\n'
+            '- Refactor atomically across files: `multiedit`.\n'
+            '- Never write source via shell. Use real newlines/quotes, not serialized JSON strings.\n\n'
+            '**Examples**\n'
+            '- Find candidates: `find_symbols(query="authenticate")`.\n'
+            '- Read symbols: `read(type="symbols", symbols=[{"qualified_name": "authenticate_user"}, {"qualified_name": "UserService"}])`.\n'
+            '- README/config add: `replace_string("## Usage\\n", "## Usage\\n\\nExample:\\n...")`.\n'
+            '- Delete: `replace_string(old_string="old config block", new_string="")`.\n'
+            '- Modify method: `edit_symbols(edits=[{"path": "src/auth.py", "qualified_name": "AuthService.login", "symbol_kind": "method", "new_content": "def login(...):\\n    ..."}])`.\n'
+            '- Multiple functions: `edit_symbols`; implementation + tests: `multiedit`.\n'
+            '</EDITOR_AND_FILE_OPERATIONS>'
+        )
+
+
     return render_partial(
         'system_partial_02_tools.md',
         confirm_paths=confirm_cmd,
         process_management=proc_find,
         checkpoint_rollback_hint=checkpoint_rollback_hint,
+        editor_and_file_operations=editor_ops,
     )
 
 
