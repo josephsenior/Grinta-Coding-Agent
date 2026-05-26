@@ -57,6 +57,11 @@ class FileEditorEditOpsMixin:
         raw = os.environ.get('GRINTA_STRICT_WRITE_VALIDATION', '').strip().lower()
         return raw in {'1', 'true', 'yes', 'on'}
 
+    @staticmethod
+    def _syntax_regression_guard_enabled() -> bool:
+        raw = os.environ.get('GRINTA_SYNTAX_REGRESSION_GUARD', '').strip().lower()
+        return raw not in {'0', 'false', 'no', 'off'}
+
     def _maybe_validate_syntax_for_file(
         self, file_path: Path, content: str
     ) -> tuple[bool, str]:
@@ -65,25 +70,21 @@ class FileEditorEditOpsMixin:
             return False, preflight
 
         try:
-            from backend.utils.treesitter_editor import TreeSitterEditor
+            from backend.utils.syntax_check import check_syntax
         except Exception as exc:
-            return True, f'Tree-sitter unavailable: {exc}'
+            return True, f'Syntax checker unavailable: {exc}'
 
-        try:
-            editor = TreeSitterEditor()
-        except Exception as exc:
-            return True, f'Tree-sitter initialization failed: {exc}'
+        result = check_syntax(str(file_path), content)
+        language = result.language
+        if result.status == 'skipped':
+            return True, result.detail or 'Syntax validation skipped'
 
-        language = editor.detect_language(str(file_path))
-        if not language:
-            return True, 'No parser mapping for file extension; skipping validation'
-
-        is_valid, msg = editor.validate_syntax(content, str(file_path), language)
-        if is_valid:
-            return True, msg
+        if result.status == 'passed':
+            checker = f' via {result.checker}' if result.checker else ''
+            return True, f'Syntax validation passed{checker}'
 
         enriched_msg = self._enrich_syntax_error_with_escape_hint(
-            msg, content, file_path
+            result.detail, content, file_path
         )
         enriched_msg = self._attach_content_context(enriched_msg, content)
 
@@ -94,6 +95,45 @@ class FileEditorEditOpsMixin:
             return False, enriched_msg
 
         return True, f'WARNING: {enriched_msg}'
+
+    def _detect_introduced_syntax_error(
+        self,
+        file_path: Path,
+        old_content: str | None,
+        new_content: str,
+    ) -> str | None:
+        """Block edits that turn a previously parse-valid file parse-invalid."""
+        if (
+            old_content is None
+            or old_content == new_content
+            or not self._syntax_regression_guard_enabled()
+        ):
+            return None
+
+        try:
+            from backend.utils.syntax_check import check_syntax
+        except Exception:
+            return None
+
+        try:
+            old_result = check_syntax(str(file_path), old_content)
+            new_result = check_syntax(str(file_path), new_content)
+        except Exception:
+            return None
+
+        if old_result.status != 'passed' or new_result.status != 'failed':
+            return None
+
+        enriched_msg = self._enrich_syntax_error_with_escape_hint(
+            new_result.detail, new_content, file_path
+        )
+        enriched_msg = self._attach_content_context(enriched_msg, new_content)
+        return (
+            'INTRODUCED_SYNTAX_ERROR: the previous file parsed successfully, '
+            'but this edit introduces syntax errors. Re-read the affected '
+            'region and repair with one smaller targeted edit.\n'
+            f'{enriched_msg}'
+        )
 
     @staticmethod
     def _preflight_content_guard(file_path: Path, content: str) -> str | None:

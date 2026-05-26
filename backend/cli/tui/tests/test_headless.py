@@ -430,6 +430,11 @@ def test_tui_strips_leaked_mouse_reports_from_input_text() -> None:
     assert _strip_terminal_control_literals(leaked) == 'hello'
 
 
+def test_tui_strips_leaked_mouse_reports_without_sgr_marker() -> None:
+    leaked = 'PS> [444444;32;15M[555;31;16Mhello'
+    assert _strip_terminal_control_literals(leaked) == 'PS> hello'
+
+
 @pytest.mark.asyncio
 async def test_tui_input_removes_leaked_mouse_reports_live(mock_config):
     console = RichConsole()
@@ -793,6 +798,65 @@ async def test_tui_mode_switch_supports_chat_plan_agent(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_mode_switch_updates_default_agent_config(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    mock_config.default_agent = 'Orchestrator'
+    configs = {
+        'Orchestrator': SimpleNamespace(mode='agent'),
+        'agent': SimpleNamespace(mode='agent'),
+    }
+    mock_config.get_agent_config.side_effect = lambda name='agent': configs[name]
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._apply_mode('chat')
+        await pilot.pause()
+
+        assert configs['Orchestrator'].mode == 'chat'
+        assert configs['agent'].mode == 'agent'
+
+
+@pytest.mark.asyncio
+async def test_tui_mode_switch_updates_running_agent_config(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    agent_config = SimpleNamespace(mode='agent')
+    mock_config.get_agent_config.return_value = agent_config
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        running_config = SimpleNamespace(mode='agent')
+        planner = SimpleNamespace(
+            _config=running_config,
+            build_toolset=MagicMock(return_value=['read']),
+        )
+        agent = SimpleNamespace(
+            config=running_config,
+            planner=planner,
+            tools=['old'],
+        )
+        s._controller = SimpleNamespace(
+            agent=agent,
+            state=SimpleNamespace(extra_data={'active_run_mode': 'agent'}),
+        )
+
+        s._apply_mode('chat')
+        await pilot.pause()
+
+        assert agent_config.mode == 'chat'
+        assert running_config.mode == 'chat'
+        assert agent.tools == ['read']
+        assert 'active_run_mode' not in s._controller.state.extra_data
+
+
+@pytest.mark.asyncio
 async def test_tui_autonomy_visibility_follows_mode(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
@@ -1053,6 +1117,47 @@ async def test_tui_terminal_session_reuses_single_card(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_terminal_observation_strips_control_traffic(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(TerminalRunAction(command='powershell'))
+        renderer._process_event(
+            TerminalObservation(
+                session_id='term-1',
+                content='PS> \x1b[32mok\x1b[0m [444444;32;15Mdone',
+            )
+        )
+        await pilot.pause()
+
+        card = next(
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-terminal' in card.classes
+        )
+        extra = card.query_one('#extra')
+        rendered = str(extra.renderable)
+        assert '\x1b' not in rendered
+        assert '[444444;32;15M' not in rendered
+        assert 'PS> ok done' in rendered
+
+
+@pytest.mark.asyncio
 async def test_tui_shell_command_reuses_single_card(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
@@ -1303,6 +1408,42 @@ async def test_tui_file_edit_observation_uses_unified_diff_rows(mock_config):
         assert any(line.startswith('+++ demo.txt') for line in diff_text)
         assert any(line.startswith('@@') for line in diff_text)
         assert any(line.startswith('+gamma') for line in diff_text)
+
+
+@pytest.mark.asyncio
+async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            FileEditObservation(
+                content='edited',
+                path='.',
+                prev_exist=True,
+                diff='--- demo.txt\n+++ demo.txt\n@@ -1 +1 @@\n-old\n+new\n',
+            )
+        )
+        await pilot.pause()
+
+        diff_rows = list(s.query(DiffLine).results())
+        diff_text = [row.renderable.plain for row in diff_rows]
+        assert any(line.startswith('--- demo.txt') for line in diff_text)
+        assert any(line.startswith('+new') for line in diff_text)
 
 
 @pytest.mark.asyncio

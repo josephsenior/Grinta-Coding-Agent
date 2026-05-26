@@ -151,6 +151,26 @@ async def test_middleware_blocks_str_replace_without_prior_read(
 
 
 @pytest.mark.asyncio
+async def test_middleware_blocks_replace_string_without_prior_read(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv('GRINTA_FILE_STATE_GUARD', raising=False)
+    monkeypatch.delenv('SECURITY_FILE_STATE_GUARD', raising=False)
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / 'target.py'
+    f.write_text('x = 1\n', encoding='utf-8')
+
+    mw = FileStateMiddleware()
+    action = _file_edit_action(str(f), 'replace_string')
+    ctx = _make_ctx(action)
+
+    await mw.execute(ctx)
+
+    assert ctx.blocked is True
+    assert 'FILE_STATE_GUARD' in (ctx.block_reason or '')
+
+
+@pytest.mark.asyncio
 async def test_middleware_allows_str_replace_without_prior_read_when_guard_disabled(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -167,6 +187,41 @@ async def test_middleware_allows_str_replace_without_prior_read_when_guard_disab
     await mw.execute(ctx)
 
     assert ctx.blocked is False
+
+
+@pytest.mark.asyncio
+async def test_middleware_allows_replace_string_after_read(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / 'target.py'
+    f.write_text('x = 1\n', encoding='utf-8')
+
+    mw = FileStateMiddleware()
+    mw.tracker.record(str(f), 'read')
+    action = _file_edit_action(str(f), 'replace_string')
+    ctx = _make_ctx(action)
+
+    await mw.execute(ctx)
+
+    assert ctx.blocked is False
+
+
+@pytest.mark.asyncio
+async def test_middleware_does_not_record_failed_edit_as_modified(tmp_path) -> None:
+    from backend.ledger.observation import ErrorObservation
+
+    f = tmp_path / 'target.py'
+    f.write_text('x = 1\n', encoding='utf-8')
+
+    mw = FileStateMiddleware()
+    action = _file_edit_action(str(f), 'replace_string')
+    ctx = _make_ctx(action)
+
+    await mw.observe(ctx, ErrorObservation('replace_string old_string was not found'))
+
+    assert mw.tracker.has_been_modified_recently(str(f)) is False
+    assert mw.tracker.has_been_read_recently(str(f)) is False
 
 
 @pytest.mark.asyncio

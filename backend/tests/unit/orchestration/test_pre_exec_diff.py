@@ -353,14 +353,27 @@ class TestSimulateEdit:
         middleware = PreExecDiffMiddleware()
         action = MagicMock()
         action.command = 'insert_text'
-        action.insert_line = 1
+        action.insert_line = 2
         action.new_str = 'inserted line'
 
-        old_content = 'line 0\\nline 1\\nline 2'
+        old_content = 'line 0\nline 1\nline 2'
         new_content = middleware._simulate_edit(old_content, action)
 
-        assert new_content is not None
-        assert 'inserted line' in new_content
+        assert new_content == 'line 0\ninserted line\nline 1\nline 2'
+
+    def test_simulate_edit_replace_string(self):
+        """Should simulate exact replace_string command."""
+        middleware = PreExecDiffMiddleware()
+        action = MagicMock()
+        action.command = 'replace_string'
+        action.old_string = 'beta\n'
+        action.new_str = 'BETA\n'
+        action.replace_all = False
+
+        old_content = 'alpha\nbeta\ngamma\n'
+        new_content = middleware._simulate_edit(old_content, action)
+
+        assert new_content == 'alpha\nBETA\ngamma\n'
 
     def test_simulate_edit_insert_text_at_end(self):
         """Should handle insert_text beyond last line."""

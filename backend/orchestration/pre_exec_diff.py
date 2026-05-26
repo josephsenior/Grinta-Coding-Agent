@@ -106,9 +106,35 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
             return action.file_text or ''
         if action.command == 'insert_text' and action.insert_line is not None:
             lines = old_content.splitlines(keepends=True)
-            insert_idx = max(0, min(action.insert_line, len(lines)))
-            lines.insert(insert_idx, (action.new_str or '') + '\n')
-            return ''.join(lines)
+            new_text = action.new_str or ''
+            line_ending = '\r\n' if '\r\n' in old_content else '\n'
+            if old_content and new_text and not new_text.endswith(('\n', '\r')):
+                new_text += line_ending
+            insert_idx = max(0, min(action.insert_line - 1, len(lines)))
+            new_lines = new_text.splitlines(keepends=True) or [new_text]
+            return ''.join(lines[:insert_idx] + new_lines + lines[insert_idx:])
+        if action.command == 'replace_string':
+            old_string = getattr(action, 'old_string', None)
+            if not old_string:
+                return None
+            newline = '\r\n' if '\r\n' in old_content else '\n'
+            old_match = old_string.replace('\r\n', '\n').replace('\r', '\n')
+            new_replacement = (action.new_str or '').replace('\r\n', '\n').replace(
+                '\r', '\n'
+            )
+            if newline == '\r\n':
+                old_match = old_match.replace('\n', '\r\n')
+                new_replacement = new_replacement.replace('\n', '\r\n')
+            replace_all = getattr(action, 'replace_all', False)
+            replace_all = replace_all if isinstance(replace_all, bool) else False
+            match_count = old_content.count(old_match)
+            if match_count == 0 or (match_count > 1 and not replace_all):
+                return None
+            return old_content.replace(
+                old_match,
+                new_replacement,
+                -1 if replace_all else 1,
+            )
         if action.command == 'edit' and getattr(action, 'edit_mode', None) == 'range':
             start = getattr(action, 'start_line', None)
             end = getattr(action, 'end_line', None)

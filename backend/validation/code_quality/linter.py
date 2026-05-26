@@ -7,7 +7,6 @@ backends with proper error formatting and reporting.
 from __future__ import annotations
 
 import hashlib
-import tempfile
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -286,6 +285,7 @@ class DefaultLinter:
         """Lint a file using the detected backend."""
         # Try LSP first for all supported languages
         from backend.utils.lsp_client import get_lsp_client
+        from backend.utils.syntax_check import check_syntax
 
         lsp = get_lsp_client()
         lsp_res = lsp.query('diagnostics', file_path)
@@ -305,25 +305,35 @@ class DefaultLinter:
             if errors:
                 return LintResult(errors=errors, warnings=[])
 
+        syntax_result = check_syntax(file_path)
+        if syntax_result.status == 'failed':
+            return LintResult(
+                errors=[self._syntax_result_to_lint_error(syntax_result, file_path)],
+                warnings=[],
+            )
+
         return LintResult(errors=[], warnings=[])
 
     def _lint_content(self, content: str, file_path: str | None = None) -> LintResult:
         """Lint content string using the detected backend."""
-        # Write content to temporary file and lint it
-        suffix = Path(file_path).suffix if file_path else '.py'
-        with tempfile.NamedTemporaryFile(
-            mode='w', suffix=suffix, delete=False
-        ) as tmp_file:
-            tmp_file.write(content)
-            tmp_path = tmp_file.name
+        from backend.utils.syntax_check import check_syntax
 
-        try:
-            pass
-        finally:
-            # Clean up temp file
-            try:
-                Path(tmp_path).unlink()
-            except Exception:
-                pass
+        path = file_path or '<memory>.py'
+        syntax_result = check_syntax(path, content)
+        if syntax_result.status != 'failed':
+            return LintResult(errors=[], warnings=[])
+        return LintResult(
+            errors=[self._syntax_result_to_lint_error(syntax_result, path)],
+            warnings=[],
+        )
 
-        return LintResult(errors=[], warnings=[])
+    @staticmethod
+    def _syntax_result_to_lint_error(result: Any, file_path: str) -> LintError:
+        return LintError(
+            line=result.line or 1,
+            column=result.column,
+            message=result.detail or 'Syntax check failed',
+            code=result.checker,
+            severity='error',
+            file_path=file_path,
+        )

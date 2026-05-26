@@ -787,6 +787,13 @@ class TestGetCallKwargs:
         assert result['seed'] == 123
         assert result['tool_choice'] == 'none'
 
+    def test_explicit_max_tokens_is_not_overwritten_by_config_default(self):
+        llm = self._make_llm_stub('gpt-4o')
+
+        result = llm._get_call_kwargs(is_stream=True, max_tokens=321)
+
+        assert result['max_tokens'] == 321
+
 
 class TestInbandDisconnectDetection:
     """astream() must detect in-band provider disconnect messages and raise APIConnectionError.

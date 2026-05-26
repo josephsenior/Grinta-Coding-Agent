@@ -5,6 +5,8 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from backend.core.type_safety.sentinels import MISSING
 from backend.execution.utils.file_editor import FileEditor, ToolError, ToolResult
 
@@ -215,6 +217,21 @@ class TestFileEditorWrite:
         assert result.error is None
         assert existing.read_text() == 'print("rewritten")\n'
 
+    def test_write_blocks_large_existing_code_file_overwrite(self):
+        existing = Path(self.tmpdir) / 'big.py'
+        original = ''.join(f'line_{i} = {i}\n' for i in range(220))
+        existing.write_text(original)
+
+        result = self.editor(
+            command='write',
+            path='big.py',
+            file_text='print("truncated")\n',
+        )
+
+        assert result.error is not None
+        assert result.error_code == 'LARGE_EXISTING_CODE_FILE_OVERWRITE_BLOCKED'
+        assert existing.read_text() == original
+
     def test_create_file_rejects_obvious_serialized_payload(self):
         result = self.editor(
             command='create_file',
@@ -274,6 +291,43 @@ class TestFileEditorEdit:
         assert result.error is None
         content = (Path(self.tmpdir) / 'code.py').read_text()
         assert 'y = 42' in content
+
+    def test_range_edit_blocks_syntax_regression(self):
+        from backend.utils import treesitter_editor
+
+        if not treesitter_editor.TREE_SITTER_AVAILABLE:
+            pytest.skip('tree-sitter not installed')
+        target = self._write('code.py', 'def ok():\n    return 1\n')
+
+        result = self.editor(
+            command='edit',
+            path='code.py',
+            edit_mode='range',
+            start_line=1,
+            end_line=1,
+            new_str='def broken(\n',
+        )
+
+        assert result.error is not None
+        assert result.error_code == 'INTRODUCED_SYNTAX_ERROR'
+        assert target.read_text() == 'def ok():\n    return 1\n'
+
+    def test_range_edit_blocks_python_compile_only_regression(self):
+        target = self._write('code.py', 'def ok():\n    return 1\n')
+
+        result = self.editor(
+            command='edit',
+            path='code.py',
+            edit_mode='range',
+            start_line=1,
+            end_line=2,
+            new_str='return 1\n',
+        )
+
+        assert result.error is not None
+        assert result.error_code == 'INTRODUCED_SYNTAX_ERROR'
+        assert "'return' outside function" in result.error
+        assert target.read_text() == 'def ok():\n    return 1\n'
 
     def test_edit_dry_run(self):
         self._write('code.py', 'x = 1\n')

@@ -18,6 +18,7 @@ class HUDState:
     """Mutable state backing the HUD bar."""
 
     model: str = '(not set)'
+    total_tokens: int = 0
     context_tokens: int = 0
     context_limit: int = 0
     cost_usd: float = 0.0
@@ -230,6 +231,46 @@ class HUDBar:
         self.state.context_tokens = used
         self.state.context_limit = limit
 
+    @staticmethod
+    def _usage_total_tokens(usage: Any) -> int:
+        if usage is None:
+            return 0
+        prompt = int(getattr(usage, 'prompt_tokens', 0) or 0)
+        completion = int(getattr(usage, 'completion_tokens', 0) or 0)
+        return prompt + completion
+
+    @staticmethod
+    def _dict_usage_total_tokens(usage: dict[str, Any] | None) -> int:
+        if not isinstance(usage, dict):
+            return 0
+        prompt = int(usage.get('prompt_tokens', 0) or 0)
+        completion = int(usage.get('completion_tokens', 0) or 0)
+        return prompt + completion
+
+    def _resolve_total_tokens_from_object_metrics(
+        self,
+        usages: list[Any] | None,
+        accumulated_usage: Any,
+    ) -> int:
+        total = self._usage_total_tokens(accumulated_usage)
+        if total > 0:
+            return total
+        return sum(self._usage_total_tokens(usage) for usage in usages or [])
+
+    def _resolve_total_tokens_from_dict_metrics(
+        self,
+        usages: list[Any] | None,
+        accumulated_usage: dict[str, Any] | None,
+    ) -> int:
+        total = self._dict_usage_total_tokens(accumulated_usage)
+        if total > 0:
+            return total
+        summed = 0
+        for usage in usages or []:
+            if isinstance(usage, dict):
+                summed += self._dict_usage_total_tokens(usage)
+        return summed
+
     def update_cost(self, cost_usd: float) -> None:
         self.state.cost_usd = cost_usd
 
@@ -313,6 +354,12 @@ class HUDBar:
         response_latencies = getattr(metrics, 'response_latencies', []) or []
         costs = getattr(metrics, 'costs', []) or []
         accumulated_usage = getattr(metrics, 'accumulated_token_usage', None)
+        resolved_total_tokens = self._resolve_total_tokens_from_object_metrics(
+            usages,
+            accumulated_usage,
+        )
+        if resolved_total_tokens > 0:
+            self.state.total_tokens = resolved_total_tokens
         resolved_calls = self._resolve_call_count(
             usages=usages,
             response_latencies=response_latencies,
@@ -332,6 +379,8 @@ class HUDBar:
 
     def _apply_object_accumulated_usage(self, accumulated_usage: Any) -> None:
         prompt_tokens = int(getattr(accumulated_usage, 'prompt_tokens', 0) or 0)
+        completion_tokens = int(getattr(accumulated_usage, 'completion_tokens', 0) or 0)
+        self.state.total_tokens = prompt_tokens + completion_tokens
         self.state.context_tokens = prompt_tokens
         self.state.context_limit = int(
             getattr(accumulated_usage, 'context_window', 0) or 0
@@ -352,6 +401,12 @@ class HUDBar:
         self.state.cost_usd = accumulated_cost
         usages = metrics.get('token_usages', [])
         accumulated_usage = metrics.get('accumulated_token_usage')
+        resolved_total_tokens = self._resolve_total_tokens_from_dict_metrics(
+            usages if isinstance(usages, list) else [],
+            accumulated_usage if isinstance(accumulated_usage, dict) else None,
+        )
+        if resolved_total_tokens > 0:
+            self.state.total_tokens = resolved_total_tokens
         resolved_calls = self._resolve_call_count(
             usages=usages if isinstance(usages, list) else [],
             response_latencies=metrics.get('response_latencies', []),
@@ -376,8 +431,10 @@ class HUDBar:
         accumulated_usage: dict[str, Any],
     ) -> bool:
         prompt = int(accumulated_usage.get('prompt_tokens', 0) or 0)
+        completion = int(accumulated_usage.get('completion_tokens', 0) or 0)
         if prompt <= 0 and int(accumulated_usage.get('context_window', 0) or 0) <= 0:
             return False
+        self.state.total_tokens = prompt + completion
         self.state.context_tokens = prompt
         self.state.context_limit = int(accumulated_usage.get('context_window', 0) or 0)
         self.state.token_usage_estimated = bool(

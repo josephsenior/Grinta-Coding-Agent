@@ -274,13 +274,20 @@ class TestDefaultLinterLintFile:
 
 
 class TestDefaultLinterLintContent:
-    """Test _lint_content with unsupported backend (line 351 fallback)."""
+    """Test _lint_content syntax validation."""
 
     def test_lint_content_unsupported_backend_returns_empty(self):
-        """When backend is neither ruff nor pylint, returns empty LintResult."""
+        """Valid content returns an empty LintResult."""
         with patch.object(DefaultLinter, '_check_backend_available', return_value=True):
             linter = DefaultLinter(backend='tree-sitter')
-        # tree-sitter is not handled in _lint_content, falls through to line 351
         result = linter.lint(content='x = 1')
         assert result.errors == []
         assert result.warnings == []
+
+    def test_lint_content_reports_python_compile_errors(self):
+        with patch.object(DefaultLinter, '_check_backend_available', return_value=True):
+            linter = DefaultLinter(backend='tree-sitter')
+        result = linter.lint(content='return 1\n', file_path='app.py')
+        assert len(result.errors) == 1
+        assert result.errors[0].code == 'python-compile'
+        assert "'return' outside function" in result.errors[0].message

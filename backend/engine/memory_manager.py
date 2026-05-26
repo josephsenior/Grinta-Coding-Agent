@@ -138,7 +138,7 @@ class ContextMemoryManager:
             return CondensedHistory(history, None)
 
         # Auto-extract critical context before compaction may discard events
-        self._extract_pre_condensation_snapshot(history)
+        self._extract_pre_condensation_snapshot(state, history)
 
         # Check if we have a pre-warmed condensation from the background task
         turn_signals = getattr(state, 'turn_signals', None)
@@ -184,7 +184,9 @@ class ContextMemoryManager:
         # Compaction occurred — attach the snapshot for post-recovery injection
         return CondensedHistory([], action)
 
-    def _extract_pre_condensation_snapshot(self, history: list[Event]) -> None:
+    def _extract_pre_condensation_snapshot(
+        self, state: State, history: list[Event]
+    ) -> None:
         """Extract and persist a snapshot of critical context from current history.
 
         This runs *before* the compactor, so the full event stream is still
@@ -192,14 +194,37 @@ class ContextMemoryManager:
         """
         try:
             snapshot = extract_snapshot(history)
+            self._attach_runtime_snapshot(snapshot, state)
             if (
                 snapshot.get('files_touched')
                 or snapshot.get('recent_errors')
                 or snapshot.get('decisions')
+                or snapshot.get('runtime')
             ):
                 save_snapshot(snapshot)
         except Exception:
             logger.debug('Pre-condensation snapshot extraction failed', exc_info=True)
+
+    @staticmethod
+    def _attach_runtime_snapshot(snapshot: dict, state: State) -> None:
+        """Attach live run position so post-condensation recovery is anchored."""
+        iteration_flag = getattr(state, 'iteration_flag', None)
+        turn_signals = getattr(state, 'turn_signals', None)
+        runtime: dict[str, object] = {}
+        session_id = getattr(state, 'session_id', None)
+        if isinstance(session_id, str) and session_id:
+            runtime['session_id'] = session_id
+        current = getattr(iteration_flag, 'current_value', None)
+        maximum = getattr(iteration_flag, 'max_value', None)
+        if isinstance(current, int):
+            runtime['iteration'] = current
+        if isinstance(maximum, int):
+            runtime['max_iterations'] = maximum
+        memory_pressure = getattr(turn_signals, 'memory_pressure', None)
+        if isinstance(memory_pressure, str) and memory_pressure:
+            runtime['memory_pressure'] = memory_pressure
+        if runtime:
+            snapshot['runtime'] = runtime
 
     @staticmethod
     def get_restored_context() -> str:

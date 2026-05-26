@@ -104,7 +104,11 @@ def classify_editor_recovery(
             ),
         )
 
-    if 'syntax validation failed' in lower or 'syntax error after edit' in lower:
+    if (
+        'syntax validation failed' in lower
+        or 'syntax error after edit' in lower
+        or 'introduced_syntax_error' in lower
+    ):
         return EditorRecoveryAdvice(
             kind='syntax_validation_failed',
             preferred_tool='read',

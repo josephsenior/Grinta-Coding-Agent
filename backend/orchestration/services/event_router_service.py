@@ -98,20 +98,12 @@ def _summarize_delegate_file_action(
         return None
 
     command = getattr(event, 'command', '') or ''
-    if command == 'create_file':
-        return 'running', f'Created {event.path}'
     if command == 'read_file':
         region = ''
         vr = getattr(event, 'view_range', None)
         if vr and len(vr) == 2:
             region = f' L{vr[0]}:L{vr[1]}'
         return 'running', f'Read {event.path}{region}'
-    if command == 'insert_text':
-        return 'running', f'Inserted into {event.path}'
-    if command == 'write':
-        return 'running', f'Wrote {event.path}'
-    if command == 'undo_last_edit':
-        return 'running', f'Reverted {event.path}'
     return 'running', f'Edited {event.path}'
 
 

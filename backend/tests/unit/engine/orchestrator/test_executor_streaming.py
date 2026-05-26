@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.engine.safety import OrchestratorSafetyManager
+from backend.inference.exceptions import ContextWindowExceededError
 
 
 class _Safety:
@@ -270,6 +271,108 @@ def test_async_execute_preserves_streamed_reasoning_content(monkeypatch):
         resp.to_dict()['choices'][0]['message']['reasoning_content']
         == 'think one think two'
     )
+
+
+def test_async_execute_clamps_completion_budget_before_stream_call(monkeypatch):
+    import backend.engine.function_calling as fc
+    from backend.engine.executor import OrchestratorExecutor
+
+    sys.modules.setdefault('app.engine.function_calling', fc)
+
+    from backend.engine import executor as executor_module
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: [],
+    )
+
+    captured: dict[str, Any] = {}
+
+    async def fake_astream(**kwargs):
+        captured.update(kwargs)
+        yield {
+            'id': 'chatcmpl-clamped',
+            'model': 'test-model',
+            'choices': [{'delta': {'content': 'ok'}, 'finish_reason': None}],
+        }
+        yield {
+            'id': 'chatcmpl-clamped',
+            'model': 'test-model',
+            'choices': [{'delta': {}, 'finish_reason': 'stop'}],
+        }
+
+    llm = MagicMock()
+    llm.astream = fake_astream
+    llm.context_window = MagicMock(return_value=650)
+    llm.config = SimpleNamespace(
+        model='test-model',
+        max_input_tokens=600,
+        max_output_tokens=300,
+    )
+    llm.features = SimpleNamespace(
+        max_input_tokens=600,
+        max_output_tokens=300,
+    )
+
+    executor = OrchestratorExecutor(
+        llm=llm,
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    params = {'messages': [{'role': 'user', 'content': 'x' * 2000}]}
+    expected = executor._apply_context_window_preflight(dict(params))
+
+    asyncio.run(executor.async_execute(params, MagicMock()))
+
+    assert captured['max_tokens'] == expected['max_tokens']
+    assert captured['max_tokens'] < 300
+
+
+def test_async_execute_raises_preflight_context_error_before_provider_call(
+    monkeypatch,
+):
+    import backend.engine.function_calling as fc
+    from backend.engine.executor import OrchestratorExecutor
+
+    sys.modules.setdefault('app.engine.function_calling', fc)
+
+    from backend.engine import executor as executor_module
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: [],
+    )
+
+    llm = MagicMock()
+    llm.astream = MagicMock()
+    llm.context_window = MagicMock(return_value=240)
+    llm.config = SimpleNamespace(
+        model='test-model',
+        max_input_tokens=220,
+        max_output_tokens=64,
+    )
+    llm.features = SimpleNamespace(
+        max_input_tokens=220,
+        max_output_tokens=64,
+    )
+
+    executor = OrchestratorExecutor(
+        llm=llm,
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    params = {'messages': [{'role': 'user', 'content': 'x' * 3000}]}
+
+    with pytest.raises(ContextWindowExceededError):
+        asyncio.run(executor.async_execute(params, MagicMock()))
+
+    llm.astream.assert_not_called()
 
 
 def test_async_execute_does_not_timeout_active_reasoning_stream(
@@ -641,7 +744,7 @@ def test_append_only_delta_preserves_content_even_when_chunk_is_substring_of_pre
     # short whitespace+punctuation delta that *happens* to reappear inside
     # the prefix. Plain concatenation must preserve it verbatim.
     prefix = (
-        '{"command": "create_file", "path": "styles.css", "file_text": '
+        '{"path": "styles.css", "old_string": "/* old */", "new_string": '
         '"h1 {\\n    color: #fff;\\n    margin-bottom: 20px;\\n}\\n\\n'
         '.controls {\\n    margin-top: 25px'
     )

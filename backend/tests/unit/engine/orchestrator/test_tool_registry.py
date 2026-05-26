@@ -145,14 +145,8 @@ class TestFeatureFlagToolPresence:
             'read_file',
             'read_range',
             'read_symbol',
-            'create_file',
-            'create_symbol',
             'replace_symbol',
-            'insert_symbol',
-            'insert_text',
             'append_text',
-            'undo_last_edit',
-            'rename_symbol',
             'file_editor',
             'text_editor',
             'symbol_editor',
@@ -351,11 +345,31 @@ class TestModeToolVisibility:
         assert {'create', 'edit_symbols', 'replace_string', 'multiedit'} <= names
         assert {'terminal_manager', 'communicate_with_user', 'finish'} <= names
 
-    def test_chat_mode_hides_finish_and_communicate(self):
-        names = _build_toolset(
-            mode='chat',
-            enable_finish=True,
-            enable_meta_cognition=True,
-        )
-        assert 'finish' not in names
-        assert 'communicate_with_user' not in names
+    def test_chat_mode_exposes_only_read_only_inspection_tools(self):
+        from unittest.mock import patch
+
+        with patch(
+            'backend.utils.runtime_detect.has_any_lsp_server', return_value=True
+        ):
+            names = _build_toolset(
+                mode='chat',
+                enable_finish=True,
+                enable_meta_cognition=True,
+                enable_terminal=True,
+                enable_editor=True,
+                enable_task_tracker_tool=True,
+                enable_mcp=True,
+                enable_browsing=True,
+                enable_debugger=True,
+                enable_checkpoints=True,
+                enable_working_memory=True,
+            )
+
+        assert names == {
+            'read',
+            'find_symbols',
+            'search_code',
+            'analyze_project_structure',
+            'lsp',
+            'recall',
+        }

@@ -4,6 +4,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from backend.core.interaction_modes import (
+    CHAT_MODE_ALLOWED_TOOLS,
     PLAN_MODE,
     PLAN_MODE_ALLOWED_TOOLS,
     is_chat_mode,
@@ -134,28 +135,10 @@ class OrchestratorPlanner:
         if mode == PLAN_MODE:
             return self._filter_plan_mode_tools(tools)
         if is_chat_mode(mode):
-            forbidden_tool_names = {
-                'run',
-                'terminal_manager',
-                'debugger',
-                'create',
-                'replace_string',
-                'edit_symbols',
-                'multiedit',
-                'delegate_task',
-                'blackboard',
-                'checkpoint',
-                'call_tool_mcp',
-                'browser_tool',
-                'browse_interactive',
-                'communicate_with_user',
-                'finish',
-                'task_tracker',
-            }
             return [
                 tool
                 for tool in tools
-                if self._tool_name(tool) not in forbidden_tool_names
+                if self._tool_name(tool) in CHAT_MODE_ALLOWED_TOOLS
             ]
         return tools
 
@@ -453,7 +436,7 @@ class OrchestratorPlanner:
             '- create creates a new file or a new code symbol.\n'
             '- edit_symbols modifies or deletes existing symbols.\n'
             '- replace_string performs exact one-file text replacement, insertion, or deletion.\n'
-            '- multiedit performs atomic multi-file refactoring.\n'
+            '- multiedit performs atomic multi-file refactoring with replace_string and edit_symbols operations.\n'
             '</TOOL_CALL_FORMAT>'
         )
 
@@ -622,7 +605,7 @@ class OrchestratorPlanner:
             '- `create` creates new files or new symbols; file creation must not modify existing files.\n'
             '- `edit_symbols` modifies or deletes existing code symbols.\n'
             '- `replace_string` for exact text replacement, insertion by anchor, and deletion.\n'
-            '- `multiedit` for atomic multi-file refactoring.\n\n'
+            '- `multiedit` for atomic multi-file refactoring with `replace_string` and `edit_symbols` operations.\n\n'
             'Do not use shell commands to write source files. Use only the registered file tools.\n'
             '=====================================\n'
         )

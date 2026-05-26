@@ -87,11 +87,21 @@ class TestSimulateEdit:
     def test_insert_text_command(self):
         action = MagicMock()
         action.command = 'insert_text'
-        action.insert_line = 1
+        action.insert_line = 2
         action.new_str = 'inserted line'
         result = self.mw._simulate_edit('line0\nline1\n', action)
-        assert result is not None
-        assert 'inserted line' in result
+        assert result == 'line0\ninserted line\nline1\n'
+
+    def test_replace_string_command(self):
+        action = MagicMock()
+        action.command = 'replace_string'
+        action.old_string = 'old\n'
+        action.new_str = 'new\n'
+        action.replace_all = False
+
+        result = self.mw._simulate_edit('keep\nold\nkeep\n', action)
+
+        assert result == 'keep\nnew\nkeep\n'
 
     def test_unknown_command_returns_none(self):
         action = MagicMock()

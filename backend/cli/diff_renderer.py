@@ -16,9 +16,9 @@ from backend.cli.theme import (
     CLR_CARD_TITLE,
     CLR_DIFF_ADD,
     CLR_DIFF_REM,
-    NAVY_BG,
     CLR_STATUS_WARN,
     CLR_WARN_BODY,
+    NAVY_BG,
     get_grinta_pygments_style,
 )
 from backend.cli.transcript import (
@@ -310,6 +310,9 @@ class DiffPanel:
 
     def _extract_visualize_diff(self) -> str | None:
         obs = self._obs
+        explicit_diff = getattr(obs, 'diff', None)
+        if isinstance(explicit_diff, str) and explicit_diff.strip():
+            return explicit_diff
         if not hasattr(obs, 'visualize_diff'):
             return None
         try:

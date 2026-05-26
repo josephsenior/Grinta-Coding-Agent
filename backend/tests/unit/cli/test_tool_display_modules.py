@@ -4,11 +4,6 @@ from __future__ import annotations
 
 import unittest
 
-from backend.cli._tool_display.renderers.file_editor import (
-    render_file_create,
-    render_file_edit,
-)
-
 # ============================================================================
 # headline.py
 # ============================================================================
@@ -16,6 +11,10 @@ from backend.cli._tool_display.headline import (
     friendly_verb_for_tool,
     tool_activity_stats_hint,
     tool_headline,
+)
+from backend.cli._tool_display.renderers.file_editor import (
+    render_file_create,
+    render_file_edit,
 )
 
 
@@ -102,11 +101,11 @@ class TestFriendlyVerbForTool(unittest.TestCase):
 
     def test_simple_map_tools(self) -> None:
         self.assertEqual(friendly_verb_for_tool('read_file', {}), 'Read')
-        self.assertEqual(friendly_verb_for_tool('create_file', {}), 'Created')
-        self.assertEqual(friendly_verb_for_tool('insert_text', {}), 'Inserted')
-        self.assertEqual(friendly_verb_for_tool('undo_last_edit', {}), 'Reverted')
+        self.assertEqual(friendly_verb_for_tool('create', {}), 'Created')
+        self.assertEqual(friendly_verb_for_tool('replace_string', {}), 'Edited')
+        self.assertEqual(friendly_verb_for_tool('edit_symbols', {}), 'Edited')
+        self.assertEqual(friendly_verb_for_tool('multiedit', {}), 'Edited')
         self.assertEqual(friendly_verb_for_tool('find_symbol', {}), 'Found')
-        self.assertEqual(friendly_verb_for_tool('rename_symbol', {}), 'Renamed')
         self.assertEqual(friendly_verb_for_tool('search_code', {}), 'Searched')
         self.assertEqual(friendly_verb_for_tool('think', {}), 'Thinking')
         self.assertEqual(friendly_verb_for_tool('finish', {}), 'Finished')
@@ -283,10 +282,21 @@ class TestSummarizeToolArguments(unittest.TestCase):
         s = summarize_tool_arguments('execute_bash', {'command': 'ls -la'})
         self.assertIn('ls -la', s)
 
-    def test_create_file(self) -> None:
-        s = summarize_tool_arguments('create_file', {'path': 'foo.py'})
+    def test_replace_string(self) -> None:
+        s = summarize_tool_arguments('replace_string', {'path': 'foo.py'})
+        self.assertIn('foo.py', s)
+
+    def test_create(self) -> None:
+        s = summarize_tool_arguments('create', {'type': 'file', 'path': 'foo.py'})
         self.assertIn('foo.py', s)
         self.assertIn('new file', s)
+
+    def test_multiedit(self) -> None:
+        s = summarize_tool_arguments(
+            'multiedit',
+            {'operations': [{'command': 'replace_string'}]},
+        )
+        self.assertIn('1 operation', s)
 
     def test_find_symbol(self) -> None:
         s = summarize_tool_arguments('find_symbol', {'path': 'foo.py', 'symbol_name': 'main'})

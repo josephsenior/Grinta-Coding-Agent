@@ -28,7 +28,6 @@ from backend.inference.exceptions import (
 )
 from backend.ledger import EventSource
 from backend.ledger.observation import ErrorObservation
-from backend.ledger.observation.agent import AgentThinkObservation
 from backend.ledger.observation.error import (
     ERROR_CATEGORY_AUTH,
     ERROR_CATEGORY_CONTENT_POLICY,
@@ -238,31 +237,37 @@ class RecoveryService:
     async def _attempt_aggressive_compaction(self, controller) -> bool:
         """Try to aggressively compact context and retry. Returns True if recovery succeeded."""
         try:
-            services = getattr(controller, 'services', None)
-            if services is None:
+            agent = getattr(controller, 'agent', None)
+            agent_config = getattr(agent, 'config', None) if agent else None
+            if not getattr(agent_config, 'enable_history_truncation', False):
                 return False
-            context_service = getattr(services, 'context', None)
-            if context_service is None:
+
+            event_stream = getattr(controller, 'event_stream', None)
+            if event_stream is None:
                 return False
-            # Force a compaction by calling the compactor directly.
-            compactor = getattr(context_service, 'compactor', None)
-            if compactor is None:
-                return False
-            # Emit a think observation so the agent knows what happened.
+
+            from backend.ledger.action.agent import CondensationRequestAction
+            from backend.ledger.observation.status import StatusObservation
+
             self._context.emit_event(
-                AgentThinkObservation(
-                    content='Context window exceeded. Aggressively compacting context to continue.',
+                StatusObservation(
+                    content='Context window exceeded. Compacting context before retrying...',
+                    status_type='compaction',
                 ),
                 EventSource.ENVIRONMENT,
             )
-            # Trigger compaction via the context service.
-            force_compaction = getattr(context_service, 'force_compaction', None)
-            if callable(force_compaction):
-                await force_compaction()
-                logger.info('Aggressive compaction succeeded, resuming agent')
-                if _recovery_may_set_state(controller, AgentState.RUNNING):
+            self._context.emit_event(
+                CondensationRequestAction(),
+                EventSource.AGENT,
+            )
+            logger.info('Queued aggressive compaction after context-window overflow')
+            if controller.get_agent_state() == AgentState.RUNNING:
+                schedule_step_soon = getattr(controller, 'schedule_step_soon', None)
+                if callable(schedule_step_soon):
+                    schedule_step_soon()
+                else:
                     controller.step()
-                return True
+            return True
         except Exception:
             logger.warning('Aggressive compaction failed', exc_info=True)
         return False
@@ -415,21 +420,19 @@ class RecoveryService:
         self._inject_task_reconciliation_directive(controller, exc)
         pause = 2.0 if isinstance(exc, (InternalServerError, Timeout)) else 1.0
         await asyncio.sleep(pause)
-        # Reset the consecutive-error counter on successful recovery.
-        # Without this, the counter grows monotonically and eventually
-        # triggers the hard backstop (>20) even when the agent recovers
-        # between intermittent failures.
-        if state is not None and hasattr(state, 'extra_data'):
-            state.extra_data['__survivable_error_consecutive'] = 0
-        # Atomic check-then-step: verify state is still RUNNING before stepping.
-        if not _recovery_may_set_state(controller, AgentState.RUNNING):
+        # Verify that no other recovery path or user action changed the state.
+        if controller.get_agent_state() != AgentState.RUNNING:
             logger.debug(
                 'Skipping post-error step: state changed during sleep (now %s)',
                 controller.get_agent_state(),
             )
             return
         if controller.get_agent_state() == AgentState.RUNNING:
-            controller.step()
+            schedule_step_soon = getattr(controller, 'schedule_step_soon', None)
+            if callable(schedule_step_soon):
+                schedule_step_soon()
+            else:
+                controller.step()
 
     async def _route_exception_recovery(self, controller, exc: Exception) -> bool:
         if await self._handle_hard_stop_exception(controller, exc):

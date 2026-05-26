@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
 import os
 import re
 import sys
@@ -195,6 +197,7 @@ class OrchestratorExecutor:
         self._step_cancelled = False
 
         call_params = dict(params)
+        call_params = self._apply_context_window_preflight(call_params)
 
         # NOTE: Grinta's DirectLLMClient implementations intentionally expose
         # deterministic *non-streaming* completion for all providers. Native
@@ -203,7 +206,7 @@ class OrchestratorExecutor:
         # provider-specific streaming, we always fetch a complete response
         # and then emit StreamingChunkAction events derived from the final text.
         ckpt_token = checkpoint.begin(
-            params,
+            call_params,
             anchor_event_id=self._checkpoint_anchor_event_id(event_stream),
         )
 
@@ -265,7 +268,190 @@ class OrchestratorExecutor:
 
     @staticmethod
     def _llm_model_name(llm: Any) -> str | None:
-        return getattr(getattr(llm, 'config', None), 'model', None)
+        model = getattr(getattr(llm, 'config', None), 'model', None)
+        if isinstance(model, str) and model.strip():
+            return model
+        return None
+
+    @staticmethod
+    def _positive_int(value: Any) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value if value > 0 else None
+        if isinstance(value, float):
+            iv = int(value)
+            return iv if iv > 0 else None
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return None
+            with contextlib.suppress(ValueError):
+                iv = int(stripped)
+                return iv if iv > 0 else None
+        return None
+
+    def _llm_input_token_limit(self) -> int:
+        llm = self._llm
+        features = getattr(llm, 'features', None)
+        config = getattr(llm, 'config', None)
+
+        max_in = self._positive_int(getattr(features, 'max_input_tokens', None))
+        if max_in is not None:
+            return max_in
+
+        max_in = self._positive_int(getattr(config, 'max_input_tokens', None))
+        if max_in is not None:
+            return max_in
+
+        context_window = getattr(llm, 'context_window', None)
+        if callable(context_window):
+            with contextlib.suppress(Exception):
+                fallback = self._positive_int(context_window())
+                if fallback is not None:
+                    return fallback
+        return 0
+
+    def _llm_output_token_limit(self) -> int | None:
+        llm = self._llm
+        features = getattr(llm, 'features', None)
+        config = getattr(llm, 'config', None)
+
+        max_out = self._positive_int(getattr(features, 'max_output_tokens', None))
+        if max_out is not None:
+            return max_out
+
+        return self._positive_int(getattr(config, 'max_output_tokens', None))
+
+    @staticmethod
+    def _preflight_completion_field(
+        call_params: dict[str, Any],
+    ) -> tuple[str, int | None]:
+        if 'max_completion_tokens' in call_params:
+            return 'max_completion_tokens', OrchestratorExecutor._positive_int(
+                call_params.get('max_completion_tokens')
+            )
+        if 'max_tokens' in call_params:
+            return 'max_tokens', OrchestratorExecutor._positive_int(
+                call_params.get('max_tokens')
+            )
+        return 'max_tokens', None
+
+    @staticmethod
+    def _preflight_margin(limit: int) -> int:
+        if limit <= 0:
+            return 0
+        return max(128, min(1024, limit // 100))
+
+    @staticmethod
+    def _minimum_viable_completion_tokens() -> int:
+        return 64
+
+    @staticmethod
+    def _serialize_preflight_payload(value: Any) -> str:
+        try:
+            return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+        except Exception:
+            return str(value)
+
+    def _estimate_request_tokens(self, call_params: dict[str, Any]) -> int:
+        from backend.inference.llm_utils import get_token_count
+
+        model = self._llm_model_name(self._llm) or 'gpt-4o'
+        messages = call_params.get('messages') or []
+        prompt_tokens = get_token_count(messages, model=model)
+
+        extra_lines: list[str] = []
+        for key in sorted(call_params.keys()):
+            if key in {
+                'messages',
+                'stream',
+                'max_tokens',
+                'max_completion_tokens',
+            }:
+                continue
+            value = call_params.get(key)
+            if value is None:
+                continue
+            extra_lines.append(
+                f'{key}:{self._serialize_preflight_payload(value)}'
+            )
+
+        if not extra_lines:
+            return prompt_tokens
+
+        extra_tokens = get_token_count(
+            [{'role': 'system', 'content': '\n'.join(extra_lines)}],
+            model=model,
+        )
+        return prompt_tokens + extra_tokens
+
+    def _apply_context_window_preflight(
+        self, call_params: dict[str, Any]
+    ) -> dict[str, Any]:
+        from backend.inference.exceptions import ContextWindowExceededError
+
+        input_limit = self._llm_input_token_limit()
+        output_limit = self._llm_output_token_limit()
+
+        total_limit = 0
+        context_window = getattr(self._llm, 'context_window', None)
+        if callable(context_window):
+            with contextlib.suppress(Exception):
+                total_limit = self._positive_int(context_window()) or 0
+        if total_limit <= 0:
+            if input_limit > 0 and output_limit is not None:
+                total_limit = input_limit + output_limit
+            else:
+                total_limit = input_limit
+
+        if input_limit <= 0 and total_limit <= 0:
+            return call_params
+
+        prompt_tokens = self._estimate_request_tokens(call_params)
+        model_name = self._llm_model_name(self._llm) or 'unknown'
+        margin = self._preflight_margin(total_limit or input_limit)
+        input_margin = min(margin, 256)
+
+        if input_limit > 0 and prompt_tokens >= max(input_limit - input_margin, 1):
+            raise ContextWindowExceededError(
+                'Preflight context guard rejected the request: estimated prompt '
+                f'({prompt_tokens}) exceeds the safe input budget for {model_name}.'
+            )
+
+        if total_limit <= 0:
+            return call_params
+
+        available_completion = total_limit - prompt_tokens - margin
+        if available_completion < self._minimum_viable_completion_tokens():
+            raise ContextWindowExceededError(
+                'Preflight context guard rejected the request: not enough token '
+                f'budget remains for a usable completion on {model_name}.'
+            )
+
+        field_name, requested_completion = self._preflight_completion_field(call_params)
+        desired_completion = requested_completion
+        if output_limit is not None:
+            desired_completion = (
+                output_limit
+                if desired_completion is None
+                else min(desired_completion, output_limit)
+            )
+
+        if desired_completion is None:
+            desired_completion = available_completion
+        elif desired_completion > available_completion:
+            logger.warning(
+                'Clamping completion budget from %d to %d tokens for %s to stay within the context window',
+                desired_completion,
+                available_completion,
+                model_name,
+            )
+            desired_completion = available_completion
+
+        guarded = dict(call_params)
+        guarded[field_name] = desired_completion
+        return guarded
 
     @staticmethod
     def _merge_stream_fragment(existing: str, incoming: str) -> str:
@@ -942,6 +1128,7 @@ class OrchestratorExecutor:
         call_params = dict(params)
         call_params.pop('stream', None)
         call_params['stream'] = True
+        call_params = self._apply_context_window_preflight(call_params)
 
         ckpt_token = checkpoint.begin(
             call_params,

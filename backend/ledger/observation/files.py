@@ -80,7 +80,7 @@ class FileEditObservation(Observation):
     def added(self) -> int:
         """Count of lines added in this edit."""
         if self.old_content is None or self.new_content is None:
-            return 0
+            return self._count_explicit_diff_lines('+')
         old_lines = self.old_content.split('\n')
         new_lines = self.new_content.split('\n')
         added = 0
@@ -95,7 +95,7 @@ class FileEditObservation(Observation):
     def removed(self) -> int:
         """Count of lines removed in this edit."""
         if self.old_content is None or self.new_content is None:
-            return 0
+            return self._count_explicit_diff_lines('-')
         old_lines = self.old_content.split('\n')
         new_lines = self.new_content.split('\n')
         removed = 0
@@ -105,6 +105,21 @@ class FileEditObservation(Observation):
             if tag in {'delete', 'replace'}:
                 removed += i2 - i1
         return removed
+
+    def _count_explicit_diff_lines(self, prefix: str) -> int:
+        if not self.diff:
+            return 0
+        if prefix == '+':
+            header = '+++'
+        elif prefix == '-':
+            header = '---'
+        else:
+            header = ''
+        return sum(
+            1
+            for line in self.diff.splitlines()
+            if line.startswith(prefix) and not line.startswith(header)
+        )
 
     def _calculate_indent_pad_size(self, group: list) -> int:
         """Calculate the padding size for line numbers."""

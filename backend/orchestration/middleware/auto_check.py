@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING, Any
 
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
@@ -15,7 +14,7 @@ if TYPE_CHECKING:
 def _treesitter_syntax_check(
     path: str, content: bytes | None = None
 ) -> tuple[bool, str] | None:
-    """Check syntax using tree-sitter.
+    """Check syntax using the shared whole-file syntax service.
 
     Args:
         path: File path (used to determine language from extension).
@@ -26,75 +25,31 @@ def _treesitter_syntax_check(
     Returns:
         (is_valid, error_detail) or None if language not supported.
     """
-    from backend.utils.treesitter_editor import (
-        LANGUAGE_EXTENSIONS,
-        TREE_SITTER_AVAILABLE,
-        _get_parser,
-    )
+    from backend.utils.syntax_check import check_syntax
 
-    if not TREE_SITTER_AVAILABLE or _get_parser is None:
-        return None
-
-    _, ext = os.path.splitext(path)
-    ext = ext.lower()
-    language = LANGUAGE_EXTENSIONS.get(ext)
-    if not language:
-        return None
-
-    try:
-        parser = _get_parser(language)
-    except Exception:
-        return None
-    if not parser:
-        return None
-
-    # If no content supplied, try reading from disk (local-runtime case).
-    if content is None:
-        try:
-            with open(path, 'rb') as f:
-                content = f.read()
-        except (OSError, IOError):
-            return None
-
-    tree = parser.parse(content)
-    errors = _collect_syntax_errors(tree.root_node, content, max_errors=5)
-    if not errors:
-        return (True, '')
-    detail = '; '.join(errors)
-    return (False, detail)
+    return check_syntax(path, content).as_legacy_tuple()
 
 
 def _collect_syntax_errors(node: Any, source: bytes, max_errors: int = 5) -> list[str]:
     """Walk tree-sitter AST and collect ERROR/MISSING node descriptions."""
-    errors: list[str] = []
+    from backend.utils.syntax_check import collect_tree_sitter_syntax_errors
 
-    def _walk(n: Any) -> None:
-        if len(errors) >= max_errors:
-            return
-        if n.type == 'ERROR' or n.is_missing:
-            row = n.start_point[0] + 1
-            col = n.start_point[1] + 1
-            # Extract the problematic source snippet
-            snippet = source[n.start_byte : n.end_byte].decode(
-                'utf-8', errors='replace'
-            )
-            if len(snippet) > 60:
-                snippet = snippet[:60] + '...'
-            kind = 'missing node' if n.is_missing else 'syntax error'
-            errors.append(f'line {row}:{col} {kind}: {snippet!r}')
-            return  # don't recurse into ERROR subtrees
-        for child in n.children:
-            _walk(child)
-
-    _walk(node)
-    return errors
+    return collect_tree_sitter_syntax_errors(node, source, max_errors=max_errors)
 
 
-def _extract_syntax_check_payload(action: object) -> tuple[str, bytes | None] | None:
+def _extract_syntax_check_payload(
+    action: object, observation: Observation | None = None
+) -> tuple[str, bytes | None] | None:
     from backend.ledger.action import FileEditAction, FileWriteAction
 
     if isinstance(action, FileEditAction):
-        raw = action.new_str or action.file_text
+        observed_new_content = getattr(observation, 'new_content', None)
+        if isinstance(observed_new_content, str):
+            raw = observed_new_content
+        elif action.command in {'create_file', 'write'}:
+            raw = action.file_text or action.new_str
+        else:
+            return None
         return action.path, raw.encode('utf-8') if raw else None
     if isinstance(action, FileWriteAction):
         raw = action.content
@@ -133,7 +88,7 @@ class AutoCheckMiddleware(ToolInvocationMiddleware):
         if isinstance(observation, ErrorObservation):
             return
 
-        payload = _extract_syntax_check_payload(ctx.action)
+        payload = _extract_syntax_check_payload(ctx.action, observation)
         if payload is None:
             return
 

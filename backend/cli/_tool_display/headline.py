@@ -36,10 +36,10 @@ _TERMINAL_MANAGER_VERBS = {
 
 _SIMPLE_VERB_MAP = {
     'read_file': 'Read',
-    'create_file': 'Created',
-    'insert_text': 'Inserted',
-    'undo_last_edit': 'Reverted',
-    'rename_symbol': 'Renamed',
+    'create': 'Created',
+    'replace_string': 'Edited',
+    'edit_symbols': 'Edited',
+    'multiedit': 'Edited',
     'find_symbol': 'Found',
     'agent_think': 'Thinking',
     'think': 'Thinking',

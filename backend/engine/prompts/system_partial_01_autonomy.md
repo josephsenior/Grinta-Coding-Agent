@@ -52,7 +52,7 @@ Do not edit in batches without one; checkpoint.save.name="batch before X".
 Read errors quickly. If path is uncertain: {path_discovery_hint}
 
 On tool failure:
-- symbol edit error → locate the symbol with `read` or `search_code`, then retry with a more specific `edit_symbols` or `create` call
+- symbol edit error → locate the symbol with `read` or `search_code`, then retry with a more specific `edit_symbols` call
 - `replace_string` ambiguity → re-read nearby context and make `old_string` more specific, or use `replace_all=true` only when every exact occurrence must change
 - multi-file edit failure → split the refactor only if atomicity is not required; otherwise fix the failing `multiedit` operation and retry
 {error_recovery_pivot_lines}
@@ -74,7 +74,6 @@ Before the **second** substantive milestone in one task (e.g. moving from core i
 </PROBLEM_SOLVING_WORKFLOW>
 
 <WORK_HABITS>
-**Multi-file creation:** list paths first, create minimal stubs, then edit.
 **Edit scope:** For an existing file, do not rewrite the whole file to make a local fix unless you have explicit evidence that a full rewrite is required.
 **Research-then-implement chain:** act with tool calls immediately after gathering info. DO NOT stop to explain.
 {task_sync_instruction}

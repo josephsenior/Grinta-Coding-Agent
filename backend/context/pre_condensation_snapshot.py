@@ -406,6 +406,7 @@ def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
     """
     parts = ['<RESTORED_CONTEXT>']
     parts.append(f'Events condensed: {snapshot.get("events_condensed", "?")}')
+    parts.extend(_format_runtime_section(snapshot.get('runtime', {})))
     parts.extend(_format_files_section(snapshot.get('files_touched', {})))
     parts.extend(_format_errors_section(snapshot.get('recent_errors', [])))
     parts.extend(_format_decisions_section(snapshot.get('decisions', [])))
@@ -413,6 +414,27 @@ def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
     parts.extend(_format_approaches_section(snapshot.get('attempted_approaches', [])))
     parts.append('</RESTORED_CONTEXT>')
     return '\n'.join(parts)
+
+
+def _format_runtime_section(runtime: dict) -> list[str]:
+    """Format live runtime position captured immediately before condensation."""
+    if not isinstance(runtime, dict) or not runtime:
+        return []
+    lines = ['\nRuntime position before condensation:']
+    iteration = runtime.get('iteration')
+    max_iterations = runtime.get('max_iterations')
+    if isinstance(iteration, int):
+        if isinstance(max_iterations, int):
+            lines.append(f'  iteration: {iteration}/{max_iterations}')
+        else:
+            lines.append(f'  iteration: {iteration}')
+    memory_pressure = runtime.get('memory_pressure')
+    if isinstance(memory_pressure, str) and memory_pressure:
+        lines.append(f'  memory_pressure: {memory_pressure}')
+    session_id = runtime.get('session_id')
+    if isinstance(session_id, str) and session_id:
+        lines.append(f'  session_id: {session_id}')
+    return lines if len(lines) > 1 else []
 
 
 def _format_files_section(files: dict) -> list[str]:

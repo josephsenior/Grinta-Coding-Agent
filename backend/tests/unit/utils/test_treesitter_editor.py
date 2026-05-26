@@ -494,73 +494,6 @@ class TestEditFunction:
 
 
 # ---------------------------------------------------------------------------
-# rename_symbol
-# ---------------------------------------------------------------------------
-
-
-class TestRenameSymbol:
-    def test_rename_function(self, editor: TreeSitterEditor, py_file: str) -> None:
-        result = editor.rename_symbol(py_file, 'greet', 'welcome')
-        assert result.success is True
-        content = open(py_file, encoding='utf-8').read()
-        assert 'def welcome' in content
-        assert 'def greet' not in content
-
-    def test_rename_nonexistent_symbol(
-        self, editor: TreeSitterEditor, py_file: str
-    ) -> None:
-        result = editor.rename_symbol(py_file, 'no_such_sym', 'new_name')
-        assert result.success is False
-        assert 'not found' in result.message.lower()
-
-    def test_rename_in_nonexistent_file(self, editor: TreeSitterEditor) -> None:
-        result = editor.rename_symbol('/no/file.py', 'old', 'new')
-        assert result.success is False
-
-    def test_rename_clears_cache(self, editor: TreeSitterEditor, py_file: str) -> None:
-        editor.parse_file(py_file)
-        editor.rename_symbol(py_file, 'add', 'sum_values')
-        assert py_file not in editor.tree_cache
-
-    def test_rename_returns_occurrence_count(
-        self, editor: TreeSitterEditor, py_file: str
-    ) -> None:
-        result = editor.rename_symbol(py_file, 'greet', 'helloo')
-        assert result.success is True
-        # lines_changed is the count of occurrences
-        assert result.lines_changed >= 1
-
-    def test_rename_in_string_literals(
-        self, editor: TreeSitterEditor, tmp_path: Path
-    ) -> None:
-        """Rename of a symbol should also update occurrences in string literals."""
-        content = textwrap.dedent("""\
-            class EmailValidator:
-                \"\"\"EmailValidator validator.\"\"\"
-                name = "EmailValidator"
-
-            if __name__ == "__main__":
-                obj = EmailValidator()
-                print("EmailValidator")
-        """)
-        f = tmp_path / 'email_validator.py'
-        f.write_text(content, encoding='utf-8')
-        path = str(f)
-
-        result = editor.rename_symbol(path, 'EmailValidator', 'NewValidator')
-        assert result.success is True
-
-        new_content = open(path, encoding='utf-8').read()
-        assert 'class NewValidator' in new_content
-        assert 'class EmailValidator' not in new_content
-        assert '"""NewValidator validator."""' in new_content
-        assert 'name = "NewValidator"' in new_content
-        assert 'obj = NewValidator()' in new_content
-        assert 'print("NewValidator")' in new_content
-        assert result.lines_changed >= 5
-
-
-# ---------------------------------------------------------------------------
 # validate_syntax (public)
 # ---------------------------------------------------------------------------
 
@@ -620,36 +553,6 @@ class TestClearCache:
 
 
 # ---------------------------------------------------------------------------
-# _find_all_symbol_occurrences (internal)
-# ---------------------------------------------------------------------------
-
-
-class TestFindAllSymbolOccurrences:
-    def test_finds_multiple_occurrences(
-        self, editor: TreeSitterEditor, py_file: str
-    ) -> None:
-        result = editor.parse_file(py_file)
-        assert result is not None
-        tree, file_bytes, _ = result
-        occurrences = editor._find_all_symbol_occurrences(  # type: ignore
-            tree, file_bytes, 'greet', 'python'
-        )
-        # "greet" appears in def statement
-        assert occurrences
-
-    def test_no_occurrences_returns_empty(
-        self, editor: TreeSitterEditor, py_file: str
-    ) -> None:
-        result = editor.parse_file(py_file)
-        assert result is not None
-        tree, file_bytes, _ = result
-        occurrences = editor._find_all_symbol_occurrences(  # type: ignore
-            tree, file_bytes, 'no_such_name_xyz', 'python'
-        )
-        assert occurrences == []
-
-
-# ---------------------------------------------------------------------------
 # Additional coverage tests
 # ---------------------------------------------------------------------------
 
@@ -676,15 +579,6 @@ class TestCoverageGaps:
         assert result.success is False
         assert 'Syntax error' in result.message
         assert result.syntax_valid is False
-
-    def test_rename_symbol_syntax_error(
-        self, editor: TreeSitterEditor, py_file: str
-    ) -> None:
-        """Test rename_symbol when result has syntax error (e.g. renaming to invalid identifier)."""
-        # Renaming to something that breaks syntax
-        result = editor.rename_symbol(py_file, 'greet', '123invalid')
-        assert result.success is False
-        assert 'Rename created syntax error' in result.message or not result.success
 
     def test_validate_syntax_exception(self, editor: TreeSitterEditor) -> None:
         """Test _validate_syntax when an exception occurs during parsing."""
@@ -771,15 +665,6 @@ class TestCoverageGaps:
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(editor, 'parse_file', lambda *args, **kwargs: None)  # type: ignore
             result = editor.edit_function(py_file, 'func', 'body')
-            assert result.success is False
-
-    def test_rename_symbol_parse_failure(
-        self, editor: TreeSitterEditor, py_file: str
-    ) -> None:
-        """Test rename_symbol when parsing fails."""
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(editor, 'parse_file', lambda *args, **kwargs: None)  # type: ignore
-            result = editor.rename_symbol(py_file, 'old', 'new')
             assert result.success is False
 
     def test_find_function_node_default_types(

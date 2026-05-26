@@ -69,6 +69,22 @@ def test_lsp_result_format_text_branches() -> None:
     assert isinstance(fallback, str)
 
 
+def test_lsp_query_diagnostics_accepts_process_timeout(tmp_path: Path) -> None:
+    py_file = tmp_path / 'x.py'
+    py_file.write_text('x = 1\n', encoding='utf-8')
+    client = lc.LspClient()
+    with patch.object(client, '_run_query', return_value=lc.LspResult()) as run_query:
+        client.query('diagnostics', str(py_file), process_timeout=0.25)
+    run_query.assert_called_once_with(
+        'diagnostics',
+        str(py_file),
+        1,
+        1,
+        '',
+        process_timeout=0.25,
+    )
+
+
 def test_get_server_command_runtime_then_fallback(tmp_path: Path) -> None:
     py_file = tmp_path / 'x.py'
     py_file.write_text('x', encoding='utf-8')

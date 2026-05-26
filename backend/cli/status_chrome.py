@@ -96,11 +96,21 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
     provider, model = HUDBar.describe_model(hud.model)
     model_display = f'{provider}/{model}' if provider and model else model
 
+    total = HUDBar._format_tokens(int(getattr(hud, 'total_tokens', 0) or 0))
     ctx = HUDBar._format_tokens(hud.context_tokens)
     lim_tok = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
     is_estimated = getattr(hud, 'token_usage_estimated', False)
-    if hud.context_tokens == 0 and hud.context_limit == 0:
+    if (
+        int(getattr(hud, 'total_tokens', 0) or 0) == 0
+        and hud.context_tokens == 0
+        and hud.context_limit == 0
+    ):
         token_display_compact = '0'
+    elif int(getattr(hud, 'total_tokens', 0) or 0) > 0 and hud.context_limit == 0:
+        token_display_compact = f'{total}'
+    elif int(getattr(hud, 'total_tokens', 0) or 0) > 0:
+        context_detail = f'{ctx}/{lim_tok}' if lim_tok else ctx
+        token_display_compact = f'{total} · {context_detail}'
     elif hud.context_limit == 0:
         token_display_compact = f'{ctx}'
     else:

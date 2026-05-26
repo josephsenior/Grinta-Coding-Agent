@@ -7,7 +7,21 @@ import unittest
 from backend.orchestration.middleware.auto_check import (
     _treesitter_syntax_check,
 )
+from backend.utils.syntax_check import check_syntax
 from backend.utils.treesitter_editor import TREE_SITTER_AVAILABLE
+
+
+class TestSharedSyntaxCheckService(unittest.TestCase):
+    def test_python_compile_only_error_is_failed_without_tree_sitter(self):
+        result = check_syntax('/workspace/app.py', 'return 42\n')
+        self.assertEqual(result.status, 'failed')
+        self.assertEqual(result.checker, 'python-compile')
+        self.assertIn("'return' outside function", result.detail)
+
+    def test_unknown_extension_is_explicitly_skipped(self):
+        result = check_syntax('/workspace/data.unknown', 'whatever')
+        self.assertEqual(result.status, 'skipped')
+        self.assertIn('no parser mapping', result.detail)
 
 
 @unittest.skipUnless(TREE_SITTER_AVAILABLE, 'tree-sitter not installed')
@@ -341,6 +355,24 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
         self._run(pipeline.run_observe(ctx, obs))
         self.assertIn('<SYNTAX_CHECK_FAILED>', obs.content)
 
+    def test_file_edit_create_python_compile_only_error(self):
+        """Python checks catch compiler errors that tree-sitter parsing accepts."""
+        from backend.ledger.action.files import FileEditAction
+        from backend.ledger.observation import FileEditObservation
+
+        action = FileEditAction(
+            path='/workspace/app.py',
+            command='create_file',
+            file_text='return 42\n',
+        )
+        obs = FileEditObservation(
+            content='File created successfully', path='/workspace/app.py'
+        )
+        pipeline, ctx = self._make_pipeline_and_ctx(action)
+        self._run(pipeline.run_observe(ctx, obs))
+        self.assertIn('<SYNTAX_CHECK_FAILED>', obs.content)
+        self.assertIn("'return' outside function", obs.content)
+
     def test_file_write_valid_js(self):
         """FileWriteAction with valid JS → SYNTAX_CHECK_PASSED."""
         from backend.ledger.action.files import FileWriteAction
@@ -382,10 +414,32 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
             end_line=1,
             new_str='def hello():\n    return 42\n',
         )
-        obs = FileEditObservation(content='Replacement done', path='/workspace/app.py')
+        obs = FileEditObservation(
+            content='Replacement done',
+            path='/workspace/app.py',
+            new_content='def hello():\n    return 42\n',
+        )
         pipeline, ctx = self._make_pipeline_and_ctx(action)
         self._run(pipeline.run_observe(ctx, obs))
         self.assertIn('<SYNTAX_CHECK_PASSED />', obs.content)
+
+    def test_file_edit_range_without_observed_content_is_skipped(self):
+        """Partial replacement snippets are not parsed as whole files."""
+        from backend.ledger.action.files import FileEditAction
+        from backend.ledger.observation import FileEditObservation
+
+        action = FileEditAction(
+            path='/workspace/app.py',
+            command='edit',
+            edit_mode='range',
+            start_line=3,
+            end_line=3,
+            new_str='    return 42\n',
+        )
+        obs = FileEditObservation(content='Replacement done', path='/workspace/app.py')
+        pipeline, ctx = self._make_pipeline_and_ctx(action)
+        self._run(pipeline.run_observe(ctx, obs))
+        self.assertNotIn('SYNTAX_CHECK', obs.content)
 
     def test_error_observation_skipped(self):
         """ErrorObservation should not trigger syntax check."""

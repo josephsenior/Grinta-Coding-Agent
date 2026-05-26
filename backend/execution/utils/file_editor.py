@@ -247,6 +247,31 @@ _GLOBAL_UNDO_HISTORY: dict[str, deque[str | None]] = defaultdict(
 )
 _GLOBAL_FILE_LOCKS: dict[str, threading.RLock] = {}
 _GLOBAL_FILE_LOCKS_GUARD = threading.Lock()
+_LARGE_EXISTING_CODE_FILE_LINES = 200
+_CODE_FILE_SUFFIXES: frozenset[str] = frozenset(
+    {
+        '.py',
+        '.js',
+        '.jsx',
+        '.ts',
+        '.tsx',
+        '.go',
+        '.rs',
+        '.java',
+        '.c',
+        '.cpp',
+        '.cc',
+        '.cxx',
+        '.h',
+        '.hpp',
+        '.cs',
+        '.rb',
+        '.php',
+        '.swift',
+        '.kt',
+        '.scala',
+    }
+)
 
 
 def _canonical_lock_key(file_path: Path) -> str:
@@ -264,6 +289,12 @@ def _file_lock_for_path(file_path: Path) -> threading.RLock:
             lock = threading.RLock()
             _GLOBAL_FILE_LOCKS[key] = lock
         return lock
+
+
+def _is_large_existing_code_file(file_path: Path, content: str | None) -> bool:
+    if content is None or file_path.suffix.lower() not in _CODE_FILE_SUFFIXES:
+        return False
+    return len(content.splitlines()) >= _LARGE_EXISTING_CODE_FILE_LINES
 
 
 class FileEditor(FileEditorEditOpsMixin):
@@ -397,6 +428,7 @@ class FileEditor(FileEditorEditOpsMixin):
             edit_mode: Sub-command mode when ``command`` is ``edit`` (range only)
             expected_hash: Optional client-supplied content hash (legacy)
             expected_file_hash: Optional per-file content hash for compare-and-swap
+            overwrite_existing: Allow deliberate full-file rewrite guards to be bypassed
             **_: Additional keyword arguments (ignored)
 
         Returns:
@@ -1025,6 +1057,20 @@ class FileEditor(FileEditorEditOpsMixin):
 
         # Validate syntax where possible before applying the edit to avoid
         # introducing syntax errors into the repository.
+        regression_error = self._detect_introduced_syntax_error(
+            file_path, old_content, new_content
+        )
+        if regression_error is not None:
+            return ToolResult(
+                output='',
+                error=regression_error,
+                old_content=old_content,
+                new_content=new_content,
+                error_code='INTRODUCED_SYNTAX_ERROR',
+                retryable=True,
+                operation='edit_validate',
+            )
+
         is_valid, msg = self._maybe_validate_syntax_for_file(file_path, new_content)
         if not is_valid:
             return ToolResult(
@@ -1032,6 +1078,9 @@ class FileEditor(FileEditorEditOpsMixin):
                 error=f'Syntax validation failed: {msg}',
                 old_content=old_content,
                 new_content=new_content,
+                error_code='SYNTAX_VALIDATION_FAILED',
+                retryable=True,
+                operation='edit_validate',
             )
 
         # Backup original if in transaction
@@ -1135,6 +1184,26 @@ class FileEditor(FileEditorEditOpsMixin):
                 new_content=content,
                 operation='write_noop',
             )
+        if (
+            file_existed
+            and not is_create
+            and not overwrite_existing
+            and _is_large_existing_code_file(file_path, old_content)
+        ):
+            return ToolResult(
+                output='',
+                error=(
+                    'LARGE_EXISTING_CODE_FILE_OVERWRITE_BLOCKED: refusing a full-file '
+                    f'overwrite of {file_path.name} ({len((old_content or "").splitlines())} lines). '
+                    'Use edit_symbols or replace_string for targeted changes, or set '
+                    'overwrite_existing=true when a deliberate full rewrite is required.'
+                ),
+                old_content=old_content,
+                new_content=content,
+                error_code='LARGE_EXISTING_CODE_FILE_OVERWRITE_BLOCKED',
+                retryable=False,
+                operation='write_guard',
+            )
         return None
 
     def _handle_write_commit(
@@ -1147,6 +1216,20 @@ class FileEditor(FileEditorEditOpsMixin):
         is_create: bool,
     ) -> ToolResult:
         """Validate, detect stale disk, backup, undo snapshot, atomic write."""
+        regression_error = self._detect_introduced_syntax_error(
+            file_path, old_content, content
+        )
+        if regression_error is not None:
+            return ToolResult(
+                output='',
+                error=regression_error,
+                old_content=old_content,
+                new_content=content,
+                error_code='INTRODUCED_SYNTAX_ERROR',
+                retryable=True,
+                operation='write_validate',
+            )
+
         is_valid, msg = self._maybe_validate_syntax_for_file(file_path, content)
         if not is_valid:
             return ToolResult(
@@ -1254,6 +1337,7 @@ class FileEditor(FileEditorEditOpsMixin):
             content: Content to write to the file
             is_create: If True, use "created" message instead of "written"
             dry_run: If True, return preview without writing changes
+            overwrite_existing: If True, allow guarded full-file overwrites
         """
         try:
             old_content = None
