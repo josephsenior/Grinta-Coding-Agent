@@ -200,11 +200,51 @@ def _render_thinking_with_diff(text: str) -> Text:
     return Text(text or '', style='dim lightgray')
 
 
-def _preview_line_text(line: str, *, max_chars: int = 160) -> str:
-    """Render a file preview line without duplicating its content."""
-    if not line:
-        return ' '
-    return line[:max_chars] + ('...' if len(line) > max_chars else '')
+def _count_text_lines(text: str) -> int:
+    """Count visible lines in a text blob."""
+    return text.count('\n') + 1 if text else 0
+
+
+def _format_diff_summary(added: int, removed: int) -> str | None:
+    """Format a compact add/remove summary for file edit cards."""
+    parts: list[str] = []
+    if added:
+        parts.append(f'+{added}')
+    if removed:
+        parts.append(f'-{removed}')
+    return ' · '.join(parts) if parts else None
+
+
+def _encode_unified_diff_text(diff_text: str, *, max_lines: int = 200) -> str | None:
+    """Encode a unified diff into full-width TUI diff rows."""
+    if not diff_text:
+        return None
+
+    lines = diff_text.splitlines()
+    encoded: list[str] = []
+    visible_lines = lines[:max_lines]
+    for line in visible_lines:
+        if line.startswith(('---', '+++', '@@')):
+            kind = 'ctx'
+        elif line.startswith('+'):
+            kind = 'add'
+        elif line.startswith('-'):
+            kind = 'rem'
+        else:
+            kind = 'ctx'
+        encoded.append(encode_diff_line(line or ' ', kind))
+
+    remaining = len(lines) - len(visible_lines)
+    if remaining > 0:
+        encoded.append(encode_diff_line(f'... {remaining} more diff lines', 'ctx'))
+
+    return '\n'.join(encoded) if encoded else None
+
+
+def _join_secondary_parts(*parts: str | None) -> str | None:
+    """Join compact secondary labels while skipping blanks."""
+    values = [part for part in parts if part]
+    return ' · '.join(values) if values else None
 
 
 # ── Widget classes ────────────────────────────────────────────────────────
@@ -287,12 +327,32 @@ _WELCOME_SUGGESTIONS = [
 class WelcomeWidget(Vertical):
     """Empty-state welcome panel with interactive task suggestions."""
 
-    def compose(self) -> ComposeResult:
-        yield Static('Describe a task for the current workspace.', id='welcome-header')
-        yield Static(
-            'Use up/down + Enter, or click a starter task.', id='welcome-subheader'
+    def __init__(
+        self,
+        *,
+        header: str = 'Describe a task for the current workspace.',
+        subheader: str = 'Use up/down + Enter, or click a starter task.',
+        suggestions: list[str] | None = None,
+        suggestion_details: list[str] | None = None,
+        callback_name: str = '_handle_welcome_click',
+    ) -> None:
+        super().__init__()
+        self._header_text = header
+        self._subheader_text = subheader
+        self._suggestions = list(suggestions or _WELCOME_SUGGESTIONS)
+        self._suggestion_details = list(
+            suggestion_details or [''] * len(self._suggestions)
         )
-        for text in _WELCOME_SUGGESTIONS:
+        if len(self._suggestion_details) < len(self._suggestions):
+            self._suggestion_details.extend(
+                [''] * (len(self._suggestions) - len(self._suggestion_details))
+            )
+        self._callback_name = callback_name
+
+    def compose(self) -> ComposeResult:
+        yield Static(self._header_text, id='welcome-header')
+        yield Static(self._subheader_text, id='welcome-subheader')
+        for _text in self._suggestions:
             yield Static('', classes='welcome-item')
 
     def on_mount(self) -> None:
@@ -321,23 +381,29 @@ class WelcomeWidget(Vertical):
 
     def _highlight(self, idx: int) -> None:
         for i, item in enumerate(self._items):
-            if i == idx:
-                item.update(f'  ▶ [#5eead4 bold]{_WELCOME_SUGGESTIONS[i]}[/]')
-            else:
-                item.update(f'  ▸ [#8ea2c8]{_WELCOME_SUGGESTIONS[i]}[/]')
+            item.update(self._render_suggestion(i, selected=i == idx))
         self._selected = idx
+
+    def _render_suggestion(self, index: int, *, selected: bool) -> str:
+        icon = '▶' if selected else '▸'
+        label_style = '#5eead4 bold' if selected else '#8ea2c8'
+        detail = (self._suggestion_details[index] or '').strip()
+        text = f'  {icon} [{label_style}]{self._suggestions[index]}[/]'
+        if detail:
+            text += f'\n    [#6b7280]{detail}[/]'
+        return text
 
     def highlight_prev(self) -> None:
         if self._selected > 0:
             self._highlight(self._selected - 1)
 
     def highlight_next(self) -> None:
-        if self._selected < len(self._items) - 1:
+        if self._selected < len(self._suggestions) - 1:
             self._highlight(self._selected + 1)
 
     def select_current(self) -> str | None:
-        if 0 <= self._selected < len(self._items):
-            return _WELCOME_SUGGESTIONS[self._selected]
+        if 0 <= self._selected < len(self._suggestions):
+            return self._suggestions[self._selected]
         return None
 
     def on_click(self, event: events.Click) -> None:
@@ -352,9 +418,87 @@ class WelcomeWidget(Vertical):
                     event.prevent_default()
                     event.stop()
                     screen = getattr(self, 'screen', None)
-                    if screen and hasattr(screen, '_handle_welcome_click'):
-                        screen._handle_welcome_click(text)
+                    if screen and hasattr(screen, self._callback_name):
+                        getattr(screen, self._callback_name)(text)
                 break
+
+
+class CommunicatePromptWidget(WelcomeWidget):
+    """Interactive transcript prompt for communicate_with_user."""
+
+    def __init__(
+        self,
+        title: str,
+        prompt: str,
+        *,
+        context: str = '',
+        details: list[str] | None = None,
+        options: list[tuple[str, str, str, bool]] | None = None,
+    ) -> None:
+        details_text = ' '.join(details or [])
+        helper = 'Use up/down + Enter, or click an option.'
+        parts = [part for part in (context, details_text, helper) if part]
+        super().__init__(
+            header=f'{title}: {prompt}',
+            subheader=' '.join(parts) if parts else helper,
+            suggestions=[
+                option[0] + (' (recommended)' if option[3] else '')
+                for option in (options or [])
+            ],
+            suggestion_details=[option[2] for option in (options or [])],
+            callback_name='_handle_communicate_selection',
+        )
+        self._values = [option[1] for option in (options or [])]
+        self._active = bool(self._values)
+        self._submitted: int | None = None
+
+    def on_mount(self) -> None:
+        self._selected = 0
+        self._items = list(self.query('.welcome-item'))
+        self._cascade_timers = []
+        for item in self._items:
+            item.display = True
+        if self._items:
+            self._highlight(0)
+
+    @property
+    def has_options(self) -> bool:
+        return bool(self._values)
+
+    @property
+    def current_value(self) -> str | None:
+        if not self._values:
+            return None
+        return self._values[self._selected]
+
+    def set_active(self, active: bool) -> None:
+        self._active = active and self.has_options
+
+    def mark_submitted(self, index: int | None = None) -> None:
+        if not self._values:
+            return
+        self._submitted = self._selected if index is None else index
+        self._active = False
+
+    def action_submit_option(self) -> None:
+        if not self._active or not self._values:
+            return
+        self.mark_submitted(self._selected)
+        screen = getattr(self, 'screen', None)
+        if screen and hasattr(screen, '_handle_communicate_selection'):
+            screen._handle_communicate_selection(self._values[self._selected], card=self)
+
+    def on_click(self, event: events.Click) -> None:
+        target = event.widget
+        if target is None:
+            return
+        for i, item in enumerate(self._items):
+            if target is item:
+                self._highlight(i)
+                self.action_submit_option()
+                event.prevent_default()
+                event.stop()
+                return
 
 
 class InputBar(Horizontal):
@@ -369,16 +513,20 @@ class PromptTextArea(TextArea):
         if (
             event.key in {'up', 'down'}
             and bool(screen)
-            and getattr(screen, '_welcome_visible', False)
             and not self.text.strip()
         ):
-            if event.key == 'up' and hasattr(screen, 'action_focus_prev_card'):
-                screen.action_focus_prev_card()
-            elif event.key == 'down' and hasattr(screen, 'action_focus_next_card'):
-                screen.action_focus_next_card()
-            event.prevent_default()
-            event.stop()
-            return
+            if getattr(screen, '_welcome_visible', False):
+                if event.key == 'up' and hasattr(screen, 'action_focus_prev_card'):
+                    screen.action_focus_prev_card()
+                elif event.key == 'down' and hasattr(screen, 'action_focus_next_card'):
+                    screen.action_focus_next_card()
+                event.prevent_default()
+                event.stop()
+                return
+            if hasattr(screen, '_handle_communicate_navigation') and screen._handle_communicate_navigation(event.key):
+                event.prevent_default()
+                event.stop()
+                return
 
 
 class HUD(Vertical):
@@ -1033,6 +1181,7 @@ class GrintaScreen(Screen):
         self._command_history: list[str] = []
         self._history_index: int = -1
         self._welcome_visible = False
+        self._active_communicate_card: Any | None = None
 
     _STATE_LABELS = {
         'starting': 'Starting…',
@@ -1135,7 +1284,6 @@ class GrintaScreen(Screen):
                         action_label='+',
                         id='sidebar-skills',
                     )
-                yield Static(id='sidebar-footer', markup=False)
 
     def on_mount(self) -> None:
         _tui_logger.debug('on_mount: GrintaScreen mounted')
@@ -1208,6 +1356,7 @@ class GrintaScreen(Screen):
         display_state, state_color = self._resolve_state_display(raw_state)
 
         cost = hud.state.cost_usd or 0
+        total_tokens = int(getattr(hud.state, 'total_tokens', 0) or 0)
         used = hud.state.context_tokens
         limit = hud.state.context_limit
         # Restore Model and Autonomy
@@ -1227,6 +1376,8 @@ class GrintaScreen(Screen):
         line1_parts.append('[#91abec bold]GRINTA[/]')
         line1_parts.append(f'[{state_color}]● {display_state}[/]')
         line1_parts.append(f'[{NAVY_TEXT_SECONDARY}]Model: {model_display}[/]')
+        ws_display = HUDBar.ellipsize_path(workspace, 35)
+        line1_parts.append(f'[{NAVY_TEXT_DIM}]Ws: {ws_display}[/]')
         if limit > 0:
             pct = min(100, used * 100 // limit)
             ctx_color = (
@@ -1236,11 +1387,13 @@ class GrintaScreen(Screen):
                 if pct < 95
                 else NAVY_RED_ACCENT
             )
+            shown = total_tokens if total_tokens > 0 else used
             line1_parts.append(
-                f'[{NAVY_TEXT_DIM}]Tok: {used:,} [{ctx_color}]({pct}%)[/][/]'
+                f'[{NAVY_TEXT_DIM}]Tok: {shown:,} [{ctx_color}]({pct}%)[/][/]'
             )
         else:
-            line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
+            shown = total_tokens if total_tokens > 0 else used
+            line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {shown:,}[/]')
         line1_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
         line1_parts.append(
             f'[{NAVY_TEXT_SECONDARY}]Now:[/] '
@@ -1278,14 +1431,6 @@ class GrintaScreen(Screen):
             is_agent = current_mode == AGENT_MODE
             hud_bar.query_one('#hud-autonomy').display = is_agent
             hud_bar.query_one('#hud-label-autonomy').display = is_agent
-        except Exception:
-            pass
-        try:
-            footer = self.query_one('#sidebar-footer', Static)
-            sidebar = self.query_one('#sidebar')
-            budget = max(18, int(getattr(sidebar.size, 'width', 28)) - 2)
-            workspace_display = HUDBar.ellipsize_path(workspace, budget)
-            footer.update(workspace_display)
         except Exception:
             pass
 
@@ -1616,110 +1761,76 @@ class GrintaScreen(Screen):
         self.set_last_tool_status(text)
 
     def add_communicate_clarification(self, action: ClarificationRequestAction) -> None:
-        """Agent asks a question — show question and options in a callout panel."""
-        from rich.text import Text
-
-        from backend.cli.layout_tokens import DECISION_PANEL_ACCENT_STYLE
-        from backend.cli.theme import (
-            CLR_OPTION_RECOMMENDED,
-            CLR_OPTION_TEXT,
-            CLR_QUESTION_TEXT,
+        """Agent asks a question — render an interactive communicate card."""
+        options = [(opt, opt, '', False) for opt in (action.options or [])]
+        details = [action.context] if action.context else []
+        card = CommunicatePromptWidget(
+            'Question',
+            action.question or 'The agent needs your input.',
+            context=action.thought,
+            details=details,
+            options=options,
         )
-        from backend.cli.transcript import format_callout_panel
-
-        clarify_parts: list[Any] = []
-        if action.question:
-            t = _rich_text(action.question)
-            t.stylize(CLR_QUESTION_TEXT)
-            clarify_parts.append(t)
-        for i, opt in enumerate(action.options or [], 1):
-            line = Text()
-            line.append(f'{i}. ', style=f'bold {CLR_OPTION_RECOMMENDED}')
-            t_opt = _rich_text(opt)
-            t_opt.stylize(CLR_OPTION_TEXT)
-            line.append(t_opt)
-            clarify_parts.append(line)
-
-        panel = format_callout_panel(
-            'Question', Group(*clarify_parts), accent_style=DECISION_PANEL_ACCENT_STYLE
-        )
-        self._write_log(panel)
+        self._write_log(card)
+        self._set_active_communicate_card(card if options else None)
 
     def add_communicate_uncertainty(self, action: UncertaintyAction) -> None:
         """Agent expresses uncertainty."""
-        from rich.text import Text
-
-        from backend.cli.layout_tokens import DECISION_PANEL_ACCENT_STYLE
-        from backend.cli.theme import CLR_QUESTION_TEXT, MARK_INFO, STYLE_DIM
-        from backend.cli.transcript import format_callout_panel
-
-        parts: list[Any] = []
-        for concern in (action.specific_concerns or [])[:5]:
-            line = Text()
-            line.append(f'{MARK_INFO} ', style=STYLE_DIM)
-            t_concern = _rich_text(concern)
-            t_concern.stylize(STYLE_DIM)
-            line.append(t_concern)
-            parts.append(line)
+        details = list((action.specific_concerns or [])[:5])
         if action.requested_information:
-            t_req = _rich_text(f'Need: {action.requested_information}')
-            t_req.stylize(CLR_QUESTION_TEXT)
-            parts.append(t_req)
-
-        panel = format_callout_panel(
-            'Needs Context', Group(*parts), accent_style=DECISION_PANEL_ACCENT_STYLE
+            details.append(f'Needed: {action.requested_information}')
+        card = CommunicatePromptWidget(
+            'Needs Context',
+            'The agent needs more context before it can continue confidently.',
+            context=action.thought,
+            details=details,
         )
-        self._write_log(panel)
+        self._write_log(card)
+        self._set_active_communicate_card(None)
 
     def add_communicate_proposal(self, action: ProposalAction) -> None:
         """Agent proposes a plan."""
-        from rich.text import Text
-
-        from backend.cli.layout_tokens import DECISION_PANEL_ACCENT_STYLE
-        from backend.cli.theme import CLR_OPTION_RECOMMENDED, CLR_OPTION_TEXT, STYLE_DIM
-        from backend.cli.transcript import format_callout_panel
-
-        parts: list[Any] = []
-        if action.rationale:
-            t_rat = _rich_text(action.rationale)
-            t_rat.stylize(STYLE_DIM)
-            parts.append(t_rat)
+        options: list[tuple[str, str, str, bool]] = []
         for i, opt in enumerate(action.options or []):
-            label = opt.get('name', opt.get('title', f'Option {i + 1}'))
-            marker = ' (recommended)' if i == action.recommended else ''
-            line = Text()
-            line.append(f'{i + 1}. ', style=f'bold {DECISION_PANEL_ACCENT_STYLE}')
-            line.append(
-                f'{label}{marker}',
-                style=f'bold {CLR_OPTION_RECOMMENDED}'
-                if i == action.recommended
-                else f'bold {CLR_OPTION_TEXT}',
+            label = opt.get(
+                'name',
+                opt.get('title', opt.get('approach', f'Option {i + 1}')),
             )
-            parts.append(line)
-            desc = opt.get('description', '')
-            if desc:
-                parts.append(Text(f'   {desc}', style=STYLE_DIM))
+            description = opt.get('description', '')
+            if not description:
+                pros = ', '.join(opt.get('pros') or [])
+                cons = ', '.join(opt.get('cons') or [])
+                fragments = []
+                if pros:
+                    fragments.append(f'Pros: {pros}')
+                if cons:
+                    fragments.append(f'Cons: {cons}')
+                description = ' | '.join(fragments)
+            options.append((label, label, description, i == action.recommended))
 
-        panel = format_callout_panel(
-            'Options', Group(*parts), accent_style=DECISION_PANEL_ACCENT_STYLE
+        card = CommunicatePromptWidget(
+            'Options',
+            'Choose a path for the agent to take.',
+            context=action.thought,
+            details=[action.rationale] if action.rationale else [],
+            options=options,
         )
-        self._write_log(panel)
+        self._write_log(card)
+        self._set_active_communicate_card(card if options else None)
 
     def add_communicate_escalate(self, action: EscalateToHumanAction) -> None:
         """Agent escalates to human."""
-        from backend.cli.layout_tokens import DECISION_PANEL_ACCENT_STYLE
-        from backend.cli.theme import CLR_QUESTION_TEXT
-        from backend.cli.transcript import format_callout_panel
-
-        t_reason = _rich_text(
-            action.reason or 'The agent needs your input to continue.'
+        details = list(action.attempts_made or [])
+        if action.specific_help_needed:
+            details.append(f'Help needed: {action.specific_help_needed}')
+        card = CommunicatePromptWidget(
+            'Need Your Input',
+            action.reason or 'The agent needs your input to continue.',
+            context=action.thought,
+            details=details,
         )
-        t_reason.stylize(CLR_QUESTION_TEXT)
-
-        panel = format_callout_panel(
-            'Need Your Input', t_reason, accent_style=DECISION_PANEL_ACCENT_STYLE
-        )
-        self._write_log(panel)
+        self._write_log(card)
+        self._set_active_communicate_card(None)
 
     def add_divider(self) -> None:
         self._write_log(Rule(style=NAVY_BORDER))
@@ -1903,15 +2014,58 @@ class GrintaScreen(Screen):
         display = self._get_display()
         return [c for c in display.query(ActivityCard) if c.display]
 
+    def _set_active_communicate_card(self, card: Any | None) -> None:
+        previous = self._active_communicate_card
+        if previous is not None and previous is not card:
+            try:
+                previous.set_active(False)
+            except Exception:
+                pass
+        self._active_communicate_card = card
+        if card is not None:
+            try:
+                card.set_active(True)
+            except Exception:
+                pass
+
+    def _handle_communicate_navigation(self, key: str) -> bool:
+        card = self._active_communicate_card
+        if card is None or not getattr(card, 'has_options', False):
+            return False
+        if key == 'up':
+            card.highlight_prev()
+            return True
+        if key == 'down':
+            card.highlight_next()
+            return True
+        return False
+
+    def _handle_communicate_selection(
+        self,
+        text: str,
+        *,
+        card: Any | None = None,
+    ) -> None:
+        active = card or self._active_communicate_card
+        if active is not None:
+            try:
+                active.set_active(False)
+            except Exception:
+                pass
+            if active is self._active_communicate_card:
+                self._active_communicate_card = None
+        ta = self.query_one('#input', TextArea)
+        ta.text = text
+        self.action_submit_input()
+
     def action_focus_next_card(self) -> None:
         """Move keyboard focus to the next ActivityCard or suggestion."""
         if self._welcome_visible:
             ta = self.query_one('#input', TextArea)
             if not ta.text.strip():
-                try:
-                    self.query_one(WelcomeWidget).highlight_next()
-                except Exception:
-                    pass
+                widget = self._get_welcome_widget()
+                if widget is not None:
+                    widget.highlight_next()
                 return
         if self.focused and self.focused is self.query_one('#input', TextArea):
             return
@@ -1929,10 +2083,9 @@ class GrintaScreen(Screen):
         if self._welcome_visible:
             ta = self.query_one('#input', TextArea)
             if not ta.text.strip():
-                try:
-                    self.query_one(WelcomeWidget).highlight_prev()
-                except Exception:
-                    pass
+                widget = self._get_welcome_widget()
+                if widget is not None:
+                    widget.highlight_prev()
                 return
         if self.focused and self.focused is self.query_one('#input', TextArea):
             return
@@ -2042,10 +2195,20 @@ class GrintaScreen(Screen):
                 continue
             if getattr(child, 'id', None) == 'scroll-badge':
                 continue
-            if isinstance(child, WelcomeWidget):
+            if type(child) is WelcomeWidget:
                 continue
             return True
         return False
+
+    def _get_welcome_widget(self) -> WelcomeWidget | None:
+        try:
+            display = self._get_display()
+        except Exception:
+            return None
+        for child in display.children:
+            if type(child) is WelcomeWidget:
+                return child
+        return None
 
     def _show_welcome(self) -> None:
         if self._welcome_visible or self._is_unmounted:
@@ -2054,8 +2217,7 @@ class GrintaScreen(Screen):
             if self._transcript_has_real_content():
                 return
             display = self._get_display()
-            existing = display.query(WelcomeWidget)
-            if existing:
+            if self._get_welcome_widget() is not None:
                 return
             display.mount(WelcomeWidget())
             self._welcome_visible = True
@@ -2066,8 +2228,9 @@ class GrintaScreen(Screen):
         if not self._welcome_visible:
             return
         try:
-            widget = self.query_one(WelcomeWidget)
-            widget.remove()
+            widget = self._get_welcome_widget()
+            if widget is not None:
+                widget.remove()
             self._welcome_visible = False
         except Exception:
             self._welcome_visible = False
@@ -2078,10 +2241,10 @@ class GrintaScreen(Screen):
         ta = self.query_one('#input', TextArea)
         if ta.text.strip():
             return
-        try:
-            text = self.query_one(WelcomeWidget).select_current()
-        except Exception:
+        widget = self._get_welcome_widget()
+        if widget is None:
             return
+        text = widget.select_current()
         if text:
             ta.text = text
             self._hide_welcome()
@@ -2344,9 +2507,23 @@ class GrintaScreen(Screen):
             if self._welcome_visible:
                 _tui_logger.debug('action_submit_input: routing to welcome select')
                 self.action_welcome_select()
+            elif (
+                self._active_communicate_card is not None
+                and getattr(self._active_communicate_card, 'has_options', False)
+            ):
+                _tui_logger.debug(
+                    'action_submit_input: routing to communicate selection'
+                )
+                self._active_communicate_card.action_submit_option()
             else:
                 _tui_logger.debug('action_submit_input: empty text, ignoring')
             return
+        if self._active_communicate_card is not None:
+            try:
+                self._active_communicate_card.set_active(False)
+            except Exception:
+                pass
+            self._active_communicate_card = None
         if not self._command_history or self._command_history[-1] != text:
             self._command_history.append(text)
         self._history_index = -1
@@ -3197,6 +3374,8 @@ class TUIRenderer:
         self._tools_in_turn: int = 0
         self._turn_start_time: float = 0.0
         self._terminal_cards_by_session: dict[str, Any] = {}
+        self._terminal_commands_by_session: dict[str, str] = {}
+        self._pending_terminal_command: str | None = None
         self._pending_terminal_card: Any | None = None
         self._pending_shell_cards_by_command: dict[str, deque[Any]] = defaultdict(deque)
         self._active_worker_tasks: list[str] = []
@@ -3342,6 +3521,8 @@ class TUIRenderer:
         self._live_thinking_widget = None
         self._live_response_widget = None
         self._terminal_cards_by_session = {}
+        self._terminal_commands_by_session = {}
+        self._pending_terminal_command = None
         self._pending_terminal_card = None
         self._pending_shell_cards_by_command = defaultdict(deque)
         self._active_worker_tasks = []
@@ -3563,6 +3744,7 @@ class TUIRenderer:
             verb=card.verb,
             detail=card.detail,
             badge_category=card.badge_category,
+            title=card.title,
             secondary=card.secondary,
             secondary_kind=card.secondary_kind,
             extra_content=extra_content,
@@ -3600,23 +3782,81 @@ class TUIRenderer:
         display.append_widget(widget)
 
     def _write_tui_file_card(
-        self, verb: str, path: str, extra_content: str | None, delta: str
+        self,
+        verb: str,
+        detail: str,
+        *,
+        secondary: str | None = None,
+        secondary_kind: str = 'neutral',
+        extra_content: str | None = None,
+        collapsed: bool = False,
     ) -> None:
         from backend.cli.tui.widgets.activity_card import (
             ActivityCard as TUIActivityCard,
         )
 
-        detail = f'{path}  {delta}' if delta else path
+        self._clear_last_active_card_processing()
         widget = TUIActivityCard(
             verb=verb,
             detail=detail,
             badge_category='files',
+            title='Files',
+            secondary=secondary,
+            secondary_kind=secondary_kind,
             extra_content=extra_content,
-            collapsed=False,
+            collapsed=collapsed,
         )
-        self._tui.set_last_tool_status(f'{verb} {path}')
+        self._tui.set_last_tool_status(f'{verb} {detail}')
+        self._tui.set_current_operation(
+            f'Files: {verb} {detail}'.strip(),
+            meta=secondary or 'Completed',
+            active=False,
+        )
         display = self._tui._get_display()
         display.append_widget(widget)
+
+    def _remember_terminal_command(self, session_id: str, command: str) -> None:
+        """Remember the most relevant command for a terminal session."""
+        clean_command = (command or '').strip()
+        if not clean_command:
+            return
+        if session_id:
+            self._terminal_commands_by_session[session_id] = clean_command
+            if self._pending_terminal_command == clean_command:
+                self._pending_terminal_command = None
+            return
+        self._pending_terminal_command = clean_command
+
+    def _resolve_terminal_command(self, session_id: str = '') -> str | None:
+        """Resolve the active command for a terminal session, if known."""
+        if session_id:
+            command = self._terminal_commands_by_session.get(session_id)
+            if command:
+                return command
+            if self._pending_terminal_command:
+                command = self._pending_terminal_command
+                self._terminal_commands_by_session[session_id] = command
+                self._pending_terminal_command = None
+                return command
+            return None
+        return self._pending_terminal_command
+
+    def _terminal_card_detail(self, session_id: str = '', command: str = '') -> str:
+        """Build a stable terminal card headline."""
+        if command.strip():
+            self._remember_terminal_command(session_id, command)
+        active_command = self._resolve_terminal_command(session_id)
+        if active_command:
+            preview = active_command[:80] + ('...' if len(active_command) > 80 else '')
+            return f'$ {preview}'
+        if session_id:
+            return f'session {session_id}'
+        return 'terminal session'
+
+    @staticmethod
+    def _terminal_session_label(session_id: str) -> str | None:
+        """Format the session label used in terminal card secondary text."""
+        return f'session {session_id}' if session_id else None
 
     def _upsert_terminal_session_card(
         self,
@@ -3700,6 +3940,7 @@ class TUIRenderer:
             verb=card.verb,
             detail=card.detail,
             badge_category=card.badge_category,
+            title=card.title,
             secondary=card.secondary,
             secondary_kind=card.secondary_kind,
             extra_content=None,
@@ -3742,7 +3983,7 @@ class TUIRenderer:
         if self._last_active_card is widget:
             self._last_active_card = None
 
-        widget.update_header(verb=card.verb, detail=card.detail)
+        widget.update_header(verb=card.verb, detail=card.detail, title=card.title)
         if card.secondary:
             widget.update_secondary(card.secondary, kind=card.secondary_kind)
 
@@ -3923,35 +4164,21 @@ class TUIRenderer:
 
             if cmd == 'create_file':
                 file_text = getattr(event, 'file_text', '') or ''
-                extra_parts = []
-                pad = len(str(file_text.count('\n') + 1)) + 1 if file_text else 1
-                for i, line in enumerate(file_text.splitlines()):
-                    display = _preview_line_text(line)
-                    extra_parts.append(
-                        encode_diff_line(f'+{i + 1:>{pad - 1}}| {display}', 'add')
-                    )
-                extra_content = '\n'.join(extra_parts) if extra_parts else None
-                added = file_text.count('\n') + 1 if file_text else 0
-                self._write_tui_file_card(
-                    'Created', path, extra_content, f'[bold #54efae]+{added}[/]'
+                card = ActivityRenderer.file_create(
+                    path,
+                    line_count=_count_text_lines(file_text),
                 )
+                self._write_card(card)
             else:
                 card = ActivityRenderer.file_edit(verb, path, line_range)
                 self._write_card(card)
         elif isinstance(event, FileWriteAction):
             content = getattr(event, 'content', '') or ''
-            extra_parts = []
-            pad = len(str(content.count('\n') + 1)) + 1 if content else 1
-            for i, line in enumerate(content.splitlines()):
-                display = _preview_line_text(line)
-                extra_parts.append(
-                    encode_diff_line(f'+{i + 1:>{pad - 1}}| {display}', 'add')
-                )
-            extra_content = '\n'.join(extra_parts) if extra_parts else None
-            added = content.count('\n') + 1 if content else 0
-            self._write_tui_file_card(
-                'Created', event.path, extra_content, f'[bold #54efae]+{added}[/]'
+            card = ActivityRenderer.file_create(
+                event.path,
+                line_count=_count_text_lines(content),
             )
+            self._write_card(card)
         elif isinstance(event, FileReadObservation):
             pass
         elif isinstance(event, FileEditObservation):
@@ -3961,40 +4188,34 @@ class TUIRenderer:
             if hasattr(event, 'content') and event.content:
                 event.content = strip_indentation_warnings(event.content)
 
-            groups = event.get_edit_groups(n_context_lines=0)
-            if groups:
-                extra_parts = []
-                for group in groups:
-                    if extra_parts:
-                        extra_parts.append('')
-                    for line in group.get('before_edits', []):
-                        display = line if line else ' '
-                        extra_parts.append(encode_diff_line(display, 'rem'))
-                    for line in group.get('after_edits', []):
-                        display = line if line else ' '
-                        extra_parts.append(encode_diff_line(display, 'add'))
-                extra_content = '\n'.join(extra_parts) if extra_parts else None
-                added = event.added
-                removed = event.removed
-                delta = ''
-                if added or removed:
-                    parts = []
-                    if added:
-                        parts.append(f'+{added}')
-                    if removed:
-                        parts.append(f'-{removed}')
-                    delta = f'  [dim]({", ".join(parts)})[/dim]'
-                self._write_tui_file_card('Edited', event.path, extra_content, delta)
+            added = event.added
+            removed = event.removed
+            if not getattr(event, 'prev_exist', True):
+                card = ActivityRenderer.file_create(
+                    event.path,
+                    line_count=added
+                    or _count_text_lines(getattr(event, 'new_content', '') or ''),
+                )
+                self._write_card(card)
             else:
-                summary = f'Edited {event.path}'
-                if added or removed:
-                    delta_parts = []
-                    if added:
-                        delta_parts.append(f'+{added} lines')
-                    if removed:
-                        delta_parts.append(f'-{removed} lines')
-                    summary += f'  ({", ".join(delta_parts)})'
-                self._tui._write_log(Text(f'  {summary}', style=NAVY_TEXT_DIM))
+                diff_text = self._extract_file_edit_diff(event)
+                if diff_text:
+                    self._write_tui_file_card(
+                        'Edited',
+                        event.path,
+                        secondary=_format_diff_summary(added, removed),
+                        secondary_kind='ok' if added and not removed else 'neutral',
+                        extra_content=_encode_unified_diff_text(diff_text),
+                        collapsed=len(diff_text.splitlines()) > 14,
+                    )
+                else:
+                    card = ActivityRenderer.file_edit(
+                        'Edited',
+                        event.path,
+                        added=added,
+                        removed=removed,
+                    )
+                    self._write_card(card)
         elif isinstance(event, FileWriteObservation):
             pass
         elif isinstance(event, MCPAction):
@@ -4099,27 +4320,32 @@ class TUIRenderer:
         elif isinstance(event, TerminalRunAction):
             cmd = getattr(event, 'command', '') or ''
             session_id = getattr(event, 'session_id', '') or ''
-            detail = f'$ {cmd[:80]}' if cmd else f'session {session_id or "terminal"}'
+            detail = self._terminal_card_detail(session_id, cmd)
             self._upsert_terminal_session_card(
                 session_id=session_id,
                 verb='Started',
                 detail=detail,
-                secondary=f'session {session_id}' if session_id else 'starting session',
+                secondary=_join_secondary_parts(
+                    self._terminal_session_label(session_id),
+                    'starting session',
+                ),
                 secondary_kind='neutral',
-                extra_content=f'$ {cmd}' if cmd else None,
                 processing=True,
             )
         elif isinstance(event, TerminalInputAction):
             session_id = getattr(event, 'session_id', '') or ''
             submitted = getattr(event, 'input', '') or ''
-            detail = f'session {session_id or "terminal"}'
+            detail = self._terminal_card_detail(session_id, submitted)
             self._upsert_terminal_session_card(
                 session_id=session_id,
                 verb='Sent',
                 detail=detail,
-                secondary='awaiting output',
+                secondary=_join_secondary_parts(
+                    self._terminal_session_label(session_id),
+                    'awaiting output',
+                ),
                 secondary_kind='neutral',
-                extra_content=f'> {submitted.rstrip()}',
+                extra_content=f'$ {submitted.rstrip()}' if submitted.strip() else None,
                 processing=True,
             )
         elif isinstance(event, TerminalReadAction):
@@ -4127,8 +4353,11 @@ class TUIRenderer:
             self._upsert_terminal_session_card(
                 session_id=session_id,
                 verb='Reading',
-                detail=f'session {session_id or "terminal"}',
-                secondary='streaming output',
+                detail=self._terminal_card_detail(session_id),
+                secondary=_join_secondary_parts(
+                    self._terminal_session_label(session_id),
+                    'streaming output',
+                ),
                 secondary_kind='neutral',
                 processing=True,
             )
@@ -4137,10 +4366,13 @@ class TUIRenderer:
             session_id = getattr(event, 'session_id', '') or ''
             exit_code = getattr(event, 'exit_code', None)
             state = getattr(event, 'state', None)
-            secondary = (
-                f'exit {exit_code}'
-                if exit_code is not None
-                else (state or f'session {session_id or "terminal"}')
+            secondary = _join_secondary_parts(
+                self._terminal_session_label(session_id),
+                (
+                    f'exit {exit_code}'
+                    if exit_code is not None
+                    else (state or None)
+                ),
             )
             secondary_kind = (
                 'ok'
@@ -4152,7 +4384,7 @@ class TUIRenderer:
             self._upsert_terminal_session_card(
                 session_id=session_id,
                 verb='Output',
-                detail=f'session {session_id or "terminal"}',
+                detail=self._terminal_card_detail(session_id),
                 secondary=secondary,
                 secondary_kind=secondary_kind,
                 extra_content=content or None,
