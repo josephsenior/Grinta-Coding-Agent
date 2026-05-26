@@ -16,6 +16,7 @@ from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.tui.app import (
     HUD,
+    CommunicatePromptWidget,
     GrintaHelpDialog,
     GrintaScreen,
     GrintaSessionsDialog,
@@ -34,7 +35,13 @@ from backend.cli.tui.widgets.activity_card import (
     TurnCompletion,
 )
 from backend.core.enums import AgentState, EventSource
-from backend.ledger.action import FileWriteAction, MessageAction, StreamingChunkAction
+from backend.ledger.action import (
+    ClarificationRequestAction,
+    FileWriteAction,
+    MessageAction,
+    ProposalAction,
+    StreamingChunkAction,
+)
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.terminal import (
     TerminalInputAction,
@@ -43,6 +50,7 @@ from backend.ledger.action.terminal import (
 )
 from backend.ledger.observation.agent import AgentStateChangedObservation
 from backend.ledger.observation.commands import CmdOutputObservation
+from backend.ledger.observation.files import FileEditObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
 from backend.ledger.observation.terminal import TerminalObservation
 
@@ -237,7 +245,144 @@ async def test_tui_welcome_click_submits_selected_suggestion(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_sidebar_footer_shows_workspace_path(mock_config):
+async def test_tui_communicate_clarification_supports_keyboard_selection(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        captured: list[str] = []
+
+        async def _fake_handle_input(text: str) -> None:
+            captured.append(text)
+
+        s._handle_input = _fake_handle_input  # type: ignore[method-assign]
+        s._hide_welcome()
+        s._write_log = display.append_widget  # type: ignore[method-assign]
+        s.add_communicate_clarification(
+            ClarificationRequestAction(
+                question='Which direction should I take?',
+                options=['Keep the API as-is', 'Refactor the public API'],
+                context='A scope choice is required before continuing.',
+            )
+        )
+        await pilot.pause()
+
+        card = s.query_one(CommunicatePromptWidget)
+        ta = s.query_one('#input', TextArea)
+        ta.focus()
+
+        assert card.current_value == 'Keep the API as-is'
+
+        await pilot.press('down')
+        await pilot.pause()
+        assert card.current_value == 'Refactor the public API'
+
+        await pilot.press('enter')
+        await pilot.pause()
+
+        assert captured == ['Refactor the public API']
+
+
+@pytest.mark.asyncio
+async def test_tui_communicate_proposal_click_submits_selected_option(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        captured: list[str] = []
+
+        async def _fake_handle_input(text: str) -> None:
+            captured.append(text)
+
+        s._handle_input = _fake_handle_input  # type: ignore[method-assign]
+        s._hide_welcome()
+        s._write_log = display.append_widget  # type: ignore[method-assign]
+        s.add_communicate_proposal(
+            ProposalAction(
+                rationale='There are two reasonable ways to continue.',
+                recommended=1,
+                options=[
+                    {
+                        'name': 'Patch the current flow',
+                        'description': 'Keep the current surface and fix the bug in place.',
+                    },
+                    {
+                        'name': 'Rework the flow',
+                        'description': 'Clean the interaction up before adding more behavior.',
+                    },
+                ],
+            )
+        )
+        await pilot.pause()
+
+        card = s.query_one(CommunicatePromptWidget)
+        items = list(card.query('.welcome-item'))
+        assert 'recommended' in str(items[1].renderable).lower()
+        assert 'Keep the current surface and fix the bug in place.' in str(
+            items[0].renderable
+        )
+
+        clicked = await pilot.click(
+            items[0],
+            offset=(1, 0),
+        )
+        await pilot.pause()
+
+        assert clicked
+        assert captured == ['Patch the current flow']
+
+
+@pytest.mark.asyncio
+async def test_tui_communicate_prompt_blocks_welcome_empty_state(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        s._hide_welcome()
+        s._write_log = display.append_widget  # type: ignore[method-assign]
+        s.add_communicate_clarification(
+            ClarificationRequestAction(
+                question='Which direction should I take?',
+                options=['Keep the API as-is', 'Refactor the public API'],
+            )
+        )
+        await pilot.pause()
+
+        assert s._transcript_has_real_content() is True
+
+        s._show_welcome()
+        await pilot.pause()
+
+        assert len(list(display.query(CommunicatePromptWidget))) == 1
+        assert len([child for child in display.children if type(child) is WelcomeWidget]) == 0
+
+
+@pytest.mark.asyncio
+async def test_tui_hud_bar_shows_workspace_path(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -246,11 +391,13 @@ async def test_tui_sidebar_footer_shows_workspace_path(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        footer = s.query_one('#sidebar-footer', Static)
-        rendered = str(footer.renderable)
-        workspace_line = rendered.strip()
-        assert workspace_line
-        assert any(sep in workspace_line for sep in ('/', '\\', '~'))
+        s._render_hud_bar()
+        await pilot.pause()
+
+        stats = s.query_one('#hud-line-1', Label)
+        rendered = str(stats.renderable)
+        assert 'Ws:' in rendered
+        assert any(sep in rendered for sep in ('/', '\\', '~'))
 
 
 @pytest.mark.asyncio
@@ -583,6 +730,28 @@ async def test_tui_update_hud_state(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_hud_bar_shows_accumulated_and_context_tokens(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._hud.state.total_tokens = 430
+        s._hud.state.context_tokens = 200
+        s._hud.state.context_limit = 8192
+        s._render_hud_bar()
+        await pilot.pause()
+
+        stats = s.query_one('#hud-line-1', Label)
+        rendered = str(stats.renderable)
+        assert 'Tok: 430' in rendered
+        assert '%' in rendered
+
+
+@pytest.mark.asyncio
 async def test_tui_hud_autonomy_selector_updates_controller(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
@@ -876,7 +1045,11 @@ async def test_tui_terminal_session_reuses_single_card(mock_config):
         assert len(terminal_cards) == 1
 
         header = terminal_cards[0].query_one('#header')
-        assert 'session term-1' in str(header.renderable)
+        secondary = terminal_cards[0].query_one('#secondary')
+        title = terminal_cards[0].query_one('.card-title')
+        assert '$ status' in str(header.renderable)
+        assert 'session term-1' in str(secondary.renderable)
+        assert 'Terminal' in str(title.renderable)
 
 
 @pytest.mark.asyncio
@@ -910,8 +1083,10 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
         assert len(shell_cards) == 1
         header = shell_cards[0].query_one('#header')
         secondary = shell_cards[0].query_one('#secondary')
+        title = shell_cards[0].query_one('.card-title')
         assert '$ pytest -q' in str(header.renderable)
         assert 'exit 0' in str(secondary.renderable)
+        assert 'Shell' in str(title.renderable)
 
 
 @pytest.mark.asyncio
@@ -1022,7 +1197,7 @@ async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_con
 
 
 @pytest.mark.asyncio
-async def test_tui_file_write_uses_full_width_diff_rows(mock_config):
+async def test_tui_file_write_renders_compact_create_card(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -1044,13 +1219,19 @@ async def test_tui_file_write_uses_full_width_diff_rows(mock_config):
         renderer._process_event(FileWriteAction(path='demo.txt', content='alpha\nbeta'))
         await pilot.pause()
 
-        diff_rows = list(s.query(DiffLine).results())
-        assert len(diff_rows) == 2
-        assert all('add' in row.classes for row in diff_rows)
+        file_cards = [
+            card for card in s.query(TUIActivityCard).results() if 'category-files' in card.classes
+        ]
+        assert len(file_cards) == 1
+        header = file_cards[0].query_one('#header')
+        secondary = file_cards[0].query_one('#secondary')
+        assert 'demo.txt' in str(header.renderable)
+        assert '+2 lines' in str(secondary.renderable)
+        assert list(s.query(DiffLine).results()) == []
 
 
 @pytest.mark.asyncio
-async def test_tui_file_write_preview_lines_are_not_duplicated(mock_config):
+async def test_tui_file_write_does_not_dump_created_file_body(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -1077,11 +1258,51 @@ async def test_tui_file_write_preview_lines_are_not_duplicated(mock_config):
         )
         await pilot.pause()
 
-        diff_rows = list(s.query(DiffLine).results())
-        assert [row.renderable.plain for row in diff_rows] == [
-            '+1| # This is a test file',
-            '+2| It contains multiple sections',
+        file_cards = [
+            card for card in s.query(TUIActivityCard).results() if 'category-files' in card.classes
         ]
+        assert len(file_cards) == 1
+        assert list(s.query(DiffLine).results()) == []
+        assert list(file_cards[0].query('#extra-wrap').results()) == []
+
+
+@pytest.mark.asyncio
+async def test_tui_file_edit_observation_uses_unified_diff_rows(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            FileEditObservation(
+                content='edited',
+                path='demo.txt',
+                prev_exist=True,
+                old_content='alpha\nbeta\n',
+                new_content='alpha\ngamma\nbeta\n',
+            )
+        )
+        await pilot.pause()
+
+        diff_rows = list(s.query(DiffLine).results())
+        diff_text = [row.renderable.plain for row in diff_rows]
+        assert any(line.startswith('--- demo.txt') for line in diff_text)
+        assert any(line.startswith('+++ demo.txt') for line in diff_text)
+        assert any(line.startswith('@@') for line in diff_text)
+        assert any(line.startswith('+gamma') for line in diff_text)
 
 
 @pytest.mark.asyncio

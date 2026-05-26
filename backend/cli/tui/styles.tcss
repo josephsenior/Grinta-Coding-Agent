@@ -159,14 +159,6 @@ SidebarRow {
     height: auto;
 }
 
-#sidebar-footer {
-    height: 3;
-    padding: 1 1 0 1;
-    border-top: solid #15233c;
-    color: #8f9fc1;
-    text-style: bold;
-}
-
 SidebarRow:hover {
     background: #101c36;
     color: #e9e9e9;
