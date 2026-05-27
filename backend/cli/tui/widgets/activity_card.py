@@ -211,6 +211,7 @@ class ActivityCard(Container):
         secondary_kind: str = 'neutral',
         extra_content: str | None = None,
         collapsed: bool = False,
+        diff_encoded: bool = False,
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
@@ -222,6 +223,7 @@ class ActivityCard(Container):
         self._secondary_kind = secondary_kind
         self._extra_content = extra_content
         self._collapsed = collapsed
+        self._diff_encoded = diff_encoded
         self.can_focus = bool(extra_content)
         self.processing = False
         self.add_class(f'category-{badge_category}')
@@ -276,7 +278,16 @@ class ActivityCard(Container):
         from rich.syntax import Syntax
         content = self._extra_content or ""
 
-        if any(_decode_diff_line(line) for line in content.splitlines()):
+        # Strip internal diff prefixes if present (safety net — not the primary path).
+        if self._diff_encoded:
+            cleaned_lines = []
+            for line in content.splitlines():
+                decoded = _decode_diff_line(line)
+                if decoded is not None:
+                    cleaned_lines.append(decoded[1])
+                else:
+                    cleaned_lines.append(line)
+            content = '\n'.join(cleaned_lines)
             return content
 
         # Content already has Rich-style background markup — return as-is
@@ -338,19 +349,19 @@ class ActivityCard(Container):
 
     def _extra_renderables(self) -> list[Static]:
         content = self._extra_content or ''
-        renderables: list[Static] = []
-        diff_mode = False
-        for line in content.splitlines():
-            decoded = _decode_diff_line(line)
-            if decoded is None:
-                if diff_mode and line == '':
-                    renderables.append(DiffLine('', 'ctx'))
-                    continue
-                return [Static(self._get_formatted_extra_content(), classes='card-extra', id='extra')]
-            diff_mode = True
-            kind, body = decoded
-            renderables.append(DiffLine(body, kind))
-        return renderables or [Static('', classes='card-extra', id='extra')]
+        
+        if self._diff_encoded:
+            renderables: list[Static] = []
+            for line in content.splitlines():
+                decoded = _decode_diff_line(line)
+                if decoded is not None:
+                    kind, body = decoded
+                    renderables.append(DiffLine(body, kind))
+                else:
+                    renderables.append(DiffLine(line, 'ctx'))
+            return renderables or [Static('', classes='card-extra', id='extra')]
+
+        return [Static(self._get_formatted_extra_content(), classes='card-extra', id='extra')]
 
     def compose(self) -> ComposeResult:
         if self._title:

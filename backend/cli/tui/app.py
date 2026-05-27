@@ -3843,6 +3843,7 @@ class TUIRenderer:
             secondary_kind=secondary_kind,
             extra_content=extra_content,
             collapsed=collapsed,
+            diff_encoded=True,
         )
         self._tui.set_last_tool_status(f'{verb} {detail}')
         self._tui.set_current_operation(
