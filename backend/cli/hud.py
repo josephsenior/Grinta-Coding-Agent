@@ -381,7 +381,6 @@ class HUDBar:
         prompt_tokens = int(getattr(accumulated_usage, 'prompt_tokens', 0) or 0)
         completion_tokens = int(getattr(accumulated_usage, 'completion_tokens', 0) or 0)
         self.state.total_tokens = prompt_tokens + completion_tokens
-        self.state.context_tokens = prompt_tokens
         self.state.context_limit = int(
             getattr(accumulated_usage, 'context_window', 0) or 0
         )
@@ -435,7 +434,6 @@ class HUDBar:
         if prompt <= 0 and int(accumulated_usage.get('context_window', 0) or 0) <= 0:
             return False
         self.state.total_tokens = prompt + completion
-        self.state.context_tokens = prompt
         self.state.context_limit = int(accumulated_usage.get('context_window', 0) or 0)
         self.state.token_usage_estimated = bool(
             accumulated_usage.get('usage_estimated', False)
