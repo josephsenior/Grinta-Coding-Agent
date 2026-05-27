@@ -120,9 +120,9 @@ class FileStateTracker:
         if key:
             self._read_snapshots.pop(key, None)
 
-    def check_read_stale(self, path_str: str) -> str | None:
+    def check_read_stale(self, path_str: str, guard_override: bool | None = None) -> str | None:
         """Return error message if disk changed since snapshot; else None."""
-        if not _file_state_guard_enabled():
+        if not _file_state_guard_enabled(guard_override):
             return None
         key = _normalize_path_key(path_str)
         if not key:
@@ -192,12 +192,13 @@ class FileStateTracker:
                 )
 
 
-def _file_state_guard_enabled() -> bool:
+def _file_state_guard_enabled(override: bool | None = None) -> bool:
     """Single gate for all file-state-guard checks.
 
-    Enabled by default. Disable with ``GRINTA_FILE_STATE_GUARD=0`` or
-    ``SECURITY_FILE_STATE_GUARD=false`` in config.
+    Priority: explicit override > env var > default True.
     """
+    if override is not None:
+        return override
     for var in ('GRINTA_FILE_STATE_GUARD', 'SECURITY_FILE_STATE_GUARD'):
         raw = os.environ.get(var, '').strip().lower()
         if raw in ('0', 'false', 'no', 'off'):
@@ -301,16 +302,17 @@ def _find_symbol_references(
     return '\n'.join(report)
 
 
-def _read_before_edit_enforced() -> bool:
+def _read_before_edit_enforced(override: bool | None = None) -> bool:
     """Read-before-edit guard. Controlled by GRINTA_FILE_STATE_GUARD."""
-    return _file_state_guard_enabled()
+    return _file_state_guard_enabled(override)
 
 
 class FileStateMiddleware(ToolInvocationMiddleware):
     """Middleware that blocks unknown file edits and records file operations."""
 
-    def __init__(self) -> None:
+    def __init__(self, file_state_guard: bool | None = None) -> None:
         self._tracker = FileStateTracker()
+        self._file_state_guard = file_state_guard
 
     @property
     def tracker(self) -> FileStateTracker:
@@ -327,7 +329,7 @@ class FileStateMiddleware(ToolInvocationMiddleware):
 
         if action_cls == 'FileEditAction':
             command = getattr(action, 'command', '') or 'write'
-            if command in _READ_BEFORE_EDIT_COMMANDS and _read_before_edit_enforced():
+            if command in _READ_BEFORE_EDIT_COMMANDS and _read_before_edit_enforced(self._file_state_guard):
                 requires_read_check = True
                 target_path = getattr(action, 'path', '')
             if command in _MUTATING_EDIT_COMMANDS:
@@ -363,7 +365,7 @@ class FileStateMiddleware(ToolInvocationMiddleware):
             and target_path
             and action_cls == 'FileEditAction'
         ):
-            stale_msg = self._tracker.check_read_stale(target_path)
+            stale_msg = self._tracker.check_read_stale(target_path, self._file_state_guard)
             if stale_msg:
                 ctx.block(stale_msg, agent_only=True)
 
