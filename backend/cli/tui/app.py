@@ -1389,7 +1389,6 @@ class GrintaScreen(Screen):
         display_state, state_color = self._resolve_state_display(raw_state)
 
         cost = hud.state.cost_usd or 0
-        total_tokens = int(getattr(hud.state, 'total_tokens', 0) or 0)
         used = hud.state.context_tokens
         limit = hud.state.context_limit
         # Restore Model and Autonomy
@@ -1420,13 +1419,11 @@ class GrintaScreen(Screen):
                 if pct < 95
                 else NAVY_RED_ACCENT
             )
-            shown = total_tokens if total_tokens > 0 else used
             line1_parts.append(
-                f'[{NAVY_TEXT_DIM}]Tok: {shown:,} [{ctx_color}]({pct}%)[/][/]'
+                f'[{NAVY_TEXT_DIM}]Tok: {used:,} [{ctx_color}]({pct}%)[/][/]'
             )
         else:
-            shown = total_tokens if total_tokens > 0 else used
-            line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {shown:,}[/]')
+            line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
         line1_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
         line1_parts.append(
             f'[{NAVY_TEXT_SECONDARY}]Now:[/] '
@@ -3420,6 +3417,7 @@ class TUIRenderer:
         self._worker_recent_results: deque[str] = deque(maxlen=3)
         self._worker_completed: int = 0
         self._worker_failed: int = 0
+        self._condensation_count: int = 0
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
@@ -4447,17 +4445,20 @@ class TUIRenderer:
             pruned_count = 0
             if event.pruned_event_ids:
                 pruned_count = len(event.pruned_event_ids)
-            count = getattr(self, '_condensation_count', 0) + 1
+            elif event.pruned_events_start_id is not None and event.pruned_events_end_id is not None:
+                pruned_count = event.pruned_events_end_id - event.pruned_events_start_id + 1
+            count = self._condensation_count + 1
             self._condensation_count = count
             card = ActivityRenderer.condensation(pruned_count, count)
             self._write_card(card)
+            self._hud.update_condensation_count(count)
         elif isinstance(event, AgentCondensationObservation):
             self._update_runtime_strip(
                 'Context compacted',
                 'Context compressed successfully',
                 active=False,
             )
-            count = getattr(self, '_condensation_count', 1)
+            count = max(self._condensation_count, 1)
             card = ActivityRenderer.condensation(count=count, result=event.content)
             self._write_card(card)
         elif isinstance(event, DelegateTaskAction):
