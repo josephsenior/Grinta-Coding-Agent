@@ -279,7 +279,11 @@ class ActivityRenderer:
 
     @staticmethod
     def mcp_tool(
-        name: str, arguments: dict | None = None, result: str | None = None
+        name: str,
+        arguments: dict | None = None,
+        result: str | None = None,
+        success: bool | None = None,
+        error: str | None = None,
     ) -> ActivityCard:
         """Create an activity card for an MCP tool call."""
         args_str = ''
@@ -291,6 +295,15 @@ class ActivityRenderer:
                 args_preview = args_preview[:57] + '...'
             args_str = f'({args_preview})' if args_preview else ''
 
+        secondary = None
+        secondary_kind = 'neutral'
+        if error:
+            secondary = 'failed'
+            secondary_kind = 'err'
+        elif success is True:
+            secondary = 'completed'
+            secondary_kind = 'ok'
+
         extra_lines: list[ActivityLine] = []
         if result:
             preview = result[:200] + ('...' if len(result) > 200 else '')
@@ -301,32 +314,67 @@ class ActivityRenderer:
             detail=f'{name}{args_str}',
             badge_category='mcp',
             title='Connected Tool',
+            secondary=secondary,
+            secondary_kind=secondary_kind,
             extra_lines=extra_lines,
-            is_collapsible=bool(result),
-            start_collapsed=bool(result),
+            is_collapsible=bool(result) or bool(error),
+            start_collapsed=not bool(error),
         )
 
     @staticmethod
-    def browser_action(action_name: str, url: str = '') -> ActivityCard:
+    def browser_action(
+        action_name: str,
+        url: str = '',
+        result: str | None = None,
+        error: str | None = None,
+    ) -> ActivityCard:
         """Create an activity card for a browser action."""
         detail = url[:80] if url else action_name
+
+        secondary = None
+        secondary_kind = 'neutral'
+        if error:
+            secondary = 'error' if len(error) > 60 else error
+            secondary_kind = 'err'
+        elif result:
+            secondary = 'done'
+            secondary_kind = 'ok'
+
         extra_lines: list[ActivityLine] = []
         if url:
             extra_lines.append(ActivityLine(f'URL: {url}', indent=0))
-            extra_lines.append(ActivityLine(f'Action: {action_name}', indent=0))
+        extra_lines.append(ActivityLine(f'Action: {action_name}', indent=0))
+        if error:
+            extra_lines.append(ActivityLine(f'Error: {error}', style=NAVY_ERROR, indent=0))
+
         return ActivityCard(
             verb=action_name.title(),
             detail=detail,
             badge_category='browser',
             title='Browser',
+            secondary=secondary,
+            secondary_kind=secondary_kind,
             extra_lines=extra_lines,
-            is_collapsible=bool(url),
-            start_collapsed=True,
+            is_collapsible=bool(extra_lines),
+            start_collapsed=not bool(error),
         )
 
     @staticmethod
-    def lsp_query(symbol: str, result: str | None = None) -> ActivityCard:
+    def lsp_query(
+        symbol: str,
+        result: str | None = None,
+        available: bool = True,
+    ) -> ActivityCard:
         """Create an activity card for an LSP query."""
+        secondary = None
+        secondary_kind = 'neutral'
+        if not available:
+            secondary = 'unavailable'
+            secondary_kind = 'err'
+        elif result:
+            secondary = 'completed'
+            secondary_kind = 'ok'
+
         extra_lines: list[ActivityLine] = []
         if result:
             preview = result[:200] + ('...' if len(result) > 200 else '')
@@ -337,6 +385,8 @@ class ActivityRenderer:
             detail=symbol,
             badge_category='code',
             title='Code',
+            secondary=secondary,
+            secondary_kind=secondary_kind,
             extra_lines=extra_lines,
             is_collapsible=bool(result),
             start_collapsed=bool(result),
@@ -435,6 +485,32 @@ class ActivityRenderer:
             extra_lines=extra_lines,
             is_collapsible=bool(extra_lines),
             start_collapsed=should_collapse,
+        )
+
+    @staticmethod
+    def terminal_action(
+        verb: str,
+        detail: str,
+        secondary: str | None = None,
+        secondary_kind: str = 'neutral',
+        extra_content: str | None = None,
+    ) -> ActivityCard:
+        """Create an activity card for a terminal lifecycle action (start, send, read)."""
+        extra_lines: list[ActivityLine] = []
+        if extra_content:
+            for line in extra_content.splitlines():
+                extra_lines.append(ActivityLine(line, style=NAVY_TEXT_MUTED, indent=1))
+
+        return ActivityCard(
+            verb=verb,
+            detail=detail,
+            badge_category='terminal',
+            title='Terminal',
+            secondary=secondary,
+            secondary_kind=secondary_kind,
+            extra_lines=extra_lines,
+            is_collapsible=bool(extra_lines),
+            start_collapsed=bool(extra_lines),
         )
 
     @staticmethod

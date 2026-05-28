@@ -3589,7 +3589,8 @@ class TUIRenderer:
         self._worker_completed: int = 0
         self._worker_failed: int = 0
         self._condensation_count: int = 0
-        self._last_mcp_card: Any | None = None
+        self._last_browser_action_card: Any | None = None
+        self._last_browser_cmd: str = ''
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
@@ -3922,7 +3923,12 @@ class TUIRenderer:
             'No delegated work', meta='Idle', active=False, has_error=False
         )
 
-    def _write_card(self, card: ActivityCard) -> None:
+    def _write_card(
+        self,
+        card: ActivityCard,
+        *,
+        collapsed: bool = True,
+    ) -> Any:
         """Write an activity card to the transcript using native ActivityCard widget."""
         self._clear_last_active_card_processing()
 
@@ -3952,7 +3958,7 @@ class TUIRenderer:
             status=status,
             outcome=card.secondary,
             extra_content=extra_content,
-            collapsed=True,
+            collapsed=collapsed,
         )
 
         is_tool = card.badge_category in (
@@ -4079,10 +4085,6 @@ class TUIRenderer:
         processing: bool = True,
         collapse_after_update: bool = False,
     ) -> None:
-        from backend.cli.tui.widgets.activity_card import (
-            ActivityCard as TUIActivityCard,
-        )
-
         session_key = session_id or 'terminal'
         widget = self._terminal_cards_by_session.get(session_key)
         if widget is None and session_id and self._pending_terminal_card is not None:
@@ -4090,35 +4092,29 @@ class TUIRenderer:
             self._terminal_cards_by_session[session_key] = widget
             self._pending_terminal_card = None
         if widget is None:
-            status_map = {'ok': 'ok', 'err': 'err', 'warn': 'warn', 'neutral': 'neutral'}
-            status = status_map.get(secondary_kind, 'neutral')
-            widget = TUIActivityCard(
-                verb=verb,
-                detail=detail,
-                badge_category='terminal',
-                status=status,
-                outcome=secondary,
+            card = ActivityRenderer.terminal_action(
+                verb, detail,
+                secondary=secondary,
+                secondary_kind=secondary_kind,
                 extra_content=extra_content,
-                collapsed=False,
             )
-            display = self._tui._get_display()
-            display.append_widget(widget)
+            widget = self._write_card(card, collapsed=collapse_after_update)
             if session_id:
                 self._terminal_cards_by_session[session_key] = widget
             else:
                 self._pending_terminal_card = widget
-        else:
-            widget.set_verb(verb, detail=detail)
-            widget.set_status(
-                'ok' if secondary_kind == 'ok' else 'err' if secondary_kind == 'err' else 'neutral',
-                outcome=secondary,
-            )
-            if extra_content:
-                widget.append_content(extra_content)
+            return
 
-        if not extra_content and collapse_after_update:
-            widget.set_collapsed(True)
-        elif collapse_after_update:
+        # Update existing widget for same session
+        widget.set_verb(verb, detail=detail)
+        widget.set_status(
+            'ok' if secondary_kind == 'ok' else 'err' if secondary_kind == 'err' else 'neutral',
+            outcome=secondary,
+        )
+        if extra_content:
+            widget.append_content(extra_content)
+
+        if collapse_after_update:
             widget.set_collapsed(True)
 
         widget.set_processing(processing)
@@ -4481,27 +4477,18 @@ class TUIRenderer:
                 )
         elif isinstance(event, MCPAction):
             card = ActivityRenderer.mcp_tool(event.name, event.arguments)
-            widget = self._write_card(card)
-            self._last_mcp_card = widget
+            self._write_card(card)
         elif isinstance(event, CmdRunAction):
             cmd = getattr(event, 'command', '') or ''
             if not getattr(event, 'hidden', False):
                 self._create_shell_command_card(cmd)
         elif isinstance(event, MCPObservation):
-            if getattr(self, '_last_mcp_card', None) is not None:
-                try:
-                    widget = self._last_mcp_card
-                    self._last_mcp_card = None
-                    widget.set_status('ok', outcome='completed')
-                    if event.content:
-                        preview = event.content[:500] + ('...' if len(event.content) > 500 else '')
-                        widget.append_content(preview)
-                    widget.set_processing(False)
-                    self._tui.set_current_operation('MCP', meta='completed', active=False)
-                    return
-                except Exception:
-                    pass
-            card = ActivityRenderer.mcp_tool('mcp', result=event.content)
+            card = ActivityRenderer.mcp_tool(
+                event.name,
+                event.arguments,
+                result=event.content or '',
+                success=True,
+            )
             self._write_card(card)
         elif isinstance(event, CmdOutputObservation):
             output = (event.content or '').strip()
@@ -4577,18 +4564,38 @@ class TUIRenderer:
             if thought and thought.strip() != 'Your thought has been logged.':
                 self._tui.add_thinking(thought)
         elif isinstance(event, BrowserToolAction):
-            action_name = getattr(event, 'action', 'browser') or 'browser'
-            url = getattr(event, 'url', '') or ''
+            action_name = getattr(event, 'command', 'browser') or 'browser'
+            url = ''
+            if action_name == 'navigate':
+                url = (getattr(event, 'params', {}) or {}).get('url', '')
+            elif action_name == 'click':
+                selector = (getattr(event, 'params', {}) or {}).get('selector', '')
+                url = selector[:80] if selector else ''
             card = ActivityRenderer.browser_action(action_name, url)
-            self._write_card(card)
+            widget = self._write_card(card)
+            self._last_browser_action_card = widget
+            self._last_browser_cmd = action_name
         elif isinstance(event, BrowseInteractiveAction):
-            url = getattr(event, 'url', '') or ''
-            card = ActivityRenderer.browser_action('browse', url)
-            self._write_card(card)
+            actions = getattr(event, 'browser_actions', '') or ''
+            detail = actions[:80] + ('...' if len(actions) > 80 else '') if actions else ''
+            card = ActivityRenderer.browser_action('browse', detail)
+            widget = self._write_card(card)
+            self._last_browser_action_card = widget
+            self._last_browser_cmd = 'browse'
         elif isinstance(event, BrowserScreenshotObservation):
-            url = getattr(event, 'url', '') or ''
-            card = ActivityRenderer.browser_action('screenshot', url)
-            self._write_card(card)
+            url = getattr(event, 'image_path', '') or ''
+            card = ActivityRenderer.browser_action(
+                'screenshot', url, result=event.content or 'captured'
+            )
+            widget = self._write_card(card)
+            prev = getattr(self, '_last_browser_action_card', None)
+            if prev is not None and getattr(self, '_last_browser_cmd', '') in ('screenshot', 'browse', 'browser'):
+                try:
+                    prev.set_processing(False)
+                    if self._last_active_card is prev:
+                        self._last_active_card = None
+                except Exception:
+                    pass
         elif isinstance(event, LspQueryAction):
             symbol = getattr(event, 'symbol', '') or getattr(event, 'query', '') or ''
             card = ActivityRenderer.lsp_query(symbol)
@@ -4596,7 +4603,8 @@ class TUIRenderer:
         elif isinstance(event, LspQueryObservation):
             content = (event.content or '').strip()
             symbol = getattr(event, 'symbol', '') or ''
-            card = ActivityRenderer.lsp_query(symbol, result=content)
+            available = bool(getattr(event, 'available', True))
+            card = ActivityRenderer.lsp_query(symbol, result=content, available=available)
             self._write_card(card)
         elif isinstance(event, TerminalRunAction):
             cmd = getattr(event, 'command', '') or ''

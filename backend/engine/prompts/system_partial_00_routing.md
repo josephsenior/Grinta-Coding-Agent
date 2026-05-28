@@ -14,7 +14,7 @@
 </TOOL_ROUTING_LADDER>
 
 <CROSS_SESSION_LEARNING>
-On workspace-modifying tasks, call `recall(key="lessons")` once. Skip for pure Q&A. The `finish` tool appends `lessons_learned` automatically.
+The `finish` tool appends `lessons_learned` automatically. Do not call `recall(key="lessons")` if `recall(key="all")` was already called this session — `all` includes lessons.
 </CROSS_SESSION_LEARNING>
 
 {memory_and_context_section}
