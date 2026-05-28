@@ -129,12 +129,7 @@ class ActivityRenderer:
 
         secondary_parts: list[str] = []
         if exit_code is not None:
-            if exit_code == 0:
-                secondary_parts.append(f'exit {exit_code}')
-            else:
-                secondary_parts.append(f'exit {exit_code}')
-        if duration:
-            secondary_parts.append(duration)
+            secondary_parts.append(f'exit {exit_code}')
 
         secondary = ' · '.join(secondary_parts) if secondary_parts else None
         kind = (
@@ -269,6 +264,7 @@ class ActivityRenderer:
             extra_lines.append(ActivityLine('─' * 40, indent=0))
             for line in lines:
                 extra_lines.append(ActivityLine(line, indent=0))
+        should_collapse = bool(preview_content) and len(preview_content) > 500
         return ActivityCard(
             verb='Created',
             detail=path,
@@ -277,6 +273,8 @@ class ActivityRenderer:
             secondary=secondary,
             secondary_kind='ok' if secondary else 'neutral',
             extra_lines=extra_lines,
+            is_collapsible=bool(preview_content),
+            start_collapsed=should_collapse,
         )
 
     @staticmethod
@@ -312,11 +310,18 @@ class ActivityRenderer:
     def browser_action(action_name: str, url: str = '') -> ActivityCard:
         """Create an activity card for a browser action."""
         detail = url[:80] if url else action_name
+        extra_lines: list[ActivityLine] = []
+        if url:
+            extra_lines.append(ActivityLine(f'URL: {url}', indent=0))
+            extra_lines.append(ActivityLine(f'Action: {action_name}', indent=0))
         return ActivityCard(
             verb=action_name.title(),
             detail=detail,
             badge_category='browser',
             title='Browser',
+            extra_lines=extra_lines,
+            is_collapsible=bool(url),
+            start_collapsed=True,
         )
 
     @staticmethod

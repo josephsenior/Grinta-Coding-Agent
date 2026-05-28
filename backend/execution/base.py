@@ -812,6 +812,9 @@ class Runtime(
 
         try:
             file_path = action.path
+            # Skip verification for multi-file edits — no single file path
+            if not file_path or file_path == '.':
+                return None
             # Normalize Unix-style absolute paths (e.g. /workspace/app.py) to
             # workspace-relative so they resolve correctly on Windows, where
             # PurePosixPath-style leading slashes confuse pathlib joins.
