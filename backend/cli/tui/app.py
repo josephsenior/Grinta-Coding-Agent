@@ -3610,6 +3610,7 @@ class TUIRenderer:
         self._worker_completed: int = 0
         self._worker_failed: int = 0
         self._condensation_count: int = 0
+        self._last_mcp_card: Any | None = None
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
@@ -4005,6 +4006,7 @@ class TUIRenderer:
 
         display = self._tui._get_display()
         display.append_widget(widget)
+        return widget
 
     def _write_tui_file_card(
         self,
@@ -4503,12 +4505,27 @@ class TUIRenderer:
                 )
         elif isinstance(event, MCPAction):
             card = ActivityRenderer.mcp_tool(event.name, event.arguments)
-            self._write_card(card)
+            widget = self._write_card(card)
+            self._last_mcp_card = widget
         elif isinstance(event, CmdRunAction):
             cmd = getattr(event, 'command', '') or ''
             if not getattr(event, 'hidden', False):
                 self._create_shell_command_card(cmd)
         elif isinstance(event, MCPObservation):
+            if getattr(self, '_last_mcp_card', None) is not None:
+                try:
+                    widget = self._last_mcp_card
+                    self._last_mcp_card = None
+                    widget.set_status('ok', outcome='completed')
+                    if event.content:
+                        preview = event.content[:500] + ('...' if len(event.content) > 500 else '')
+                        widget.append_content(preview)
+                    widget.set_processing(False)
+                    self._tui.set_last_tool_status('MCP completed')
+                    self._tui.set_current_operation('MCP', meta='completed', active=False)
+                    return
+                except Exception:
+                    pass
             card = ActivityRenderer.mcp_tool('mcp', result=event.content)
             self._write_card(card)
         elif isinstance(event, CmdOutputObservation):
