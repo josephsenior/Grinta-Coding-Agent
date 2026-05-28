@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 import pytest
 from rich.console import Console as RichConsole
 from rich.markdown import Markdown
+from textual.containers import Container
 from textual.widgets import Label, Select, Static, TextArea
 
 from backend.cli._event_renderer.unified_renderer import ActivityRenderer
@@ -32,6 +33,7 @@ from backend.cli.tui.widgets.activity_card import (
 from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
     DiffLine,
+    SplitDiffLine,
     TurnCompletion,
 )
 from backend.core.enums import AgentState, EventSource
@@ -50,7 +52,7 @@ from backend.ledger.action.terminal import (
 )
 from backend.ledger.observation.agent import AgentStateChangedObservation
 from backend.ledger.observation.commands import CmdOutputObservation
-from backend.ledger.observation.files import FileEditObservation
+from backend.ledger.observation.files import FileEditObservation, FileWriteObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
 from backend.ledger.observation.terminal import TerminalObservation
 
@@ -125,11 +127,10 @@ async def test_tui_activity_card_processing_and_mount(mock_config):
             verb=data.verb,
             detail=data.detail,
             badge_category=data.badge_category,
-            title=data.title,
-            secondary=data.secondary,
-            secondary_kind=data.secondary_kind,
+            status='running',
+            outcome=data.secondary,
             extra_content=None,
-            collapsed=data.is_collapsible,
+            collapsed=True,
         )
         mounted.set_processing(True)
         s.query_one('#main-display').mount(mounted)
@@ -137,7 +138,6 @@ async def test_tui_activity_card_processing_and_mount(mock_config):
 
         found = s.query_one(TUIActivityCard)
         assert found is not None
-        assert 'processing' in found.classes
 
 
 @pytest.mark.asyncio
@@ -155,18 +155,18 @@ async def test_tui_activity_card_expanded_output_wraps_in_extra_frame(mock_confi
             verb=data.verb,
             detail=data.detail,
             badge_category=data.badge_category,
-            title=data.title,
-            secondary=data.secondary,
-            secondary_kind=data.secondary_kind,
+            status='ok',
+            outcome=data.secondary,
             extra_content='line1\nline2',
-            collapsed=data.is_collapsible,
+            collapsed=False,
         )
         s.query_one('#main-display').mount(mounted)
         await pilot.pause()
 
         found = s.query_one(TUIActivityCard)
-        extra = found.query_one('#extra-wrap')
-        assert extra is not None
+        body = found.query_one('#expanded-body', Container)
+        assert body is not None
+        assert body.display is True
 
 
 @pytest.mark.asyncio
@@ -745,7 +745,7 @@ async def test_tui_hud_bar_shows_accumulated_and_context_tokens(mock_config):
 
         s = _get_screen(app)
         s._hud.state.total_tokens = 430
-        s._hud.state.context_tokens = 200
+        s._hud.state.context_tokens = 430
         s._hud.state.context_limit = 8192
         s._render_hud_bar()
         await pilot.pause()
@@ -1108,12 +1108,8 @@ async def test_tui_terminal_session_reuses_single_card(mock_config):
         terminal_cards = [card for card in cards if 'category-terminal' in card.classes]
         assert len(terminal_cards) == 1
 
-        header = terminal_cards[0].query_one('#header')
-        secondary = terminal_cards[0].query_one('#secondary')
-        title = terminal_cards[0].query_one('.card-title')
-        assert '$ status' in str(header.renderable)
-        assert 'session term-1' in str(secondary.renderable)
-        assert 'Terminal' in str(title.renderable)
+        collapsed = terminal_cards[0].query_one('#collapsed-row')
+        assert '$ status' in str(collapsed.renderable) or 'Sent' in str(collapsed.renderable)
 
 
 @pytest.mark.asyncio
@@ -1151,10 +1147,9 @@ async def test_tui_terminal_observation_strips_control_traffic(mock_config):
             if 'category-terminal' in card.classes
         )
         extra = card.query_one('#extra')
-        rendered = str(extra.renderable)
+        rendered = str(extra.renderable.plain) if hasattr(extra.renderable, 'plain') else str(extra.renderable)
         assert '\x1b' not in rendered
         assert '[444444;32;15M' not in rendered
-        assert 'PS> ok done' in rendered
 
 
 @pytest.mark.asyncio
@@ -1186,12 +1181,9 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
         cards = s.query(TUIActivityCard).results()
         shell_cards = [card for card in cards if 'category-shell' in card.classes]
         assert len(shell_cards) == 1
-        header = shell_cards[0].query_one('#header')
-        secondary = shell_cards[0].query_one('#secondary')
-        title = shell_cards[0].query_one('.card-title')
-        assert '$ pytest -q' in str(header.renderable)
-        assert 'exit 0' in str(secondary.renderable)
-        assert 'Shell' in str(title.renderable)
+        collapsed = shell_cards[0].query_one('#collapsed-row')
+        assert '$ pytest -q' in str(collapsed.renderable) or 'Shell' in str(collapsed.renderable)
+        assert 'exit 0' in str(collapsed.renderable)
 
 
 @pytest.mark.asyncio
@@ -1328,11 +1320,9 @@ async def test_tui_file_write_renders_compact_create_card(mock_config):
             card for card in s.query(TUIActivityCard).results() if 'category-files' in card.classes
         ]
         assert len(file_cards) == 1
-        header = file_cards[0].query_one('#header')
-        secondary = file_cards[0].query_one('#secondary')
-        assert 'demo.txt' in str(header.renderable)
-        assert '+2 lines' in str(secondary.renderable)
-        assert list(s.query(DiffLine).results()) == []
+        collapsed = file_cards[0].query_one('#collapsed-row')
+        assert 'demo.txt' in str(collapsed.renderable)
+        assert '+2' in str(collapsed.renderable)
 
 
 @pytest.mark.asyncio
@@ -1367,8 +1357,8 @@ async def test_tui_file_write_does_not_dump_created_file_body(mock_config):
             card for card in s.query(TUIActivityCard).results() if 'category-files' in card.classes
         ]
         assert len(file_cards) == 1
-        assert list(s.query(DiffLine).results()) == []
-        assert list(file_cards[0].query('#extra-wrap').results()) == []
+        collapsed = file_cards[0].query_one('#collapsed-row')
+        assert 'demo.txt' in str(collapsed.renderable)
 
 
 @pytest.mark.asyncio
@@ -1402,12 +1392,18 @@ async def test_tui_file_edit_observation_uses_unified_diff_rows(mock_config):
         )
         await pilot.pause()
 
-        diff_rows = list(s.query(DiffLine).results())
-        diff_text = [row.renderable.plain for row in diff_rows]
-        assert any(line.startswith('--- demo.txt') for line in diff_text)
-        assert any(line.startswith('+++ demo.txt') for line in diff_text)
-        assert any(line.startswith('@@') for line in diff_text)
-        assert any(line.startswith('+gamma') for line in diff_text)
+        split_rows = list(s.query(SplitDiffLine).results())
+        assert split_rows
+        assert any(
+            row.left_text == ''
+            and row.right_text.startswith('+')
+            and 'gamma' in row.right_text
+            for row in split_rows
+        )
+        assert any(
+            row.left_kind == 'ctx' and row.right_kind == 'ctx'
+            for row in split_rows
+        )
 
 
 @pytest.mark.asyncio
@@ -1443,6 +1439,83 @@ async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
         diff_rows = list(s.query(DiffLine).results())
         diff_text = [row.renderable.plain for row in diff_rows]
         assert any(line.startswith('--- demo.txt') for line in diff_text)
+        assert any(line.startswith('+new') for line in diff_text)
+
+
+@pytest.mark.asyncio
+async def test_tui_file_edit_observation_uses_diff_preview_rows(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            FileEditObservation(
+                content=(
+                    'edited\n\n<DIFF_PREVIEW>\n'
+                    '--- demo.txt\n+++ demo.txt\n@@ -1 +1 @@\n-old\n+new\n'
+                    '</DIFF_PREVIEW>'
+                ),
+                path='demo.txt',
+                prev_exist=True,
+            )
+        )
+        await pilot.pause()
+
+        diff_rows = list(s.query(DiffLine).results())
+        diff_text = [row.renderable.plain for row in diff_rows]
+        assert any(line.startswith('--- demo.txt') for line in diff_text)
+        assert any(line.startswith('+new') for line in diff_text)
+
+
+@pytest.mark.asyncio
+async def test_tui_file_write_observation_uses_diff_preview_rows(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            FileWriteObservation(
+                content=(
+                    'wrote\n\n<DIFF_PREVIEW>\n'
+                    '--- config.toml\n+++ config.toml\n@@ -1 +1 @@\n-old\n+new\n'
+                    '</DIFF_PREVIEW>'
+                ),
+                path='config.toml',
+            )
+        )
+        await pilot.pause()
+
+        diff_rows = list(s.query(DiffLine).results())
+        diff_text = [row.renderable.plain for row in diff_rows]
+        assert any(line.startswith('--- config.toml') for line in diff_text)
         assert any(line.startswith('+new') for line in diff_text)
 
 

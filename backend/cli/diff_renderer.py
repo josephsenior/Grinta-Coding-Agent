@@ -154,6 +154,18 @@ def _extract_indentation_warnings(content: str) -> tuple[str, list[str] | None]:
     return main_content, warnings if warnings else None
 
 
+def _extract_tagged_block(content: str, start_tag: str, end_tag: str) -> str | None:
+    start = content.find(start_tag)
+    if start == -1:
+        return None
+    body_start = start + len(start_tag)
+    end = content.find(end_tag, body_start)
+    if end == -1:
+        return None
+    block = content[body_start:end].strip()
+    return block or None
+
+
 class DiffPanel:
     """Rich renderable that shows a unified diff for a file edit."""
 
@@ -321,16 +333,16 @@ class DiffPanel:
             return None
 
     def _extract_embedded_diff(self) -> str | None:
-        """Extract diff embedded in content string (via [EDIT_DIFF] marker)."""
+        """Extract diff embedded in content string."""
         obs = self._obs
         content = getattr(obs, 'content', None)
         if not content:
             return None
         marker = '[EDIT_DIFF]'
         idx = content.find(marker)
-        if idx == -1:
-            return None
-        return content[idx + len(marker) :].lstrip('\n')
+        if idx != -1:
+            return content[idx + len(marker) :].lstrip('\n')
+        return _extract_tagged_block(content, '<DIFF_PREVIEW>', '</DIFF_PREVIEW>')
 
     def _append_groups_diff(
         self,

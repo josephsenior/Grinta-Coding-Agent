@@ -528,6 +528,27 @@ def test_diff_panel_shows_files_badge_title_when_requested() -> None:
     assert 'main.py' in output
 
 
+def test_diff_panel_extracts_diff_preview_block() -> None:
+    obs = MagicMock()
+    obs.path = 'README.md'
+    obs.prev_exist = True
+    obs.diff = None
+    obs.get_edit_groups.return_value = []
+    obs.visualize_diff.side_effect = RuntimeError('no old/new content')
+    obs.content = (
+        'updated\n\n<DIFF_PREVIEW>\n'
+        '--- README.md\n+++ README.md\n@@ -1 +1 @@\n-old\n+new\n'
+        '</DIFF_PREVIEW>'
+    )
+
+    panel = DiffPanel(obs)
+    console = _make_console(width=80)
+    console.print(panel)
+    output = _console_output(console)
+    assert 'README.md' in output
+    assert '+new' in output
+
+
 def test_show_grinta_splash_renders_logo_text() -> None:
     console = _make_console(width=120)
     show_grinta_splash(console)
