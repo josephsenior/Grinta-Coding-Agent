@@ -492,6 +492,7 @@ class ActivityRenderer:
         file_count: int = 0,
         file_list: list[tuple[str, int]] | None = None,
         result_lines: list[str] | None = None,
+        scope: str = '',
     ) -> ActivityCard:
         """Create an activity card for search results.
 
@@ -500,19 +501,38 @@ class ActivityRenderer:
             match_count: Total number of matches
             file_count: Total number of files with matches
             file_list: List of (filepath, match_count) tuples for display
-            result_lines: Legacy raw result lines (deprecated, use file_list)
+            result_lines: Raw ripgrep-style result lines (file:line:content)
+            scope: Optional search path scope (e.g. 'src/runtime')
         """
-        secondary_parts = []
-        if match_count:
-            secondary_parts.append(f'{match_count} matches')
-        if file_count:
-            secondary_parts.append(f'in {file_count} files')
-        secondary = ' '.join(secondary_parts) if secondary_parts else 'No matches'
+        # Detail: quoted query, optionally with scope
+        quoted = f'"{query}"'
+        detail = f'{quoted} in {scope}' if scope else quoted
+
+        # Secondary: match count · file count
+        if match_count and file_count:
+            secondary = f'{match_count} matches · {file_count} files'
+        elif match_count:
+            secondary = f'{match_count} matches'
+        else:
+            secondary = 'no matches'
 
         extra_lines: list[ActivityLine] = []
 
-        # Display file list (Option C)
-        if file_list:
+        # Expanded view: grouped by file with line numbers and snippets
+        if result_lines:
+            from backend.cli._tool_display.renderers.search import (
+                render_search_results,
+            )
+
+            rich_lines = render_search_results(
+                '\n'.join(result_lines),
+                query=query,
+                max_files=10,
+                max_lines_per_file=4,
+            )
+            for rl in rich_lines:
+                extra_lines.append(ActivityLine(rl, indent=0))
+        elif file_list:
             for filepath, count in file_list:
                 extra_lines.append(
                     ActivityLine(
@@ -532,18 +552,14 @@ class ActivityRenderer:
                         indent=1,
                     )
                 )
-        elif result_lines:
-            # Legacy fallback
-            for line in result_lines:
-                extra_lines.append(ActivityLine(line, style=NAVY_TEXT_MUTED, indent=1))
 
         return ActivityCard(
-            verb='Searched',
-            detail=query,
+            verb='Search',
+            detail=detail,
             badge_category='search',
             title='Search',
             secondary=secondary,
             secondary_kind='ok' if match_count else 'neutral',
             extra_lines=extra_lines,
-            is_collapsible=bool(file_list or result_lines),
+            is_collapsible=bool(extra_lines),
         )
