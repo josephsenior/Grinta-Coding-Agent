@@ -13,7 +13,11 @@ _STATUS_PARAM = {
 
 _SUMMARY_PARAM = {
     'type': 'string',
-    'description': 'Concise explanation of the planning or execution result.',
+    'description': (
+        'Detailed summary of the run result. Cover what was accomplished, '
+        'what changed (key files, functionality, config), and the end state. '
+        'Include specific paths, feature names, or outcomes — 2-5 sentences.'
+    ),
 }
 
 _NEXT_STEP_PARAM = {
@@ -24,12 +28,16 @@ _NEXT_STEP_PARAM = {
 _PLAN_FINISH_DESCRIPTION = (
     'Finish a Plan Mode run with a structured execution plan. Plan Mode is read-only; '
     'use communicate_with_user for clarification before finishing. Use blocked only '
-    'when planning cannot continue.'
+    'when planning cannot continue. '
+    'Include a detailed summary covering what was investigated, what was found, '
+    'and what the plan achieves.'
 )
 
 _AGENT_FINISH_DESCRIPTION = (
-    'Finish an Agent Mode execution run with a structured execution result. Include '
-    'honest verification details; if no validation was run, say so explicitly.'
+    'Finish an Agent Mode execution run with a structured execution result. '
+    'Provide a detailed summary covering what was accomplished, what changed, '
+    'and the end state. Include specific file paths, feature names, and outcomes. '
+    'Be honest about verification; if no validation was run, say so explicitly.'
 )
 
 
@@ -65,12 +73,22 @@ def _create_agent_finish_tool() -> ChatCompletionToolParam:
             'summary': _SUMMARY_PARAM,
             'actions_taken': {
                 'type': 'array',
-                'description': 'Concrete actions performed during execution.',
+                'description': (
+                    'Concrete actions performed during execution. Each item should '
+                    'include the file path and what was done (e.g. "Added input '
+                    'validation to src/api/login.py"). Be specific — include '
+                    'function names, routes, or config keys where relevant.'
+                ),
                 'items': {'type': 'string'},
             },
             'verification': {
                 'type': 'object',
-                'description': 'Validation status and details. Do not claim tests were run unless they were.',
+                'description': (
+                    'Validation results. Describe exactly what was verified — '
+                    'specific commands run, pages visited, test suites executed, '
+                    'or manual checks performed. Do not claim tests were run '
+                    'unless they were.'
+                ),
                 'properties': {
                     'status': {
                         'type': 'string',
@@ -78,7 +96,11 @@ def _create_agent_finish_tool() -> ChatCompletionToolParam:
                     },
                     'details': {
                         'type': 'string',
-                        'description': 'Specific validation performed or why it was not run.',
+                        'description': (
+                            'Specific validation performed. Include commands, '
+                            'URLs visited, test names, or why validation was '
+                            'not run / only partial.'
+                        ),
                     },
                 },
                 'required': ['status', 'details'],
@@ -86,15 +108,21 @@ def _create_agent_finish_tool() -> ChatCompletionToolParam:
             },
             'remaining_items': {
                 'type': 'array',
-                'description': 'Known remaining work, if any.',
+                'description': (
+                    'Known remaining work, if any. Be specific about what '
+                    'is left undone and why (e.g. "Add rate limiting to '
+                    'src/api/users.py — low priority, deferred").'
+                ),
                 'items': {'type': 'string'},
             },
             'next_step': _NEXT_STEP_PARAM,
             'lessons_learned': {
                 'type': 'string',
                 'description': (
-                    'Optional internal reflection on recurring patterns, mistakes, '
-                    'or verified solutions that should be remembered.'
+                    'Optional internal reflection on recurring patterns, '
+                    'mistakes, or verified solutions that should be remembered '
+                    'for future tasks. Include specific anti-patterns, '
+                    'solutions found, or configuration gotchas.'
                 ),
             },
         },

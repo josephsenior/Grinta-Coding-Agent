@@ -4773,13 +4773,9 @@ class TUIRenderer:
             )
             self._write_card(card)
         elif isinstance(event, PlaybookFinishAction):
-            summary = (
-                getattr(event, 'final_thought', '')
-                or getattr(event, 'thought', '')
-                or ''
-            )
-            if summary:
-                self._tui._write_log(Markdown(summary))
+            message = getattr(event, 'message', '') or ''
+            if message:
+                self._tui._write_log(Markdown(message))
         elif isinstance(event, UserRejectObservation):
             card = ActivityRenderer.user_reject()
             self._write_card(card)

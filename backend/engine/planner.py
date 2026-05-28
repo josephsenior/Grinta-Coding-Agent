@@ -581,8 +581,14 @@ class OrchestratorPlanner:
             'or memory write tools.\n\n'
             'communicate_with_user is for questions that allow the run to continue. '
             "finish(status='blocked') is for ending the run when planning cannot continue.\n\n"
-            'Plan Mode finish requires exactly these universal fields: status, summary, '
-            "plan, assumptions, next_step. For status='completed', plan must be non-empty.\n"
+            "Plan Mode finish requires exactly these universal fields: status, summary, "
+            "plan, assumptions, next_step. For status='completed', plan must be non-empty.\n\n"
+            'When calling finish, be detailed:\n'
+            '- summary: 2-5 sentences covering what was investigated, what was found, '
+            'and what the plan achieves.\n'
+            '- plan: one step per logical action. Include file paths and functions '
+            'that will be modified.\n'
+            '- assumptions: Be specific about dependencies, risks, or unknowns.\n'
             '=================================\n'
         )
         return self._apply_control_message(messages, instruction)
@@ -599,6 +605,17 @@ class OrchestratorPlanner:
             'Agent Mode finish requires exactly these universal fields: status, summary, '
             'actions_taken, verification, remaining_items, next_step. If no verification '
             "was run, use verification.status='not_run' and explain honestly in details.\n\n"
+            'When calling finish, be detailed:\n'
+            '- summary: 2-5 sentences covering what was accomplished, what changed '
+            '(files, functions, config), and the end state.\n'
+            '- actions_taken: one item per distinct action. Include file paths, '
+            'function names, and what changed (e.g. "Added input validation to '
+            'src/api/login.py").\n'
+            "- verification: Describe exactly what was checked — commands run, "
+            'pages visited, test suites executed. Be specific; say "Ran pytest '
+            'on tests/test_auth.py — all 12 passed", not just "Tests passed".\n'
+            '- remaining_items: If nothing remains, say so. If work was deferred, '
+            'say why (e.g. "Add rate limiting — low priority, deferred").\n\n'
             'File API mental model:\n'
             '- `find_symbols` discovers symbol candidates without reading full bodies.\n'
             '- `read` inspects file, range, or one/more symbol bodies.\n'

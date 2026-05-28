@@ -181,7 +181,45 @@ TOOL_EXAMPLES = {
         'view_page': "\nASSISTANT:\nLet me check how the page looks in the browser:\n<function=browser>\n<parameter=code>\ngoto('http://127.0.0.1:5000')\nnoop(1000)  # Wait for page to load\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [browser]:\n[Browser shows the numbers in a table format]\n",
     },
     'finish': {
-        'example': '\nASSISTANT:\n<function=finish>\n<parameter=status>completed</parameter>\n<parameter=summary>The server is running on port 5000 and displays numbers 1-10 in a table.</parameter>\n<parameter=actions_taken>["Started the updated server", "Verified the page URL"]</parameter>\n<parameter=verification>{"status":"passed","details":"Opened http://127.0.0.1:5000 and confirmed the table rendered."}</parameter>\n<parameter=remaining_items>[]</parameter>\n<parameter=next_step>No further action needed.</parameter>\n</function>\n',
+        'example': (
+            '\nASSISTANT:\n<function=finish>\n'
+            '<parameter=status>completed</parameter>\n'
+            '<parameter=summary>'
+            'Refactored the Flask server in src/app.py to render numbers 1-10 in an HTML table '
+            'instead of a plain text list. Added a route for /numbers that returns an '
+            'HTML page with styled table layout. The server runs on port 5000 and the '
+            'endpoint is fully functional.'
+            '</parameter>\n'
+            '<parameter=actions_taken>'
+            '["Updated src/app.py -- replaced the / route to return an HTML table '
+            'template instead of str(numbers)", '
+            '"Added src/templates/numbers.html -- created a new Jinja2 template with '
+            'table markup and CSS styling", '
+            '"Installed flask (version 3.0.3) via pip to resolve ModuleNotFoundError", '
+            '"Restarted the server on port 5000 with PID 126", '
+            '"Opened http://127.0.0.1:5000 in the browser and confirmed the table renders '
+            'correctly with all 10 rows"]'
+            '</parameter>\n'
+            '<parameter=verification>'
+            '{"status":"passed","details":"Ran `curl http://127.0.0.1:5000 | grep '
+            '<table>` -- confirmed HTML table in response body. Visited '
+            'http://127.0.0.1:5000 in browser -- table renders with rows 1-10. '
+            'No console errors."}'
+            '</parameter>\n'
+            '<parameter=remaining_items>'
+            '["Add pagination for large datasets -- deferred, not in scope", '
+            '"Internationalize table headers -- low priority"]'
+            '</parameter>\n'
+            '<parameter=next_step>'
+            'Consider adding sort-by-column functionality or pagination for larger datasets.'
+            '</parameter>\n'
+            '<parameter=lessons_learned>'
+            'Jinja2 templates must be in a templates/ subdirectory relative to the Flask '
+            'app for auto-discovery. Running pip install before importing avoids '
+            'ModuleNotFoundError even when requirements.txt exists.'
+            '</parameter>\n'
+            '</function>\n'
+        ),
     },
 }
 
