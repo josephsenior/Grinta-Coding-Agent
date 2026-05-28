@@ -814,7 +814,7 @@ def _render_tool_reference(
             '**Examples**\n'
             '- Find candidates: `find_symbols(query="authenticate")`.\n'
             '- Read symbols: `read(type="symbols", symbols=[{"qualified_name": "authenticate_user"}, {"qualified_name": "UserService"}])`.\n'
-            '- APPEND config: `replace_string(old_string="# END CONFIG", new_string="new_key=new_value\\n# END CONFIG")` — anchor to a unique line, then insert before it.\n'
+            '- APPEND to a config file: use `replace_string` with a unique anchor line. Set old_string to the anchor, new_string to the inserted text followed by the same anchor, using real line breaks.\n'
             '- DELETE: `replace_string(old_string="old config block", new_string="")`.\n'
             '- Code/content payloads must represent normal source text. Do not include literal backslash-n sequences unless the target file actually requires them. Transport escaping is handled by the tool API; do not serialize code yourself.\n'
             '- Multiple functions: `edit_symbols`; implementation + tests: `multiedit`.\n'
