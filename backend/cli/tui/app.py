@@ -1368,7 +1368,6 @@ class GrintaScreen(Screen):
         self._command_hint = ''
         self._phase_label = 'Ready'
         self._phase_started_at = time.monotonic()
-        self._last_tool_status = 'No tool activity yet'
         self._current_operation_summary = 'Idle'
         self._current_operation_meta = 'Waiting for activity'
         self._current_operation_active = False
@@ -1617,10 +1616,6 @@ class GrintaScreen(Screen):
         else:
             line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
         line1_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
-        line1_parts.append(
-            f'[{NAVY_TEXT_SECONDARY}]Now:[/] '
-            f'[{NAVY_TEXT_PRIMARY}]{self._last_tool_status}[/]'
-        )
         line1 = '  '.join(line1_parts)
 
         help_hint = r'  [#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
@@ -1706,15 +1701,6 @@ class GrintaScreen(Screen):
             self._phase_label = label
             self._phase_started_at = time.monotonic()
             self._render_hud_bar()
-
-    def set_last_tool_status(self, status: str) -> None:
-        compact = re.sub(r'\s+', ' ', (status or '').strip())
-        if not compact:
-            return
-        if len(compact) > 96:
-            compact = compact[:93] + '...'
-        self._last_tool_status = compact
-        self._render_hud_bar()
 
     def set_current_operation(
         self,
@@ -1931,7 +1917,6 @@ class GrintaScreen(Screen):
         body = _rich_text(text)
         body.stylize(NAVY_TEXT_MUTED)
         self._write_log(body)
-        self.set_last_tool_status(text)
 
     def add_error(self, text: str) -> None:
         import textwrap
@@ -1946,14 +1931,11 @@ class GrintaScreen(Screen):
                 result.append(Text('✗ ', style=f'bold {NAVY_ERROR}'))
             result.append(Text(line, style=f'bold {NAVY_ERROR}'))
         self._write_log(result)
-        self.set_last_tool_status(f'Error: {text}')
-
     def add_success(self, text: str) -> None:
         icon = Text('✓ ', style=f'bold {NAVY_READY}')
         body = _rich_text(text)
         body.stylize(f'bold {NAVY_READY}')
         self._write_log(Text.assemble(icon, body))
-        self.set_last_tool_status(text)
 
     def add_tool_start(self, tool_name: str, *, command: str = '') -> None:
         """Tool call — show in transcript."""
@@ -1966,17 +1948,14 @@ class GrintaScreen(Screen):
             self._write_log(
                 Text.assemble(icon, name, ' (', cmd_text, ')', style='#969aad')
             )
-            self.set_last_tool_status(f'{tool_name}: {command}')
         else:
             self._write_log(Text.assemble(icon, name))
-            self.set_last_tool_status(str(tool_name))
 
     def add_tool_result(self, text: str) -> None:
         """Tool result — muted text."""
         body = _rich_text(text)
         body.stylize(NAVY_TEXT_MUTED)
         self._write_log(Text.assemble('  ', body))
-        self.set_last_tool_status(text)
 
     def add_communicate_clarification(self, action: ClarificationRequestAction) -> None:
         """Agent asks a question — render an interactive communicate card."""
@@ -3945,8 +3924,6 @@ class TUIRenderer:
 
     def _write_card(self, card: ActivityCard) -> None:
         """Write an activity card to the transcript using native ActivityCard widget."""
-        self._tui.set_last_tool_status(f'{card.verb} {card.detail}'.strip())
-
         self._clear_last_active_card_processing()
 
         extra_content = None
@@ -3991,13 +3968,17 @@ class TUIRenderer:
         is_active = is_tool and (not card.secondary or card.secondary_kind == 'neutral')
         if is_active:
             widget.set_processing(True)
+            self._clear_last_active_card_processing()
+            widget.set_processing(True)
             self._last_active_card = widget
             self._tui.set_current_operation(
                 f'{card.verb} {card.detail}'.strip(),
-                meta='Running',
+                meta=card.secondary or 'Running',
                 active=True,
             )
         else:
+            if self._last_active_card is widget:
+                self._last_active_card = None
             self._tui.set_current_operation(
                 f'{card.verb} {card.detail}'.strip(),
                 meta=card.secondary or 'Completed',
@@ -4035,7 +4016,6 @@ class TUIRenderer:
             collapsed=collapsed,
             diff_encoded=True,
         )
-        self._tui.set_last_tool_status(f'{verb} {detail}')
         self._tui.set_current_operation(
             f'{verb} {detail}'.strip(),
             meta=secondary or 'Completed',
@@ -4146,7 +4126,6 @@ class TUIRenderer:
             self._clear_last_active_card_processing()
             widget.set_processing(True)
             self._last_active_card = widget
-            self._tui.set_last_tool_status(f'{verb} {detail}'.strip())
             self._tui.set_current_operation(
                 f'{verb} {detail}'.strip(),
                 meta=secondary or f'session {session_key}',
@@ -4155,7 +4134,6 @@ class TUIRenderer:
         else:
             if self._last_active_card is widget:
                 self._last_active_card = None
-            self._tui.set_last_tool_status(f'{verb} {detail}'.strip())
             self._tui.set_current_operation(
                 f'{verb} {detail}'.strip(),
                 meta=secondary or f'session {session_key}',
@@ -4181,7 +4159,6 @@ class TUIRenderer:
         self._clear_last_active_card_processing()
         self._last_active_card = widget
         self._pending_shell_cards_by_command[command].append(widget)
-        self._tui.set_last_tool_status(f'{card.verb} {card.detail}'.strip())
         self._tui.set_current_operation(
             f'{card.verb} {card.detail}'.strip(),
             meta='running',
@@ -4235,7 +4212,6 @@ class TUIRenderer:
         widget.update_content(extra_content)
         widget.set_collapsed(False)
         widget.set_processing(False)
-        self._tui.set_last_tool_status(f'{card.verb} {card.detail}'.strip())
         self._tui.set_current_operation(
             f'{card.verb} {card.detail}'.strip(),
             meta=card.secondary or 'completed',
@@ -4521,7 +4497,6 @@ class TUIRenderer:
                         preview = event.content[:500] + ('...' if len(event.content) > 500 else '')
                         widget.append_content(preview)
                     widget.set_processing(False)
-                    self._tui.set_last_tool_status('MCP completed')
                     self._tui.set_current_operation('MCP', meta='completed', active=False)
                     return
                 except Exception:
@@ -4569,14 +4544,12 @@ class TUIRenderer:
                 self._hud.update_ledger('Backoff')
                 self._hud.update_agent_state(label)
                 self._tui.set_agent_phase(label)
-                self._tui.set_last_tool_status(last_status)
                 self._update_retry_strip(label, message)
                 return
             if status_type == 'compaction':
                 self._clear_retry_strip('Idle')
                 self._hud.update_agent_state('Compacting')
                 self._tui.set_agent_phase('Compacting context...')
-                self._tui.set_last_tool_status('Compacting context...')
                 self._update_runtime_strip(
                     'Compacting context',
                     'Reducing context to continue the task',

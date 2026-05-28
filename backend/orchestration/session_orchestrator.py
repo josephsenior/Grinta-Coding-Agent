@@ -262,7 +262,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             AutoCheckMiddleware(),
             PostEditDiagnosticsMiddleware(),
         ]
-        file_state_mw = FileStateMiddleware(file_state_guard=self.config.file_state_guard)
+        file_state_mw = FileStateMiddleware()
         middlewares.append(file_state_mw)
         self._file_state_tracker = file_state_mw.tracker
         middlewares.extend([LoggingMiddleware(self), TelemetryMiddleware(self)])

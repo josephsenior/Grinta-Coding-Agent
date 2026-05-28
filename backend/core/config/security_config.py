@@ -113,13 +113,6 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "allowed inside the workspace, e.g. ['curl', 'invoke-webrequest']."
         ),
     )
-    file_state_guard: bool = Field(
-        default=True,
-        description=(
-            'When True, enables file-state-guard checks: read-before-edit enforcement '
-            'and disk-staleness detection. Set False to disable all file state guards.'
-        ),
-    )
     model_config = ConfigDict(extra='ignore')
 
     @classmethod

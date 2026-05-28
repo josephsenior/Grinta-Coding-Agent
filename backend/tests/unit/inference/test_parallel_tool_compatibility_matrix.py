@@ -183,7 +183,6 @@ def test_system_capabilities_parallel_scheduling_line_matrix(
     text = _render_system_capabilities(
         cfg,
         function_calling_mode=fc_mode,
-        multi_edit_available=False,
         parallel_tool_calls_provider_flag=provider_flag,
     )
     if expect_enabled_substring:
@@ -203,7 +202,6 @@ def test_system_capabilities_parallel_native_all_on_renders_enabled() -> None:
     text = _render_system_capabilities(
         cfg,
         function_calling_mode='native',
-        multi_edit_available=False,
         parallel_tool_calls_provider_flag=True,
     )
     assert 'Parallel tool scheduling' in text

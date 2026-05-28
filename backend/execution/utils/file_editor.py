@@ -499,7 +499,6 @@ class FileEditor(FileEditorEditOpsMixin):
                     old_string,
                     self._extract_content(MISSING, new_str),
                     replace_all=replace_all,
-                    expected_file_hash=expected_file_hash,
                     dry_run=dry_run,
                 )
             if command in (
@@ -707,12 +706,6 @@ class FileEditor(FileEditorEditOpsMixin):
             old_content = self._read_file(file_path) if file_path.exists() else None
             old_content_str = old_content or ''
 
-            hash_error = self._check_file_hash_guard(
-                file_path, old_content_str, expected_file_hash
-            )
-            if hash_error:
-                return hash_error
-
             file_text_val, new_str_val = self._extract_edit_params(file_text, new_str)
 
             new_content = self._apply_edit_logic(
@@ -759,7 +752,6 @@ class FileEditor(FileEditorEditOpsMixin):
         new_string: str,
         *,
         replace_all: bool,
-        expected_file_hash: str | None,
         dry_run: bool,
     ) -> ToolResult:
         """Replace exact text occurrences using the safe edit pipeline."""
@@ -793,12 +785,6 @@ class FileEditor(FileEditorEditOpsMixin):
                 )
 
             old_content = self._read_file(file_path)
-            hash_error = self._check_file_hash_guard(
-                file_path, old_content, expected_file_hash
-            )
-            if hash_error:
-                return hash_error
-
             newline = '\r\n' if '\r\n' in old_content else '\n'
             old_match = old_string.replace('\r\n', '\n').replace('\r', '\n')
             new_replacement = new_string.replace('\r\n', '\n').replace('\r', '\n')
@@ -855,33 +841,6 @@ class FileEditor(FileEditorEditOpsMixin):
                 retryable=True,
                 operation='replace_string',
             )
-
-    def _check_file_hash_guard(
-        self,
-        file_path: Path,
-        old_content_str: str,
-        expected_file_hash: str | None,
-    ) -> ToolResult | None:
-        """Check if file hash matches expected value. Returns error result if mismatch."""
-        if not expected_file_hash or not file_path.exists():
-            return None
-
-        digest = self._sha256_text(old_content_str)
-        if digest == expected_file_hash:
-            return None
-
-        return ToolResult(
-            output='',
-            error=(
-                'File hash guard failed: expected_file_hash does not match '
-                'current file contents (re-read the file and refresh the hash).'
-            ),
-            old_content=None,
-            new_content=None,
-            error_code='FILE_HASH_GUARD_FAILED',
-            retryable=True,
-            operation='file_hash_guard',
-        )
 
     def _build_receipt(
         self,

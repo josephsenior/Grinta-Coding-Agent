@@ -1,5 +1,3 @@
-import hashlib
-
 from backend.execution.utils.file_editor import FileEditor, ToolResult
 
 
@@ -35,44 +33,6 @@ def test_edit_mode_range_replaces_entire_inclusive_span(tmp_path):
     )
     assert result.error is None
     assert target.read_text(encoding='utf-8') == 'one\nTWO\nTHREE\nfour\n'
-
-
-def test_expected_file_hash_guard_rejects_stale_content(tmp_path):
-    target = tmp_path / 'x.py'
-    target.write_bytes(b'alpha\n')
-    editor = FileEditor(workspace_root=str(tmp_path))
-    wrong_hash = hashlib.sha256(b'not-the-file').hexdigest()
-    result = editor(
-        command='edit',
-        path='x.py',
-        edit_mode='range',
-        start_line=1,
-        end_line=1,
-        new_str='beta\n',
-        expected_file_hash=wrong_hash,
-    )
-    assert result.error is not None
-    assert 'hash guard' in (result.error or '').lower()
-    assert target.read_text(encoding='utf-8') == 'alpha\n'
-
-
-def test_expected_file_hash_guard_accepts_matching_content(tmp_path):
-    target = tmp_path / 'x.py'
-    body = 'alpha\n'
-    target.write_bytes(body.encode('utf-8'))
-    editor = FileEditor(workspace_root=str(tmp_path))
-    digest = hashlib.sha256(body.encode('utf-8')).hexdigest()
-    result = editor(
-        command='edit',
-        path='x.py',
-        edit_mode='range',
-        start_line=1,
-        end_line=1,
-        new_str='beta\n',
-        expected_file_hash=digest,
-    )
-    assert result.error is None
-    assert target.read_text(encoding='utf-8') == 'beta\n'
 
 
 def test_crlf_preserved_on_write(tmp_path):

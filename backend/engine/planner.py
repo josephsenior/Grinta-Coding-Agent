@@ -382,8 +382,7 @@ class OrchestratorPlanner:
         messages = self._inject_turn_status(messages, state)
         mode = self._active_mode_for_state(state)
         tools = self._filter_tools_for_mode(tools, mode)
-        if not is_chat_mode(mode):
-            messages = self._inject_mode_instructions(messages, state, mode)
+        messages = self._inject_mode_instructions(messages, state, mode)
         _maybe_log_prompt_metrics(messages)
         self._warn_if_degraded_emergency_prompt(messages)
 
@@ -561,6 +560,8 @@ class OrchestratorPlanner:
     ) -> list:
         if mode == PLAN_MODE:
             return self._inject_plan_mode_instructions(messages, state)
+        if is_chat_mode(mode):
+            return self._inject_chat_mode_instructions(messages, state)
         return self._inject_agent_mode_instructions(messages, state)
 
     def _inject_plan_mode_instructions(self, messages: list, state: State) -> list:
@@ -568,13 +569,14 @@ class OrchestratorPlanner:
             '\n\n=== STRICT PLAN MODE PROTOCOL ===\n'
             'You are running in PLAN MODE. Plan Mode is a read-only agent run. '
             'Your job is to inspect the project and produce a concrete execution plan. '
-            'Direct plain text prose/responses are strictly forbidden while this run is active.\n\n'
-            'Your output must be exactly one of the following:\n'
-            '1. A read-only inspection tool call, such as read, find_symbols, search_code, '
-            'analyze_project_structure, lsp, or recall.\n'
-            '2. A communicate_with_user tool call when clarification is needed before '
+            'Prose responses are only for casual conversation; when working on the planning '
+            'task you must use tool calls.\n\n'
+            'Your output must be one of the following:\n'
+            '1. A read-only inspection tool call (when investigating the project).\n'
+            '2. Natural prose response (when the user is conversing, not tasking).\n'
+            '3. A communicate_with_user tool call when clarification is needed before '
             'a useful plan can be produced.\n'
-            '3. A finish tool call with the final structured plan.\n\n'
+            '4. A finish tool call with the final structured plan.\n\n'
             'Do not modify files or project state. Do not use create, edit_symbols, '
             'replace_string, multiedit, shell commands, formatters, installers, migrations, '
             'git operations, MCP tools, browser tools, checkpoints, task_tracker, note, '
@@ -596,12 +598,15 @@ class OrchestratorPlanner:
     def _inject_agent_mode_instructions(self, messages: list, state: State) -> list:
         instruction = (
             '\n\n=== STRICTOR AGENT MODE PROTOCOL ===\n'
-            'You are running in AGENT MODE. In this mode, direct plain text prose/responses '
-            'are strictly forbidden. Do not write explanations, thoughts, or comments in direct prose. '
-            'Your output must be exactly one of the following:\n'
-            '1. A real tool/function call (using the native function calling mechanism).\n'
-            '2. A communicate_with_user tool call (to ask questions, clarify, or report blockers).\n'
-            '3. A finish tool call (to end the task successfully).\n\n'
+            'You are running in AGENT MODE. When the user gives you a task or asks you to '
+            'perform work, respond with tool calls — do not write prose explanations. '
+            'When the user is directly conversing with you (asking a casual question, '
+            'chit-chat, or seeking your opinion), it is fine to respond in natural prose. '
+            'Your output must be one of the following:\n'
+            '1. A real tool/function call (when performing work).\n'
+            '2. Natural prose response (when the user is conversing, not tasking).\n'
+            '3. A communicate_with_user tool call (to ask questions, clarify, or report blockers).\n'
+            '4. A finish tool call (to end the task successfully).\n\n'
             'Agent Mode finish requires exactly these universal fields: status, summary, '
             'actions_taken, verification, remaining_items, next_step. If no verification '
             "was run, use verification.status='not_run' and explain honestly in details.\n\n"
@@ -627,4 +632,17 @@ class OrchestratorPlanner:
             '=====================================\n'
         )
 
+        return self._apply_control_message(messages, instruction)
+
+    def _inject_chat_mode_instructions(self, messages: list, state: State) -> list:
+        instruction = (
+            '\n\n=== CHAT MODE ===\n'
+            'You are running in CHAT MODE. The user is having a conversation with you -- '
+            'they are not issuing a task. Respond naturally in prose.\n\n'
+            'You have access to read-only tools (read, search_code, find_symbols, recall, '
+            'lsp, analyze_project_structure) if the user asks a code-related question '
+            'and you need to look something up. You may NOT use any write tools '
+            '(create, edit_symbols, replace_string, multiedit, shell, finish).\n'
+            '================\n'
+        )
         return self._apply_control_message(messages, instruction)

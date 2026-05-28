@@ -60,28 +60,6 @@ def classify_editor_recovery(
             ),
         )
 
-    if 'file_unexpectedly_modified' in lower or 'file changed on disk since it was read' in lower:
-        return EditorRecoveryAdvice(
-            kind='stale_file_context',
-            preferred_tool='read',
-            next_action='read',
-            detail=(
-                'The file changed since the last read. Refresh the exact file contents with '
-                '`read` before issuing another edit.'
-            ),
-        )
-
-    if 'file hash guard failed' in lower:
-        return EditorRecoveryAdvice(
-            kind='stale_file_context',
-            preferred_tool='read',
-            next_action='read',
-            detail=(
-                'The file contents no longer match the last verified read. Re-read the file, '
-                'then retry one smaller edit with fresh context.'
-            ),
-        )
-
     if 'edit verification failed' in lower:
         return EditorRecoveryAdvice(
             kind='edit_verification_failed',

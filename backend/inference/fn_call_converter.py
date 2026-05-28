@@ -220,12 +220,49 @@ TOOL_EXAMPLES = {
             '</parameter>\n'
             '</function>\n'
         ),
+        'plan_example': (
+            '\nASSISTANT:\n<function=finish>\n'
+            '<parameter=status>completed</parameter>\n'
+            '<parameter=summary>'
+            'Inspected the project structure and analyzed the Flask server in src/app.py. '
+            'The current / route returns a plain text list of numbers. The plan is to '
+            'add an HTML table template, a new /numbers route, and install Flask if missing. '
+            'Server will run on port 5000.'
+            '</parameter>\n'
+            '<parameter=plan>'
+            '["Create src/templates/numbers.html -- add a Jinja2 template with HTML table '
+            'markup and CSS styling for the number rows", '
+            '"Update src/app.py -- add /numbers route that renders the new template '
+            'with numbers 1-10 passed as context", '
+            '"Install flask via pip if ModuleNotFoundError occurs on first run", '
+            '"Start the server on port 5000 and verify the page loads correctly"]'
+            '</parameter>\n'
+            '<parameter=assumptions>'
+            '["Flask app uses default Jinja2 template resolution (expects '
+            'templates/ subdirectory next to the app file)", '
+            '"Port 5000 is available and not blocked by firewall", '
+            '"Python 3.8+ is available with pip installed"]'
+            '</parameter>\n'
+            '<parameter=next_step>'
+            'Run the plan steps to implement the table display feature.'
+            '</parameter>\n'
+            '</function>\n'
+        ),
     },
 }
 
 
-def get_example_for_tools(tools: list[dict]) -> str:
-    """Generate an in-context learning example based on available tools."""
+def get_example_for_tools(tools: list[dict], mode: str = 'agent') -> str:
+    """Generate an in-context learning example based on available tools.
+
+    Args:
+        tools: Available tool definitions.
+        mode: Interaction mode ('agent' or 'plan').
+
+    Returns:
+        str: The built example string, or empty string if no tools found.
+
+    """
     from backend.engine.tools.prompt import get_terminal_tool_name
 
     # Extract available tools from the tools list
@@ -236,7 +273,7 @@ def get_example_for_tools(tools: list[dict]) -> str:
 
     # Build the example step by step
     example = _build_example_header()
-    example += _build_example_steps(available_tools)
+    example += _build_example_steps(available_tools, mode=mode)
     example += _build_example_footer()
 
     example_str = example.lstrip()
@@ -308,31 +345,34 @@ def _build_example_header() -> str:
     )
 
 
-def _build_example_steps(available_tools: set[str]) -> str:
+def _build_example_steps(available_tools: set[str], mode: str = 'agent') -> str:
     """Build the example steps based on available tools.
 
     Args:
         available_tools: Set of available tool names.
+        mode: Interaction mode ('agent' or 'plan').
 
     Returns:
         str: The built example steps string.
 
     """
-    example_builder = ExampleStepBuilder(available_tools)
+    example_builder = ExampleStepBuilder(available_tools, mode=mode)
     return example_builder.build_all_steps()
 
 
 class ExampleStepBuilder:
     """Builder class for constructing example steps based on available tools."""
 
-    def __init__(self, available_tools: set[str]) -> None:
+    def __init__(self, available_tools: set[str], mode: str = 'agent') -> None:
         """Initialize the example step builder.
 
         Args:
             available_tools: Set of available tool names.
+            mode: Interaction mode ('agent' or 'plan').
 
         """
         self.available_tools = available_tools
+        self.mode = mode
         self.example = ''
 
     def build_all_steps(self) -> str:
@@ -391,7 +431,8 @@ class ExampleStepBuilder:
     def _add_finish_step(self) -> None:
         """Add finish step if finish tool is available."""
         if 'finish' in self.available_tools:
-            self.example += TOOL_EXAMPLES['finish']['example']
+            key = 'plan_example' if self.mode == 'plan' else 'example'
+            self.example += TOOL_EXAMPLES['finish'][key]
 
 
 def _build_example_footer() -> str:
@@ -591,18 +632,23 @@ def _process_user_message(
     tools: list[dict],
     add_in_context_learning_example: bool,
     first_user_message_encountered: bool,
+    mode: str = 'agent',
 ) -> tuple[dict, bool]:
     """Process user message, adding in-context learning example if needed."""
     if not first_user_message_encountered and add_in_context_learning_example:
         first_user_message_encountered = True
-        content = _add_in_context_learning_example(content, tools)
+        content = _add_in_context_learning_example(content, tools, mode=mode)
 
     return ({'role': 'user', 'content': content}, first_user_message_encountered)
 
 
-def _add_in_context_learning_example(content: Any, tools: list[dict]) -> Any:
+def _add_in_context_learning_example(
+    content: Any,
+    tools: list[dict],
+    mode: str = 'agent',
+) -> Any:
     """Add in-context learning example to content."""
-    if not (example := IN_CONTEXT_LEARNING_EXAMPLE_PREFIX(tools)):
+    if not (example := IN_CONTEXT_LEARNING_EXAMPLE_PREFIX(tools, mode)):
         return content
 
     if isinstance(content, str):
@@ -625,6 +671,7 @@ def convert_fncall_messages_to_non_fncall_messages(
     messages: list[dict],
     tools: list[dict],
     add_in_context_learning_example: bool = True,
+    mode: str = 'agent',
 ) -> list[dict]:
     """Convert function calling messages to non-function calling messages."""
     messages = copy.deepcopy(messages)
@@ -641,6 +688,7 @@ def convert_fncall_messages_to_non_fncall_messages(
             system_prompt_suffix,
             add_in_context_learning_example,
             first_user_message_encountered,
+            mode=mode,
         )
         converted_messages.extend(message_payloads)
     return converted_messages
@@ -652,6 +700,7 @@ def _convert_single_message(
     system_prompt_suffix: str,
     add_in_context_learning_example: bool,
     first_user_message_encountered: bool,
+    mode: str = 'agent',
 ) -> tuple[list[dict], bool]:
     role = message['role']
     content = message['content']
@@ -668,6 +717,7 @@ def _convert_single_message(
             tools,
             add_in_context_learning_example,
             first_user_message_encountered,
+            mode=mode,
         )
         return [user_msg], first_user_message_encountered
     if role == 'tool':
@@ -854,13 +904,13 @@ def _process_system_message_reverse(content: Any, system_prompt_suffix: str) -> 
     return {'role': 'system', 'content': content}
 
 
-def _process_user_message_reverse(content: Any, tools: list[dict]) -> dict:
+def _process_user_message_reverse(content: Any, tools: list[dict], mode: str = 'agent') -> dict:
     """Process user message for reverse conversion, removing examples and converting tool results.
 
     If the user message contains a tool result (detected by EXECUTION RESULT pattern),
     it should be converted back to a 'tool' role message for proper round-trip conversion.
     """
-    content = _remove_in_context_learning_examples(content, tools)
+    content = _remove_in_context_learning_examples(content, tools, mode=mode)
 
     # Structured tool result blocks are the only accepted non-native format.
     if parsed := _extract_structured_tool_result(content):
@@ -870,18 +920,26 @@ def _process_user_message_reverse(content: Any, tools: list[dict]) -> dict:
     return {'role': 'user', 'content': content}
 
 
-def _remove_in_context_learning_examples(content: Any, tools: list[dict]) -> Any:
+def _remove_in_context_learning_examples(
+    content: Any,
+    tools: list[dict],
+    mode: str = 'agent',
+) -> Any:
     """Remove in-context learning examples from content."""
     if isinstance(content, str):
-        return _remove_examples_from_string(content, tools)
+        return _remove_examples_from_string(content, tools, mode=mode)
     if isinstance(content, list):
-        return _remove_examples_from_list(content, tools)
+        return _remove_examples_from_list(content, tools, mode=mode)
     _raise_unexpected_content_type(content)
 
 
-def _remove_examples_from_string(content: str, tools: list[dict]) -> str:
+def _remove_examples_from_string(
+    content: str,
+    tools: list[dict],
+    mode: str = 'agent',
+) -> str:
     """Remove examples from string content."""
-    example_prefix = IN_CONTEXT_LEARNING_EXAMPLE_PREFIX(tools)
+    example_prefix = IN_CONTEXT_LEARNING_EXAMPLE_PREFIX(tools, mode)
     if content.startswith(example_prefix):
         content = content.replace(example_prefix, '', 1)
     if content.endswith(IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX):
@@ -889,9 +947,13 @@ def _remove_examples_from_string(content: str, tools: list[dict]) -> str:
     return content
 
 
-def _remove_examples_from_list(content: list, tools: list[dict]) -> list:
+def _remove_examples_from_list(
+    content: list,
+    tools: list[dict],
+    mode: str = 'agent',
+) -> list:
     """Remove examples from list content."""
-    example_prefix = IN_CONTEXT_LEARNING_EXAMPLE_PREFIX(tools)
+    example_prefix = IN_CONTEXT_LEARNING_EXAMPLE_PREFIX(tools, mode)
     for item in content:
         if item['type'] == 'text':
             if item['text'].startswith(example_prefix):
@@ -1173,6 +1235,7 @@ def _process_assistant_message_for_conversion(
 def convert_non_fncall_messages_to_fncall_messages(
     messages: list[dict],
     tools: list[dict],
+    mode: str = 'agent',
 ) -> list[dict]:
     """Convert non-function calling messages back to function calling messages."""
     messages = copy.deepcopy(messages)
@@ -1197,7 +1260,7 @@ def convert_non_fncall_messages_to_fncall_messages(
             processed = _process_system_message_reverse(content, system_prompt_suffix)
             converted_messages.append(processed)
         elif role == 'user':
-            processed = _process_user_message_reverse(content, tools)
+            processed = _process_user_message_reverse(content, tools, mode=mode)
             converted_messages.append(processed)
         else:
             converted_messages.append({'role': role, 'content': content})

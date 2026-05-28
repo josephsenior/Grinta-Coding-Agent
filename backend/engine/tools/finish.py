@@ -50,12 +50,22 @@ def _create_plan_finish_tool() -> ChatCompletionToolParam:
             'summary': _SUMMARY_PARAM,
             'plan': {
                 'type': 'array',
-                'description': 'Ordered list of concrete execution steps.',
+                'description': (
+                    'Ordered list of concrete execution steps. Each step should '
+                    'include the file path(s) and what will be done (e.g. '
+                    '"Add input validation to src/api/login.py"). Be specific '
+                    'about functions, routes, or config keys to be modified.'
+                ),
                 'items': {'type': 'string'},
             },
             'assumptions': {
                 'type': 'array',
-                'description': 'Assumptions made while producing the plan.',
+                'description': (
+                    'Assumptions made while producing the plan. Be specific '
+                    'about dependencies, risks, version requirements, or '
+                    'environment expectations (e.g. "Assumes PostgreSQL 15+ '
+                    'with pgcrypto extension installed").'
+                ),
                 'items': {'type': 'string'},
             },
             'next_step': _NEXT_STEP_PARAM,
