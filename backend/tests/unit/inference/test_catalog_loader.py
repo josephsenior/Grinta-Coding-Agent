@@ -287,6 +287,12 @@ class TestGetTokenLimits:
     def test_unknown_opencode_go_chat_models_keep_native_tools(self):
         assert supports_function_calling('opencode-go/deepseek-v4-flash') is True
 
+    def test_digitalocean_provider_supports_native_tools(self):
+        assert supports_function_calling('digitalocean/deepseek-v4-pro') is True
+
+    def test_unknown_provider_without_prefix_returns_false(self):
+        assert supports_function_calling('some-random-model') is False
+
 
 class TestGetFeaturedModels:
     """Tests for get_featured_models function."""

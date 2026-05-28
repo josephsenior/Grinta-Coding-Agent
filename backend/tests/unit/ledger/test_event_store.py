@@ -200,3 +200,47 @@ class TestEventStoreSearch:
         events = list(store.search_events(start_id=0, end_id=0))
 
         assert len(events) == 1
+
+    def test_search_events_skips_corrupt_events_continues(self):
+        """Corrupt events are skipped and search continues to subsequent events."""
+        action_dicts = [
+            {
+                'id': i,
+                'action': 'message',
+                'args': {'content': f'msg-{i}', 'image_urls': [], 'wait_for_response': False},
+                'message': f'msg-{i}',
+            }
+            for i in range(4)
+        ]
+
+        def _mock_get_event(event_id):
+            if event_id == 1:
+                raise ValueError('checksum mismatch')
+            from backend.ledger.serialization.event import event_from_dict
+            return event_from_dict(action_dicts[event_id])
+
+        fs = MagicMock()
+        fs.read.side_effect = FileNotFoundError
+        store = EventStore(sid='s1', file_store=fs, user_id=None)
+        store._cur_id = 4
+        store.get_event = _mock_get_event
+
+        events = list(store.search_events(start_id=0, end_id=3))
+        assert len(events) == 3
+        assert events[0].id == 0
+        assert events[1].id == 2
+        assert events[2].id == 3
+
+    def test_search_events_stops_at_too_many_corrupt(self):
+        """Search aborts after max_consecutive corrupt events."""
+        def _mock_get_event(event_id):
+            raise ValueError('checksum mismatch')
+
+        fs = MagicMock()
+        fs.read.side_effect = FileNotFoundError
+        store = EventStore(sid='s1', file_store=fs, user_id=None)
+        store._cur_id = 10
+        store.get_event = _mock_get_event
+
+        events = list(store.search_events(start_id=0, end_id=10))
+        assert len(events) == 0

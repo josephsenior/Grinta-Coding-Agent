@@ -202,14 +202,12 @@ class ActivityRenderer:
             detail = f'{path}  [dim]·  {line_range}[/dim]'
 
         secondary = None
-        if new_file and added:
-            secondary = f'+{added} line{"s" if added != 1 else ""}'
-        elif added or removed:
+        if added or removed:
             parts = []
             if added:
-                parts.append(f'+{added} lines')
+                parts.append(f'+{added}')
             if removed:
-                parts.append(f'-{removed} lines')
+                parts.append(f'-{removed}')
             secondary = ', '.join(parts)
 
         extra_lines: list[ActivityLine] = []
@@ -243,9 +241,17 @@ class ActivityRenderer:
         )
 
     @staticmethod
-    def file_create(path: str, line_count: int = 0) -> ActivityCard:
+    def file_create(
+        path: str,
+        line_count: int = 0,
+        preview_content: str | None = None,
+    ) -> ActivityCard:
         """Create an activity card for file creation."""
-        return ActivityRenderer.file_create_with_preview(path, line_count=line_count)
+        return ActivityRenderer.file_create_with_preview(
+            path,
+            line_count=line_count,
+            preview_content=preview_content,
+        )
 
     @staticmethod
     def file_create_with_preview(
@@ -253,13 +259,16 @@ class ActivityRenderer:
         line_count: int = 0,
         preview_content: str | None = None,
     ) -> ActivityCard:
-        """Create an activity card for file creation without dumping the full body."""
-        del preview_content
-        secondary = (
-            f'+{line_count} line{"s" if line_count != 1 else ""}'
-            if line_count
-            else None
-        )
+        """Create an activity card for file creation."""
+        secondary = f'+{line_count}' if line_count else None
+        extra_lines: list[ActivityLine] = []
+        if preview_content:
+            lines = preview_content.rstrip('\n').split('\n')
+            extra_lines.append(ActivityLine(f'Path: {path}', indent=0))
+            extra_lines.append(ActivityLine(f'Added: +{line_count}', indent=0))
+            extra_lines.append(ActivityLine('─' * 40, indent=0))
+            for line in lines:
+                extra_lines.append(ActivityLine(line, indent=0))
         return ActivityCard(
             verb='Created',
             detail=path,
@@ -267,6 +276,7 @@ class ActivityRenderer:
             title='Files',
             secondary=secondary,
             secondary_kind='ok' if secondary else 'neutral',
+            extra_lines=extra_lines,
         )
 
     @staticmethod
