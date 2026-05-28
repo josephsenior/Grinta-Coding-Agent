@@ -19,7 +19,7 @@ from rich.syntax import Syntax
 from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
-from textual.containers import Container
+from textual.containers import Container, Horizontal
 from textual.widgets import Static
 
 from backend.cli.theme import (
@@ -204,28 +204,42 @@ class ActivityCard(Container):
     ActivityCard {
         width: 100%;
         height: auto;
-        margin: 0 0 0 0;
-        border: none;
-        background: transparent;
-        padding: 0;
-    }
-    ActivityCard.-expanded {
+        margin: 0 0 1 0;
         border: round #1b233a;
         background: #08101d;
-        margin: 0 0 1 0;
-        padding: 0;
+        padding: 0 0 0 1;
     }
-    ActivityCard.-expanded:focus {
+    ActivityCard:focus {
         border: round #4a5f99;
         background: #0d162a;
     }
-    ActivityCard .card-collapsed-row {
+    ActivityCard:hover {
+        background: #0a1323;
+        border: round #26365b;
+    }
+    ActivityCard.-category-shell,
+    ActivityCard.-category-terminal {
+        border: round #24385c;
+        background: #050913;
+    }
+    ActivityCard #collapsed-row-container {
         width: 100%;
         height: 1;
-        padding: 0 0;
+        layout: horizontal;
     }
-    ActivityCard .card-collapsed-row:hover {
-        background: #0a1323;
+    ActivityCard .card-collapsed-text {
+        width: 1fr;
+        height: 1;
+    }
+    ActivityCard .card-caret {
+        width: 3;
+        height: 1;
+        content-align: right middle;
+        color: #54597b;
+        padding: 0 1 0 0;
+    }
+    ActivityCard .card-caret:hover {
+        color: #91abec;
     }
     ActivityCard .card-expanded-body {
         width: 100%;
@@ -372,11 +386,10 @@ class ActivityCard(Container):
             )
             outcome_part = f'  [{outcome_color}]{self._outcome}[/]'
 
-        caret = ''
-        if self._extra_content:
-            caret = f' [{NAVY_TEXT_DIM}]{chr(9660) if not self._collapsed else chr(9654)}[/]'
+        return f'{pulse}{icon_part} {verb_part}  {detail_part}{outcome_part}'
 
-        return f'{pulse}{icon_part} {verb_part}  {detail_part}{outcome_part}{caret}'
+    def _caret_char(self) -> str:
+        return chr(9660) if not self._collapsed else chr(9654)
 
     def _get_formatted_extra_content(self) -> Any:
         content = self._extra_content or ''
@@ -470,7 +483,10 @@ class ActivityCard(Container):
         return [Static(self._get_formatted_extra_content(), id='extra')]
 
     def compose(self) -> ComposeResult:
-        yield Static(self._build_collapsed_markup(), id='collapsed-row')
+        with Horizontal(id='collapsed-row-container'):
+            yield Static(self._build_collapsed_markup(), id='collapsed-row', classes='card-collapsed-text')
+            if self._extra_content:
+                yield Static(self._caret_char(), id='caret', classes='card-caret')
 
         if self._extra_content:
             with Container(classes='card-expanded-body', id='expanded-body'):
@@ -516,6 +532,11 @@ class ActivityCard(Container):
             collapsed.update(self._build_collapsed_markup())
         except Exception:
             pass
+        try:
+            caret = self.query_one('#caret', Static)
+            caret.update(self._caret_char())
+        except Exception:
+            pass
 
     def set_collapsed(self, collapsed: bool) -> None:
         """Set the expanded/collapsed state."""
@@ -547,11 +568,12 @@ class ActivityCard(Container):
     def on_click(self, event: events.Click) -> None:
         """Handle click events to toggle expansion."""
         if self._extra_content:
-            if event.widget and event.widget.id == 'collapsed-row':
+            clicked = event.widget
+            if clicked and clicked.id in ('collapsed-row', 'caret', 'collapsed-row-container'):
                 self.toggle_extra()
                 event.prevent_default()
                 event.stop()
-            elif event.widget == self:
+            elif clicked == self:
                 self.toggle_extra()
                 event.prevent_default()
                 event.stop()

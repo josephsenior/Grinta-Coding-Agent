@@ -64,46 +64,6 @@ ActivityCard {
     transition: background 150ms, border 150ms;
 }
 
-ActivityCard.-expanded {
-    transition: background 150ms, border 150ms;
-    border: round #1b233a;
-    background: #08101d;
-    padding: 0;
-    margin: 0 0 1 0;
-}
-
-ActivityCard.-expanded:hover {
-    background: #0a1323;
-    border: round #26365b;
-}
-
-ActivityCard.-expanded:focus {
-    background: #0d162a;
-    border: round #4a5f99;
-}
-
-ActivityCard.-expanded.category-shell,
-ActivityCard.-expanded.category-terminal {
-    border: round #24385c;
-    background: #050913;
-}
-
-ActivityCard .card-collapsed-row {
-    color: #c8d4e8;
-}
-
-ActivityCard .card-collapsed-row:hover {
-    background: #0a1323;
-}
-
-ActivityCard .card-expanded-body {
-    border: none;
-}
-
-ActivityCard .card-meta-row {
-    color: #54597b;
-}
-
 CollapsibleSection {
     transition: background 150ms, border-left 150ms;
     border-left: transparent;
