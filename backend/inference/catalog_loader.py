@@ -217,25 +217,26 @@ def supports_tool_choice(model: str) -> bool:
 
 
 def supports_function_calling(model: str) -> bool:
-    """Return whether the model should receive native tool schemas."""
+    """Return whether the model should receive native tool schemas.
+
+    Models in the catalog use their catalog entry; uncataloged models
+    with a recognised provider prefix default to ``True`` so that
+    arbitrary provider/model combos (e.g. ``digitalocean/deepseek-v4-pro``)
+    work without catalog changes.
+    """
     entry = lookup(model)
     if entry is not None:
         return entry.supports_function_calling
 
-    from backend.inference.provider_resolver import extract_provider_prefix
+    from backend.inference.provider_resolver import (
+        KNOWN_PROVIDER_PREFIXES,
+        extract_provider_prefix,
+    )
 
     provider = extract_provider_prefix(model)
-    return provider in {
-        'anthropic',
-        'cerebras',
-        'deepseek',
-        'mistral',
-        'opencode',
-        'opencode-go',
-        'openai',
-        'openrouter',
-        'xai',
-    }
+    if provider is None:
+        return False
+    return provider in KNOWN_PROVIDER_PREFIXES
 
 
 def prefers_short_tool_descriptions(model: str) -> bool:

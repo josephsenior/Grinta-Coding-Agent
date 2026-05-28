@@ -4164,6 +4164,7 @@ class TUIRenderer:
         *,
         output: str,
         exit_code: int | None,
+        cwd: str | None = None,
     ) -> None:
         queue = self._pending_shell_cards_by_command.get(command)
         widget = queue.popleft() if queue else None
@@ -4183,15 +4184,22 @@ class TUIRenderer:
         status = 'ok' if exit_code == 0 else 'err'
         widget.set_status(status, outcome=card.secondary)
 
-        extra_content = None
-        if card.extra_lines:
-            extra_content = '\n'.join(
-                f'{"  " * extra.indent}{extra.text}' for extra in card.extra_lines
-            )
-        if extra_content:
-            widget.update_content(extra_content)
-            widget.set_collapsed(False)
+        # Build expanded content with metadata header per spec
+        meta_lines = [f'$ {command}']
+        if cwd:
+            meta_lines.append(f'cwd: {cwd}')
+        meta_lines.append(f'exit: {exit_code}')
+        meta_lines.append('─' * 50)
 
+        extra_parts = list(meta_lines)
+        if card.extra_lines:
+            for extra in card.extra_lines:
+                indent = '  ' * extra.indent
+                extra_parts.append(f'{indent}{extra.text}')
+        extra_content = '\n'.join(extra_parts)
+
+        widget.update_content(extra_content)
+        widget.set_collapsed(False)
         widget.set_processing(False)
         self._tui.set_last_tool_status(f'{card.verb} {card.detail}'.strip())
         self._tui.set_current_operation(
@@ -4373,6 +4381,7 @@ class TUIRenderer:
             card = ActivityRenderer.file_create(
                 event.path,
                 line_count=_count_text_lines(content),
+                preview_content=content,
             )
             self._write_card(card)
         elif isinstance(event, FileReadObservation):
@@ -4387,10 +4396,11 @@ class TUIRenderer:
             added = event.added
             removed = event.removed
             if not getattr(event, 'prev_exist', True):
+                new_content = getattr(event, 'new_content', '') or ''
                 card = ActivityRenderer.file_create(
                     event.path,
-                    line_count=added
-                    or _count_text_lines(getattr(event, 'new_content', '') or ''),
+                    line_count=added or _count_text_lines(new_content),
+                    preview_content=new_content,
                 )
                 self._write_card(card)
             else:
@@ -4442,6 +4452,11 @@ class TUIRenderer:
             output = (event.content or '').strip()
             exit_code = getattr(event, 'exit_code', None)
             cmd = getattr(event, 'command', '') or ''
+            cwd = (
+                getattr(event.metadata, 'working_dir', None)
+                if hasattr(event, 'metadata') and event.metadata
+                else None
+            )
             if output:
                 output = _sanitize_terminal_display_text(
                     strip_tool_result_validation_annotations(output)
@@ -4451,6 +4466,7 @@ class TUIRenderer:
                     cmd,
                     output=output[:500],
                     exit_code=exit_code,
+                    cwd=cwd,
                 )
         elif isinstance(event, ErrorObservation):
             self._tui.add_error(event.content or 'An unknown error occurred')

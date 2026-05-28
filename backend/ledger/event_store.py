@@ -242,6 +242,9 @@ class EventStore(EventStoreABC):
         cache_page = _DUMMY_PAGE
         num_results = 0
 
+        max_corrupt = 5
+        corrupt_seen = 0
+
         for index in range(start_id, end_id, step):
             if not cache_page.covers(index):
                 cache_page = self._load_cache_page_for_index(index)
@@ -249,16 +252,27 @@ class EventStore(EventStoreABC):
             try:
                 event = self._get_event_from_cache_or_storage(index, cache_page)
             except (json.JSONDecodeError, ValueError) as exc:
-                # Corrupt or partially-written event file; stop iteration to avoid
-                # taking down long-running sessions.
+                # Corrupt or partially-written event file; skip it so the
+                # rest of the event history remains accessible.
+                corrupt_seen += 1
                 logger.warning(
-                    'Stopping event search for %s at id=%s due to unreadable event: %s',
-                    self.sid,
+                    'Skipping corrupt event id=%s in search for %s: %s '
+                    '(skipped %s/%s)',
                     index,
+                    self.sid,
                     exc,
+                    corrupt_seen,
+                    max_corrupt,
                     extra={'session_id': self.sid, 'event_id': index},
                 )
-                return
+                if corrupt_seen >= max_corrupt:
+                    logger.error(
+                        'Aborting event search for %s: %s consecutive corrupt events',
+                        self.sid,
+                        max_corrupt,
+                    )
+                    return
+                continue
             if event is None:
                 continue
             if event_filter and not event_filter.include(event):
