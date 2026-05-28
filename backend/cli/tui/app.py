@@ -266,6 +266,38 @@ def _encode_unified_diff_text(diff_text: str, *, max_lines: int = 200) -> str | 
     return '\n'.join(encoded) if encoded else None
 
 
+def _split_combined_diff(diff_text: str) -> list[tuple[str, str]]:
+    """Split a combined unified diff (multi-file) into per-file (path, diff_text) pairs.
+
+    Standard unified diff separates files with ``--- a/path`` / ``+++ b/b/path``
+    headers. This function splits on those boundaries.
+    """
+    per_file: list[tuple[str, str]] = []
+    current_lines: list[str] = []
+    current_path: str | None = None
+
+    for line in diff_text.splitlines():
+        if line.startswith('--- '):
+            if current_path and current_lines:
+                per_file.append((current_path, '\n'.join(current_lines)))
+            current_lines = [line]
+            current_path = None
+        elif line.startswith('+++ ') and current_path is None:
+            raw = line[4:].strip()
+            if raw.startswith('b/'):
+                raw = raw[2:]
+            if raw and raw != '/dev/null':
+                current_path = raw
+            current_lines.append(line)
+        else:
+            current_lines.append(line)
+
+    if current_path and current_lines:
+        per_file.append((current_path, '\n'.join(current_lines)))
+
+    return per_file
+
+
 def _numbered_diff_line(kind: str, line_no: int, line: str, pad: int) -> str:
     prefix = {'add': '+', 'rem': '-'}.get(kind, ' ')
     return f'{prefix}{line_no:>{pad}}|{line}'
@@ -4393,16 +4425,47 @@ class TUIRenderer:
             if hasattr(event, 'content') and event.content:
                 event.content = strip_indentation_warnings(event.content)
 
+            path = (getattr(event, 'path', '') or '').strip()
             added = event.added
             removed = event.removed
+
             if not getattr(event, 'prev_exist', True):
                 new_content = getattr(event, 'new_content', '') or ''
                 card = ActivityRenderer.file_create(
-                    event.path,
+                    path or event.path,
                     line_count=added or _count_text_lines(new_content),
                     preview_content=new_content,
                 )
                 self._write_card(card)
+            elif not path or path == '.':
+                # Multi-file edit — split combined diff into per-file cards
+                diff_text = self._extract_file_edit_diff(event)
+                if diff_text:
+                    per_file = _split_combined_diff(diff_text)
+                    if per_file:
+                        for fp, file_diff in per_file:
+                            f_added = sum(
+                                1 for l in file_diff.splitlines()
+                                if l.startswith('+') and not l.startswith('+++')
+                            )
+                            f_removed = sum(
+                                1 for l in file_diff.splitlines()
+                                if l.startswith('-') and not l.startswith('---')
+                            )
+                            encoded = _encode_unified_diff_text(file_diff)
+                            if encoded:
+                                self._write_tui_file_card(
+                                    'Edited',
+                                    fp,
+                                    secondary=_format_diff_summary(f_added, f_removed),
+                                    secondary_kind='ok' if f_added else 'neutral',
+                                    extra_content=encoded,
+                                    collapsed=_should_collapse_file_diff(encoded),
+                                )
+                    else:
+                        self._write_card(ActivityRenderer.file_edit('Edited', path or '?'))
+                else:
+                    self._write_card(ActivityRenderer.file_edit('Edited', path or '?'))
             else:
                 encoded_diff = self._extract_file_edit_group_rows(event)
                 if not encoded_diff:
@@ -4413,7 +4476,7 @@ class TUIRenderer:
                 if encoded_diff:
                     self._write_tui_file_card(
                         'Edited',
-                        event.path,
+                        path,
                         secondary=_format_diff_summary(added, removed),
                         secondary_kind='ok' if added and not removed else 'neutral',
                         extra_content=encoded_diff,
@@ -4422,7 +4485,7 @@ class TUIRenderer:
                 else:
                     card = ActivityRenderer.file_edit(
                         'Edited',
-                        event.path,
+                        path,
                         added=added,
                         removed=removed,
                     )
@@ -4867,24 +4930,39 @@ class TUIRenderer:
         if not content:
             return
 
-        # Extract file summary for user display (Option C)
         from backend.cli._tool_display.renderers.search import extract_file_summary
 
         match_count, file_count, file_list = extract_file_summary(content)
-
-        # Extract query from first line if it looks like a query
         lines = content.splitlines()
         query = ''
+        scope = ''
+        result_lines: list[str] = []
 
-        # Check if first line is a query line (doesn't match file:line:content pattern)
-        if lines and not re.match(r'^.*:\d+:', lines[0]):
-            query = lines[0]  # type: ignore[unreachable]
+        if lines:
+            first = lines[0].strip()
+            # Check if first line has an embedded query hint like "Query: ..." or "pattern: ..."
+            query_match = re.match(r'^(?:query|pattern|searching for):\s*(.+?)$', first, re.I)
+            if query_match:
+                query = query_match.group(1).strip().strip('"\'')
+                result_lines = [l for l in lines[1:] if l.strip() and ':' in l.split(None, 1)[0]]
+            elif re.match(r'^.*:\d+:', first):
+                # First line is already file:line:content — no separate query line
+                result_lines = [l for l in lines if l.strip()]
+            else:
+                # First line is the query itself
+                query = first.strip().strip('"\'')
+                result_lines = [l for l in lines[1:] if l.strip() and ':' in l.split(None, 1)[0]]
+
+        if not query:
+            query = 'code search'
 
         card = ActivityRenderer.search_results(
-            query=query or 'code search',
+            query=query,
             match_count=match_count,
             file_count=file_count,
             file_list=file_list,
+            result_lines=result_lines,
+            scope=scope,
         )
         self._write_card(card)
 
