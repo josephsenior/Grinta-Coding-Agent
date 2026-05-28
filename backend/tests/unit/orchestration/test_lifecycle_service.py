@@ -25,7 +25,6 @@ def _make_controller() -> MagicMock:
     ctrl.conversation_stats = None
     ctrl.state_tracker = None
     ctrl.state = None
-    ctrl.confirmation_mode = False
     ctrl.agent_to_llm_config = {}
     ctrl.agent_configs = {}
     ctrl._initial_max_iterations = 0
@@ -139,13 +138,11 @@ class TestInitializeStateAndTracking:
                 conversation_stats=MagicMock(),
                 iteration_delta=100,
                 budget_per_task_delta=5.0,
-                confirmation_mode=True,
                 replay_events=None,
             )
 
             mock_st.assert_called_once_with('s1', file_store, 'u1')
             assert ctrl.state_tracker == mock_st.return_value
-            assert ctrl.confirmation_mode is True
             ctrl.set_initial_state.assert_called_once()
 
     def test_sets_replay_manager(self):
@@ -166,7 +163,6 @@ class TestInitializeStateAndTracking:
                     conversation_stats=MagicMock(),
                     iteration_delta=50,
                     budget_per_task_delta=None,
-                    confirmation_mode=False,
                     replay_events=replay_events,
                 )
 

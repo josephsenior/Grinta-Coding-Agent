@@ -16,7 +16,6 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller._replay_manager = MagicMock()
         self.mock_controller.agent = MagicMock()
         self.mock_controller.state = MagicMock()
-        self.mock_controller.state.confirmation_mode = False
         self.mock_controller.log = MagicMock()
 
         self.mock_context = MagicMock()
@@ -162,20 +161,8 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-    async def test_evaluate_action_confirmation_mode_off(self):
-        """Test evaluate_action does nothing when confirmation_mode is off."""
-        self.mock_controller.state.confirmation_mode = False
-        mock_action = MagicMock()
-
-        await self.service.evaluate_action(mock_action)
-
-        # Should not call safety service methods
-        self.mock_safety_service.action_requires_confirmation.assert_not_called()
-        self.mock_safety_service.analyze_security.assert_not_called()
-
     async def test_evaluate_action_no_confirmation_required(self):
         """Test evaluate_action skips analysis when action doesn't require confirmation."""
-        self.mock_controller.state.confirmation_mode = True
         self.mock_safety_service.action_requires_confirmation.return_value = False
         mock_action = MagicMock()
 
@@ -188,7 +175,6 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
 
     async def test_evaluate_action_with_confirmation_required(self):
         """Test evaluate_action performs full security analysis."""
-        self.mock_controller.state.confirmation_mode = True
         self.mock_safety_service.action_requires_confirmation.return_value = True
         self.mock_safety_service.evaluate_security_risk.return_value = (True, False)
 
@@ -212,7 +198,6 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
 
     async def test_evaluate_action_high_risk_and_ask_every_action(self):
         """Test evaluate_action with both high risk and ask every action flags."""
-        self.mock_controller.state.confirmation_mode = True
         self.mock_safety_service.action_requires_confirmation.return_value = True
         self.mock_safety_service.evaluate_security_risk.return_value = (True, True)
 

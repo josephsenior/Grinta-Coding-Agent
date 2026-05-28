@@ -12,7 +12,6 @@ from backend.ledger.action import (
     BrowserToolAction,
     CmdRunAction,
     FileEditAction,
-    FileReadAction,
 )
 
 if TYPE_CHECKING:
@@ -29,7 +28,6 @@ class SafetyService:
         BrowseInteractiveAction,
         BrowserToolAction,
         FileEditAction,
-        FileReadAction,
     )
 
     def __init__(self, context: OrchestrationContext) -> None:

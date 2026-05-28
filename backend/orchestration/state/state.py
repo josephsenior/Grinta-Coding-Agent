@@ -58,7 +58,6 @@ def _serialize_state_scalars(data: dict) -> dict[str, Any]:
     for key in (
         'session_id',
         'user_id',
-        'confirmation_mode',
         'delegate_level',
         'start_id',
         'end_id',
@@ -109,7 +108,6 @@ def _apply_state_scalars(state: State, doc: dict) -> None:
     scalar_keys = (
         'session_id',
         'user_id',
-        'confirmation_mode',
         'delegate_level',
         'start_id',
         'end_id',
@@ -452,7 +450,6 @@ class State:
     )
     conversation_stats: ConversationStats | None = None
     budget_flag: BudgetControlFlag | None = None
-    confirmation_mode: bool = False
     history: list[Event] = field(default_factory=list)
     inputs: dict = field(default_factory=dict)
     outputs: dict = field(default_factory=dict)

@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 
 from backend.ledger.action import (
     Action,
+    BrowseInteractiveAction,
+    BrowserToolAction,
     CmdRunAction,
     FileEditAction,
     FileWriteAction,
@@ -96,7 +98,13 @@ class AutonomyController:
         logger.info('Always-allow registered for session: %s', sig)
 
     def is_always_allowed(self, action: Action) -> bool:
-        return self.action_signature(action) in self._always_allow
+        sig = self.action_signature(action)
+        if sig in self._always_allow:
+            return True
+        for allowed in self._always_allow:
+            if allowed.endswith('*') and sig.startswith(allowed[:-1]):
+                return True
+        return False
 
     def should_request_confirmation(self, action: Action) -> bool:
         """Determine if an action requires user confirmation.
@@ -155,11 +163,11 @@ class AutonomyController:
                 )
                 return True
 
-        # File operations are generally safe in isolated environments
-        # but we could add checks for sensitive paths
-        if isinstance(action, FileWriteAction | FileEditAction):
-            # Could add checks for sensitive files like /etc/passwd
-            pass
+        if isinstance(action, FileEditAction):
+            return True
+
+        if isinstance(action, BrowseInteractiveAction | BrowserToolAction):
+            return True
 
         return False
 

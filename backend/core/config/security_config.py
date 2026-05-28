@@ -13,7 +13,6 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for security related functionalities.
 
     Attributes:
-        confirmation_mode: Whether to enable confirmation mode.
         security_analyzer: The security analyzer to use.
         enforce_security: Whether the security analyzer should block/confirm risky actions.
         block_high_risk: Whether HIGH-risk actions should be blocked outright (True)
@@ -26,7 +25,6 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     """
 
-    confirmation_mode: bool = Field(default=False)
     security_analyzer: str | None = Field(default=None)
     enforce_security: bool = Field(
         default=True,

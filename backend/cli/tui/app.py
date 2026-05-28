@@ -138,6 +138,7 @@ from backend.ledger.action import (
     AgentThinkAction,
     BrowseInteractiveAction,
     BrowserToolAction,
+    ChangeAgentStateAction,
     ClarificationRequestAction,
     CmdRunAction,
     CondensationAction,
@@ -1358,8 +1359,6 @@ class GrintaScreen(Screen):
         self._runtime_stub: Any = None
         self._memory_stub: Any = None
         self._agent_running = True
-        self._pending_confirm: asyncio.Event | None = None
-        self._confirm_result: str | None = None
         self._input_lock = asyncio.Lock()
         self._bootstrapping: asyncio.Event | None = None
         self._bootstrap_task: asyncio.Task[Any] | None = None
@@ -1836,32 +1835,6 @@ class GrintaScreen(Screen):
     def _get_display(self) -> Transcript:
         return self.query_one('#main-display', Transcript)
 
-    def _get_sidebar(self) -> Any:
-        try:
-            return self.query_one('#sidebar')
-        except Exception:
-            from unittest.mock import MagicMock
-
-            return MagicMock()
-
-    @staticmethod
-    def _break_long_runs(text: str, max_len: int = 80) -> str:
-        """Insert zero-width spaces in long continuous runs, preserving Rich markup tags."""
-
-        def _break_word(w: str) -> str:
-            if len(w) > max_len and not w.isspace():
-                return '\u200b'.join(
-                    w[i : i + max_len] for i in range(0, len(w), max_len)
-                )
-            return w
-
-        parts = re.split(r'(\[[^\[\]]*\])', text)
-        for i, part in enumerate(parts):
-            if not (part.startswith('[') and part.endswith(']')):
-                words = re.split(r'(\s+)', part)
-                parts[i] = ''.join(_break_word(w) for w in words)
-        return ''.join(parts)
-
     def _write_log(self, renderable: Any) -> None:
         if self._renderer:
             self._renderer.add_to_history(renderable)
@@ -1908,10 +1881,6 @@ class GrintaScreen(Screen):
         self.query_one('#spinner', Static).add_class('-hidden')
         if self._renderer:
             self._renderer.commit_live_thinking()
-
-    def _hide_thinking(self) -> None:
-        """Called when user submits a new message — hide spinner if still active."""
-        self.query_one('#spinner', Static).add_class('-hidden')
 
     def add_system_message(self, text: str) -> None:
         body = _rich_text(text)
@@ -3463,56 +3432,126 @@ class GrintaScreen(Screen):
 
         _poll_started = _time.monotonic()
         _max_poll_seconds = 3600  # 1 hour hard cap for the polling loop
-        _tui_logger.debug('_dispatch_to_agent: entering poll loop')
         while True:
-            try:
-                if self._renderer is not None:
-                    await self._renderer.wait_for_activity(wait_timeout_sec=0.5)
-                else:
-                    await asyncio.sleep(0.5)
-                loop_count += 1
-                state = self._controller.get_agent_state()
-                if loop_count == 1 or loop_count % 20 == 0:
+            _tui_logger.debug('_dispatch_to_agent: entering poll loop')
+            while True:
+                try:
+                    if self._renderer is not None:
+                        await self._renderer.wait_for_activity(wait_timeout_sec=0.5)
+                    else:
+                        await asyncio.sleep(0.5)
+                    loop_count += 1
+                    state = self._controller.get_agent_state()
+                    if loop_count == 1 or loop_count % 20 == 0:
+                        _tui_logger.debug(
+                            f'_dispatch_to_agent: poll #{loop_count}, state={state}'
+                        )
+                        logger.info(
+                            '[TUI] _dispatch_to_agent: poll #%d, state=%s',
+                            loop_count,
+                            state,
+                        )
+                    if state in end_states:
+                        _tui_logger.debug(
+                            f'_dispatch_to_agent: reached end state {state}'
+                        )
+                        logger.info(
+                            '[TUI] _dispatch_to_agent: reached end state %s', state
+                        )
+                        break
+                    if self._agent_task and self._agent_task.done():
+                        _tui_logger.debug(
+                            f'_dispatch_to_agent: agent task done, state={state}'
+                        )
+                        logger.info(
+                            '[TUI] _dispatch_to_agent: agent task done, state=%s', state
+                        )
+                        break
+                    # Hard timeout: prevent infinite polling if the agent gets stuck.
+                    if _time.monotonic() - _poll_started > _max_poll_seconds:
+                        _tui_logger.debug('_dispatch_to_agent: poll timeout reached')
+                        logger.error(
+                            '[TUI] _dispatch_to_agent: poll timeout after %.0fs in state=%s',
+                            _max_poll_seconds,
+                            state,
+                        )
+                        self.add_error('Agent timed out — check app.log')
+                        break
+                except Exception as exc:
                     _tui_logger.debug(
-                        f'_dispatch_to_agent: poll #{loop_count}, state={state}'
+                        f'_dispatch_to_agent: poll loop EXCEPTION {type(exc).__name__}: {exc}'
                     )
-                    logger.info(
-                        '[TUI] _dispatch_to_agent: poll #%d, state=%s',
-                        loop_count,
-                        state,
-                    )
-                if state in end_states:
-                    _tui_logger.debug(f'_dispatch_to_agent: reached end state {state}')
-                    logger.info('[TUI] _dispatch_to_agent: reached end state %s', state)
-                    break
-                if self._agent_task and self._agent_task.done():
-                    _tui_logger.debug(
-                        f'_dispatch_to_agent: agent task done, state={state}'
-                    )
-                    logger.info(
-                        '[TUI] _dispatch_to_agent: agent task done, state=%s', state
-                    )
-                    break
-                # Hard timeout: prevent infinite polling if the agent gets stuck.
-                if _time.monotonic() - _poll_started > _max_poll_seconds:
-                    _tui_logger.debug('_dispatch_to_agent: poll timeout reached')
-                    logger.error(
-                        '[TUI] _dispatch_to_agent: poll timeout after %.0fs in state=%s',
-                        _max_poll_seconds,
-                        state,
-                    )
-                    self.add_error('Agent timed out — check app.log')
-                    break
-            except Exception as exc:
-                _tui_logger.debug(
-                    f'_dispatch_to_agent: poll loop EXCEPTION {type(exc).__name__}: {exc}'
-                )
-                raise
+                    raise
+            if state == AgentState.AWAITING_USER_CONFIRMATION:
+                await self._handle_confirmation_dialog()
+                continue
+            break
         _tui_logger.debug('_dispatch_to_agent: poll loop exited')
         if self._renderer:
             self._renderer.drain_events()
 
     # ── Confirmation ────────────────────────────────────────────────────────
+
+    async def _handle_confirmation_dialog(self) -> None:
+        """Show confirmation dialog and send user decision back to the agent."""
+        pending = None
+        try:
+            pending = self._controller.get_pending_action()
+        except Exception:
+            pass
+
+        action_type = type(pending).__name__ if pending else 'Unknown'
+        action_detail = ''
+        risk_label = 'UNKNOWN'
+
+        if pending:
+            if hasattr(pending, 'command') and pending.command:
+                action_detail = pending.command
+            elif hasattr(pending, 'path') and pending.path:
+                action_detail = pending.path
+
+            risk = getattr(pending, 'security_risk', None)
+            if risk is not None:
+                risk_label = str(risk)
+
+        thought = getattr(pending, 'thought', '') or ''
+
+        body_lines = [f'[bold]Type:[/bold] {action_type}']
+        if action_detail:
+            body_lines.append(f'[bold]Target:[/bold] {action_detail}')
+        body_lines.append(f'[bold]Risk:[/bold] {risk_label}')
+        if thought:
+            body_lines.append(f'\n[dim]Why:[/dim]\n{thought}')
+
+        body = '\n'.join(body_lines)
+
+        options: list[tuple[str, str]] = [
+            ('approve', 'Approve'),
+            ('reject', 'Reject'),
+        ]
+
+        ac = getattr(self._controller, 'autonomy_controller', None)
+        if ac is not None and hasattr(ac, 'remember_always_allow'):
+            options.append(('always', 'Always allow'))
+
+        result = await self.confirm(
+            title='Action requires approval',
+            body=body,
+            options=options,
+            recommended=0,
+        )
+
+        if result == 'approve':
+            decision = AgentState.USER_CONFIRMED
+        elif result == 'always':
+            decision = AgentState.USER_CONFIRMED
+            if ac is not None and pending is not None:
+                ac.remember_always_allow(pending)
+        else:
+            decision = AgentState.USER_REJECTED
+
+        action = ChangeAgentStateAction(agent_state=decision)
+        self._event_stream.add_event(action, EventSource.USER)
 
     async def confirm(
         self,
@@ -4232,7 +4271,9 @@ class TUIRenderer:
                 )
             )
             self._history.append(Text(''))
-            self._trim_history()
+            overflow = len(self._history) - _TUI_HISTORY_RENDER_LIMIT
+            if overflow > 0:
+                del self._history[:overflow]
         for event in events:
             self._process_event(event)
         self._refresh_display()

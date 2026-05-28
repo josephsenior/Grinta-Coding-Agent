@@ -24,7 +24,6 @@ class TestSafetyService(unittest.IsolatedAsyncioTestCase):
         self.mock_context = MagicMock()
         self.mock_context.autonomy_controller = None
         self.mock_context.security_analyzer = None
-        self.mock_context.confirmation_mode = False
         self.mock_context.pending_action = None
 
         self.mock_controller = MagicMock()
@@ -58,13 +57,13 @@ class TestSafetyService(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(result)
 
-    def test_action_requires_confirmation_file_read(self):
-        """Test action_requires_confirmation for FileReadAction."""
+    def test_action_requires_confirmation_skip_file_read(self):
+        """FileReadAction no longer requires confirmation."""
         action = FileReadAction(path='/test')
 
         result = self.service.action_requires_confirmation(action)
 
-        self.assertTrue(result)
+        self.assertFalse(result)
 
     def test_action_requires_confirmation_other_action(self):
         """Test action_requires_confirmation for non-confirmation actions."""

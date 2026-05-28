@@ -19,7 +19,6 @@ class TestSecurityConfigDefaults:
         _assert_security_attrs(
             cfg,
             {
-                'confirmation_mode': False,
                 'security_analyzer': None,
                 'enforce_security': True,
                 'block_high_risk': False,
@@ -56,7 +55,6 @@ class TestSecurityConfigValidation:
 
     def test_custom_values(self):
         cfg = SecurityConfig(
-            confirmation_mode=True,
             security_analyzer='custom_analyzer',
             enforce_security=False,
             block_high_risk=True,
@@ -73,7 +71,6 @@ class TestSecurityConfigValidation:
         _assert_security_attrs(
             cfg,
             {
-                'confirmation_mode': True,
                 'security_analyzer': 'custom_analyzer',
                 'enforce_security': False,
                 'block_high_risk': True,
@@ -92,23 +89,22 @@ class TestSecurityConfigValidation:
 
 class TestSecurityConfigFromToml:
     def test_basic(self):
-        data = {'confirmation_mode': True, 'enforce_security': False}
+        data = {'enforce_security': False}
         mapping = SecurityConfig.from_toml_section(data)
         assert 'security' in mapping
         cfg = mapping['security']
-        assert cfg.confirmation_mode is True
         assert cfg.enforce_security is False
 
     def test_empty_dict(self):
         mapping = SecurityConfig.from_toml_section({})
         cfg = mapping['security']
         # All defaults
-        assert cfg.confirmation_mode is False
+        assert cfg.enforce_security is True
 
     def test_invalid_data_uses_defaults(self):
         mapping = SecurityConfig.from_toml_section({'unknown_field': 'bad'})
         cfg = mapping['security']
-        assert cfg.confirmation_mode is False
+        assert cfg.enforce_security is True
 
     def test_invalid_validation_mode_raises_value_error(self):
         with pytest.raises(ValueError, match='Invalid security configuration'):

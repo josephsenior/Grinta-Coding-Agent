@@ -66,10 +66,6 @@ class TestOrchestrationContextProperties:
         ctx = _make_ctx(event_stream=es)
         assert ctx.event_stream is es
 
-    def test_confirmation_mode(self):
-        ctx = _make_ctx(confirmation_mode=True)
-        assert ctx.confirmation_mode is True
-
     def test_autonomy_controller(self):
         ac = MagicMock()
         ctx = _make_ctx(autonomy_controller=ac)

@@ -94,7 +94,6 @@ class TestStateJsonRoundTrip:
         s.set_last_error('err')
         s.set_outputs({'x': 42})
         s.set_extra('tag', 'v1')
-        s.confirmation_mode = True
 
         raw = s._to_json_str()
         doc = json.loads(raw)
@@ -108,7 +107,6 @@ class TestStateJsonRoundTrip:
         assert restored.last_error == 'err'
         assert restored.outputs == {'x': 42}
         assert restored.extra_data['tag'] == 'v1'
-        assert restored.confirmation_mode is True
 
     def test_from_raw_rejects_non_json(self):
         with pytest.raises(ValueError, match='legacy pickle'):
