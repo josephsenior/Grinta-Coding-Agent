@@ -7,15 +7,38 @@ and other verbose content. Users can toggle visibility with keyboard shortcuts.
 from __future__ import annotations
 
 from typing import Any
+
 from textual import events
 from textual.app import ComposeResult
-from textual.containers import Container, Vertical, Horizontal
-from textual.widgets import Static
+from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
+from textual.widgets import Static
+
+STATUS_COLORS = {
+    'ok': '#54efae',
+    'err': '#fd8383',
+    'warn': '#f6ff8f',
+    'info': '#91abec',
+    'neutral': '#969aad',
+    'running': '#5eead4',
+}
+
+STATUS_ICONS = {
+    'ok': '✓',
+    'err': '✗',
+    'warn': '!',
+    'info': '?',
+    'neutral': '•',
+    'running': '…',
+}
 
 
 class SidebarRow(Static):
-    """An interactive, hoverable, and focusable row inside sidebar panels."""
+    """An interactive, hoverable, and focusable row inside sidebar panels.
+
+    Renders in compact format: [status icon] [bold label] [muted meta]
+    matching the ActivityCard collapsed-row visual language.
+    """
 
     can_focus = True
 
@@ -33,15 +56,34 @@ class SidebarRow(Static):
 
     def __init__(
         self,
-        renderable: Any,
+        label: str,
         item_id: str | None = None,
         *,
         deletable: bool = False,
-        classes: str | None = None,
+        status: str | None = None,
+        meta: str | None = None,
     ) -> None:
-        super().__init__(renderable, classes=classes)
+        self._label = label
+        self._status = status or 'neutral'
+        self._meta = meta
+        super().__init__(self._build_markup())
         self.item_id = item_id
         self.deletable = deletable
+
+    def _build_markup(self) -> str:
+        color = STATUS_COLORS.get(self._status, '#969aad')
+        icon = STATUS_ICONS.get(self._status, '•')
+        icon_part = f'[{color}]{icon}[/]'
+        label_part = f'[bold #c8d4e8]{self._label}[/]'
+        meta_part = f'  [#54597b]{self._meta}[/]' if self._meta else ''
+        return f'{icon_part} {label_part}{meta_part}'
+
+    def update_status(self, status: str, meta: str | None = None) -> None:
+        """Update the row status icon and optional meta text."""
+        self._status = status
+        if meta is not None:
+            self._meta = meta
+        self.update(self._build_markup())
 
     def on_click(self, event: events.Click) -> None:
         if self.deletable:
@@ -56,11 +98,11 @@ class SidebarRow(Static):
         event.stop()
 
     def on_key(self, event: events.Key) -> None:
-        if event.key in ("enter", "space"):
+        if event.key in ('enter', 'space'):
             self.post_message(self.Selected(self.item_id))
             event.prevent_default()
             event.stop()
-        elif event.key in ("delete", "backspace"):
+        elif event.key in ('delete', 'backspace'):
             self.post_message(self.DeleteRequested(self.item_id))
             event.prevent_default()
             event.stop()
@@ -69,7 +111,7 @@ class SidebarRow(Static):
 class CollapsibleSection(Container):
     class ActionClicked(Message):
         """Event fired when the action label is clicked."""
-        
+
         def __init__(self, control: 'CollapsibleSection') -> None:
             super().__init__()
             self._control = control
@@ -109,8 +151,17 @@ class CollapsibleSection(Container):
     CollapsibleSection .collapsible-header {
         width: 1fr;
         height: 1;
-        color: $text;
+    }
+    CollapsibleSection .collapsible-header.collapsed {
+        color: #6f83aa;
+    }
+    CollapsibleSection .collapsible-header.expanded {
+        color: #c8d4e8;
         text-style: bold;
+    }
+    CollapsibleSection .collapsible-header-caret {
+        width: auto;
+        height: 1;
     }
     CollapsibleSection .collapsible-action {
         width: auto;
@@ -121,12 +172,6 @@ class CollapsibleSection(Container):
     }
     CollapsibleSection .collapsible-action:hover {
         color: #ffffff;
-    }
-    CollapsibleSection .collapsible-header.collapsed {
-        color: $text-muted;
-    }
-    CollapsibleSection .collapsible-header.expanded {
-        color: $text-primary;
     }
     CollapsibleSection .collapsible-body {
         width: 100%;
@@ -145,8 +190,8 @@ class CollapsibleSection(Container):
     can_focus = True
 
     BINDINGS = [
-        ("enter", "toggle", "Toggle Expansion"),
-        ("space", "toggle", "Toggle Expansion"),
+        ('enter', 'toggle', 'Toggle Expansion'),
+        ('space', 'toggle', 'Toggle Expansion'),
     ]
 
     def __init__(
@@ -166,7 +211,7 @@ class CollapsibleSection(Container):
         self._collapsed = collapsed
         self._accent_color = accent_color
         self._action_label = action_label
-        self._items: list[tuple[Any, str, bool]] = []
+        self._items: list[tuple[Any, str, bool, str | None, str | None]] = []
         self._is_thinking = is_thinking
 
     @property
@@ -174,22 +219,28 @@ class CollapsibleSection(Container):
         return self._collapsed
 
     def compose(self) -> ComposeResult:
-        header_style = 'collapsed' if self._collapsed else 'expanded'
         icon = '▸' if self._collapsed else '▾'
-        header_text = f'[{self._accent_color}]{icon}[/] {self._section_title}'
-        
+        caret = f'[#54597b]{icon}[/]'
+        title_part = f'[{self._accent_color}]{self._section_title}[/]'
+        header_text = f'{caret} {title_part}'
+
         with Horizontal(classes='collapsible-header-row', id='header-row'):
-            yield Static(header_text, classes=f'collapsible-header {header_style}', id='header')
+            yield Static(header_text, id='header')
             if self._action_label:
                 yield Static(self._action_label, classes='collapsible-action', id='action-btn')
-                
+
         body_classes = (
             'collapsible-body -hidden' if self._collapsed else 'collapsible-body'
         )
         with Vertical(classes=body_classes, id='body'):
             if self._items:
-                for renderable, item_id, deletable in self._items:
-                    yield SidebarRow(renderable, item_id, deletable=deletable)
+                for label, item_id, deletable, status, meta in self._items:
+                    yield SidebarRow(
+                        label, item_id,
+                        deletable=deletable,
+                        status=status,
+                        meta=meta,
+                    )
             else:
                 content_classes = 'empty-text'
                 if self._is_thinking:
@@ -202,17 +253,16 @@ class CollapsibleSection(Container):
         header = self.query_one('#header', Static)
         body = self.query_one('#body', Vertical)
 
+        icon = '▸' if self._collapsed else '▾'
+        caret = f'[#54597b]{icon}[/]'
+        header_text = f'{caret} [{self._accent_color}]{self._section_title}[/]'
+        header.update(header_text)
+        header.classes = 'collapsible-header collapsed' if self._collapsed else 'collapsible-header expanded'
+
         if self._collapsed:
-            icon = '▸'
-            header.classes = 'collapsible-header collapsed'
             body.add_class('-hidden')
         else:
-            icon = '▾'
-            header.classes = 'collapsible-header expanded'
             body.remove_class('-hidden')
-
-        header_text = f'[{self._accent_color}]{icon}[/] {self._section_title}'
-        header.update(header_text)
 
     def action_toggle(self) -> None:
         """Action handler for enter/space keypresses."""
@@ -244,26 +294,40 @@ class CollapsibleSection(Container):
         self._section_title = title
         header = self.query_one('#header', Static)
         icon = '▸' if self._collapsed else '▾'
-        header_text = f'[{self._accent_color}]{icon}[/] {self._section_title}'
+        caret = f'[#54597b]{icon}[/]'
+        header_text = f'{caret} [{self._accent_color}]{title}[/]'
         header.update(header_text)
 
-    def set_items(self, items: list[tuple[Any, str] | tuple[Any, str, bool]]) -> None:
-        """Update the list of interactive items in the body."""
-        normalized: list[tuple[Any, str, bool]] = []
+    def set_items(self, items: list[tuple[Any, str] | tuple[Any, str, bool] | tuple[Any, str, bool, str | None, str | None]]) -> None:
+        """Update the list of interactive items in the body.
+
+        Each item is a tuple of (label, item_id) or (label, item_id, deletable)
+        or (label, item_id, deletable, status, meta).
+        """
+        normalized: list[tuple[str, str, bool, str | None, str | None]] = []
         for item in items:
-            if len(item) == 2:
-                renderable, item_id = item
-                normalized.append((renderable, item_id, False))
+            if len(item) >= 4:
+                label, item_id, deletable, status = item[:4]
+                meta = item[4] if len(item) >= 5 else None
+                normalized.append((label, item_id, bool(deletable), status, meta))
+            elif len(item) == 3:
+                label, item_id, deletable = item
+                normalized.append((label, item_id, bool(deletable), None, None))
             else:
-                renderable, item_id, deletable = item
-                normalized.append((renderable, item_id, deletable))
+                label, item_id = item
+                normalized.append((label, item_id, False, None, None))
         self._items = normalized
         body = self.query_one('#body', Vertical)
         body.remove_children()
 
         if normalized:
-            for renderable, item_id, deletable in normalized:
-                body.mount(SidebarRow(renderable, item_id, deletable=deletable))
+            for label, item_id, deletable, status, meta in normalized:
+                body.mount(SidebarRow(
+                    label, item_id,
+                    deletable=deletable,
+                    status=status,
+                    meta=meta,
+                ))
         else:
             body.mount(Static(self._content or 'No items', id='empty-text'))
 

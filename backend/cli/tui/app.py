@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import difflib
 import logging
 import os
 import re
 import shlex
 import shutil
+import subprocess
 import threading
 import time
 from collections import defaultdict, deque
@@ -31,7 +33,7 @@ from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.css.query import NoMatches
 from textual.message import Message
-from textual.screen import ModalScreen, Screen
+from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import (
     Button,
@@ -71,6 +73,11 @@ _TUI_HISTORY_RENDER_LIMIT = _bounded_int_env(
     default=2000,
     minimum=200,
 )
+_FILE_DIFF_AUTO_COLLAPSE_LINES = _bounded_int_env(
+    'GRINTA_TUI_FILE_DIFF_AUTO_COLLAPSE_LINES',
+    default=80,
+    minimum=20,
+)
 
 from backend.cli._event_renderer.panels import task_panel_signature
 from backend.cli._event_renderer.text_utils import (
@@ -99,7 +106,11 @@ from backend.cli.theme import (
     NAVY_YELLOW_ACCENT,
 )
 from backend.cli.transcript import strip_tool_result_validation_annotations
-from backend.cli.tui.widgets.activity_card import encode_diff_line
+from backend.cli.tui.widgets.activity_card import (
+    encode_diff_line,
+    encode_split_diff_line,
+)
+from backend.cli.tui.widgets.dialogs import ModalDialog
 from backend.core.bootstrap.agent_control_loop import run_agent_until_done
 from backend.core.bootstrap.main import (
     create_agent,
@@ -121,6 +132,7 @@ from backend.core.interaction_modes import (
     normalize_interaction_mode,
 )
 from backend.core.logger import app_logger as logger
+from backend.core.workspace_resolution import resolve_cli_workspace_directory
 from backend.ledger import EventStream, EventStreamSubscriber
 from backend.ledger.action import (
     AgentThinkAction,
@@ -254,10 +266,154 @@ def _encode_unified_diff_text(diff_text: str, *, max_lines: int = 200) -> str | 
     return '\n'.join(encoded) if encoded else None
 
 
+def _numbered_diff_line(kind: str, line_no: int, line: str, pad: int) -> str:
+    prefix = {'add': '+', 'rem': '-'}.get(kind, ' ')
+    return f'{prefix}{line_no:>{pad}}|{line}'
+
+
+def _encode_split_diff_contents(
+    old_content: str,
+    new_content: str,
+    *,
+    max_lines: int = 200,
+    n_context_lines: int = 3,
+) -> str | None:
+    """Encode before/after text into aligned two-pane TUI diff rows."""
+    old_lines = old_content.split('\n')
+    new_lines = new_content.split('\n')
+    matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
+    encoded: list[str] = []
+    for group_idx, group in enumerate(matcher.get_grouped_opcodes(n_context_lines)):
+        if group_idx > 0:
+            encoded.append(encode_split_diff_line('...', '...', 'ctx', 'ctx'))
+        max_line_no = max((op[2] for op in group), default=0)
+        max_line_no = max(max_line_no, max((op[4] for op in group), default=0))
+        pad = max(1, len(str(max_line_no)))
+        for tag, i1, i2, j1, j2 in group:
+            for row in _split_diff_opcode_rows(
+                tag,
+                old_lines,
+                new_lines,
+                i1,
+                i2,
+                j1,
+                j2,
+                pad,
+            ):
+                if len(encoded) >= max_lines:
+                    encoded.append(
+                        encode_split_diff_line(
+                            '... more diff rows',
+                            '... more diff rows',
+                            'ctx',
+                            'ctx',
+                        )
+                    )
+                    return '\n'.join(encoded)
+                encoded.append(
+                    encode_split_diff_line(
+                        row[0],
+                        row[1],
+                        row[2],
+                        row[3],
+                    )
+                )
+    return '\n'.join(encoded) if encoded else None
+
+
+def _split_diff_opcode_rows(
+    tag: str,
+    old_lines: list[str],
+    new_lines: list[str],
+    i1: int,
+    i2: int,
+    j1: int,
+    j2: int,
+    pad: int,
+) -> list[tuple[str, str, str, str]]:
+    rows: list[tuple[str, str, str, str]] = []
+    if tag == 'equal':
+        for offset, old_index in enumerate(range(i1, i2)):
+            new_index = j1 + offset
+            rows.append(
+                (
+                    _numbered_diff_line('ctx', old_index + 1, old_lines[old_index], pad),
+                    _numbered_diff_line('ctx', new_index + 1, new_lines[new_index], pad),
+                    'ctx',
+                    'ctx',
+                )
+            )
+        return rows
+    if tag == 'delete':
+        for old_index in range(i1, i2):
+            rows.append(
+                (
+                    _numbered_diff_line('rem', old_index + 1, old_lines[old_index], pad),
+                    '',
+                    'rem',
+                    'ctx',
+                )
+            )
+        return rows
+    if tag == 'insert':
+        for new_index in range(j1, j2):
+            rows.append(
+                (
+                    '',
+                    _numbered_diff_line('add', new_index + 1, new_lines[new_index], pad),
+                    'ctx',
+                    'add',
+                )
+            )
+        return rows
+    if tag == 'replace':
+        old_count = i2 - i1
+        new_count = j2 - j1
+        for offset in range(max(old_count, new_count)):
+            old_index = i1 + offset
+            new_index = j1 + offset
+            left = (
+                _numbered_diff_line('rem', old_index + 1, old_lines[old_index], pad)
+                if offset < old_count
+                else ''
+            )
+            right = (
+                _numbered_diff_line('add', new_index + 1, new_lines[new_index], pad)
+                if offset < new_count
+                else ''
+            )
+            rows.append(
+                (
+                    left,
+                    right,
+                    'rem' if left else 'ctx',
+                    'add' if right else 'ctx',
+                )
+            )
+    return rows
+
+
 def _join_secondary_parts(*parts: str | None) -> str | None:
     """Join compact secondary labels while skipping blanks."""
     values = [part for part in parts if part]
     return ' · '.join(values) if values else None
+
+
+def _extract_tagged_block(content: str, start_tag: str, end_tag: str) -> str | None:
+    """Return the first non-empty tagged block from an observation content string."""
+    start = content.find(start_tag)
+    if start == -1:
+        return None
+    body_start = start + len(start_tag)
+    end = content.find(end_tag, body_start)
+    if end == -1:
+        return None
+    block = content[body_start:end].strip()
+    return block or None
+
+
+def _should_collapse_file_diff(diff_text: str) -> bool:
+    return len(diff_text.splitlines()) > _FILE_DIFF_AUTO_COLLAPSE_LINES
 
 
 # ── Widget classes ────────────────────────────────────────────────────────
@@ -569,12 +725,14 @@ class RendererDrainRequested(Message):
     """Message requesting the screen to drain queued renderer events."""
 
 
-class GrintaConfirmDialog(ModalScreen[str | None]):
+class GrintaConfirmDialog(ModalDialog[str | None]):
     """Confirmation dialog shown when the agent needs user input."""
 
-    BINDINGS = [
-        Binding('escape', 'dismiss(None)', 'Cancel', show=False),
-    ]
+    DEFAULT_CSS = """
+    GrintaConfirmDialog > #dialog-container {
+        width: 60;
+    }
+    """
 
     def __init__(
         self,
@@ -590,10 +748,10 @@ class GrintaConfirmDialog(ModalScreen[str | None]):
         self._recommended = recommended
 
     def compose(self) -> ComposeResult:
-        with Vertical():
-            yield Label(f'[bold]{self._dialog_title}[/]', classes='title')
-            yield Label(self._dialog_body, classes='body')
-            with Horizontal(classes='buttons-row'):
+        with Vertical(id='dialog-container'):
+            yield Label(f'[bold]{self._dialog_title}[/]', id='dialog-title')
+            yield Static(self._dialog_body, id='dialog-body')
+            with Horizontal(id='dialog-buttons'):
                 for i, (key, label) in enumerate(self._options):
                     yield Button(
                         label,
@@ -610,12 +768,8 @@ class GrintaConfirmDialog(ModalScreen[str | None]):
                 return
 
 
-class GrintaHelpDialog(ModalScreen[None]):
+class GrintaHelpDialog(ModalDialog[None]):
     """Dedicated help and shortcuts modal."""
-
-    BINDINGS = [
-        Binding('escape', 'dismiss(None)', 'Close', show=False),
-    ]
 
     def compose(self) -> ComposeResult:
         help_markup = (
@@ -632,14 +786,14 @@ class GrintaHelpDialog(ModalScreen[None]):
             f'[{NAVY_TEXT_SECONDARY}]PageUp/Down[/] [{NAVY_TEXT_TERTIARY}]Scroll transcript[/]\n'
             f'[{NAVY_TEXT_SECONDARY}]Home/End[/]   [{NAVY_TEXT_TERTIARY}]Jump transcript[/]'
         )
-        with Vertical(id='help-dialog'):
-            yield Label('[bold]Help[/]', classes='title')
+        with Vertical(id='dialog-container'):
+            yield Label('[bold]Help[/]', id='dialog-title')
             yield Static(
                 f'[{NAVY_TEXT_MUTED}]Use the transcript for evidence and the pinned strips for runtime state.[/]\n\n'
                 f'{help_markup}',
                 id='help-body',
             )
-            with Horizontal(id='help-buttons'):
+            with Horizontal(id='dialog-buttons'):
                 yield Button('Close', id='help-close', variant='primary')
 
     def on_mount(self) -> None:
@@ -650,23 +804,23 @@ class GrintaHelpDialog(ModalScreen[None]):
             self.dismiss(None)
 
 
-class GrintaAddSkillDialog(ModalScreen[dict[str, str] | None]):
+class GrintaAddSkillDialog(ModalDialog[dict[str, str] | None]):
     """Dialog to create a custom skill dynamically."""
 
     BINDINGS = [
-        Binding('escape', 'dismiss(None)', 'Cancel', show=False),
+        *ModalDialog.BINDINGS,
         Binding('ctrl+s', 'save', 'Save', show=False),
     ]
 
     def compose(self) -> ComposeResult:
-        with Vertical(id='settings-dialog'):
-            yield Label('[bold]Add Custom Skill[/]', classes='title')
+        with Vertical(id='dialog-container'):
+            yield Label('[bold]Add Custom Skill[/]', id='dialog-title')
             yield Label('Skill Name (e.g. react_best_practices)', classes='field-label')
             yield Input(id='skill-name')
             yield Label('Instructions (Markdown)', classes='field-label')
             yield TextArea(id='skill-content')
-            yield Label('', id='settings-feedback')
-            with Horizontal(id='settings-buttons'):
+            yield Label('', id='dialog-feedback')
+            with Horizontal(id='dialog-buttons'):
                 yield Button('Save', id='settings-save', variant='primary')
                 yield Button('Cancel', id='settings-cancel')
 
@@ -686,29 +840,29 @@ class GrintaAddSkillDialog(ModalScreen[dict[str, str] | None]):
         name = self.query_one('#skill-name', Input).value.strip()
         content = self.query_one('#skill-content', TextArea).text.strip()
         if not name:
-            self.query_one('#settings-feedback', Label).update(
+            self.query_one('#dialog-feedback', Label).update(
                 '[#f05757]Skill name required.[/]'
             )
             return
         if not content:
-            self.query_one('#settings-feedback', Label).update(
+            self.query_one('#dialog-feedback', Label).update(
                 '[#f05757]Content required.[/]'
             )
             return
         self.dismiss({'name': name, 'content': content})
 
 
-class GrintaAddMCPDialog(ModalScreen[dict[str, str] | None]):
+class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
     """Dialog to add an MCP Server."""
 
     BINDINGS = [
-        Binding('escape', 'dismiss(None)', 'Cancel', show=False),
+        *ModalDialog.BINDINGS,
         Binding('ctrl+s', 'save', 'Save', show=False),
     ]
 
     def compose(self) -> ComposeResult:
-        with Vertical(id='settings-dialog'):
-            yield Label('[bold]Add MCP Server[/]', classes='title')
+        with Vertical(id='dialog-container'):
+            yield Label('[bold]Add MCP Server[/]', id='dialog-title')
             yield Label('Server Name', classes='field-label')
             yield Input(id='mcp-name')
             yield Label(
@@ -716,8 +870,8 @@ class GrintaAddMCPDialog(ModalScreen[dict[str, str] | None]):
                 classes='field-label',
             )
             yield Input(id='mcp-command')
-            yield Label('', id='settings-feedback')
-            with Horizontal(id='settings-buttons'):
+            yield Label('', id='dialog-feedback')
+            with Horizontal(id='dialog-buttons'):
                 yield Button('Save', id='settings-save', variant='primary')
                 yield Button('Cancel', id='settings-cancel')
 
@@ -737,18 +891,18 @@ class GrintaAddMCPDialog(ModalScreen[dict[str, str] | None]):
         name = self.query_one('#mcp-name', Input).value.strip()
         cmd = self.query_one('#mcp-command', Input).value.strip()
         if not name or not cmd:
-            self.query_one('#settings-feedback', Label).update(
+            self.query_one('#dialog-feedback', Label).update(
                 '[#f05757]Name and command required.[/]'
             )
             return
         self.dismiss({'name': name, 'command': cmd})
 
 
-class GrintaSettingsDialog(ModalScreen[dict[str, Any] | None]):
+class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
     """Native settings modal for full-screen TUI."""
 
     BINDINGS = [
-        Binding('escape', 'dismiss(None)', 'Cancel', show=False),
+        *ModalDialog.BINDINGS,
         Binding('ctrl+s', 'save', 'Save', show=False),
     ]
 
@@ -765,8 +919,8 @@ class GrintaSettingsDialog(ModalScreen[dict[str, Any] | None]):
         budget_value = '' if raw_budget is None else f'{float(raw_budget):g}'
         icons_enabled = bool(getattr(self._config, 'cli_tool_icons', True))
 
-        with Vertical(id='settings-dialog'):
-            yield Label('[bold]Settings[/]', classes='title')
+        with Vertical(id='dialog-container'):
+            yield Label('[bold]Settings[/]', id='dialog-title')
             yield Label(f'Current API key: {masked_key}', id='settings-current-key')
             yield Label('Model', classes='field-label')
             yield Input(value=current_model, id='settings-model')
@@ -784,8 +938,8 @@ class GrintaSettingsDialog(ModalScreen[dict[str, Any] | None]):
                 value=icons_enabled,
                 id='settings-icons',
             )
-            yield Label('', id='settings-feedback')
-            with Horizontal(id='settings-buttons'):
+            yield Label('', id='dialog-feedback')
+            with Horizontal(id='dialog-buttons'):
                 yield Button('Save', id='settings-save', variant='primary')
                 yield Button('Cancel', id='settings-cancel')
 
@@ -804,7 +958,7 @@ class GrintaSettingsDialog(ModalScreen[dict[str, Any] | None]):
 
     def _set_feedback(self, message: str, *, error: bool = False) -> None:
         style = NAVY_ERROR if error else NAVY_READY
-        self.query_one('#settings-feedback', Label).update(f'[{style}]{message}[/]')
+        self.query_one('#dialog-feedback', Label).update(f'[{style}]{message}[/]')
 
     def _submit(self) -> None:
         model = self.query_one('#settings-model', Input).value.strip()
@@ -839,11 +993,17 @@ class GrintaSettingsDialog(ModalScreen[dict[str, Any] | None]):
         )
 
 
-class GrintaSessionsDialog(ModalScreen[str | None]):
+class GrintaSessionsDialog(ModalDialog[str | None]):
     """Native sessions manager for full-screen TUI."""
 
+    DEFAULT_CSS = """
+    GrintaSessionsDialog > #dialog-container {
+        max-height: 40;
+    }
+    """
+
     BINDINGS = [
-        Binding('escape', 'dismiss(None)', 'Close', show=False),
+        *ModalDialog.BINDINGS,
         Binding('f5', 'refresh', 'Refresh', show=False),
         Binding('delete', 'delete_selected', 'Delete', show=False),
     ]
@@ -877,8 +1037,8 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
             ('Cost', 'cost'),
             ('Model', 'model'),
         ]
-        with Vertical(id='sessions-dialog'):
-            yield Label('[bold]Sessions[/]', classes='title')
+        with Vertical(id='dialog-container'):
+            yield Label('[bold]Sessions[/]', id='dialog-title')
             with Horizontal(id='sessions-filters'):
                 yield Input(
                     value=self._search, placeholder='Search…', id='sessions-search'
@@ -895,8 +1055,8 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
                 yield Button('Refresh', id='sessions-refresh')
             yield DataTable(id='sessions-table')
             yield Static('', id='sessions-preview')
-            yield Label('', id='sessions-feedback')
-            with Horizontal(id='sessions-buttons'):
+            yield Label('', id='dialog-feedback')
+            with Horizontal(id='dialog-buttons'):
                 yield Button('Resume', id='sessions-resume', variant='primary')
                 yield Button('Delete', id='sessions-delete', variant='error')
                 yield Button('Close', id='sessions-close')
@@ -985,7 +1145,7 @@ class GrintaSessionsDialog(ModalScreen[str | None]):
 
     def _set_feedback(self, message: str, *, error: bool = False) -> None:
         style = NAVY_ERROR if error else NAVY_READY
-        self.query_one('#sessions-feedback', Label).update(f'[{style}]{message}[/]')
+        self.query_one('#dialog-feedback', Label).update(f'[{style}]{message}[/]')
 
     def _refresh_table(self) -> None:
         from backend.cli.session_manager import (
@@ -3584,12 +3744,16 @@ class TUIRenderer:
 
     def _refresh_display(self) -> None:
         """Refresh derived sidebar state; transcript writes are incremental."""
-        from rich.text import Text
-
         from backend.cli._event_renderer.sidebar import _load_playbook_skills
-        from backend.cli.theme import STYLE_DEFAULT, STYLE_DIM
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
-        from backend.core.task_status import TASK_STATUS_PANEL_STYLES
+
+        _TASK_TO_SIDEBAR_STATUS = {
+            'done': 'ok',
+            'doing': 'running',
+            'blocked': 'err',
+            'todo': 'neutral',
+            'skipped': 'warn',
+        }
 
         mcp_count = self._hud.state.mcp_servers
         skill_count = self._hud.bundled_skill_count
@@ -3621,18 +3785,9 @@ class TUIRenderer:
                 tasks_widget = self._tui.query_one('#sidebar-tasks', CollapsibleSection)
                 task_items = []
                 for task_id, status, desc in task_signature:
-                    status_style = TASK_STATUS_PANEL_STYLES.get(status, 'dim')
-                    status_icon = Text('●', style=f'bold {status_style}')
-                    body = Text()
-                    if task_id and task_id != '?':
-                        body.append(f'{task_id} ', style=STYLE_DIM)
-                    body.append(desc, style=STYLE_DEFAULT)
-
-                    row_text = Text()
-                    row_text.append(status_icon)
-                    row_text.append(' ')
-                    row_text.append(body)
-                    task_items.append((row_text, f'task:{task_id}'))
+                    item_status = _TASK_TO_SIDEBAR_STATUS.get(status, 'neutral')
+                    meta = task_id if task_id and task_id != '?' else None
+                    task_items.append((desc, f'task:{task_id}', False, item_status, meta))
 
                 tasks_widget.set_title(f'Tasks ({len(task_signature)})')
                 tasks_widget.set_items(task_items)
@@ -3647,12 +3802,7 @@ class TUIRenderer:
                     for server in mcp_servers:
                         name = server.get('name', 'unknown')
                         server_type = server.get('type', 'stdio')
-
-                        row_text = Text()
-                        row_text.append('● ', style='bold #eacb8a')
-                        row_text.append(name, style='#c8d4e8')
-                        row_text.append(f' ({server_type})', style='#54597b')
-                        mcp_items.append((row_text, f'mcp:{name}', True))
+                        mcp_items.append((name, f'mcp:{name}', True, 'info', server_type))
 
                 mcp_widget.set_title(
                     f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})'
@@ -3670,10 +3820,7 @@ class TUIRenderer:
                 skill_items = []
                 if skills_list:
                     for skill in sorted(skills_list):
-                        row_text = Text()
-                        row_text.append('● ', style='bold #7a849c')
-                        row_text.append(skill, style='#a1acc2')
-                        skill_items.append((row_text, f'skill:{skill}', True))
+                        skill_items.append((skill, f'skill:{skill}', True, 'neutral', None))
 
                 skills_widget.set_title(f'Skills ({len(skills_list)})')
                 skills_widget.set_items(skill_items)
@@ -3781,18 +3928,23 @@ class TUIRenderer:
             ActivityCard as TUIActivityCard,
         )
 
+        status_map = {
+            'ok': 'ok',
+            'err': 'err',
+            'warn': 'warn',
+            'neutral': 'neutral',
+        }
+        status = status_map.get(card.secondary_kind, 'neutral')
         widget = TUIActivityCard(
             verb=card.verb,
             detail=card.detail,
             badge_category=card.badge_category,
-            title=card.title,
-            secondary=card.secondary,
-            secondary_kind=card.secondary_kind,
+            status=status,
+            outcome=card.secondary,
             extra_content=extra_content,
-            collapsed=card.start_collapsed if card.is_collapsible else False,
+            collapsed=True,
         )
 
-        # Defer/enable processing state if it is a tool card that is actively executing
         is_tool = card.badge_category in (
             'tool',
             'shell',
@@ -3808,13 +3960,13 @@ class TUIRenderer:
             widget.set_processing(True)
             self._last_active_card = widget
             self._tui.set_current_operation(
-                f'{card.title or "Activity"}: {card.verb} {card.detail}'.strip(),
-                meta=card.secondary or 'Running',
+                f'{card.verb} {card.detail}'.strip(),
+                meta='Running',
                 active=True,
             )
         else:
             self._tui.set_current_operation(
-                f'{card.title or "Activity"}: {card.verb} {card.detail}'.strip(),
+                f'{card.verb} {card.detail}'.strip(),
                 meta=card.secondary or 'Completed',
                 active=False,
             )
@@ -3837,20 +3989,21 @@ class TUIRenderer:
         )
 
         self._clear_last_active_card_processing()
+        status_map = {'ok': 'ok', 'err': 'err', 'warn': 'warn', 'neutral': 'neutral'}
+        status = status_map.get(secondary_kind, 'neutral')
         widget = TUIActivityCard(
             verb=verb,
             detail=detail,
             badge_category='files',
-            title='Files',
-            secondary=secondary,
-            secondary_kind=secondary_kind,
+            status=status,
+            outcome=secondary,
             extra_content=extra_content,
             collapsed=collapsed,
             diff_encoded=True,
         )
         self._tui.set_last_tool_status(f'{verb} {detail}')
         self._tui.set_current_operation(
-            f'Files: {verb} {detail}'.strip(),
+            f'{verb} {detail}'.strip(),
             meta=secondary or 'Completed',
             active=False,
         )
@@ -3923,13 +4076,14 @@ class TUIRenderer:
             self._terminal_cards_by_session[session_key] = widget
             self._pending_terminal_card = None
         if widget is None:
+            status_map = {'ok': 'ok', 'err': 'err', 'warn': 'warn', 'neutral': 'neutral'}
+            status = status_map.get(secondary_kind, 'neutral')
             widget = TUIActivityCard(
                 verb=verb,
                 detail=detail,
                 badge_category='terminal',
-                title='Terminal',
-                secondary=secondary,
-                secondary_kind=secondary_kind,
+                status=status,
+                outcome=secondary,
                 extra_content=extra_content,
                 collapsed=False,
             )
@@ -3940,11 +4094,13 @@ class TUIRenderer:
             else:
                 self._pending_terminal_card = widget
         else:
-            widget.update_header(verb=verb, detail=detail, title='Terminal')
-            if secondary:
-                widget.update_secondary(secondary, kind=secondary_kind)
+            widget.set_verb(verb, detail=detail)
+            widget.set_status(
+                'ok' if secondary_kind == 'ok' else 'err' if secondary_kind == 'err' else 'neutral',
+                outcome=secondary,
+            )
             if extra_content:
-                widget.append_extra(extra_content)
+                widget.append_content(extra_content)
 
         if not extra_content and collapse_after_update:
             widget.set_collapsed(True)
@@ -3958,7 +4114,7 @@ class TUIRenderer:
             self._last_active_card = widget
             self._tui.set_last_tool_status(f'{verb} {detail}'.strip())
             self._tui.set_current_operation(
-                f'Terminal: {verb} {detail}'.strip(),
+                f'{verb} {detail}'.strip(),
                 meta=secondary or f'session {session_key}',
                 active=True,
             )
@@ -3967,7 +4123,7 @@ class TUIRenderer:
                 self._last_active_card = None
             self._tui.set_last_tool_status(f'{verb} {detail}'.strip())
             self._tui.set_current_operation(
-                f'Terminal: {verb} {detail}'.strip(),
+                f'{verb} {detail}'.strip(),
                 meta=secondary or f'session {session_key}',
                 active=False,
             )
@@ -3982,11 +4138,10 @@ class TUIRenderer:
             verb=card.verb,
             detail=card.detail,
             badge_category=card.badge_category,
-            title=card.title,
-            secondary=card.secondary,
-            secondary_kind=card.secondary_kind,
+            status='running',
+            outcome=card.secondary,
             extra_content=None,
-            collapsed=False,
+            collapsed=True,
         )
         widget.set_processing(True)
         self._clear_last_active_card_processing()
@@ -3994,7 +4149,7 @@ class TUIRenderer:
         self._pending_shell_cards_by_command[command].append(widget)
         self._tui.set_last_tool_status(f'{card.verb} {card.detail}'.strip())
         self._tui.set_current_operation(
-            f'{card.title or "Shell"}: {card.verb} {card.detail}'.strip(),
+            f'{card.verb} {card.detail}'.strip(),
             meta='running',
             active=True,
         )
@@ -4025,9 +4180,8 @@ class TUIRenderer:
         if self._last_active_card is widget:
             self._last_active_card = None
 
-        widget.update_header(verb=card.verb, detail=card.detail, title=card.title)
-        if card.secondary:
-            widget.update_secondary(card.secondary, kind=card.secondary_kind)
+        status = 'ok' if exit_code == 0 else 'err'
+        widget.set_status(status, outcome=card.secondary)
 
         extra_content = None
         if card.extra_lines:
@@ -4035,13 +4189,13 @@ class TUIRenderer:
                 f'{"  " * extra.indent}{extra.text}' for extra in card.extra_lines
             )
         if extra_content:
-            widget.append_extra(extra_content)
-            widget.set_collapsed(card.start_collapsed if card.is_collapsible else False)
+            widget.update_content(extra_content)
+            widget.set_collapsed(False)
 
         widget.set_processing(False)
         self._tui.set_last_tool_status(f'{card.verb} {card.detail}'.strip())
         self._tui.set_current_operation(
-            f'{card.title or "Shell"}: {card.verb} {card.detail}'.strip(),
+            f'{card.verb} {card.detail}'.strip(),
             meta=card.secondary or 'completed',
             active=False,
         )
@@ -4240,15 +4394,20 @@ class TUIRenderer:
                 )
                 self._write_card(card)
             else:
-                diff_text = self._extract_file_edit_diff(event)
-                if diff_text:
+                encoded_diff = self._extract_file_edit_group_rows(event)
+                if not encoded_diff:
+                    diff_text = self._extract_file_edit_diff(event)
+                    encoded_diff = (
+                        _encode_unified_diff_text(diff_text) if diff_text else None
+                    )
+                if encoded_diff:
                     self._write_tui_file_card(
                         'Edited',
                         event.path,
                         secondary=_format_diff_summary(added, removed),
                         secondary_kind='ok' if added and not removed else 'neutral',
-                        extra_content=_encode_unified_diff_text(diff_text),
-                        collapsed=len(diff_text.splitlines()) > 14,
+                        extra_content=encoded_diff,
+                        collapsed=_should_collapse_file_diff(encoded_diff),
                     )
                 else:
                     card = ActivityRenderer.file_edit(
@@ -4259,7 +4418,16 @@ class TUIRenderer:
                     )
                     self._write_card(card)
         elif isinstance(event, FileWriteObservation):
-            pass
+            diff_text = self._extract_file_observation_diff(event)
+            if diff_text:
+                self._write_tui_file_card(
+                    'Edited',
+                    event.path,
+                    secondary=None,
+                    secondary_kind='neutral',
+                    extra_content=_encode_unified_diff_text(diff_text),
+                    collapsed=_should_collapse_file_diff(diff_text),
+                )
         elif isinstance(event, MCPAction):
             card = ActivityRenderer.mcp_tool(event.name, event.arguments)
             self._write_card(card)
@@ -4578,7 +4746,19 @@ class TUIRenderer:
             return True
         return not self._task_list
 
-    def _extract_file_edit_diff(self, event: FileEditObservation) -> str | None:
+    def _extract_file_observation_diff(self, event: Any) -> str | None:
+        """Extract unified diff text from any file edit/write observation."""
+        return self._extract_file_edit_diff(event)
+
+    def _extract_file_edit_group_rows(self, event: Any) -> str | None:
+        """Extract two-pane diff rows from before/after edit groups."""
+        old_content = getattr(event, 'old_content', None)
+        new_content = getattr(event, 'new_content', None)
+        if old_content is None or new_content is None:
+            return None
+        return _encode_split_diff_contents(old_content, new_content)
+
+    def _extract_file_edit_diff(self, event: Any) -> str | None:
         """Extract unified diff from a FileEditObservation for TUI display."""
         explicit_diff = getattr(event, 'diff', None)
         if isinstance(explicit_diff, str) and explicit_diff.strip():
@@ -4593,19 +4773,73 @@ class TUIRenderer:
                 if embedded:
                     return embedded
 
+            preview = _extract_tagged_block(
+                content,
+                '<DIFF_PREVIEW>',
+                '</DIFF_PREVIEW>',
+            )
+            if preview:
+                return preview
+
         try:
             from backend.execution.utils.diff import get_diff
 
             old_content = getattr(event, 'old_content', None)
             new_content = getattr(event, 'new_content', None)
             if old_content is None or new_content is None:
-                return None
+                return self._extract_git_file_diff(getattr(event, 'path', ''))
 
             diff = get_diff(old_content, new_content, path=event.path)
             if diff:
                 return diff
+            return None
         except Exception:
             pass
+        return self._extract_git_file_diff(getattr(event, 'path', ''))
+
+    def _extract_git_file_diff(self, path: str) -> str | None:
+        """Best-effort fallback when observations omit inline diff payloads."""
+        clean_path = (path or '').strip()
+        if not clean_path or clean_path == '.':
+            return None
+        try:
+            workspace = resolve_cli_workspace_directory(
+                getattr(self._tui, '_config', None)
+            )
+            if workspace is None:
+                return None
+
+            path_obj = Path(clean_path)
+            if path_obj.is_absolute():
+                try:
+                    clean_path = str(path_obj.resolve().relative_to(workspace.resolve()))
+                except (OSError, ValueError):
+                    return None
+
+            for args in (
+                ['git', '-C', str(workspace), '--no-pager', 'diff', '--', clean_path],
+                [
+                    'git',
+                    '-C',
+                    str(workspace),
+                    '--no-pager',
+                    'diff',
+                    '--cached',
+                    '--',
+                    clean_path,
+                ],
+            ):
+                result = subprocess.run(
+                    args,
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                    check=False,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    return result.stdout
+        except Exception:
+            return None
         return None
 
     def _handle_search_code_action(self, thought: str) -> None:

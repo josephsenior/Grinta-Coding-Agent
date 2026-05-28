@@ -26,12 +26,9 @@
 | `add_repo_inst.md` | Scaffold `.grinta/playbooks/repo.md` |
 | `address_pr_comments.md` | `/address_pr_comments` workflow |
 | `agent_memory.md` | `/remember` — lessons.md vs vector recall |
-| `api.md` | `/api` — REST/FastAPI patterns |
-| `architecture.md` | `/architecture` and `/adr` — architectural decision workflow |
-| `audit.md` | `/audit` — inspect event streams and session traces |
+| `api.md` | `/api` — REST/FastAPI/Express patterns |
 | `ci.md` | `/ci` — CI triage and stabilization workflow |
 | `code-review.md` | `/codereview` and `/codereview-roasted` |
-| `compress.md` | `/compress` — context window and compaction decisions |
 | `database.md` | `/database` |
 | `debug.md` | `/debug` |
 | `documentation.md` | `/docs` |
@@ -40,14 +37,14 @@
 | `json-jitsu.md` | `/json` — jq recipes, filtering, aggregation, transformation |
 | `log-fu.md` | `/logs` — log analysis, timing, rate tracking, grep patterns |
 | `net-diag.md` | `/net` — DNS, TLS, HTTP, connectivity diagnostics |
-| `hardened.md` | `/hardened` — safer execution in semi-trusted repos |
 | `incident.md` | `/incident` and `/oncall` — live issue triage and recovery |
 | `migration.md` | `/migration` and `/upgrade` — staged upgrade workflow |
-| `orch-debug.md` | `/orch-debug` — orchestration-level debugging |
-| `perf.md` | `/perf` — token, cost, and performance workflow |
-| `premerge.md` | `/premerge` and `/shipcheck` — final quality gate before merge |
+| `python.md` | `/python` — Python coding best practices |
 | `react.md` | `/react` |
-| `recover.md` | `/recover` — recover after stuck/circuit-breaker events |
+| `shell.md` | `/shell` — Bash, terminal execution, non-interactive |
+| `typescript.md` | `/typescript` — TypeScript code generation rules |
+| `testing.md` | `/testing` |
+| `tool.md` | `/tool` |
 | `release.md` | `/release` — release readiness and rollout workflow |
 | `refactoring.md` | `/refactor` |
 | `testing.md` | `/testing` |
