@@ -158,13 +158,8 @@ def _routing_memory_tool_placeholders(
         post_condensation_retrieval = 'Call `memory_manager(action="working_memory")` after condensation to restore plan/findings before acting.'
         surviving_state_facts = 'Only `note` (disk) and `memory_manager` (session) facts reliably survive condensation.'
     else:
-        memory_and_context_section = (
-            '<MEMORY_AND_CONTEXT_TOOLS>\n'
-            '- Disk facts still use `note(key, value)` / `recall(key)`.\n'
-            '- No structured within-session working-memory tool is available in this run; keep active hypotheses compact and rely on verified observations.\n'
-            '</MEMORY_AND_CONTEXT_TOOLS>'
-        )
-        post_condensation_retrieval = 'Resume from the summary and your most recent verified observations; no structured working-memory tool is available in this run.'
+        memory_and_context_section = ''
+        post_condensation_retrieval = 'Resume from the summary and your most recent verified observations.'
         surviving_state_facts = (
             'Only `note` (disk) facts are guaranteed to survive condensation.'
         )
@@ -281,7 +276,6 @@ def _render_system_capabilities(
     config: Any,
     *,
     function_calling_mode: str | None,
-    multi_edit_available: bool,
     parallel_tool_calls_provider_flag: bool,
 ) -> str:
     """Runtime-truth capability statement.
@@ -312,23 +306,6 @@ def _render_system_capabilities(
         )
         provider_line = ''
 
-    if multi_edit_available:
-        multi_edit_line = (
-            '- **Atomic multi-file edits**: AVAILABLE. '
-            'Use the top-level `multiedit` tool for atomic multi-file refactors. '
-            'Use it instead of sequential edits when the changes must succeed as a unit.'
-        )
-    else:
-        multi_edit_line = (
-            '- **Atomic multi-file edits**: not exposed in this build — use targeted '
-            '`edit_symbols` or `replace_string` tool calls sequentially'
-            + (
-                ' and take a `checkpoint` before the batch for coarse rollback.'
-                if checkpoints_on
-                else '.'
-            )
-        )
-
     condensation_line = (
         '- **Conversation condensation**: AUTOMATIC and middleware-driven. '
         'It costs ZERO tool calls and ZERO turns from your budget. '
@@ -342,7 +319,7 @@ def _render_system_capabilities(
         'Take one before risky multi-step edits when atomic batch tools are not a fit. '
         '`checkpoint(command="view")` auto-detects modified files from workspace snapshots — no need to manually specify `files_modified`.'
         if checkpoints_on
-        else '- **Checkpoints**: not enabled in this run.'
+        else ''
     )
 
     fc_line = f'- **Function-calling mode**: `{fc_mode}`.'
@@ -359,19 +336,22 @@ def _render_system_capabilities(
         else ''
     )
 
-    return (
+    parts = [
         '# 🧭 System Capabilities (verified at runtime)\n'
         'The following statements are derived from live config and feature flags. '
         'Treat them as authoritative — do not contradict them in user-facing replies.'
         f'{runtime_discovery_hint}\n\n'
         f'{parallel_line}\n'
         f'{provider_line}\n'
-        f'{multi_edit_line}\n'
         f'{condensation_line}\n'
-        f'{checkpoint_line}\n'
-        f'{fc_line}\n'
-        f'{detection_block}'
-    )
+    ]
+    if checkpoint_line:
+        parts.append(f'{checkpoint_line}\n')
+    parts.append(f'{fc_line}\n')
+    if detection_block:
+        parts.append(detection_block)
+
+    return '\n'.join(parts)
 
 
 def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
@@ -415,13 +395,7 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
             'For file edits use the public file API tools; `lsp` is read-only. For file reads use `read`.'
         )
     else:
-        lsp_line = (
-            '- **Language servers (LSP)**: none detected on the host. The LSP '
-            'navigation tool is hidden from your toolset; fall back to '
-            '`search_code` + `read` for navigation. To enable it the user can install e.g. '
-            '`pip install python-lsp-server`, `npm i -g typescript-language-server`, '
-            '`rustup component add rust-analyzer`.'
-        )
+        lsp_line = ''
 
     if not debugger_enabled:
         dap_line = ''
@@ -435,10 +409,7 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
                 'pass `adapter_command` unless you have a custom binary.'
             )
         else:
-            dap_line = (
-                '- **Debug adapters (DAP / `debugger`)**: none detected (Python `debugpy` '
-                'normally ships bundled — if it is missing the install is broken).'
-            )
+            dap_line = ''
     return lsp_line, dap_line
 
 
@@ -469,6 +440,157 @@ def _render_security(cli_mode: bool = True) -> str:
     )
 
 
+def _build_context_discipline_section(
+    *,
+    working_memory_on: bool,
+    tracker_on: bool,
+    checkpoints_on: bool,
+    condensation_on: bool,
+) -> str:
+    parts = ['<CONTEXT_DISCIPLINE>']
+    parts.append(
+        'You have persistent context tools. Use them — context condensation is free '
+        'and silent; relying only on attention-backed context guarantees information loss.'
+    )
+
+    # note/recall are always available — unconditional include
+    parts.extend([
+        '',
+        '**note/recall** — facts that must survive across turns and new tasks:',
+        '- Decision made, constraint discovered, or secret revealed \u2192 note() immediately.',
+        '- Workspace architecture, DB URL, port mapping, test command \u2192 note().',
+        "- recall(key='all') at session start to re-ground; never recall 'lessons' twice this session.",
+    ])
+
+    if working_memory_on:
+        parts.extend([
+            '',
+            '**memory_manager** — your structured cognitive workspace for the current session:',
+            "- update section='hypothesis' when you form a theory; update 'findings' when you have evidence.",
+            "- update section='blockers' when something is stuck; update 'decisions' at each architectural pivot.",
+            '- Call memory_manager(get) before context re-reads you might skip.',
+        ])
+
+    if tracker_on:
+        parts.extend([
+            '',
+            '**task_tracker** — your structural anchor:',
+            '- task_tracker(update) with the full plan before starting engineering work.',
+            "- Update status \u2192 'doing' when starting, 'done' after proof, 'blocked' with reason.",
+            '- For multi-step tasks: task_tracker(view) at turn start to re-anchor.',
+        ])
+        if condensation_on:
+            if working_memory_on:
+                parts.append('  Post-condensation: task_tracker(view) first, then memory_manager(get) + scratchpad.')
+            else:
+                parts.append('  Post-condensation: task_tracker(view) first, then scratchpad.')
+
+    if checkpoints_on:
+        parts.extend([
+            '',
+            '**checkpoint** — before risky multi-file edits or destructive shell operations.',
+            'Do not edit in batches without one; checkpoint.save.name="batch before X".',
+        ])
+
+    parts.append('</CONTEXT_DISCIPLINE>')
+    return '\n'.join(parts)
+
+
+def _build_when_to_use_context(
+    *,
+    working_memory_on: bool,
+    tracker_on: bool,
+    checkpoints_on: bool,
+) -> str:
+    parts = ['<WHEN_TO_USE_CONTEXT>']
+    parts.append('- **note/recall**: Cross-turn persistence for facts, decisions, and discoveries.')
+    if working_memory_on:
+        parts.append('- **memory_manager**: In-session structured workspace for hypotheses, blockers, findings, and decisions.')
+    if tracker_on:
+        parts.append('- **task_tracker**: Engineering work planning and progress tracking — update before multi-step tasks, view at turn start.')
+    if checkpoints_on:
+        parts.append('- **checkpoint**: Before destructive or multi-file batch operations — save state so you can rollback.')
+    parts.append('</WHEN_TO_USE_CONTEXT>')
+    return '\n'.join(parts)
+
+
+def _build_mandatory_discipline_checkpoints(
+    *,
+    working_memory_on: bool,
+    tracker_on: bool,
+    checkpoints_on: bool,
+) -> str:
+    parts = ['<MANDATORY_DISCIPLINE_CHECKPOINTS>']
+    # Session start is always relevant
+    items = ["1. Session start \u2192 recall(key='all')"]
+    idx = 2
+    if tracker_on:
+        items.append(f"{idx}. For multi-step tasks \u2192 task_tracker(update) with full plan")
+        idx += 1
+        items.append(f"{idx}. At turn start during multi-step work \u2192 task_tracker(view)")
+        idx += 1
+    if checkpoints_on:
+        items.append(f"{idx}. Before destructive ops \u2192 checkpoint.save")
+        idx += 1
+    items.append(f"{idx}. On decision/pivot/discovery \u2192 note() or{' memory_manager(update) or' if working_memory_on else ''} note()")
+    parts.extend(items)
+    parts.append('</MANDATORY_DISCIPLINE_CHECKPOINTS>')
+    return '\n'.join(parts)
+
+
+def _build_risk_preview(
+    *,
+    tracker_on: bool,
+) -> str:
+    if not tracker_on:
+        return ''
+    return (
+        '<RISK_PREVIEW>\n'
+        'Before the **second** substantive milestone in one task (e.g. moving from core implementation work to tests or full build), '
+        'or when **task_tracker** shows **more than one** non-`done` item you still intend to touch: write **two** concrete failure '
+        'modes you could hit next (e.g. wrong public API vs wrong file; context loss between steps). '
+        'After each major milestone, one line: *did a predicted failure happen?* If yes, pivot using `<ERROR_RECOVERY>` above — '
+        'do not repeat the same failing move unchanged.\n'
+        '</RISK_PREVIEW>'
+    )
+
+
+def _build_autonomy_block(mode: str, *, checkpoints_on: bool) -> str:
+    cp_line = (
+        " Auto-save occurs before large writes; use 'checkpoint' tool to manually save logically safe states."
+        if checkpoints_on
+        else ''
+    )
+    from backend.core.interaction_modes import (
+        is_chat_mode,
+        is_plan_mode,
+    )
+    if is_chat_mode(mode):
+        return (
+            '<AUTONOMY>\n'
+            'Answer conversationally. Use tools only when investigation is needed. '
+            'Do not mutate files or run mutating commands without explicit user request.'
+            f'{cp_line}\n</AUTONOMY>'
+        )
+    if is_plan_mode(mode):
+        return (
+            '<AUTONOMY>\n'
+            'Inspect and produce a structured plan. Do not mutate files. '
+            'Do not run mutating commands. Finish with a plan covering the approach, '
+            'files to change, risks, and verification steps.'
+            f'{cp_line}\n</AUTONOMY>'
+        )
+    return (
+        '<AUTONOMY>\n'
+        "Plan, execute, and verify the user's task end-to-end. The runtime may "
+        'interrupt a tool call to surface a user decision; treat that decision as '
+        'authoritative and continue from where you stopped. On tool failure, make '
+        'the next action a corrected retry or a different tool (e.g. `read` \u2192 `edit_symbols`, '
+        'or `read` \u2192 `replace_string`) and auto-retry recoverable errors before reporting back.'
+        f'{cp_line}\n</AUTONOMY>'
+    )
+
+
 def _render_autonomy(
     render_partial: Callable[..., str],
     config: Any,
@@ -477,11 +599,87 @@ def _render_autonomy(
     windows_with_bash: bool,
     shell_is_powershell: bool,
 ) -> str:
-    checkpoints = getattr(config, 'enable_checkpoints', False)
-    cp_line = (
-        " Auto-save occurs before large writes; use 'checkpoint' tool to manually save logically safe states."
-        if checkpoints
+    from backend.core.interaction_modes import (
+        normalize_interaction_mode,
+    )
+    mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+    checkpoints_on = bool(getattr(config, 'enable_checkpoints', False))
+    working_memory_on = bool(getattr(config, 'enable_working_memory', True))
+    condensation_on = bool(getattr(config, 'enable_condensation_request', False))
+    tracker_on = bool(getattr(config, 'enable_task_tracker_tool', False))
+
+    autonomy_block = _build_autonomy_block(mode, checkpoints_on=checkpoints_on)
+    context_discipline = _build_context_discipline_section(
+        working_memory_on=working_memory_on,
+        tracker_on=tracker_on,
+        checkpoints_on=checkpoints_on,
+        condensation_on=condensation_on,
+    )
+    when_to_use_context = _build_when_to_use_context(
+        working_memory_on=working_memory_on,
+        tracker_on=tracker_on,
+        checkpoints_on=checkpoints_on,
+    )
+    mandatory_discipline_checkpoints = _build_mandatory_discipline_checkpoints(
+        working_memory_on=working_memory_on,
+        tracker_on=tracker_on,
+        checkpoints_on=checkpoints_on,
+    )
+    risk_preview = _build_risk_preview(tracker_on=tracker_on)
+
+    explore = _explore_hint(config)
+    path_hint = _path_uncertainty_hint(
+        explore,
+        is_windows=is_windows,
+        windows_with_bash=windows_with_bash,
+        shell_is_powershell=shell_is_powershell,
+    )
+    if tracker_on:
+        task_tracker_discipline_block = (
+            '<TASK_TRACKING>\n'
+            '**task_tracker**: For multi-step tasks, use `view` to inspect the plan and `update` to replace the full `task_list`.\n'
+            'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task without re-emitting the full list. Optional `result` field captures outcome.\n'
+            'Allowed statuses: `todo`, `doing`, `done`, `skipped`, `blocked`.\n'
+            '**Completion**: Put waiting tasks to `blocked` before calling `finish`.'
+            '</TASK_TRACKING>'
+        )
+    else:
+        task_tracker_discipline_block = ''
+
+    base_workflow = (
+        'Default loop: scope \u2192 reproduce \u2192 isolate \u2192 fix \u2192 verify.\n'
+        'For debug/fix tasks, re-run the same reproducer when possible.'
+    )
+    if tracker_on:
+        problem_solving_workflow_body = (
+            base_workflow
+            + '\n\nWith **task_tracker** enabled, treat **sync** as part of the loop: after verify, update the plan when progress changed.'
+        )
+        task_sync_instruction = '**Task synchronization:** Update `task_tracker` to `done`, `skipped`, or `blocked` before attempting to finish.'
+    else:
+        problem_solving_workflow_body = base_workflow
+        task_sync_instruction = '**Plan synchronization:** Keep your working memory and finish summary aligned with what was actually completed before attempting to finish.'
+
+    lsp_avail = _lsp_available(config)
+    error_recovery_pivot_lines = (
+            '- `search_code` \u2192 `lsp` (check locally with the language server; no shell grep)\n'
+            '- `lsp` \u2192 `search_code` (wider text search)'
+        if lsp_avail
         else ''
+    )
+
+    return render_partial(
+        'system_partial_01_autonomy.md',
+        autonomy_block=autonomy_block,
+        context_discipline=context_discipline,
+        when_to_use_context=when_to_use_context,
+        mandatory_discipline_checkpoints=mandatory_discipline_checkpoints,
+        risk_preview=risk_preview,
+        task_tracker_discipline_block=task_tracker_discipline_block,
+        task_sync_instruction=task_sync_instruction,
+        path_discovery_hint=path_hint,
+        problem_solving_workflow_body=problem_solving_workflow_body,
+        error_recovery_pivot_lines=error_recovery_pivot_lines,
     )
 
     # Single mode-agnostic instruction. The runtime confirmation gate decides
@@ -616,9 +814,9 @@ def _render_tool_reference(
             '**Examples**\n'
             '- Find candidates: `find_symbols(query="authenticate")`.\n'
             '- Read symbols: `read(type="symbols", symbols=[{"qualified_name": "authenticate_user"}, {"qualified_name": "UserService"}])`.\n'
-            '- README/config add: `replace_string("## Usage\\n", "## Usage\\n\\nExample:\\n...")`.\n'
-            '- Delete: `replace_string(old_string="old config block", new_string="")`.\n'
-            '- Modify method: `edit_symbols(edits=[{"path": "src/auth.py", "qualified_name": "AuthService.login", "symbol_kind": "method", "new_content": "def login(...):\\n    ..."}])`.\n'
+            '- APPEND config: `replace_string(old_string="# END CONFIG", new_string="new_key=new_value\\n# END CONFIG")` — anchor to a unique line, then insert before it.\n'
+            '- DELETE: `replace_string(old_string="old config block", new_string="")`.\n'
+            '- Code/content payloads must represent normal source text. Do not include literal backslash-n sequences unless the target file actually requires them. Transport escaping is handled by the tool API; do not serialize code yourself.\n'
             '- Multiple functions: `edit_symbols`; implementation + tests: `multiedit`.\n'
             '</EDITOR_AND_FILE_OPERATIONS>'
         )
@@ -638,6 +836,8 @@ def _render_critical(
     terminal_command_tool: str,
     *,
     terminal_manager_available: bool,
+    tracker_on: bool,
+    checkpoints_on: bool,
     meta_cognition_on: bool,
 ) -> str:
     """Render last-mile critical execution rules with dynamic terminal tool naming."""
@@ -648,7 +848,27 @@ def _render_critical(
             '**Rules**: 1) Reuse `session_id`, 2) Use `mode=delta` when reading, 3) Wait for output instead of repeating inputs.'
         )
     else:
-        terminal_manager_rule = f'**Interactive terminal sessions are unavailable in this run** — do not refer to `terminal_manager`; use `{terminal_command_tool}` for non-interactive command execution only.'
+        terminal_manager_rule = ''
+
+    task_tracker_antipattern = (
+        '- **Calling `finish` with `task_tracker` items still `todo` or `doing`.** Sync the tracker first.'
+        if tracker_on
+        else ''
+    )
+
+    destructive_ops_antipattern = (
+        '- **Running `rm`, `Remove-Item`, force pushes, or other destructive ops without explicit confirmation from the confirmation gate.**'
+        + (' If available, take a `checkpoint` first.' if checkpoints_on else '')
+        if True
+        else ''
+    )
+
+    planning_tool_list = (
+        '`task_tracker`, `{terminal_command_tool}`, and the public file API tools'
+        if tracker_on
+        else '`{terminal_command_tool}` and the public file API tools'
+    )
+
     user_question_antipattern = (
         '**Asking the user a question in plain prose mid-turn** when `communicate_with_user` is available. The turn must end so the user can answer.'
         if meta_cognition_on
@@ -659,6 +879,9 @@ def _render_critical(
         terminal_command_tool=terminal_command_tool,
         terminal_manager_rule=terminal_manager_rule,
         think_execution_rule=think_execution_rule,
+        task_tracker_antipattern=task_tracker_antipattern,
+        destructive_ops_antipattern=destructive_ops_antipattern,
+        planning_tool_list=planning_tool_list,
         user_question_antipattern=user_question_antipattern,
     )
 

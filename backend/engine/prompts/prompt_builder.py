@@ -68,11 +68,6 @@ if TYPE_CHECKING:
     )
 
 
-def _multi_edit_tool_available() -> bool:
-    """Return True when atomic multi-edit is exposed to the model."""
-    return False
-
-
 def _provider_parallel_tool_calls_supported(model_id: str) -> bool:
     """Return True when the active model's catalog entry advertises parallel tool_calls.
 
@@ -195,12 +190,16 @@ def _render_critical(
     terminal_command_tool: str,
     *,
     terminal_manager_available: bool,
+    tracker_on: bool,
+    checkpoints_on: bool,
     meta_cognition_on: bool,
 ) -> str:
     return _render_critical_impl(
         _render_partial,
         terminal_command_tool,
         terminal_manager_available=terminal_manager_available,
+        tracker_on=tracker_on,
+        checkpoints_on=checkpoints_on,
         meta_cognition_on=meta_cognition_on,
     )
 
@@ -417,7 +416,6 @@ def _collect_system_prompt_sections(
             _render_system_capabilities_impl(
                 config,
                 function_calling_mode=function_calling_mode,
-                multi_edit_available=_multi_edit_tool_available(),
                 parallel_tool_calls_provider_flag=_provider_parallel_tool_calls_supported(
                     model_id
                 ),
@@ -460,6 +458,8 @@ def _collect_system_prompt_sections(
                 terminal_manager_available=bool(
                     getattr(config, 'enable_terminal', True)
                 ),
+                tracker_on=bool(getattr(config, 'enable_task_tracker_tool', False)),
+                checkpoints_on=bool(getattr(config, 'enable_checkpoints', False)),
                 meta_cognition_on=bool(getattr(config, 'enable_meta_cognition', False)),
             ),
         ),

@@ -467,7 +467,6 @@ def create_controller(
             enable_parallel_tool_scheduling=bool(
                 getattr(agent.config, 'enable_parallel_tool_scheduling', False)
             ),
-            file_state_guard=config.security.file_state_guard,
         )
     )
     # Store the runtime so downstream code (worker delegation, middleware)

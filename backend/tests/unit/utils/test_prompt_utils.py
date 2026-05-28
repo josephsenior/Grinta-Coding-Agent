@@ -245,10 +245,6 @@ class TestOrchestratorPromptManager:
 
         assert '`memory_manager(action="working_memory")`' not in result
         assert '`memory_manager(action="semantic_recall", key=...)`' not in result
-        assert (
-            'No structured within-session working-memory tool is available in this run'
-            in result
-        )
 
     def test_get_system_message_uses_lsp_when_lsp_is_available(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -319,7 +315,7 @@ class TestOrchestratorPromptManager:
         result = opm.get_system_message()
 
         assert '`terminal_manager action=open`' not in result
-        assert 'do not refer to `terminal_manager`' in result
+        assert 'do not refer to `terminal_manager`' not in result
 
     def test_build_knowledge_base_info(self, tmp_path):
         from backend.utils.prompt import PromptManager
@@ -639,6 +635,7 @@ class TestPromptBudgetRegression:
 def _base_config(**overrides: object) -> SimpleNamespace:
     """Minimal config SimpleNamespace with safe defaults for prompt rendering tests."""
     return SimpleNamespace(
+        mode=str(overrides.get('mode', 'agent')),
         autonomy_level=overrides.get('autonomy_level', 'balanced'),
         enable_checkpoints=bool(overrides.get('enable_checkpoints', False)),
         enable_lsp_query=bool(overrides.get('enable_lsp_query', False)),
@@ -786,28 +783,12 @@ def test_system_capabilities_skips_lsp_dap_discovery_hint_when_both_gated_off() 
     text = _render_system_capabilities(
         cfg,
         function_calling_mode='native',
-        multi_edit_available=False,
         parallel_tool_calls_provider_flag=False,
     )
     assert 'Get-Command' not in text
 
 
-def test_system_capabilities_mentions_both_atomic_batch_editors_when_available() -> None:
-    from backend.engine.prompts.section_renderers import _render_system_capabilities
 
-    cfg = SimpleNamespace(
-        enable_parallel_tool_scheduling=False,
-        enable_checkpoints=False,
-        enable_lsp_query=False,
-        enable_debugger=False,
-    )
-    text = _render_system_capabilities(
-        cfg,
-        function_calling_mode='native',
-        multi_edit_available=True,
-        parallel_tool_calls_provider_flag=False,
-    )
-    assert 'Atomic multi-file edits' in text
 
 
 class TestBuildSystemPromptRenders:
@@ -957,7 +938,7 @@ class TestBuildSystemPromptRenders:
             config=_base_config(enable_terminal=False),
             function_calling_mode='native',
         )
-        assert 'terminal_manager' not in result or 'do not refer to' in result
+        assert 'do not refer to `terminal_manager`' not in result
 
     def test_lsp_available(self) -> None:
         with patch(
@@ -980,3 +961,80 @@ class TestBuildSystemPromptRenders:
         )
         assert 'Tool-call batching mode:' in result
         assert '- **Function-calling mode**: `unknown`.' in result
+
+    # --- Prompt lint tests ---
+
+    STALE_TOOL_NAMES = [
+        'read_file', 'read_range', 'read_symbol',
+        'create_file',
+        'replace_symbol', 'insert_symbol',
+    ]
+
+    OLD_EDIT_FORMATS = [
+        'XML edit block',
+        'raw editor block',
+        'apply_patch',
+        'heredoc source write',
+    ]
+
+    def test_no_stale_tool_names(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(),
+            function_calling_mode='native',
+        )
+        for stale in self.STALE_TOOL_NAMES:
+            assert stale not in result, f'Stale tool name {stale!r} found in rendered prompt'
+
+    def test_no_old_edit_formats(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(),
+            function_calling_mode='native',
+        )
+        for fmt in self.OLD_EDIT_FORMATS:
+            assert fmt not in result, f'Old edit format {fmt!r} found in rendered prompt'
+
+    def test_no_disabled_tools_when_off(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(
+                enable_task_tracker_tool=False,
+                enable_checkpoints=False,
+                enable_working_memory=False,
+            ),
+            function_calling_mode='native',
+        )
+        # The tool names themselves should not appear when disabled
+        assert 'task_tracker' not in result, (
+            'task_tracker mentioned when tool is disabled'
+        )
+        assert 'checkpoint' not in result, (
+            'checkpoint mentioned when tool is disabled'
+        )
+        assert 'memory_manager' not in result, (
+            'memory_manager mentioned when tool is disabled'
+        )
+
+    def test_plan_mode_omits_mutation_tools(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(mode='plan'),
+            function_calling_mode='native',
+        )
+        assert 'Plan, execute, and verify' not in result
+        assert '<AUTONOMY>' in result
+
+    def test_chat_mode_avoids_execution_language(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(mode='chat'),
+            function_calling_mode='native',
+        )
+        assert '<AUTONOMY>' in result
+        assert 'mutate files' in result or 'investigation' in result

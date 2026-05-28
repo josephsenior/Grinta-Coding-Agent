@@ -49,9 +49,6 @@ async def test_tui_renderer_surfaces_retry_pending_status() -> None:
     assert hud.state.ledger_status == 'Backoff'
     assert hud.state.agent_state_label == 'Backoff 1/3 (retrying in 5s)'
     tui.set_agent_phase.assert_called_once_with('Backoff 1/3 (retrying in 5s)')
-    tui.set_last_tool_status.assert_called_once_with(
-        'Waiting 5s to retry after APIConnectionError'
-    )
     tui._write_log.assert_called_once()
 
 

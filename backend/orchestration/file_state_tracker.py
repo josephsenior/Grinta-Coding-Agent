@@ -4,14 +4,10 @@ Maintains a manifest of files read, modified, and created during a session.
 The manifest path for on-disk persistence (when used) is under
 ``~/.grinta/workspaces/<id>/agent/file_manifest.json``; the in-memory summary
 is injected into context via the planner.
-
-Read snapshots (mtime + content hash) support Claude-style staleness detection:
-if disk changes after a read, edits can be blocked until the model re-reads.
 """
 
 from __future__ import annotations
 
-import hashlib
 import os
 import re
 import time
@@ -36,7 +32,6 @@ def file_manifest_path() -> Path:
 
 
 _MAX_TRACKED_FILES = 50
-_MAX_READ_SNAPSHOTS = 50
 
 
 @dataclass
@@ -44,14 +39,6 @@ class FileEntry:
     path: str
     action: str  # "read", "modified", "created"
     timestamp: float = field(default_factory=time.time)
-
-
-@dataclass(frozen=True)
-class ReadSnapshot:
-    """Disk state observed after a read (Claude-style readFileState + mtime)."""
-
-    mtime: float
-    content_sha256: str
 
 
 def _normalize_path_key(path_str: str) -> str | None:
@@ -74,87 +61,19 @@ class FileStateTracker:
 
     def __init__(self) -> None:
         self._files: dict[str, FileEntry] = {}
-        self._read_snapshots: dict[str, ReadSnapshot] = {}
 
     def record(self, path: str, action: str) -> None:
         if not path:
             return
-        # Upgrade action priority: created > modified > read
         existing = self._files.get(path)
         priority = {'read': 0, 'modified': 1, 'created': 2}
         if existing and priority.get(existing.action, 0) >= priority.get(action, 0):
             existing.timestamp = time.time()
             return
         self._files[path] = FileEntry(path=path, action=action)
-        # Evict oldest if over limit
         if len(self._files) > _MAX_TRACKED_FILES:
             oldest_key = min(self._files, key=lambda k: self._files[k].timestamp)
             del self._files[oldest_key]
-            self._read_snapshots.pop(oldest_key, None)
-        # Independently evict stale read snapshots to prevent unbounded growth
-        if len(self._read_snapshots) > _MAX_READ_SNAPSHOTS:
-            stale_keys = [k for k in self._read_snapshots if k not in self._files]
-            for k in stale_keys:
-                del self._read_snapshots[k]
-
-    def record_read_snapshot_from_disk(self, path_str: str) -> None:
-        """Store mtime + sha256 of file bytes after a read (for staleness checks)."""
-        key = _normalize_path_key(path_str)
-        if not key:
-            return
-        try:
-            p = Path(key)
-            if not p.is_file():
-                return
-            st = p.stat()
-            digest = hashlib.sha256(p.read_bytes()).hexdigest()
-            self._read_snapshots[key] = ReadSnapshot(
-                mtime=st.st_mtime,
-                content_sha256=digest,
-            )
-        except OSError:
-            logger.debug('record_read_snapshot_from_disk failed for %s', path_str)
-
-    def invalidate_read_snapshot(self, path_str: str) -> None:
-        key = _normalize_path_key(path_str)
-        if key:
-            self._read_snapshots.pop(key, None)
-
-    def check_read_stale(self, path_str: str, guard_override: bool | None = None) -> str | None:
-        """Return error message if disk changed since snapshot; else None."""
-        if not _file_state_guard_enabled(guard_override):
-            return None
-        key = _normalize_path_key(path_str)
-        if not key:
-            return None
-        snap = self._read_snapshots.get(key)
-        if snap is None:
-            return None
-        try:
-            p = Path(key)
-            if not p.is_file():
-                return None
-            st = p.stat()
-            digest = hashlib.sha256(p.read_bytes()).hexdigest()
-            logger.debug(
-                'File read stale check compare',
-                extra={
-                    'msg_type': 'FILE_STALE_CHECK',
-                    'path': path_str,
-                    'current_mtime': st.st_mtime,
-                    'snapshot_mtime': snap.mtime,
-                    'mtime_advanced': st.st_mtime > snap.mtime,
-                    'digest_equal': digest == snap.content_sha256,
-                },
-            )
-            if digest == snap.content_sha256:
-                return None
-        except OSError:
-            return None
-        return (
-            f'[FILE_STATE_GUARD] File changed on disk since it was read '
-            f'(path {path_str!r}). Read it again before editing.'
-        )
 
     def get_summary(self) -> str:
         """Return a compact summary of tracked files for injection into context."""
@@ -192,32 +111,7 @@ class FileStateTracker:
                 )
 
 
-def _file_state_guard_enabled(override: bool | None = None) -> bool:
-    """Single gate for all file-state-guard checks.
 
-    Priority: explicit override > env var > default True.
-    """
-    if override is not None:
-        return override
-    for var in ('GRINTA_FILE_STATE_GUARD', 'SECURITY_FILE_STATE_GUARD'):
-        raw = os.environ.get(var, '').strip().lower()
-        if raw in ('0', 'false', 'no', 'off'):
-            return False
-        if raw in ('1', 'true', 'yes', 'on'):
-            return True
-    return True
-
-
-_READ_BEFORE_EDIT_COMMANDS: frozenset[str] = frozenset(
-    {
-        'insert_text',
-        'edit',
-        'str_replace',
-        'replace_string',
-        # `create_file` and `write` supply the entire file body — no anchor
-        # text can mismatch — so they do not require a prior read.
-    }
-)
 
 _MUTATING_EDIT_COMMANDS: frozenset[str] = frozenset(
     {
@@ -302,72 +196,18 @@ def _find_symbol_references(
     return '\n'.join(report)
 
 
-def _read_before_edit_enforced(override: bool | None = None) -> bool:
-    """Read-before-edit guard. Controlled by GRINTA_FILE_STATE_GUARD."""
-    return _file_state_guard_enabled(override)
-
-
 class FileStateMiddleware(ToolInvocationMiddleware):
-    """Middleware that blocks unknown file edits and records file operations."""
+    """Middleware that records file operations."""
 
-    def __init__(self, file_state_guard: bool | None = None) -> None:
+    def __init__(self) -> None:
         self._tracker = FileStateTracker()
-        self._file_state_guard = file_state_guard
 
     @property
     def tracker(self) -> FileStateTracker:
         return self._tracker
 
     async def execute(self, ctx: ToolInvocationContext) -> None:
-        action = ctx.action
-        action_cls = type(action).__name__
-
-        # Enforce read-before-edit for file modifications
-        requires_read_check = False
-        target_path = ''
-        mutating_edit = False
-
-        if action_cls == 'FileEditAction':
-            command = getattr(action, 'command', '') or 'write'
-            if command in _READ_BEFORE_EDIT_COMMANDS and _read_before_edit_enforced(self._file_state_guard):
-                requires_read_check = True
-                target_path = getattr(action, 'path', '')
-            if command in _MUTATING_EDIT_COMMANDS:
-                mutating_edit = True
-                target_path = target_path or getattr(action, 'path', '')
-
-        if requires_read_check and target_path:
-            is_known = self._tracker.has_been_read_recently(
-                target_path
-            ) or self._tracker.has_been_modified_recently(target_path)
-            # Skip the read-before-edit guard when the file does not yet
-            # exist — this is a common pattern for "create-then-edit" flows
-            # where the first edit supplies the initial body. ``create_file``
-            # is already excluded by command allowlist above.
-            if not is_known:
-                try:
-                    exists = Path(target_path).expanduser().is_file()
-                except OSError:
-                    exists = True
-                if not exists:
-                    return
-                ctx.block(
-                    '[FILE_STATE_GUARD] File has not been read yet in this '
-                    f'session: {target_path}. Read it first (use read_file or '
-                    'grep to locate the exact text) before editing, otherwise '
-                    'your range / anchor context will likely not match.',
-                    agent_only=True,
-                )
-
-        if (
-            not ctx.blocked
-            and mutating_edit
-            and target_path
-            and action_cls == 'FileEditAction'
-        ):
-            stale_msg = self._tracker.check_read_stale(target_path, self._file_state_guard)
-            if stale_msg:
-                ctx.block(stale_msg, agent_only=True)
+        pass
 
     async def observe(
         self, ctx: ToolInvocationContext, observation: Observation | None
@@ -398,23 +238,19 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                     mutated_path = path
                 elif command == 'read_file':
                     self._tracker.record(path, 'read')
-                    self._tracker.record_read_snapshot_from_disk(path)
                 else:
                     self._tracker.record(path, 'modified')
-                    self._tracker.invalidate_read_snapshot(path)
                     mutated_path = path
             elif action_cls == 'FileReadAction':
                 if observation_failed:
                     return
                 path = getattr(action, 'path', '')
                 self._tracker.record(path, 'read')
-                self._tracker.record_read_snapshot_from_disk(path)
             elif action_cls == 'FileWriteAction':
                 if observation_failed:
                     return
                 path = getattr(action, 'path', '')
                 self._tracker.record(path, 'created')
-                self._tracker.invalidate_read_snapshot(path)
                 mutated_path = path
         except Exception:
             logger.debug('FileStateMiddleware: failed to record action', exc_info=True)
