@@ -62,7 +62,6 @@ class OrchestrationConfig:
     sid: str | None = None
     file_store: FileStore | None = None
     user_id: str | None = None
-    confirmation_mode: bool = False
     initial_state: State | None = None
     headless_mode: bool = True
     status_callback: Callable | None = None

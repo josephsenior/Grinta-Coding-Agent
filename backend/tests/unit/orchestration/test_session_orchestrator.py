@@ -287,7 +287,6 @@ async def test_init_registers_main_event_loop(
             initial_state=None,
             iteration_delta=10,
             budget_per_task_delta=1.0,
-            confirmation_mode=None,
             replay_events=None,
             agent_to_llm_config={},
             agent_configs={},
@@ -796,9 +795,9 @@ class TestStateHelpers(unittest.TestCase):
 
     def test_set_initial_state(self):
         stats = MagicMock()
-        self.ctrl.set_initial_state(None, stats, 100, 10.0, True)
+        self.ctrl.set_initial_state(None, stats, 100, 10.0)
         self.ctrl.state_tracker.set_initial_state.assert_called_once_with(
-            'test-sid', None, stats, 100, 10.0, True
+            'test-sid', None, stats, 100, 10.0
         )
 
 
@@ -1332,17 +1331,17 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         self,
     ):
         success_action = SimpleNamespace(
-            action='read_file',
+            action='read',
             id=101,
             tool_call_metadata=MagicMock(),
         )
         failed_action = SimpleNamespace(
-            action='read_file',
+            action='read',
             id=102,
             tool_call_metadata=MagicMock(),
         )
         overflow_action = SimpleNamespace(
-            action='read_file',
+            action='read',
             id=103,
             tool_call_metadata=MagicMock(),
         )

@@ -874,7 +874,6 @@ class EventRouterService:
                     headless_mode=True,  # No UI for sub-agent
                     agent_to_llm_config=agent_to_llm_config,
                     agent_configs=agent_configs,
-                    confirmation_mode=False,
                     security_analyzer=parent_config.security_analyzer,
                     blackboard=shared_blackboard,
                     pending_action_timeout=parent_config.pending_action_timeout,

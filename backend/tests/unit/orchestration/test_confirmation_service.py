@@ -21,7 +21,6 @@ def _make_context(**overrides) -> MagicMock:
     controller._replay_manager.should_replay.return_value = False
     controller._replay_manager.replay_mode = False
     controller.state = MagicMock()
-    controller.state.confirmation_mode = overrides.get('confirmation_mode', False)
     ctx = MagicMock()
     ctx.get_controller.return_value = controller
     ctx.set_agent_state = AsyncMock()
@@ -101,16 +100,8 @@ class TestReplayProperties:
 
 class TestEvaluateAction:
     @pytest.mark.asyncio
-    async def test_skips_when_not_confirmation_mode(self):
-        ctx = _make_context(confirmation_mode=False)
-        ss = _make_safety_service()
-        svc = ConfirmationService(ctx, ss)
-        await svc.evaluate_action(cast(Action, SimpleNamespace()))
-        ss.action_requires_confirmation.assert_not_called()
-
-    @pytest.mark.asyncio
     async def test_skips_non_confirmable(self):
-        ctx = _make_context(confirmation_mode=True)
+        ctx = _make_context()
         ss = _make_safety_service()
         ss.action_requires_confirmation.return_value = False
         svc = ConfirmationService(ctx, ss)
@@ -119,7 +110,7 @@ class TestEvaluateAction:
 
     @pytest.mark.asyncio
     async def test_runs_full_pipeline(self):
-        ctx = _make_context(confirmation_mode=True)
+        ctx = _make_context()
         ss = _make_safety_service()
         ss.action_requires_confirmation.return_value = True
         svc = ConfirmationService(ctx, ss)

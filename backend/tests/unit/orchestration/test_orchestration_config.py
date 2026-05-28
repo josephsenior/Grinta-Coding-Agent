@@ -92,7 +92,6 @@ class TestOrchestrationConfig:
                 'sid': None,
                 'file_store': None,
                 'user_id': None,
-                'confirmation_mode': False,
                 'initial_state': None,
                 'headless_mode': True,
                 'status_callback': None,
@@ -122,7 +121,6 @@ class TestOrchestrationConfig:
             sid='session_123',
             file_store=mock_file_store,
             user_id='user_456',
-            confirmation_mode=True,
             initial_state=mock_state,
             headless_mode=False,
             status_callback=mock_callback,
@@ -133,7 +131,6 @@ class TestOrchestrationConfig:
         assert config.budget_per_task_delta == 100.5
         assert config.sid == 'session_123'
         assert config.user_id == 'user_456'
-        assert config.confirmation_mode is True
         assert config.headless_mode is False
         assert config.replay_events is not None
         assert len(config.replay_events) == 2
@@ -148,17 +145,6 @@ class TestOrchestrationConfig:
         )
 
         assert config.headless_mode is True
-
-    def test_confirmation_mode_default_false(self):
-        """Test confirmation_mode defaults to False."""
-        config = OrchestrationConfig(
-            agent=MagicMock(spec=Agent),
-            event_stream=MagicMock(spec=EventStream),
-            conversation_stats=MagicMock(),
-            iteration_delta=10,
-        )
-
-        assert config.confirmation_mode is False
 
 
 class TestOrchestrationServices:

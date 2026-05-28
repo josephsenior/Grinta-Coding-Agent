@@ -98,10 +98,10 @@ class TestShouldRequestConfirmation:
         action = CmdRunAction(command='shutdown -h now')
         assert ctrl.should_request_confirmation(action) is True
 
-    def test_balanced_file_edit_not_high_risk(self):
+    def test_balanced_file_edit_is_high_risk(self):
         ctrl = self._make('balanced')
         action = FileEditAction(path='/tmp/test.py', new_str='pass')
-        assert ctrl.should_request_confirmation(action) is False
+        assert ctrl.should_request_confirmation(action) is True
 
     def test_balanced_file_write_not_high_risk(self):
         ctrl = self._make('balanced')

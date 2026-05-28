@@ -394,20 +394,6 @@ class ActivityCard(Container):
     def _get_formatted_extra_content(self) -> Any:
         content = self._extra_content or ''
 
-        if self._diff_encoded:
-            cleaned_lines = []
-            for line in content.splitlines():
-                split_decoded = _decode_split_diff_line(line)
-                if split_decoded is not None:
-                    cleaned_lines.append(f'{split_decoded[0]} | {split_decoded[1]}')
-                    continue
-                decoded = _decode_diff_line(line)
-                if decoded is not None:
-                    cleaned_lines.append(decoded[1])
-                else:
-                    cleaned_lines.append(line)
-            return '\n'.join(cleaned_lines)
-
         if '[on #' in content:
             return content
 
@@ -626,22 +612,6 @@ class ActivityCard(Container):
             meta.display = not self._collapsed
         except Exception:
             pass
-
-
-class TurnDivider(Static):
-    """A visual divider between agent turns."""
-
-    DEFAULT_CSS = """
-    TurnDivider {
-        width: 100%;
-        height: 1;
-        color: $text-muted;
-    }
-    """
-
-    def __init__(self, *, id: str | None = None) -> None:
-        super().__init__(id=id)
-        self.update('[dim #32416a]────────────────────────────────────────[/dim]')
 
 
 class TurnCompletion(Static):

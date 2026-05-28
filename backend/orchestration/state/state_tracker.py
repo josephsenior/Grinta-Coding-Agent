@@ -75,7 +75,6 @@ class StateTracker:
         conversation_stats: ConversationStats,
         max_iterations: int,
         max_budget_per_task: float | None,
-        confirmation_mode: bool = False,
     ) -> None:
         """Set the initial state for the agent.
 
@@ -87,7 +86,6 @@ class StateTracker:
             conversation_stats: Statistics for the conversation.
             max_iterations: The maximum number of iterations allowed for the task.
             max_budget_per_task: The maximum budget allowed for the task.
-            confirmation_mode: Whether to enable confirmation mode.
 
         """
         if state is None:
@@ -110,7 +108,6 @@ class StateTracker:
                     if max_budget_per_task
                     else None
                 ),
-                confirmation_mode=confirmation_mode,
             )
             self.state.start_id = 0
             logger.info(

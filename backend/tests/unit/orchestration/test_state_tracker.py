@@ -78,13 +78,11 @@ class TestStateTrackerInit:
             conversation_stats=stats,
             max_iterations=200,
             max_budget_per_task=5.0,
-            confirmation_mode=True,
         )
         assert st.state.session_id == 's1'
         assert st.state.iteration_flag.max_value == 200
         assert st.state.budget_flag is not None
         assert st.state.budget_flag.max_value == 5.0
-        assert st.state.confirmation_mode is True
         assert st.state.start_id == 0
 
     def test_set_initial_state_existing(self):

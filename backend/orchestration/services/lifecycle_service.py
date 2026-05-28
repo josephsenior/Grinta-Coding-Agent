@@ -77,7 +77,6 @@ class LifecycleService:
         conversation_stats: ConversationStats,
         iteration_delta: int,
         budget_per_task_delta: float | None,
-        confirmation_mode: bool,
         replay_events: list[Event] | None,
     ) -> None:
         """Prepare state tracker, stuck detector, and replay manager."""
@@ -88,9 +87,7 @@ class LifecycleService:
             conversation_stats=conversation_stats,
             max_iterations=iteration_delta,
             max_budget_per_task=budget_per_task_delta,
-            confirmation_mode=confirmation_mode,
         )
-        controller.confirmation_mode = confirmation_mode
         controller._replay_manager = ReplayManager(replay_events)
 
     def initialize_agent_configs(

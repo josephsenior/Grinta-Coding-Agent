@@ -460,7 +460,6 @@ def create_controller(
             event_stream=event_stream,
             initial_state=initial_state,
             headless_mode=headless_mode,
-            confirmation_mode=config.security.confirmation_mode,
             replay_events=replay_events,
             security_analyzer=runtime.security_analyzer,
             pending_action_timeout=config.pending_action_timeout,

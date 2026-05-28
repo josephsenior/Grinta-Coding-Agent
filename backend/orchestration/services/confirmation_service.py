@@ -138,10 +138,6 @@ class ConfirmationService:
 
     async def evaluate_action(self, action: Action) -> None:
         """Run confirmation policy checks for a runnable action."""
-        controller = self._context.get_controller()
-        if not controller.state.confirmation_mode:
-            return
-
         if not self._safety_service.action_requires_confirmation(action):
             return
 

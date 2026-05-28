@@ -271,8 +271,8 @@ class TestHighRiskDetection:
         action = FileWriteAction(path='/tmp/test.txt', content='test')
         assert controller._is_high_risk_action(action) is False
 
-    def test_file_edit_not_high_risk(self):
-        """FileEditAction should not be flagged as high-risk."""
+    def test_file_edit_is_high_risk(self):
+        """FileEditAction should be flagged as high-risk in balanced mode."""
         config = MagicMock()
         config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
@@ -280,7 +280,7 @@ class TestHighRiskDetection:
         action = FileEditAction(
             path='/tmp/test.txt', start_line=1, end_line=1, new_str='new'
         )
-        assert controller._is_high_risk_action(action) is False
+        assert controller._is_high_risk_action(action) is True
 
     def test_file_read_not_high_risk(self):
         """FileReadAction should not be flagged as high-risk."""

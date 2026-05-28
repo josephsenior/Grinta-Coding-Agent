@@ -106,7 +106,6 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
     headless_mode: bool
     status_callback: Callable | None
     security_analyzer: SecurityAnalyzer | None
-    confirmation_mode: bool
     agent_to_llm_config: dict[str, LLMConfig]
     agent_configs: dict[str, AgentConfig]
     _initial_max_iterations: int
@@ -191,7 +190,6 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             config.conversation_stats,
             config.iteration_delta,
             config.budget_per_task_delta,
-            config.confirmation_mode,
             config.replay_events,
         )
 
@@ -1241,7 +1239,6 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         conversation_stats: ConversationStats,
         max_iterations: int,
         max_budget_per_task: float | None,
-        confirmation_mode: bool = False,
     ) -> None:
         """Set the initial state for the agent controller.
 
@@ -1250,7 +1247,6 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             conversation_stats: Statistics tracker for the conversation
             max_iterations: Maximum number of agent iterations allowed
             max_budget_per_task: Maximum budget in USD per task
-            confirmation_mode: Whether to require user confirmation for actions
 
         """
         self.state_tracker.set_initial_state(
@@ -1259,7 +1255,6 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             conversation_stats,
             max_iterations,
             max_budget_per_task,
-            confirmation_mode,
         )
         self.state_tracker._init_history(self.event_stream)  # type: ignore[attr-defined]  # bootstrap wiring
 

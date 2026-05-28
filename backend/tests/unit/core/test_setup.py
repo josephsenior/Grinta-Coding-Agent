@@ -189,7 +189,6 @@ def test_create_controller(mock_controller_cls, mock_restore):
     mock_config.pending_action_timeout = 60.0
     mock_config.get_agent_to_llm_config_map.return_value = {}
     mock_config.security = MagicMock()
-    mock_config.security.confirmation_mode = False
 
     # Test success restoration
     mock_restore.return_value = MagicMock()

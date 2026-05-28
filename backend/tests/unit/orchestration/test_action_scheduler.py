@@ -10,6 +10,13 @@ from backend.orchestration.action_scheduler import ActionScheduler
 @dataclass
 class _FakeAction:
     action: str
+    name: str = ''
+
+
+@dataclass
+class _FakeMCPAction:
+    action: str = 'call_tool_mcp'
+    name: str = ''
 
 
 def test_decide_parallel_batch_disabled() -> None:
@@ -27,21 +34,32 @@ def test_decide_parallel_batch_requires_multiple_actions() -> None:
     assert decision.reason == 'insufficient_actions'
 
 
-def test_decide_parallel_batch_allows_parallel_safe_actions() -> None:
+def test_decide_parallel_batch_allows_parallel_safe_action_types() -> None:
     scheduler = ActionScheduler(enabled=True)
-    actions = [_FakeAction('read'), _FakeAction('search_code')]
+    actions = [_FakeAction('read'), _FakeAction('lsp_query')]
     decision = scheduler.decide_parallel_batch(actions)
     assert decision.should_execute_parallel is True
     assert decision.reason == 'parallel_safe_batch'
     assert list(decision.actions) == actions
 
 
-def test_decide_parallel_batch_rejects_mixed_action_sets() -> None:
+def test_decide_parallel_batch_allows_parallel_safe_mcp_tools() -> None:
     scheduler = ActionScheduler(enabled=True)
-    actions = [_FakeAction('read'), _FakeAction('execute_bash')]
+    actions = [
+        _FakeMCPAction(name='search_code'),
+        _FakeMCPAction(name='get_entity'),
+    ]
+    decision = scheduler.decide_parallel_batch(actions)
+    assert decision.should_execute_parallel is True
+    assert decision.reason == 'parallel_safe_batch'
+
+
+def test_decide_parallel_batch_degrades_mixed_batch_to_sequential() -> None:
+    scheduler = ActionScheduler(enabled=True)
+    actions = [_FakeAction('read'), _FakeAction('run')]
     decision = scheduler.decide_parallel_batch(actions)
     assert decision.should_execute_parallel is False
-    assert decision.reason == 'contains_non_parallel_safe_action'
+    assert decision.reason == 'mixed_batch_sequential'
 
 
 def test_decide_parallel_batch_caps_large_batches() -> None:

@@ -242,7 +242,6 @@ class TestStateInitialization:
                 'session_id': '',
                 'user_id': None,
                 'agent_state': AgentState.LOADING,
-                'confirmation_mode': False,
                 'history': [],
                 'inputs': {},
                 'outputs': {},
@@ -257,13 +256,11 @@ class TestStateInitialization:
         state = State(
             session_id='test123',
             user_id='user456',
-            confirmation_mode=True,
             delegate_level=2,
         )
 
         assert state.session_id == 'test123'
         assert state.user_id == 'user456'
-        assert state.confirmation_mode is True
         assert state.delegate_level == 2
 
     def test_iteration_flag_default(self):

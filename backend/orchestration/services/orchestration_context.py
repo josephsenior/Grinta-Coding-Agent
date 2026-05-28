@@ -169,10 +169,6 @@ class OrchestrationContext:
         return getattr(self._controller, 'autonomy_controller', None)
 
     @property
-    def confirmation_mode(self) -> bool:
-        return bool(getattr(self._controller, 'confirmation_mode', False))
-
-    @property
     def security_analyzer(self):
         return getattr(self._controller, 'security_analyzer', None)
 

@@ -118,7 +118,6 @@ class TestLifecycleService(unittest.TestCase):
             conversation_stats=mock_conversation_stats,
             iteration_delta=100,
             budget_per_task_delta=50.0,
-            confirmation_mode=True,
             replay_events=mock_replay_events,
         )
 
@@ -134,11 +133,7 @@ class TestLifecycleService(unittest.TestCase):
             conversation_stats=mock_conversation_stats,
             max_iterations=100,
             max_budget_per_task=50.0,
-            confirmation_mode=True,
         )
-
-        # Check confirmation_mode set
-        self.assertTrue(self.mock_controller.confirmation_mode)
 
         # Check ReplayManager created
         mock_replay_manager_class.assert_called_once_with(mock_replay_events)
@@ -162,7 +157,6 @@ class TestLifecycleService(unittest.TestCase):
             conversation_stats=MagicMock(),
             iteration_delta=0,
             budget_per_task_delta=None,
-            confirmation_mode=False,
             replay_events=None,
         )
 
@@ -171,9 +165,6 @@ class TestLifecycleService(unittest.TestCase):
 
         # Should create ReplayManager with None
         mock_replay_manager_class.assert_called_once_with(None)
-
-        # Confirmation mode should be False
-        self.assertFalse(self.mock_controller.confirmation_mode)
 
     def test_initialize_agent_configs_with_configs(self):
         """Test initialize_agent_configs stores config dictionaries."""
@@ -260,7 +251,6 @@ class TestLifecycleService(unittest.TestCase):
                     conversation_stats=MagicMock(),
                     iteration_delta=100,
                     budget_per_task_delta=50.0,
-                    confirmation_mode=True,
                     replay_events=[],
                 )
 

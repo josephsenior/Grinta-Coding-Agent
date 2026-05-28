@@ -22,7 +22,6 @@ def _make_context(**overrides) -> MagicMock:
     ctx = MagicMock()
     ctx.security_analyzer = overrides.get('security_analyzer')
     ctx.autonomy_controller = overrides.get('autonomy_controller')
-    ctx.confirmation_mode = overrides.get('confirmation_mode', False)
     ctx.pending_action = overrides.get('pending_action')
     ctx.emit_event = MagicMock()
     ctx.clear_pending_action = MagicMock()
@@ -47,10 +46,10 @@ class TestActionRequiresConfirmation:
         action = FileEditAction(path='/tmp/x.py', new_str='x')
         assert svc.action_requires_confirmation(action) is True
 
-    def test_file_read_requires_confirmation(self):
+    def test_file_read_does_not_require_confirmation(self):
         svc = SafetyService(_make_context())
         action = FileReadAction(path='/tmp/x.py')
-        assert svc.action_requires_confirmation(action) is True
+        assert svc.action_requires_confirmation(action) is False
 
     def test_generic_action_does_not_require_confirmation(self):
         svc = SafetyService(_make_context())

@@ -54,13 +54,8 @@ class GrintaTUIApp(App):
         self._hud = HUDBar()
         self._reasoning = ReasoningDisplay()
         self._session_running = True
-        self._pending_confirm: asyncio.Event | None = None
-        self._confirm_result: str | None = None
         self._event_stream: Any | None = None
-        self._controller: Any | None = None
         self._agent_task: asyncio.Task[Any] | None = None
-        self._renderer: Any | None = None
-        self._input_lock = asyncio.Lock()
         self._screen: Any | None = None
 
         # Register Rich theme for consistent markup rendering
