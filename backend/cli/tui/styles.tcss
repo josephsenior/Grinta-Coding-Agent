@@ -256,6 +256,8 @@ HUD,
     width: 1fr;
     height: 1;
     color: #8f9fc1;
+    text-align: right;
+    padding: 0 0 0 1;
 }
 
 #hud-line-2-row {
