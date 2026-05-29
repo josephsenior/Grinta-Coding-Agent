@@ -45,12 +45,11 @@ from backend.cli.theme import (
     CLR_ERR_ICON,
     CLR_STATUS_ERR,
     CLR_STATUS_WARN,
-    CLR_USER_BORDER,
     CLR_USER_BG,
+    CLR_USER_BORDER,
     CLR_WARN_BODY,
     CLR_WARN_ICON,
     STYLE_BOLD_DIM,
-    STYLE_DEFAULT,
     STYLE_DIM,
     accessible_mode_enabled,
 )

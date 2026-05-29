@@ -25,6 +25,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from backend.core.logger import app_logger as logger
+from backend.core.workspace_resolution import workspace_agent_state_dir
 from backend.ledger.backpressure import BackpressureManager
 from backend.ledger.coalescing import EventCoalescer
 from backend.ledger.config import get_event_runtime_defaults
@@ -33,7 +34,6 @@ from backend.ledger.event_store import EventStore
 from backend.ledger.persistence import EventPersistence
 from backend.ledger.secret_masker import SecretMasker
 from backend.ledger.serialization.event import event_from_dict, event_to_dict
-from backend.core.workspace_resolution import workspace_agent_state_dir
 from backend.persistence.locations import get_conversation_dir
 from backend.utils.async_utils import (
     call_sync_from_async,

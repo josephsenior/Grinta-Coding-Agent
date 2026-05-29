@@ -15,11 +15,11 @@ from unittest.mock import MagicMock
 
 from backend.ledger.action import ActionSecurityRisk
 from backend.orchestration.agent_circuit_breaker import (
+    FILE_EDIT_BUCKET,
+    FILE_EDIT_SYNTAX_BUCKET,
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerResult,
-    FILE_EDIT_SYNTAX_BUCKET,
-    FILE_EDIT_BUCKET,
     classify_file_edit_error_bucket,
 )
 

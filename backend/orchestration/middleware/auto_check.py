@@ -45,7 +45,7 @@ def _extract_syntax_check_payload(
     if isinstance(action, FileEditAction):
         observed_new_content = getattr(observation, 'new_content', None)
         if isinstance(observed_new_content, str):
-            raw = observed_new_content
+            raw: str | None = observed_new_content
         elif action.command in {'create_file', 'write'}:
             raw = action.file_text or action.new_str
         else:

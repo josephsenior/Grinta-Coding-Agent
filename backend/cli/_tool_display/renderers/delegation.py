@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from backend.cli.theme import (
     CLR_BRAND_HUE,
     CLR_SECONDARY,
@@ -14,9 +16,9 @@ from backend.cli.transcript import format_activity_primary
 def render_delegation(
     total_workers: int,
     tasks: list[dict[str, str]] | None = None,
-) -> list[str]:
+) -> list[Any]:
     """Render delegation status with worker tasks."""
-    lines: list[str] = []
+    lines: list[Any] = []
 
     lines.append(format_activity_primary('Delegated', f'{total_workers} tasks'))
 

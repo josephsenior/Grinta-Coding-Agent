@@ -384,7 +384,7 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     except Exception:
         pass
 
-    scope_note = ""
+    scope_note = ''
     if not is_global:
         scope_note = f'[{CLR_STATUS_WARN}]Note: Running from source. Settings localized to this directory.[/]\n'
 

@@ -482,7 +482,7 @@ def _validate_connection(model: str, api_key: str, base_url: str | None) -> None
                 async def _update_spinner_text() -> None:
                     await asyncio.sleep(5)
                     spinner.text = Text('  Still waiting on provider... (this might take up to 15s)', style=CLR_SPINNER)
-                
+
                 update_task = asyncio.create_task(_update_spinner_text())
                 try:
                     return await _test_llm_call(model, api_key, base_url)
@@ -766,11 +766,11 @@ def remove_mcp_server(name: str) -> None:
     settings = _load_raw_settings()
     mcp_cfg = settings.get('mcp_config', {})
     servers = mcp_cfg.get('servers', [])
-    
+
     new_servers = [s for s in servers if s.get('name') != name]
     if len(new_servers) == len(servers):
         raise ValueError(f"MCP server '{name}' not found")
-        
+
     mcp_cfg['servers'] = new_servers
     settings['mcp_config'] = mcp_cfg
     _save_raw_settings(settings)

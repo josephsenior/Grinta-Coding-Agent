@@ -396,8 +396,8 @@ def _recover_deepseek_thinking_history(
     recovered: list[dict[str, Any]] = []
     for msg in messages:
         if not isinstance(msg, dict):
-            recovered.append(msg)
-            continue
+            recovered.append(msg)  # type: ignore[unreachable]
+            continue  # type: ignore[unreachable]
         role = msg.get('role')
         if role == 'assistant' and not msg.get('reasoning_content'):
             recovered.append(_flatten_stale_deepseek_assistant_message(msg))

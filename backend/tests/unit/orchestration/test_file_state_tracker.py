@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from backend.orchestration.file_state_tracker import (
@@ -9,7 +7,6 @@ from backend.orchestration.file_state_tracker import (
     FileStateTracker,
     _extract_removed_symbols,
     _find_symbol_references,
-    _normalize_path_key,
     file_manifest_path,
 )
 from backend.orchestration.tool_pipeline import ToolInvocationContext

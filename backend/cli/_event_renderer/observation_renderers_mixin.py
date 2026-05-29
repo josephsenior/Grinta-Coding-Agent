@@ -26,9 +26,6 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.text import Text
 
-from backend.cli._event_renderer.text_utils import (
-    summarize_cmd_failure as _summarize_cmd_failure,
-)
 from backend.cli._event_renderer.constants import (
     BROWSER_TOOL_COMMANDS as _BROWSER_TOOL_COMMANDS,
 )
@@ -49,6 +46,9 @@ from backend.cli._event_renderer.text_utils import (
 )
 from backend.cli._event_renderer.text_utils import (
     strip_pty_echo as _strip_pty_echo,
+)
+from backend.cli._event_renderer.text_utils import (
+    summarize_cmd_failure as _summarize_cmd_failure,
 )
 from backend.cli._tool_display.preview import (
     file_read_syntax_highlight as _file_read_syntax_highlight,

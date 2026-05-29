@@ -4460,12 +4460,12 @@ class TUIRenderer:
                     if per_file:
                         for fp, file_diff in per_file:
                             f_added = sum(
-                                1 for l in file_diff.splitlines()
-                                if l.startswith('+') and not l.startswith('+++')
+                                1 for line in file_diff.splitlines()
+                                if line.startswith('+') and not line.startswith('+++')
                             )
                             f_removed = sum(
-                                1 for l in file_diff.splitlines()
-                                if l.startswith('-') and not l.startswith('---')
+                                1 for line in file_diff.splitlines()
+                                if line.startswith('-') and not line.startswith('---')
                             )
                             encoded = _encode_unified_diff_text(file_diff)
                             if encoded:
@@ -4979,14 +4979,14 @@ class TUIRenderer:
             query_match = re.match(r'^(?:query|pattern|searching for):\s*(.+?)$', first, re.I)
             if query_match:
                 query = query_match.group(1).strip().strip('"\'')
-                result_lines = [l for l in lines[1:] if l.strip() and ':' in l.split(None, 1)[0]]
+                result_lines = [line for line in lines[1:] if line.strip() and ':' in line.split(None, 1)[0]]
             elif re.match(r'^.*:\d+:', first):
                 # First line is already file:line:content — no separate query line
-                result_lines = [l for l in lines if l.strip()]
+                result_lines = [line for line in lines if line.strip()]
             else:
                 # First line is the query itself
                 query = first.strip().strip('"\'')
-                result_lines = [l for l in lines[1:] if l.strip() and ':' in l.split(None, 1)[0]]
+                result_lines = [line for line in lines[1:] if line.strip() and ':' in line.split(None, 1)[0]]
 
         if not query:
             query = 'code search'

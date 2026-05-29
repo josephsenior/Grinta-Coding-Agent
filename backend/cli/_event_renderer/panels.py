@@ -32,7 +32,6 @@ from backend.cli.theme import (
     CLR_WORKER_LABEL_FAILED,
     CLR_WORKER_SPINNER,
     CLR_WORKER_TIMER,
-    STYLE_DEFAULT,
     STYLE_DIM,
     STYLE_SYSTEM_TAG_AUTONOMY,
     STYLE_SYSTEM_TAG_NOTE,
@@ -156,10 +155,10 @@ def build_task_panel(task_list: list[Any]) -> Any:
         )
 
         from rich.markdown import Markdown
-        
+
         if task_id and task_id != '?':
             desc = f'**{task_id}**  {desc}'
-            
+
         body = Markdown(desc)
         table.add_row(badge, body)
 
@@ -358,10 +357,10 @@ def build_system_notice_panel(
         accent_style.split(' ', 1)[1] if ' ' in accent_style else accent_style
     )
     panel_title = Text(normalized_title, style=accent_style)
-    
+
     # Use Markdown for syntax highlighting if there is any code in the system message
     body = Markdown((text or '').strip())
-    
+
     return Panel(
         body,
         title=panel_title,

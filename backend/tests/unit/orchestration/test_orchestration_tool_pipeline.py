@@ -198,7 +198,6 @@ class TestCircuitBreakerMiddlewarePipeline:
         from backend.ledger.observation import ErrorObservation
         from backend.orchestration.agent_circuit_breaker import (
             FILE_EDIT_SYNTAX_BUCKET,
-            FILE_EDIT_BUCKET,
         )
 
         controller = MagicMock()

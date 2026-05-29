@@ -92,6 +92,9 @@ class BaseRetryBackend:
     async def dead_letter(self, task: RetryTask) -> None:
         raise NotImplementedError
 
+    def recover_pending(self) -> list[RetryTask]:
+        raise NotImplementedError
+
 
 class InMemoryRetryBackend(BaseRetryBackend):
     """In-memory retry backend with heap-based scheduling and optional sidecar persistence."""
@@ -294,6 +297,9 @@ class RetryQueue:
 
     async def dead_letter(self, task: RetryTask) -> None:
         await self.backend.dead_letter(task)
+
+    def recover_pending(self) -> list[RetryTask]:
+        return self.backend.recover_pending()
 
     def _compute_backoff(self, attempts: int) -> float:
         attempts = max(attempts, 1)

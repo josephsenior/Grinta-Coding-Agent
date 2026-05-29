@@ -735,8 +735,19 @@ def _build_grinta_pygments_style() -> type:
     """Build a custom Pygments Style class using Grinta theme colors."""
     from pygments.style import Style
     from pygments.token import (
-        Comment, Error, Generic, Keyword, Literal, Name, Number,
-        Operator, Other, Punctuation, String, Text, Whitespace,
+        Comment,
+        Error,
+        Generic,
+        Keyword,
+        Literal,
+        Name,
+        Number,
+        Operator,
+        Other,
+        Punctuation,
+        String,
+        Text,
+        Whitespace,
     )
 
     class GrintaStyle(Style):

@@ -31,6 +31,7 @@ from backend.core.constants import (
 from backend.core.logger import app_logger as logger
 from backend.ledger.action import ActionSecurityRisk
 from backend.ledger.observation import ErrorObservation
+
 # Per-tool keys for file edit failures. Syntax validation rejects are
 # tracked separately with higher trip thresholds than match/path/guard errors.
 FILE_EDIT_BUCKET = 'file_edit'

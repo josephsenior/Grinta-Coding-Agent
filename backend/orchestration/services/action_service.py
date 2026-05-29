@@ -141,7 +141,7 @@ class ActionService:
         # MagicMock event streams do not run EventStream's pre-dispatch hook, so
         # keep tests and lightweight fakes on the old post-add path.
         if action.runnable and not isinstance(es, EventStream):
-            self.set_pending_action(action)
+            self.set_pending_action(action)  # type: ignore[unreachable]
 
         _bind_action_context_if_present(controller, action, ctx)
 

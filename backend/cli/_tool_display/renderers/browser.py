@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from rich.markup import escape as markup_escape
 
 from backend.cli.transcript import format_activity_primary
@@ -12,9 +14,9 @@ def render_browser_navigation(
     url: str = '',
     title: str = '',
     steps: list[str] | None = None,
-) -> list[str]:
-    """Render a browser navigation/interaction."""
-    lines: list[str] = []
+) -> list[Any]:
+    """Render a browser action."""
+    lines: list[Any] = []
 
     action_verb = action.replace('_', ' ').title()
     lines.append(format_activity_primary(action_verb, url or 'Browser'))
@@ -40,9 +42,9 @@ def render_browser_page(
     url: str,
     title: str = '',
     content_preview: str = '',
-) -> list[str]:
+) -> list[Any]:
     """Render a loaded page."""
-    lines: list[str] = []
+    lines: list[Any] = []
 
     lines.append(format_activity_primary('Loaded', url))
 

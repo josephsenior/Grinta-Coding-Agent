@@ -18,13 +18,13 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.logger import app_logger as logger
-from backend.core.workspace_resolution import workspace_agent_state_dir
 from backend.core.rollback.workspace_checkpoint import (
     restore_checkpoint as restore_workspace_checkpoint,
 )
 from backend.core.rollback.workspace_checkpoint import (
     save_checkpoint as save_workspace_checkpoint,
 )
+from backend.core.workspace_resolution import workspace_agent_state_dir
 
 
 @dataclass
@@ -95,6 +95,7 @@ class RollbackManager:
             checkpoints_dir: Directory to store checkpoints (default: workspace_path/.app/checkpoints)
             max_checkpoints: Maximum number of checkpoints to keep
             auto_cleanup: Whether to automatically clean up old checkpoints
+            allow_destructive_git_rollback: Whether to allow destructive git rollback
 
         """
         self.workspace_path = Path(workspace_path)

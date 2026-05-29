@@ -6,6 +6,7 @@ Shows search results grouped by file with match previews.
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from rich.markup import escape as markup_escape
 
@@ -23,13 +24,13 @@ def render_search_results(
     query: str = '',
     max_files: int = 5,
     max_lines_per_file: int = 3,
-) -> list[str]:
+    ) -> list[Any]:
     """Parse and render ripgrep-style search output as extra lines.
 
     Format: filepath:line:content
     Returns Rich markup lines (no badge/verb — just the file+match rows).
     """
-    lines: list[str] = []
+    lines: list[Any] = []
 
     raw_lines = [
         line
@@ -112,9 +113,9 @@ def render_search_summary(
     file_count: int,
     query: str = '',
     duration: str = '',
-) -> list[str]:
+) -> list[Any]:
     """Render just the summary line for search results."""
-    lines: list[str] = []
+    lines: list[Any] = []
 
     detail = f'{match_count} matches'
     if file_count > 0:
@@ -174,7 +175,7 @@ def render_file_list(
     files: list[tuple[str, int]],
     total_files: int,
     total_matches: int,
-) -> list[str]:
+) -> list[Any]:
     """Render a compact file list for user display (Option C).
 
     Format:
@@ -182,7 +183,7 @@ def render_file_list(
       • src/utils.py (8 matches)
       ... 3 more files, 15 matches
     """
-    lines: list[str] = []
+    lines: list[Any] = []
 
     for filepath, count in files:
         escaped_path = markup_escape(filepath)

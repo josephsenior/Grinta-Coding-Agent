@@ -89,7 +89,7 @@ def _preview_syntax_block(path: str, content: str) -> Any | None:
     return Syntax(
         body,
         lexer=lexer,
-        theme=get_grinta_pygments_style(),
+        theme=get_grinta_pygments_style(),  # type: ignore[arg-type]
         word_wrap=True,
         line_numbers=True,
         padding=(0, 1),

@@ -632,7 +632,7 @@ class SlashCommandsMixin:
             syntax = Syntax(
                 diff_body,
                 lexer='diff',
-                theme=get_grinta_pygments_style(),
+                theme=get_grinta_pygments_style(),  # type: ignore[arg-type]
                 word_wrap=True,
                 padding=(1, 2),
                 background_color=NAVY_BG,
@@ -655,7 +655,7 @@ class SlashCommandsMixin:
             syntax = Syntax(
                 file_diff,
                 lexer='diff',
-                theme=get_grinta_pygments_style(),
+                theme=get_grinta_pygments_style(),  # type: ignore[arg-type]
                 word_wrap=True,
                 padding=(1, 2),
                 background_color=NAVY_BG,

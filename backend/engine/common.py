@@ -52,7 +52,7 @@ def _check_format_error_retry_guard(
     Returns (should_continue, reason). If should_continue is False, reason
     explains why the retry was blocked.
     """
-    key = f"{tool_name}:{error_signature}"
+    key = f'{tool_name}:{error_signature}'
     content_hash = _compute_content_hash(raw_content)
     with _RETRY_GUARD_LOCK:
         if len(_RETRY_GUARD) > _RETRY_GUARD_MAX_ENTRIES:
@@ -72,7 +72,7 @@ def _check_format_error_retry_guard(
                 _RETRY_GUARD[key] = (content_hash, 1)
         else:
             _RETRY_GUARD[key] = (content_hash, 1)
-    return True, ""
+    return True, ''
 
 
 def extract_redacted_thinking_inner(text: str) -> str:
@@ -618,20 +618,9 @@ def _extract_xml_tool_calls_from_content(
             param_body = fn_body
             param_matches = list(_iter_parameter_matches(fn_body, param_body))
 
-            if tool_def is not None and param_matches:
-                # Use strict validation: type coercion, enum checks, required params
-                params = _validate_xml_params(tool_def, param_matches, fn_name)
-                # Strip newlines from string values (XML format adds them)
-                for k, v in params.items():
-                    if isinstance(v, str):
-                        if v.startswith(chr(10)):
-                            params[k] = v[1:]
-                        if params[k].endswith(chr(10)):
-                            params[k] = params[k][:-1]
-            else:
-                # Fallback: raw string extraction for unknown tools
-                params = {}
-                for pm in param_matches:
+            # Fallback: raw string extraction for unknown tools
+            params = {}
+            for pm in param_matches:
                     pn = pm.group(1)
                     pv = pm.group(2)
                     if pv.startswith(chr(10)):
@@ -641,19 +630,19 @@ def _extract_xml_tool_calls_from_content(
                     params[pn] = pv
 
             if is_unclosed:
-                params["__xml_syntax_error__"] = "Unclosed <function> tag. Use </function> to close."
+                params['__xml_syntax_error__'] = 'Unclosed <function> tag. Use </function> to close.'
             elif not params and fn_body.strip():
-                params["__xml_syntax_error__"] = "No <parameter=...> tags found. You must wrap arguments in parameter tags."
+                params['__xml_syntax_error__'] = 'No <parameter=...> tags found. You must wrap arguments in parameter tags.'
 
             # Check retry guard for XML syntax errors
-            if "__xml_syntax_error__" in params:
+            if '__xml_syntax_error__' in params:
                 serialized_args = json.dumps(params, sort_keys=True, ensure_ascii=False)
                 error_sig = f"xml_parsing:{params['__xml_syntax_error__']}"
                 allowed, reason = _check_format_error_retry_guard(fn_name, serialized_args, error_sig)
                 if not allowed:
                     _LOGGER.error('XML parsing retry guard: %s', reason)
                     params = {
-                        "__xml_syntax_error__": f"Retry guard stopped repeated error: {params['__xml_syntax_error__']}. Report as system error."
+                        '__xml_syntax_error__': f"Retry guard stopped repeated error: {params['__xml_syntax_error__']}. Report as system error."
                     }
 
         except Exception as e:
@@ -663,7 +652,7 @@ def _extract_xml_tool_calls_from_content(
                 e,
             )
             params = {
-                "__xml_syntax_error__": f"Malformed parameters: {str(e)}"
+                '__xml_syntax_error__': f'Malformed parameters: {str(e)}'
             }
 
         call_id = f'xml_toolu_{call_counter:02d}'

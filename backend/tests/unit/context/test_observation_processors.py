@@ -21,8 +21,10 @@ from backend.ledger.observation import (
     MCPObservation,
     UserRejectObservation,
 )
-from backend.ledger.observation.agent import AgentCondensationObservation
-from backend.ledger.observation.agent import AgentThinkObservation
+from backend.ledger.observation.agent import (
+    AgentCondensationObservation,
+    AgentThinkObservation,
+)
 
 # ── _get_observation_content ─────────────────────────────────────────
 

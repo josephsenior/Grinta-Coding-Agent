@@ -525,12 +525,12 @@ def _build_mandatory_discipline_checkpoints(
     items = ["1. Session start \u2192 recall(key='all')"]
     idx = 2
     if tracker_on:
-        items.append(f"{idx}. For multi-step tasks \u2192 task_tracker(update) with full plan")
+        items.append(f'{idx}. For multi-step tasks \u2192 task_tracker(update) with full plan')
         idx += 1
-        items.append(f"{idx}. At turn start during multi-step work \u2192 task_tracker(view)")
+        items.append(f'{idx}. At turn start during multi-step work \u2192 task_tracker(view)')
         idx += 1
     if checkpoints_on:
-        items.append(f"{idx}. Before destructive ops \u2192 checkpoint.save")
+        items.append(f'{idx}. Before destructive ops \u2192 checkpoint.save')
         idx += 1
     items.append(f"{idx}. On decision/pivot/discovery \u2192 note() or{' memory_manager(update) or' if working_memory_on else ''} note()")
     parts.extend(items)
@@ -682,73 +682,7 @@ def _render_autonomy(
         error_recovery_pivot_lines=error_recovery_pivot_lines,
     )
 
-    # Single mode-agnostic instruction. The runtime confirmation gate decides
-    # whether to interrupt for user confirmation based on the configured autonomy
-    # level — the agent should not branch on that knob in its prompt logic,
-    # because the prompt would be wrong as soon as the user toggles modes
-    # mid-session via /autonomy. Treat any user decision surfaced by the
-    # gate as authoritative and continue from where you stopped.
-    autonomy = (
-        '<AUTONOMY>\n'
-        "Plan, execute, and verify the user's task end-to-end. The runtime may "
-        'interrupt a tool call to surface a user decision; treat that decision as '
-        'authoritative and continue from where you stopped. On tool failure, pivot '
-        'to an alternative tool in the same turn (e.g. `read` \u2192 `edit_symbols`, or `read` \u2192 `replace_string`) '
-        'and auto-retry recoverable errors before reporting back.'
-        f'{cp_line}\n</AUTONOMY>'
-    )
 
-    explore = _explore_hint(config)
-    path_hint = _path_uncertainty_hint(
-        explore,
-        is_windows=is_windows,
-        windows_with_bash=windows_with_bash,
-        shell_is_powershell=shell_is_powershell,
-    )
-    tracker_on = getattr(config, 'enable_task_tracker_tool', False)
-    if tracker_on:
-        task_tracker_discipline_block = (
-            '<TASK_TRACKING>\n'
-            '**task_tracker**: For multi-step tasks, use `view` to inspect the plan and `update` to replace the full `task_list`.\n'
-            'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task without re-emitting the full list. Optional `result` field captures outcome.\n'
-            'Allowed statuses: `todo`, `doing`, `done`, `skipped`, `blocked`.\n'
-            '**Completion**: Put waiting tasks to `blocked` before calling `finish`.'
-            '</TASK_TRACKING>'
-        )
-    else:
-        task_tracker_discipline_block = ''
-
-    base_workflow = (
-        'Default loop: scope → reproduce → isolate → fix → verify.\n'
-        'For debug/fix tasks, re-run the same reproducer when possible.'
-    )
-    if tracker_on:
-        problem_solving_workflow_body = (
-            base_workflow
-            + '\n\nWith **task_tracker** enabled, treat **sync** as part of the loop: after verify, update the plan when progress changed.'
-        )
-        task_sync_instruction = '**Task synchronization:** Update `task_tracker` to `done`, `skipped`, or `blocked` before attempting to finish.'
-    else:
-        problem_solving_workflow_body = base_workflow
-        task_sync_instruction = '**Plan synchronization:** Keep your working memory and finish summary aligned with what was actually completed before attempting to finish.'
-
-    lsp_avail = _lsp_available(config)
-    error_recovery_pivot_lines = (
-            '- `search_code` \u2192 `lsp` (check locally with the language server; no shell grep)\n'
-            '- `lsp` \u2192 `search_code` (wider text search)'
-        if lsp_avail
-        else ''
-    )
-
-    return render_partial(
-        'system_partial_01_autonomy.md',
-        autonomy_block=autonomy,
-        task_tracker_discipline_block=task_tracker_discipline_block,
-        task_sync_instruction=task_sync_instruction,
-        path_discovery_hint=path_hint,
-        problem_solving_workflow_body=problem_solving_workflow_body,
-        error_recovery_pivot_lines=error_recovery_pivot_lines,
-    )
 
 
 def _render_tool_reference(

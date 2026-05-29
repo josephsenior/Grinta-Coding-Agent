@@ -24,9 +24,9 @@ def render_mcp_tool(
     result: Any | None = None,
     error: str | None = None,
     duration: str = '',
-) -> list[str]:
+) -> list[Any]:
     """Render an MCP tool call with structured display."""
-    lines: list[str] = []
+    lines: list[Any] = []
 
     service_name = tool_name.split('::')[0] if '::' in tool_name else tool_name
     short_name = tool_name.split('::')[-1] if '::' in tool_name else tool_name
@@ -103,7 +103,7 @@ def _summarize_mcp_args(tool_name: str, args: dict[str, Any]) -> str:
     return f'[dim]{len(keys)} args[/dim]'
 
 
-def _format_mcp_result(result: Any) -> list[str]:
+def _format_mcp_result(result: Any) -> list[Any]:
     """Format MCP result for display."""
     if result is None:
         return []

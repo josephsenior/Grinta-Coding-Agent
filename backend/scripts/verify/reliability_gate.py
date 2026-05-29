@@ -17,7 +17,6 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-
 _RUN_ID = f'{int(time.time() * 1000)}-{os.getpid()}'
 
 

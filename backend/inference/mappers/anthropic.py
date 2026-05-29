@@ -182,7 +182,7 @@ def _normalize_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     known_tool_ids: set[str] = set()
     for raw_message in messages:
         if not isinstance(raw_message, dict):
-            continue
+            continue  # type: ignore[unreachable]
         message = dict(raw_message)
         message.pop('tool_ok', None)
         role = message.get('role')
