@@ -11,11 +11,11 @@ from rich.table import Table
 from rich.text import Text
 
 import backend
+from backend.cli._event_renderer.panels import task_panel_signature
 from backend.cli.layout_tokens import (
     SIDEBAR_VISIBLE_MIN_WIDTH,
     SIDEBAR_WIDTH_RATIO,
 )
-from backend.cli._event_renderer.panels import task_panel_signature
 from backend.cli.theme import (
     STYLE_DEFAULT,
     STYLE_DIM,

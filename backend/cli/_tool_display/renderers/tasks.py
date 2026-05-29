@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from backend.cli.theme import (
     CLR_BRAND_HUE,
     CLR_DETAIL,
@@ -15,9 +17,9 @@ from backend.cli.transcript import format_activity_primary
 def render_task_list(
     tasks: list[dict[str, str]],
     title: str = 'Tasks',
-) -> list[str]:
+) -> list[Any]:
     """Render a task list with status indicators."""
-    lines: list[str] = []
+    lines: list[Any] = []
 
     active = sum(
         1 for t in tasks if t.get('status') in ('active', 'in_progress', 'running')
@@ -79,7 +81,7 @@ def render_task_summary(
     active: int = 0,
     completed: int = 0,
     blocked: int = 0,
-) -> list[str]:
+) -> list[Any]:
     """Render just the task summary line."""
     parts = []
     if active:

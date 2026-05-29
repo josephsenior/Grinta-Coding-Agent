@@ -9,7 +9,6 @@ from typing import Any
 from rich.syntax import Syntax
 
 from backend.cli._tool_display.constants import _TOOL_CALL_PREFIX
-from backend.cli.theme import NAVY_BG, get_grinta_pygments_style
 from backend.cli._tool_display.summarize import (
     _preview_result_item,
     _summarize_raw_mcp_text,
@@ -18,6 +17,7 @@ from backend.cli._tool_display.summarize import (
     format_tool_invocation_line,
     parse_tool_arguments_json,
 )
+from backend.cli.theme import NAVY_BG, get_grinta_pygments_style
 
 
 def flatten_tool_call_for_history(name: str, arguments: str) -> str:
@@ -305,7 +305,7 @@ def mcp_result_syntax_extras(
             body,
             'json',
             word_wrap=True,
-            theme=get_grinta_pygments_style(),
+            theme=get_grinta_pygments_style(),  # type: ignore[arg-type]
             line_numbers=False,
             background_color=NAVY_BG,
         )
@@ -358,7 +358,7 @@ def file_read_syntax_highlight(
             body,
             lexer,
             word_wrap=True,
-            theme=get_grinta_pygments_style(),
+            theme=get_grinta_pygments_style(),  # type: ignore[arg-type]
             line_numbers=True,
             background_color=NAVY_BG,
             padding=(1, 1),

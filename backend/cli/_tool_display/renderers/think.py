@@ -4,20 +4,20 @@ from __future__ import annotations
 
 from rich.markup import escape as markup_escape
 
+from typing import Any
+
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
-from backend.cli.theme import (
-    CLR_SECONDARY,
-    CLR_THOUGHT_BODY,
-)
+from backend.cli.theme import CLR_SECONDARY, CLR_THOUGHT_BODY
 from backend.cli.transcript import format_activity_primary
 
 
-def render_think(thought: str, source_tool: str = '') -> list[str]:
+
+def render_think(thought: str, source_tool: str = '') -> list[Any]:
     """Render internal agent reasoning as structured extra lines.
 
     Returns badge + primary line with 'Thinking:' prefix + continuation lines.
     """
-    lines: list[str] = []
+    lines: list[Any] = []
 
     badge = badge_for_tool_name(source_tool or 'think')
     lines.append(badge.render())
@@ -47,12 +47,12 @@ def render_think(thought: str, source_tool: str = '') -> list[str]:
     return lines
 
 
-def render_message(content: str) -> list[str]:
+def render_message(content: str) -> list[Any]:
     """Render an assistant message as structured extra lines.
 
     Returns badge + primary line + continuation lines.
     """
-    lines: list[str] = []
+    lines: list[Any] = []
 
     badge = badge_for_tool_name('message')
     lines.append(badge.render())

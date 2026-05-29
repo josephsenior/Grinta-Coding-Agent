@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from backend.cli.theme import (
     CLR_BRAND_HUE,
     CLR_SECONDARY,
@@ -18,9 +20,9 @@ def render_memory_update(
     entries_added: int = 0,
     entries_removed: int = 0,
     compression_ratio: float = 0.0,
-) -> list[str]:
+) -> list[Any]:
     """Render memory/context update."""
-    lines: list[str] = []
+    lines: list[Any] = []
 
     action_verb = action.replace('_', ' ').title()
     lines.append(format_activity_primary(action_verb, 'Memory'))

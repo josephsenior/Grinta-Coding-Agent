@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from backend.cli.theme import (
     CLR_BRAND_HUE,
     CLR_SECONDARY,
@@ -15,9 +17,9 @@ def render_lsp_query(
     location: str = '',
     definition: str = '',
     references: list[str] | None = None,
-) -> list[str]:
+) -> list[Any]:
     """Render an LSP query result."""
-    lines: list[str] = []
+    lines: list[Any] = []
 
     lines.append(format_activity_primary(command.title(), target))
 

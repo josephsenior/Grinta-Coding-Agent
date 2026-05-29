@@ -13,10 +13,10 @@ import os
 import re
 from typing import TYPE_CHECKING, Any
 
+from backend.core.editor_recovery import append_editor_recovery_guidance
 from backend.core.enums import FileEditSource
 from backend.core.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
-from backend.core.editor_recovery import append_editor_recovery_guidance
 from backend.execution.utils.files import (
     detect_line_ending,
     insert_lines,

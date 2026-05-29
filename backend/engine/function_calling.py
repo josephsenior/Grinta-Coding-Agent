@@ -11,7 +11,7 @@ import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 import backend.engine.tools.analyze_project_structure as analyze_project_structure_tools
 import backend.engine.tools.blackboard as blackboard_tools
@@ -1611,7 +1611,7 @@ def _resolve_multi_edit_path(raw_path: str, item_index: int) -> tuple[str, str]:
     return str(safe_path.path), safe_path.relative_to_workspace()
 
 
-def _multi_edit_raise(message: str, *, path: str | None = None) -> None:
+def _multi_edit_raise(message: str, *, path: str | None = None) -> NoReturn:
     from backend.core.errors import ToolExecutionError
 
     raise ToolExecutionError(

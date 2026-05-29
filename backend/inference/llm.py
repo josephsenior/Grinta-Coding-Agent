@@ -768,7 +768,7 @@ class LLM(RetryMixin, DebugMixin):
             return False
         return is_retryable and not is_last and not yielded_any
 
-    def _notify_retry_listener(
+    def _notify_retry_listener(  # type: ignore[override]
         self,
         attempt: int,
         max_attempts: int,

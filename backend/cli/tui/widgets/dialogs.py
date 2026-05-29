@@ -6,7 +6,8 @@ Provides consistent styling and structure for all modal dialogs
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, TypeVar
+from typing import ClassVar, TypeVar
+
 from textual.screen import ModalScreen
 
 _T = TypeVar('_T')

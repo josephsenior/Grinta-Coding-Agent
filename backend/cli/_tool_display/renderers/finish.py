@@ -5,6 +5,8 @@ Shows the final task summary with changed files, duration, and stats.
 
 from __future__ import annotations
 
+from typing import Any
+
 from backend.cli.theme import (
     CLR_DETAIL,
     CLR_SECONDARY,
@@ -21,9 +23,9 @@ def render_finish_summary(
     duration: str = '',
     tool_calls: int = 0,
     files: list[str] | None = None,
-) -> list[str]:
+) -> list[Any]:
     """Render finish/completion summary."""
-    lines: list[str] = []
+    lines: list[Any] = []
 
     if summary:
         lines.append(format_activity_primary('Finished', summary))

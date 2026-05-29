@@ -701,7 +701,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         overwrite_existing=getattr(action, 'overwrite_existing', False),
     )
     if result_str.startswith('ERROR:'):
-        obs = ErrorObservation(result_str)
+        obs: ErrorObservation | FileEditObservation = ErrorObservation(result_str)
         obs.tool_result = tool_result
         return obs
 
@@ -859,7 +859,7 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
                 {'file_edits': payload.get('file_edits')},
             )
         except (FunctionCallValidationError, ToolExecutionError, ValueError) as exc:
-            obs = ErrorObservation(str(exc))
+            obs: ErrorObservation | FileEditObservation = ErrorObservation(str(exc))
             obs.tool_result = {
                 'tool': 'file_edit',
                 'ok': False,
@@ -886,7 +886,7 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
         if diff:
             content = f'{summary}\n\n[EDIT_DIFF]\n{diff}' if summary else f'[EDIT_DIFF]\n{diff}'
             content += f'\n\n{verification_text}'
-        obs = FileEditObservation(
+        final_obs: ErrorObservation | FileEditObservation = FileEditObservation(
             content=content,
             path=action.path,
             prev_exist=True,
@@ -895,7 +895,7 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
             diff=diff,
             impl_source=FileEditSource.FILE_EDITOR,
         )
-        obs.tool_result = {
+        final_obs.tool_result = {
             'tool': 'file_edit',
             'ok': verification_passed,
             'error_code': None
@@ -907,7 +907,7 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
             'files': file_receipts,
             'verification_passed': verification_passed,
         }
-        return obs
+        return final_obs
 
     return ErrorObservation(f'Unsupported structured file edit command: {command}')
 

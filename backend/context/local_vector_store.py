@@ -164,7 +164,7 @@ class ChromaDBBackend(VectorBackend):
                 contextlib.redirect_stderr(io.StringIO()),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
-                self._model = embedding_functions.FastEmbedEmbeddingFunction(
+                self._model = embedding_functions.FastEmbedEmbeddingFunction(  # type: ignore[attr-defined]
                     model_name=self._model_name
                 )
             logger.info('Embedding model ready (%s)', self._model_name)
@@ -246,7 +246,7 @@ class ChromaDBBackend(VectorBackend):
                 self.collection.add(
                     ids=chunk_ids,
                     documents=chunks,
-                    metadatas=chunk_metadatas,
+                    metadatas=chunk_metadatas,  # type: ignore[arg-type]
                 )
 
     def add_batch(
@@ -318,12 +318,12 @@ class ChromaDBBackend(VectorBackend):
 
         # Single batch insert for all parents
         if all_ids:
-            self.collection.add(ids=all_ids, documents=all_docs, metadatas=all_metas)
+            self.collection.add(ids=all_ids, documents=all_docs, metadatas=all_metas)  # type: ignore[arg-type]
 
         # Single batch insert for all children
         if child_ids:
             self.collection.add(
-                ids=child_ids, documents=child_docs, metadatas=child_metas
+                ids=child_ids, documents=child_docs, metadatas=child_metas  # type: ignore[arg-type]
             )
 
     def search(
@@ -349,7 +349,7 @@ class ChromaDBBackend(VectorBackend):
         results = self.collection.query(
             query_texts=[query],
             n_results=n_results,
-            where=search_filter,
+            where=search_filter,  # type: ignore[arg-type]
             include=['documents', 'metadatas', 'distances'],
         )
 
@@ -361,7 +361,7 @@ class ChromaDBBackend(VectorBackend):
             results = self.collection.query(
                 query_texts=[query],
                 n_results=min(k, self.collection.count()),
-                where=parent_filter,
+                where=parent_filter,  # type: ignore[arg-type]
                 include=['documents', 'metadatas', 'distances'],
             )
 
@@ -374,9 +374,14 @@ class ChromaDBBackend(VectorBackend):
         parent_texts: dict[str, str] = {}
         parent_metas: dict[str, dict[str, Any]] = {}
 
-        for i, meta in enumerate(results['metadatas'][0]):
-            pid = meta.get('parent_id') or results['ids'][0][i]
-            dist = results['distances'][0][i]
+        ids_list: list[str] = results['ids'][0]  # type: ignore[index]
+        metas_list: list[Any] = results['metadatas'][0]  # type: ignore[index]
+        dists_list: list[float] = results['distances'][0]  # type: ignore[index]
+        docs_list: list[str] = results['documents'][0]  # type: ignore[index]
+
+        for i, meta in enumerate(metas_list):
+            pid = meta.get('parent_id') or ids_list[i]
+            dist = dists_list[i]
             score = 1.0 - dist
 
             if pid not in scores:
@@ -384,7 +389,7 @@ class ChromaDBBackend(VectorBackend):
                 scores[pid] = score
                 # For parent-path fallback results, the document IS the parent text
                 if meta.get('is_child') is False:
-                    parent_texts[pid] = results['documents'][0][i]
+                    parent_texts[pid] = docs_list[i]
                     parent_metas[pid] = meta
                 else:
                     # Capture parent_id metadata from the child match
@@ -404,8 +409,8 @@ class ChromaDBBackend(VectorBackend):
                 include=['documents', 'metadatas'],
             )
             for i, pid in enumerate(parent_results['ids']):
-                parent_texts[pid] = parent_results['documents'][i]
-                parent_metas[pid] = parent_results['metadatas'][i]
+                parent_texts[pid] = parent_results['documents'][i]  # type: ignore[index]
+                parent_metas[pid] = dict(parent_results['metadatas'][i])  # type: ignore[index]
 
         final_results = []
         for pid in parent_ids[:k]:

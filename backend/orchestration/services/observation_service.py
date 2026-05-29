@@ -21,7 +21,7 @@ _BACKGROUND_OBSERVATION_NAMES = frozenset(
 
 # XML-format tools that previously triggered FORMAT_ERROR recovery prompts.
 # After successful execution, stale FORMAT_ERROR observations should be cleaned up.
-_XML_FORMAT_TOOLS = frozenset()
+_XML_FORMAT_TOOLS: frozenset[str] = frozenset()
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (

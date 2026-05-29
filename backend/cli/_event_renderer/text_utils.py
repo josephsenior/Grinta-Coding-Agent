@@ -248,7 +248,6 @@ def summarize_cmd_failure(content: str) -> str:
     """Pick the most actionable single-line failure summary."""
     from backend.cli._event_renderer.constants import (
         CMD_SUMMARY_NOISE_PATTERNS,
-        CMD_SUMMARY_PRIORITY_PATTERNS,
     )
 
     lines = [line.strip() for line in (content or '').splitlines() if line.strip()]

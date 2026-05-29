@@ -609,8 +609,8 @@ class Orchestrator(Agent):
         self._sync_executor_llm()
 
         try:
-            self.executor._has_active_tasks = self._has_active_tasks_in_state(state)
-            self.executor._active_run_mode = self._active_run_mode_for_state(state)
+            self.executor._has_active_tasks = self._has_active_tasks_in_state(state)  # type: ignore[attr-defined]
+            self.executor._active_run_mode = self._active_run_mode_for_state(state)  # type: ignore[attr-defined]
             result = self.executor.execute(params, self.event_stream)
             self._consecutive_invalid_protocol_outputs = 0
         except Exception:
@@ -674,8 +674,8 @@ class Orchestrator(Agent):
         self._sync_executor_llm()
 
         try:
-            self.executor._has_active_tasks = self._has_active_tasks_in_state(state)
-            self.executor._active_run_mode = self._active_run_mode_for_state(state)
+            self.executor._has_active_tasks = self._has_active_tasks_in_state(state)  # type: ignore[attr-defined]
+            self.executor._active_run_mode = self._active_run_mode_for_state(state)  # type: ignore[attr-defined]
             result = await self.executor.async_execute(params, self.event_stream)
             self._consecutive_invalid_protocol_outputs = 0
         except Exception:

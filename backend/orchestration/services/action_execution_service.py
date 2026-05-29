@@ -44,7 +44,6 @@ from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.action.empty import NullActionReason
 from backend.ledger.observation import ErrorObservation
 
-
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
         OrchestrationContext,

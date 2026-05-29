@@ -5,7 +5,7 @@ Shows file edits with badge, path info, and syntax-highlighted diff.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rich.markup import escape as markup_escape
 
@@ -28,8 +28,8 @@ def _preview_lines(
     *,
     max_lines: int = 12,
     max_chars: int = 160,
-) -> list[str]:
-    lines: list[str] = []
+) -> list[Any]:
+    lines: list[Any] = []
     if not content:
         return lines
     raw_lines = content.splitlines()
@@ -50,12 +50,12 @@ def render_file_edit(
     removed: int = 0,
     new_file: bool = False,
     preview_content: str | None = None,
-) -> list[str]:
+) -> list[Any]:
     """Render a file edit with optional diff lines.
 
     Returns a list of Rich markup lines for console.print().
     """
-    lines: list[str] = []
+    lines: list[Any] = []
 
     # Build detail with inline stats for new files
     detail = path
@@ -102,7 +102,7 @@ def render_file_read(
     path: str,
     line_range: str = '',
     line_count: int = 0,
-) -> list[str]:
+) -> list[Any]:
     """Render a file read event."""
     if line_range:
         detail = f'{path}  [dim]·  {line_range}[/dim]'
@@ -118,7 +118,7 @@ def render_file_create(
     path: str,
     line_count: int = 0,
     preview_content: str | None = None,
-) -> list[str]:
+) -> list[Any]:
     """Render a new file creation."""
     detail = path
     if line_count:

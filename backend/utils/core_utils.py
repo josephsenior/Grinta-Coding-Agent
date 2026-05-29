@@ -49,6 +49,7 @@ def create_registry_and_conversation_stats(
         sid: Session/conversation ID.
         user_id: User ID for the session.
         user_settings: Optional user-specific settings.
+        retry_listener: Optional retry listener callback.
 
     Returns:
         tuple[LLMRegistry, ConversationStats, AppConfig]: Registry, stats, and updated config.

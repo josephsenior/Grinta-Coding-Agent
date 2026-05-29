@@ -100,6 +100,8 @@ def apply_edit_logic(
                 ),
                 new_content=old_content_str,
             )
+        assert start_line is not None
+        assert end_line is not None
         return replace_range_guarded(
             editor,
             old_content_str,
