@@ -13,6 +13,7 @@ from backend.cli.theme import (
     CLR_DETAIL,
     CLR_SECONDARY,
     CLR_STATUS_OK,
+    NAVY_TEXT_DIM,
 )
 from backend.cli.transcript import (
     format_activity_delta_secondary,
@@ -62,9 +63,10 @@ def render_file_edit(
     if new_file and added:
         detail += f'  [{CLR_STATUS_OK}]+{added}[/{CLR_STATUS_OK}]'
     elif line_range:
-        detail = f'{path}  [dim]·  {line_range}[/dim]'
+        detail = f'{path}  [{NAVY_TEXT_DIM}]·  {line_range}[/]'
 
     # For edits (not new files), show delta as secondary line
+
     if not new_file and (added or removed):
         delta = format_activity_delta_secondary(added=added, removed=removed)
         if delta:
@@ -105,9 +107,9 @@ def render_file_read(
 ) -> list[Any]:
     """Render a file read event."""
     if line_range:
-        detail = f'{path}  [dim]·  {line_range}[/dim]'
+        detail = f'{path}  [{NAVY_TEXT_DIM}]·  {line_range}[/]'
     elif line_count:
-        detail = f'{path}  [dim]({line_count} lines)[/dim]'
+        detail = f'{path}  [{NAVY_TEXT_DIM}]({line_count} lines)[/]'
     else:
         detail = path
 

@@ -3135,6 +3135,21 @@ class GrintaScreen(Screen):
                 logger.exception('TUI _bootstrap: failed in phase2')
                 raise
 
+            # Warm up MCP servers (best-effort — failure is non-fatal)
+            try:
+                from backend.core.bootstrap.main import _setup_mcp_tools
+
+                await _setup_mcp_tools(agent, runtime, memory)
+                mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
+                try:
+                    mcp_n = int(mcp_status.get('connected_client_count') or 0)
+                except (TypeError, ValueError):
+                    mcp_n = 0
+                self._hud.update_mcp_servers(mcp_n)
+            except Exception:
+                _tui_logger.debug('_bootstrap: MCP warmup failed (non-fatal)')
+                self._hud.update_mcp_servers(0)
+
             _tui_logger.debug(
                 f'_bootstrap: controller created, state={controller.get_agent_state()}'
             )
