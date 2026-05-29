@@ -1599,24 +1599,22 @@ class GrintaScreen(Screen):
         line1_parts.append(f'[{NAVY_TEXT_SECONDARY}]Model: {model_display}[/]')
         ws_display = HUDBar.ellipsize_path(workspace, 35)
         line1_parts.append(f'[{NAVY_TEXT_DIM}]Ws: {ws_display}[/]')
+        line1 = '  '.join(line1_parts)
+
+        # Token count with context circle for top-right corner
         if limit > 0:
             pct = min(100, used * 100 // limit)
             ctx_color = (
-                NAVY_GREEN_ACCENT
-                if pct < 80
-                else NAVY_YELLOW_ACCENT
-                if pct < 95
+                NAVY_GREEN_ACCENT if pct < 80
+                else NAVY_YELLOW_ACCENT if pct < 95
                 else NAVY_RED_ACCENT
             )
-            line1_parts.append(
-                f'[{NAVY_TEXT_DIM}]Tok: {used:,} [{ctx_color}]({pct}%)[/][/]'
-            )
+            token_display = f'[{NAVY_TEXT_DIM}]Tok: {used:,} ({pct}%)  [{ctx_color}]●[/][/]'
         else:
-            line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
-        line1 = '  '.join(line1_parts)
+            token_display = f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]'
 
-        help_hint = r'  [#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
-        line2 = help_hint
+        help_hint = r'[#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
+        line2 = f'{token_display}   {help_hint}'
 
         hud_bar = self.query_one('#hud-bar', HUD)
         hud_bar.query_one('#hud-line-1', Label).update(line1)
