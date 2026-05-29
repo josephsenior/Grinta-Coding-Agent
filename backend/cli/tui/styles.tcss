@@ -243,13 +243,14 @@ HUD,
     height: auto;
     background: #0a1525;
     color: #969aad;
-    padding: 1 2;
+    padding: 0 2;
     border-top: solid #15233c;
 }
 
 #hud-line-1 {
     height: 1;
     text-style: bold;
+    border-top: solid #15233c;
 }
 
 #hud-line-2 {
@@ -263,7 +264,6 @@ HUD,
     layout: horizontal;
     align-vertical: middle;
     margin: 0;
-    border-top: solid #15233c;
     padding: 0;
 }
 

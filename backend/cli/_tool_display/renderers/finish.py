@@ -7,6 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from rich.text import Text
+
+from backend.cli._tool_display.renderers._syntax import highlight_code_blocks
 from backend.cli.theme import (
     CLR_DETAIL,
     CLR_SECONDARY,
@@ -28,7 +31,17 @@ def render_finish_summary(
     lines: list[Any] = []
 
     if summary:
-        lines.append(format_activity_primary('Finished', summary))
+        if '```' in summary:
+            highlighted = highlight_code_blocks(summary)
+            first = highlighted[0]
+            if isinstance(first, Text):
+                lines.append(format_activity_primary('Finished', first))
+            else:
+                lines.append(format_activity_primary('Finished', 'Result:'))
+                lines.append(first)
+            lines.extend(highlighted[1:])
+        else:
+            lines.append(format_activity_primary('Finished', summary))
 
     stats_parts: list[str] = []
     if files_changed > 0:

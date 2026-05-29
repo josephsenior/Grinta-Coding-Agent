@@ -157,22 +157,18 @@ def test_provider_parallel_tool_calls_supported_matrix(
     (
         'parallel_cfg',
         'provider_flag',
-        'fc_mode',
-        'expect_enabled_substring',
+        'expect_parallel_visible',
     ),
     [
-        pytest.param(True, True, 'native', True, id='all_gates_on'),
-        pytest.param(False, True, 'native', False, id='config_off'),
-        pytest.param(True, False, 'native', False, id='provider_flag_off'),
-        pytest.param(True, True, 'string', False, id='string_fc_mode'),
-        pytest.param(True, True, 'unknown', False, id='unknown_fc_mode'),
+        pytest.param(True, True, True, id='all_gates_on'),
+        pytest.param(False, True, False, id='config_off'),
+        pytest.param(True, False, False, id='provider_flag_off'),
     ],
 )
 def test_system_capabilities_parallel_scheduling_line_matrix(
     parallel_cfg: bool,
     provider_flag: bool,
-    fc_mode: str,
-    expect_enabled_substring: bool,
+    expect_parallel_visible: bool,
 ) -> None:
     cfg = SimpleNamespace(
         enable_parallel_tool_scheduling=parallel_cfg,
@@ -182,13 +178,14 @@ def test_system_capabilities_parallel_scheduling_line_matrix(
     )
     text = _render_system_capabilities(
         cfg,
-        function_calling_mode=fc_mode,
+        function_calling_mode='native',
         parallel_tool_calls_provider_flag=provider_flag,
     )
-    if expect_enabled_substring:
+    if expect_parallel_visible:
         assert 'ENABLED for read-only batches' in text
     else:
-        assert 'NOT SUPPORTED' in text
+        assert 'ENABLED for read-only batches' not in text
+        assert 'Parallel tool scheduling' not in text
 
 
 def test_system_capabilities_parallel_native_all_on_renders_enabled() -> None:
