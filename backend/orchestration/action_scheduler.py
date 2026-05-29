@@ -1,6 +1,6 @@
 """Action scheduling policies for orchestrator batch execution.
 
-This module centralizes concurrency decisions so parallel scheduling can be
+This module centralises concurrency decisions so parallel scheduling can be
 extended incrementally without coupling policy logic to SessionOrchestrator.
 """
 
@@ -12,10 +12,9 @@ from typing import Any
 from backend.core.constants import DEFAULT_AGENT_PARALLEL_BATCH_SIZE
 from backend.core.enums import ActionType
 
-# ActionType values that are observation-only (no side effects) and safe to
-# execute concurrently. Any batch containing an action outside this set
-# degrades to sequential execution.
-_PARALLEL_SAFE_ACTION_TYPES: frozenset[str] = frozenset({
+# Action types that are observation-only (no side effects) and safe to
+# execute concurrently in any mix (read + lsp + think + etc.).
+_READ_ONLY_ACTION_TYPES: frozenset[str] = frozenset({
     ActionType.READ,
     ActionType.LSP_QUERY,
     ActionType.THINK,
@@ -24,12 +23,23 @@ _PARALLEL_SAFE_ACTION_TYPES: frozenset[str] = frozenset({
     ActionType.BROWSER_TOOL,
 })
 
-# MCP tool names that are read-only.  The generic MCP action cannot be
-# classified by ActionType alone, so we check the tool name.
-_PARALLEL_SAFE_MCP_TOOL_NAMES: frozenset[str] = frozenset({
+# MCP tool names that are read-only.
+_READ_ONLY_MCP_TOOL_NAMES: frozenset[str] = frozenset({
     'search_code',
     'get_entity',
 })
+
+# Side-effect action types that may run in parallel when every action in the
+# batch shares the same category **and** targets a different resource (file
+# path, terminal session, etc.).  Each entry maps an ActionType string to a
+# logical category key.
+_SAME_TYPE_CATEGORIES: dict[str, str] = {
+    ActionType.TERMINAL_RUN: 'terminal',
+    ActionType.TERMINAL_INPUT: 'terminal',
+    ActionType.TERMINAL_READ: 'terminal',
+    ActionType.WRITE: 'file_write',
+    ActionType.EDIT: 'file_edit',
+}
 
 DEFAULT_MAX_PARALLEL_BATCH_SIZE = DEFAULT_AGENT_PARALLEL_BATCH_SIZE
 
@@ -49,11 +59,17 @@ class ParallelBatchDecision:
 class ActionScheduler:
     """Determines when queued actions are safe to execute concurrently.
 
-    The policy is simple:
-    - Observation-only actions (reads, queries, thinks) may run in parallel.
-    - Any action with side effects forces the entire batch to sequential.
-    - Mixed batches are *not* rejected --- they degrade to sequential so the
-      agent's intent is always preserved.
+    Policy summary (``enabled=True``):
+
+    * Read-only actions (reads, queries, thinks) may run in parallel in any
+      mix — they have no side effects.
+    * Same-type write-side-effect actions (e.g. multiple ``terminal_run``,
+      all ``edit`` to different files, all ``write`` to different files) may
+      also run in parallel **when they target distinct resources**.
+    * Actions that target the same resource (same file path, same terminal
+      session) always run sequentially.
+    * Mixed-type batches (e.g. a read + a write, a terminal + an edit) always
+      degrade to sequential so the agent's intent is preserved.
     """
 
     def __init__(
@@ -65,26 +81,66 @@ class ActionScheduler:
         self.enabled = enabled
         self.max_parallel_batch_size = max(1, max_parallel_batch_size)
 
-    def is_parallel_safe(self, action: Any) -> bool:
-        """Return True when an action is safe for concurrent execution."""
-        action_type = str(getattr(action, 'action', '') or '')
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
 
-        if action_type in _PARALLEL_SAFE_ACTION_TYPES:
-            return True
+    @staticmethod
+    def _action_type(action: Any) -> str:
+        return str(getattr(action, 'action', '') or '')
+
+    @staticmethod
+    def _resource_key(action: Any) -> str | None:
+        """Return a resource identifier for conflict detection.
+
+        Actions in the same same-type category with the same resource key
+        cannot execute concurrently (e.g. two edits to the same file, two
+        ``terminal_read`` on the same session).
+        """
+        path: Any = getattr(action, 'path', None)
+        if path:
+            return str(path)
+        session_id: Any = getattr(action, 'session_id', None)
+        if session_id is not None:
+            return str(session_id)
+        return None
+
+    def _classify(self, action: Any) -> str | None:
+        """Classify *action* into a concurrency category.
+
+        Returns
+        -------
+        ``'read_only'``
+            Always parallel-safe with any other ``'read_only'`` action.
+        A same-type category key (e.g. ``'terminal'``, ``'file_write'``)
+            Parallel-safe when **every** action in the batch shares this key
+            and all ``_resource_key()`` values differ.
+        ``None``
+            This action cannot run in parallel with any other action.
+        """
+        action_type = self._action_type(action)
+
+        if action_type in _READ_ONLY_ACTION_TYPES:
+            return 'read_only'
 
         if action_type == ActionType.MCP:
             tool_name = str(getattr(action, 'name', '') or '')
-            return tool_name in _PARALLEL_SAFE_MCP_TOOL_NAMES
+            if tool_name in _READ_ONLY_MCP_TOOL_NAMES:
+                return 'read_only'
+            return None  # Opaque MCP tools are always sequential
 
-        return False
+        return _SAME_TYPE_CATEGORIES.get(action_type)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def decide_parallel_batch(self, actions: list[Any]) -> ParallelBatchDecision:
-        """Return a conservative parallel-execution decision for pending actions.
+        """Return a parallel-execution decision for the pending *actions*.
 
-        When the batch contains any action that isn't parallel-safe the
-        decision returns ``should_execute_parallel=False`` so the caller
-        falls through to sequential execution --- the agent's requested
-        ordering is always preserved.
+        The decision is conservative: when the policy cannot guarantee safety,
+        ``should_execute_parallel`` is ``False`` and the caller falls through
+        to sequential execution.
         """
         if not self.enabled:
             return ParallelBatchDecision(
@@ -100,19 +156,69 @@ class ActionScheduler:
                 reason='insufficient_actions',
             )
 
-        if any(not self.is_parallel_safe(a) for a in actions):
+        # Classify every action.
+        classified: list[tuple[str | None, str | None]] = [
+            (self._classify(a), self._resource_key(a)) for a in actions
+        ]
+
+        categories = {c for c, _ in classified}
+
+        # Any action that is None (opaque MCP tool, legacy run, etc.) forces
+        # the entire batch to sequential.
+        if None in categories:
             return ParallelBatchDecision(
                 should_execute_parallel=False,
                 actions=(),
                 reason='mixed_batch_sequential',
             )
 
-        capped = tuple(actions[: self.max_parallel_batch_size])
-        overflow = tuple(actions[self.max_parallel_batch_size :])
-        reason = 'parallel_safe_batch' if not overflow else 'parallel_safe_batch_capped'
+        # All read-only → parallel irrespective of mix.
+        if categories == {'read_only'}:
+            capped = tuple(actions[: self.max_parallel_batch_size])
+            overflow = tuple(actions[self.max_parallel_batch_size :])
+            reason = (
+                'parallel_safe_batch'
+                if not overflow
+                else 'parallel_safe_batch_capped'
+            )
+            return ParallelBatchDecision(
+                should_execute_parallel=True,
+                actions=capped,
+                reason=reason,
+                overflow=overflow,
+            )
+
+        # All actions share the same side-effect category → check resources.
+        if len(categories) == 1:
+            resource_keys = [k for _, k in classified]
+            seen: set[str] = set()
+            for rk in resource_keys:
+                if rk is not None:
+                    if rk in seen:
+                        return ParallelBatchDecision(
+                            should_execute_parallel=False,
+                            actions=(),
+                            reason='same_resource_conflict',
+                        )
+                    seen.add(rk)
+
+            capped = tuple(actions[: self.max_parallel_batch_size])
+            overflow = tuple(actions[self.max_parallel_batch_size :])
+            reason = (
+                'parallel_safe_batch'
+                if not overflow
+                else 'parallel_safe_batch_capped'
+            )
+            return ParallelBatchDecision(
+                should_execute_parallel=True,
+                actions=capped,
+                reason=reason,
+                overflow=overflow,
+            )
+
+        # Mixed categories (e.g. read_only + file_write) → sequential.
         return ParallelBatchDecision(
-            should_execute_parallel=True,
-            actions=capped,
-            reason=reason,
-            overflow=overflow,
+            should_execute_parallel=False,
+            actions=(),
+            reason='mixed_batch_sequential',
         )

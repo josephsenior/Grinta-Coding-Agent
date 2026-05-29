@@ -69,10 +69,12 @@ if TYPE_CHECKING:
 
 
 def _provider_parallel_tool_calls_supported(model_id: str) -> bool:
-    """Return True when the active model's catalog entry advertises parallel tool_calls.
+    """Return True when the active model supports parallel tool_calls.
 
-    Strictly model-agnostic: we read the catalog capability flag, never the
-    model name. A model lacking the flag never gets the kwarg.
+    Checks the catalog first for ``supports_parallel_tool_calls``.  For
+    uncataloged models, falls back to
+    ``model_features.get_features().supports_function_calling`` — models
+    that support function calling generally also support parallel tool calls.
     """
     if not model_id:
         return False
@@ -80,9 +82,14 @@ def _provider_parallel_tool_calls_supported(model_id: str) -> bool:
         from backend.inference.catalog_loader import lookup as _catalog_lookup
 
         entry = _catalog_lookup(model_id)
-        if entry is None:
-            return False
-        return bool(getattr(entry, 'supports_parallel_tool_calls', False))
+        if entry is not None:
+            return bool(getattr(entry, 'supports_parallel_tool_calls', False))
+    except Exception:
+        pass
+    try:
+        from backend.inference.model_features import get_features
+
+        return get_features(model_id).supports_function_calling
     except Exception:
         return False
 
