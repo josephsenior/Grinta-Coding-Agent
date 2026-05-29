@@ -20,6 +20,7 @@ from backend.cli.layout_tokens import (
 )
 from backend.cli.path_links import linkify_plain
 from backend.cli.theme import (
+    CLR_CARD_BORDER,
     CLR_DIFF_ADD,
     CLR_DIFF_REM,
     CLR_ERR_BODY,
@@ -231,7 +232,13 @@ def format_activity_block(
     title: str | None = None,
     badge_label: str | None = None,
 ) -> Any:
-    """Primary row plus optional secondary rows, optionally prefixed with a title."""
+    """Primary row plus optional secondary rows, wrapped in a bordered card panel.
+
+    When ``badge_label`` or ``title`` is provided the output is wrapped in a
+    ``Panel`` whose border matches ``CLR_CARD_BORDER`` (matching ``shell.py``
+    and the TUI ``ActivityCard`` widget).  Plain activity rows (no badge, no
+    title) are returned as a bare ``Group`` with no border.
+    """
     parts: list[Any] = [format_activity_primary(verb, detail)]
     if secondary:
         parts.append(format_activity_secondary(secondary, kind=secondary_kind))
@@ -240,20 +247,30 @@ def format_activity_block(
     if extra_lines:
         parts.extend(extra_lines)
     content = Group(*parts)
-    if title or badge_label:
-        title_parts: list[Any] = []
-        if badge_label:
-            from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 
-            title_parts.append(
-                Text.from_markup(badge_for_tool_name(badge_label).render())
-            )
-        if title:
-            title_line = Text()
-            title_line.append(_ACTIVITY_PRIMARY_INDENT, style=STYLE_EMPTY)
-            title_line.append((title or '').strip(), style=ACTIVITY_CARD_TITLE_STYLE)
-            title_parts.append(title_line)
-        return Group(Group(*title_parts), content)
+    if badge_label:
+        from backend.cli._tool_display.renderers.badge import badge_for_tool_name
+
+        badge = badge_for_tool_name(badge_label)
+        panel_title = Text(badge.label, style=f'bold {badge.label_color}')
+        return Panel(
+            content,
+            title=panel_title,
+            title_align='left',
+            border_style=CLR_CARD_BORDER,
+            padding=(0, 2),
+        )
+
+    if title:
+        panel_title = Text(title.strip(), style=ACTIVITY_CARD_TITLE_STYLE)
+        return Panel(
+            content,
+            title=panel_title,
+            title_align='left',
+            border_style=CLR_CARD_BORDER,
+            padding=(0, 2),
+        )
+
     return content
 
 
@@ -295,13 +312,13 @@ def format_activity_shell_block(
     title: str | None = None,
     badge_label: str | None = None,
 ) -> Any:
-    """Shell command activity block — same visual style as other tool cards."""
-    extra_lines = list(extra_lines) if extra_lines else []
-    if badge_label:
-        from backend.cli._tool_display.renderers.badge import badge_for_tool_name
+    """Shell command activity block — same visual style as other tool cards.
 
-        badge = badge_for_tool_name(badge_label)
-        extra_lines.insert(0, format_activity_secondary(badge.render(), kind='neutral'))
+    The badge label is forwarded to :func:`format_activity_block` which uses it
+    as the ``Panel`` title (rather than embedding it as a text line).
+    """
+    if badge_label:
+        title = title or badge_label
     return format_activity_block(
         verb,
         detail,
@@ -309,8 +326,9 @@ def format_activity_shell_block(
         secondary_kind=secondary_kind,
         result_message=result_message,
         result_kind=result_kind,
-        extra_lines=extra_lines if extra_lines else None,
+        extra_lines=extra_lines,
         title=title,
+        badge_label=badge_label,
     )
 
 
