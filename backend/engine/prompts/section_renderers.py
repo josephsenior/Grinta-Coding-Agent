@@ -289,22 +289,13 @@ def _render_system_capabilities(
     checkpoints_on = bool(getattr(config, 'enable_checkpoints', False))
     fc_mode = (function_calling_mode or 'unknown').strip().lower()
 
-    if parallel_enabled and parallel_tool_calls_provider_flag and fc_mode == 'native':
-        parallel_line = (
-            '- **Parallel tool scheduling**: ENABLED for read-only batches '
-            '(`read`, `search_code`, `lsp`).\n'
-            '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
-            'Emit independent reads in a single assistant turn to run them concurrently.\n'
-            '  - **Constraint**: Writes, edits, and shell commands always run sequentially.'
-        )
-        provider_line = ''
-    else:
-        parallel_line = (
-            '- **Parallel tool calls**: NOT SUPPORTED by this model/run. '
-            'Emit exactly ONE tool call per assistant turn. '
-            'Batching multiple tool calls will cause errors.'
-        )
-        provider_line = ''
+    parallel_line = (
+        '- **Parallel tool scheduling**: ENABLED for read-only batches '
+        '(`read`, `search_code`, `lsp`).\n'
+        '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
+        'Emit independent reads in a single assistant turn to run them concurrently.\n'
+        '  - **Constraint**: Writes, edits, and shell commands always run sequentially.'
+    ) if parallel_enabled and parallel_tool_calls_provider_flag else ''
 
     condensation_line = (
         '- **Conversation condensation**: AUTOMATIC and middleware-driven. '
@@ -337,14 +328,14 @@ def _render_system_capabilities(
     )
 
     parts = [
-        '# 🧭 System Capabilities (verified at runtime)\n'
+        '# 🧠 System Capabilities (verified at runtime)\n'
         'The following statements are derived from live config and feature flags. '
         'Treat them as authoritative — do not contradict them in user-facing replies.'
         f'{runtime_discovery_hint}\n\n'
-        f'{parallel_line}\n'
-        f'{provider_line}\n'
         f'{condensation_line}\n'
     ]
+    if parallel_line:
+        parts.append(f'{parallel_line}\n')
     if checkpoint_line:
         parts.append(f'{checkpoint_line}\n')
     parts.append(f'{fc_line}\n')
@@ -793,8 +784,6 @@ def _render_critical(
     destructive_ops_antipattern = (
         '- **Running `rm`, `Remove-Item`, force pushes, or other destructive ops without explicit confirmation from the confirmation gate.**'
         + (' If available, take a `checkpoint` first.' if checkpoints_on else '')
-        if True
-        else ''
     )
 
     planning_tool_list = (

@@ -735,7 +735,6 @@ class HUD(Vertical):
     """Multi-line status bar at the very bottom."""
 
     def compose(self) -> ComposeResult:
-        yield Label(id='hud-line-1')
         with Horizontal(id='hud-line-2-row'):
             yield Label('[#7a6a4a]Mode:[/]', id='hud-label-mode')
             yield Select(
@@ -752,6 +751,7 @@ class HUD(Vertical):
                 allow_blank=False,
             )
             yield Label(id='hud-line-2')
+        yield Label(id='hud-line-1')
 
 
 class RendererDrainRequested(Message):
