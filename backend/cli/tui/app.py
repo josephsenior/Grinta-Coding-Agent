@@ -1578,7 +1578,6 @@ class GrintaScreen(Screen):
         raw_state = hud.state.agent_state_label or 'Ready'
         display_state, state_color = self._resolve_state_display(raw_state)
 
-        cost = hud.state.cost_usd or 0
         used = hud.state.context_tokens
         limit = hud.state.context_limit
         # Restore Model and Autonomy
@@ -1614,7 +1613,6 @@ class GrintaScreen(Screen):
             )
         else:
             line1_parts.append(f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]')
-        line1_parts.append(f'[{NAVY_TEXT_PRIMARY}]${cost:.4f}[/]')
         line1 = '  '.join(line1_parts)
 
         help_hint = r'  [#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
