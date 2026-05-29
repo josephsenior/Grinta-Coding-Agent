@@ -294,7 +294,9 @@ def _render_system_capabilities(
         '(`read`, `search_code`, `lsp`).\n'
         '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
         'Emit independent reads in a single assistant turn to run them concurrently.\n'
-        '  - **Constraint**: Writes, edits, and shell commands always run sequentially.'
+        '  - **Constraint**: Side-effect actions (writes, edits, shell commands) '
+        'may run in parallel only when every action shares the same type '
+        'and targets a different resource (file path or terminal session).'
     ) if parallel_enabled and parallel_tool_calls_provider_flag else ''
 
     condensation_line = (
