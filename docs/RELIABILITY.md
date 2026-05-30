@@ -37,10 +37,7 @@ actions so the agent does not lose context on an unrelated tool result.
 
 * **Null-action recovery.** When the model returns no actionable tool call
   the controller injects a recovery prompt rather than looping.
-* **Pending-action timeouts.** Two tiers: short-running tools default to
-  120 s, long-running interactive tools (debugger, terminal) default to 600 s.
-  Per-tool timeouts in `backend/core/constants.py` (`TOOL_BRIDGE_TIMEOUT_*`)
-  are sourced from a single place and respect any explicit `action.timeout`.
+* **Pending-action timeouts.** Two tiers: **debugger tools** default to 120 s, **terminal tools** (bash, PowerShell, interactive shell) default to 600 s. These map to `TOOL_BRIDGE_TIMEOUT_DEBUGGER` and `TOOL_BRIDGE_TIMEOUT_TERMINAL_RUN` in `backend/core/constants.py`, which respect any explicit `action.timeout`.
 
 ## Debugger latency contract
 

@@ -12,7 +12,7 @@ local LLM automatically, and solves a real bug end-to-end.
 
 ## Pre-flight (do this BEFORE pressing record)
 
-1. Have **Ollama** running locally with `llama3.1:8b` (or any code-capable
+1. Have **Ollama** running locally with `llama3.2` (or any code-capable
    model) pulled. Grinta auto-detects it.
 2. Use a fresh demo workspace:
 
@@ -63,7 +63,7 @@ grinta
 # 0:22–0:55  — Watch HUD: tokens / cost (0.00 USD on Ollama) / latency
 #              tick up while Grinta:
 #                 1. runs pytest, sees ZeroDivisionError
-#                 2. opens calc.py via `read_symbol_definition`
+#                 2. opens calc.py via `read`
 #                 3. patches average() to handle empty list
 #                 4. re-runs pytest, sees green
 #                 5. announces FINISHED
