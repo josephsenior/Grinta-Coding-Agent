@@ -583,6 +583,33 @@ def _build_autonomy_block(mode: str, *, checkpoints_on: bool) -> str:
     )
 
 
+def _build_response_style_block(mode: str) -> str:
+    from backend.core.interaction_modes import (
+        is_chat_mode,
+        is_plan_mode,
+    )
+    if is_chat_mode(mode):
+        return (
+            'In Chat mode, prose is the default. '
+            'Use tools only when investigation is needed.'
+        )
+    if is_plan_mode(mode):
+        return (
+            'In Plan mode, tool calls are the default until the run ends:\n'
+            '- use tools to inspect the project and produce a structured plan\n'
+            '- use `communicate_with_user` for blocking questions when available\n'
+            '- use `finish` for final outcome\n'
+            '- do not use plain prose as a substitute for an action'
+        )
+    return (
+        'In Agent mode, tool calls are the default until the run ends:\n'
+        '- use tools to inspect, plan, edit, execute, and verify\n'
+        '- use `communicate_with_user` for blocking questions when available\n'
+        '- use `finish` for final outcome\n'
+        '- do not use plain prose as a substitute for an action'
+    )
+
+
 def _render_autonomy(
     render_partial: Callable[..., str],
     config: Any,
@@ -929,8 +956,15 @@ def _append_mcp_connected_catalog_sections(
     mcp_tool_names: list[str],
     mcp_tool_descriptions: dict[str, str],
     mcp_server_hints: list[dict[str, str]],
+    mode: str,
 ) -> None:
+    from backend.core.interaction_modes import is_plan_mode
     total = len(mcp_tool_names)
+    mode_rule = (
+        'Mode rules override MCP capability suggestions.'
+        if not is_plan_mode(mode)
+        else 'Mode rules override MCP capability suggestions. Plan mode remains read-only.'
+    )
     parts.extend(
         (
             '<CURATED_MCP_CAPABILITIES>\n'
@@ -941,7 +975,7 @@ def _append_mcp_connected_catalog_sections(
             '- Docs / Context7: use for reliable library/framework documentation when the library is known.\n'
             '- UI / shadcn: use only for React/Tailwind/shadcn component work.\n'
             '- Quality Gates: use for tests, lint, typecheck, formatting checks, and finish-readiness validation.\n\n'
-            'Mode rules override MCP capability suggestions. Plan mode remains read-only.\n'
+            f'{mode_rule}\n'
             '</CURATED_MCP_CAPABILITIES>',
             f'🔌 **External MCP tools** ({total}): use **`call_mcp_tool(tool_name="...", arguments={{...}})`** '
             f'— argument shapes match the registered tool schema.',
@@ -1000,7 +1034,13 @@ def _append_mcp_connected_catalog_sections(
 def _mcp_tail_render_kwargs(
     render_partial: Callable[..., str],
     config: Any,
+    mode: str | None = None,
 ) -> str:
+    from backend.core.interaction_modes import normalize_interaction_mode
+    resolved_mode = normalize_interaction_mode(
+        mode if mode is not None else getattr(config, 'mode', 'agent')
+    )
+    response_style_body = _build_response_style_block(resolved_mode)
     meta_cognition = getattr(config, 'enable_meta_cognition', False)
     communicate_tool_section = (
         '<COMMUNICATE_TOOL>\n'
@@ -1016,6 +1056,7 @@ def _mcp_tail_render_kwargs(
         uncertainty_state_1_discover_line = '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**, not shell repo search/read. Do NOT ask first.'
     return render_partial(
         'system_partial_03_tail.md',
+        response_style_body=response_style_body,
         communicate_tool_section=communicate_tool_section,
         interaction_guidance=(
             'If a request is vague, inspect nearby docs/config first; use `communicate_with_user` only if you are still blocked or the scope is still ambiguous.'
@@ -1043,6 +1084,8 @@ def _render_mcp_and_permissions(
     mcp_server_hints: list[dict[str, str]],
     config: Any,
 ) -> str:
+    from backend.core.interaction_modes import normalize_interaction_mode
+    mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
     parts: list[str] = ['<MCP_TOOLS>']
 
     if mcp_tool_names:
@@ -1051,6 +1094,7 @@ def _render_mcp_and_permissions(
             mcp_tool_names,
             mcp_tool_descriptions,
             mcp_server_hints,
+            mode,
         )
     else:
         parts.append('No external MCP tools connected.')
@@ -1061,6 +1105,6 @@ def _render_mcp_and_permissions(
         if perm is not None:
             parts.extend(('', _render_permissions(config, perm)))
 
-    parts.extend(('', _mcp_tail_render_kwargs(render_partial, config)))
+    parts.extend(('', _mcp_tail_render_kwargs(render_partial, config, mode)))
 
     return '\n'.join(parts)
