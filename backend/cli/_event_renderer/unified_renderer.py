@@ -514,7 +514,7 @@ class ActivityRenderer:
         )
 
     @staticmethod
-    def condensation(pruned_count: int = 0, count: int = 1, result: str | None = None) -> ActivityCard:
+    def condensation(count: int = 1, result: str | None = None) -> ActivityCard:
         """Create an activity card for context condensation."""
         suffix = (
             'st'
@@ -525,10 +525,9 @@ class ActivityRenderer:
             if count % 10 == 3 and count % 11 != 3
             else 'th'
         )
-        detail = f'{pruned_count} events' if pruned_count else 'context'
         return ActivityCard(
             verb=f'Compressed ({count}{suffix})',
-            detail=detail,
+            detail='context',
             badge_category='tool',
             extra_lines=[result] if result else None,
             is_collapsible=bool(result),

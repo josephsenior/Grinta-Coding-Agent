@@ -23,6 +23,7 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
+import pyperclip
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.rule import Rule
@@ -758,6 +759,41 @@ class InputBar(Horizontal):
 
 class PromptTextArea(TextArea):
     """Input area that routes arrow navigation to welcome suggestions when idle."""
+
+    def _on_paste(self, event: events.Paste) -> None:
+        """Handle paste events by reading the system clipboard directly.
+
+        In most terminals (Windows Terminal, etc.), Ctrl+V is intercepted and
+        forwarded as a bracketed paste event. For large clipboard content, the
+        terminal/PTY can silently truncate the data mid-stream — the paste event
+        arrives with incomplete or empty text, so the user sees nothing.
+
+        Bypass this by reading the system clipboard directly via pyperclip.
+        Falls back to the paste-event text when pyperclip is unavailable.
+        """
+        if self.read_only:
+            return
+        try:
+            clipboard = pyperclip.paste()
+        except Exception:
+            clipboard = event.text
+        if result := self._replace_via_keyboard(clipboard, *self.selection):
+            self.move_cursor(result.end_location)
+
+    def action_paste(self) -> None:
+        """Paste from system clipboard directly.
+
+        This handles the case where Ctrl+V is NOT intercepted by the terminal
+        and reaches the app as a key binding.
+        """
+        if self.read_only:
+            return
+        try:
+            clipboard = pyperclip.paste()
+        except Exception:
+            return super().action_paste()
+        if result := self._replace_via_keyboard(clipboard, *self.selection):
+            self.move_cursor(result.end_location)
 
     def on_key(self, event: events.Key) -> None:
         screen = getattr(self, 'screen', None)
@@ -4796,14 +4832,9 @@ class TUIRenderer:
         elif isinstance(event, RecallFailureObservation):
             pass
         elif isinstance(event, CondensationAction):
-            pruned_count = 0
-            if event.pruned_event_ids:
-                pruned_count = len(event.pruned_event_ids)
-            elif event.pruned_events_start_id is not None and event.pruned_events_end_id is not None:
-                pruned_count = event.pruned_events_end_id - event.pruned_events_start_id + 1
             count = self._condensation_count + 1
             self._condensation_count = count
-            card = ActivityRenderer.condensation(pruned_count, count)
+            card = ActivityRenderer.condensation(count=count)
             self._write_card(card)
             self._hud.update_condensation_count(count)
         elif isinstance(event, AgentCondensationObservation):
