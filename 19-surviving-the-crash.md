@@ -74,9 +74,27 @@ That is why the durability layer uses an asynchronous writer with explicit queue
 
 This is the kind of boring engineering people skip in conference demos. It is also exactly what prevents an overloaded run from collapsing when persistence gets slow.
 
-## The WAL Contract
+### The Durability Pipeline
 
-The Write-Ahead Log design in Grinta is intentionally simple and brutal:
+```mermaid
+flowchart LR
+    Event[Event\npublished] --> Async{critical?}
+    Async -->|yes| SyncWrite[Sync persist\nimmediate to disk]
+    Async -->|no| Queue[Async writer queue\nbounded 4096]
+    Queue --> Batch[Micro-batch\nup to 16 events]
+    Batch --> WAL[WAL write\n*.pending marker]
+    WAL --> Canonical[Canonical event file]
+    Canonical --> Clean[Remove *.pending]
+    SyncWrite --> Disk[(Disk\nappend-only store)]
+    Clean --> Disk
+    Crash[Crash\nat any point] --> Recovery[Recovery scan\n*.pending markers]
+    Recovery -->|canonical exists| Stale[Clean stale marker]
+    Recovery -->|canonical missing| Restore[Recover pending → canonical]
+    Stale --> Disk
+    Restore --> Disk
+```
+
+The WAL contract is intentionally simple and brutal:
 
 1. Write event JSON to `*.pending` marker.
 2. Write canonical event file.
@@ -134,4 +152,4 @@ Crash survival is not a feature on top of the agent. It is the floor under every
 
 ---
 
-← [The Mind of the Agent](18-the-mind-of-the-agent.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [Circuit Breakers and Hallucinations](20-circuit-breakers-and-hallucinations.md) →
+← [The Mind of the Agent](18-the-mind-of-the-agent.md) | [The Book of Grinta](README.md) | [Circuit Breakers and Hallucinations](20-circuit-breakers-and-hallucinations.md) →

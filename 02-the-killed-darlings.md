@@ -468,4 +468,4 @@ That is the next chapter.
 
 ---
 
-← [The SaaS Fortress](01-the-saas-fortress.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Architectural Gauntlet](03-the-architectural-gauntlet.md) →
+← [The SaaS Fortress](01-the-saas-fortress.md) | [The Book of Grinta](README.md) | [The Architectural Gauntlet](03-the-architectural-gauntlet.md) →

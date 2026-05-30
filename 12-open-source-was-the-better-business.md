@@ -88,4 +88,4 @@ Open source was not the fallback plan. It was the only architecture that let Gri
 
 ---
 
-← [The Console Wars](11-the-console-wars.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Hidden Playbooks](13-the-hidden-playbooks.md) →
+← [The Console Wars](11-the-console-wars.md) | [The Book of Grinta](README.md) | [The Hidden Playbooks](13-the-hidden-playbooks.md) →

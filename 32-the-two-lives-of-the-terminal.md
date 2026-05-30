@@ -1,4 +1,4 @@
-# 31. The Two Lives of the Terminal
+# 28. The Two Lives of the Terminal
 
 I did not go back in time to erase [chapter 11](11-the-console-wars.md). That would miss the point of how this project grows. The “Console Wars” are still the truth: Windows and Unix disagree about what a process even *is*, tmux is still the gold standard where it exists, and the three implementation tiers (tmux bash, simple bash, PowerShell) are still the map most commands follow every day.
 
@@ -67,4 +67,4 @@ That is not retreating from the console wars. It is surviving them without lying
 
 ---
 
-← [The Myth of the Committee](31-the-myth-of-the-committee.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Small Async Wars](33-the-small-async-wars.md) →
+← [The Myth of the Committee](31-the-myth-of-the-committee.md) | [The Book of Grinta](README.md) | [The Small Async Wars](33-the-small-async-wars.md) →

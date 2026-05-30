@@ -483,4 +483,4 @@ That is where the story moves next.
 
 ---
 
-← [The Context War](04-the-context-war.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The System Design Playbook](06-the-system-design-playbook.md) →
+← [The Context War](04-the-context-war.md) | [The Book of Grinta](README.md) | [The System Design Playbook](06-the-system-design-playbook.md) →

@@ -1,4 +1,4 @@
-# 23. The Parallelization Trap: When Speed Breaks the Agent
+# 24. The Parallelization Trap: When Speed Breaks the Agent
 
 The premise sounds perfect: If an agent can read a file in one second, why not let it read ten files at once? Why not let it run a search, start a server, and edit a config all in the same batch?
 
@@ -8,7 +8,7 @@ I fell for this premise. And it broke everything.
 
 ## The Illusion of Throughput
 
-When I first considered parallelization for Grinta, I envisioned a massive throughput boost. The model could issue an array of parallel tool calls—`read_file`, `grep_search`, `cmd_run`—and process them all simultaneously.
+When I first considered parallelization for Grinta, I envisioned a massive throughput boost. The model could issue an array of parallel tool calls—`read`, `search_code`, `cmd_run`—and process them all simultaneously.
 
 But autonomous coding agents are not just glorified task runners. They are state machines that rely on an unbroken, deterministic chain of events.
 
@@ -72,8 +72,8 @@ Throughput should never cost you determinism. When it does, your agent isn't get
 
 ## What Comes Next
 
-The next chapter returns to the epilogue perspective: what remains unfinished, where the architecture is still evolving, and what constraints still need better answers.
+The next chapter explores how we debug a non-deterministic agent loop and manage token budgets in production.
 
 ---
 
-← [The Middleware Contract](23-the-middleware-contract.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Identity and Execution Crisis](24-the-identity-and-execution-crisis.md) →
+← [The Identity and Execution Crisis](24-the-identity-and-execution-crisis.md) | [The Book of Grinta](README.md) | [The Observability, Cost, and Latency Triad](27-the-observability-black-hole.md) →

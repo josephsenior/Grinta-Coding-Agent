@@ -137,4 +137,4 @@ And in engineering, working answers you can iterate on are worth more than perfe
 
 ---
 
-← [The System Design Playbook](06-the-system-design-playbook.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The 3 AM Decisions](09-the-3am-decisions.md) →
+← [The System Design Playbook](06-the-system-design-playbook.md) | [The Book of Grinta](README.md) | [The 3 AM Decisions](09-the-3am-decisions.md) →

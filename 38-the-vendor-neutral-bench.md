@@ -1,4 +1,4 @@
-# 37. The Vendor-Neutral Bench
+# 34. The Vendor-Neutral Bench
 
 I have a complicated relationship with benchmarks.
 
@@ -99,4 +99,4 @@ What it *is*, today: the smallest scorer I could write that lets me ask a seriou
 
 ---
 
-← [The Verbose Status](37-the-verbose-status.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Road Ahead](07-the-road-ahead.md) →
+← [The Verbose Status](37-the-verbose-status.md) | [The Book of Grinta](README.md) | [The Semantic Memory That Survived](39-the-semantic-memory-that-survived.md) →

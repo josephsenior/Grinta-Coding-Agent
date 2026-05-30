@@ -98,4 +98,4 @@ The loneliness of solo engineering is real. So is the uncompromising clarity tha
 
 ---
 
-← [The First Fixed Issue](08-the-first-fixed-issue.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Model-Agnostic Reckoning](10-model-agnostic-reckoning.md) →
+← [The First Fixed Issue](08-the-first-fixed-issue.md) | [The Book of Grinta](README.md) | [The Model-Agnostic Reckoning](10-model-agnostic-reckoning.md) →

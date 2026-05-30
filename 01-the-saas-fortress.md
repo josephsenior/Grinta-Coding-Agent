@@ -302,4 +302,4 @@ The next chapter is where those deletions become real.
 
 ---
 
-← [The Meaning of Grinta](00-the-meaning-of-grinta.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Killed Darlings](02-the-killed-darlings.md) →
+← [The Meaning of Grinta](00-the-meaning-of-grinta.md) | [The Book of Grinta](README.md) | [The Killed Darlings](02-the-killed-darlings.md) →

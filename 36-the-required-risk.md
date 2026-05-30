@@ -1,4 +1,4 @@
-# 35. The Required Risk
+# 32. The Required Risk
 
 There is a particular failure mode I came to recognize on sight.
 
@@ -94,4 +94,4 @@ The composite effect is a system where the model has to be honest about risk, th
 
 ---
 
-← [The Self-Knowing Agent](35-the-self-knowing-agent.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Verbose Status](37-the-verbose-status.md) →
+← [The Self-Knowing Agent](35-the-self-knowing-agent.md) | [The Book of Grinta](README.md) | [The Verbose Status](37-the-verbose-status.md) →

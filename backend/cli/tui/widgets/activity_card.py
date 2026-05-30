@@ -650,12 +650,14 @@ class AgentMessage(Static):
 
     def __init__(self, text: str, *, id: str | None = None) -> None:
         from rich.markdown import Markdown
-        super().__init__(Markdown(text), id=id)
+        from backend.cli.theme import get_grinta_pygments_style
+        super().__init__(Markdown(text, code_theme=get_grinta_pygments_style()), id=id)
 
     def update_message(self, text: str) -> None:
         """Update message content dynamically."""
         from rich.markdown import Markdown
-        self.update(Markdown(text))
+        from backend.cli.theme import get_grinta_pygments_style
+        self.update(Markdown(text, code_theme=get_grinta_pygments_style()))
 
 
 class ThinkingIndicator(Static):

@@ -116,4 +116,4 @@ That alignment is what turned this debugging period into a reliability upgrade r
 
 ---
 
-← [The Parallelization Trap](23-the-parallelization-trap.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Perfect Prompt Illusion](24-the-perfect-prompt-illusion.md) →
+← [The Middleware Contract](23-the-middleware-contract.md) | [The Book of Grinta](README.md) | [The Parallelization Trap](25-the-parallelization-trap.md) →

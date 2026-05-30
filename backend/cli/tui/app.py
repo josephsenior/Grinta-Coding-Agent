@@ -3765,7 +3765,7 @@ class TUIRenderer:
                 display = self._tui._get_display()
                 if type(display).__name__ != 'MagicMock':
                     content = Text(
-                        '  '.join(thoughts), style='rgb(150,154,189)'
+                        '\n  '.join(thoughts), style='rgb(150,154,189)'
                     )
                     display.append_widget(
                         Static(

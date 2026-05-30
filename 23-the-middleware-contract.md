@@ -36,6 +36,24 @@ Good middleware architecture is not "did we add the feature?" It is "did we plac
 
 That distinction decides reliability.
 
+### The Pipeline Shape
+
+```mermaid
+flowchart LR
+    Action[Action\narrives] --> Telemetry[Telemetry\nlog invocation]
+    Telemetry --> Cost[CostTracker\nrecord before spend]
+    Cost --> Rollback[Rollback\nsnapshot before write]
+    Rollback --> Safety[SafetyGate\nrisk classification]
+    Safety --> Blocked{blocked?}
+    Blocked -->|yes| Fail[ErrorObservation\nmiddleware reason]
+    Blocked -->|no| Execute[Execute\ntool dispatch]
+    Execute --> Observe[Observe stage\nreconcile reality]
+    Observe --> Update[Update audit\ncontext + checkpoint]
+    Update --> Result[Result\nreturned]
+```
+
+The order is not cosmetic. Each stage depends on the one before it: telemetry must fire before cost tracking, cost tracking must fire before rollback (so the cost of the rollback itself is visible), rollback must fire before safety (so the snapshot exists before the risky action), and safety must fire before execution (so the gate can block).
+
 ## The Rollback Story Was a Real Lesson
 
 One of the most practical examples in Grinta is rollback integration.
@@ -131,4 +149,4 @@ The next chapter tackles one of the most tempting mistakes in autonomous agent d
 
 ---
 
-← [Who Grades the Agent](22-who-grades-the-agent.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Parallelization Trap](23-the-parallelization-trap.md) →
+← [Who Grades the Agent](22-who-grades-the-agent.md) | [The Book of Grinta](README.md) | [The Identity and Execution Crisis](24-the-identity-and-execution-crisis.md) →

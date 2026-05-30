@@ -35,14 +35,20 @@ def render_think(thought: str, source_tool: str = '') -> list[Any]:
 
     if len(paragraphs) > 1:
         for para in paragraphs[1:4]:
-            text = para.replace('\n', ' ').strip()
-            if len(text) > 100:
-                text = text[:97] + '…'
-            if text:
-                # Escape text to prevent MarkupError from unescaped brackets
-                escaped_text = markup_escape(text)
+            if not para.strip():
+                continue
+            # Build continuation lines preserving internal line breaks
+            para_lines = [l.strip() for l in para.split('\n') if l.strip()]
+            for pl in para_lines[:6]:
+                if len(pl) > 100:
+                    pl = pl[:97] + '…'
+                escaped = markup_escape(pl)
                 lines.append(
-                    f'  [{CLR_THOUGHT_BODY}]{escaped_text}[/{CLR_THOUGHT_BODY}]'
+                    f'  [{CLR_THOUGHT_BODY}]{escaped}[/{CLR_THOUGHT_BODY}]'
+                )
+            if len(para_lines) > 6:
+                lines.append(
+                    f'  [{CLR_THOUGHT_BODY}]… ({len(para_lines) - 6} more lines)[/{CLR_THOUGHT_BODY}]'
                 )
 
     return lines
