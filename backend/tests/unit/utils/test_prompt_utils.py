@@ -973,7 +973,6 @@ class TestBuildSystemPromptRenders:
     OLD_EDIT_FORMATS = [
         'XML edit block',
         'raw editor block',
-        'apply_patch',
         'heredoc source write',
     ]
 

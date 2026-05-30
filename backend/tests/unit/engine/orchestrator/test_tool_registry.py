@@ -136,7 +136,6 @@ class TestFeatureFlagToolPresence:
         }
         assert public_file_tools <= names
         assert {
-            'apply_patch',
             'patch',
             'replace_range',
             'section_edit',

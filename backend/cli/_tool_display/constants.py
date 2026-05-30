@@ -20,7 +20,7 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'replace_string': ('', 'Files'),
     'edit_symbols': ('', 'Code edit'),
     'multiedit': ('', 'Files'),
-    'find_symbol': ('', 'Code edit'),
+    'find_symbols': ('', 'Code edit'),
     'agent_think': ('', 'Think'),
     'think': ('', 'Think'),
     'finish': ('', 'Finish'),
