@@ -855,10 +855,10 @@ class ConfirmWidget(Widget):
     ConfirmWidget {
         dock: top;
         height: auto;
-        max-height: 6;
-        background: #0d1321;
-        border-top: tall #1e293b;
-        border-bottom: tall #1e293b;
+        max-height: 5;
+        background: #0f1729;
+        border-top: tall #1a2744;
+        border-bottom: tall #1a2744;
         padding: 0 2;
         display: none;
     }
@@ -874,35 +874,49 @@ class ConfirmWidget(Widget):
         width: 1fr;
         height: auto;
         color: #cbd5e1;
+        padding: 0 1;
     }
     ConfirmWidget #confirm-actions {
         height: auto;
-        align-horizontal: right;
         dock: right;
         margin-left: 2;
     }
     ConfirmWidget #confirm-actions Button {
-        min-width: 12;
+        min-width: 0;
+        width: auto;
         margin-left: 1;
+        height: 1;
+    }
+    ConfirmWidget Button.-primary {
+        background: #2563eb;
+        color: #ffffff;
+    }
+    ConfirmWidget Button.-default {
+        background: #1e293b;
+        color: #94a3b8;
+    }
+    ConfirmWidget .confirm-label {
+        color: #64748b;
     }
     ConfirmWidget .confirm-type {
-        color: #91abec;
+        color: #7dd3fc;
         text-style: bold;
     }
+    ConfirmWidget .confirm-target {
+        color: #e2e8f0;
+        text-style: italic;
+    }
     ConfirmWidget .confirm-risk-low {
-        color: #54efae;
+        color: #4ade80;
     }
     ConfirmWidget .confirm-risk-medium {
-        color: #eacb8a;
+        color: #fbbf24;
     }
     ConfirmWidget .confirm-risk-high {
         color: #f87171;
     }
     ConfirmWidget .confirm-risk-unknown {
-        color: #6f83aa;
-    }
-    ConfirmWidget .confirm-target {
-        color: #8f9fc1;
+        color: #94a3b8;
     }
     """
 
@@ -929,12 +943,19 @@ class ConfirmWidget(Widget):
         recommended: int | None = None,
     ) -> None:
         """Populate the confirmation bar with action details."""
-        info_parts = [f'<span class="confirm-type">{action_type}</span>']
         if target:
-            truncated = target if len(target) <= 60 else target[:57] + '...'
-            info_parts.append(f'<span class="confirm-target">{truncated}</span>')
-        info_parts.append(f'<span class="{risk_class}">{risk_label}</span>')
-        info = '  ·  '.join(info_parts)
+            truncated = target if len(target) <= 50 else target[:47] + '...'
+            info = (
+                f'[bold cyan]{action_type}[/] '
+                f'[dim]→[/] '
+                f'[white]{truncated}[/]  '
+                f'[{risk_class}]{risk_label}[/]'
+            )
+        else:
+            info = (
+                f'[bold cyan]{action_type}[/]  '
+                f'[{risk_class}]{risk_label}[/]'
+            )
 
         info_static = self.query_one('#confirm-info', Static)
         info_static.update(info)
@@ -944,12 +965,12 @@ class ConfirmWidget(Widget):
         self._options = options
         self._recommended = recommended
         for i, (key, label) in enumerate(options):
-            yield_btn = Button(
+            btn = Button(
                 label,
                 id=f'confirm-{key}',
                 variant='primary' if i == (recommended or 0) else 'default',
             )
-            actions.mount(yield_btn)
+            actions.mount(btn)
 
     def show(self) -> None:
         self.add_class('-visible')
@@ -3745,10 +3766,10 @@ class GrintaScreen(Screen):
     }
 
     _RISK_LABELS: dict[str, tuple[str, str]] = {
-        'UNKNOWN': ('· Unknown', 'confirm-risk-unknown'),
-        'LOW': ('· Low', 'confirm-risk-low'),
-        'MEDIUM': ('· Medium', 'confirm-risk-medium'),
-        'HIGH': ('· High', 'confirm-risk-high'),
+        'UNKNOWN': ('Unknown', 'dim'),
+        'LOW': ('Low', 'green'),
+        'MEDIUM': ('Medium', 'yellow'),
+        'HIGH': ('High', 'bold red'),
     }
 
     async def _handle_confirmation_dialog(self) -> None:
