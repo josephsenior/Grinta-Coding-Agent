@@ -93,7 +93,7 @@ types: feat, fix, refactor, docs, test, chore, perf
 
 | Directory | Purpose |
 | --- | --- |
-| `backend/orchestration/` | Session orchestration (22 decomposed services) |
+| `backend/orchestration/` | Session orchestration (21 decomposed services) |
 | `backend/orchestration/services/` | Service classes composing the orchestrator |
 | `backend/cli/` | CLI entrypoint, REPL, init wizard, and session commands |
 | `backend/ledger/` | Event sourcing, backpressure-aware stream, durable writer |
@@ -106,7 +106,7 @@ types: feat, fix, refactor, docs, test, chore, perf
 
 ### Orchestration Service Map
 
-The `SessionOrchestrator` (~770 LOC) delegates work to these services:
+The `SessionOrchestrator` (1267 LOC) delegates work to these services:
 
 | Service | Responsibility |
 | --- | --- |
@@ -118,7 +118,6 @@ The `SessionOrchestrator` (~770 LOC) delegates work to these services:
 | `CircuitBreakerService` | Circuit breaker pattern |
 | `StuckDetectionService` | 6-strategy stuck/loop detection |
 | `IterationGuardService` | Iteration limit control flags |
-| `BudgetGuardService` | Budget limit sync |
 | `StateTransitionService` | Agent state machine transitions |
 | `StepGuardService` | Pre-step guard checks |
 | `StepPrerequisiteService` | Can-step prerequisite checks |
@@ -127,7 +126,6 @@ The `SessionOrchestrator` (~770 LOC) delegates work to these services:
 | `SafetyService` | Safety validation |
 | `RetryService` | Retry count & backoff |
 | `ObservationService` | Observation event handling |
-| `TelemetryService` | Tool pipeline & telemetry init |
 | `AutonomyService` | Autonomy controller init |
 | `IterationService` | Iteration counting |
 | `OrchestrationContext` | Shared facade for services |
