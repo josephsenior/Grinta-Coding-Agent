@@ -61,6 +61,24 @@ class GrintaTUIApp(App):
         # Register Rich theme for consistent markup rendering
         self._console.push_theme(_RICH_THEME)
 
+    async def on_event(self, event: Any) -> None:
+        from textual import events as _events
+
+        if isinstance(event, _events.Paste):
+            _log = os.path.join(
+                os.environ.get('TEMP', os.environ.get('TMP', '.')),
+                'grinta_paste_debug.log',
+            )
+            with open(_log, 'a', encoding='utf-8') as _f:
+                _f.write(
+                    f'=== APP.on_event: Paste received ===\n'
+                    f'  event.text len={len(event.text) if event.text else 0}\n'
+                    f'  event.is_forwarded={event.is_forwarded}\n'
+                    f'  self.focused={self.focused!r}\n'
+                    f'  self.screen={self.screen!r}\n'
+                )
+        await super().on_event(event)
+
     def compose(self):
         """Layout is handled by the pushed screen."""
         return iter([])
