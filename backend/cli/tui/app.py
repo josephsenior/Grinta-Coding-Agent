@@ -2750,26 +2750,32 @@ class GrintaScreen(Screen):
         item_id = event.item_id
         if item_id.startswith('skill:'):
             skill_name = item_id[6:]
-            result = await self.app.push_screen_wait(
-                GrintaConfirmDialog(
-                    title='Delete Skill',
-                    body=f'Are you sure you want to delete {skill_name}.md?',
-                    options=[('cancel', 'Cancel'), ('delete', 'Delete')],
-                )
-            )
-            if result == 'delete':
-                self._delete_skill(skill_name)
+            self.run_worker(self._confirm_delete_skill(skill_name), exclusive=True)
         elif item_id.startswith('mcp:'):
             mcp_name = item_id.split(':', 1)[1]
-            result = await self.app.push_screen_wait(
-                GrintaConfirmDialog(
-                    title='Delete MCP Server',
-                    body=f"Are you sure you want to remove the server '{mcp_name}'?",
-                    options=[('cancel', 'Cancel'), ('delete', 'Remove')],
-                )
+            self.run_worker(self._confirm_delete_mcp(mcp_name), exclusive=True)
+
+    async def _confirm_delete_skill(self, skill_name: str) -> None:
+        result = await self.app.push_screen_wait(
+            GrintaConfirmDialog(
+                title='Delete Skill',
+                body=f'Are you sure you want to delete {skill_name}.md?',
+                options=[('cancel', 'Cancel'), ('delete', 'Delete')],
             )
-            if result == 'delete':
-                self._delete_mcp_server(mcp_name)
+        )
+        if result == 'delete':
+            self._delete_skill(skill_name)
+
+    async def _confirm_delete_mcp(self, mcp_name: str) -> None:
+        result = await self.app.push_screen_wait(
+            GrintaConfirmDialog(
+                title='Delete MCP Server',
+                body=f"Are you sure you want to remove the server '{mcp_name}'?",
+                options=[('cancel', 'Cancel'), ('delete', 'Remove')],
+            )
+        )
+        if result == 'delete':
+            self._delete_mcp_server(mcp_name)
 
     def _delete_skill(self, name: str) -> None:
         if not name.endswith('.md'):
@@ -3802,17 +3808,6 @@ class GrintaScreen(Screen):
 
         action = ChangeAgentStateAction(agent_state=decision)
         self._event_stream.add_event(action, EventSource.USER)
-
-    async def confirm(
-        self,
-        title: str,
-        body: str,
-        options: list[tuple[str, str]],
-        recommended: int | None = None,
-    ) -> str | None:
-        dialog = GrintaConfirmDialog(title, body, options, recommended)
-        result = await self.app.push_screen_wait(dialog)
-        return result
 
 
 # ── TUIRenderer ───────────────────────────────────────────────────────────
