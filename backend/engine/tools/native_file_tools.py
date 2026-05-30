@@ -38,7 +38,9 @@ def create_read_tool() -> ChatCompletionToolParam:
                 'enum': ['file', 'range', 'symbols'],
                 'description': 'Read kind: complete file, line range, or one/more symbol bodies.',
             },
-            'path': get_path_param('Optional project-relative path. Required for file/range reads.'),
+            'path': get_path_param(
+                'Optional project-relative path. Required for file/range reads.'
+            ),
             'start_line': {
                 'type': 'integer',
                 'description': '1-based inclusive start line for type=range.',
@@ -215,7 +217,9 @@ def create_edit_symbols_tool() -> ChatCompletionToolParam:
             'Ambiguous targets reject with candidates.'
         ),
         properties={
-            'path': get_path_param('Optional project-relative source file path. Strongly preferred for writes.'),
+            'path': get_path_param(
+                'Optional project-relative source file path. Strongly preferred for writes.'
+            ),
             'edits': {
                 'type': 'array',
                 'description': 'Symbol replacements/deletions to apply atomically.',

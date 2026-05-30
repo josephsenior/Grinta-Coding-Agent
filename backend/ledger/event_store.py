@@ -256,8 +256,7 @@ class EventStore(EventStoreABC):
                 # rest of the event history remains accessible.
                 corrupt_seen += 1
                 logger.warning(
-                    'Skipping corrupt event id=%s in search for %s: %s '
-                    '(skipped %s/%s)',
+                    'Skipping corrupt event id=%s in search for %s: %s (skipped %s/%s)',
                     index,
                     self.sid,
                     exc,

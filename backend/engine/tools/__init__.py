@@ -30,7 +30,6 @@ __all__ = [
     'create_checkpoint_tool',
     'create_summarize_context_tool',
     'create_communicate_tool',
-
     'create_finish_tool',
     'create_lsp_query_tool',
     'create_create_tool',

@@ -92,7 +92,9 @@ class SmartCompactor(BaseLLMCompactor):
         essential_event_ids = self._identify_essential_events(events)
 
         # Score importance of remaining events
-        importance_scores = await self._score_event_importance(events, essential_event_ids)
+        importance_scores = await self._score_event_importance(
+            events, essential_event_ids
+        )
 
         # Determine which events to keep
         events_to_keep = self._select_events_to_keep(
@@ -295,7 +297,9 @@ class SmartCompactor(BaseLLMCompactor):
             return 0.6
         return 0.5
 
-    async def _score_event_batch_with_llm(self, events: list[Event]) -> dict[int, float]:
+    async def _score_event_batch_with_llm(
+        self, events: list[Event]
+    ) -> dict[int, float]:
         """Score a batch of events using LLM.
 
         Args:

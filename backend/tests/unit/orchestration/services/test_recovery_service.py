@@ -373,7 +373,9 @@ class TestTaskReconciliationDirective:
         await svc.react_to_exception(ContextWindowExceededError('too large'))
 
         ctrl.schedule_step_soon.assert_called_once_with()
-        emitted_events = [call.args[0] for call in mock_context.emit_event.call_args_list]
+        emitted_events = [
+            call.args[0] for call in mock_context.emit_event.call_args_list
+        ]
         assert any(
             isinstance(event, CondensationRequestAction) for event in emitted_events
         )

@@ -30,7 +30,9 @@ from backend.cli.transcript import (
 )
 
 
-def _preview_text_lines(content: str, *, max_lines: int = 12, max_chars: int = 160) -> list[Text]:
+def _preview_text_lines(
+    content: str, *, max_lines: int = 12, max_chars: int = 160
+) -> list[Text]:
     lines: list[Text] = []
     if not content:
         return lines
@@ -201,8 +203,8 @@ class DiffPanel:
         # New file creation — no diff, just show creation note
         if not prev_exist:
             self._append_new_file_delta(parts)
-            preview_content = (
-                getattr(obs, 'new_content', None) or getattr(obs, 'content', '')
+            preview_content = getattr(obs, 'new_content', None) or getattr(
+                obs, 'content', ''
             )
             preview_block = _preview_syntax_block(path, preview_content or '')
             if preview_block is not None:
@@ -390,7 +392,9 @@ class DiffPanel:
         return title
 
     @staticmethod
-    def _render_groups(groups: list[dict[str, list[str]]], file_path: str = 'edited file') -> Any:
+    def _render_groups(
+        groups: list[dict[str, list[str]]], file_path: str = 'edited file'
+    ) -> Any:
         """Build colored diff lines with green/red backgrounds for +/- lines.
 
         Format: filename +N lines -N lines (header) followed by colored diff lines

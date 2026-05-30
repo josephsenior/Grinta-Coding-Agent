@@ -31,7 +31,6 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'lsp': ('', 'Code intelligence'),
     'analyze_project_structure': ('', 'Analyze project'),
     'read_symbol': ('', 'Read symbol'),
-
     'browser': ('', 'Browser'),
     'delegate_task': ('', 'Delegate'),
     'shared_task_board': ('', 'Board'),

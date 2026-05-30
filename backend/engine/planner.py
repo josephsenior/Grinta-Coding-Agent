@@ -578,7 +578,7 @@ class OrchestratorPlanner:
             'multiedit/shell/git/MCP tools, or write tools.\n\n'
             '`communicate_with_user` is for continuation questions. '
             "`finish(status='blocked')` is for ending when planning cannot continue.\n\n"
-            "Plan finish requires these universal fields: status, summary, plan, "
+            'Plan finish requires these universal fields: status, summary, plan, '
             "assumptions, next_step. For status='completed', plan must be non-empty.\n"
             '=================================\n'
         )
@@ -593,7 +593,7 @@ class OrchestratorPlanner:
             '3. A `communicate_with_user` tool call (for questions, blockers, or escalation).\n'
             '4. A `finish` tool call (to end the task successfully).\n\n'
             '`finish` fields: status, summary, actions_taken, verification, remaining_items, next_step.\n'
-            'If verification was not run, use verification.status=\'not_run\' and explain in details.\n\n'
+            "If verification was not run, use verification.status='not_run' and explain in details.\n\n"
             'File API: `find_symbols` discovers; `read` inspects; `create` new files/symbols; '
             '`edit_symbols` modifies/deletes existing symbols; `replace_string` exact text replacement; '
             '`multiedit` atomic multi-file refactors.\n'

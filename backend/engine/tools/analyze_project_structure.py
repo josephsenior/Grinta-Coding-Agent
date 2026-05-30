@@ -547,11 +547,7 @@ def _git_files_for_tree(cwd: str) -> set[str]:
         )
         if result.returncode != 0:
             return set()
-        return {
-            item
-            for item in result.stdout.split('\0')
-            if item
-        }
+        return {item for item in result.stdout.split('\0') if item}
     except Exception:
         return set()
 

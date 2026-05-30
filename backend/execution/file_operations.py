@@ -58,12 +58,16 @@ def execute_file_editor(
     """Execute file editor command and handle exceptions."""
     insert_line, error_msg = _parse_insert_line(insert_line)
     if error_msg:
-        return error_msg, (None, None), {
-            'tool': 'file_edit',
-            'ok': False,
-            'error_code': 'INVALID_INSERT_LINE',
-            'retryable': False,
-        }
+        return (
+            error_msg,
+            (None, None),
+            {
+                'tool': 'file_edit',
+                'ok': False,
+                'error_code': 'INVALID_INSERT_LINE',
+                'retryable': False,
+            },
+        )
 
     result = _invoke_editor(
         editor,
@@ -109,7 +113,26 @@ def execute_file_editor(
         )
     if not result.output:
         logger.warning('No output from file edit pipeline for %s', path)
-        return '', (None, None), {
+        return (
+            '',
+            (None, None),
+            {
+                'tool': 'file_edit',
+                'ok': True,
+                'error_code': None,
+                'retryable': False,
+                'operation': result.operation or command,
+                'payload': result.metadata or {},
+                'verification_passed': bool(
+                    (result.metadata or {}).get('verification_passed', False)
+                ),
+            },
+        )
+
+    return (
+        result.output,
+        (result.old_content, result.new_content),
+        {
             'tool': 'file_edit',
             'ok': True,
             'error_code': None,
@@ -119,19 +142,8 @@ def execute_file_editor(
             'verification_passed': bool(
                 (result.metadata or {}).get('verification_passed', False)
             ),
-        }
-
-    return result.output, (result.old_content, result.new_content), {
-        'tool': 'file_edit',
-        'ok': True,
-        'error_code': None,
-        'retryable': False,
-        'operation': result.operation or command,
-        'payload': result.metadata or {},
-        'verification_passed': bool(
-            (result.metadata or {}).get('verification_passed', False)
-        ),
-    }
+        },
+    )
 
 
 def _parse_insert_line(insert_line: int | str | None) -> tuple[int | None, str | None]:

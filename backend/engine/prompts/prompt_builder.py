@@ -84,7 +84,7 @@ def _provider_parallel_tool_calls_supported(model_id: str) -> bool:
             return bool(getattr(entry, 'supports_parallel_tool_calls', False))
     except Exception:
         pass
-    
+
     return False
 
 

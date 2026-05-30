@@ -372,9 +372,7 @@ class OrchestratorExecutor:
             value = call_params.get(key)
             if value is None:
                 continue
-            extra_lines.append(
-                f'{key}:{self._serialize_preflight_payload(value)}'
-            )
+            extra_lines.append(f'{key}:{self._serialize_preflight_payload(value)}')
 
         if not extra_lines:
             return prompt_tokens

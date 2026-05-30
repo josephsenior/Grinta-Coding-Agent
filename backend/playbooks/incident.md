@@ -49,4 +49,3 @@ Use during live breakage, production regressions, or high-severity user-facing f
 - Root cause
 - Fix and verification
 - Follow-ups
-

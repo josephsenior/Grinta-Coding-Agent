@@ -89,7 +89,9 @@ class Blackboard:
         self._lock = asyncio.Lock()
 
     def _current_total_bytes(self) -> int:
-        return sum(_utf8_len(key) + _utf8_len(value) for key, value in self._data.items())
+        return sum(
+            _utf8_len(key) + _utf8_len(value) for key, value in self._data.items()
+        )
 
     def _validate_limits(self, key: str, value: str) -> None:
         key_bytes = _utf8_len(key)

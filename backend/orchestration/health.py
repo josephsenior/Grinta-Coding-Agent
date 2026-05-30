@@ -63,9 +63,10 @@ def _controller_circuit_breaker_stats(controller: Any) -> list[CircuitBreakerHea
         return [
             CircuitBreakerHealth(
                 name='agent_circuit_breaker',
-                state='tripped' if getattr(cb, 'consecutive_errors', 0) >= getattr(
-                    getattr(cb, 'config', None), 'max_consecutive_errors', 5
-                ) else 'closed',
+                state='tripped'
+                if getattr(cb, 'consecutive_errors', 0)
+                >= getattr(getattr(cb, 'config', None), 'max_consecutive_errors', 5)
+                else 'closed',
                 failure_count=getattr(cb, 'consecutive_errors', 0),
                 last_failure_time=getattr(cb, 'last_error_time', None),
             )
@@ -184,7 +185,8 @@ def _controller_circuit_breaker_health(name: str, controller: Any) -> dict[str, 
             'name': 'agent_circuit_breaker',
             'state': (
                 'OPEN'
-                if getattr(cb, 'consecutive_errors', 0) >= getattr(config, 'max_consecutive_errors', 5)
+                if getattr(cb, 'consecutive_errors', 0)
+                >= getattr(config, 'max_consecutive_errors', 5)
                 else 'CLOSED'
             ),
             'failures': getattr(cb, 'consecutive_errors', 0),
@@ -308,14 +310,11 @@ def _add_circuit_breaker_warnings(warnings: list[str], cb_service: Any) -> str |
     cb_state_name = _as_state_name(getattr(cb_service, 'state', None))
     failure_count = _as_real_number(getattr(cb_service, 'failure_count', None))
 
-    is_open = (
-        cb_state_name in {'OPEN', 'TRIPPED'}
-        or (
-            consecutive is not None
-            and max_errors is not None
-            and max_errors > 0
-            and consecutive >= max_errors
-        )
+    is_open = cb_state_name in {'OPEN', 'TRIPPED'} or (
+        consecutive is not None
+        and max_errors is not None
+        and max_errors > 0
+        and consecutive >= max_errors
     )
     unhealthy_count = consecutive if consecutive is not None else failure_count
 

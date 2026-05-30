@@ -410,7 +410,9 @@ class EventStream(EventStore):
 
                     try:
                         self._session_lock_handle.seek(0)
-                        msvcrt.locking(self._session_lock_handle.fileno(), msvcrt.LK_UNLCK, 1)
+                        msvcrt.locking(
+                            self._session_lock_handle.fileno(), msvcrt.LK_UNLCK, 1
+                        )
                     except OSError:
                         pass
                 self._session_lock_handle.close()

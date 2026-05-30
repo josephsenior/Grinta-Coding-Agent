@@ -287,7 +287,13 @@ def _find_next_xml_tool_call_block(
     close = f'</{tag_name}>'
     close_start = lower.find(close, tag_end + 1)
     if close_start < 0:
-        return start, len(text), tag_name, _parse_tag_attrs(attrs_text), text[tag_end + 1 :]
+        return (
+            start,
+            len(text),
+            tag_name,
+            _parse_tag_attrs(attrs_text),
+            text[tag_end + 1 :],
+        )
     end = close_start + len(close)
     return (
         start,

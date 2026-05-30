@@ -209,7 +209,9 @@ def _json_check(path: str, language: str, code: str) -> SyntaxCheckResult:
     try:
         json.loads(code)
     except json.JSONDecodeError as exc:
-        detail = f'JSON syntax error at {path}: line {exc.lineno}:{exc.colno}: {exc.msg}'
+        detail = (
+            f'JSON syntax error at {path}: line {exc.lineno}:{exc.colno}: {exc.msg}'
+        )
         return SyntaxCheckResult(
             path=path,
             status='failed',

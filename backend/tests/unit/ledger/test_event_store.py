@@ -207,7 +207,11 @@ class TestEventStoreSearch:
             {
                 'id': i,
                 'action': 'message',
-                'args': {'content': f'msg-{i}', 'image_urls': [], 'wait_for_response': False},
+                'args': {
+                    'content': f'msg-{i}',
+                    'image_urls': [],
+                    'wait_for_response': False,
+                },
                 'message': f'msg-{i}',
             }
             for i in range(4)
@@ -217,6 +221,7 @@ class TestEventStoreSearch:
             if event_id == 1:
                 raise ValueError('checksum mismatch')
             from backend.ledger.serialization.event import event_from_dict
+
             return event_from_dict(action_dicts[event_id])
 
         fs = MagicMock()
@@ -233,6 +238,7 @@ class TestEventStoreSearch:
 
     def test_search_events_stops_at_too_many_corrupt(self):
         """Search aborts after max_consecutive corrupt events."""
+
         def _mock_get_event(event_id):
             raise ValueError('checksum mismatch')
 

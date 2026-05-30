@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from rich.markup import escape as markup_escape
 from rich.text import Text
-
-from typing import Any
 
 from backend.cli._tool_display.renderers._syntax import highlight_code_blocks
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
@@ -38,14 +38,12 @@ def render_think(thought: str, source_tool: str = '') -> list[Any]:
             if not para.strip():
                 continue
             # Build continuation lines preserving internal line breaks
-            para_lines = [l.strip() for l in para.split('\n') if l.strip()]
+            para_lines = [ln.strip() for ln in para.split('\n') if ln.strip()]
             for pl in para_lines[:6]:
                 if len(pl) > 100:
                     pl = pl[:97] + '…'
                 escaped = markup_escape(pl)
-                lines.append(
-                    f'  [{CLR_THOUGHT_BODY}]{escaped}[/{CLR_THOUGHT_BODY}]'
-                )
+                lines.append(f'  [{CLR_THOUGHT_BODY}]{escaped}[/{CLR_THOUGHT_BODY}]')
             if len(para_lines) > 6:
                 lines.append(
                     f'  [{CLR_THOUGHT_BODY}]… ({len(para_lines) - 6} more lines)[/{CLR_THOUGHT_BODY}]'

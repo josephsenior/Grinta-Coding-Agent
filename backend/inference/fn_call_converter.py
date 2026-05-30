@@ -904,7 +904,9 @@ def _process_system_message_reverse(content: Any, system_prompt_suffix: str) -> 
     return {'role': 'system', 'content': content}
 
 
-def _process_user_message_reverse(content: Any, tools: list[dict], mode: str = 'agent') -> dict:
+def _process_user_message_reverse(
+    content: Any, tools: list[dict], mode: str = 'agent'
+) -> dict:
     """Process user message for reverse conversion, removing examples and converting tool results.
 
     If the user message contains a tool result (detected by EXECUTION RESULT pattern),

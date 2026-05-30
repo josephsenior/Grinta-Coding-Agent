@@ -268,6 +268,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
         # De-duplicate consecutive thinking cards with identical content
         import hashlib
+
         content_hash = hashlib.sha256((thought or '').encode()).hexdigest()[:16]
         if content_hash == getattr(self, '_last_think_action_hash', None):
             self.refresh()

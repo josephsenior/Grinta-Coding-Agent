@@ -116,7 +116,9 @@ def commit_snapshot() -> None:
         _os.replace(staging, final)
         logger.debug('Pre-condensation snapshot committed to %s', final)
     except OSError:
-        logger.debug('Pre-condensation snapshot commit failed (non-fatal)', exc_info=True)
+        logger.debug(
+            'Pre-condensation snapshot commit failed (non-fatal)', exc_info=True
+        )
 
 
 def extract_snapshot(events: list[Event]) -> dict[str, Any]:

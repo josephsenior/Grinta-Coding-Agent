@@ -380,9 +380,7 @@ class TestHysteresis:
         breaker = CircuitBreaker(config)
 
         for _ in range(3):
-            breaker.record_error(
-                RuntimeError('bad edit'), tool_name=FILE_EDIT_BUCKET
-            )
+            breaker.record_error(RuntimeError('bad edit'), tool_name=FILE_EDIT_BUCKET)
         assert breaker.get_tool_error_count(FILE_EDIT_BUCKET) == 3
 
         breaker.record_success(tool_name=FILE_EDIT_BUCKET)
@@ -617,10 +615,7 @@ class TestFileEditTaxonomy:
             classify_file_edit_error_bucket('Syntax validation failed: oops')
             == FILE_EDIT_SYNTAX_BUCKET
         )
-        assert (
-            classify_file_edit_error_bucket('old_str not found')
-            == FILE_EDIT_BUCKET
-        )
+        assert classify_file_edit_error_bucket('old_str not found') == FILE_EDIT_BUCKET
 
     def test_syntax_errors_skip_consecutive_counter(self):
         """Syntax-bucket errors should not advance global consecutive_errors."""
@@ -645,13 +640,9 @@ class TestFileEditTaxonomy:
         )
         breaker = CircuitBreaker(config)
         for _ in range(9):
-            breaker.record_error(
-                RuntimeError('x'), tool_name=FILE_EDIT_SYNTAX_BUCKET
-            )
+            breaker.record_error(RuntimeError('x'), tool_name=FILE_EDIT_SYNTAX_BUCKET)
         assert breaker.check(MagicMock()).tripped is False
-        breaker.record_error(
-            RuntimeError('x'), tool_name=FILE_EDIT_SYNTAX_BUCKET
-        )
+        breaker.record_error(RuntimeError('x'), tool_name=FILE_EDIT_SYNTAX_BUCKET)
         result = breaker.check(MagicMock())
         assert result.tripped is True
         assert result.action == 'switch_context'
@@ -664,13 +655,9 @@ class TestFileEditTaxonomy:
         )
         breaker = CircuitBreaker(config)
         for _ in range(14):
-            breaker.record_error(
-                RuntimeError('x'), tool_name=FILE_EDIT_SYNTAX_BUCKET
-            )
+            breaker.record_error(RuntimeError('x'), tool_name=FILE_EDIT_SYNTAX_BUCKET)
         assert breaker.check(MagicMock()).action == 'switch_context'
-        breaker.record_error(
-            RuntimeError('x'), tool_name=FILE_EDIT_SYNTAX_BUCKET
-        )
+        breaker.record_error(RuntimeError('x'), tool_name=FILE_EDIT_SYNTAX_BUCKET)
         result = breaker.check(MagicMock())
         assert result.tripped is True
         assert result.action == 'pause'
@@ -682,13 +669,9 @@ class TestFileEditTaxonomy:
             max_stuck_detections=100,
         )
         breaker = CircuitBreaker(config)
-        breaker.record_error(
-            RuntimeError('no match'), tool_name=FILE_EDIT_BUCKET
-        )
+        breaker.record_error(RuntimeError('no match'), tool_name=FILE_EDIT_BUCKET)
         assert breaker.check(MagicMock()).tripped is False
-        breaker.record_error(
-            RuntimeError('no match'), tool_name=FILE_EDIT_BUCKET
-        )
+        breaker.record_error(RuntimeError('no match'), tool_name=FILE_EDIT_BUCKET)
         result = breaker.check(MagicMock())
         assert result.tripped is True
         assert result.action == 'switch_context'
@@ -696,9 +679,7 @@ class TestFileEditTaxonomy:
     def test_record_success_clears_both_str_replace_buckets(self):
         config = CircuitBreakerConfig()
         breaker = CircuitBreaker(config)
-        breaker.record_error(
-            RuntimeError('a'), tool_name=FILE_EDIT_BUCKET
-        )
+        breaker.record_error(RuntimeError('a'), tool_name=FILE_EDIT_BUCKET)
         breaker.record_error(
             RuntimeError('Syntax validation failed:'),
             tool_name=FILE_EDIT_SYNTAX_BUCKET,

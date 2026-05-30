@@ -240,9 +240,7 @@ def test_async_execute_preserves_streamed_reasoning_content(monkeypatch):
         yield {
             'id': 'chatcmpl-reasoning',
             'model': 'deepseek-v4-flash',
-            'choices': [
-                {'delta': {'content': 'done'}, 'finish_reason': None}
-            ],
+            'choices': [{'delta': {'content': 'done'}, 'finish_reason': None}],
         }
         yield {
             'id': 'chatcmpl-reasoning',
@@ -375,9 +373,7 @@ def test_async_execute_raises_preflight_context_error_before_provider_call(
     llm.astream.assert_not_called()
 
 
-def test_async_execute_does_not_timeout_active_reasoning_stream(
-    monkeypatch, tmp_path
-):
+def test_async_execute_does_not_timeout_active_reasoning_stream(monkeypatch, tmp_path):
     """Active reasoning streams are governed by per-chunk stall timeouts."""
     import backend.engine.function_calling as fc
     from backend.engine.executor import OrchestratorExecutor

@@ -167,7 +167,7 @@ def _decode_diff_line(line: str) -> tuple[str, str] | None:
         (DIFF_CTX_PREFIX, 'ctx'),
     ):
         if line.startswith(prefix):
-            return kind, line[len(prefix):]
+            return kind, line[len(prefix) :]
     return None
 
 
@@ -175,7 +175,7 @@ def _decode_split_diff_line(line: str) -> tuple[str, str, str, str] | None:
     if not line.startswith(DIFF_SPLIT_PREFIX):
         return None
     try:
-        payload = json.loads(line[len(DIFF_SPLIT_PREFIX):])
+        payload = json.loads(line[len(DIFF_SPLIT_PREFIX) :])
     except json.JSONDecodeError:
         return None
     if not isinstance(payload, dict):
@@ -380,8 +380,10 @@ class ActivityCard(Container):
         outcome_part = ''
         if self._outcome:
             outcome_color = (
-                NAVY_READY if status == 'ok'
-                else NAVY_ERROR if status == 'err'
+                NAVY_READY
+                if status == 'ok'
+                else NAVY_ERROR
+                if status == 'err'
                 else NAVY_TEXT_DIM
             )
             outcome_part = f'  [{outcome_color}]{self._outcome}[/]'
@@ -417,7 +419,9 @@ class ActivityCard(Container):
                 word_wrap=True,
             )
 
-        if (content.startswith('{') and content.endswith('}')) or (content.startswith('[') and content.endswith(']')):
+        if (content.startswith('{') and content.endswith('}')) or (
+            content.startswith('[') and content.endswith(']')
+        ):
             try:
                 json.loads(content)
                 return Syntax(
@@ -470,7 +474,11 @@ class ActivityCard(Container):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id='collapsed-row-container'):
-            yield Static(self._build_collapsed_markup(), id='collapsed-row', classes='card-collapsed-text')
+            yield Static(
+                self._build_collapsed_markup(),
+                id='collapsed-row',
+                classes='card-collapsed-text',
+            )
             if self._extra_content:
                 yield Static(self._caret_char(), id='caret', classes='card-caret')
 
@@ -480,7 +488,13 @@ class ActivityCard(Container):
 
             if self._show_meta or self._meta_lines:
                 meta_text = '  '.join(self._meta_lines) if self._meta_lines else ''
-                yield Static(meta_text, id='meta-row', classes='card-meta-row -hidden' if self._collapsed else 'card-meta-row')
+                yield Static(
+                    meta_text,
+                    id='meta-row',
+                    classes='card-meta-row -hidden'
+                    if self._collapsed
+                    else 'card-meta-row',
+                )
         else:
             yield Container(id='expanded-body', classes='card-expanded-body -hidden')
             yield Static('', id='meta-row', classes='card-meta-row -hidden')
@@ -555,7 +569,11 @@ class ActivityCard(Container):
         """Handle click events to toggle expansion."""
         if self._extra_content:
             clicked = event.widget
-            if clicked and clicked.id in ('collapsed-row', 'caret', 'collapsed-row-container'):
+            if clicked and clicked.id in (
+                'collapsed-row',
+                'caret',
+                'collapsed-row-container',
+            ):
                 self.toggle_extra()
                 event.prevent_default()
                 event.stop()
@@ -650,13 +668,17 @@ class AgentMessage(Static):
 
     def __init__(self, text: str, *, id: str | None = None) -> None:
         from rich.markdown import Markdown
+
         from backend.cli.theme import get_grinta_pygments_style
+
         super().__init__(Markdown(text, code_theme=get_grinta_pygments_style()), id=id)
 
     def update_message(self, text: str) -> None:
         """Update message content dynamically."""
         from rich.markdown import Markdown
+
         from backend.cli.theme import get_grinta_pygments_style
+
         self.update(Markdown(text, code_theme=get_grinta_pygments_style()))
 
 
@@ -712,11 +734,9 @@ class ThinkingIndicator(Static):
         import time
 
         elapsed = int(time.monotonic() - self._start_time) if self._start_time else 0
-        dots = '.' * ((elapsed % 4))
+        dots = '.' * (elapsed % 4)
 
-        thoughts_text = Text(
-            '\n  '.join(self._thoughts), style='rgb(150,154,189)'
-        )
+        thoughts_text = Text('\n  '.join(self._thoughts), style='rgb(150,154,189)')
         self.update(
             Text.assemble(
                 ('Thinking:', 'bold #5eead4'),

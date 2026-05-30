@@ -257,10 +257,13 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         }
 
         try:
-            with patch.object(
-                snapshot_module, '_snapshot_path', return_value=snapshot_path
-            ), patch.object(
-                snapshot_module, '_snapshot_staging_path', return_value=staging_path
+            with (
+                patch.object(
+                    snapshot_module, '_snapshot_path', return_value=snapshot_path
+                ),
+                patch.object(
+                    snapshot_module, '_snapshot_staging_path', return_value=staging_path
+                ),
             ):
                 snapshot_module.save_snapshot(snapshot)
                 assert staging_path.exists()

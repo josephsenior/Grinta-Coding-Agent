@@ -211,7 +211,10 @@ class StructureEditor:
             with open(path, encoding='utf-8') as f:
                 actual = f.read()
         except Exception as e:
-            return False, f'Edit verification failed after {operation}: could not re-read file: {e}'
+            return (
+                False,
+                f'Edit verification failed after {operation}: could not re-read file: {e}',
+            )
         if actual == expected_content:
             return True, ''
         return (

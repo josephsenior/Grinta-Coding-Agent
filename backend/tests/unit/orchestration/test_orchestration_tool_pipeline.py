@@ -205,9 +205,7 @@ class TestCircuitBreakerMiddlewarePipeline:
         controller.circuit_breaker_service = service
         mw = CircuitBreakerMiddleware(controller)
         action = MagicMock()
-        action.tool_call_metadata = MagicMock(
-            function_name='edit_symbols'
-        )
+        action.tool_call_metadata = MagicMock(function_name='edit_symbols')
         ctx = ToolInvocationContext(
             controller=controller, action=action, state=MagicMock()
         )
@@ -231,18 +229,13 @@ class TestCircuitBreakerMiddlewarePipeline:
         controller.circuit_breaker_service = service
         mw = CircuitBreakerMiddleware(controller)
         action = MagicMock()
-        action.tool_call_metadata = MagicMock(
-            function_name='edit_symbols'
-        )
+        action.tool_call_metadata = MagicMock(function_name='edit_symbols')
         ctx = ToolInvocationContext(
             controller=controller, action=action, state=MagicMock()
         )
         obs = ErrorObservation(content='old_str not found')
         await mw.observe(ctx, obs)
-        assert (
-            service.record_error.call_args.kwargs['tool_name']
-            == FILE_EDIT_BUCKET
-        )
+        assert service.record_error.call_args.kwargs['tool_name'] == FILE_EDIT_BUCKET
 
     @pytest.mark.asyncio
     async def test_observe_none_observation_is_noop(self):

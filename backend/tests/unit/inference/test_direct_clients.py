@@ -328,9 +328,7 @@ class TestGetDirectClientRouting:
         'backend.inference.direct_clients.get_shared_http_client',
         return_value=MagicMock(),
     )
-    def test_opencode_go_qwen_routes_to_openai_compatible(
-        self, _h, _ah, _oai, _aoai
-    ):
+    def test_opencode_go_qwen_routes_to_openai_compatible(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('opencode-go/qwen3.6-plus', api_key='key')
         assert type(client).__name__ == 'OpenAIClient'
         assert client._model_name == 'qwen3.6-plus'

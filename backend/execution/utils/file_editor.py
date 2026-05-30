@@ -723,8 +723,10 @@ class FileEditor(FileEditorEditOpsMixin):
                 new_content.old_content = old_content
                 return new_content
 
-            target_kind = 'range' if (edit_mode or '').strip().lower() == 'range' else (
-                'insert' if insert_line is not None else 'text'
+            target_kind = (
+                'range'
+                if (edit_mode or '').strip().lower() == 'range'
+                else ('insert' if insert_line is not None else 'text')
             )
 
             return self._finalize_edit_result(

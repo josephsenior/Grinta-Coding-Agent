@@ -111,8 +111,6 @@ class FileStateTracker:
                 )
 
 
-
-
 _MUTATING_EDIT_COMMANDS: frozenset[str] = frozenset(
     {
         'insert_text',

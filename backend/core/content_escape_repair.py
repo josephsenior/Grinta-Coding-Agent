@@ -346,9 +346,8 @@ def looks_serialized_payload(content: str) -> bool:
     if stripped.startswith('```') and stripped.endswith('```') and len(stripped) > 6:
         return True
 
-    quoted = (
-        (stripped.startswith('"') and stripped.endswith('"'))
-        or (stripped.startswith("'") and stripped.endswith("'"))
+    quoted = (stripped.startswith('"') and stripped.endswith('"')) or (
+        stripped.startswith("'") and stripped.endswith("'")
     )
     literal_newlines = content.count('\\n')
     real_newlines = content.count('\n')

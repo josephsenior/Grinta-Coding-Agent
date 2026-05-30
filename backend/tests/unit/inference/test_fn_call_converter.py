@@ -406,6 +406,7 @@ class TestExampleStepBuilder:
         result = builder.build_all_steps()
         assert 'finish' in result
 
+
 # ── convert_fncall_messages_to_non_fncall_messages ─────────────────────
 
 
@@ -771,7 +772,10 @@ class TestXmlParserRegression:
         messages = [{'role': 'assistant', 'content': content}]
         result = convert_non_fncall_messages_to_fncall_messages(messages, tools)
         return [
-            {'name': tc['function']['name'], 'arguments': json.loads(tc['function']['arguments'])}
+            {
+                'name': tc['function']['name'],
+                'arguments': json.loads(tc['function']['arguments']),
+            }
             for tc in result[0].get('tool_calls', [])
         ]
 
@@ -798,9 +802,7 @@ class TestXmlParserRegression:
         """
         tools = [self._make_sample_tool()]
         content = (
-            '<function=execute_bash>\n'
-            '<parameter=command>pwd</parameter>\n'
-            '</function>'
+            '<function=execute_bash>\n<parameter=command>pwd</parameter>\n</function>'
         )
         result = self._parse_payload(content, tools)
         assert result is not None
@@ -845,4 +847,3 @@ class TestXmlParserRegression:
         assert result is not None
         assert len(result) == 1
         assert result[0]['arguments']['command'] == 'pwd'
-

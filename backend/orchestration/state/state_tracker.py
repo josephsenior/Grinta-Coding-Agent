@@ -136,7 +136,9 @@ class StateTracker:
         self.state.history = self._fetch_events_from_stream(
             event_stream, start_id, end_id
         )
-        self.state.start_id = self._first_retained_event_id(self.state.history, start_id)
+        self.state.start_id = self._first_retained_event_id(
+            self.state.history, start_id
+        )
 
     def _get_history_range(self, event_stream: EventStream) -> tuple[int, int]:
         """Get the start and end ID range for history."""
@@ -214,7 +216,9 @@ class StateTracker:
             start_id,
             end_id,
         )
-        self.state.start_id = self._first_retained_event_id(self.state.history, start_id)
+        self.state.start_id = self._first_retained_event_id(
+            self.state.history, start_id
+        )
 
     def add_history(self, event: Event) -> None:
         """Add event to state history if it passes filter criteria.
@@ -270,12 +274,9 @@ class StateTracker:
             return f'count {len(history)} > {MAX_HISTORY_EVENTS}'
 
         self._events_since_last_byte_estimate += 1
-        if (
-            not force_byte_check
-            and (
-                len(history) <= 100
-                or self._events_since_last_byte_estimate < _BYTE_ESTIMATE_INTERVAL
-            )
+        if not force_byte_check and (
+            len(history) <= 100
+            or self._events_since_last_byte_estimate < _BYTE_ESTIMATE_INTERVAL
         ):
             return None
 

@@ -59,12 +59,15 @@ def _check_format_error_retry_guard(
             _RETRY_GUARD.clear()
         if key in _RETRY_GUARD:
             stored_hash, attempt_count = _RETRY_GUARD[key]
-            if stored_hash == content_hash and attempt_count >= _RETRY_GUARD_MAX_ATTEMPTS:
+            if (
+                stored_hash == content_hash
+                and attempt_count >= _RETRY_GUARD_MAX_ATTEMPTS
+            ):
                 return False, (
-                    f"Retry guard triggered: {tool_name} with identical error "
+                    f'Retry guard triggered: {tool_name} with identical error '
                     f"'{error_signature}' and same content hash {content_hash} "
-                    f"after {attempt_count} attempts. Stop auto-retry and report as "
-                    f"system/tool error."
+                    f'after {attempt_count} attempts. Stop auto-retry and report as '
+                    f'system/tool error.'
                 )
             if stored_hash == content_hash:
                 _RETRY_GUARD[key] = (content_hash, attempt_count + 1)
@@ -456,7 +459,11 @@ def _filter_native_tool_calls_superseded_by_xml(
 
 
 def _extract_text_marker_tool_calls_from_content(content_text: str) -> list[Any]:
-    if not content_text or 'tool_call' not in content_text and '[Tool call]' not in content_text:
+    if (
+        not content_text
+        or 'tool_call' not in content_text
+        and '[Tool call]' not in content_text
+    ):
         return []
     from backend.cli.tool_call_display import extract_tool_calls_from_text_markers
 
@@ -487,7 +494,9 @@ def _enforce_xml_compliance(
         if name in xml_tool_names:
             raw_arguments = getattr(fn, 'arguments', '') or ''
             error_sig = 'native_toolcall_rejected'
-            allowed, reason = _check_format_error_retry_guard(name, raw_arguments, error_sig)
+            allowed, reason = _check_format_error_retry_guard(
+                name, raw_arguments, error_sig
+            )
             if not allowed:
                 _LOGGER.error('FORMAT_ERROR retry guard: %s', reason)
                 raise CoreFunctionCallValidationError(
@@ -550,6 +559,7 @@ class _SyntheticToolCall:
         self.function = _SyntheticFunction(name, arguments)
         self._mcp_tool_names: list[str] | None = None
 
+
 def _extract_xml_tool_calls_from_content(
     content_text: str, xml_tool_names: frozenset[str]
 ) -> list[Any]:
@@ -597,9 +607,7 @@ def _extract_xml_tool_calls_from_content(
 
         close_m = _FN_CLOSE_RE.search(content_text, open_m.end(0))
         if close_m is None:
-            logger.warning(
-                'Unclosed <function=%s> block in response content', fn_name
-            )
+            logger.warning('Unclosed <function=%s> block in response content', fn_name)
             fn_body = content_text[open_m.end(0) :]
             end_pos = len(content_text)
             is_unclosed = True
@@ -610,39 +618,40 @@ def _extract_xml_tool_calls_from_content(
 
         # Extract parameters with schema-aware type coercion and validation
         try:
-            from backend.inference.fn_call_converter import (
-                _extract_and_validate_params as _validate_xml_params,
-            )
-
-            tool_def = None
             param_body = fn_body
             param_matches = list(_iter_parameter_matches(fn_body, param_body))
 
             # Fallback: raw string extraction for unknown tools
             params = {}
             for pm in param_matches:
-                    pn = pm.group(1)
-                    pv = pm.group(2)
-                    if pv.startswith(chr(10)):
-                        pv = pv[1:]
-                    if pv.endswith(chr(10)):
-                        pv = pv[:-1]
-                    params[pn] = pv
+                pn = pm.group(1)
+                pv = pm.group(2)
+                if pv.startswith(chr(10)):
+                    pv = pv[1:]
+                if pv.endswith(chr(10)):
+                    pv = pv[:-1]
+                params[pn] = pv
 
             if is_unclosed:
-                params['__xml_syntax_error__'] = 'Unclosed <function> tag. Use </function> to close.'
+                params['__xml_syntax_error__'] = (
+                    'Unclosed <function> tag. Use </function> to close.'
+                )
             elif not params and fn_body.strip():
-                params['__xml_syntax_error__'] = 'No <parameter=...> tags found. You must wrap arguments in parameter tags.'
+                params['__xml_syntax_error__'] = (
+                    'No <parameter=...> tags found. You must wrap arguments in parameter tags.'
+                )
 
             # Check retry guard for XML syntax errors
             if '__xml_syntax_error__' in params:
                 serialized_args = json.dumps(params, sort_keys=True, ensure_ascii=False)
-                error_sig = f"xml_parsing:{params['__xml_syntax_error__']}"
-                allowed, reason = _check_format_error_retry_guard(fn_name, serialized_args, error_sig)
+                error_sig = f'xml_parsing:{params["__xml_syntax_error__"]}'
+                allowed, reason = _check_format_error_retry_guard(
+                    fn_name, serialized_args, error_sig
+                )
                 if not allowed:
                     _LOGGER.error('XML parsing retry guard: %s', reason)
                     params = {
-                        '__xml_syntax_error__': f"Retry guard stopped repeated error: {params['__xml_syntax_error__']}. Report as system error."
+                        '__xml_syntax_error__': f'Retry guard stopped repeated error: {params["__xml_syntax_error__"]}. Report as system error.'
                     }
 
         except Exception as e:
@@ -651,9 +660,7 @@ def _extract_xml_tool_calls_from_content(
                 fn_name,
                 e,
             )
-            params = {
-                '__xml_syntax_error__': f'Malformed parameters: {str(e)}'
-            }
+            params = {'__xml_syntax_error__': f'Malformed parameters: {str(e)}'}
 
         call_id = f'xml_toolu_{call_counter:02d}'
         call_counter += 1

@@ -299,7 +299,9 @@ class TestSummarizeToolArguments(unittest.TestCase):
         self.assertIn('1 operation', s)
 
     def test_find_symbol(self) -> None:
-        s = summarize_tool_arguments('find_symbols', {'path': 'foo.py', 'symbol_name': 'main'})
+        s = summarize_tool_arguments(
+            'find_symbols', {'path': 'foo.py', 'symbol_name': 'main'}
+        )
         self.assertIn('foo.py', s)
         self.assertIn('main', s)
 

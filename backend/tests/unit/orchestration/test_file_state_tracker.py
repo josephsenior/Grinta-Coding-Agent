@@ -40,9 +40,6 @@ def test_load_from_dict_restores_entries() -> None:
     assert 'created: src/app.py' in summary
 
 
-
-
-
 # ---------------------------------------------------------------------------
 # FileStateMiddleware enforcement tests
 # ---------------------------------------------------------------------------

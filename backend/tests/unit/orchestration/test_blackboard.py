@@ -72,8 +72,7 @@ def test_blackboard_skips_oversized_existing_data(tmp_path, monkeypatch) -> None
         json.dumps(
             {
                 'ok': 'ready',
-                'too_large': 'x'
-                * (blackboard_module.MAX_BLACKBOARD_VALUE_BYTES + 1),
+                'too_large': 'x' * (blackboard_module.MAX_BLACKBOARD_VALUE_BYTES + 1),
             }
         ),
         encoding='utf-8',

@@ -19,7 +19,9 @@ class EditorRecoveryAdvice:
     detail: str
 
 
-def _python_comment_prefix_issue(content: str, path: str | None) -> EditorRecoveryAdvice | None:
+def _python_comment_prefix_issue(
+    content: str, path: str | None
+) -> EditorRecoveryAdvice | None:
     suffix = Path(path or '').suffix.lower()
     if suffix != '.py':
         return None
@@ -108,7 +110,11 @@ def classify_editor_recovery(
             ),
         )
 
-    if 'replace failed' in lower or 'start line' in lower or 'end_line must be' in lower:
+    if (
+        'replace failed' in lower
+        or 'start line' in lower
+        or 'end_line must be' in lower
+    ):
         return EditorRecoveryAdvice(
             kind='range_edit_failed',
             preferred_tool='read',

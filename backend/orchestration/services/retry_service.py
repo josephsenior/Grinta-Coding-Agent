@@ -416,7 +416,9 @@ class RetryService:
         except Exception as budget_exc:  # pragma: no cover - defensive
             logger.debug('Could not compensate iteration budget: %s', budget_exc)
 
-    async def _process_tasks(self, tasks: list[RetryTask], poll_interval: float) -> None:
+    async def _process_tasks(
+        self, tasks: list[RetryTask], poll_interval: float
+    ) -> None:
         queue = self._retry_queue
         if queue is None:
             logger.debug('Retry queue no longer available; stopping task processing.')

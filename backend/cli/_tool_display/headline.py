@@ -58,6 +58,8 @@ _SIMPLE_VERB_MAP = {
     'call_mcp_tool': 'Invoked',
     'checkpoint': 'Saved',
 }
+
+
 def _verb_terminal_manager(args: dict[str, Any]) -> str:
     op = str(args.get('action') or '').strip().lower()
     return _TERMINAL_MANAGER_VERBS.get(op, 'Tool')

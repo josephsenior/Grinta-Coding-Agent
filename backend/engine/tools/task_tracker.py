@@ -76,7 +76,9 @@ class TaskTracker:
         with open(self.path, 'w', encoding='utf-8') as f:
             json.dump(normalized, f, indent=2, ensure_ascii=False)
 
-    def update_task_status(self, task_id: str, status: str, result: str | None = None) -> tuple[bool, str]:
+    def update_task_status(
+        self, task_id: str, status: str, result: str | None = None
+    ) -> tuple[bool, str]:
         """Update status of a single task by ID.
 
         Args:
@@ -95,7 +97,10 @@ class TaskTracker:
             TASK_STATUS_BLOCKED,
         }
         if status not in valid_statuses:
-            return False, f"Invalid status '{status}'. Valid: {', '.join(sorted(valid_statuses))}"
+            return (
+                False,
+                f"Invalid status '{status}'. Valid: {', '.join(sorted(valid_statuses))}",
+            )
 
         task_list = self.load_from_file()
         if not task_list:
@@ -113,7 +118,9 @@ class TaskTracker:
         return True, f"Task '{task_id}' status updated: {old_status} -> {status}"
 
 
-def _find_task_by_id(task_list: list[dict[str, Any]], task_id: str) -> dict[str, Any] | None:
+def _find_task_by_id(
+    task_list: list[dict[str, Any]], task_id: str
+) -> dict[str, Any] | None:
     """Find a task by ID in the task list, including nested subtasks."""
     for task in task_list:
         if task.get('id') == task_id:

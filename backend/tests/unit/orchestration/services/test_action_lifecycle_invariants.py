@@ -156,7 +156,9 @@ class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):
                 'controller-placeholder',
             )
 
-            with patch.object(PendingActionService, '_schedule_watchdog', autospec=True):
+            with patch.object(
+                PendingActionService, '_schedule_watchdog', autospec=True
+            ):
                 await self.action_service.run(action, None)
 
             self.assertEqual(pending_was_armed_before_runtime, [True])

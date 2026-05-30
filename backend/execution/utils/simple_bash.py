@@ -199,9 +199,7 @@ class SimpleBashSession(BaseShellSession):
             stderr=subprocess.PIPE,
             start_new_session=sys.platform != 'win32',
             creationflags=(
-                subprocess.CREATE_NEW_PROCESS_GROUP
-                if sys.platform == 'win32'
-                else 0
+                subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == 'win32' else 0
             ),
         )
         self._cancellation.register_process(process)
