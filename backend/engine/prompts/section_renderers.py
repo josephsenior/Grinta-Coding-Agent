@@ -567,9 +567,9 @@ def _build_autonomy_block(mode: str, *, checkpoints_on: bool) -> str:
     if is_plan_mode(mode):
         return (
             '<AUTONOMY>\n'
-            'Inspect and produce a structured plan. Do not mutate files. '
-            'Do not run mutating commands. Finish with a plan covering the approach, '
-            'files to change, risks, and verification steps.'
+            'Inspect the project and produce a structured plan. '
+            'Do not mutate files or run mutating commands. '
+            'Use `finish` to deliver the plan with approach, files to change, risks, and verification steps.'
             f'{cp_line}\n</AUTONOMY>'
         )
     return (
@@ -590,20 +590,21 @@ def _build_response_style_block(mode: str) -> str:
     )
     if is_chat_mode(mode):
         return (
-            'In Chat mode, prose is the default. '
-            'Use tools only when investigation is needed.'
+            'Prose is the default. Use tools only when investigation is needed. '
+            'Do not mutate files or run mutating commands without explicit user request.'
         )
     if is_plan_mode(mode):
         return (
-            'In Plan mode, tool calls are the default until the run ends:\n'
-            '- use tools to inspect the project and produce a structured plan\n'
+            'Tool calls are the default until the run ends:\n'
+            '- inspect the project and produce a structured plan\n'
             '- use `communicate_with_user` for blocking questions when available\n'
             '- use `finish` for final outcome\n'
-            '- do not use plain prose as a substitute for an action'
+            '- do not use plain prose as a substitute for an action\n'
+            '- do not mutate files or run mutating commands'
         )
     return (
-        'In Agent mode, tool calls are the default until the run ends:\n'
-        '- use tools to inspect, plan, edit, execute, and verify\n'
+        'Tool calls are the default until the run ends:\n'
+        '- inspect, plan, edit, execute, and verify\n'
         '- use `communicate_with_user` for blocking questions when available\n'
         '- use `finish` for final outcome\n'
         '- do not use plain prose as a substitute for an action'

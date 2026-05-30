@@ -824,7 +824,7 @@ class TestBuildSystemPromptRenders:
             in result
         )
         assert (
-            'In Agent mode, tool calls are the default until the run ends:'
+            'Tool calls are the default until the run ends:'
             in result
         )
         assert 'Be terse and direct.' not in result
