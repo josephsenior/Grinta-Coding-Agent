@@ -2518,9 +2518,12 @@ class GrintaScreen(Screen):
                             'Failed to rebuild toolset on mode change', exc_info=True
                         )
             state = getattr(controller, 'state', None)
-            extra_data = getattr(state, 'extra_data', None)
-            if is_chat_mode(mode) and isinstance(extra_data, dict):
-                extra_data.pop('active_run_mode', None)
+            extra_data = getattr(state, 'extra_data', None) if state is not None else None
+            if isinstance(extra_data, dict):
+                if is_chat_mode(mode):
+                    extra_data.pop('active_run_mode', None)
+                else:
+                    extra_data['active_run_mode'] = mode
         self._render_hud_bar()
         self._update_input_identity(mode)
         self._toggle_autonomy_tabs_visibility(mode)
