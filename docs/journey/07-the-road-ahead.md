@@ -271,4 +271,4 @@ It will look like what it really is:
 
 ---
 
-← [The Facade Pattern and the Escape from JSON Prison](40-the-facade-pattern-and-the-escape-from-json-prison.md) | [The Book of Grinta](README.md)
+← [The Facade Pattern and the Smaller File API](40-the-facade-pattern-and-the-smaller-file-api.md) | [The Book of Grinta](README.md)

@@ -247,7 +247,7 @@ def _render_routing(
         shell_and_execution_ladder = ''
     else:
         read_and_edit_ladder = (
-            '- **Read & Edit:** Use native tool calls only. `find_symbols` discovers symbol candidates; `read` inspects file/range/symbol content; `create` creates new files/symbols; `edit_symbols` modifies/deletes existing symbols; `replace_string` performs exact one-file text replacement/addition/deletion; `multiedit` performs atomic multi-file refactors with `replace_string` and `edit_symbols` operations.\n'
+            '- **Read & Edit:** Use native tool calls only. `find_symbols` discovers symbol candidates; `read` inspects file/range/symbol content; `create` creates new files/symbols; `edit_symbols` modifies/deletes existing symbols; `replace_string` performs exact one-file text replacement/addition/deletion; `multiedit` performs atomic multi-file refactors with `replace_string` and `edit_symbols` operations; `undo_last_edit` reverts the most recent file-write on an existing file.\n'
             '- **Edit scope:** Prefer the smallest intent-level operation that solves the problem. Do not use shell commands to write source files.\n'
             '- **NORMAL MODE:** Use the registered file tools only; do not invent alternate file-edit formats or serialized code payloads.'
         )
@@ -294,9 +294,7 @@ def _render_system_capabilities(
         '(`read`, `search_code`, `lsp`).\n'
         '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
         'Emit independent reads in a single assistant turn to run them concurrently.\n'
-        '  - **Constraint**: Side-effect actions (writes, edits, shell commands) '
-        'may run in parallel only when every action shares the same type '
-        'and targets a different resource (file path or terminal session).'
+        '  - **Constraint**: Only read-only observation tools may run concurrently. Mutating tools, file edits, shell commands, terminal sessions, task/memory updates, and finish/communicate actions are executed sequentially in model order.'
     ) if parallel_enabled and parallel_tool_calls_provider_flag else ''
 
     condensation_line = (
@@ -450,7 +448,8 @@ def _build_context_discipline_section(
     parts.extend([
         '',
         '**note/recall** — facts that must survive across turns and new tasks:',
-        '- Decision made, constraint discovered, or secret revealed \u2192 note() immediately.',
+        '- Decision made, architectural constraint discovered, stable command found, or project convention learned \u2192 note() when useful.',
+        '- Never store raw secrets, tokens, passwords, private keys, or credentials in note/memory. Store only non-sensitive facts such as "API key exists in env var X" when needed.',
         '- Workspace architecture, DB URL, port mapping, test command \u2192 note().',
         "- recall(key='all') at session start to re-ground; never recall 'lessons' twice this session.",
     ])
@@ -468,7 +467,9 @@ def _build_context_discipline_section(
         parts.extend([
             '',
             '**task_tracker** — your structural anchor:',
-            '- task_tracker(update) with the full plan before starting engineering work.',
+            '- Use task_tracker for multi-step, multi-file, risky, long-running, or recovery-heavy tasks.',
+            '- For small/local tasks, do not create tracker overhead; act, verify, and finish.',
+            '- If task_tracker was used for this run, keep it synced before finish.',
             "- Update status \u2192 'doing' when starting, 'done' after proof, 'blocked' with reason.",
             '- For multi-step tasks: task_tracker(view) at turn start to re-anchor.',
         ])
@@ -481,8 +482,8 @@ def _build_context_discipline_section(
     if checkpoints_on:
         parts.extend([
             '',
-            '**checkpoint** — before risky multi-file edits or destructive shell operations.',
-            'Do not edit in batches without one; checkpoint.save.name="batch before X".',
+            '**checkpoint** — Use checkpoint before destructive operations or risky non-atomic multi-step edits.',
+            '`multiedit` already provides atomic edit semantics; use checkpoint when rollback beyond a single atomic edit would be valuable.',
         ])
 
     parts.append('</CONTEXT_DISCIPLINE>')
@@ -539,11 +540,9 @@ def _build_risk_preview(
         return ''
     return (
         '<RISK_PREVIEW>\n'
-        'Before the **second** substantive milestone in one task (e.g. moving from core implementation work to tests or full build), '
-        'or when **task_tracker** shows **more than one** non-`done` item you still intend to touch: write **two** concrete failure '
-        'modes you could hit next (e.g. wrong public API vs wrong file; context loss between steps). '
-        'After each major milestone, one line: *did a predicted failure happen?* If yes, pivot using `<ERROR_RECOVERY>` above — '
-        'do not repeat the same failing move unchanged.\n'
+        'Use risk preview only for risky work: multi-file refactors, core runtime changes, concurrency/async changes, lifecycle/finish/tool-schema changes, destructive operations, public API changes, or large generated edits.\n\n'
+        'When triggered, write two concrete failure modes before continuing, then after the next major milestone note whether either occurred and pivot if needed.\n\n'
+        'For small/local edits, skip formal risk preview.\n'
         '</RISK_PREVIEW>'
     )
 
@@ -633,7 +632,7 @@ def _render_autonomy(
             '**task_tracker**: For multi-step tasks, use `view` to inspect the plan and `update` to replace the full `task_list`.\n'
             'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task without re-emitting the full list. Optional `result` field captures outcome.\n'
             'Allowed statuses: `todo`, `doing`, `done`, `skipped`, `blocked`.\n'
-            '**Completion**: Put waiting tasks to `blocked` before calling `finish`.'
+            '**Completion**: Before `finish`, no task should remain `todo` or `doing`. Mark truly completed work `done`, intentionally omitted work `skipped`, and only genuinely blocked work `blocked` with a reason.'
             '</TASK_TRACKING>'
         )
     else:
@@ -737,6 +736,7 @@ def _render_tool_reference(
             '- Code: `edit_symbols` for modifying/deleting existing symbols; prefer `path` + `qualified_name` + `symbol_kind` for write targets.\n'
             '- Text/config/docs: `replace_string`; add by anchor -> anchor + content, delete with `new_string=""`.\n'
             '- Refactor atomically across files: `multiedit`.\n'
+            '- Undo: `undo_last_edit` reverts the last file-write on an existing file. File must still exist — for creation rollback, delete the file.\n'
             '- Never write source via shell. Use real newlines/quotes, not serialized JSON strings.\n\n'
             '**Examples**\n'
             '- Find candidates: `find_symbols(query="authenticate")`.\n'
@@ -933,6 +933,16 @@ def _append_mcp_connected_catalog_sections(
     total = len(mcp_tool_names)
     parts.extend(
         (
+            '<CURATED_MCP_CAPABILITIES>\n'
+            'Grinta has a curated first-party MCP capability layer. Think in capabilities first, then call the matching MCP tool by its exact listed name.\n\n'
+            '- Web Search: discover external/current information, official pages, unknown errors, release notes, or references.\n'
+            '- Fetch: read a specific URL/page. Web Search finds pages; Fetch reads pages.\n'
+            '- GitHub: inspect repositories, issues, PRs, commits, releases, and upstream context. Remote write actions require explicit user intent.\n'
+            '- Docs / Context7: use for reliable library/framework documentation when the library is known.\n'
+            '- UI / shadcn: use only for React/Tailwind/shadcn component work.\n'
+            '- Quality Gates: use for tests, lint, typecheck, formatting checks, and finish-readiness validation.\n\n'
+            'Mode rules override MCP capability suggestions. Plan mode remains read-only.\n'
+            '</CURATED_MCP_CAPABILITIES>',
             f'🔌 **External MCP tools** ({total}): use **`call_mcp_tool(tool_name="...", arguments={{...}})`** '
             f'— argument shapes match the registered tool schema.',
             '**Tool-name discipline (critical):** Pass each tool name to '
