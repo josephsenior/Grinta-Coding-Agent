@@ -24,7 +24,6 @@ from backend.core.constants import (
 )
 from backend.core.errors import ModelProviderError
 from backend.core.interaction_modes import (
-    PLAN_MODE,
     is_chat_mode,
     normalize_interaction_mode,
 )
@@ -1488,10 +1487,10 @@ class OrchestratorExecutor:
     def _gate_agent_mode_plain_text(
         self, actions: list[Action], response: ModelResponse
     ) -> list[Action]:
-        """Enforce AGENT mode protocol on plain-text (MessageAction-only) responses.
+        """Block plain-text responses in AGENT mode when active tasks exist.
 
-        Blocks plain text only when there are active tasks (todo/doing).
-        Without active tasks the agent is free to chat — no tool calls required.
+        Plan mode is not gated here — the prompt guidance and tool filtering
+        handle the preference for structured finish() calls.
         """
         from backend.ledger.action.message import MessageAction as _MessageAction
 
@@ -1501,25 +1500,6 @@ class OrchestratorExecutor:
 
         if not actions or not all(isinstance(a, _MessageAction) for a in actions):
             return actions
-
-        if mode == PLAN_MODE:
-            from backend.ledger.action import AgentThinkAction
-
-            logger.warning(
-                'Plan mode plain-text gate: blocking plain text response. '
-                'The model must use inspection tools, communicate_with_user, or finish.'
-            )
-            return [
-                AgentThinkAction(
-                    thought=(
-                        '[PLAN_MODE_PROTOCOL_ERROR] Plain text assistant output is not allowed '
-                        'during an active Plan Mode run. Use read/search/inspection tools, '
-                        'communicate_with_user for clarification, or finish with status, '
-                        'summary, plan, assumptions, and next_step.'
-                    ),
-                    suppress_cli=True,
-                )
-            ]
 
         if not self._has_active_tasks:
             return actions
