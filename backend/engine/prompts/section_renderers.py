@@ -250,7 +250,7 @@ def _render_routing(
         read_and_edit_ladder = (
             '- **Read & Edit:** Use the registered file tools only. `find_symbols` discovers symbol candidates; `read` inspects file/range/symbol content; `create` creates new files/symbols; `edit_symbols` modifies/deletes existing symbols; `replace_string` performs exact one-file text replacement/addition/deletion; `multiedit` performs atomic multi-file refactors with `replace_string` and `edit_symbols` operations; `undo_last_edit` reverts the most recent file-write on an existing file.\n'
             '- **Edit scope:** Prefer the smallest intent-level operation that solves the problem. Do not use shell commands to write source files.\n'
-            '- **NORMAL MODE:** Do not invent alternate file-edit formats or serialized code payloads.'
+            '- **Edit discipline:** Do not invent alternate file-edit formats or serialized code payloads.'
         )
         shell_and_execution_ladder = '- **Shell & Execution:** Use the terminal strictly for build/test/git/processes.'
 
