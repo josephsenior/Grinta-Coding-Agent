@@ -566,89 +566,49 @@ class OrchestratorPlanner:
 
     def _inject_plan_mode_instructions(self, messages: list, state: State) -> list:
         instruction = (
-            '\n\n=== STRICT PLAN MODE PROTOCOL ===\n'
-            'You are running in PLAN MODE. Plan Mode is a read-only agent run. '
-            'Your job is to inspect the project and produce a concrete execution plan. '
-            'Prose responses are only for casual conversation; when working on the planning '
-            'task you must use tool calls.\n\n'
-            'Your output must be one of the following:\n'
+            '\n\n=== PLAN MODE PROTOCOL ===\n'
+            'Output must be one of the following:\n'
             '1. A read-only inspection tool call (when investigating the project).\n'
-            '2. Natural prose response (when the user is conversing, not tasking).\n'
-            '3. A communicate_with_user tool call when clarification is needed before '
-            'a useful plan can be produced.\n'
-            '4. A finish tool call with the final structured plan.\n\n'
-            'Using finish is strongly preferred for delivering your plan — it '
-            'produces a structured summary in the transcript with your plan steps, '
-            'assumptions, and next steps clearly formatted. '
-            'Plain prose does not end the conversation — only the finish tool does. '
-            'Plain prose is acceptable for casual conversation and brief clarifications, '
-            'but always use finish to deliver your complete plan.\n\n'
-            'Do not modify files or project state. Do not use create, edit_symbols, '
-            'replace_string, multiedit, shell commands, formatters, installers, migrations, '
-            'git operations, MCP tools, browser tools, checkpoints, task_tracker, note, '
-            'or memory write tools.\n\n'
-            'communicate_with_user is for questions that allow the run to continue. '
-            "finish(status='blocked') is for ending the run when planning cannot continue.\n\n"
-            "Plan Mode finish requires exactly these universal fields: status, summary, "
-            "plan, assumptions, next_step. For status='completed', plan must be non-empty.\n\n"
-            'When calling finish, be detailed:\n'
-            '- summary: 2-5 sentences covering what was investigated, what was found, '
-            'and what the plan achieves.\n'
-            '- plan: one step per logical action. Include file paths and functions '
-            'that will be modified.\n'
-            '- assumptions: Be specific about dependencies, risks, or unknowns.\n'
+            '2. Natural prose response (when the user is conversing casually, not tasking).\n'
+            '3. A `communicate_with_user` tool call when clarification is needed.\n'
+            '4. A `finish` tool call with the final structured plan.\n\n'
+            'Use `finish` to deliver the plan — it produces a structured summary in the '
+            'transcript. Plain prose does not end the conversation — only `finish` does.\n\n'
+            'Do not: mutate files, run mutating commands, use create/edit_symbols/replace_string/'
+            'multiedit/shell/git/MCP tools, or write tools.\n\n'
+            '`communicate_with_user` is for continuation questions. '
+            "`finish(status='blocked')` is for ending when planning cannot continue.\n\n"
+            "Plan finish requires these universal fields: status, summary, plan, "
+            "assumptions, next_step. For status='completed', plan must be non-empty.\n"
             '=================================\n'
         )
         return self._apply_control_message(messages, instruction)
 
     def _inject_agent_mode_instructions(self, messages: list, state: State) -> list:
         instruction = (
-            '\n\n=== STRICTOR AGENT MODE PROTOCOL ===\n'
-            'You are running in AGENT MODE. When the user gives you a task or asks you to '
-            'perform work, respond with tool calls — do not write prose explanations. '
-            'When the user is directly conversing with you (asking a casual question, '
-            'chit-chat, or seeking your opinion), it is fine to respond in natural prose. '
-            'Your output must be one of the following:\n'
+            '\n\n=== AGENT MODE PROTOCOL ===\n'
+            'Output must be one of the following:\n'
             '1. A real tool/function call (when performing work).\n'
             '2. Natural prose response (when the user is conversing, not tasking).\n'
-            '3. A communicate_with_user tool call (to ask questions, clarify, or report blockers).\n'
-            '4. A finish tool call (to end the task successfully).\n\n'
-            'Agent Mode finish requires exactly these universal fields: status, summary, '
-            'actions_taken, verification, remaining_items, next_step. If no verification '
-            "was run, use verification.status='not_run' and explain honestly in details.\n\n"
-            'When calling finish, be detailed:\n'
-            '- summary: 2-5 sentences covering what was accomplished, what changed '
-            '(files, functions, config), and the end state.\n'
-            '- actions_taken: one item per distinct action. Include file paths, '
-            'function names, and what changed (e.g. "Added input validation to '
-            'src/api/login.py").\n'
-            "- verification: Describe exactly what was checked — commands run, "
-            'pages visited, test suites executed. Be specific; say "Ran pytest '
-            'on tests/test_auth.py — all 12 passed", not just "Tests passed".\n'
-            '- remaining_items: If nothing remains, say so. If work was deferred, '
-            'say why (e.g. "Add rate limiting — low priority, deferred").\n\n'
-            'File API mental model:\n'
-            '- `find_symbols` discovers symbol candidates without reading full bodies.\n'
-            '- `read` inspects file, range, or one/more symbol bodies.\n'
-            '- `create` creates new files or new symbols; file creation must not modify existing files.\n'
-            '- `edit_symbols` modifies or deletes existing code symbols.\n'
-            '- `replace_string` for exact text replacement, insertion by anchor, and deletion.\n'
-            '- `multiedit` for atomic multi-file refactoring with `replace_string` and `edit_symbols` operations.\n\n'
-            'Do not use shell commands to write source files. Use only the registered file tools.\n'
+            '3. A `communicate_with_user` tool call (for questions, blockers, or escalation).\n'
+            '4. A `finish` tool call (to end the task successfully).\n\n'
+            '`finish` fields: status, summary, actions_taken, verification, remaining_items, next_step.\n'
+            'If verification was not run, use verification.status=\'not_run\' and explain in details.\n\n'
+            'File API: `find_symbols` discovers; `read` inspects; `create` new files/symbols; '
+            '`edit_symbols` modifies/deletes existing symbols; `replace_string` exact text replacement; '
+            '`multiedit` atomic multi-file refactors.\n'
+            'Do not use shell commands to write source files.\n'
             '=====================================\n'
         )
-
         return self._apply_control_message(messages, instruction)
 
     def _inject_chat_mode_instructions(self, messages: list, state: State) -> list:
         instruction = (
             '\n\n=== CHAT MODE ===\n'
-            'You are running in CHAT MODE. The user is having a conversation with you -- '
-            'they are not issuing a task. Respond naturally in prose.\n\n'
-            'You have access to read-only tools (read, search_code, find_symbols, recall, '
-            'lsp, analyze_project_structure) if the user asks a code-related question '
-            'and you need to look something up. You may NOT use any write tools '
-            '(create, edit_symbols, replace_string, multiedit, shell, finish).\n'
+            'Respond naturally in prose. '
+            'Use read-only tools (read, search_code, find_symbols, recall, lsp, '
+            'analyze_project_structure) if investigating the codebase. '
+            'Do NOT use write tools (create, edit_symbols, replace_string, multiedit, shell, finish).\n'
             '================\n'
         )
         return self._apply_control_message(messages, instruction)
