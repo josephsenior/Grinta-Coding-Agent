@@ -2,7 +2,7 @@
 
 There is a sentence I had to argue myself out of for months:
 
-> *“If the agent cannot match an exact string, it is the agent’s problem.”*
+> *“If the agent cannot match an exact string, it is the agent's problem.”*
 
 That sentence is satisfying. It is also the reason real edits used to fail half the time on real files. This chapter is the part of the journey where I gave up on exact-match purity, realized that **a tolerant editor is not a sloppy one — it is the one that survives indentation, line endings, and the realities of how LLMs serialize context**, and finally buried the unified diff.
 
@@ -37,7 +37,7 @@ Today, the unified diff is dead. We tore out the `apply_patch.py` file, stripped
 
 ## The Ladder of Match Modes
 
-Even with search-and-replace blocks, exact match remains a lie in the real world. A tab vs. four spaces. CRLF vs. LF. A trailing space the user’s editor stripped that the model still remembers. The model offered the right edit; the editor said no; the user blamed the model.
+Even with search-and-replace blocks, exact match remains a lie in the real world. A tab vs. four spaces. CRLF vs. LF. A trailing space the user's editor stripped that the model still remembers. The model offered the right edit; the editor said no; the user blamed the model.
 
 Grinta's default editor is now tolerant by construction, supporting three match modes in order of strictness:
 
@@ -47,7 +47,7 @@ Used when you genuinely care about every character: replacing a JSON literal, a 
 ### 2. `normalize_ws` — general code edits (the default)
 Before matching, both the haystack (file content) and the needle (search block) are normalized: tabs and spaces collapsed to a canonical form, trailing whitespace stripped on each line, CR/LF normalized to LF. The match still has to be unique after normalization. If the file uses tabs and the model offered spaces, the edit succeeds.
 
-Crucially, **the file on disk is not normalized.** The output preserves the file’s native line endings and indentation. The tolerance is only in the *match step*, not in the write step. That distinction is what kept this from turning into an automated whitespace-style war on every edit.
+Crucially, **the file on disk is not normalized.** The output preserves the file's native line endings and indentation. The tolerance is only in the *match step*, not in the write step. That distinction is what kept this from turning into an automated whitespace-style war on every edit.
 
 Here is the exact whitespace comparison function implemented in the editor:
 
@@ -79,9 +79,10 @@ Reserved for short snippets (≤120 characters) where the model knows the line i
 Not all files are code. Markdown, YAML, JSON, plain text, `.gitignore`, `.env` templates. Tree-sitter does not have anything useful to say about most of them. Whitespace tolerance is *more* dangerous, not less, because YAML cares about indentation and Markdown cares about blank lines.
 
 The robust edit protocol for non-code files added a smaller, simpler set of rules:
-* **Show the line range you’re editing.** The editor enforces a `view_range` discipline for the touch-points before the edit, so the model has to ground itself in current file state.
-* **Refuse the edit if the file changed since the last read in this turn.** This is a soft optimistic-concurrency check, enough to catch the case where a user saves a file from VS Code while the agent is thinking.
-* **Preserve the file’s native line endings, byte-for-byte.** A `.gitignore` written with CRLF stays CRLF. A YAML file written with LF stays LF.
+* **Show the line range you're editing.** The editor enforces a `view_range` discipline for the touch-points before the edit, so the model has to ground itself in current file state.
+* **Preserve the file's native line endings, byte-for-byte.** A `.gitignore` written with CRLF stays CRLF. A YAML file written with LF stays LF.
+
+The original protocol also included an optimistic-concurrency check: refuse the edit if the file had changed since the last read. That guard was removed. The strict hash check misfired too often — the user saving a file in their editor while the agent was thinking, or a build script touching a file, triggering a false conflict that derailed the edit flow. The lighter replacement is grounding through reads, tool observations, validation, and explicit failures only where they carry real signal. If a file changed between read and write, the model usually catches the mismatch through the edit response and re-reads. For the rare case where it does not, the tree-sitter validation post-edit catches structural damage. The guard that blocked before the edit was protecting against a threat that rarely materialized at the cost of frequent false positives.
 
 ---
 
@@ -93,7 +94,28 @@ I want to be specific about lines I will not cross, because the appeal of more t
 * **No automatic conflict resolution against the disk.** If the file changed under us, the right answer is to fail loudly and let the agent re-read.
 * **No silent format conversions.** No “auto-convert tabs to spaces because the project uses spaces.” That is an opinion. The editor does not get to have opinions.
 
-Whitespace tolerance was built to remove a *false* failure (whitespace difference that doesn’t change meaning). It was never to start guessing about *real* differences.
+Whitespace tolerance was built to remove a *false* failure (whitespace difference that doesn't change meaning). It was never to start guessing about *real* differences.
+
+---
+
+## Addendum: The Facade After the Fuzzy Match Era
+
+Fuzzy matching improved edit reliability significantly, but it was not the final abstraction.
+
+The real improvement came from a different direction: reducing the model-facing API. The raw editing block — any format where the model produces a structured payload that the backend must parse — was replaced by an intent-oriented tool facade. The model no longer constructs diffs, escapes strings, or manages open/close tags. It declares what it wants to do:
+
+- `edit_symbols` for code, backed by tree-sitter and AST parsing.
+- `replace_string` for grounded textual changes, with the three match modes as a fallback layer.
+- `create` for new files and symbols.
+- `multiedit` for atomic cross-file refactors.
+
+The backend still uses normalization, AST parsing, rollback, and validation internally. The model no longer needs to think in editor protocols.
+
+This layered design means the fuzzy-match modes are not the primary editing path anymore. They are the safety net. The primary path is `edit_symbols` — named symbol replacement with tree-sitter verification. When that does not apply (non-code files, generated code, templated languages), `replace_string` with its match modes takes over. And when the change crosses file boundaries, `multiedit` wraps everything in a transaction.
+
+The match modes survived because they serve a real need. But the architecture stopped asking the model to think about them. The model just says "replace this symbol" or "find this string and change it." The backend handles the mode selection, the tolerance, and the validation.
+
+That was the real lesson of the fuzzy match era: not that tolerance is the answer, but that the question itself changes when you stop asking the model to be an editor and start asking it to be a client of an editing API.
 
 ---
 

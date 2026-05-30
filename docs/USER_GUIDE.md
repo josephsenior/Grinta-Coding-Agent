@@ -199,6 +199,16 @@ Grinta executes locally on your host machine.
 
 Use Grinta in trusted repositories and environments.
 
+### Modes (`/mode`)
+
+Grinta has three interaction modes that change the conversational contract:
+
+- **Chat** — talk freely, ask questions, discuss architecture. No execution pressure. Use this when you want to think out loud or explore without triggering tool calls.
+- **Plan** — the agent thinks, clarifies requirements, and produces an actionable plan before any tool executes. Use this for complex or ambiguous tasks where you want to review the approach first.
+- **Agent** — full task execution. The agent plans, runs tools, validates results, and finishes. This is the default mode when you give a direct task. While work remains active, the agent focuses on execution rather than plain-text conversation.
+
+Switch between them at any time with `/mode chat`, `/mode plan`, or `/mode agent`. The current mode is visible in the HUD bar.
+
 ### Autonomy levels (`/autonomy`)
 
 There are three stored levels: **conservative**, **balanced**, and **full**. They differ only in **when the agent asks you before running an action**; execution, retries, and prompts are otherwise the same.
@@ -206,6 +216,8 @@ There are three stored levels: **conservative**, **balanced**, and **full**. The
 - **Conservative** — confirm before every runnable action.
 - **Balanced** (default) — confirm only for high-risk actions.
 - **Full** — never prompt for confirmation; hard safety blocks (for example CRITICAL-classified commands) still apply.
+
+Autonomy level is only meaningful in **Agent** mode. Chat and Plan modes have their own interaction contracts independent of autonomy.
 
 See also [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md).
 

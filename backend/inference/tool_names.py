@@ -9,6 +9,7 @@ from backend.core.constants import (
     READ_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
+    UNDO_LAST_EDIT_TOOL_NAME,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     'READ_TOOL_NAME',
     'REPLACE_STRING_TOOL_NAME',
     'TASK_TRACKER_TOOL_NAME',
+    'UNDO_LAST_EDIT_TOOL_NAME',
 ]

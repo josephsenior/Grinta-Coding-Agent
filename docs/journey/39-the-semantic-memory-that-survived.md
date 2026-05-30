@@ -1,4 +1,4 @@
-# 35. The Semantic Memory That Survived
+# 39. The Semantic Memory That Survived
 
 There is a specific kind of embarrassment in engineering: the gap between what you built and what you actually needed.
 
@@ -137,4 +137,4 @@ That is the RAG stack that earned its place in Grinta.
 
 ---
 
-← [The Vendor-Neutral Bench](38-the-vendor-neutral-bench.md) | [The Book of Grinta](README.md) | [The Facade Pattern and the Escape from JSON Prison](40-the-facade-pattern-and-the-escape-from-json-prison.md) →
+← [The Vendor-Neutral Bench](38-the-vendor-neutral-bench.md) | [The Book of Grinta](README.md) | [The Facade Pattern and the Smaller File API](40-the-facade-pattern-and-the-smaller-file-api.md) →

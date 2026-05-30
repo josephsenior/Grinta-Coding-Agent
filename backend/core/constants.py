@@ -379,6 +379,7 @@ EDIT_SYMBOLS_TOOL_NAME = 'edit_symbols'
 MULTIEDIT_TOOL_NAME = 'multiedit'
 FINISH_TOOL_NAME = 'finish'
 TASK_TRACKER_TOOL_NAME = 'task_tracker'
+UNDO_LAST_EDIT_TOOL_NAME = 'undo_last_edit'
 NOTE_TOOL_NAME = 'note'
 RECALL_TOOL_NAME = 'recall'
 # ── Security Risk ───────────────────────────────────────────────────

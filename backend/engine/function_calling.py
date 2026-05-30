@@ -55,6 +55,7 @@ from backend.engine.tools import (
     create_read_tool,
     create_replace_string_tool,
     create_summarize_context_tool,
+    create_undo_last_edit_tool,
 )
 from backend.engine.tools.analyze_project_structure import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
@@ -98,6 +99,7 @@ from backend.inference.tool_names import (
     READ_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
+    UNDO_LAST_EDIT_TOOL_NAME,
 )
 from backend.ledger.action import (
     Action,
@@ -765,6 +767,22 @@ def _single_symbol_candidate(
             _symbol_action_ambiguity_error(symbol_name, candidates)
         )
     return safe_path, content, candidates[0]
+
+
+def _handle_undo_last_edit_tool(arguments: Mapping[str, Any]) -> Action:
+    """Handle undo_last_edit tool: revert the last file-write on an existing file."""
+    path = str(require_tool_argument(arguments, 'path', UNDO_LAST_EDIT_TOOL_NAME))
+    safe_path = _safe_workspace_path(path)
+    if not safe_path.is_file():
+        raise FunctionCallValidationError(
+            f"File '{path}' does not exist. undo_last_edit only applies to existing files. "
+            'To undo a file creation, delete the file instead.'
+        )
+    return FileEditAction(
+        path=_relative_display_path(safe_path),
+        command='undo_last_edit',
+        impl_source=FileEditSource.FILE_EDITOR,
+    )
 
 
 def _handle_checkpoint_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
@@ -1947,6 +1965,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         COMMUNICATE_TOOL_NAME: _handle_communicate_tool,
         EXECUTE_MCP_TOOL_TOOL_NAME: _handle_execute_mcp_tool_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
+        UNDO_LAST_EDIT_TOOL_NAME: _handle_undo_last_edit_tool,
         BROWSER_TOOL_NAME: _handle_browser_tool,
     }
 

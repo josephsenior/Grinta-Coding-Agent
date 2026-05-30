@@ -20,6 +20,7 @@ from .native_file_tools import (
     create_multiedit_tool,
     create_read_tool,
     create_replace_string_tool,
+    create_undo_last_edit_tool,
 )
 from .search_code import create_search_code_tool
 from .task_tracker import create_task_tracker_tool
@@ -38,6 +39,7 @@ __all__ = [
     'create_multiedit_tool',
     'create_read_tool',
     'create_replace_string_tool',
+    'create_undo_last_edit_tool',
     'create_memory_manager_tool',
     'create_debugger_tool',
     'create_analyze_project_structure_tool',

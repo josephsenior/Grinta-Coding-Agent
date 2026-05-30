@@ -71,10 +71,8 @@ if TYPE_CHECKING:
 def _provider_parallel_tool_calls_supported(model_id: str) -> bool:
     """Return True when the active model supports parallel tool_calls.
 
-    Checks the catalog first for ``supports_parallel_tool_calls``.  For
-    uncataloged models, falls back to
-    ``model_features.get_features().supports_function_calling`` — models
-    that support function calling generally also support parallel tool calls.
+    Checks the catalog first for ``supports_parallel_tool_calls``.
+    Returns False as conservative fallback if unknown.
     """
     if not model_id:
         return False
@@ -86,12 +84,8 @@ def _provider_parallel_tool_calls_supported(model_id: str) -> bool:
             return bool(getattr(entry, 'supports_parallel_tool_calls', False))
     except Exception:
         pass
-    try:
-        from backend.inference.model_features import get_features
-
-        return get_features(model_id).supports_function_calling
-    except Exception:
-        return False
+    
+    return False
 
 
 _DIR = Path(__file__).parent
@@ -275,13 +269,17 @@ def _shell_identity_sections(
             (
                 'shell_identity_powershell_windows',
                 '<SHELL_IDENTITY>\n'
-                'Your terminal is **PowerShell** on Windows. Use PowerShell syntax: chain with `;` (not `&&` / `||`); '
-                'prefer `-ErrorAction SilentlyContinue` or `try/catch` instead of `|| true`; use `Start-Process` / '
-                '`Start-Job` instead of a trailing `&`.\n\n'
-                '**Directory/Content listing:** You may use `Get-ChildItem` (or `ls`, `dir`) and `Select-String` if needed, '
-                'but prefer native tools from the **TOOL_ROUTING_LADDER** (`search_code`, editors, structure tools) first.\n\n'
-                '**Do not use Unix-only habits here:** `find`, `cat`, `grep`, `head`, `tail`, `touch`, `rm -rf`, '
-                '`pkill`, `timeout`, `which`, or `&&` / `||`.\n'
+                'Your terminal is **PowerShell** on Windows.\n\n'
+                'Use PowerShell-native syntax:\n'
+                '- chain commands with `;`\n'
+                '- use `Get-ChildItem` for listing\n'
+                '- use `Get-Content` for reading shell output files when necessary\n'
+                '- use `Select-String` for shell-level text filtering when native search tools are not appropriate\n'
+                '- use `Test-Path`, `New-Item`, `Remove-Item`, `Set-Location`\n'
+                '- use `Start-Process` / `Start-Job` for background process patterns\n'
+                '- use `try/catch` or `-ErrorAction` for error handling\n\n'
+                'Prefer Grinta’s native tools for repo intelligence and file edits.\n'
+                'Do not write source files through shell when file tools are available.\n'
                 '</SHELL_IDENTITY>',
             ),
         ]
@@ -482,11 +480,7 @@ def build_mcp_user_addendum(
 ) -> str:
     """Render the MCP catalogue as a *per-turn* addendum.
 
-    Emit this as a system-role message *appended* to the conversation each
-    turn (after history compaction) so the static system prompt remains stable
-    across MCP connect/disconnect events. This restores Claude / Gemini prefix
-    caching that was previously broken by inlining the MCP tool list into the
-    system prompt.
+    Render the MCP catalogue as a per-turn addendum so the static system prompt remains cache-stable.
 
     Returns an empty string when no MCP tools are connected.
     """

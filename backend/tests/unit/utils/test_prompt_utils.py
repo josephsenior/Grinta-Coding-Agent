@@ -824,7 +824,7 @@ class TestBuildSystemPromptRenders:
             in result
         )
         assert (
-            'Prose is the default; use lists only when the content is list-shaped.'
+            'In Chat mode, prose is the default.'
             in result
         )
         assert 'Be terse and direct.' not in result

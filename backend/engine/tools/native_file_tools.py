@@ -20,6 +20,7 @@ from backend.inference.tool_names import (
     MULTIEDIT_TOOL_NAME,
     READ_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
+    UNDO_LAST_EDIT_TOOL_NAME,
 )
 
 
@@ -242,6 +243,21 @@ def create_edit_symbols_tool() -> ChatCompletionToolParam:
     )
 
 
+def create_undo_last_edit_tool() -> ChatCompletionToolParam:
+    return create_tool_definition(
+        name=UNDO_LAST_EDIT_TOOL_NAME,
+        description=(
+            'Undo the last file-write operation on the given file path. '
+            'Only works on existing files — if the file no longer exists, '
+            'this tool will report an error; use delete or create instead.'
+        ),
+        properties={
+            'path': get_path_param('Project-relative path to undo the last edit on.'),
+        },
+        required=['path'],
+    )
+
+
 def create_multiedit_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=MULTIEDIT_TOOL_NAME,
@@ -285,4 +301,5 @@ __all__ = [
     'create_multiedit_tool',
     'create_read_tool',
     'create_replace_string_tool',
+    'create_undo_last_edit_tool',
 ]

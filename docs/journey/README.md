@@ -1,6 +1,6 @@
 # The Book of Grinta
 
-**A 7-month journey from multi-tenant SaaS to the rawest open-source coding agent on the planet.**
+**An 8-month journey from multi-tenant SaaS to a coherent local-first coding agent.**
 
 By Youssef Mejdi, AI Engineering Student, 4th Year
 
@@ -36,7 +36,7 @@ What survived was the engine: a single, focused agent that plans, implements, te
 
 ## The Arc
 
-Seven months. Three distinct phases. One principle.
+Eight months. Several distinct phases. One principle.
 
 **Month 1 (September 2025):** Research. I spent the entire first month not writing code. I studied tech stacks, architectures, agent behaviors, terminal multiplexing, event sourcing patterns, and the design decisions of every major coding agent I could find — Claude Code, OpenHands, SWE-Agent, Devin, Aider, LangChain. I mapped out what they did well, where they cut corners, and where the gaps were. I learned how OpenHands treats sessions as durable event streams. I analyzed how SWE-Agent makes tool design the center of agent behavior. This month produced no code, but it produced the design convictions that survived every pivot.
 
@@ -47,6 +47,8 @@ Seven months. Three distinct phases. One principle.
 **Month 6 (February 2026):** The Pivot. I deleted the cloud. I removed Redis from the core runtime. I moved the async database driver into an optional dependency group. I removed the Textual TUI. I removed the cloud runtime providers. I stripped Grinta down to its engine — 43 required packages, zero cloud dependencies — and shipped the foundation release.
 
 **Month 7 (March–April 2026):** The Refinement. Decomposing monoliths into focused modules, pushing orchestration responsibilities into clearer service boundaries, and consolidating the context subsystem after a wave of exploratory variants. Hardening the local security profile. Building the CLI with tab completion, fuzzy command matching, slash commands, and an animated ASCII splash screen. Writing this document. Alongside that work, the terminal story grew a deliberate second layer: a native, OS-agnostic PTY path for **opt-in** interactive shells (no Docker required), sitting next to the original batch/tmux model instead of replacing it — because growing means adding truth, not erasing the chapter you already wrote about the console wars.
+
+**Current Phase (May 2026 onward):** Productization and Runtime UX. The architecture was always serious. Now the interface caught up. The mode split stabilized — Chat, Plan, and Agent as three distinct conversational contracts instead of one overloaded prompt. The autonomy knob separated from execution mode. The Textual TUI returned, no longer as product theater but as operational HUD — cost, tokens, latency, breaker state, and mode switch visible at a glance. Tool cards replaced raw JSON observations. The file editing facade collapsed into six intent-oriented tools with a single rule: read may search, write must target. XML and JSON transport formats died; only model intent remains. MCP servers were curated as deliberate capability extensions rather than infinite plugin soup. The quality gate before finish is becoming automatic. And the agent succeeded twice on a Raft/RFT consensus task from an empty directory — a serious receipt for what the architecture can do when given hard problems. The project is not finished, but it is no longer just an engine. It is becoming a coherent product.
 
 ---
 
@@ -69,8 +71,12 @@ The file names stay stable for repository sanity, but the strongest reading arc 
 - **Act VIII — Operational Reality & Production:** [25](27-the-observability-black-hole.md), [26](30-the-weight-divide-local-vs-hosted.md), [27](31-the-myth-of-the-committee.md)
 - **Act IX — Addendum (The Terminal, Revisited):** [28](32-the-two-lives-of-the-terminal.md)
 - **Act X — Reliability Receipts and Editor Honesty:** [29](33-the-small-async-wars.md), [30](34-the-fuzzy-match-heresy.md), [31](35-the-self-knowing-agent.md), [32](36-the-required-risk.md), [33](37-the-verbose-status.md), [34](38-the-vendor-neutral-bench.md)
-- **Act XI — Memory and Retrieval Honesty:** [35](39-the-semantic-memory-that-survived.md)
-- **Act XII — The Interface and Transport Physics:** [36](40-the-facade-pattern-and-the-escape-from-json-prison.md)
+- **Act XI — Memory and Retrieval Honesty:** [39](39-the-semantic-memory-that-survived.md)
+- **Act XII — The Interface and Transport Physics:** [40](40-the-facade-pattern-and-the-smaller-file-api.md)
+- **Act XIII — Mode as Product Architecture:** [41](41-the-mode-split.md)
+- **Act XIV — The Interface Returned:** [42](42-the-interface-returned.md)
+- **Act XV — The Plugin Boundary:** [43](43-the-plugin-boundary.md)
+- **Act XVI — The Empty Folder Trials:** [44](44-the-empty-folder-trials.md)
 - **Epilogue:** [07](07-the-road-ahead.md)
 
 Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
@@ -112,8 +118,12 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [32](36-the-required-risk.md) | **The Required Risk** | Why optional security parameters are not security parameters, the autonomy-mode collapse to a single honest knob, and the per-session “always allow” memory that turned a confirmation gate from noise back into signal. |
 | [33](37-the-verbose-status.md) | **The Verbose Status** | `/status verbose` diagnostics, `DO_NOT_TRACK` and `GRINTA_DISABLE_METRICS` as honest opt-outs, and the in-band disconnect probe that catches provider proxies pretending to be the model. |
 | [34](38-the-vendor-neutral-bench.md) | **The Vendor-Neutral Bench** | The internal eval pack: why the scorer refuses to drive other agents, how the five 0–5 metrics compose, why failure caps the score at 49, and what vendor-neutral honestly does (and does not) mean. |
-| [35](39-the-semantic-memory-that-survived.md) | **The Semantic Memory That Survived** | The RAG stack that survived deletion: ChromaDB + FastEmbed ONNX, SQLite FTS5 BM25, parent-child chunking, LRU cache, optional flashrank reranking, and why the 15,000-line graph memory had to die. |
-| [36](40-the-facade-pattern-and-the-escape-from-json-prison.md) | **The Facade Pattern and the Escape from JSON Prison** | How separating backend complexity from prompt cognitive load and moving multi-file edits to nested XML saved the agent from the JSON escaping prison. |
+| [39](39-the-semantic-memory-that-survived.md) | **The Semantic Memory That Survived** | The RAG stack that survived deletion: ChromaDB + FastEmbed ONNX, SQLite FTS5 BM25, parent-child chunking, LRU cache, optional flashrank reranking, and why the 15,000-line graph memory had to die. |
+| [40](40-the-facade-pattern-and-the-smaller-file-api.md) | **The Facade Pattern and the Smaller File API** | How separating backend complexity from prompt cognitive load, and removing transport-format thinking from the model's job entirely, created a smaller and more honest editing API. |
+| [41](41-the-mode-split.md) | **The Mode Split** | Why autonomy is not one setting but a state machine with different conversational contracts, and how Chat / Plan / Agent mode replaced prompt-wrangling with product architecture. |
+| [42](42-the-interface-returned.md) | **The Interface Returned** | Why the Textual TUI was removed as product theater and brought back as operational UI — HUD bar, mode switch, cost observability, and the difference between pretty and useful. |
+| [43](43-the-plugin-boundary.md) | **The Plugin Boundary** | Why MCP is dangerous as infinite tool soup, and how Grinta treats selected MCP servers as deliberate capability extensions rather than identity replacements. |
+| [44](44-the-empty-folder-trials.md) | **The Empty Folder Trials** | Lab notes from the Raft/RFT consensus stress test: what Grinta built from an empty directory, where it struggled, and what the receipts actually prove. |
 | [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
 
 ### Short reading paths
@@ -123,7 +133,7 @@ If you will not read linearly, three curated arcs:
 - **Reliability and proof:** [18 · Surviving the Crash](19-surviving-the-crash.md) → [19 · Circuit Breakers](20-circuit-breakers-and-hallucinations.md) → [20 · Safety Sandbox](21-the-safety-sandbox-is-not-optional.md) → [21 · Who Grades the Agent](22-who-grades-the-agent.md) → [22 · Middleware Contract](23-the-middleware-contract.md).
 - **Pivot and subtraction:** [02 · Killed Darlings](02-the-killed-darlings.md) → [12 · Open Source Was the Better Business](12-open-source-was-the-better-business.md) → [27 · Myth of the Committee](31-the-myth-of-the-committee.md).
 - **Terminal and execution:** [11 · Console Wars](11-the-console-wars.md) → [28 · Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) → [29 · Small Async Wars](33-the-small-async-wars.md) → [30 · Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md).
-- **Memory and retrieval:** [04 · Context War](04-the-context-war.md) → [17 · Mind of the Agent](18-the-mind-of-the-agent.md) → [35 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md).
+- **Memory and retrieval:** [04 · Context War](04-the-context-war.md) → [17 · Mind of the Agent](18-the-mind-of-the-agent.md) → [39 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md).
 
 ### Reference companion
 
@@ -136,8 +146,8 @@ Use these when a chapter names a subsystem and you want current behavior in pros
 | Repo layout, tests, contribution | [Developer Guide](../DEVELOPER.md), [CI](../CI.md) |
 | Terms and symbols | [Vocabulary](../VOCABULARY.md) |
 | Security posture | [Security checklist](../SECURITY_CHECKLIST.md), [Reliability](../RELIABILITY.md) |
-| Memory and RAG stack | [35 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md); implementation under `backend/context/` |
-| Tool design and XML editing | [36 · The Facade Pattern and the Escape from JSON Prison](40-the-facade-pattern-and-the-escape-from-json-prison.md); implementation under `backend/tools/` |
+| Memory and RAG stack | [39 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md); implementation under `backend/context/` |
+| Tool design and the editing facade | [40 · The Facade Pattern and the Smaller File API](40-the-facade-pattern-and-the-smaller-file-api.md); implementation under `backend/tools/` |
 
 ---
 
