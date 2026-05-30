@@ -347,7 +347,7 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'replace_string': _summary_replace_string,
     'edit_symbols': _summary_edit_symbols,
     'multiedit': _summary_multiedit,
-    'find_symbol': _summary_find_symbol,
+    'find_symbols': _summary_find_symbol,
     'think': _summary_think,
     'agent_think': _summary_think,
     'finish': _summary_finish,

@@ -29,7 +29,7 @@ Each of these fills a specific gap that the native tool set does not cover. Web 
 
 The boundary between native and plugin is intentional.
 
-Native core tools — `read`, `write`, `edit_symbols`, `replace_string`, `multiedit`, `cmd_run`, `terminal_manager`, `search_files`, `grep_search` — are always available. They are taught in the system prompt as native truths. The model knows they exist, knows their interfaces, and relies on them for the central work of coding.
+Native core tools — `read`, `write`, `edit_symbols`, `replace_string`, `multiedit`, `cmd_run`, `terminal_manager`, `search_code`, `analyze_project_structure` — are always available. They are taught in the system prompt as native truths. The model knows they exist, knows their interfaces, and relies on them for the central work of coding.
 
 MCP tools are taught differently. They are declared in the tool schema rather than the prompt, discovered at runtime, and presented as capability extensions. The model can use them when relevant but does not depend on them for core behavior.
 

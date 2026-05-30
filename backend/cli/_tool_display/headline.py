@@ -40,7 +40,7 @@ _SIMPLE_VERB_MAP = {
     'replace_string': 'Edited',
     'edit_symbols': 'Edited',
     'multiedit': 'Edited',
-    'find_symbol': 'Found',
+    'find_symbols': 'Found',
     'agent_think': 'Thinking',
     'think': 'Thinking',
     'finish': 'Finished',

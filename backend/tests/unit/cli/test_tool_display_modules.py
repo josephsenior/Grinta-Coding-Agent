@@ -105,7 +105,7 @@ class TestFriendlyVerbForTool(unittest.TestCase):
         self.assertEqual(friendly_verb_for_tool('replace_string', {}), 'Edited')
         self.assertEqual(friendly_verb_for_tool('edit_symbols', {}), 'Edited')
         self.assertEqual(friendly_verb_for_tool('multiedit', {}), 'Edited')
-        self.assertEqual(friendly_verb_for_tool('find_symbol', {}), 'Found')
+        self.assertEqual(friendly_verb_for_tool('find_symbols', {}), 'Found')
         self.assertEqual(friendly_verb_for_tool('search_code', {}), 'Searched')
         self.assertEqual(friendly_verb_for_tool('think', {}), 'Thinking')
         self.assertEqual(friendly_verb_for_tool('finish', {}), 'Finished')
@@ -299,7 +299,7 @@ class TestSummarizeToolArguments(unittest.TestCase):
         self.assertIn('1 operation', s)
 
     def test_find_symbol(self) -> None:
-        s = summarize_tool_arguments('find_symbol', {'path': 'foo.py', 'symbol_name': 'main'})
+        s = summarize_tool_arguments('find_symbols', {'path': 'foo.py', 'symbol_name': 'main'})
         self.assertIn('foo.py', s)
         self.assertIn('main', s)
 
