@@ -211,11 +211,15 @@ class ActionRenderersMixin(_ActionRenderersBase):
         display_parts: list[Any] = []
 
         extra_lines = render_message(thought)
-        display_parts.append(
-            Text.from_markup(
-                '\n'.join(extra_lines[1:]),
-            )
-        )
+        text_parts: list[str] = []
+        for item in extra_lines[1:]:
+            if isinstance(item, Text):
+                text_parts.append(item.plain)
+            elif hasattr(item, 'code'):
+                text_parts.append(item.code)
+            else:
+                text_parts.append(str(item))
+        display_parts.append(Text('\n'.join(text_parts)))
 
         if content:
             sanitized_content = _sanitize_visible_transcript_text(content)

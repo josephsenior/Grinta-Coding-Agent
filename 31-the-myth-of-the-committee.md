@@ -1,4 +1,4 @@
-# 30. The Myth of the Committee
+# 27. The Myth of the Committee
 
 There is an obsession in the AI space with "Swarm Intelligence" or multi-agent systems. When you build an agent framework, the immediate temptation is to build a committee: an Architect agent, a Developer agent, a Reviewer agent, and a QA agent.
 
@@ -32,4 +32,4 @@ Grinta is that single developer.
 
 ---
 
-← [The Weight Divide: Local vs Hosted](30-the-weight-divide-local-vs-hosted.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) →
+← [The Weight Divide: Local vs Hosted](30-the-weight-divide-local-vs-hosted.md) | [The Book of Grinta](README.md) | [The Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) →

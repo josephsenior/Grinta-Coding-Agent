@@ -289,4 +289,4 @@ The best moment in a project like this is not when the model *sounds* impressive
 
 ---
 
-← [The Hidden Playbooks](13-the-hidden-playbooks.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [Prompts Are Programs](15-prompts-are-programs.md) →
+← [The Hidden Playbooks](13-the-hidden-playbooks.md) | [The Book of Grinta](README.md) | [Prompts Are Programs](15-prompts-are-programs.md) →

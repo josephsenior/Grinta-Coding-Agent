@@ -353,4 +353,4 @@ The next chapter is about those systems: what they get right, what they optimize
 
 ---
 
-← [The Architectural Gauntlet](03-the-architectural-gauntlet.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Giants' Playbook](05-the-giants-playbook.md) →
+← [The Architectural Gauntlet](03-the-architectural-gauntlet.md) | [The Book of Grinta](README.md) | [The Giants' Playbook](05-the-giants-playbook.md) →

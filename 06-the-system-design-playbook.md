@@ -111,7 +111,7 @@ A local-first product should feel local all the way down.
 
 That sounds obvious, but it has consequences.
 
-The current Grinta storage story centers around project-scoped local persistence under `.grinta/storage/`. That gives the system a canonical local root for sessions, storage artifacts, and related data instead of scattering state across random legacy paths.
+The current Grinta storage story centers around local per-workspace persistence under `~/.grinta/workspaces/<id>/storage`. That gives the system a canonical local root for sessions, storage artifacts, and related data instead of scattering state across random legacy paths.
 
 This matters because consistency in storage is not just neatness. It affects:
 
@@ -637,4 +637,4 @@ That is where I end.
 
 ---
 
-← [The Giants' Playbook](05-the-giants-playbook.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The First Fixed Issue](08-the-first-fixed-issue.md) →
+← [The Giants' Playbook](05-the-giants-playbook.md) | [The Book of Grinta](README.md) | [The First Fixed Issue](08-the-first-fixed-issue.md) →

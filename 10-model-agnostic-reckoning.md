@@ -129,4 +129,4 @@ Grinta is model-agnostic because it is the only way to build an agent that can s
 
 ---
 
-← [The 3 AM Decisions](09-the-3am-decisions.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Console Wars](11-the-console-wars.md) →
+← [The 3 AM Decisions](09-the-3am-decisions.md) | [The Book of Grinta](README.md) | [The Console Wars](11-the-console-wars.md) →

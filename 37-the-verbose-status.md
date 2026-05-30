@@ -1,4 +1,4 @@
-# 36. The Verbose Status
+# 33. The Verbose Status
 
 The chapter on observability (chapter 27) was about admitting the black hole existed. This chapter is about the small, unglamorous instruments I added once I stopped pretending I could debug an autonomous system by reading the transcript.
 
@@ -85,4 +85,4 @@ The pattern is consistent enough that I now treat it as a rule: **the most valua
 
 ---
 
-← [The Required Risk](36-the-required-risk.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Vendor-Neutral Bench](38-the-vendor-neutral-bench.md) →
+← [The Required Risk](36-the-required-risk.md) | [The Book of Grinta](README.md) | [The Vendor-Neutral Bench](38-the-vendor-neutral-bench.md) →

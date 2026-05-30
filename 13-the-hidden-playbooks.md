@@ -320,4 +320,4 @@ That is a better kind of intelligence.
 
 ---
 
-← [Open Source Was the Better Business](12-open-source-was-the-better-business.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Verification Tax](14-the-verification-tax.md) →
+← [Open Source Was the Better Business](12-open-source-was-the-better-business.md) | [The Book of Grinta](README.md) | [The Verification Tax](14-the-verification-tax.md) →

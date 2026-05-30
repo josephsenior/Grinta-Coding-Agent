@@ -120,11 +120,11 @@ If you are new, read in this order:
 
 1. this preface
 2. [00-the-meaning-of-grinta.md](00-the-meaning-of-grinta.md)
-3. the recommended act structure in [BOOK_OF_GRINTA.md](BOOK_OF_GRINTA.md)
+3. the recommended act structure in [README.md](README.md)
 
 The goal is not to convince you that Grinta is finished.
 The goal is to show what it takes to build something unfinished honestly.
 
 ---
 
-[The Book of Grinta](BOOK_OF_GRINTA.md) | [The Meaning of Grinta](00-the-meaning-of-grinta.md) →
+[The Book of Grinta](README.md) | [The Meaning of Grinta](00-the-meaning-of-grinta.md) →

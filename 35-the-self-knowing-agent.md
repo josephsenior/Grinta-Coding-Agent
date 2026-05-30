@@ -1,4 +1,4 @@
-# 34. The Self-Knowing Agent
+# 31. The Self-Knowing Agent
 
 Most of what looks like model misbehavior is actually the model lying to *itself* about what tools it has.
 
@@ -14,14 +14,18 @@ This chapter is about closing that gap. The fix has two halves: a **runtime-trut
 
 The first piece is a section in the system prompt called *“System Capabilities (verified at runtime).”* Every line in it is rendered from a live config flag or a runtime probe. Nothing in it is aspirational. If a default changes, the next prompt assembly reflects the change automatically.
 
-The block currently teaches the model six facts:
+The block currently teaches the model these facts:
 
-1. Whether parallel tool scheduling is enabled in this run, and which read-only tools participate.
+1. Whether parallel tool scheduling is enabled in this run, and which read-only tools participate. The parallel-safe set is intentionally narrow: `read`, `find_symbols`, `search_code`, and `lsp` — read-only tools whose observation order does not matter.
 2. Whether the provider supports emitting multiple `tool_calls` in a single assistant message (i.e. native parallel function calling at the API level).
-3. Whether atomic multi-file edits via `multiedit` are exposed in this build.
+3. Whether atomic multi-file edits via `multiedit` are exposed in this build. `multiedit` accepts `edit_symbols` and `replace_string` operations across files; it does not include `create`, which has separate atomicity requirements.
 4. That conversation condensation is automatic, middleware-driven, costs zero turns, and uses a three-tier (working / episodic / semantic) memory model — *not* something the agent has to invoke or apologize for.
 5. Whether checkpoint/revert is available for coarse rollback.
 6. Which language servers and debug adapters were detected on `PATH`, with the explicit instruction: **do not shell out to `Get-Command`/`which`/`where` to rediscover this** — the line above is the authoritative answer.
+7. Which MCP servers are active in the current session — the curated set (web search, web fetch, GitHub, quality gates, shadcn/ui, context7) is declared as runtime capabilities, not aspirational tool soup. The model knows they exist and can use them, but they are distinct from native core tools.
+8. What mode the session is in — Chat, Plan, or Agent — and which tools are visible in each mode. The model should not see tools it should not use. `finish` and `communicate_with_user` are mode-aware.
+9. Whether the Textual TUI is active. The model knows whether the user is looking at a rich terminal interface with HUD, cards, and mode switch, or a plain terminal.
+10. Whether the quality gate before finish is enabled and whether it runs automatically on task completion.
 
 The block ends with a sentence I care about: *“treat these as authoritative — do not contradict them in user-facing replies.”* That is not just style. The model would otherwise generate hedge phrases like *“I’m not sure if I can run those in parallel”* even when the block above the hedge said it could. Stating authority explicitly cut the hedging.
 
@@ -33,7 +37,7 @@ There is a small principle hiding here that I keep coming back to: **the prompt 
 
 Once the capability block was honest, the next problem was that one of the things it would honestly say was *“parallel scheduling is OFF in this run.”* Which the model would then dutifully obey — issuing reads sequentially even when the task obviously wanted them parallel.
 
-So the default flipped. `enable_parallel_tool_scheduling` is on by default, and the parallel set is intentionally narrow: `read`, `find_symbols`, `search_code`, `lsp`, and `think`. Every one of these is read-only. None of them touches disk in a way that another concurrent call could race against.
+So the default flipped. `enable_parallel_tool_scheduling` is on by default, and the parallel set is intentionally narrow: `read`, `find_symbols`, `search_code`, and `lsp`. Every one of these is read-only. None of them touches disk in a way that another concurrent call could race against.
 
 What is *not* in the parallel set is just as deliberate: shell commands, file edits, file writes, `create`, `edit_symbols`, `replace_string`, `multiedit`, terminal_manager I/O. Anything that mutates state runs sequentially, full stop. The chapter on parallelization went through *why* (chapter 25 — “The Parallelization Trap”). This chapter is about how the boundary survived being crossed under pressure, because the moment you turn parallel reads on by default, every PR that adds a new read-style tool comes with a thirty-second internal argument about whether to add it to the parallel allowlist. The answer has to be a structured one: only if the tool is genuinely read-only, only if its observation order does not matter, only if it cannot fail in a way that contaminates the others. That gate is small but real.
 
@@ -55,7 +59,7 @@ The pattern matters more than the kwarg. **Every line in the runtime-truth block
 
 The third piece is `multiedit`. Before it existed, the agent would do a refactor across five files as five sequential exact replacements or symbol edits. If the third call failed — uniqueness mismatch, syntax error caught by the tree-sitter middleware, anything — the first two had already landed and the last two had not. The repository was now in a half-refactored state, the agent had no clean rollback path, and the only honest recovery was to checkpoint-revert the whole turn (assuming checkpoints were enabled, which they often were not on lower-power configurations).
 
-`multiedit` is one tool call that takes a list of create, exact-replace, and symbol-edit operations and treats the batch as a transaction. Every file commits or none do. On the first failure — uniqueness, parse error, write error, anything — the previous writes in the batch are rolled back from in-memory snapshots before any observation is returned to the model. The model never sees a half-applied state.
+`multiedit` is one tool call that takes a list of `edit_symbols` and `replace_string` operations across files and treats the batch as a transaction. `create` is deliberately excluded — batch creation has different atomicity semantics and is handled through individual `create` calls or a dedicated batch creation path. Every file commits or none do. On the first failure — uniqueness mismatch, parse error, write error, anything — the previous writes in the batch are rolled back from in-memory snapshots before any observation is returned to the model. The model never sees a half-applied state.
 
 This is the kind of feature that sounds boring on a slide and is load-bearing in practice. Cross-file refactors are common. Half-applied refactors are catastrophic, because the model now has to re-derive *which* files it already touched and which it did not, and it does that by re-reading every file, and the context budget collapses.
 
@@ -77,4 +81,4 @@ The rest is plumbing — a sanitizer here, a mapper-level strip there, a runtime
 
 ---
 
-← [The Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Required Risk](36-the-required-risk.md) →
+← [The Fuzzy Match Heresy and the Death of Unified Diffs](34-the-fuzzy-match-heresy.md) | [The Book of Grinta](README.md) | [The Required Risk](36-the-required-risk.md) →
