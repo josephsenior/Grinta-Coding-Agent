@@ -126,12 +126,10 @@ def _path_uncertainty_hint(
 
 
 def _routing_tool_batching_paragraph(function_calling_mode: str | None) -> str:
-    mode = (function_calling_mode or 'unknown').strip().lower()
-    if mode == 'native':
-        return 'You may batch independent code search/reads in one turn if it improves latency. Dependent edits/runs must be sequential.'
-    if mode == 'string':
-        return 'Fallback string-parsing mode is active. Only emit one tool call per message.'
-    return 'Use single tool-calls unless multi-call is clearly supported.'
+    return (
+        'You may batch independent code search or read operations in one turn '
+        'when they improve latency. Dependent edits and runs must remain sequential.'
+    )
 
 
 def _routing_memory_tool_placeholders(
@@ -250,9 +248,9 @@ def _render_routing(
         shell_and_execution_ladder = ''
     else:
         read_and_edit_ladder = (
-            '- **Read & Edit:** Use native tool calls only. `find_symbols` discovers symbol candidates; `read` inspects file/range/symbol content; `create` creates new files/symbols; `edit_symbols` modifies/deletes existing symbols; `replace_string` performs exact one-file text replacement/addition/deletion; `multiedit` performs atomic multi-file refactors with `replace_string` and `edit_symbols` operations; `undo_last_edit` reverts the most recent file-write on an existing file.\n'
+            '- **Read & Edit:** Use the registered file tools only. `find_symbols` discovers symbol candidates; `read` inspects file/range/symbol content; `create` creates new files/symbols; `edit_symbols` modifies/deletes existing symbols; `replace_string` performs exact one-file text replacement/addition/deletion; `multiedit` performs atomic multi-file refactors with `replace_string` and `edit_symbols` operations; `undo_last_edit` reverts the most recent file-write on an existing file.\n'
             '- **Edit scope:** Prefer the smallest intent-level operation that solves the problem. Do not use shell commands to write source files.\n'
-            '- **NORMAL MODE:** Use the registered file tools only; do not invent alternate file-edit formats or serialized code payloads.'
+            '- **NORMAL MODE:** Do not invent alternate file-edit formats or serialized code payloads.'
         )
         shell_and_execution_ladder = '- **Shell & Execution:** Use the terminal strictly for build/test/git/processes.'
 
@@ -290,7 +288,6 @@ def _render_system_capabilities(
     """
     parallel_enabled = bool(getattr(config, 'enable_parallel_tool_scheduling', False))
     checkpoints_on = bool(getattr(config, 'enable_checkpoints', False))
-    fc_mode = (function_calling_mode or 'unknown').strip().lower()
 
     parallel_line = (
         (
@@ -320,8 +317,6 @@ def _render_system_capabilities(
         else ''
     )
 
-    fc_line = f'- **Function-calling mode**: `{fc_mode}`.'
-
     # Runtime-detected language servers / debug adapters — only when those tools
     # are enabled in config (omit bullets entirely when gated off).
     lsp_line, dap_line = _render_runtime_detection_lines(config)
@@ -345,7 +340,6 @@ def _render_system_capabilities(
         parts.append(f'{parallel_line}\n')
     if checkpoint_line:
         parts.append(f'{checkpoint_line}\n')
-    parts.append(f'{fc_line}\n')
     if detection_block:
         parts.append(detection_block)
 

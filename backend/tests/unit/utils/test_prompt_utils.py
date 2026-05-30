@@ -417,8 +417,7 @@ class TestOrchestratorPromptManager:
         ):
             result = opm.get_system_message()
 
-        assert 'Tool-call batching mode:' in result
-        assert '- **Function-calling mode**: `native`.' in result
+        assert 'Function-calling mode' not in result
 
     def test_function_calling_mode_string_guidance_when_disabled(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -440,8 +439,8 @@ class TestOrchestratorPromptManager:
         )
         result = opm.get_system_message()
 
-        assert 'Tool-call batching mode:' in result
-        assert 'Fallback string-parsing mode is active.' in result
+        assert 'Function-calling mode' not in result
+        assert 'Fallback' not in result
 
     def test_shell_identity_uses_active_terminal_tool_over_bash_presence(
         self, tmp_path
@@ -953,8 +952,7 @@ class TestBuildSystemPromptRenders:
             config=_base_config(),
             function_calling_mode=None,
         )
-        assert 'Tool-call batching mode:' in result
-        assert '- **Function-calling mode**: `unknown`.' in result
+        assert 'Function-calling mode' not in result
 
     # --- Prompt lint tests ---
 

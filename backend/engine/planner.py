@@ -567,6 +567,7 @@ class OrchestratorPlanner:
     def _inject_plan_mode_instructions(self, messages: list, state: State) -> list:
         instruction = (
             '\n\n=== PLAN MODE PROTOCOL ===\n'
+            'Current mode: PLAN\n\n'
             'Output must be one of the following:\n'
             '1. A read-only inspection tool call (when investigating the project).\n'
             '2. Natural prose response (when the user is conversing casually, not tasking).\n'
@@ -587,6 +588,7 @@ class OrchestratorPlanner:
     def _inject_agent_mode_instructions(self, messages: list, state: State) -> list:
         instruction = (
             '\n\n=== AGENT MODE PROTOCOL ===\n'
+            'Current mode: AGENT\n\n'
             'Output must be one of the following:\n'
             '1. A real tool/function call (when performing work).\n'
             '2. Natural prose response (when the user is conversing, not tasking).\n'
@@ -605,6 +607,7 @@ class OrchestratorPlanner:
     def _inject_chat_mode_instructions(self, messages: list, state: State) -> list:
         instruction = (
             '\n\n=== CHAT MODE ===\n'
+            'Current mode: CHAT\n\n'
             'Respond naturally in prose. '
             'Use read-only tools (read, search_code, find_symbols, recall, lsp, '
             'analyze_project_structure) if investigating the codebase. '
