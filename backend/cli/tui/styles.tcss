@@ -32,9 +32,9 @@ Screen {
 
 #sidebar-container {
     height: 1fr;
-    scrollbar-color: #33405d #080c18;
-    scrollbar-color-hover: #404f71 #080c18;
-    scrollbar-color-active: #4f608a #080c18;
+    scrollbar-color: #475569 #0f172a;
+    scrollbar-color-hover: #64748b #0f172a;
+    scrollbar-color-active: #94a3b8 #0f172a;
     scrollbar-size: 1 0;
 }
 
