@@ -11,7 +11,7 @@ import pytest
 from backend.core.errors import LLMNoActionError
 from backend.engine.executor import OrchestratorExecutor
 from backend.engine.orchestrator import Orchestrator
-from backend.ledger.action import Action, AgentThinkAction, MessageAction
+from backend.ledger.action import Action, MessageAction
 
 
 def _make_result(content: str) -> SimpleNamespace:
@@ -129,7 +129,7 @@ class TestPlainTextProtocolGate:
 
         assert result == []
 
-    def test_plan_mode_blocks_plain_text_without_task_tracker_state(self):
+    def test_plan_mode_allows_plain_text_without_task_tracker_state(self):
         executor = self._make_executor('plan', active_tasks=False)
         action = MessageAction(content='here is a plan in prose')
 
@@ -137,6 +137,4 @@ class TestPlainTextProtocolGate:
             [action], _make_result('plain').response
         )
 
-        assert len(result) == 1
-        assert isinstance(result[0], AgentThinkAction)
-        assert 'PLAN_MODE_PROTOCOL_ERROR' in result[0].thought
+        assert result == [action]
