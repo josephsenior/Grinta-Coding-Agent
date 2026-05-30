@@ -844,12 +844,142 @@ class RendererDrainRequested(Message):
     """Message requesting the screen to drain queued renderer events."""
 
 
+class ConfirmWidget(Widget):
+    """Inline confirmation bar that appears when the agent needs approval.
+
+    Renders as a single compact row inside the main page rather than
+    a blocking modal overlay.
+    """
+
+    DEFAULT_CSS = """
+    ConfirmWidget {
+        dock: top;
+        height: auto;
+        max-height: 6;
+        background: #0d1321;
+        border-top: tall #1e293b;
+        border-bottom: tall #1e293b;
+        padding: 0 2;
+        display: none;
+    }
+    ConfirmWidget.-visible {
+        display: block;
+    }
+    ConfirmWidget #confirm-bar {
+        layout: horizontal;
+        height: auto;
+        align: left middle;
+    }
+    ConfirmWidget #confirm-info {
+        width: 1fr;
+        height: auto;
+        color: #cbd5e1;
+    }
+    ConfirmWidget #confirm-actions {
+        height: auto;
+        align-horizontal: right;
+        dock: right;
+        margin-left: 2;
+    }
+    ConfirmWidget #confirm-actions Button {
+        min-width: 12;
+        margin-left: 1;
+    }
+    ConfirmWidget .confirm-type {
+        color: #91abec;
+        text-style: bold;
+    }
+    ConfirmWidget .confirm-risk-low {
+        color: #54efae;
+    }
+    ConfirmWidget .confirm-risk-medium {
+        color: #eacb8a;
+    }
+    ConfirmWidget .confirm-risk-high {
+        color: #f87171;
+    }
+    ConfirmWidget .confirm-risk-unknown {
+        color: #6f83aa;
+    }
+    ConfirmWidget .confirm-target {
+        color: #8f9fc1;
+    }
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._decision_event: asyncio.Event = asyncio.Event()
+        self._decision: str | None = None
+        self._options: list[tuple[str, str]] = []
+        self._recommended: int | None = None
+
+    def compose(self) -> ComposeResult:
+        with Horizontal(id='confirm-bar'):
+            yield Static('', id='confirm-info')
+            with Horizontal(id='confirm-actions'):
+                pass
+
+    def configure(
+        self,
+        action_type: str,
+        risk_label: str,
+        risk_class: str,
+        target: str,
+        options: list[tuple[str, str]],
+        recommended: int | None = None,
+    ) -> None:
+        """Populate the confirmation bar with action details."""
+        info_parts = [f'<span class="confirm-type">{action_type}</span>']
+        if target:
+            truncated = target if len(target) <= 60 else target[:57] + '...'
+            info_parts.append(f'<span class="confirm-target">{truncated}</span>')
+        info_parts.append(f'<span class="{risk_class}">{risk_label}</span>')
+        info = '  ·  '.join(info_parts)
+
+        info_static = self.query_one('#confirm-info', Static)
+        info_static.update(info)
+
+        actions = self.query_one('#confirm-actions', Horizontal)
+        actions.remove_children()
+        self._options = options
+        self._recommended = recommended
+        for i, (key, label) in enumerate(options):
+            yield_btn = Button(
+                label,
+                id=f'confirm-{key}',
+                variant='primary' if i == (recommended or 0) else 'default',
+            )
+            actions.mount(yield_btn)
+
+    def show(self) -> None:
+        self.add_class('-visible')
+        self._decision = None
+        self._decision_event.clear()
+
+    def hide(self) -> None:
+        self.remove_class('-visible')
+        self._decision = None
+
+    async def wait_for_decision(self) -> str | None:
+        """Block until the user clicks a button."""
+        await self._decision_event.wait()
+        return self._decision
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        for key, _label in self._options:
+            if event.button.id == f'confirm-{key}':
+                self._decision = key
+                self._decision_event.set()
+                self.hide()
+                return
+
+
 class GrintaConfirmDialog(ModalDialog[str | None]):
-    """Confirmation dialog shown when the agent needs user input."""
+    """Modal confirmation dialog for one-off confirmations."""
 
     DEFAULT_CSS = """
     GrintaConfirmDialog > #dialog-container {
-        width: 60;
+        width: 50;
     }
     """
 
@@ -1560,6 +1690,7 @@ class GrintaScreen(Screen):
 
         with Horizontal(id='app-layout'):
             with Vertical(id='left-column'):
+                yield ConfirmWidget(id='confirm-widget')
                 yield Transcript(id='main-display')
                 yield ListView(id='suggestions-list', classes='-hidden')
                 with InputBar(id='input-bar'):
@@ -3592,38 +3723,56 @@ class GrintaScreen(Screen):
 
     # ── Confirmation ────────────────────────────────────────────────────────
 
+    _ACTION_TYPE_LABELS: dict[str, str] = {
+        'CmdRunAction': 'Run Command',
+        'FileWriteAction': 'Write File',
+        'FileEditAction': 'Edit File',
+        'FileReadAction': 'Read File',
+        'FileEditActionMulti': 'Edit File',
+        'MCPAction': 'MCP Tool',
+        'BrowserToolAction': 'Browser',
+        'DelegateTaskAction': 'Delegate',
+        'MessageAction': 'Message',
+        'FinishAction': 'Finish',
+        'SystemMessageAction': 'System',
+        'NoteAction': 'Note',
+    }
+
+    _RISK_LABELS: dict[str, tuple[str, str]] = {
+        'UNKNOWN': ('· Unknown', 'confirm-risk-unknown'),
+        'LOW': ('· Low', 'confirm-risk-low'),
+        'MEDIUM': ('· Medium', 'confirm-risk-medium'),
+        'HIGH': ('· High', 'confirm-risk-high'),
+    }
+
     async def _handle_confirmation_dialog(self) -> None:
-        """Show confirmation dialog and send user decision back to the agent."""
+        """Show inline confirmation widget and wait for user decision."""
         pending = None
         try:
-            pending = self._controller.get_pending_action()
+            action_service = getattr(self._controller, 'action_service', None)
+            if action_service is not None:
+                pending = action_service.get_pending_action()
         except Exception:
             pass
 
-        action_type = type(pending).__name__ if pending else 'Unknown'
-        action_detail = ''
-        risk_label = 'UNKNOWN'
+        action_type_raw = type(pending).__name__ if pending else 'Unknown'
+        action_type = self._ACTION_TYPE_LABELS.get(action_type_raw, action_type_raw)
+        target = ''
+        risk_raw = 'UNKNOWN'
 
         if pending:
             if hasattr(pending, 'command') and pending.command:
-                action_detail = pending.command
+                target = pending.command
             elif hasattr(pending, 'path') and pending.path:
-                action_detail = pending.path
+                target = pending.path
 
             risk = getattr(pending, 'security_risk', None)
             if risk is not None:
-                risk_label = str(risk)
+                risk_raw = str(risk)
 
-        thought = getattr(pending, 'thought', '') or ''
-
-        body_lines = [f'[bold]Type:[/bold] {action_type}']
-        if action_detail:
-            body_lines.append(f'[bold]Target:[/bold] {action_detail}')
-        body_lines.append(f'[bold]Risk:[/bold] {risk_label}')
-        if thought:
-            body_lines.append(f'\n[dim]Why:[/dim]\n{thought}')
-
-        body = '\n'.join(body_lines)
+        risk_label, risk_class = self._RISK_LABELS.get(
+            risk_raw, ('· Unknown', 'confirm-risk-unknown')
+        )
 
         options: list[tuple[str, str]] = [
             ('approve', 'Approve'),
@@ -3632,14 +3781,15 @@ class GrintaScreen(Screen):
 
         ac = getattr(self._controller, 'autonomy_controller', None)
         if ac is not None and hasattr(ac, 'remember_always_allow'):
-            options.append(('always', 'Always allow'))
+            options.append(('always', 'Always'))
 
-        result = await self.confirm(
-            title='Action requires approval',
-            body=body,
-            options=options,
-            recommended=0,
-        )
+        widget = self.query_one('#confirm-widget', ConfirmWidget)
+        widget.configure(action_type, risk_label, risk_class, target, options, recommended=0)
+        widget.show()
+        try:
+            result = await widget.wait_for_decision()
+        finally:
+            widget.hide()
 
         if result == 'approve':
             decision = AgentState.USER_CONFIRMED
