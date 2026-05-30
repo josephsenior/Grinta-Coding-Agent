@@ -2355,8 +2355,6 @@ class GrintaScreen(Screen):
                 hint.display = not bool(text.strip())
             except Exception:
                 pass
-            if self._welcome_visible and text.strip():
-                self._hide_welcome()
             self._resize_input_bar()
 
     _INPUT_HEIGHT_FRACTION = 0.3
@@ -2740,6 +2738,8 @@ class GrintaScreen(Screen):
             else:
                 _tui_logger.debug('action_submit_input: empty text, ignoring')
             return
+        if self._welcome_visible:
+            self._hide_welcome()
         if self._active_communicate_card is not None:
             try:
                 self._active_communicate_card.set_active(False)
