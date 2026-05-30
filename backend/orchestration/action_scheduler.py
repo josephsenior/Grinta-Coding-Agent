@@ -14,20 +14,24 @@ from backend.core.enums import ActionType
 
 # Action types that are observation-only (no side effects) and safe to
 # execute concurrently in any mix (read + lsp + think + etc.).
-_READ_ONLY_ACTION_TYPES: frozenset[str] = frozenset({
-    ActionType.READ,
-    ActionType.LSP_QUERY,
-    ActionType.THINK,
-    ActionType.RECALL,
-    ActionType.BROWSE_INTERACTIVE,
-    ActionType.BROWSER_TOOL,
-})
+_READ_ONLY_ACTION_TYPES: frozenset[str] = frozenset(
+    {
+        ActionType.READ,
+        ActionType.LSP_QUERY,
+        ActionType.THINK,
+        ActionType.RECALL,
+        ActionType.BROWSE_INTERACTIVE,
+        ActionType.BROWSER_TOOL,
+    }
+)
 
 # MCP tool names that are read-only.
-_READ_ONLY_MCP_TOOL_NAMES: frozenset[str] = frozenset({
-    'search_code',
-    'get_entity',
-})
+_READ_ONLY_MCP_TOOL_NAMES: frozenset[str] = frozenset(
+    {
+        'search_code',
+        'get_entity',
+    }
+)
 
 # Side-effect action types that may run in parallel when every action in the
 # batch shares the same category **and** targets a different resource (file
@@ -108,7 +112,7 @@ class ActionScheduler:
     def _classify(self, action: Any) -> str | None:
         """Classify *action* into a concurrency category.
 
-        Returns
+        Returns:
         -------
         ``'read_only'``
             Always parallel-safe with any other ``'read_only'`` action.
@@ -177,9 +181,7 @@ class ActionScheduler:
             capped = tuple(actions[: self.max_parallel_batch_size])
             overflow = tuple(actions[self.max_parallel_batch_size :])
             reason = (
-                'parallel_safe_batch'
-                if not overflow
-                else 'parallel_safe_batch_capped'
+                'parallel_safe_batch' if not overflow else 'parallel_safe_batch_capped'
             )
             return ParallelBatchDecision(
                 should_execute_parallel=True,
@@ -205,9 +207,7 @@ class ActionScheduler:
             capped = tuple(actions[: self.max_parallel_batch_size])
             overflow = tuple(actions[self.max_parallel_batch_size :])
             reason = (
-                'parallel_safe_batch'
-                if not overflow
-                else 'parallel_safe_batch_capped'
+                'parallel_safe_batch' if not overflow else 'parallel_safe_batch_capped'
             )
             return ParallelBatchDecision(
                 should_execute_parallel=True,

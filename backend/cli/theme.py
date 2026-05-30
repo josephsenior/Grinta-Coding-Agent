@@ -731,6 +731,7 @@ def _prompt_toolkit_style_dict_no_color() -> dict[str, str]:
 
 # ── Custom Pygments theme for syntax highlighting ─────────────────────────────
 
+
 def _build_grinta_pygments_style() -> type:
     """Build a custom Pygments Style class using Grinta theme colors."""
     from pygments.style import Style
@@ -760,12 +761,10 @@ def _build_grinta_pygments_style() -> type:
             # Base text
             Text: '#e9e9e9',
             Whitespace: '#5a6a8a',
-
             # Comments
             Comment: '#7f8aa3 italic',
             Comment.Preproc: '#c792ea',
             Comment.Special: '#c792ea bold',
-
             # Keywords
             Keyword: '#91abec bold',
             Keyword.Constant: '#f6ff8f',
@@ -774,7 +773,6 @@ def _build_grinta_pygments_style() -> type:
             Keyword.Pseudo: '#c792ea',
             Keyword.Reserved: '#91abec bold',
             Keyword.Type: '#4fd6be',
-
             # Names
             Name: '#e9e9e9',
             Name.Attribute: '#7dcfff',
@@ -797,11 +795,9 @@ def _build_grinta_pygments_style() -> type:
             Name.Variable.Global: '#ffcb6b',
             Name.Variable.Instance: '#e9e9e9',
             Name.Variable.Magic: '#c792ea',
-
             # Literals
             Literal: '#e9e9e9',
             Literal.Date: '#f6c177',
-
             # Strings
             String: '#a3e635',
             String.Affix: '#f6c177',
@@ -817,7 +813,6 @@ def _build_grinta_pygments_style() -> type:
             String.Regex: '#4fd6be',
             String.Single: '#a3e635',
             String.Symbol: '#f6c177',
-
             # Numbers
             Number: '#f6c177',
             Number.Bin: '#f6c177',
@@ -826,14 +821,11 @@ def _build_grinta_pygments_style() -> type:
             Number.Integer: '#f6c177',
             Number.Integer.Long: '#f6c177',
             Number.Oct: '#f6c177',
-
             # Operators
             Operator: '#c0caf5',
             Operator.Word: '#91abec bold',
-
             # Punctuation
             Punctuation: '#969aad',
-
             # Generic - for diff output
             Generic.Deleted: '#fd8383',
             Generic.Emph: '#e9e9e9 italic',
@@ -845,10 +837,8 @@ def _build_grinta_pygments_style() -> type:
             Generic.Strong: '#e9e9e9 bold',
             Generic.Subheading: '#91abec',
             Generic.Traceback: '#fd8383',
-
             # Error
             Error: '#fd8383 bg:#2e0d0d',
-
             # Other
             Other: '#e9e9e9',
         }

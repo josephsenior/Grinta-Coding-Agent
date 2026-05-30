@@ -155,7 +155,9 @@ class ActivityRenderer:
                     )
                 )
 
-        should_collapse = bool(output) and exit_code == 0 and not _looks_error_heavy(output)
+        should_collapse = (
+            bool(output) and exit_code == 0 and not _looks_error_heavy(output)
+        )
 
         return ActivityCard(
             verb='Ran',
@@ -221,7 +223,11 @@ class ActivityRenderer:
                 )
 
         diff_text = '\n'.join(diff_lines or [])
-        should_collapse = bool(diff_lines) and len(diff_lines or []) > 12 and not _looks_error_heavy(diff_text)
+        should_collapse = (
+            bool(diff_lines)
+            and len(diff_lines or []) > 12
+            and not _looks_error_heavy(diff_text)
+        )
 
         return ActivityCard(
             verb=verb,
@@ -345,7 +351,9 @@ class ActivityRenderer:
             extra_lines.append(ActivityLine(f'URL: {url}', indent=0))
         extra_lines.append(ActivityLine(f'Action: {action_name}', indent=0))
         if error:
-            extra_lines.append(ActivityLine(f'Error: {error}', style=NAVY_ERROR, indent=0))
+            extra_lines.append(
+                ActivityLine(f'Error: {error}', style=NAVY_ERROR, indent=0)
+            )
 
         return ActivityCard(
             verb=action_name.title(),
@@ -420,7 +428,9 @@ class ActivityRenderer:
             secondary = 'failed'
             secondary_kind = 'err'
 
-        should_collapse = bool(result) and success is not False and not _looks_error_heavy(result)
+        should_collapse = (
+            bool(result) and success is not False and not _looks_error_heavy(result)
+        )
 
         return ActivityCard(
             verb='Delegated',
@@ -473,7 +483,9 @@ class ActivityRenderer:
         elif session_id:
             secondary = f'session {session_id}'
 
-        should_collapse = bool(content) and exit_code == 0 and not _looks_error_heavy(content)
+        should_collapse = (
+            bool(content) and exit_code == 0 and not _looks_error_heavy(content)
+        )
 
         return ActivityCard(
             verb='Output',
@@ -529,7 +541,7 @@ class ActivityRenderer:
             verb=f'Compressed ({count}{suffix})',
             detail='context',
             badge_category='tool',
-            extra_lines=[result] if result else None,
+            extra_lines=[ActivityLine(result)] if result else None,
             is_collapsible=bool(result),
             start_collapsed=False,
         )

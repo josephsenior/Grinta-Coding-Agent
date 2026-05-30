@@ -12,9 +12,9 @@ Other frameworks solve this by dumping everything into a massive cloud logging d
 
 ## The Event-Sourced Ledger
 
-The first foundation was treating the agent's execution not as a call-and-response loop, but as an append-only event stream. Every thought, every tool call, every stdout chunk, every validation failure is emitted as a distinct event. 
+The first foundation was treating the agent's execution not as a call-and-response loop, but as an append-only event stream. Every thought, every tool call, every stdout chunk, every validation failure is emitted as a distinct event.
 
-Decoupling *what the LLM sees* from *what the ledger records* is critical. As the session goes on, context compaction runs to save tokens. It summarizes past turns. But when you are debugging *why* the agent made a decision at turn 50, you need to know exactly what it saw at turn 49. If turn 49 was summarized away, the evidence is gone. 
+Decoupling *what the LLM sees* from *what the ledger records* is critical. As the session goes on, context compaction runs to save tokens. It summarizes past turns. But when you are debugging *why* the agent made a decision at turn 50, you need to know exactly what it saw at turn 49. If turn 49 was summarized away, the evidence is gone.
 
 The ledger is immutable and append-only. The compactor only modifies the payload sent to the API, not the historical record. When the agent fails, the ledger holds the truth, even if the model's memory has been compressed into oblivion.
 
@@ -119,7 +119,7 @@ This is the latency veil: the gap between what the agent is doing (calling the i
 
 ### Streaming Intent
 
-The event-sourced architecture made the solution possible: stream every tool execution as it happens, not after it completes. The reasoning display streams the agent's intermediate thoughts and intent as they arrive, not as a batch after the turn completes. 
+The event-sourced architecture made the solution possible: stream every tool execution as it happens, not after it completes. The reasoning display streams the agent's intermediate thoughts and intent as they arrive, not as a batch after the turn completes.
 
 ```
 [TOOL] read(type="file", path="tests/conftest.py")

@@ -163,9 +163,7 @@ class TestFileEditorWrite:
 
     def test_python_double_slash_comment_is_rejected_preflight(self):
         bad_python = '// bad comment\nprint("ok")\n'
-        result = self.editor(
-            command='create_file', path='bad.py', file_text=bad_python
-        )
+        result = self.editor(command='create_file', path='bad.py', file_text=bad_python)
         assert result.error is not None
         assert 'invalid Python comment prefix' in result.error
         assert not (Path(self.tmpdir) / 'bad.py').exists()

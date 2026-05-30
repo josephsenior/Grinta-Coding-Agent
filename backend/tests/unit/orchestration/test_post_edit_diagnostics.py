@@ -102,7 +102,9 @@ async def test_post_edit_diagnostics_reports_installed_lsp_skip(tmp_path) -> Non
 
 
 @pytest.mark.asyncio
-async def test_post_edit_diagnostics_uses_structured_edit_file_receipts(tmp_path) -> None:
+async def test_post_edit_diagnostics_uses_structured_edit_file_receipts(
+    tmp_path,
+) -> None:
     path = tmp_path / 'app.py'
     path.write_text('def ok():\n    return 1\n', encoding='utf-8')
     action = FileEditAction(path='', command='multi_edit')
@@ -126,9 +128,7 @@ async def test_post_edit_diagnostics_uses_structured_edit_file_receipts(tmp_path
         await PostEditDiagnosticsMiddleware().observe(_ctx(action), obs)
 
     assert '<LSP_DIAGNOSTICS status="passed">' in obs.content
-    assert obs.tool_result['lsp_diagnostics']['files'][0]['path'] == str(
-        path.resolve()
-    )
+    assert obs.tool_result['lsp_diagnostics']['files'][0]['path'] == str(path.resolve())
 
 
 @pytest.mark.asyncio

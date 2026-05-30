@@ -68,7 +68,11 @@ class GrintaTUIApp(App):
         # default handler forwards the Paste event to the Screen, which has no
         # _on_paste handler — the event is silently dropped.  Detect this and
         # route the paste directly to the input TextArea.
-        if isinstance(event, _events.Paste) and not event.is_forwarded and self.focused is None:
+        if (
+            isinstance(event, _events.Paste)
+            and not event.is_forwarded
+            and self.focused is None
+        ):
             try:
                 textarea = self.screen.query_one('#input')
                 textarea._forward_event(event)

@@ -119,8 +119,8 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
                 return None
             newline = '\r\n' if '\r\n' in old_content else '\n'
             old_match = old_string.replace('\r\n', '\n').replace('\r', '\n')
-            new_replacement = (action.new_str or '').replace('\r\n', '\n').replace(
-                '\r', '\n'
+            new_replacement = (
+                (action.new_str or '').replace('\r\n', '\n').replace('\r', '\n')
             )
             if newline == '\r\n':
                 old_match = old_match.replace('\n', '\r\n')

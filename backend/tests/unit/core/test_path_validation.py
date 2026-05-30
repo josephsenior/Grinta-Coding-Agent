@@ -179,9 +179,10 @@ class TestValidateAndSanitizePath:
             'New Folder (2)/build&test;$cache`name.py',
             workspace_root=str(workspace),
         )
-        assert result == (
-            workspace / 'New Folder (2)' / 'build&test;$cache`name.py'
-        ).resolve()
+        assert (
+            result
+            == (workspace / 'New Folder (2)' / 'build&test;$cache`name.py').resolve()
+        )
 
     def test_very_deep_path(self, workspace: Path):
         """Test path depth limit (>100 levels)."""

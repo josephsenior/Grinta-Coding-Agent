@@ -57,13 +57,13 @@ def normalize_whitespace(text: str) -> str:
     # Convert CRLF to LF
     unix_text = text.replace('\r\n', '\n').replace('\r', '\n')
     lines = unix_text.split('\n')
-    
+
     normalized_lines = []
     for line in lines:
         # Strip trailing whitespace and collapse interior whitespace/tabs
         collapsed = ' '.join(line.split())
         normalized_lines.append(collapsed)
-        
+
     return '\n'.join(normalized_lines).strip()
 ```
 

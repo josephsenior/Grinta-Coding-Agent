@@ -246,9 +246,7 @@ def _validate_path_length_and_nulls(path: str) -> None:
         )
 
 
-def _reject_dangerous_characters(
-    path: str, *, must_be_relative: bool = True
-) -> None:
+def _reject_dangerous_characters(path: str, *, must_be_relative: bool = True) -> None:
     dangerous_char = next((char for char in DANGEROUS_CHARS if char in path), None)
     if dangerous_char is None:
         if OS_CAPS.is_windows:

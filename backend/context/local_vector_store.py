@@ -323,7 +323,9 @@ class ChromaDBBackend(VectorBackend):
         # Single batch insert for all children
         if child_ids:
             self.collection.add(
-                ids=child_ids, documents=child_docs, metadatas=child_metas  # type: ignore[arg-type]
+                ids=child_ids,
+                documents=child_docs,
+                metadatas=child_metas,  # type: ignore[arg-type]
             )
 
     def search(

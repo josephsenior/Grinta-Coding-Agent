@@ -15,7 +15,7 @@ Use this when writing shell scripts (`.sh`, `.ps1`) or running terminal commands
 ## Principles
 
 1. **Non-Interactive First**: Never run commands that pop up interactive prompts (e.g. `npm init` without `-y`, or `apt install` without `-y`). Always supply necessary flags to force non-interactive execution.
-2. **Robustness**: 
+2. **Robustness**:
    - Bash: Always use `set -euo pipefail` in scripts so they fail fast on errors or unbound variables.
    - PowerShell: Use `$ErrorActionPreference = 'Stop'`.
 3. **Data Parsing**: Output pure JSON or strict line-delimited formats when chaining tools. Use `jq` to reliably slice data instead of fragile `awk/sed/grep` combinations if structures are nested.

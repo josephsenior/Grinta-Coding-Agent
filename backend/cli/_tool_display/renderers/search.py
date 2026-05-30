@@ -24,7 +24,7 @@ def render_search_results(
     query: str = '',
     max_files: int = 5,
     max_lines_per_file: int = 3,
-    ) -> list[Any]:
+) -> list[Any]:
     """Parse and render ripgrep-style search output as extra lines.
 
     Format: filepath:line:content
@@ -187,7 +187,9 @@ def render_file_list(
 
     for filepath, count in files:
         escaped_path = markup_escape(filepath)
-        lines.append(f'  • [{CLR_BRAND_HUE}]{escaped_path}[/{CLR_BRAND_HUE}] [dim]({count} matches)[/dim]')
+        lines.append(
+            f'  • [{CLR_BRAND_HUE}]{escaped_path}[/{CLR_BRAND_HUE}] [dim]({count} matches)[/dim]'
+        )
 
     if total_files > len(files):
         remaining_files = total_files - len(files)

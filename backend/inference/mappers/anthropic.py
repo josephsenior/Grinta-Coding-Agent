@@ -242,9 +242,7 @@ def _anthropic_tool_to_anthropic(tool: dict[str, Any]) -> dict[str, Any] | None:
         return None
     converted = dict(tool)
     converted['name'] = name.strip()
-    converted['input_schema'] = _normalize_input_schema(
-        converted.get('input_schema')
-    )
+    converted['input_schema'] = _normalize_input_schema(converted.get('input_schema'))
     converted.pop('parameters', None)
     return converted
 

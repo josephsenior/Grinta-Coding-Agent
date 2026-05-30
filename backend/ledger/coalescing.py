@@ -29,12 +29,10 @@ if TYPE_CHECKING:
 # NOTE: StreamingChunkAction is intentionally NOT here — each chunk must be
 # dispatched individually so the frontend can display tokens as they arrive.
 _COALESCE_TYPES: set[str] = set()
-"""Default coalescing is intentionally empty.
-
-Control-plane events such as state transitions and action/observation pairs
-must be persisted individually. Callers that need UI-only batching can pass an
-explicit set of non-durable telemetry event class names.
-"""
+# Default coalescing is intentionally empty.
+# Control-plane events such as state transitions and action/observation pairs
+# must be persisted individually. Callers that need UI-only batching can pass an
+# explicit set of non-durable telemetry event class names.
 
 
 class CoalescedBatch:

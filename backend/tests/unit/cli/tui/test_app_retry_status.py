@@ -13,9 +13,7 @@ from backend.ledger.observation import AgentStateChangedObservation, StatusObser
 
 
 def test_grinta_screen_resolves_backoff_display_state() -> None:
-    display, color = GrintaScreen._resolve_state_display(
-        'Backoff 1/3 (retrying in 5s)'
-    )
+    display, color = GrintaScreen._resolve_state_display('Backoff 1/3 (retrying in 5s)')
 
     assert display == 'Backoff 1/3 (retrying in 5s)'
     assert color == GrintaScreen._STATE_COLORS['backoff']

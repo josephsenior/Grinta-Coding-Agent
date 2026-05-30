@@ -377,7 +377,9 @@ class EventPersistence:
             if normalized.endswith('.pending') or '/event_cache/' in normalized:
                 continue
             try:
-                legacy_files.append((self._event_id_from_event_path(normalized), normalized))
+                legacy_files.append(
+                    (self._event_id_from_event_path(normalized), normalized)
+                )
             except ValueError:
                 continue
 

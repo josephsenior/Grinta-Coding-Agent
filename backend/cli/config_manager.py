@@ -481,7 +481,10 @@ def _validate_connection(model: str, api_key: str, base_url: str | None) -> None
             async def _run_with_timeout_update() -> bool | str:
                 async def _update_spinner_text() -> None:
                     await asyncio.sleep(5)
-                    spinner.text = Text('  Still waiting on provider... (this might take up to 15s)', style=CLR_SPINNER)
+                    spinner.text = Text(
+                        '  Still waiting on provider... (this might take up to 15s)',
+                        style=CLR_SPINNER,
+                    )
 
                 update_task = asyncio.create_task(_update_spinner_text())
                 try:

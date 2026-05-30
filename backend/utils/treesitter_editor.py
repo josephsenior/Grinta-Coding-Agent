@@ -599,7 +599,9 @@ class TreeSitterEditor:
                     message=str(e),
                 )
         if not func_node:
-            class_node = self._find_class_node(tree, file_bytes, function_name, language)
+            class_node = self._find_class_node(
+                tree, file_bytes, function_name, language
+            )
             if class_node is not None:
                 func_node = class_node
 

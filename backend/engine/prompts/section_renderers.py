@@ -159,7 +159,9 @@ def _routing_memory_tool_placeholders(
         surviving_state_facts = 'Only `note` (disk) and `memory_manager` (session) facts reliably survive condensation.'
     else:
         memory_and_context_section = ''
-        post_condensation_retrieval = 'Resume from the summary and your most recent verified observations.'
+        post_condensation_retrieval = (
+            'Resume from the summary and your most recent verified observations.'
+        )
         surviving_state_facts = (
             'Only `note` (disk) facts are guaranteed to survive condensation.'
         )
@@ -205,6 +207,7 @@ def _render_routing(
         is_plan_mode,
         normalize_interaction_mode,
     )
+
     mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
     can_edit = not (is_chat_mode(mode) or is_plan_mode(mode))
 
@@ -290,12 +293,16 @@ def _render_system_capabilities(
     fc_mode = (function_calling_mode or 'unknown').strip().lower()
 
     parallel_line = (
-        '- **Parallel tool scheduling**: ENABLED for read-only batches '
-        '(`read`, `search_code`, `lsp`).\n'
-        '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
-        'Emit independent reads in a single assistant turn to run them concurrently.\n'
-        '  - **Constraint**: Only read-only observation tools may run concurrently. Mutating tools, file edits, shell commands, terminal sessions, task/memory updates, and finish/communicate actions are executed sequentially in model order.'
-    ) if parallel_enabled and parallel_tool_calls_provider_flag else ''
+        (
+            '- **Parallel tool scheduling**: ENABLED for read-only batches '
+            '(`read`, `search_code`, `lsp`).\n'
+            '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
+            'Emit independent reads in a single assistant turn to run them concurrently.\n'
+            '  - **Constraint**: Only read-only observation tools may run concurrently. Mutating tools, file edits, shell commands, terminal sessions, task/memory updates, and finish/communicate actions are executed sequentially in model order.'
+        )
+        if parallel_enabled and parallel_tool_calls_provider_flag
+        else ''
+    )
 
     condensation_line = (
         '- **Conversation condensation**: AUTOMATIC and middleware-driven. '
@@ -445,46 +452,58 @@ def _build_context_discipline_section(
     )
 
     # note/recall are always available — unconditional include
-    parts.extend([
-        '',
-        '**note/recall** — facts that must survive across turns and new tasks:',
-        '- Decision made, architectural constraint discovered, stable command found, or project convention learned \u2192 note() when useful.',
-        '- Never store raw secrets, tokens, passwords, private keys, or credentials in note/memory. Store only non-sensitive facts such as "API key exists in env var X" when needed.',
-        '- Workspace architecture, DB URL, port mapping, test command \u2192 note().',
-        "- recall(key='all') at session start to re-ground; never recall 'lessons' twice this session.",
-    ])
+    parts.extend(
+        [
+            '',
+            '**note/recall** — facts that must survive across turns and new tasks:',
+            '- Decision made, architectural constraint discovered, stable command found, or project convention learned \u2192 note() when useful.',
+            '- Never store raw secrets, tokens, passwords, private keys, or credentials in note/memory. Store only non-sensitive facts such as "API key exists in env var X" when needed.',
+            '- Workspace architecture, DB URL, port mapping, test command \u2192 note().',
+            "- recall(key='all') at session start to re-ground; never recall 'lessons' twice this session.",
+        ]
+    )
 
     if working_memory_on:
-        parts.extend([
-            '',
-            '**memory_manager** — your structured cognitive workspace for the current session:',
-            "- update section='hypothesis' when you form a theory; update 'findings' when you have evidence.",
-            "- update section='blockers' when something is stuck; update 'decisions' at each architectural pivot.",
-            '- Call memory_manager(get) before context re-reads you might skip.',
-        ])
+        parts.extend(
+            [
+                '',
+                '**memory_manager** — your structured cognitive workspace for the current session:',
+                "- update section='hypothesis' when you form a theory; update 'findings' when you have evidence.",
+                "- update section='blockers' when something is stuck; update 'decisions' at each architectural pivot.",
+                '- Call memory_manager(get) before context re-reads you might skip.',
+            ]
+        )
 
     if tracker_on:
-        parts.extend([
-            '',
-            '**task_tracker** — your structural anchor:',
-            '- Use task_tracker for multi-step, multi-file, risky, long-running, or recovery-heavy tasks.',
-            '- For small/local tasks, do not create tracker overhead; act, verify, and finish.',
-            '- If task_tracker was used for this run, keep it synced before finish.',
-            "- Update status \u2192 'doing' when starting, 'done' after proof, 'blocked' with reason.",
-            '- For multi-step tasks: task_tracker(view) at turn start to re-anchor.',
-        ])
+        parts.extend(
+            [
+                '',
+                '**task_tracker** — your structural anchor:',
+                '- Use task_tracker for multi-step, multi-file, risky, long-running, or recovery-heavy tasks.',
+                '- For small/local tasks, do not create tracker overhead; act, verify, and finish.',
+                '- If task_tracker was used for this run, keep it synced before finish.',
+                "- Update status \u2192 'doing' when starting, 'done' after proof, 'blocked' with reason.",
+                '- For multi-step tasks: task_tracker(view) at turn start to re-anchor.',
+            ]
+        )
         if condensation_on:
             if working_memory_on:
-                parts.append('  Post-condensation: task_tracker(view) first, then memory_manager(get) + scratchpad.')
+                parts.append(
+                    '  Post-condensation: task_tracker(view) first, then memory_manager(get) + scratchpad.'
+                )
             else:
-                parts.append('  Post-condensation: task_tracker(view) first, then scratchpad.')
+                parts.append(
+                    '  Post-condensation: task_tracker(view) first, then scratchpad.'
+                )
 
     if checkpoints_on:
-        parts.extend([
-            '',
-            '**checkpoint** — Use checkpoint before destructive operations or risky non-atomic multi-step edits.',
-            '`multiedit` already provides atomic edit semantics; use checkpoint when rollback beyond a single atomic edit would be valuable.',
-        ])
+        parts.extend(
+            [
+                '',
+                '**checkpoint** — Use checkpoint before destructive operations or risky non-atomic multi-step edits.',
+                '`multiedit` already provides atomic edit semantics; use checkpoint when rollback beyond a single atomic edit would be valuable.',
+            ]
+        )
 
     parts.append('</CONTEXT_DISCIPLINE>')
     return '\n'.join(parts)
@@ -497,13 +516,21 @@ def _build_when_to_use_context(
     checkpoints_on: bool,
 ) -> str:
     parts = ['<WHEN_TO_USE_CONTEXT>']
-    parts.append('- **note/recall**: Cross-turn persistence for facts, decisions, and discoveries.')
+    parts.append(
+        '- **note/recall**: Cross-turn persistence for facts, decisions, and discoveries.'
+    )
     if working_memory_on:
-        parts.append('- **memory_manager**: In-session structured workspace for hypotheses, blockers, findings, and decisions.')
+        parts.append(
+            '- **memory_manager**: In-session structured workspace for hypotheses, blockers, findings, and decisions.'
+        )
     if tracker_on:
-        parts.append('- **task_tracker**: Engineering work planning and progress tracking — update before multi-step tasks, view at turn start.')
+        parts.append(
+            '- **task_tracker**: Engineering work planning and progress tracking — update before multi-step tasks, view at turn start.'
+        )
     if checkpoints_on:
-        parts.append('- **checkpoint**: Before destructive or multi-file batch operations — save state so you can rollback.')
+        parts.append(
+            '- **checkpoint**: Before destructive or multi-file batch operations — save state so you can rollback.'
+        )
     parts.append('</WHEN_TO_USE_CONTEXT>')
     return '\n'.join(parts)
 
@@ -519,14 +546,20 @@ def _build_mandatory_discipline_checkpoints(
     items = ["1. Session start \u2192 recall(key='all')"]
     idx = 2
     if tracker_on:
-        items.append(f'{idx}. For multi-step tasks \u2192 task_tracker(update) with full plan')
+        items.append(
+            f'{idx}. For multi-step tasks \u2192 task_tracker(update) with full plan'
+        )
         idx += 1
-        items.append(f'{idx}. At turn start during multi-step work \u2192 task_tracker(view)')
+        items.append(
+            f'{idx}. At turn start during multi-step work \u2192 task_tracker(view)'
+        )
         idx += 1
     if checkpoints_on:
         items.append(f'{idx}. Before destructive ops \u2192 checkpoint.save')
         idx += 1
-    items.append(f"{idx}. On decision/pivot/discovery \u2192 note() or{' memory_manager(update) or' if working_memory_on else ''} note()")
+    items.append(
+        f'{idx}. On decision/pivot/discovery \u2192 note() or{" memory_manager(update) or" if working_memory_on else ""} note()'
+    )
     parts.extend(items)
     parts.append('</MANDATORY_DISCIPLINE_CHECKPOINTS>')
     return '\n'.join(parts)
@@ -557,6 +590,7 @@ def _build_autonomy_block(mode: str, *, checkpoints_on: bool) -> str:
         is_chat_mode,
         is_plan_mode,
     )
+
     if is_chat_mode(mode):
         return (
             '<AUTONOMY>\n'
@@ -588,6 +622,7 @@ def _build_response_style_block(mode: str) -> str:
         is_chat_mode,
         is_plan_mode,
     )
+
     if is_chat_mode(mode):
         return (
             'Prose is the default. Use tools only when investigation is needed. '
@@ -622,6 +657,7 @@ def _render_autonomy(
     from backend.core.interaction_modes import (
         normalize_interaction_mode,
     )
+
     mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
     checkpoints_on = bool(getattr(config, 'enable_checkpoints', False))
     working_memory_on = bool(getattr(config, 'enable_working_memory', True))
@@ -682,8 +718,8 @@ def _render_autonomy(
 
     lsp_avail = _lsp_available(config)
     error_recovery_pivot_lines = (
-            '- `search_code` \u2192 `lsp` (check locally with the language server; no shell grep)\n'
-            '- `lsp` \u2192 `search_code` (wider text search)'
+        '- `search_code` \u2192 `lsp` (check locally with the language server; no shell grep)\n'
+        '- `lsp` \u2192 `search_code` (wider text search)'
         if lsp_avail
         else ''
     )
@@ -703,8 +739,6 @@ def _render_autonomy(
     )
 
 
-
-
 def _render_tool_reference(
     render_partial: Callable[..., str],
     config: Any = None,
@@ -718,6 +752,7 @@ def _render_tool_reference(
         is_plan_mode,
         normalize_interaction_mode,
     )
+
     mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
     can_edit = not (is_chat_mode(mode) or is_plan_mode(mode))
 
@@ -775,7 +810,6 @@ def _render_tool_reference(
             '- Multiple functions: `edit_symbols`; implementation + tests: `multiedit`.\n'
             '</EDITOR_AND_FILE_OPERATIONS>'
         )
-
 
     return render_partial(
         'system_partial_02_tools.md',
@@ -960,6 +994,7 @@ def _append_mcp_connected_catalog_sections(
     mode: str,
 ) -> None:
     from backend.core.interaction_modes import is_plan_mode
+
     total = len(mcp_tool_names)
     mode_rule = (
         'Mode rules override MCP capability suggestions.'
@@ -1038,6 +1073,7 @@ def _mcp_tail_render_kwargs(
     mode: str | None = None,
 ) -> str:
     from backend.core.interaction_modes import normalize_interaction_mode
+
     resolved_mode = normalize_interaction_mode(
         mode if mode is not None else getattr(config, 'mode', 'agent')
     )
@@ -1086,6 +1122,7 @@ def _render_mcp_and_permissions(
     config: Any,
 ) -> str:
     from backend.core.interaction_modes import normalize_interaction_mode
+
     mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
     parts: list[str] = ['<MCP_TOOLS>']
 

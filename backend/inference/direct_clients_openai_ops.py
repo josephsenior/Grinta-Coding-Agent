@@ -363,7 +363,8 @@ def _flatten_stale_deepseek_assistant_message(msg: dict[str, Any]) -> dict[str, 
     content = '\n'.join(part for part in [text, *tool_lines] if part).strip()
     return {
         'role': 'user',
-        'content': content or '[Previous assistant response omitted missing reasoning trace.]',
+        'content': content
+        or '[Previous assistant response omitted missing reasoning trace.]',
     }
 
 

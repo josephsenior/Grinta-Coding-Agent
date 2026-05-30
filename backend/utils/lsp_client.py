@@ -223,8 +223,8 @@ class LspResult:
         lines = [
             f'Available code actions ({len(self.code_actions)}; ★ = preferred):',
             '(Discovery-only — no auto-apply yet. Implement the chosen fix '
-             'and re-run `get_diagnostics` '
-             'to verify.)',
+            'and re-run `get_diagnostics` '
+            'to verify.)',
         ]
         for act in self.code_actions[:25]:
             lines.append(f'  {act}')
@@ -476,9 +476,7 @@ class LspClient:
         # We also send a shutdown to ensure we get all responses
         msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 99, 'params': {}})
 
-        responses = self._rpc(
-            msgs, server_cmd, process_timeout=process_timeout or 15.0
-        )
+        responses = self._rpc(msgs, server_cmd, process_timeout=process_timeout or 15.0)
 
         errors = []
         for resp in responses:

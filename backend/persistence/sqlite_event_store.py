@@ -191,9 +191,7 @@ class SQLiteEventStore:
         """Validate persisted event payload IDs and checksums."""
         try:
             conn = self._get_read_conn()
-            rows = conn.execute(
-                'SELECT id, payload FROM events ORDER BY id'
-            ).fetchall()
+            rows = conn.execute('SELECT id, payload FROM events ORDER BY id').fetchall()
             previous_id = -1
             for row in rows:
                 event_id = int(row['id'])
@@ -283,9 +281,7 @@ class SQLiteEventStore:
         if not isinstance(timestamp, (int, float)):
             timestamp_attr = getattr(timestamp, 'timestamp', None)
             timestamp = (
-                float(timestamp_attr())
-                if callable(timestamp_attr)
-                else _time.time()
+                float(timestamp_attr()) if callable(timestamp_attr) else _time.time()
             )
         event_type = event_dict.get('action', event_dict.get('observation', 'unknown'))
         source = event_dict.get('source')
@@ -388,9 +384,7 @@ class SQLiteEventStore:
         data = json.loads(row['payload'])
         payload_id = data.get('id')
         if payload_id is not None and payload_id != event_id:
-            raise ValueError(
-                f'Event {event_id}: payload id mismatch ({payload_id!r})'
-            )
+            raise ValueError(f'Event {event_id}: payload id mismatch ({payload_id!r})')
         if not verify_event_integrity(data, event_id):
             raise ValueError(
                 f'Event {event_id}: integrity checksum mismatch in SQLite ledger'
@@ -450,9 +444,7 @@ class SQLiteEventStore:
             data = json.loads(r['payload'])
             event_id = data.get('id')
             if event_id is not None and event_id != row_id:
-                raise ValueError(
-                    f'Event {row_id}: payload id mismatch ({event_id!r})'
-                )
+                raise ValueError(f'Event {row_id}: payload id mismatch ({event_id!r})')
             if not verify_event_integrity(data, row_id):
                 raise ValueError(
                     f'Event {row_id}: integrity checksum mismatch in SQLite ledger'

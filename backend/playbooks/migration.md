@@ -52,4 +52,3 @@ Use for framework upgrades, API contract shifts, schema migrations, and large de
 ## Minimal example prompt
 
 `/migration: move from Pydantic v1 patterns to v2 across settings and validation models`
-

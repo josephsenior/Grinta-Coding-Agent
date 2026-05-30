@@ -169,7 +169,10 @@ class TestCreateFile:
         monkeypatch.setattr(
             editor,
             '_verify_disk_content',
-            lambda *_args, **_kwargs: (False, 'Edit verification failed after create_file'),
+            lambda *_args, **_kwargs: (
+                False,
+                'Edit verification failed after create_file',
+            ),
         )
         result = editor.create_file(path, 'x = 1\n')
         assert result.success is False

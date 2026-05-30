@@ -104,6 +104,7 @@ def map_anthropic_error(client: Any, exc: Exception) -> Exception:
     from backend.inference.exceptions import (
         APIError as ProviderAPIError,
     )
+
     provider_name = getattr(client, '_provider_name', 'anthropic')
 
     if isinstance(exc, (anthropic.APITimeoutError, httpx.TimeoutException)):
@@ -149,16 +150,20 @@ def map_anthropic_error(client: Any, exc: Exception) -> Exception:
         )
     return exc
 
+
 # Monkey-patch Anthropic SDK to prevent stream crashes due to API bugs
 # (e.g. content_block_stop with an out-of-bounds index).
 try:
     from anthropic.lib.streaming import _messages as anthropic_messages
+
     _orig_build_events = anthropic_messages.build_events
+
     def _patched_build_events(*args, **kwargs):
         try:
             return _orig_build_events(*args, **kwargs)
         except IndexError:
             return []
+
     anthropic_messages.build_events = _patched_build_events
 except Exception:
     pass

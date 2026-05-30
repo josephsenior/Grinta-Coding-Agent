@@ -44,12 +44,14 @@ class SidebarRow(Static):
 
     class Selected(Message):
         """Event fired when the row is selected."""
+
         def __init__(self, item_id: str | None) -> None:
             super().__init__()
             self.item_id = item_id
 
     class DeleteRequested(Message):
         """Event fired when the row receives a delete intent."""
+
         def __init__(self, item_id: str | None) -> None:
             super().__init__()
             self.item_id = item_id
@@ -119,6 +121,7 @@ class CollapsibleSection(Container):
         @property
         def control(self) -> 'CollapsibleSection':
             return self._control
+
     """A collapsible section with a header and expandable body.
 
     Usage::
@@ -227,7 +230,9 @@ class CollapsibleSection(Container):
         with Horizontal(classes='collapsible-header-row', id='header-row'):
             yield Static(header_text, id='header')
             if self._action_label:
-                yield Static(self._action_label, classes='collapsible-action', id='action-btn')
+                yield Static(
+                    self._action_label, classes='collapsible-action', id='action-btn'
+                )
 
         body_classes = (
             'collapsible-body -hidden' if self._collapsed else 'collapsible-body'
@@ -236,7 +241,8 @@ class CollapsibleSection(Container):
             if self._items:
                 for label, item_id, deletable, status, meta in self._items:
                     yield SidebarRow(
-                        label, item_id,
+                        label,
+                        item_id,
                         deletable=deletable,
                         status=status,
                         meta=meta,
@@ -245,7 +251,9 @@ class CollapsibleSection(Container):
                 content_classes = 'empty-text'
                 if self._is_thinking:
                     content_classes += ' thinking-content'
-                yield Static(self._content or '', id='empty-text', classes=content_classes)
+                yield Static(
+                    self._content or '', id='empty-text', classes=content_classes
+                )
 
     def toggle(self) -> None:
         """Toggle the collapsed state."""
@@ -257,7 +265,11 @@ class CollapsibleSection(Container):
         caret = f'[#54597b]{icon}[/]'
         header_text = f'{caret} [{self._accent_color}]{self._section_title}[/]'
         header.update(header_text)
-        header.classes = 'collapsible-header collapsed' if self._collapsed else 'collapsible-header expanded'
+        header.classes = (
+            'collapsible-header collapsed'
+            if self._collapsed
+            else 'collapsible-header expanded'
+        )
 
         if self._collapsed:
             body.add_class('-hidden')
@@ -276,7 +288,9 @@ class CollapsibleSection(Container):
             event.stop()
             return
 
-        if event.widget and (event.widget.id in ('header', 'header-row') or event.widget == self):
+        if event.widget and (
+            event.widget.id in ('header', 'header-row') or event.widget == self
+        ):
             self.toggle()
             event.prevent_default()
             event.stop()
@@ -298,7 +312,14 @@ class CollapsibleSection(Container):
         header_text = f'{caret} [{self._accent_color}]{title}[/]'
         header.update(header_text)
 
-    def set_items(self, items: list[tuple[Any, str] | tuple[Any, str, bool] | tuple[Any, str, bool, str | None, str | None]]) -> None:
+    def set_items(
+        self,
+        items: list[
+            tuple[Any, str]
+            | tuple[Any, str, bool]
+            | tuple[Any, str, bool, str | None, str | None]
+        ],
+    ) -> None:
         """Update the list of interactive items in the body.
 
         Each item is a tuple of (label, item_id) or (label, item_id, deletable)
@@ -322,12 +343,15 @@ class CollapsibleSection(Container):
 
         if normalized:
             for label, item_id, deletable, status, meta in normalized:
-                body.mount(SidebarRow(
-                    label, item_id,
-                    deletable=deletable,
-                    status=status,
-                    meta=meta,
-                ))
+                body.mount(
+                    SidebarRow(
+                        label,
+                        item_id,
+                        deletable=deletable,
+                        status=status,
+                        meta=meta,
+                    )
+                )
         else:
             body.mount(Static(self._content or 'No items', id='empty-text'))
 

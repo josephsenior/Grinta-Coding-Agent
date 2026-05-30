@@ -48,7 +48,11 @@ _FILE_EDIT_TOOL_NAMES = {'create', 'replace_string', 'edit_symbols', 'multiedit'
 
 
 def _effective_error_tool_name(tool_name: str, content: str) -> str:
-    return classify_file_edit_error_bucket(content) if tool_name in _FILE_EDIT_TOOL_NAMES else tool_name
+    return (
+        classify_file_edit_error_bucket(content)
+        if tool_name in _FILE_EDIT_TOOL_NAMES
+        else tool_name
+    )
 
 
 def _fallback_tool(tool_name: str) -> str | None:

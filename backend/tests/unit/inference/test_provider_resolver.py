@@ -557,7 +557,9 @@ class TestCanonicalizeModelSelection(TestCase):
         self.assertEqual(provider, 'lightning')
 
     def test_opencode_go_keeps_provider_prefix(self):
-        model, provider = canonicalize_model_selection('deepseek-v4-flash', 'opencode-go')
+        model, provider = canonicalize_model_selection(
+            'deepseek-v4-flash', 'opencode-go'
+        )
         self.assertEqual(model, 'opencode-go/deepseek-v4-flash')
         self.assertEqual(provider, 'opencode-go')
 

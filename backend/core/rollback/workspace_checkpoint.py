@@ -124,7 +124,10 @@ def restore_checkpoint(
     snapshot_files: set[Path]
 
     if manifest is not None and source_root.exists():
-        snapshot_files = {_safe_relative_path(Path(entry.path), workspace_root) for entry in manifest.files}
+        snapshot_files = {
+            _safe_relative_path(Path(entry.path), workspace_root)
+            for entry in manifest.files
+        }
     else:
         # Backward compatibility for legacy flat snapshots.
         source_root = checkpoint_root
@@ -145,7 +148,9 @@ def restore_checkpoint(
     for rel_path in sorted(snapshot_files):
         source_path = source_root / rel_path
         if not source_path.exists() or not source_path.is_file():
-            logger.warning('Skipping missing checkpoint file during restore: %s', source_path)
+            logger.warning(
+                'Skipping missing checkpoint file during restore: %s', source_path
+            )
             continue
         dest_path = workspace_root / rel_path
         dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -164,7 +169,9 @@ def load_checkpoint_manifest(
     try:
         data = json.loads(manifest_path.read_text(encoding='utf-8'))
     except (OSError, json.JSONDecodeError) as exc:
-        logger.warning('Failed to load workspace checkpoint manifest %s: %s', manifest_path, exc)
+        logger.warning(
+            'Failed to load workspace checkpoint manifest %s: %s', manifest_path, exc
+        )
         return None
     if not isinstance(data, dict):
         return None
@@ -204,8 +211,12 @@ def _quarantine_workspace_extras(
 ) -> Path | None:
     created_quarantine_dir = quarantine_dir
 
-    for item in sorted(workspace_root.rglob('*'), key=lambda p: len(p.parts), reverse=True):
-        if not item.exists() or _is_reserved_workspace_path(item, workspace_root, checkpoint_root):
+    for item in sorted(
+        workspace_root.rglob('*'), key=lambda p: len(p.parts), reverse=True
+    ):
+        if not item.exists() or _is_reserved_workspace_path(
+            item, workspace_root, checkpoint_root
+        ):
             continue
         rel_path = item.relative_to(workspace_root)
 
@@ -254,7 +265,9 @@ def _move_to_quarantine(
     return quarantine_dir
 
 
-def _is_reserved_workspace_path(path: Path, workspace_root: Path, checkpoint_root: Path) -> bool:
+def _is_reserved_workspace_path(
+    path: Path, workspace_root: Path, checkpoint_root: Path
+) -> bool:
     try:
         rel_path = path.resolve().relative_to(workspace_root)
     except ValueError:

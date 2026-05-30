@@ -378,7 +378,10 @@ async def test_tui_communicate_prompt_blocks_welcome_empty_state(
         await pilot.pause()
 
         assert len(list(display.query(CommunicatePromptWidget))) == 1
-        assert len([child for child in display.children if type(child) is WelcomeWidget]) == 0
+        assert (
+            len([child for child in display.children if type(child) is WelcomeWidget])
+            == 0
+        )
 
 
 @pytest.mark.asyncio
@@ -1109,7 +1112,9 @@ async def test_tui_terminal_session_reuses_single_card(mock_config):
         assert len(terminal_cards) == 1
 
         collapsed = terminal_cards[0].query_one('#collapsed-row')
-        assert '$ status' in str(collapsed.renderable) or 'Sent' in str(collapsed.renderable)
+        assert '$ status' in str(collapsed.renderable) or 'Sent' in str(
+            collapsed.renderable
+        )
 
 
 @pytest.mark.asyncio
@@ -1147,7 +1152,11 @@ async def test_tui_terminal_observation_strips_control_traffic(mock_config):
             if 'category-terminal' in card.classes
         )
         extra = card.query_one('#extra')
-        rendered = str(extra.renderable.plain) if hasattr(extra.renderable, 'plain') else str(extra.renderable)
+        rendered = (
+            str(extra.renderable.plain)
+            if hasattr(extra.renderable, 'plain')
+            else str(extra.renderable)
+        )
         assert '\x1b' not in rendered
         assert '[444444;32;15M' not in rendered
 
@@ -1182,7 +1191,9 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
         shell_cards = [card for card in cards if 'category-shell' in card.classes]
         assert len(shell_cards) == 1
         collapsed = shell_cards[0].query_one('#collapsed-row')
-        assert '$ pytest -q' in str(collapsed.renderable) or 'Shell' in str(collapsed.renderable)
+        assert '$ pytest -q' in str(collapsed.renderable) or 'Shell' in str(
+            collapsed.renderable
+        )
         assert 'exit 0' in str(collapsed.renderable)
 
 
@@ -1317,7 +1328,9 @@ async def test_tui_file_write_renders_compact_create_card(mock_config):
         await pilot.pause()
 
         file_cards = [
-            card for card in s.query(TUIActivityCard).results() if 'category-files' in card.classes
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes
         ]
         assert len(file_cards) == 1
         collapsed = file_cards[0].query_one('#collapsed-row')
@@ -1354,7 +1367,9 @@ async def test_tui_file_write_does_not_dump_created_file_body(mock_config):
         await pilot.pause()
 
         file_cards = [
-            card for card in s.query(TUIActivityCard).results() if 'category-files' in card.classes
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes
         ]
         assert len(file_cards) == 1
         collapsed = file_cards[0].query_one('#collapsed-row')
@@ -1401,8 +1416,7 @@ async def test_tui_file_edit_observation_uses_unified_diff_rows(mock_config):
             for row in split_rows
         )
         assert any(
-            row.left_kind == 'ctx' and row.right_kind == 'ctx'
-            for row in split_rows
+            row.left_kind == 'ctx' and row.right_kind == 'ctx' for row in split_rows
         )
 
 
@@ -1698,7 +1712,7 @@ async def test_tui_dispatch_enqueues_user_message_before_starting_agent(mock_con
 
     class FakeEventStream:
         def __init__(self) -> None:
-            self.events = []
+            self.events: list[tuple] = []
 
         def add_event(self, event, source) -> None:
             self.events.append((event, source))

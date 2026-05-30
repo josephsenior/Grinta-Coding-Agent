@@ -812,8 +812,8 @@ def _structured_edit_verification_receipt(
             receipt['syntax_detail'] = syntax_detail[:1000]
         file_receipts.append(receipt)
         lines.append(
-            f"- {display_path}: disk_write={receipt['disk_write']} "
-            f"changed={'yes' if changed else 'no'} syntax={syntax_status}"
+            f'- {display_path}: disk_write={receipt["disk_write"]} '
+            f'changed={"yes" if changed else "no"} syntax={syntax_status}'
         )
 
     if not snapshots:
@@ -870,8 +870,13 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
             }
             return obs
 
-        for resolved_item_path, (original_content, _display_path) in original_snapshots.items():
-            _record_runtime_undo_snapshot(executor, resolved_item_path, original_content)
+        for resolved_item_path, (
+            original_content,
+            _display_path,
+        ) in original_snapshots.items():
+            _record_runtime_undo_snapshot(
+                executor, resolved_item_path, original_content
+            )
 
         diff = _combined_structured_edit_diff(original_snapshots)
         verification_text, file_receipts, verification_passed = (
@@ -884,7 +889,11 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
         )
         content = f'{summary}\n\n{verification_text}' if summary else verification_text
         if diff:
-            content = f'{summary}\n\n[EDIT_DIFF]\n{diff}' if summary else f'[EDIT_DIFF]\n{diff}'
+            content = (
+                f'{summary}\n\n[EDIT_DIFF]\n{diff}'
+                if summary
+                else f'[EDIT_DIFF]\n{diff}'
+            )
             content += f'\n\n{verification_text}'
         final_obs: ErrorObservation | FileEditObservation = FileEditObservation(
             content=content,

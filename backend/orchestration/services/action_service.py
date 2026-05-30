@@ -73,7 +73,9 @@ def _install_one_shot_pending_hook(
     return previous_hook
 
 
-def _restore_pre_dispatch_hook(event_stream: EventStream, previous_hook: object) -> None:
+def _restore_pre_dispatch_hook(
+    event_stream: EventStream, previous_hook: object
+) -> None:
     event_stream.pre_runnable_action_dispatch = (
         previous_hook if callable(previous_hook) else None
     )
@@ -133,7 +135,9 @@ class ActionService:
         if action.runnable and isinstance(es, EventStream):
             previous_hook = _install_one_shot_pending_hook(es, self)
         try:
-            controller.event_stream.add_event(action, action.source or EventSource.AGENT)
+            controller.event_stream.add_event(
+                action, action.source or EventSource.AGENT
+            )
         finally:
             if previous_hook is not None and isinstance(es, EventStream):
                 _restore_pre_dispatch_hook(es, previous_hook)

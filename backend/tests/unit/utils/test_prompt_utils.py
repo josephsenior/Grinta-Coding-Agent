@@ -788,9 +788,6 @@ def test_system_capabilities_skips_lsp_dap_discovery_hint_when_both_gated_off() 
     assert 'Get-Command' not in text
 
 
-
-
-
 class TestBuildSystemPromptRenders:
     """Integration-level tests: build_system_prompt must not raise PromptRenderError
     for any supported feature-flag combination, and must produce non-empty output.
@@ -823,10 +820,7 @@ class TestBuildSystemPromptRenders:
             'Be thorough and direct; prefer completeness and verification details over brevity.'
             in result
         )
-        assert (
-            'Tool calls are the default until the run ends:'
-            in result
-        )
+        assert 'Tool calls are the default until the run ends:' in result
         assert 'Be terse and direct.' not in result
 
     def test_windows_git_bash(self) -> None:
@@ -965,9 +959,12 @@ class TestBuildSystemPromptRenders:
     # --- Prompt lint tests ---
 
     STALE_TOOL_NAMES = [
-        'read_file', 'read_range', 'read_symbol',
+        'read_file',
+        'read_range',
+        'read_symbol',
         'create_file',
-        'replace_symbol', 'insert_symbol',
+        'replace_symbol',
+        'insert_symbol',
     ]
 
     OLD_EDIT_FORMATS = [
@@ -984,7 +981,9 @@ class TestBuildSystemPromptRenders:
             function_calling_mode='native',
         )
         for stale in self.STALE_TOOL_NAMES:
-            assert stale not in result, f'Stale tool name {stale!r} found in rendered prompt'
+            assert stale not in result, (
+                f'Stale tool name {stale!r} found in rendered prompt'
+            )
 
     def test_no_old_edit_formats(self) -> None:
         result = self._assert_renders_cleanly(
@@ -994,7 +993,9 @@ class TestBuildSystemPromptRenders:
             function_calling_mode='native',
         )
         for fmt in self.OLD_EDIT_FORMATS:
-            assert fmt not in result, f'Old edit format {fmt!r} found in rendered prompt'
+            assert fmt not in result, (
+                f'Old edit format {fmt!r} found in rendered prompt'
+            )
 
     def test_no_disabled_tools_when_off(self) -> None:
         result = self._assert_renders_cleanly(
@@ -1011,9 +1012,7 @@ class TestBuildSystemPromptRenders:
         assert 'task_tracker' not in result, (
             'task_tracker mentioned when tool is disabled'
         )
-        assert 'checkpoint' not in result, (
-            'checkpoint mentioned when tool is disabled'
-        )
+        assert 'checkpoint' not in result, 'checkpoint mentioned when tool is disabled'
         assert 'memory_manager' not in result, (
             'memory_manager mentioned when tool is disabled'
         )

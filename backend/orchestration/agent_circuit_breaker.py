@@ -189,8 +189,7 @@ class CircuitBreaker:
         return CircuitBreakerResult(
             tripped=True,
             reason=(
-                'Repeated file edit syntax validation failures '
-                f'({str_replace_syntax})'
+                f'Repeated file edit syntax validation failures ({str_replace_syntax})'
             ),
             action='pause'
             if str_replace_syntax >= DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE
@@ -216,9 +215,7 @@ class CircuitBreaker:
             )
         return CircuitBreakerResult(
             tripped=True,
-            reason=(
-                f'Repeated file edit deterministic failures ({str_replace_hard})'
-            ),
+            reason=(f'Repeated file edit deterministic failures ({str_replace_hard})'),
             action='pause'
             if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE
             else 'switch_context',
@@ -268,9 +265,7 @@ class CircuitBreaker:
 
         # 2.5 Deterministic same-tool failures (file-edit taxonomy)
         str_replace_hard = self.get_tool_error_count(FILE_EDIT_BUCKET)
-        str_replace_syntax = self.get_tool_error_count(
-            FILE_EDIT_SYNTAX_BUCKET
-        )
+        str_replace_syntax = self.get_tool_error_count(FILE_EDIT_SYNTAX_BUCKET)
 
         # Syntax rejects: much higher budget than match-not-found / path /
         # guard failures. Since the default write path now downgrades the

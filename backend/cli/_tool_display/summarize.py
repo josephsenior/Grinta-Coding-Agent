@@ -225,7 +225,11 @@ def _summary_edit_symbols(args: dict[str, Any]) -> str:
     path = _arg_str(args, 'path')
     edits = args.get('edits')
     if isinstance(edits, list) and edits:
-        return f'{path} · {len(edits)} symbol edit(s)' if path else f'{len(edits)} symbol edit(s)'
+        return (
+            f'{path} · {len(edits)} symbol edit(s)'
+            if path
+            else f'{len(edits)} symbol edit(s)'
+        )
     return path or 'edit symbols'
 
 
@@ -234,6 +238,7 @@ def _summary_multiedit(args: dict[str, Any]) -> str:
     if isinstance(operations, list):
         return f'{len(operations)} operation(s)'
     return 'batch edit'
+
 
 def _summary_find_symbol(args: dict[str, Any]) -> str:
     path = _arg_str(args, 'path')

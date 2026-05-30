@@ -482,7 +482,9 @@ def test_diff_panel_new_xml_file_shows_plain_preview() -> None:
 
 def test_thinking_render_is_plain_text() -> None:
     """Thinking blocks should stay plain text and not become syntax-highlighted."""
-    text = _render_thinking_with_diff('```xml\n<root>\n  <item>value</item>\n</root>\n```')
+    text = _render_thinking_with_diff(
+        '```xml\n<root>\n  <item>value</item>\n</root>\n```'
+    )
     assert isinstance(text, Text)
     assert text.plain == '```xml\n<root>\n  <item>value</item>\n</root>\n```'
 
@@ -3540,8 +3542,6 @@ async def test_renderer_internal_cmd_run_uses_origin_tool_title() -> None:
     assert 'Analyze project' in output
     assert 'Mapping project structure (.)' in output
     assert 'Shell' not in output
-
-
 
     assert 'Applying patch' in output
     assert 'failed' in output

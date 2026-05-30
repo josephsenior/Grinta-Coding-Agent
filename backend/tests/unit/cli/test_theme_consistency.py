@@ -88,4 +88,3 @@ def test_core_cli_renderers_avoid_raw_style_literals() -> None:
         content = path.read_text(encoding='utf-8')
         for needle in banned:
             assert needle not in content, f'{path} still contains {needle}'
-

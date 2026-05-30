@@ -82,11 +82,11 @@ def _collect_system_prompt_sections(
     lsp_available = _lsp_available(config)
 
     identity_line = agent_identity.strip() or 'You are Grinta...'
-    
+
     sections: list[tuple[str, str]] = [
         ('identity_header', f'{identity_line}\nModel id: `{model_id}`'),
     ]
-    
+
     # Platform-specific shell identity block
     sections.extend(
         _shell_identity_sections(
@@ -104,7 +104,7 @@ def _collect_system_prompt_sections(
         ('system_partial_02_tools', _render_tool_reference(config, is_windows=is_windows)),
         ('system_partial_03_capabilities', _render_system_capabilities(config)),
     ]
-    
+
     # Conditional MCP inclusion
     sections.extend(
         _mcp_or_permissions_sections_for_collect(
@@ -121,7 +121,7 @@ def _collect_system_prompt_sections(
         sections.append(('system_partial_05_examples', _render_examples(config)))
 
     sections.append(('system_partial_04_critical', _render_critical(resolved_terminal_tool)))
-    
+
     return sections
 ```
 
@@ -155,7 +155,7 @@ One of the cleanest consequences of the pure-Python rewrite was that the system 
 
 ## Markdown for Content, Structure for Boundaries
 
-Models are not alien readers. They are statistical machines trained on oceans of technical text. That means format matters. Markdown works well because it is close to the native visual grammar of software communication. 
+Models are not alien readers. They are statistical machines trained on oceans of technical text. That means format matters. Markdown works well because it is close to the native visual grammar of software communication.
 
 But markdown alone is not enough when you need sharper structural boundaries. That is where explicit blocks such as `<AUTONOMY>`, `<SHELL_IDENTITY>`, and `<MCP_TOOLS>` earn their place. They give the prompt hard segmentation without forcing everything into JSON-shaped rigidity.
 
@@ -199,7 +199,7 @@ We also softened conversational rigidity. By explicitly permitting targeted clar
 
 During testing, we asked the model to evaluate the system prompt's quality. The model generated highly articulate, constructive criticism, pointing out missing sections. The only problem? *Those sections were already present in the prompt.*
 
-This revealed the **criticism bias**: LLM self-critique is inherently biased toward producing plausible-sounding critiques even when the underlying claim is false. 
+This revealed the **criticism bias**: LLM self-critique is inherently biased toward producing plausible-sounding critiques even when the underlying claim is false.
 
 Therefore, prompt engineering cannot rely on model self-assessment. It must be grounded in behavioral verification:
 * Task completion rate (using the eval harness).

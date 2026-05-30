@@ -55,7 +55,6 @@ from backend.engine.tools import (
     create_read_tool,
     create_replace_string_tool,
     create_summarize_context_tool,
-    create_undo_last_edit_tool,
 )
 from backend.engine.tools.analyze_project_structure import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,

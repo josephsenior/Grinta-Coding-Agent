@@ -199,9 +199,7 @@ def _strip_ansi(text: str) -> str:
     return _rich_text(text).plain
 
 
-_TERMINAL_MOUSE_REPORT_RE = re.compile(
-    r'(?:\x1b)?\[(?:<)?\d{1,7};\d{1,7};\d{1,7}[mM]'
-)
+_TERMINAL_MOUSE_REPORT_RE = re.compile(r'(?:\x1b)?\[(?:<)?\d{1,7};\d{1,7};\d{1,7}[mM]')
 _TERMINAL_ORPHAN_PARAM_TOKEN_RE = re.compile(
     r'(?:^|(?<=[^\w]))(?:\[?\d+(?:;\d+){2,}[OI]?_){2,}'
 )
@@ -371,8 +369,12 @@ def _split_diff_opcode_rows(
             new_index = j1 + offset
             rows.append(
                 (
-                    _numbered_diff_line('ctx', old_index + 1, old_lines[old_index], pad),
-                    _numbered_diff_line('ctx', new_index + 1, new_lines[new_index], pad),
+                    _numbered_diff_line(
+                        'ctx', old_index + 1, old_lines[old_index], pad
+                    ),
+                    _numbered_diff_line(
+                        'ctx', new_index + 1, new_lines[new_index], pad
+                    ),
                     'ctx',
                     'ctx',
                 )
@@ -382,7 +384,9 @@ def _split_diff_opcode_rows(
         for old_index in range(i1, i2):
             rows.append(
                 (
-                    _numbered_diff_line('rem', old_index + 1, old_lines[old_index], pad),
+                    _numbered_diff_line(
+                        'rem', old_index + 1, old_lines[old_index], pad
+                    ),
                     '',
                     'rem',
                     'ctx',
@@ -394,7 +398,9 @@ def _split_diff_opcode_rows(
             rows.append(
                 (
                     '',
-                    _numbered_diff_line('add', new_index + 1, new_lines[new_index], pad),
+                    _numbered_diff_line(
+                        'add', new_index + 1, new_lines[new_index], pad
+                    ),
                     'ctx',
                     'add',
                 )
@@ -543,9 +549,10 @@ def _get_welcome_figlet() -> str:
         return _WELCOME_FIGLET_CACHE
     try:
         import pyfiglet as _pyfiglet
-        _WELCOME_FIGLET_CACHE = _pyfiglet.figlet_format(
-            'GRINTA', font='slant'
-        ).rstrip('\n')
+
+        _WELCOME_FIGLET_CACHE = _pyfiglet.figlet_format('GRINTA', font='slant').rstrip(
+            '\n'
+        )
     except Exception:
         _WELCOME_FIGLET_CACHE = '\n'.join(_WELCOME_FIGLET_FALLBACK)
     return _WELCOME_FIGLET_CACHE
@@ -567,7 +574,9 @@ class WelcomeWidget(Vertical):
         super().__init__()
         self._header_text = header
         self._subheader_text = subheader
-        self._suggestions = list(suggestions) if suggestions is not None else list(_WELCOME_SUGGESTIONS)
+        self._suggestions = (
+            list(suggestions) if suggestions is not None else list(_WELCOME_SUGGESTIONS)
+        )
         self._suggestion_details = list(
             suggestion_details or [''] * len(self._suggestions)
         )
@@ -738,7 +747,9 @@ class CommunicatePromptWidget(WelcomeWidget):
         self.mark_submitted(self._selected)
         screen = getattr(self, 'screen', None)
         if screen and hasattr(screen, '_handle_communicate_selection'):
-            screen._handle_communicate_selection(self._values[self._selected], card=self)
+            screen._handle_communicate_selection(
+                self._values[self._selected], card=self
+            )
 
     def on_click(self, event: events.Click) -> None:
         target = event.widget
@@ -798,11 +809,7 @@ class PromptTextArea(TextArea):
 
     def on_key(self, event: events.Key) -> None:
         screen = getattr(self, 'screen', None)
-        if (
-            event.key in {'up', 'down'}
-            and bool(screen)
-            and not self.text.strip()
-        ):
+        if event.key in {'up', 'down'} and bool(screen) and not self.text.strip():
             if getattr(screen, '_welcome_visible', False):
                 if event.key == 'up' and hasattr(screen, 'action_focus_prev_card'):
                     screen.action_focus_prev_card()
@@ -811,7 +818,9 @@ class PromptTextArea(TextArea):
                 event.prevent_default()
                 event.stop()
                 return
-            if hasattr(screen, '_handle_communicate_navigation') and screen._handle_communicate_navigation(event.key):
+            if hasattr(
+                screen, '_handle_communicate_navigation'
+            ) and screen._handle_communicate_navigation(event.key):
                 event.prevent_default()
                 event.stop()
                 return
@@ -952,10 +961,7 @@ class ConfirmWidget(Widget):
                 f'[{risk_class}]{risk_label}[/]'
             )
         else:
-            info = (
-                f'[bold cyan]{action_type}[/]  '
-                f'[{risk_class}]{risk_label}[/]'
-            )
+            info = f'[bold cyan]{action_type}[/]  [{risk_class}]{risk_label}[/]'
 
         info_static = self.query_one('#confirm-info', Static)
         info_static.update(info)
@@ -1843,11 +1849,15 @@ class GrintaScreen(Screen):
         if limit > 0:
             pct = min(100, used * 100 // limit)
             ctx_color = (
-                NAVY_GREEN_ACCENT if pct < 80
-                else NAVY_YELLOW_ACCENT if pct < 95
+                NAVY_GREEN_ACCENT
+                if pct < 80
+                else NAVY_YELLOW_ACCENT
+                if pct < 95
                 else NAVY_RED_ACCENT
             )
-            token_display = f'[{NAVY_TEXT_DIM}]Tok: {used:,} ({pct}%)  [{ctx_color}]●[/][/]'
+            token_display = (
+                f'[{NAVY_TEXT_DIM}]Tok: {used:,} ({pct}%)  [{ctx_color}]●[/][/]'
+            )
         else:
             token_display = f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]'
 
@@ -2134,6 +2144,7 @@ class GrintaScreen(Screen):
                 result.append(Text('✗ ', style=f'bold {NAVY_ERROR}'))
             result.append(Text(line, style=f'bold {NAVY_ERROR}'))
         self._write_log(result)
+
     def add_success(self, text: str) -> None:
         icon = Text('✓ ', style=f'bold {NAVY_READY}')
         body = _rich_text(text)
@@ -2707,7 +2718,9 @@ class GrintaScreen(Screen):
                             'Failed to rebuild toolset on mode change', exc_info=True
                         )
             state = getattr(controller, 'state', None)
-            extra_data = getattr(state, 'extra_data', None) if state is not None else None
+            extra_data = (
+                getattr(state, 'extra_data', None) if state is not None else None
+            )
             if isinstance(extra_data, dict):
                 if is_chat_mode(mode):
                     extra_data.pop('active_run_mode', None)
@@ -2925,9 +2938,8 @@ class GrintaScreen(Screen):
             if self._welcome_visible:
                 _tui_logger.debug('action_submit_input: routing to welcome select')
                 self.action_welcome_select()
-            elif (
-                self._active_communicate_card is not None
-                and getattr(self._active_communicate_card, 'has_options', False)
+            elif self._active_communicate_card is not None and getattr(
+                self._active_communicate_card, 'has_options', False
             ):
                 _tui_logger.debug(
                     'action_submit_input: routing to communicate selection'
@@ -3811,7 +3823,9 @@ class GrintaScreen(Screen):
             options.append(('always', 'Always'))
 
         widget = self.query_one('#confirm-widget', ConfirmWidget)
-        widget.configure(action_type, risk_label, risk_class, target, options, recommended=0)
+        widget.configure(
+            action_type, risk_label, risk_class, target, options, recommended=0
+        )
         widget.show()
         try:
             result = await widget.wait_for_decision()
@@ -4019,9 +4033,7 @@ class TUIRenderer:
             if thoughts and self._live_thinking_dirty:
                 display = self._tui._get_display()
                 if type(display).__name__ != 'MagicMock':
-                    content = Text(
-                        '\n  '.join(thoughts), style='rgb(150,154,189)'
-                    )
+                    content = Text('\n  '.join(thoughts), style='rgb(150,154,189)')
                     display.append_widget(
                         Static(
                             Text.assemble(
@@ -4105,7 +4117,9 @@ class TUIRenderer:
                 for task_id, status, desc in task_signature:
                     item_status = _TASK_TO_SIDEBAR_STATUS.get(status, 'neutral')
                     meta = task_id if task_id and task_id != '?' else None
-                    task_items.append((desc, f'task:{task_id}', False, item_status, meta))
+                    task_items.append(
+                        (desc, f'task:{task_id}', False, item_status, meta)
+                    )
 
                 tasks_widget.set_title(f'Tasks ({len(task_signature)})')
                 tasks_widget.set_items(task_items)
@@ -4120,7 +4134,9 @@ class TUIRenderer:
                     for server in mcp_servers:
                         name = server.get('name', 'unknown')
                         server_type = server.get('type', 'stdio')
-                        mcp_items.append((name, f'mcp:{name}', True, 'info', server_type))
+                        mcp_items.append(
+                            (name, f'mcp:{name}', True, 'info', server_type)
+                        )
 
                 mcp_widget.set_title(
                     f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})'
@@ -4138,7 +4154,9 @@ class TUIRenderer:
                 skill_items = []
                 if skills_list:
                     for skill in sorted(skills_list):
-                        skill_items.append((skill, f'skill:{skill}', True, 'neutral', None))
+                        skill_items.append(
+                            (skill, f'skill:{skill}', True, 'neutral', None)
+                        )
 
                 skills_widget.set_title(f'Skills ({len(skills_list)})')
                 skills_widget.set_items(skill_items)
@@ -4398,7 +4416,8 @@ class TUIRenderer:
             self._pending_terminal_card = None
         if widget is None:
             card = ActivityRenderer.terminal_action(
-                verb, detail,
+                verb,
+                detail,
                 secondary=secondary,
                 secondary_kind=secondary_kind,
                 extra_content=extra_content,
@@ -4413,7 +4432,11 @@ class TUIRenderer:
         # Update existing widget for same session
         widget.set_verb(verb, detail=detail)
         widget.set_status(
-            'ok' if secondary_kind == 'ok' else 'err' if secondary_kind == 'err' else 'neutral',
+            'ok'
+            if secondary_kind == 'ok'
+            else 'err'
+            if secondary_kind == 'err'
+            else 'neutral',
             outcome=secondary,
         )
         if extra_content:
@@ -4726,11 +4749,13 @@ class TUIRenderer:
                     if per_file:
                         for fp, file_diff in per_file:
                             f_added = sum(
-                                1 for line in file_diff.splitlines()
+                                1
+                                for line in file_diff.splitlines()
                                 if line.startswith('+') and not line.startswith('+++')
                             )
                             f_removed = sum(
-                                1 for line in file_diff.splitlines()
+                                1
+                                for line in file_diff.splitlines()
                                 if line.startswith('-') and not line.startswith('---')
                             )
                             encoded = _encode_unified_diff_text(file_diff)
@@ -4744,7 +4769,9 @@ class TUIRenderer:
                                     collapsed=_should_collapse_file_diff(encoded),
                                 )
                     else:
-                        self._write_card(ActivityRenderer.file_edit('Edited', path or '?'))
+                        self._write_card(
+                            ActivityRenderer.file_edit('Edited', path or '?')
+                        )
                 else:
                     self._write_card(ActivityRenderer.file_edit('Edited', path or '?'))
             else:
@@ -4884,7 +4911,9 @@ class TUIRenderer:
             self._last_browser_cmd = action_name
         elif isinstance(event, BrowseInteractiveAction):
             actions = getattr(event, 'browser_actions', '') or ''
-            detail = actions[:80] + ('...' if len(actions) > 80 else '') if actions else ''
+            detail = (
+                actions[:80] + ('...' if len(actions) > 80 else '') if actions else ''
+            )
             card = ActivityRenderer.browser_action('browse', detail)
             widget = self._write_card(card)
             self._last_browser_action_card = widget
@@ -4896,7 +4925,11 @@ class TUIRenderer:
             )
             widget = self._write_card(card)
             prev = getattr(self, '_last_browser_action_card', None)
-            if prev is not None and getattr(self, '_last_browser_cmd', '') in ('screenshot', 'browse', 'browser'):
+            if prev is not None and getattr(self, '_last_browser_cmd', '') in (
+                'screenshot',
+                'browse',
+                'browser',
+            ):
                 try:
                     prev.set_processing(False)
                     if self._last_active_card is prev:
@@ -4911,7 +4944,9 @@ class TUIRenderer:
             content = (event.content or '').strip()
             symbol = getattr(event, 'symbol', '') or ''
             available = bool(getattr(event, 'available', True))
-            card = ActivityRenderer.lsp_query(symbol, result=content, available=available)
+            card = ActivityRenderer.lsp_query(
+                symbol, result=content, available=available
+            )
             self._write_card(card)
         elif isinstance(event, TerminalRunAction):
             cmd = getattr(event, 'command', '') or ''
@@ -4966,11 +5001,7 @@ class TUIRenderer:
             state = getattr(event, 'state', None)
             secondary = _join_secondary_parts(
                 self._terminal_session_label(session_id),
-                (
-                    f'exit {exit_code}'
-                    if exit_code is not None
-                    else (state or None)
-                ),
+                (f'exit {exit_code}' if exit_code is not None else (state or None)),
             )
             secondary_kind = (
                 'ok'
@@ -5187,7 +5218,9 @@ class TUIRenderer:
             path_obj = Path(clean_path)
             if path_obj.is_absolute():
                 try:
-                    clean_path = str(path_obj.resolve().relative_to(workspace.resolve()))
+                    clean_path = str(
+                        path_obj.resolve().relative_to(workspace.resolve())
+                    )
                 except (OSError, ValueError):
                     return None
 
@@ -5237,17 +5270,27 @@ class TUIRenderer:
         if lines:
             first = lines[0].strip()
             # Check if first line has an embedded query hint like "Query: ..." or "pattern: ..."
-            query_match = re.match(r'^(?:query|pattern|searching for):\s*(.+?)$', first, re.I)
+            query_match = re.match(
+                r'^(?:query|pattern|searching for):\s*(.+?)$', first, re.I
+            )
             if query_match:
                 query = query_match.group(1).strip().strip('"\'')
-                result_lines = [line for line in lines[1:] if line.strip() and ':' in line.split(None, 1)[0]]
+                result_lines = [
+                    line
+                    for line in lines[1:]
+                    if line.strip() and ':' in line.split(None, 1)[0]
+                ]
             elif re.match(r'^.*:\d+:', first):
                 # First line is already file:line:content — no separate query line
                 result_lines = [line for line in lines if line.strip()]
             else:
                 # First line is the query itself
                 query = first.strip().strip('"\'')
-                result_lines = [line for line in lines[1:] if line.strip() and ':' in line.split(None, 1)[0]]
+                result_lines = [
+                    line
+                    for line in lines[1:]
+                    if line.strip() and ':' in line.split(None, 1)[0]
+                ]
 
         if not query:
             query = 'code search'

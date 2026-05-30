@@ -350,7 +350,9 @@ class TestMemoryPressureCompactorWiring:
 
         fake_compactor = MagicMock(spec=RollingCompactor)
         fake_compactor.compacted_history = AsyncMock(return_value=fake_view)
-        fake_compactor.get_compaction = AsyncMock(side_effect=RuntimeError('compactor failed'))
+        fake_compactor.get_compaction = AsyncMock(
+            side_effect=RuntimeError('compactor failed')
+        )
         mgr.compactor = fake_compactor
 
         state = _mock_state()
