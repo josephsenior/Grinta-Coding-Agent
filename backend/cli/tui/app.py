@@ -773,13 +773,39 @@ class PromptTextArea(TextArea):
         """
         if self.read_only:
             return
+        import traceback
+
+        _log_path = os.path.join(
+            os.environ.get('TEMP', os.environ.get('TMP', '.')),
+            'grinta_paste_debug.log',
+        )
+        lines = ['=== _on_paste called ===']
         try:
             clipboard = pyperclip.paste()
-        except Exception:
+            lines.append(f'pyperclip.paste() succeeded, len={len(clipboard) if clipboard else 0}')
+            lines.append(f'pyperclip.paste() repr={clipboard[:200]!r}...' if clipboard and len(clipboard) > 200 else f'pyperclip.paste() repr={clipboard!r}')
+        except Exception as exc:
+            lines.append(f'pyperclip.paste() FAILED: {exc}')
             clipboard = event.text
+            lines.append(f'Falling back to event.text, len={len(event.text) if event.text else 0}')
+        lines.append(f'event.text len={len(event.text) if event.text else 0}')
+        lines.append(f'clipboard to insert len={len(clipboard) if clipboard else 0}')
+        lines.append(f'read_only={self.read_only}')
+        lines.append(f'selection={self.selection}')
         event.prevent_default()
-        if result := self._replace_via_keyboard(clipboard, *self.selection):
-            self.move_cursor(result.end_location)
+        try:
+            result = self._replace_via_keyboard(clipboard, *self.selection)
+            lines.append(f'_replace_via_keyboard returned: {result}')
+            if result is not None:
+                self.move_cursor(result.end_location)
+                lines.append('move_cursor called')
+            else:
+                lines.append('_replace_via_keyboard returned None')
+        except Exception as exc:
+            lines.append(f'_replace_via_keyboard FAILED: {exc}')
+            lines.append(traceback.format_exc())
+        with open(_log_path, 'a', encoding='utf-8') as f:
+            f.write('\n'.join(lines) + '\n\n')
 
     def action_paste(self) -> None:
         """Paste from system clipboard directly.
