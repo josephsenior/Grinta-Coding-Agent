@@ -32,6 +32,10 @@ Screen {
 
 #sidebar-container {
     height: 1fr;
+    scrollbar-color: #33405d #080c18;
+    scrollbar-color-hover: #404f71 #080c18;
+    scrollbar-color-active: #4f608a #080c18;
+    scrollbar-size: 1 0;
 }
 
 /* ── Transcript ────────────────────────────────────── */
