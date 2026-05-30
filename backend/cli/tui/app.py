@@ -777,6 +777,7 @@ class PromptTextArea(TextArea):
             clipboard = pyperclip.paste()
         except Exception:
             clipboard = event.text
+        event.prevent_default()
         if result := self._replace_via_keyboard(clipboard, *self.selection):
             self.move_cursor(result.end_location)
 
