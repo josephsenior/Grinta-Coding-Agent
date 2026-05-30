@@ -185,6 +185,30 @@ WelcomeWidget {
     background: #0f1c31;
 }
 
+#welcome-logo {
+    color: #3a4a6a;
+    margin: 0 0 1 0;
+}
+
+#welcome-slogan {
+    height: 1;
+    color: #c8d4e8;
+    text-style: bold;
+}
+
+#welcome-tagline {
+    height: 1;
+    color: #6f83aa;
+    text-style: italic;
+    margin: 0 0 1 0;
+}
+
+#welcome-instruction {
+    height: 1;
+    color: #6f83aa;
+    margin: 0 0 2 0;
+}
+
 /* ── InputBar ──────────────────────────────────────── */
 InputBar {
     height: 6;

@@ -525,6 +525,30 @@ _WELCOME_SUGGESTIONS = [
     'Inspect the project and propose a testing strategy',
 ]
 
+_WELCOME_FIGLET_FALLBACK = (
+    '  ____ ____  ___ _   _ _____  _ ',
+    ' / ___|  _ \\|_ _| \\ | |_   _|/ \\',
+    '| |  _| |_) || ||  \\| | | | / _ \\',
+    '| |_| |  _ < | || |\\  | | |/ ___ \\',
+    ' \\____|_| \\_\\___|_| \\_| |_/_/   \\_\\',
+)
+
+_WELCOME_FIGLET_CACHE: str | None = None
+
+
+def _get_welcome_figlet() -> str:
+    global _WELCOME_FIGLET_CACHE
+    if _WELCOME_FIGLET_CACHE is not None:
+        return _WELCOME_FIGLET_CACHE
+    try:
+        import pyfiglet as _pyfiglet
+        _WELCOME_FIGLET_CACHE = _pyfiglet.figlet_format(
+            'GRINTA', font='slant'
+        ).rstrip('\n')
+    except Exception:
+        _WELCOME_FIGLET_CACHE = '\n'.join(_WELCOME_FIGLET_FALLBACK)
+    return _WELCOME_FIGLET_CACHE
+
 
 class WelcomeWidget(Vertical):
     """Empty-state welcome panel with interactive task suggestions."""
@@ -537,6 +561,7 @@ class WelcomeWidget(Vertical):
         suggestions: list[str] | None = None,
         suggestion_details: list[str] | None = None,
         callback_name: str = '_handle_welcome_click',
+        show_logo: bool = True,
     ) -> None:
         super().__init__()
         self._header_text = header
@@ -550,14 +575,37 @@ class WelcomeWidget(Vertical):
                 [''] * (len(self._suggestions) - len(self._suggestion_details))
             )
         self._callback_name = callback_name
+        self._show_logo = show_logo
 
     def compose(self) -> ComposeResult:
-        yield Static(self._header_text, id='welcome-header')
-        yield Static(self._subheader_text, id='welcome-subheader')
+        if self._show_logo:
+            yield Static('', id='welcome-logo')
+            yield Static(
+                '[#c8d4e8 bold]Autonomous coding agent runtime[/]',
+                id='welcome-slogan',
+            )
+            yield Static(
+                '[#6f83aa italic]Pure grit.[/]',
+                id='welcome-tagline',
+            )
+            yield Static(
+                '[#6f83aa]Describe a task to inspect, plan, edit, test, or refactor your project.[/]',
+                id='welcome-instruction',
+            )
+        else:
+            yield Static(self._header_text, id='welcome-header')
+            yield Static(self._subheader_text, id='welcome-subheader')
         for _text in self._suggestions:
             yield Static('', classes='welcome-item')
 
     def on_mount(self) -> None:
+        if self._show_logo:
+            width = self.screen.size.width
+            logo_static = self.query_one('#welcome-logo', Static)
+            if width >= 80:
+                logo_static.update(_get_welcome_figlet())
+            else:
+                logo_static.update('[#6f83aa bold]GRINTA[/]')
         self._selected = 0
         self._items = list(self.query('.welcome-item'))
         self._cascade_timers: list[Any] = []
@@ -649,6 +697,7 @@ class CommunicatePromptWidget(WelcomeWidget):
             ],
             suggestion_details=[option[2] for option in (options or [])],
             callback_name='_handle_communicate_selection',
+            show_logo=False,
         )
         self._values = [option[1] for option in (options or [])]
         self._active = bool(self._values)
