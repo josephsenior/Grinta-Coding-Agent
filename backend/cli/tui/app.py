@@ -566,7 +566,7 @@ class WelcomeWidget(Vertical):
         super().__init__()
         self._header_text = header
         self._subheader_text = subheader
-        self._suggestions = list(suggestions or _WELCOME_SUGGESTIONS)
+        self._suggestions = list(suggestions) if suggestions is not None else list(_WELCOME_SUGGESTIONS)
         self._suggestion_details = list(
             suggestion_details or [''] * len(self._suggestions)
         )
