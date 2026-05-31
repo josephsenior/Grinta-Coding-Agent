@@ -39,6 +39,9 @@ class TestCreateFinishTool:
             'status',
             'summary',
             'plan',
+            'files_or_areas',
+            'risks',
+            'verification',
             'assumptions',
             'next_step',
         }

@@ -69,6 +69,7 @@ class ActionRenderersHost(Protocol):
     _pending_shell_is_internal: bool
     _pending_activity_card: Any
     _pending_finish_text: str | None
+    _pending_finish_renderable: Any | None
     _last_terminal_input_sent: str
     _last_notice_error_content: Any
 

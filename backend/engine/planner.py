@@ -634,8 +634,9 @@ class OrchestratorPlanner:
             '- Do not mutate files, run mutating commands, or use write/MCP/shell tools.\n'
             '- Use `communicate_with_user` for clarification or blockers.\n'
             '- Use `finish` to deliver the structured plan or blocked outcome.\n\n'
-            '`finish` requires these universal fields: status, summary, plan, '
-            "assumptions, next_step. For status='completed', plan must be non-empty.\n"
+            '`finish` requires: status, summary, plan, files_or_areas, risks, '
+            "verification, assumptions, next_step. For status='completed', "
+            'plan, files_or_areas, and verification must be non-empty.\n'
             '==========================\n'
         )
         return self._apply_control_message(messages, instruction)

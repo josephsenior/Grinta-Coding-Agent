@@ -265,6 +265,9 @@ def _handle_plan_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishActi
     status = _require_finish_status(arguments, tool_name)
     summary = _require_finish_string(arguments, 'summary', tool_name)
     plan = _require_finish_list(arguments, 'plan', tool_name)
+    files_or_areas = _require_finish_list(arguments, 'files_or_areas', tool_name)
+    risks = _require_finish_list(arguments, 'risks', tool_name)
+    verification = _require_finish_list(arguments, 'verification', tool_name)
     assumptions = _require_finish_list(arguments, 'assumptions', tool_name)
     next_step = _require_finish_string(arguments, 'next_step', tool_name)
 
@@ -272,11 +275,22 @@ def _handle_plan_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishActi
         raise FunctionCallValidationError(
             'Plan Mode finish with status="completed" requires a non-empty plan.'
         )
+    if status == 'completed' and not any(str(item).strip() for item in files_or_areas):
+        raise FunctionCallValidationError(
+            'Plan Mode finish with status="completed" requires non-empty files_or_areas.'
+        )
+    if status == 'completed' and not any(str(item).strip() for item in verification):
+        raise FunctionCallValidationError(
+            'Plan Mode finish with status="completed" requires non-empty verification.'
+        )
 
     outputs = {
         'status': status,
         'summary': summary,
         'plan': plan,
+        'files_or_areas': files_or_areas,
+        'risks': risks,
+        'verification': verification,
         'assumptions': assumptions,
         'next_step': next_step,
     }

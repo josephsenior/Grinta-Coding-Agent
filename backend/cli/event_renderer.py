@@ -248,6 +248,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         #: once the agent actually reaches AgentState.FINISHED (validation may
         #: block the finish call and keep the agent running).
         self._pending_finish_text: str | None = None
+        self._pending_finish_renderable: Any | None = None
         #: Monotonic timestamp of the last Live refresh (for throttling).
         self._last_refresh_time: float = 0.0
         #: Last reasoning lines committed to transcript (for prefix de-dup per turn).
@@ -913,6 +914,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             # Finish was blocked — discard the buffered completion text so it
             # never appears while the agent is still working.
             self._pending_finish_text = None
+            self._pending_finish_renderable = None
 
     _STATE_FOLLOWUP_HANDLERS: dict[Any, str] = {
         # Populated lazily in :meth:`_state_followup_handlers`.
@@ -967,7 +969,12 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         # Render the finish summary that was buffered when PlaybookFinishAction
         # arrived — we deferred it to here so it only appears when the finish
         # actually went through (not when validation blocks it).
-        if self._pending_finish_text:
+        if self._pending_finish_renderable is not None:
+            self._append_history(Text(''))
+            self._append_history(self._pending_finish_renderable)
+            self._pending_finish_renderable = None
+            self._pending_finish_text = None
+        elif self._pending_finish_text:
             self._append_assistant_message(self._pending_finish_text)
             self._pending_finish_text = None
 

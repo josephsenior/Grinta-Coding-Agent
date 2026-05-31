@@ -183,6 +183,9 @@ class TestHandleFinishTool:
                 'status': 'completed',
                 'summary': 'Plan ready',
                 'plan': ['Inspect files', 'Make the change', 'Run tests'],
+                'files_or_areas': ['backend/engine'],
+                'risks': ['Tool schema drift'],
+                'verification': ['Run focused tests'],
                 'assumptions': ['Existing behavior stays stable'],
                 'next_step': 'Switch to Agent Mode',
             },
@@ -202,6 +205,9 @@ class TestHandleFinishTool:
                 {
                     'status': 'completed',
                     'plan': ['Do it'],
+                    'files_or_areas': [],
+                    'risks': [],
+                    'verification': [],
                     'assumptions': [],
                     'next_step': 'Switch to Agent Mode',
                 },
@@ -214,6 +220,9 @@ class TestHandleFinishTool:
                 'status': 'blocked',
                 'summary': 'Target subsystem is unclear',
                 'plan': [],
+                'files_or_areas': [],
+                'risks': ['Wrong subsystem could be changed'],
+                'verification': [],
                 'assumptions': [],
                 'next_step': 'Clarify the target subsystem',
             },
@@ -229,6 +238,40 @@ class TestHandleFinishTool:
                     'status': 'completed',
                     'summary': 'Plan ready',
                     'plan': [],
+                    'files_or_areas': [],
+                    'risks': [],
+                    'verification': [],
+                    'assumptions': [],
+                    'next_step': 'Switch to Agent Mode',
+                },
+                mode='plan',
+            )
+
+    def test_plan_finish_completed_requires_scope_and_verification(self):
+        with pytest.raises(FunctionCallValidationError, match='files_or_areas'):
+            _handle_finish_tool(
+                {
+                    'status': 'completed',
+                    'summary': 'Plan ready',
+                    'plan': ['Inspect files'],
+                    'files_or_areas': [],
+                    'risks': [],
+                    'verification': ['Run focused tests'],
+                    'assumptions': [],
+                    'next_step': 'Switch to Agent Mode',
+                },
+                mode='plan',
+            )
+
+        with pytest.raises(FunctionCallValidationError, match='verification'):
+            _handle_finish_tool(
+                {
+                    'status': 'completed',
+                    'summary': 'Plan ready',
+                    'plan': ['Inspect files'],
+                    'files_or_areas': ['backend/engine'],
+                    'risks': [],
+                    'verification': [],
                     'assumptions': [],
                     'next_step': 'Switch to Agent Mode',
                 },
@@ -242,6 +285,9 @@ class TestHandleFinishTool:
                     'status': 'completed',
                     'summary': 'Plan ready',
                     'plan': ['Do it'],
+                    'files_or_areas': [],
+                    'risks': [],
+                    'verification': [],
                     'assumptions': [],
                     'next_step': 'Switch to Agent Mode',
                 },

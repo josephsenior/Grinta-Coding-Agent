@@ -682,6 +682,15 @@ class AgentMessage(Static):
         self.update(Markdown(text, code_theme=get_grinta_pygments_style()))
 
 
+class PlanMessage(Static):
+    """Structured Plan-mode finish card."""
+
+    def __init__(self, action: object, *, id: str | None = None) -> None:
+        from backend.cli.plan_display import render_plan_finish_panel
+
+        super().__init__(render_plan_finish_panel(action), id=id)
+
+
 class ThinkingIndicator(Static):
     """Live thinking/reasoning indicator with step tracking."""
 
