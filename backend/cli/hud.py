@@ -18,7 +18,10 @@ class HUDState:
     """Mutable state backing the HUD bar."""
 
     model: str = '(not set)'
+    #: Total billed/processed tokens across recorded LLM calls.
     total_tokens: int = 0
+    #: Current context-window pressure. This is the largest prompt/context size
+    #: observed since the most recent condensation, not cumulative token spend.
     context_tokens: int = 0
     context_limit: int = 0
     cost_usd: float = 0.0
@@ -47,6 +50,8 @@ class HUDBar:
         self.state = HUDState()
         self._bundled_skill_count = HUDBar.count_bundled_playbook_skills()
         self._minimal_mode = False
+        self._context_usage_ignore_prefix = 0
+        self._observed_usage_count = 0
 
     @property
     def bundled_skill_count(self) -> int:
@@ -291,7 +296,15 @@ class HUDBar:
 
     def update_condensation_count(self, count: int) -> None:
         """Update the context condensation count displayed in HUD."""
-        self.state.condensation_count = max(0, count)
+        next_count = max(0, int(count))
+        if next_count > self.state.condensation_count:
+            # A condensation starts a new context-window epoch. Keep cost/call
+            # totals, but let the next post-condensation prompt establish the
+            # new context pressure instead of reusing the pre-condense high-water
+            # mark from cumulative metrics.
+            self.state.context_tokens = 0
+            self._context_usage_ignore_prefix = self._observed_usage_count
+        self.state.condensation_count = next_count
 
     def update_workspace(self, root: str | Path | None) -> None:
         """Set resolved workspace path for footer / Live HUD (empty if unknown)."""
@@ -372,7 +385,7 @@ class HUDBar:
         self.state.llm_calls = max(self.state.llm_calls, resolved_calls)
 
         if usages:
-            self._apply_object_latest_usage(usages[-1])
+            self._apply_object_context_usages(usages)
             return
         if self._has_usage_signal(accumulated_usage):
             self._apply_object_accumulated_usage(accumulated_usage)
@@ -388,12 +401,38 @@ class HUDBar:
             getattr(accumulated_usage, 'usage_estimated', False)
         )
 
+    def _object_usage_context_slice(self, usages: list[Any]) -> list[Any]:
+        usage_count = len(usages)
+        start = self._context_usage_ignore_prefix
+        if start > usage_count:
+            # The caller supplied a fresh/diff metrics object rather than the
+            # cumulative metrics list. Treat all entries as current-epoch data.
+            start = 0
+            self._context_usage_ignore_prefix = 0
+        self._observed_usage_count = max(self._observed_usage_count, usage_count)
+        return list(usages[start:])
+
+    def _apply_object_context_usages(self, usages: list[Any]) -> None:
+        relevant = self._object_usage_context_slice(usages)
+        if not relevant:
+            return
+        best_prompt = self.state.context_tokens
+        best_estimated = self.state.token_usage_estimated
+        latest_limit = self.state.context_limit
+        for usage in relevant:
+            prompt_tokens = int(getattr(usage, 'prompt_tokens', 0) or 0)
+            context_limit = int(getattr(usage, 'context_window', 0) or 0)
+            if context_limit > 0:
+                latest_limit = context_limit
+            if prompt_tokens >= best_prompt:
+                best_prompt = prompt_tokens
+                best_estimated = bool(getattr(usage, 'usage_estimated', False))
+        self.state.context_tokens = best_prompt
+        self.state.context_limit = latest_limit
+        self.state.token_usage_estimated = best_estimated
+
     def _apply_object_latest_usage(self, latest: Any) -> None:
-        self.state.context_tokens = int(getattr(latest, 'prompt_tokens', 0) or 0)
-        self.state.context_limit = int(getattr(latest, 'context_window', 0) or 0)
-        self.state.token_usage_estimated = bool(
-            getattr(latest, 'usage_estimated', False)
-        )
+        self._apply_object_context_usages([latest])
 
     def _update_from_dict_metrics(self, metrics: dict[str, Any]) -> None:
         accumulated_cost = float(metrics.get('accumulated_cost') or 0.0)
@@ -418,7 +457,7 @@ class HUDBar:
         if usages:
             latest = usages[-1] if isinstance(usages, list) else usages
             if isinstance(latest, dict):
-                self._apply_dict_latest_usage(latest)
+                self._apply_dict_context_usages(usages)
                 return
         if isinstance(accumulated_usage, dict) and self._apply_dict_accumulated_usage(
             accumulated_usage,
@@ -440,10 +479,38 @@ class HUDBar:
         )
         return True
 
+    def _dict_usage_context_slice(
+        self, usages: list[Any]
+    ) -> list[dict[str, Any]]:
+        usage_count = len(usages)
+        start = self._context_usage_ignore_prefix
+        if start > usage_count:
+            start = 0
+            self._context_usage_ignore_prefix = 0
+        self._observed_usage_count = max(self._observed_usage_count, usage_count)
+        return [usage for usage in usages[start:] if isinstance(usage, dict)]
+
+    def _apply_dict_context_usages(self, usages: list[Any]) -> None:
+        relevant = self._dict_usage_context_slice(usages)
+        if not relevant:
+            return
+        best_prompt = self.state.context_tokens
+        best_estimated = self.state.token_usage_estimated
+        latest_limit = self.state.context_limit
+        for usage in relevant:
+            prompt_tokens = int(usage.get('prompt_tokens', 0) or 0)
+            context_limit = int(usage.get('context_window', 0) or 0)
+            if context_limit > 0:
+                latest_limit = context_limit
+            if prompt_tokens >= best_prompt:
+                best_prompt = prompt_tokens
+                best_estimated = bool(usage.get('usage_estimated', False))
+        self.state.context_tokens = best_prompt
+        self.state.context_limit = latest_limit
+        self.state.token_usage_estimated = best_estimated
+
     def _apply_dict_latest_usage(self, latest: dict[str, Any]) -> None:
-        self.state.context_tokens = int(latest.get('prompt_tokens', 0) or 0)
-        self.state.context_limit = int(latest.get('context_window', 0) or 0)
-        self.state.token_usage_estimated = bool(latest.get('usage_estimated', False))
+        self._apply_dict_context_usages([latest])
 
     def plain_text(self) -> str:
         return self._format_bar().plain

@@ -5,5 +5,5 @@
 4. **Atomic multi-file edit**: inspect targets -> `multiedit` -> Verify -> `finish`.
 5. **Docs/config addition**: `read` -> `replace_string` with anchor plus inserted content -> Verify if applicable -> `finish`.
 6. **Investigation**: `search_code` -> `analyze_project_structure` -> read code -> Answer plain text.
-7. **Tool Failed (example only)**: Follow `<ERROR_RECOVERY>` in `system_partial_01_autonomy.md`.
+7. **Tool Failed (example only)**: Follow `<ERROR_RECOVERY>`.
 </COMMON_PATTERNS>

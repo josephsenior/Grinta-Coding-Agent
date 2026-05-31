@@ -574,35 +574,17 @@ def _build_risk_preview(
     )
 
 
-def _build_autonomy_block(mode: str, *, checkpoints_on: bool) -> str:
+def _build_autonomy_block(_mode: str, *, checkpoints_on: bool) -> str:
     cp_line = (
         " Auto-save occurs before large writes; use 'checkpoint' tool to manually save logically safe states."
         if checkpoints_on
         else ''
     )
-    from backend.core.interaction_modes import (
-        is_chat_mode,
-        is_plan_mode,
-    )
-
-    if is_chat_mode(mode):
-        return (
-            '<AUTONOMY>\n'
-            'Answer conversationally. Use tools only when investigation is needed. '
-            'Do not mutate files or run mutating commands without explicit user request.'
-            f'{cp_line}\n</AUTONOMY>'
-        )
-    if is_plan_mode(mode):
-        return (
-            '<AUTONOMY>\n'
-            'Inspect the project and produce a structured plan. '
-            'Do not mutate files or run mutating commands. '
-            'Use `finish` to deliver the plan with approach, files to change, risks, and verification steps.'
-            f'{cp_line}\n</AUTONOMY>'
-        )
     return (
         '<AUTONOMY>\n'
-        "Plan, execute, and verify the user's task end-to-end. The runtime may "
+        'Follow the active mode protocol injected for the current turn. For implementation work, '
+        'drive the request through tools and verification; for discussion or planning work, keep '
+        'the response aligned with the active protocol. The runtime may '
         'interrupt a tool call to surface a user decision; treat that decision as '
         'authoritative and continue from where you stopped. On tool failure, make '
         'the next action a corrected retry or a different tool (e.g. `read` \u2192 `edit_symbols`, '
@@ -611,32 +593,20 @@ def _build_autonomy_block(mode: str, *, checkpoints_on: bool) -> str:
     )
 
 
-def _build_response_style_block(mode: str) -> str:
-    from backend.core.interaction_modes import (
-        is_chat_mode,
-        is_plan_mode,
+def _build_response_style_block(
+    _mode: str, *, meta_cognition_on: bool = False
+) -> str:
+    clarification_line = (
+        '- use `communicate_with_user` for blocking questions when available'
+        if meta_cognition_on
+        else '- ask the user a short clarifying question in natural language when genuinely blocked'
     )
-
-    if is_chat_mode(mode):
-        return (
-            'Prose is the default. Use tools only when investigation is needed. '
-            'Do not mutate files or run mutating commands without explicit user request.'
-        )
-    if is_plan_mode(mode):
-        return (
-            'Tool calls are the default until the run ends:\n'
-            '- inspect the project and produce a structured plan\n'
-            '- use `communicate_with_user` for blocking questions when available\n'
-            '- use `finish` for final outcome\n'
-            '- do not use plain prose as a substitute for an action\n'
-            '- do not mutate files or run mutating commands'
-        )
     return (
-        'Tool calls are the default until the run ends:\n'
-        '- inspect, plan, edit, execute, and verify\n'
-        '- use `communicate_with_user` for blocking questions when available\n'
-        '- use `finish` for final outcome\n'
-        '- do not use plain prose as a substitute for an action'
+        'Use the output form required for this turn:\n'
+        '- use tools for investigation or implementation when the protocol calls for action\n'
+        f'{clarification_line}\n'
+        '- use `finish` for final outcomes when the protocol requires a structured completion\n'
+        '- use plain prose for conversation, explanation, or final summaries when allowed'
     )
 
 
@@ -1061,7 +1031,7 @@ def _append_mcp_connected_catalog_sections(
     )
 
 
-def _mcp_tail_render_kwargs(
+def _render_interaction_tail(
     render_partial: Callable[..., str],
     config: Any,
     mode: str | None = None,
@@ -1071,8 +1041,11 @@ def _mcp_tail_render_kwargs(
     resolved_mode = normalize_interaction_mode(
         mode if mode is not None else getattr(config, 'mode', 'agent')
     )
-    response_style_body = _build_response_style_block(resolved_mode)
     meta_cognition = getattr(config, 'enable_meta_cognition', False)
+    response_style_body = _build_response_style_block(
+        resolved_mode,
+        meta_cognition_on=meta_cognition,
+    )
     communicate_tool_section = (
         '<COMMUNICATE_TOOL>\n'
         'Use `communicate_with_user` for clarification, uncertainty, risky-action options, or escalation after 3 failed attempts on a sub-task. On escalation, include a brief post-mortem and one specific question. Do not ask mid-task questions in plain text; use this tool so the turn ends cleanly and waits for user input.\n'
@@ -1080,11 +1053,6 @@ def _mcp_tail_render_kwargs(
         if meta_cognition
         else ''
     )
-    lsp_available = _lsp_available(config)
-    if lsp_available:
-        uncertainty_state_1_discover_line = '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**; use tools like `search_code`, editor `view_*`, or `lsp`. Do NOT ask first.'
-    else:
-        uncertainty_state_1_discover_line = '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**, not shell repo search/read. Do NOT ask first.'
     return render_partial(
         'system_partial_03_tail.md',
         response_style_body=response_style_body,
@@ -1094,18 +1062,15 @@ def _mcp_tail_render_kwargs(
             if meta_cognition
             else 'If a request is vague, inspect nearby docs/config first; ask the user directly in natural language only if you are still blocked or the scope is still ambiguous.'
         ),
-        uncertainty_state_1_discover_line=uncertainty_state_1_discover_line,
-        uncertainty_state_2_ambiguous_line=(
-            '**Ambiguous intent** (multiple valid implementations, destructive action, unclear scope) → `communicate_with_user` with `options`. Do NOT guess.'
-            if meta_cognition
-            else '**Ambiguous intent** (multiple valid implementations, destructive action, unclear scope) → ask the user a short clarifying question in natural language. Do NOT guess.'
-        ),
-        uncertainty_state_3_unknowable_line=(
-            "**Needs user input** (user preference, external credential, business policy) → `communicate_with_user` with `intent='clarification'`."
-            if meta_cognition
-            else '**Needs user input** (user preference, external credential, business policy) → ask the user directly in natural language.'
-        ),
     )
+
+
+def _mcp_tail_render_kwargs(
+    render_partial: Callable[..., str],
+    config: Any,
+    mode: str | None = None,
+) -> str:
+    return _render_interaction_tail(render_partial, config, mode)
 
 
 def _render_mcp_and_permissions(
@@ -1136,7 +1101,5 @@ def _render_mcp_and_permissions(
         perm = getattr(config, 'permissions', None)
         if perm is not None:
             parts.extend(('', _render_permissions(config, perm)))
-
-    parts.extend(('', _mcp_tail_render_kwargs(render_partial, config, mode)))
 
     return '\n'.join(parts)
