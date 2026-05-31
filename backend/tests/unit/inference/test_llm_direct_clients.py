@@ -298,6 +298,20 @@ class TestAnthropicClientHelpers:
         assert kwargs['system'] == 'Be helpful'
         assert kwargs['model'] == 'claude-3'
 
+    def test_prepare_kwargs_combines_all_system_messages(self):
+        from backend.inference.mappers.anthropic import prepare_kwargs
+
+        messages = [
+            {'role': 'system', 'content': 'Base system prompt'},
+            {'role': 'system', 'content': 'Current mode: PLAN'},
+            {'role': 'user', 'content': 'What mode are you in?'},
+        ]
+
+        filtered, kwargs = prepare_kwargs(messages, {}, default_model='claude-3')
+
+        assert filtered == [{'role': 'user', 'content': 'What mode are you in?'}]
+        assert kwargs['system'] == 'Base system prompt\n\nCurrent mode: PLAN'
+
     def test_prepare_kwargs_converts_openai_tools_to_anthropic_schema(self):
         from backend.inference.mappers.anthropic import prepare_kwargs
 
@@ -444,6 +458,7 @@ class TestAnthropicClientHelpers:
         client._provider_name = 'opencode-go'
         messages = [
             {'role': 'system', 'content': 'Be helpful'},
+            {'role': 'system', 'content': 'Current mode: CHAT'},
             {'role': 'user', 'content': 'Hi'},
         ]
         original_kwargs = {
@@ -470,7 +485,7 @@ class TestAnthropicClientHelpers:
         )
 
         assert filtered == [{'role': 'user', 'content': 'Hi'}]
-        assert system_msg == 'Be helpful'
+        assert system_msg == 'Be helpful\n\nCurrent mode: CHAT'
         assert request_kwargs == {
             'max_tokens': 131072,
             'model': 'minimax-m2.7',
