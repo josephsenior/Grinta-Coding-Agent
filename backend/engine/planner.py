@@ -114,7 +114,22 @@ class OrchestratorPlanner:
         self._add_editor_tools(tools)
         self._add_execute_mcp_tool_tool(tools)
 
-        tools = self._filter_tools_for_mode(tools, self._current_mode())
+        mode = self._current_mode()
+        tools = self._filter_tools_for_mode(tools, mode)
+
+        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in (
+            '1',
+            'true',
+            'yes',
+            'on',
+        ):
+            tool_names = [self._tool_name(t) for t in tools]
+            logger.info(
+                '[APP_DEBUG_MODE] build_toolset: mode=%r config.mode=%r tools=%r',
+                mode,
+                getattr(self._config, 'mode', 'N/A'),
+                tool_names,
+            )
 
         # Invalidate cached checked-tools when toolset is rebuilt
         self._checked_tools_cache = None
@@ -386,6 +401,28 @@ class OrchestratorPlanner:
         _maybe_log_prompt_metrics(messages)
         self._warn_if_degraded_emergency_prompt(messages)
 
+        # APP_DEBUG_MODE=1 logs what the model actually sees each turn:
+        # the resolved mode and the injected mode instruction
+        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in (
+            '1',
+            'true',
+            'yes',
+            'on',
+        ):
+            mode_injected = None
+            for i in range(len(messages) - 1, -1, -1):
+                messages[i].get('role', '')
+                content = messages[i].get('content', '')
+                if isinstance(content, str) and '===' in content and 'MODE' in content:
+                    mode_injected = content[:200]
+                    break
+            logger.info(
+                '[APP_DEBUG_MODE] turn mode=%s active_run_mode=%s | injected_msg=%r',
+                mode,
+                (getattr(state, 'extra_data', {}) or {}).get('active_run_mode', 'N/A'),
+                mode_injected,
+            )
+
         params: dict[str, Any] = {
             'messages': messages,
             'stream': True,
@@ -546,11 +583,35 @@ class OrchestratorPlanner:
 
     def _active_mode_for_state(self, state: State | None) -> str:
         extra = getattr(state, 'extra_data', {}) if state is not None else {}
-        if isinstance(extra, dict):
-            active_mode = extra.get('active_run_mode')
-            if active_mode:
-                return normalize_interaction_mode(active_mode)
-        return self._current_mode()
+        active_run_mode = (
+            extra.get('active_run_mode') if isinstance(extra, dict) else None
+        )
+        mode = normalize_interaction_mode(active_run_mode) if active_run_mode else None
+        if mode:
+            if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in (
+                '1',
+                'true',
+                'yes',
+                'on',
+            ):
+                logger.info(
+                    '[APP_DEBUG_MODE] _active_mode_for_state: found active_run_mode=%r in state.extra_data -> returning %r',
+                    active_run_mode,
+                    mode,
+                )
+            return mode
+        fallback = normalize_interaction_mode(getattr(self._config, 'mode', 'agent'))
+        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in (
+            '1',
+            'true',
+            'yes',
+            'on',
+        ):
+            logger.info(
+                '[APP_DEBUG_MODE] _active_mode_for_state: no active_run_mode in extra_data, falling back to config.mode=%r',
+                fallback,
+            )
+        return fallback
 
     def _inject_mode_instructions(
         self,
