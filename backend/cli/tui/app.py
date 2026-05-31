@@ -156,7 +156,6 @@ from backend.ledger.action import (
     ProposalAction,
     RecallAction,
     StreamingChunkAction,
-    SystemMessageAction,
     TaskTrackingAction,
     TerminalInputAction,
     TerminalReadAction,
@@ -1846,7 +1845,7 @@ class GrintaScreen(Screen):
         line1_parts.append(f'[{NAVY_TEXT_DIM}]Ws: {ws_display}[/]')
         line1 = '  '.join(line1_parts)
 
-        # Token count with context circle for top-right corner
+        # Context-window pressure with saturation percentage.
         if limit > 0:
             pct = min(100, used * 100 // limit)
             ctx_color = (
@@ -1857,10 +1856,10 @@ class GrintaScreen(Screen):
                 else NAVY_RED_ACCENT
             )
             token_display = (
-                f'[{NAVY_TEXT_DIM}]Tok: {used:,} ({pct}%)  [{ctx_color}]●[/][/]'
+                f'[{NAVY_TEXT_DIM}]Ctx: {used:,}/{limit:,} ({pct}%)  [{ctx_color}]●[/][/]'
             )
         else:
-            token_display = f'[{NAVY_TEXT_DIM}]Tok: {used:,}[/]'
+            token_display = f'[{NAVY_TEXT_DIM}]Ctx: {used:,}[/]'
 
         help_hint = r'[#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
         line2 = f'{token_display}   {help_hint}'
@@ -2728,29 +2727,6 @@ class GrintaScreen(Screen):
                 else:
                     extra_data['active_run_mode'] = mode
 
-            # Add system reminder about mode change
-            event_stream = getattr(controller, 'event_stream', None)
-            if event_stream is not None:
-                if mode == 'plan':
-                    reminder_text = (
-                        '[MODE CHANGE] You are now in PLAN mode. '
-                        'This is a read-only mode. Do not use write tools '
-                        '(create, edit_symbols, replace_string, multiedit, shell). '
-                        'Use only read/inspect tools and finish with a plan.'
-                    )
-                elif mode == 'agent':
-                    reminder_text = (
-                        '[MODE CHANGE] You are now in AGENT mode. '
-                        'You may use all tools including write tools and shell commands.'
-                    )
-                else:  # chat
-                    reminder_text = (
-                        '[MODE CHANGE] You are now in CHAT mode. '
-                        'Respond naturally in prose. Use read-only tools if needed.'
-                    )
-
-                reminder = SystemMessageAction(content=reminder_text)
-                event_stream.add_event(reminder, EventSource.ENVIRONMENT)
         self._render_hud_bar()
         self._update_input_identity(mode)
         self._toggle_autonomy_tabs_visibility(mode)

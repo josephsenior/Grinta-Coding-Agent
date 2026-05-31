@@ -47,7 +47,7 @@ async def test_tui_renderer_surfaces_retry_pending_status() -> None:
     assert hud.state.ledger_status == 'Backoff'
     assert hud.state.agent_state_label == 'Backoff 1/3 (retrying in 5s)'
     tui.set_agent_phase.assert_called_once_with('Backoff 1/3 (retrying in 5s)')
-    tui._write_log.assert_called_once()
+    tui.set_retry_status.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -77,8 +77,11 @@ async def test_tui_renderer_surfaces_llm_stream_retry_pending_status() -> None:
     )
 
     assert hud.state.agent_state_label == 'Backoff 1/3 (retrying in 2s)'
-    tui._write_log.assert_called_once()
-    assert 'provider stream' in str(tui._write_log.call_args)
+    tui.set_retry_status.assert_called_once()
+    call_args = tui.set_retry_status.call_args
+    assert call_args is not None
+    args, kwargs = call_args
+    assert any('provider' in str(a).lower() for a in args) or any('provider' in str(v).lower() for v in kwargs.values())
 
 
 @pytest.mark.asyncio

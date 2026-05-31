@@ -489,6 +489,8 @@ class TestOrchestratorPromptManager:
         result = opm.get_system_message()
         addendum = opm.get_mcp_user_addendum()
 
+        assert '<RESPONSE_STYLE>' in result
+        assert '<MCP_TOOLS>' not in result
         assert 'call_mcp_tool(tool_name="...", arguments={...})' not in result
         assert '`github_search`' not in result
         assert 'Configured MCP servers' not in result
@@ -819,7 +821,7 @@ class TestBuildSystemPromptRenders:
             'Be thorough and direct; prefer completeness and verification details over brevity.'
             in result
         )
-        assert 'Tool calls are the default until the run ends:' in result
+        assert 'Use the output form required for this turn:' in result
         assert 'Be terse and direct.' not in result
 
     def test_windows_git_bash(self) -> None:
@@ -905,6 +907,44 @@ class TestBuildSystemPromptRenders:
             mcp_tool_descriptions={'search_github': 'Search GitHub repositories'},
         )
         assert '`search_github`' in addendum
+
+    @pytest.mark.parametrize('mode', ['chat', 'plan', 'agent'])
+    def test_system_prompt_does_not_embed_current_mode_block(self, mode: str) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(mode=mode),
+            function_calling_mode='native',
+        )
+        assert 'Current mode:' not in result
+        assert 'CURRENT MODE:' not in result
+
+    def test_decision_framework_owns_uncertainty_and_confidence(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(),
+            function_calling_mode='native',
+        )
+
+        assert '<DECISION_FRAMEWORK>' in result
+        assert 'uncertainty handling' in result
+        assert 'confidence calibration' in result
+        assert '<AUTONOMY_VS_ASKING_MATRIX>' in result
+        assert '<UNCERTAINTY_POLICY>' not in result
+        assert '<CONFIDENCE_CALIBRATION>' not in result
+
+    def test_system_prompt_does_not_expose_prompt_source_filenames(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(),
+            function_calling_mode='native',
+        )
+
+        assert 'system_partial_' not in result
+        assert 'prompt_builder.py' not in result
+        assert 'section_renderers.py' not in result
 
     def test_working_memory_disabled(self) -> None:
         result = self._assert_renders_cleanly(

@@ -753,9 +753,9 @@ async def test_tui_hud_bar_shows_accumulated_and_context_tokens(mock_config):
         s._render_hud_bar()
         await pilot.pause()
 
-        stats = s.query_one('#hud-line-1', Label)
+        stats = s.query_one('#hud-line-2', Label)
         rendered = str(stats.renderable)
-        assert 'Tok: 430' in rendered
+        assert 'Ctx: 430/8,192' in rendered
         assert '%' in rendered
 
 

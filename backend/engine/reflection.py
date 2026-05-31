@@ -1,6 +1,9 @@
-from typing import Any
+from __future__ import annotations
 
-from backend.core.contracts.state import State
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from backend.core.contracts.state import State
 
 
 def format_reflection_progress(state: State) -> str:
@@ -22,15 +25,24 @@ def format_reflection_metrics(state: State) -> list[str]:
     metrics = getattr(state, 'metrics', None)
     if not metrics:
         return parts
-    atu = getattr(metrics, 'accumulated_token_usage', None)
-    if atu:
-        prompt_tok = getattr(atu, 'prompt_tokens', 0)
-        ctx_window = getattr(atu, 'context_window', 0)
-        if prompt_tok and ctx_window:
-            pct = int(prompt_tok / ctx_window * 100)
-            parts.append(
-                f'  • Context usage: {pct}% ({prompt_tok}/{ctx_window} tokens)'
-            )
+    prompt_tok = 0
+    ctx_window = 0
+    token_usages = list(getattr(metrics, 'token_usages', []) or [])
+    if token_usages:
+        for usage in token_usages:
+            candidate_prompt = int(getattr(usage, 'prompt_tokens', 0) or 0)
+            candidate_window = int(getattr(usage, 'context_window', 0) or 0)
+            if candidate_prompt >= prompt_tok:
+                prompt_tok = candidate_prompt
+                ctx_window = candidate_window or ctx_window
+    else:
+        atu = getattr(metrics, 'accumulated_token_usage', None)
+        if atu:
+            prompt_tok = int(getattr(atu, 'prompt_tokens', 0) or 0)
+            ctx_window = int(getattr(atu, 'context_window', 0) or 0)
+    if prompt_tok and ctx_window:
+        pct = min(100, int(prompt_tok / ctx_window * 100))
+        parts.append(f'  • Context usage: {pct}% ({prompt_tok}/{ctx_window} tokens)')
     cost = getattr(metrics, 'accumulated_cost', 0.0)
     if cost > 0:
         parts.append(f'  • Cost so far: ${cost:.4f}')

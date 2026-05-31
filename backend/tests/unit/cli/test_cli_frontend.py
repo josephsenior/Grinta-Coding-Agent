@@ -390,6 +390,64 @@ def test_hud_displays_accumulated_tokens_while_preserving_context_pressure() -> 
     assert '200/8.2K' in rendered or '430 · 200/8192' in rendered
 
 
+def test_hud_context_pressure_does_not_drop_on_smaller_later_call() -> None:
+    hud = HUDBar()
+    metrics = Metrics()
+    metrics.add_token_usage(
+        prompt_tokens=2_000,
+        completion_tokens=80,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        context_window=16_000,
+        response_id='resp-1',
+    )
+    metrics.add_token_usage(
+        prompt_tokens=1_200,
+        completion_tokens=40,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        context_window=16_000,
+        response_id='resp-2',
+    )
+
+    hud.update_from_llm_metrics(metrics)
+
+    assert hud.state.total_tokens == 3_320
+    assert hud.state.context_tokens == 2_000
+    assert hud.state.context_limit == 16_000
+
+
+def test_hud_context_pressure_resets_after_condensation_epoch() -> None:
+    hud = HUDBar()
+    metrics = Metrics()
+    metrics.add_token_usage(
+        prompt_tokens=9_000,
+        completion_tokens=500,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        context_window=20_000,
+        response_id='pre-condense',
+    )
+    hud.update_from_llm_metrics(metrics)
+    assert hud.state.context_tokens == 9_000
+
+    hud.update_condensation_count(1)
+    assert hud.state.context_tokens == 0
+
+    metrics.add_token_usage(
+        prompt_tokens=2_500,
+        completion_tokens=100,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        context_window=20_000,
+        response_id='post-condense',
+    )
+    hud.update_from_llm_metrics(metrics)
+
+    assert hud.state.context_tokens == 2_500
+    assert hud.state.context_limit == 20_000
+
+
 def test_hud_marks_estimated_token_usage() -> None:
     hud = HUDBar()
     metrics = Metrics()
@@ -3543,8 +3601,8 @@ async def test_renderer_internal_cmd_run_uses_origin_tool_title() -> None:
     assert 'Mapping project structure (.)' in output
     assert 'Shell' not in output
 
-    assert 'Applying patch' in output
-    assert 'failed' in output
+    assert 'exit 127' in output
+    assert 'MISSING_TOOL' in output
     assert '+....' not in output
     assert '-....' not in output
 

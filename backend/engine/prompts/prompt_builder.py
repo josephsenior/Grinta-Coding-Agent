@@ -38,6 +38,9 @@ from backend.engine.prompts.section_renderers import (
     _render_examples as _render_examples_impl,
 )
 from backend.engine.prompts.section_renderers import (
+    _render_interaction_tail as _render_interaction_tail_impl,
+)
+from backend.engine.prompts.section_renderers import (
     _render_mcp_and_permissions as _render_mcp_and_permissions_impl,
 )
 from backend.engine.prompts.section_renderers import (
@@ -234,6 +237,13 @@ def _render_mcp_and_permissions(
         mcp_server_hints,
         config,
     )
+
+
+def _render_interaction_tail(config: Any) -> str:
+    from backend.core.interaction_modes import normalize_interaction_mode
+
+    mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+    return _render_interaction_tail_impl(_render_partial, config, mode)
 
 
 @lru_cache(maxsize=32)
@@ -437,6 +447,7 @@ def _collect_system_prompt_sections(
             mcp_server_hints=mcp_server_hints,
         )
     )
+    sections.append(('system_partial_03_tail', _render_interaction_tail(config)))
 
     # Worked-examples partial — capability-adapted: omit on small/local models
     # where prompt budget is tight, and where examples can crowd out tool docs.

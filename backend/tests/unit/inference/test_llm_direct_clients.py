@@ -678,7 +678,7 @@ class TestOpenAIClientHelpers:
         assert recovered[1] == messages[1]
         assert recovered[2]['role'] == 'user'
         assert 'I will inspect the file.' in recovered[2]['content']
-        assert 'Read File' in recovered[2]['content']
+        assert 'Tool call' in recovered[2]['content']
         assert 'tool_calls' not in recovered[2]
         assert recovered[3]['role'] == 'user'
         assert 'Tool result from read_file' in recovered[3]['content']

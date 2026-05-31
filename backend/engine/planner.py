@@ -627,52 +627,42 @@ class OrchestratorPlanner:
 
     def _inject_plan_mode_instructions(self, messages: list, state: State) -> list:
         instruction = (
-            '\n\n=== PLAN MODE PROTOCOL ===\n'
+            '\n\n=== CURRENT MODE: PLAN ===\n'
+            'This is the authoritative current-mode instruction for this turn.\n'
             'Current mode: PLAN\n\n'
-            'Output must be one of the following:\n'
-            '1. A read-only inspection tool call (when investigating the project).\n'
-            '2. Natural prose response (when the user is conversing casually, not tasking).\n'
-            '3. A `communicate_with_user` tool call when clarification is needed.\n'
-            '4. A `finish` tool call with the final structured plan.\n\n'
-            'Use `finish` to deliver the plan — it produces a structured summary in the '
-            'transcript. Plain prose does not end the conversation — only `finish` does.\n\n'
-            'Do not: mutate files, run mutating commands, use create/edit_symbols/replace_string/'
-            'multiedit/shell/git/MCP tools, or write tools.\n\n'
-            '`communicate_with_user` is for continuation questions. '
-            "`finish(status='blocked')` is for ending when planning cannot continue.\n\n"
-            'Plan finish requires these universal fields: status, summary, plan, '
+            '- Read-only mode: inspect with read/search tools only.\n'
+            '- Do not mutate files, run mutating commands, or use write/MCP/shell tools.\n'
+            '- Use `communicate_with_user` for clarification or blockers.\n'
+            '- Use `finish` to deliver the structured plan or blocked outcome.\n\n'
+            '`finish` requires these universal fields: status, summary, plan, '
             "assumptions, next_step. For status='completed', plan must be non-empty.\n"
-            '=================================\n'
+            '==========================\n'
         )
         return self._apply_control_message(messages, instruction)
 
     def _inject_agent_mode_instructions(self, messages: list, state: State) -> list:
         instruction = (
-            '\n\n=== AGENT MODE PROTOCOL ===\n'
+            '\n\n=== CURRENT MODE: AGENT ===\n'
+            'This is the authoritative current-mode instruction for this turn.\n'
             'Current mode: AGENT\n\n'
-            'Output must be one of the following:\n'
-            '1. A real tool/function call (when performing work).\n'
-            '2. Natural prose response (when the user is conversing, not tasking).\n'
-            '3. A `communicate_with_user` tool call (for questions, blockers, or escalation).\n'
-            '4. A `finish` tool call (to end the task successfully).\n\n'
+            '- Use real tool/function calls when performing work.\n'
+            '- Natural prose is fine for conversation or explanation when no action is needed.\n'
+            '- Use `communicate_with_user` for questions, blockers, or escalation.\n'
+            '- Use `finish` to end completed or blocked work.\n\n'
             '`finish` fields: status, summary, actions_taken, verification, remaining_items, next_step.\n'
             "If verification was not run, use verification.status='not_run' and explain in details.\n\n"
-            'File API: `find_symbols` discovers; `read` inspects; `create` new files/symbols; '
-            '`edit_symbols` modifies/deletes existing symbols; `replace_string` exact text replacement; '
-            '`multiedit` atomic multi-file refactors.\n'
-            'Do not use shell commands to write source files.\n'
-            '=====================================\n'
+            '===========================\n'
         )
         return self._apply_control_message(messages, instruction)
 
     def _inject_chat_mode_instructions(self, messages: list, state: State) -> list:
         instruction = (
-            '\n\n=== CHAT MODE ===\n'
+            '\n\n=== CURRENT MODE: CHAT ===\n'
+            'This is the authoritative current-mode instruction for this turn.\n'
             'Current mode: CHAT\n\n'
-            'Respond naturally in prose. '
-            'Use read-only tools (read, search_code, find_symbols, recall, lsp, '
-            'analyze_project_structure) if investigating the codebase. '
-            'Do NOT use write tools (create, edit_symbols, replace_string, multiedit, shell, finish).\n'
-            '================\n'
+            '- Respond naturally in prose by default.\n'
+            '- Use read-only tools only when investigation is needed.\n'
+            '- Do not use write tools, shell, MCP, or `finish`.\n'
+            '==========================\n'
         )
         return self._apply_control_message(messages, instruction)

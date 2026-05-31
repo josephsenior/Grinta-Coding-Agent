@@ -358,11 +358,9 @@ class TestBuildLlmParams:
             for m in params['messages']
             if isinstance(m.get('content'), str)
         )
-        assert 'File API mental model' in joined
-        assert '`read`' in joined
-        assert 'find_symbols' in joined
-        assert '`create`' in joined
-        assert 'replace_string' in joined
+        assert 'Current mode: AGENT' in joined
+        assert joined.count('Current mode:') == 1
+        assert 'File API mental model' not in joined
         assert 'read_file' not in joined
         assert 'read_range' not in joined
         assert 'read_symbol' not in joined
@@ -538,15 +536,35 @@ class TestBuildLlmParams:
             for m in params['messages']
             if isinstance(m.get('content'), str)
         )
-        assert 'PLAN MODE' in joined
-        assert 'read-only agent run' in joined
-        assert 'communicate_with_user is for questions' in joined
-        assert 'finish(status=' in joined
-        assert 'Do not modify files or project state' in joined
-        assert 'Direct plain text prose/responses are strictly forbidden' in joined
+        assert 'CURRENT MODE: PLAN' in joined
+        assert 'Current mode: PLAN' in joined
+        assert joined.count('Current mode:') == 1
+        assert 'Read-only mode' in joined
+        assert 'Use `communicate_with_user` for clarification or blockers.' in joined
+        assert 'Use `finish` to deliver the structured plan or blocked outcome.' in joined
         assert 'status, summary, plan, assumptions, next_step' in joined
         assert 'open_questions_or_blockers' not in joined
-        assert 'You are running in AGENT MODE' not in joined
+        assert 'Current mode: AGENT' not in joined
+
+    @pytest.mark.parametrize(
+        ('mode', 'label'),
+        [('chat', 'CHAT'), ('plan', 'PLAN'), ('agent', 'AGENT')],
+    )
+    def test_mode_protocol_injects_exactly_one_current_mode(self, mode, label):
+        p = _make_planner(config=_make_config(mode=mode))
+        state = _make_state()
+        messages = [{'role': 'user', 'content': 'What mode are you in?'}]
+
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            params = p.build_llm_params(messages, state, [])
+
+        joined = '\n'.join(
+            m['content']
+            for m in params['messages']
+            if isinstance(m.get('content'), str)
+        )
+        assert joined.count('Current mode:') == 1
+        assert f'Current mode: {label}' in joined
 
 
 class TestMinimalTurnStatusDefault:
