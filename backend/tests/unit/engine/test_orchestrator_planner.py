@@ -193,6 +193,8 @@ def test_execute_llm_step_async_offloads_message_preparation_to_thread():
     orch._set_prompt_tier_from_recent_history = MagicMock()  # type: ignore
     orch.llm = MagicMock()
     orch.llm.config = MagicMock()
+    orch.config = MagicMock()
+    orch.config.mode = 'agent'
     orch.tools = []
     orch.event_stream = MagicMock()
 
