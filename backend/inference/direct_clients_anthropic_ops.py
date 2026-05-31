@@ -232,11 +232,12 @@ def _prepare_anthropic_stream_request(
 ) -> tuple[list[dict[str, Any]], Any, dict[str, Any]]:
     from backend.inference.mappers.anthropic import (
         _apply_system_cache_control,
+        _collect_system_messages,
         _normalize_messages,
         _normalize_tools,
     )
 
-    system_raw = next((m['content'] for m in messages if m['role'] == 'system'), None)
+    system_raw = _collect_system_messages(messages)
     filtered_messages = _normalize_messages(
         [message for message in messages if message['role'] != 'system']
     )

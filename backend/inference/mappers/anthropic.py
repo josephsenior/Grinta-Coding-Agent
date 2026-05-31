@@ -63,7 +63,7 @@ def prepare_kwargs(
     messages: list[dict[str, Any]], kwargs: dict[str, Any], default_model: str
 ) -> tuple[list, dict[str, Any]]:
     """Extract system message and set model for Anthropic calls."""
-    system_msg = next((m['content'] for m in messages if m['role'] == 'system'), None)
+    system_msg = _collect_system_messages(messages)
     filtered = _normalize_messages([m for m in messages if m['role'] != 'system'])
     if 'model' not in kwargs:
         kwargs['model'] = default_model
@@ -92,6 +92,18 @@ def _content_to_text(content: Any) -> str:
             if isinstance(text, str):
                 parts.append(text)
     return '\n'.join(part for part in parts if part)
+
+
+def _collect_system_messages(messages: list[dict[str, Any]]) -> str | None:
+    """Combine all system messages for APIs that expose one system field."""
+    parts: list[str] = []
+    for message in messages:
+        if not isinstance(message, dict) or message.get('role') != 'system':
+            continue
+        text = _content_to_text(message.get('content')).strip()
+        if text:
+            parts.append(text)
+    return '\n\n'.join(parts) if parts else None
 
 
 def _parse_tool_arguments(arguments: Any) -> dict[str, Any]:

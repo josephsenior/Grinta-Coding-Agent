@@ -198,6 +198,26 @@ class OrchestratorExecutor:
         call_params = dict(params)
         call_params = self._apply_context_window_preflight(call_params)
 
+        # APP_DEBUG_MODE=1: log tools sent to LLM
+        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in (
+            '1',
+            'true',
+            'yes',
+            'on',
+        ):
+            tool_list = call_params.get('tools', [])
+            tool_names = (
+                [t.get('function', {}).get('name', '?') for t in tool_list]
+                if tool_list
+                else []
+            )
+            active_mode = getattr(self, '_active_run_mode', 'N/A')
+            logger.info(
+                '[APP_DEBUG_MODE] executor.execute: mode=%r tools=%r',
+                active_mode,
+                tool_names,
+            )
+
         # NOTE: Grinta's DirectLLMClient implementations intentionally expose
         # deterministic *non-streaming* completion for all providers. Native
         # streaming support varies widely across SDKs and tends to be the
@@ -1126,6 +1146,13 @@ class OrchestratorExecutor:
         call_params.pop('stream', None)
         call_params['stream'] = True
         call_params = self._apply_context_window_preflight(call_params)
+
+        # APP_DEBUG_MODE=1: log tools sent to LLM (same as execute for sync)
+        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in ('1', 'true', 'yes', 'on'):
+            tool_list = call_params.get('tools', [])
+            tool_names = [t.get('function', {}).get('name', '?') for t in tool_list] if tool_list else []
+            active_mode = getattr(self, '_active_run_mode', 'N/A')
+            logger.info('[APP_DEBUG_MODE] async_execute: mode=%r tools=%r', active_mode, tool_names)
 
         ckpt_token = checkpoint.begin(
             call_params,
