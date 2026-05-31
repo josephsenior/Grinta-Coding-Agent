@@ -5088,9 +5088,15 @@ class TUIRenderer:
             )
             self._write_card(card)
         elif isinstance(event, PlaybookFinishAction):
-            message = getattr(event, 'message', '') or ''
-            if message:
-                self._tui._write_log(Markdown(message))
+            from backend.cli.plan_display import is_structured_plan_finish
+            from backend.cli.tui.widgets.activity_card import PlanMessage
+
+            if is_structured_plan_finish(event):
+                self._tui._write_log(PlanMessage(event))
+            else:
+                message = getattr(event, 'message', '') or ''
+                if message:
+                    self._tui._write_log(Markdown(message))
         elif isinstance(event, UserRejectObservation):
             card = ActivityRenderer.user_reject()
             self._write_card(card)

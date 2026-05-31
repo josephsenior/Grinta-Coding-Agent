@@ -30,7 +30,8 @@ _PLAN_FINISH_DESCRIPTION = (
     'use communicate_with_user for clarification before finishing. Use blocked only '
     'when planning cannot continue. '
     'Include a detailed summary covering what was investigated, what was found, '
-    'and what the plan achieves.'
+    'and what the plan achieves. The plan should be concrete enough for Agent Mode '
+    'to execute without rediscovering the whole task.'
 )
 
 _AGENT_FINISH_DESCRIPTION = (
@@ -51,10 +52,37 @@ def _create_plan_finish_tool() -> ChatCompletionToolParam:
             'plan': {
                 'type': 'array',
                 'description': (
-                    'Ordered list of concrete execution steps. Each step should '
-                    'include the file path(s) and what will be done (e.g. '
-                    '"Add input validation to src/api/login.py"). Be specific '
-                    'about functions, routes, or config keys to be modified.'
+                    'Ordered list of concrete execution steps. Each step should start '
+                    'with a verb, name the target file/path/symbol where known, and '
+                    'explain the change or investigation to perform. Avoid vague items '
+                    'like "fix bug" or "update code".'
+                ),
+                'items': {'type': 'string'},
+            },
+            'files_or_areas': {
+                'type': 'array',
+                'description': (
+                    'Relevant files, directories, symbols, features, routes, or config '
+                    'areas the plan expects to touch or inspect. Use exact paths when known. '
+                    'For status="completed", include at least one item.'
+                ),
+                'items': {'type': 'string'},
+            },
+            'risks': {
+                'type': 'array',
+                'description': (
+                    'Known risks, edge cases, migration concerns, compatibility concerns, '
+                    'or parts needing care. Use an empty array only when there are truly no '
+                    'material risks.'
+                ),
+                'items': {'type': 'string'},
+            },
+            'verification': {
+                'type': 'array',
+                'description': (
+                    'Specific verification steps for Agent Mode after implementation. Include '
+                    'test/lint/typecheck commands, manual checks, or targeted repro steps. '
+                    'For status="completed", include at least one item.'
                 ),
                 'items': {'type': 'string'},
             },
@@ -70,7 +98,16 @@ def _create_plan_finish_tool() -> ChatCompletionToolParam:
             },
             'next_step': _NEXT_STEP_PARAM,
         },
-        required=['status', 'summary', 'plan', 'assumptions', 'next_step'],
+        required=[
+            'status',
+            'summary',
+            'plan',
+            'files_or_areas',
+            'risks',
+            'verification',
+            'assumptions',
+            'next_step',
+        ],
     )
 
 

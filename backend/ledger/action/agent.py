@@ -65,6 +65,22 @@ class PlaybookFinishAction(Action):
                     'Assumptions:\n' + '\n'.join(f'- {item}' for item in items)
                 )
 
+        files_or_areas = self.outputs.get('files_or_areas')
+        if isinstance(files_or_areas, list):
+            items = [
+                str(item).strip() for item in files_or_areas if str(item).strip()
+            ]
+            if items:
+                sections.append(
+                    'Files / areas:\n' + '\n'.join(f'- {item}' for item in items)
+                )
+
+        risks = self.outputs.get('risks')
+        if isinstance(risks, list):
+            items = [str(item).strip() for item in risks if str(item).strip()]
+            if items:
+                sections.append('Risks:\n' + '\n'.join(f'- {item}' for item in items))
+
         actions_taken = self.outputs.get('actions_taken')
         if isinstance(actions_taken, list):
             items = [str(item).strip() for item in actions_taken if str(item).strip()]
@@ -82,6 +98,14 @@ class PlaybookFinishAction(Action):
                     f'{status}: {details}' if status and details else status or details
                 )
                 sections.append(f'Verification:\n- {body}')
+        elif isinstance(verification, list):
+            items = [
+                str(item).strip() for item in verification if str(item).strip()
+            ]
+            if items:
+                sections.append(
+                    'Verification:\n' + '\n'.join(f'- {item}' for item in items)
+                )
 
         remaining_items = self.outputs.get('remaining_items')
         if isinstance(remaining_items, list):

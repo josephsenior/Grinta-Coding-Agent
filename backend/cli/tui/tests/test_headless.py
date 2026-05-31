@@ -33,6 +33,7 @@ from backend.cli.tui.widgets.activity_card import (
 from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
     DiffLine,
+    PlanMessage,
     SplitDiffLine,
     TurnCompletion,
 )
@@ -73,6 +74,33 @@ def mock_config():
 def _get_screen(app: GrintaTUIApp) -> GrintaScreen:
     """Helper: query via app.screen since app.query_one uses default screen."""
     return app.screen  # type: ignore[return-value]
+
+
+def test_tui_plan_message_renders_structured_plan_card():
+    action = SimpleNamespace(
+        final_thought='Plan produced.',
+        outputs={
+            'status': 'completed',
+            'summary': 'Plan produced.',
+            'plan': ['Inspect `backend/cli/hud.py`.', 'Run tests.'],
+            'files_or_areas': ['backend/cli/hud.py'],
+            'risks': ['Estimated provider usage.'],
+            'verification': [
+                '`uv run pytest backend/tests/unit/cli/test_cli_frontend.py -q`'
+            ],
+            'assumptions': ['Metrics are present.'],
+            'next_step': 'Switch to Agent Mode.',
+        },
+    )
+
+    widget = PlanMessage(action)
+
+    console = RichConsole(record=True, width=100)
+    console.print(widget.renderable)
+    rendered = console.export_text()
+    assert 'Plan Ready' in rendered
+    assert 'Execution Plan' in rendered
+    assert 'backend/cli/hud.py' in rendered
 
 
 @pytest.mark.asyncio

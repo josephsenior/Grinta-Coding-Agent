@@ -3037,6 +3037,49 @@ async def test_renderer_renders_finish_action_message_and_next_steps() -> None:
 
 
 @pytest.mark.asyncio
+async def test_renderer_renders_structured_plan_finish_card() -> None:
+    from backend.ledger.action import PlaybookFinishAction
+    from backend.ledger.observation.agent import AgentStateChangedObservation
+
+    console = _make_console()
+    renderer = CLIEventRenderer(
+        console, HUDBar(), ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    action = PlaybookFinishAction(
+        final_thought='Plan produced.',
+        outputs={
+            'status': 'completed',
+            'summary': 'Plan produced.',
+            'plan': ['Inspect `backend/cli/hud.py`.', 'Run the focused tests.'],
+            'files_or_areas': ['backend/cli/hud.py'],
+            'risks': ['Token usage may be estimated for streaming providers.'],
+            'verification': [
+                '`uv run pytest backend/tests/unit/cli/test_cli_frontend.py -q`'
+            ],
+            'assumptions': ['Existing HUD metrics are available.'],
+            'next_step': 'Switch to Agent Mode and execute.',
+        },
+    )
+    action.source = EventSource.AGENT
+
+    await renderer.handle_event(action)
+    assert 'Plan Ready' not in _console_output(console)
+
+    finished_obs = AgentStateChangedObservation(
+        content='', agent_state=AgentState.FINISHED
+    )
+    finished_obs.source = EventSource.ENVIRONMENT
+    await renderer.handle_event(finished_obs)
+
+    output = _console_output(console)
+    assert 'Plan Ready' in output
+    assert 'Execution Plan' in output
+    assert 'Files / Areas' in output
+    assert 'Verification' in output
+    assert 'backend/cli/hud.py' in output
+
+
+@pytest.mark.asyncio
 async def test_renderer_handles_condensation_action() -> None:
     from backend.ledger.action import CondensationAction
 
