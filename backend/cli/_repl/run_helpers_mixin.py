@@ -429,6 +429,8 @@ class RunHelpersMixin:
             agent._on_plain_text_gate = _on_gate
         except Exception:
             logger.debug('Failed to register CLI plain-text-gate callback', exc_info=True)
+
+    def _announce_chat_ready(
         self,
         agent: Any,
         session: Any | None,
