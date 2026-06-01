@@ -410,13 +410,13 @@ class RunHelpersMixin:
         def _on_gate(kind: str, count: int) -> None:
             if kind == 'under_threshold':
                 note = (
-                    f"agent is replying in prose; reminding it to use a tool "
-                    f"call ({count}/3)"
+                    f'agent is replying in prose; reminding it to use a tool '
+                    f'call ({count}/3)'
                 )
             elif kind == 'threshold_breached':
                 note = (
-                    f"agent kept replying in prose {count} times — surfacing "
-                    f"the last reply and pausing for input"
+                    f'agent kept replying in prose {count} times — surfacing '
+                    f'the last reply and pausing for input'
                 )
             else:
                 return

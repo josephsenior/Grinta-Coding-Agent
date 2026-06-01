@@ -124,7 +124,8 @@ class TestPlainTextProtocolGate:
     def test_agent_mode_with_active_tasks_emits_suppressed_sentinel(self):
         """Gate must return a sentinel (not an empty list) carrying the
         suppressed text so the orchestrator can later surface it on a
-        threshold breach."""
+        threshold breach.
+        """
         executor = self._make_executor('agent', active_tasks=True)
         action = MessageAction(content='plain answer')
 
@@ -148,7 +149,8 @@ class TestPlainTextProtocolGate:
     def test_threshold_breach_marks_sentinel(self):
         """After _PLAIN_TEXT_GATE_MAX_RETRIES + 1 consecutive gate fires, the
         sentinel is marked as a threshold breach so the orchestrator promotes
-        the suppressed text and yields to the user."""
+        the suppressed text and yields to the user.
+        """
         executor = self._make_executor('agent', active_tasks=True)
         action = MessageAction(content='plain answer')
         max_retries = executor._PLAIN_TEXT_GATE_MAX_RETRIES
@@ -168,7 +170,8 @@ class TestPlainTextProtocolGate:
 
     def test_set_planning_directive_called_when_state_attached(self):
         """When the executor has a state ref, the gate must set a planning
-        directive so the LLM gets corrective feedback on its next turn."""
+        directive so the LLM gets corrective feedback on its next turn.
+        """
         from backend.orchestration.state.state import State
 
         executor = self._make_executor('agent', active_tasks=True)

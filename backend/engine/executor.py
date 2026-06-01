@@ -1599,21 +1599,21 @@ class OrchestratorExecutor:
             return
         if breach:
             text = (
-                "Protocol error: you have produced plain prose three times in a "
-                "row. The system will now surface your most recent reply to the "
-                "user and end this turn. Next turn, emit exactly one tool call "
-                "(communicate_with_user, task_tracker, or a work tool) before "
-                "any further narration."
+                'Protocol error: you have produced plain prose three times in a '
+                'row. The system will now surface your most recent reply to the '
+                'user and end this turn. Next turn, emit exactly one tool call '
+                '(communicate_with_user, task_tracker, or a work tool) before '
+                'any further narration.'
             )
         else:
             text = (
-                f"Protocol error: your previous response was plain prose "
-                f"(attempt {count}). In agent mode while tasks are open you "
-                f"must emit exactly one tool call every turn — for example "
-                f"communicate_with_user to pause for the user, task_tracker to "
-                f"update progress, or a work tool. After "
-                f"{self._PLAIN_TEXT_GATE_MAX_RETRIES} consecutive prose-only "
-                f"turns the system will surface your reply and end the turn."
+                f'Protocol error: your previous response was plain prose '
+                f'(attempt {count}). In agent mode while tasks are open you '
+                f'must emit exactly one tool call every turn — for example '
+                f'communicate_with_user to pause for the user, task_tracker to '
+                f'update progress, or a work tool. After '
+                f'{self._PLAIN_TEXT_GATE_MAX_RETRIES} consecutive prose-only '
+                f'turns the system will surface your reply and end the turn.'
             )
         try:
             state.set_planning_directive(
