@@ -1,19 +1,19 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-06-01T21:32:44.343758+00:00",
+  "generated_at": "2026-06-01T23:30:01.428625+00:00",
   "repository_root": "C:/Users/GIGABYTE/Desktop/Grinta",
   "options": {
     "include_tests": false
   },
   "summary": {
-    "module_count": 600,
-    "import_count": 5538,
+    "module_count": 604,
+    "import_count": 5563,
     "type_checking_only_import_count": 373,
     "parse_failure_count": 0,
     "import_classification": {
-      "stdlib": 2242,
+      "stdlib": 2253,
       "third_party": 450,
-      "internal": 2846
+      "internal": 2860
     }
   },
   "biggest_files": [
@@ -23,13 +23,6 @@
       "byte_size": 214634,
       "loc": 5618,
       "importer_count": 1
-    },
-    {
-      "module_path": "backend.execution.utils.file_editor",
-      "file_path": "backend/execution/utils/file_editor.py",
-      "byte_size": 63724,
-      "loc": 1769,
-      "importer_count": 0
     },
     {
       "module_path": "backend.engine.executor",
@@ -163,6 +156,13 @@
       "byte_size": 37214,
       "loc": 972,
       "importer_count": 1
+    },
+    {
+      "module_path": "backend.execution.utils._file_editor_ops_mixin",
+      "file_path": "backend/execution/utils/_file_editor_ops_mixin.py",
+      "byte_size": 37032,
+      "loc": 1048,
+      "importer_count": 2
     },
     {
       "module_path": "backend.cli.theme",
@@ -6957,6 +6957,14 @@
           "is_type_checking": false
         },
         {
+          "importer": "backend/execution/utils/_file_editor_rollback_mixin.py",
+          "lineno": 214,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
           "importer": "backend/execution/utils/bash.py",
           "lineno": 16,
           "names": [
@@ -6991,14 +6999,6 @@
         {
           "importer": "backend/execution/utils/fallbacks/search.py",
           "lineno": 14,
-          "names": [
-            "app_logger"
-          ],
-          "is_type_checking": false
-        },
-        {
-          "importer": "backend/execution/utils/file_editor.py",
-          "lineno": 1661,
           "names": [
             "app_logger"
           ],
@@ -8964,7 +8964,7 @@
       "loc": 514,
       "class_count": 3,
       "def_count": 18,
-      "importer_count": 6,
+      "importer_count": 8,
       "intra_package_imports": [
         "backend.core.constants",
         "backend.core.os_capabilities",
@@ -9006,8 +9006,24 @@
           "is_type_checking": false
         },
         {
+          "importer": "backend/execution/utils/_file_editor_ops_mixin.py",
+          "lineno": 15,
+          "names": [
+            "SafePath"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/utils/_file_editor_rollback_mixin.py",
+          "lineno": 12,
+          "names": [
+            "PathValidationError"
+          ],
+          "is_type_checking": false
+        },
+        {
           "importer": "backend/execution/utils/file_editor.py",
-          "lineno": 18,
+          "lineno": 22,
           "names": [
             "PathValidationError",
             "SafePath"
@@ -9031,7 +9047,7 @@
       "loc": 163,
       "class_count": 1,
       "def_count": 5,
-      "importer_count": 3,
+      "importer_count": 4,
       "intra_package_imports": [],
       "imported_by": [
         {
@@ -9043,8 +9059,18 @@
           "is_type_checking": false
         },
         {
+          "importer": "backend/execution/utils/_file_editor_ops_mixin.py",
+          "lineno": 16,
+          "names": [
+            "MISSING",
+            "Sentinel",
+            "is_missing"
+          ],
+          "is_type_checking": false
+        },
+        {
           "importer": "backend/execution/utils/file_editor.py",
-          "lineno": 22,
+          "lineno": 26,
           "names": [
             "MISSING",
             "Sentinel",
@@ -12134,6 +12160,151 @@
       ],
       "imported_by": []
     },
+    "backend.execution.utils._file_editor_ops_mixin": {
+      "module_path": "backend.execution.utils._file_editor_ops_mixin",
+      "file_path": "backend/execution/utils/_file_editor_ops_mixin.py",
+      "byte_size": 37032,
+      "loc": 1048,
+      "class_count": 2,
+      "def_count": 11,
+      "importer_count": 2,
+      "intra_package_imports": [
+        "backend.core.type_safety.path_validation",
+        "backend.core.type_safety.sentinels",
+        "backend.execution.utils._file_editor_types",
+        "backend.execution.utils._file_editor_view_mixin"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/execution/utils/file_editor.py",
+          "lineno": 27,
+          "names": [
+            "_FileEditorOpsMixin",
+            "_FileReadMeta"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/utils/file_editor.py",
+          "lineno": 314,
+          "names": [
+            "_FileEditorOpsMixin",
+            "_FileReadMeta",
+            "_LARGE_EXISTING_CODE_FILE_LINES",
+            "_CODE_FILE_SUFFIXES",
+            "_QUOTE_TRANSLATE",
+            "_compose_create_file_success_message",
+            "_compose_write_success_message",
+            "_encode_disk_payload",
+            "_find_changed_ranges",
+            "_format_context_window",
+            "_format_range_lines",
+            "_is_large_existing_code_file",
+            "_merge_ranges_with_context",
+            "_normalize_newlines_for_metadata",
+            "_to_changed_line_spans",
+            "normalize_quotes"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.execution.utils._file_editor_rollback_mixin": {
+      "module_path": "backend.execution.utils._file_editor_rollback_mixin",
+      "file_path": "backend/execution/utils/_file_editor_rollback_mixin.py",
+      "byte_size": 9603,
+      "loc": 226,
+      "class_count": 2,
+      "def_count": 0,
+      "importer_count": 2,
+      "intra_package_imports": [
+        "backend.core.logger",
+        "backend.core.type_safety.path_validation",
+        "backend.execution.utils._file_editor_types"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/execution/utils/file_editor.py",
+          "lineno": 32,
+          "names": [
+            "ToolError",
+            "_FileEditorRollbackMixin"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/utils/file_editor.py",
+          "lineno": 332,
+          "names": [
+            "_FileEditorRollbackMixin",
+            "ToolError"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.execution.utils._file_editor_types": {
+      "module_path": "backend.execution.utils._file_editor_types",
+      "file_path": "backend/execution/utils/_file_editor_types.py",
+      "byte_size": 621,
+      "loc": 26,
+      "class_count": 1,
+      "def_count": 0,
+      "importer_count": 2,
+      "intra_package_imports": [],
+      "imported_by": [
+        {
+          "importer": "backend/execution/utils/_file_editor_view_mixin.py",
+          "lineno": 12,
+          "names": [
+            "ToolResult"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/utils/file_editor.py",
+          "lineno": 31,
+          "names": [
+            "ToolResult"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.execution.utils._file_editor_view_mixin": {
+      "module_path": "backend.execution.utils._file_editor_view_mixin",
+      "file_path": "backend/execution/utils/_file_editor_view_mixin.py",
+      "byte_size": 7142,
+      "loc": 220,
+      "class_count": 1,
+      "def_count": 4,
+      "importer_count": 2,
+      "intra_package_imports": [
+        "backend.execution.utils._file_editor_types"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/execution/utils/file_editor.py",
+          "lineno": 36,
+          "names": [
+            "_FileEditorViewMixin"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/utils/file_editor.py",
+          "lineno": 336,
+          "names": [
+            "_FileEditorViewMixin",
+            "_check_block_indent_after_colon",
+            "_check_first_line_indent",
+            "_detect_indentation_mismatch",
+            "_get_line_indent"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
     "backend.execution.utils.bash": {
       "module_path": "backend.execution.utils.bash",
       "file_path": "backend/execution/utils/bash.py",
@@ -12329,15 +12500,18 @@
     "backend.execution.utils.file_editor": {
       "module_path": "backend.execution.utils.file_editor",
       "file_path": "backend/execution/utils/file_editor.py",
-      "byte_size": 63724,
-      "loc": 1769,
-      "class_count": 4,
-      "def_count": 17,
+      "byte_size": 13434,
+      "loc": 342,
+      "class_count": 1,
+      "def_count": 2,
       "importer_count": 0,
       "intra_package_imports": [
-        "backend.core.logger",
         "backend.core.type_safety.path_validation",
         "backend.core.type_safety.sentinels",
+        "backend.execution.utils._file_editor_ops_mixin",
+        "backend.execution.utils._file_editor_rollback_mixin",
+        "backend.execution.utils._file_editor_types",
+        "backend.execution.utils._file_editor_view_mixin",
         "backend.execution.utils.file_editor_edit_mixin"
       ],
       "imported_by": []
