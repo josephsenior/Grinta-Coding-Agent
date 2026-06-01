@@ -1,35 +1,28 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-06-01T19:08:09.206221+00:00",
+  "generated_at": "2026-06-01T21:32:44.343758+00:00",
   "repository_root": "C:/Users/GIGABYTE/Desktop/Grinta",
   "options": {
     "include_tests": false
   },
   "summary": {
-    "module_count": 596,
-    "import_count": 5494,
+    "module_count": 600,
+    "import_count": 5538,
     "type_checking_only_import_count": 373,
     "parse_failure_count": 0,
     "import_classification": {
-      "stdlib": 2224,
+      "stdlib": 2242,
       "third_party": 450,
-      "internal": 2820
+      "internal": 2846
     }
   },
   "biggest_files": [
     {
       "module_path": "backend.cli.tui.app",
       "file_path": "backend/cli/tui/app.py",
-      "byte_size": 212830,
-      "loc": 5579,
+      "byte_size": 214634,
+      "loc": 5618,
       "importer_count": 1
-    },
-    {
-      "module_path": "backend.engine.function_calling",
-      "file_path": "backend/engine/function_calling.py",
-      "byte_size": 78764,
-      "loc": 2084,
-      "importer_count": 3
     },
     {
       "module_path": "backend.execution.utils.file_editor",
@@ -37,6 +30,13 @@
       "byte_size": 63724,
       "loc": 1769,
       "importer_count": 0
+    },
+    {
+      "module_path": "backend.engine.executor",
+      "file_path": "backend/engine/executor.py",
+      "byte_size": 62870,
+      "loc": 1665,
+      "importer_count": 1
     },
     {
       "module_path": "backend.orchestration.session_orchestrator",
@@ -53,24 +53,10 @@
       "importer_count": 1
     },
     {
-      "module_path": "backend.engine.executor",
-      "file_path": "backend/engine/executor.py",
-      "byte_size": 58635,
-      "loc": 1577,
-      "importer_count": 1
-    },
-    {
       "module_path": "backend.orchestration.services.event_router_service",
       "file_path": "backend/orchestration/services/event_router_service.py",
       "byte_size": 55740,
       "loc": 1327,
-      "importer_count": 0
-    },
-    {
-      "module_path": "backend.cli.repl",
-      "file_path": "backend/cli/repl.py",
-      "byte_size": 54635,
-      "loc": 1573,
       "importer_count": 0
     },
     {
@@ -106,6 +92,13 @@
       "file_path": "backend/execution/browser/grinta_browser.py",
       "byte_size": 47334,
       "loc": 1261,
+      "importer_count": 0
+    },
+    {
+      "module_path": "backend.engine.orchestrator",
+      "file_path": "backend/engine/orchestrator.py",
+      "byte_size": 45712,
+      "loc": 1040,
       "importer_count": 0
     },
     {
@@ -151,13 +144,6 @@
       "importer_count": 4
     },
     {
-      "module_path": "backend.engine.orchestrator",
-      "file_path": "backend/engine/orchestrator.py",
-      "byte_size": 39486,
-      "loc": 919,
-      "importer_count": 0
-    },
-    {
       "module_path": "backend.execution.base",
       "file_path": "backend/execution/base.py",
       "byte_size": 38674,
@@ -191,6 +177,20 @@
       "byte_size": 36072,
       "loc": 925,
       "importer_count": 1
+    },
+    {
+      "module_path": "backend.orchestration.state.state",
+      "file_path": "backend/orchestration/state/state.py",
+      "byte_size": 35577,
+      "loc": 1018,
+      "importer_count": 6
+    },
+    {
+      "module_path": "backend.utils.lsp_client",
+      "file_path": "backend/utils/lsp_client.py",
+      "byte_size": 34205,
+      "loc": 974,
+      "importer_count": 1
     }
   ],
   "most_imported": [
@@ -198,7 +198,7 @@
       "module_path": "backend.core.logger",
       "file_path": "backend/core/logger.py",
       "byte_size": 18140,
-      "importer_count": 145
+      "importer_count": 146
     },
     {
       "module_path": "backend.core.constants",
@@ -210,7 +210,7 @@
       "module_path": "backend.core.enums",
       "file_path": "backend/core/enums.py",
       "byte_size": 7571,
-      "importer_count": 47
+      "importer_count": 48
     },
     {
       "module_path": "backend.execution.action_execution_server_helpers",
@@ -222,7 +222,7 @@
       "module_path": "backend.core.errors",
       "file_path": "backend/core/errors.py",
       "byte_size": 14551,
-      "importer_count": 34
+      "importer_count": 37
     },
     {
       "module_path": "backend.ledger.event",
@@ -264,7 +264,7 @@
       "module_path": "backend.core.interaction_modes",
       "file_path": "backend/core/interaction_modes.py",
       "byte_size": 1427,
-      "importer_count": 13
+      "importer_count": 14
     },
     {
       "module_path": "backend.cli.config_manager",
@@ -1231,7 +1231,7 @@
         },
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 4148,
+          "lineno": 4187,
           "names": [
             "_load_playbook_skills"
           ],
@@ -1327,8 +1327,8 @@
     "backend.cli._repl.run_helpers_mixin": {
       "module_path": "backend.cli._repl.run_helpers_mixin",
       "file_path": "backend/cli/_repl/run_helpers_mixin.py",
-      "byte_size": 30443,
-      "loc": 812,
+      "byte_size": 31936,
+      "loc": 846,
       "class_count": 1,
       "def_count": 3,
       "importer_count": 1,
@@ -1347,7 +1347,7 @@
       "imported_by": [
         {
           "importer": "backend/cli/repl.py",
-          "lineno": 20,
+          "lineno": 24,
           "names": [
             "RunHelpersMixin"
           ],
@@ -1378,9 +1378,69 @@
       "imported_by": [
         {
           "importer": "backend/cli/repl.py",
-          "lineno": 21,
+          "lineno": 25,
           "names": [
             "SessionLifecycleMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.cli._repl.slash_command_registry": {
+      "module_path": "backend.cli._repl.slash_command_registry",
+      "file_path": "backend/cli/_repl/slash_command_registry.py",
+      "byte_size": 30377,
+      "loc": 954,
+      "class_count": 3,
+      "def_count": 20,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.cli.theme",
+        "backend.core.os_capabilities"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/cli/repl.py",
+          "lineno": 55,
+          "names": [
+            "_AUTONOMY_LEVEL_HINTS",
+            "_COMMAND_ALIASES",
+            "_COMMAND_NAMES",
+            "_CSI_OSC_DCS",
+            "_HELP_INPUT_TIPS",
+            "_HELP_SECTION_COLLAPSE_THRESHOLD",
+            "_HELP_SECTIONS_ORDER",
+            "_HISTORY_DIR",
+            "_HISTORY_FILE",
+            "_KNOWN_MODELS",
+            "_ORPHAN_BRACKET_CSI",
+            "_ORPHAN_PARAM_CHUNK_SINGLE",
+            "_ORPHAN_PARAM_CHUNK_STREAM",
+            "_PLAYBOOK_SLASH_COMMANDS",
+            "_SLASH_COMMANDS",
+            "ParsedSlashCommand",
+            "SlashCommandParseError",
+            "SlashCommandSpec",
+            "_attach_prompt_buffer_csi_sanitizer",
+            "_build_bindings",
+            "_build_command_completer",
+            "_build_help_markdown",
+            "_build_help_table",
+            "_build_help_table_fallback",
+            "_canonical_command_name",
+            "_closest_command_names",
+            "_copy_to_system_clipboard",
+            "_ensure_history",
+            "_find_command_spec",
+            "_help_for_specific_command",
+            "_help_section_lines",
+            "_iter_command_completion_entries",
+            "_looks_like_terminal_selection_noise",
+            "_parse_slash_command",
+            "_prompt_toolkit_available",
+            "_split_command_words",
+            "_strip_leaked_terminal_artifacts",
+            "_supports_prompt_session"
           ],
           "is_type_checking": false
         }
@@ -1409,7 +1469,7 @@
       "imported_by": [
         {
           "importer": "backend/cli/repl.py",
-          "lineno": 22,
+          "lineno": 26,
           "names": [
             "SlashCommandsMixin"
           ],
@@ -1809,7 +1869,7 @@
       "imported_by": [
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5363,
+          "lineno": 5402,
           "names": [
             "extract_file_summary"
           ],
@@ -1952,7 +2012,7 @@
         },
         {
           "importer": "backend/cli/repl.py",
-          "lineno": 23,
+          "lineno": 27,
           "names": [
             "get_current_model"
           ],
@@ -2158,7 +2218,7 @@
       "imported_by": [
         {
           "importer": "backend/cli/repl.py",
-          "lineno": 24,
+          "lineno": 28,
           "names": [
             "HUDBar"
           ],
@@ -2326,7 +2386,7 @@
       "imported_by": [
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5182,
+          "lineno": 5221,
           "names": [
             "is_structured_plan_finish"
           ],
@@ -2358,7 +2418,7 @@
       "imported_by": [
         {
           "importer": "backend/cli/repl.py",
-          "lineno": 25,
+          "lineno": 29,
           "names": [
             "ReasoningDisplay"
           ],
@@ -2393,14 +2453,15 @@
     "backend.cli.repl": {
       "module_path": "backend.cli.repl",
       "file_path": "backend/cli/repl.py",
-      "byte_size": 54635,
-      "loc": 1573,
-      "class_count": 4,
-      "def_count": 20,
+      "byte_size": 27115,
+      "loc": 699,
+      "class_count": 1,
+      "def_count": 0,
       "importer_count": 0,
       "intra_package_imports": [
         "backend.cli._repl.run_helpers_mixin",
         "backend.cli._repl.session_lifecycle_mixin",
+        "backend.cli._repl.slash_command_registry",
         "backend.cli._repl.slash_commands_mixin",
         "backend.cli.config_manager",
         "backend.cli.hud",
@@ -2413,8 +2474,7 @@
         "backend.core.bootstrap.main",
         "backend.core.bootstrap.setup",
         "backend.core.config",
-        "backend.core.enums",
-        "backend.core.os_capabilities"
+        "backend.core.enums"
       ],
       "imported_by": []
     },
@@ -2648,7 +2708,7 @@
         },
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5190,
+          "lineno": 5229,
           "names": [
             "get_grinta_pygments_style"
           ],
@@ -2711,7 +2771,7 @@
         },
         {
           "importer": "backend/engine/executor.py",
-          "lineno": 502,
+          "lineno": 506,
           "names": [
             "redact_streamed_tool_call_markers"
           ],
@@ -2719,7 +2779,7 @@
         },
         {
           "importer": "backend/engine/executor.py",
-          "lineno": 531,
+          "lineno": 535,
           "names": [
             "redact_streamed_tool_call_markers"
           ],
@@ -2727,7 +2787,7 @@
         },
         {
           "importer": "backend/engine/executor.py",
-          "lineno": 1027,
+          "lineno": 1031,
           "names": [
             "redact_streamed_tool_call_markers"
           ],
@@ -2735,7 +2795,7 @@
         },
         {
           "importer": "backend/engine/executor.py",
-          "lineno": 1384,
+          "lineno": 1388,
           "names": [
             "redact_streamed_tool_call_markers"
           ],
@@ -2743,7 +2803,7 @@
         },
         {
           "importer": "backend/engine/executor.py",
-          "lineno": 1005,
+          "lineno": 1009,
           "names": [
             "extract_tool_calls_from_text_markers"
           ],
@@ -2792,7 +2852,7 @@
         },
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5416,
+          "lineno": 5455,
           "names": [
             "strip_pseudo_xml_function_calls"
           ],
@@ -2800,7 +2860,7 @@
         },
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 4823,
+          "lineno": 4862,
           "names": [
             "strip_indentation_warnings"
           ],
@@ -2822,8 +2882,8 @@
     "backend.cli.tui.app": {
       "module_path": "backend.cli.tui.app",
       "file_path": "backend/cli/tui/app.py",
-      "byte_size": 212830,
-      "loc": 5579,
+      "byte_size": 214634,
+      "loc": 5618,
       "class_count": 17,
       "def_count": 18,
       "importer_count": 1,
@@ -4851,7 +4911,7 @@
         },
         {
           "importer": "backend/engine/function_calling.py",
-          "lineno": 23,
+          "lineno": 27,
           "names": [
             "NOTE_TOOL_NAME",
             "RECALL_TOOL_NAME"
@@ -4860,7 +4920,7 @@
         },
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 24,
+          "lineno": 25,
           "names": [
             "DEFAULT_AGENT_MAX_CONTEXT_LIMIT_ERRORS",
             "DEFAULT_AGENT_RECOVERABLE_TOOL_ERROR_THRESHOLD"
@@ -5305,8 +5365,8 @@
       ],
       "imported_by": [
         {
-          "importer": "backend/engine/function_calling.py",
-          "lineno": 459,
+          "importer": "backend/engine/tools/_file_ops.py",
+          "lineno": 56,
           "names": [
             "validate_content_payloads"
           ],
@@ -5363,14 +5423,6 @@
           "is_type_checking": true
         },
         {
-          "importer": "backend/engine/function_calling.py",
-          "lineno": 822,
-          "names": [
-            "normalize_plan_step_payload"
-          ],
-          "is_type_checking": false
-        },
-        {
           "importer": "backend/engine/memory_manager.py",
           "lineno": 26,
           "names": [
@@ -5380,7 +5432,7 @@
         },
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 28,
+          "lineno": 29,
           "names": [
             "State"
           ],
@@ -5411,6 +5463,14 @@
           "is_type_checking": true
         },
         {
+          "importer": "backend/engine/tools/_tool_handlers.py",
+          "lineno": 373,
+          "names": [
+            "normalize_plan_step_payload"
+          ],
+          "is_type_checking": false
+        },
+        {
           "importer": "backend/engine/tools/task_tracker.py",
           "lineno": 59,
           "names": [
@@ -5439,8 +5499,8 @@
       "intra_package_imports": [],
       "imported_by": [
         {
-          "importer": "backend/engine/function_calling.py",
-          "lineno": 24,
+          "importer": "backend/engine/tools/_file_edits.py",
+          "lineno": 17,
           "names": [
             "append_editor_recovery_guidance"
           ],
@@ -5463,7 +5523,7 @@
       "loc": 268,
       "class_count": 20,
       "def_count": 0,
-      "importer_count": 47,
+      "importer_count": 48,
       "intra_package_imports": [],
       "imported_by": [
         {
@@ -5512,8 +5572,16 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/engine/function_calling.py",
-          "lineno": 25,
+          "importer": "backend/engine/orchestrator.py",
+          "lineno": 581,
+          "names": [
+            "ActionSecurityRisk"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/tools/_file_edits.py",
+          "lineno": 18,
           "names": [
             "FileEditSource",
             "FileReadSource"
@@ -5521,10 +5589,10 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/engine/orchestrator.py",
-          "lineno": 554,
+          "importer": "backend/engine/tools/_tool_handlers.py",
+          "lineno": 14,
           "names": [
-            "ActionSecurityRisk"
+            "FileEditSource"
           ],
           "is_type_checking": false
         },
@@ -5877,7 +5945,7 @@
       "loc": 482,
       "class_count": 48,
       "def_count": 1,
-      "importer_count": 34,
+      "importer_count": 37,
       "intra_package_imports": [],
       "imported_by": [
         {
@@ -5939,18 +6007,10 @@
         },
         {
           "importer": "backend/engine/function_calling.py",
-          "lineno": 26,
+          "lineno": 28,
           "names": [
             "FunctionCallNotExistsError",
             "FunctionCallValidationError"
-          ],
-          "is_type_checking": false
-        },
-        {
-          "importer": "backend/engine/function_calling.py",
-          "lineno": 1646,
-          "names": [
-            "ToolExecutionError"
           ],
           "is_type_checking": false
         },
@@ -5964,7 +6024,7 @@
         },
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 29,
+          "lineno": 30,
           "names": [
             "AgentRuntimeError",
             "ContextLimitError",
@@ -5975,6 +6035,38 @@
             "LLMNoActionError",
             "ModelProviderError",
             "ToolExecutionError"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/tools/_file_edits.py",
+          "lineno": 19,
+          "names": [
+            "FunctionCallValidationError"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/tools/_file_edits.py",
+          "lineno": 702,
+          "names": [
+            "ToolExecutionError"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/tools/_file_ops.py",
+          "lineno": 14,
+          "names": [
+            "FunctionCallValidationError"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/tools/_tool_handlers.py",
+          "lineno": 15,
+          "names": [
+            "FunctionCallValidationError"
           ],
           "is_type_checking": false
         },
@@ -6239,7 +6331,7 @@
       "loc": 54,
       "class_count": 0,
       "def_count": 3,
-      "importer_count": 13,
+      "importer_count": 14,
       "intra_package_imports": [],
       "imported_by": [
         {
@@ -6253,7 +6345,7 @@
         },
         {
           "importer": "backend/engine/function_calling.py",
-          "lineno": 30,
+          "lineno": 29,
           "names": [
             "CHAT_MODE_ALLOWED_TOOLS",
             "PLAN_MODE",
@@ -6265,7 +6357,7 @@
         },
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 40,
+          "lineno": 41,
           "names": [
             "normalize_interaction_mode"
           ],
@@ -6339,6 +6431,15 @@
           "importer": "backend/engine/prompts/section_renderers.py",
           "lineno": 1083,
           "names": [
+            "normalize_interaction_mode"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/tools/_tool_handlers.py",
+          "lineno": 16,
+          "names": [
+            "PLAN_MODE",
             "normalize_interaction_mode"
           ],
           "is_type_checking": false
@@ -6544,7 +6645,7 @@
       "loc": 548,
       "class_count": 3,
       "def_count": 17,
-      "importer_count": 145,
+      "importer_count": 146,
       "intra_package_imports": [
         "backend.core.constants",
         "backend.core.log_formatters",
@@ -6601,7 +6702,7 @@
         },
         {
           "importer": "backend/engine/function_calling.py",
-          "lineno": 37,
+          "lineno": 36,
           "names": [
             "app_logger"
           ],
@@ -6633,7 +6734,7 @@
         },
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 41,
+          "lineno": 42,
           "names": [
             "app_logger"
           ],
@@ -6666,6 +6767,14 @@
         {
           "importer": "backend/engine/tool_registry.py",
           "lineno": 6,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/tools/_tool_handlers.py",
+          "lineno": 17,
           "names": [
             "app_logger"
           ],
@@ -8790,7 +8899,7 @@
         },
         {
           "importer": "backend/engine/executor.py",
-          "lineno": 1428,
+          "lineno": 1432,
           "names": [
             "parse_tool_arguments_object"
           ],
@@ -8863,18 +8972,18 @@
       ],
       "imported_by": [
         {
-          "importer": "backend/engine/function_calling.py",
-          "lineno": 430,
+          "importer": "backend/engine/tools/_file_edits.py",
+          "lineno": 684,
           "names": [
+            "PathValidationError",
             "SafePath"
           ],
           "is_type_checking": false
         },
         {
-          "importer": "backend/engine/function_calling.py",
-          "lineno": 1628,
+          "importer": "backend/engine/tools/_file_ops.py",
+          "lineno": 27,
           "names": [
-            "PathValidationError",
             "SafePath"
           ],
           "is_type_checking": false
@@ -9058,24 +9167,24 @@
       ],
       "imported_by": [
         {
-          "importer": "backend/engine/function_calling.py",
-          "lineno": 1629,
+          "importer": "backend/engine/tools/_file_edits.py",
+          "lineno": 685,
           "names": [
             "require_effective_workspace_root"
           ],
           "is_type_checking": false
         },
         {
-          "importer": "backend/engine/function_calling.py",
-          "lineno": 422,
+          "importer": "backend/engine/tools/_file_edits.py",
+          "lineno": 829,
           "names": [
             "require_effective_workspace_root"
           ],
           "is_type_checking": false
         },
         {
-          "importer": "backend/engine/function_calling.py",
-          "lineno": 1773,
+          "importer": "backend/engine/tools/_file_ops.py",
+          "lineno": 19,
           "names": [
             "require_effective_workspace_root"
           ],
@@ -9321,7 +9430,7 @@
       "imported_by": [
         {
           "importer": "backend/engine/executor.py",
-          "lineno": 1429,
+          "lineno": 1433,
           "names": [
             "extract_assistant_message"
           ],
@@ -9345,7 +9454,7 @@
         },
         {
           "importer": "backend/engine/function_calling.py",
-          "lineno": 38,
+          "lineno": 37,
           "names": [
             "common_response_to_actions"
           ],
@@ -9353,7 +9462,7 @@
         },
         {
           "importer": "backend/engine/function_calling.py",
-          "lineno": 2054,
+          "lineno": 220,
           "names": [
             "_check_format_error_retry_guard"
           ],
@@ -9361,7 +9470,7 @@
         },
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 44,
+          "lineno": 45,
           "names": [
             "FunctionCallNotExistsError"
           ],
@@ -9369,7 +9478,7 @@
         },
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 47,
+          "lineno": 48,
           "names": [
             "FunctionCallValidationError"
           ],
@@ -9405,7 +9514,7 @@
       "imported_by": [
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 50,
+          "lineno": 51,
           "names": [
             "ExecutorProtocol",
             "MemoryManagerProtocol",
@@ -9491,8 +9600,8 @@
     "backend.engine.executor": {
       "module_path": "backend.engine.executor",
       "file_path": "backend/engine/executor.py",
-      "byte_size": 58635,
-      "loc": 1577,
+      "byte_size": 62870,
+      "loc": 1665,
       "class_count": 5,
       "def_count": 0,
       "importer_count": 1,
@@ -9518,7 +9627,7 @@
       "imported_by": [
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 56,
+          "lineno": 57,
           "names": [
             "OrchestratorExecutor"
           ],
@@ -9559,7 +9668,7 @@
       "imported_by": [
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 731,
+          "lineno": 820,
           "names": [
             "try_batch_file_reads"
           ],
@@ -9570,29 +9679,24 @@
     "backend.engine.function_calling": {
       "module_path": "backend.engine.function_calling",
       "file_path": "backend/engine/function_calling.py",
-      "byte_size": 78764,
-      "loc": 2084,
+      "byte_size": 13979,
+      "loc": 351,
       "class_count": 0,
-      "def_count": 77,
+      "def_count": 4,
       "importer_count": 3,
       "intra_package_imports": [
         "backend.core.constants",
-        "backend.core.content_escape_repair",
-        "backend.core.contracts.state",
-        "backend.core.editor_recovery",
-        "backend.core.enums",
         "backend.core.errors",
         "backend.core.interaction_modes",
         "backend.core.logger",
-        "backend.core.type_safety.path_validation",
-        "backend.core.workspace_resolution",
         "backend.engine.common",
         "backend.engine.function_calling_helpers",
         "backend.engine.planner",
         "backend.engine.tools",
+        "backend.engine.tools._file_edits",
+        "backend.engine.tools._file_ops",
+        "backend.engine.tools._tool_handlers",
         "backend.engine.tools.analyze_project_structure",
-        "backend.engine.tools.atomic_refactor",
-        "backend.engine.tools.bash",
         "backend.engine.tools.blackboard",
         "backend.engine.tools.browser_native",
         "backend.engine.tools.checkpoint",
@@ -9604,20 +9708,14 @@
         "backend.engine.tools.meta_cognition",
         "backend.engine.tools.note",
         "backend.engine.tools.search_code",
-        "backend.engine.tools.task_tracker",
         "backend.engine.tools.terminal_manager",
-        "backend.engine.tools.working_memory",
-        "backend.execution.utils.file_editor",
         "backend.inference.tool_names",
-        "backend.ledger.action",
-        "backend.ledger.action.agent",
-        "backend.ledger.action.mcp",
-        "backend.utils.treesitter_editor"
+        "backend.ledger.action"
       ],
       "imported_by": [
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 22,
+          "lineno": 23,
           "names": [],
           "is_type_checking": false
         },
@@ -9646,14 +9744,37 @@
       "loc": 71,
       "class_count": 0,
       "def_count": 5,
-      "importer_count": 0,
+      "importer_count": 2,
       "intra_package_imports": [
         "backend.core.errors",
         "backend.core.logger",
         "backend.engine.tools.security_utils",
         "backend.ledger.action"
       ],
-      "imported_by": []
+      "imported_by": [
+        {
+          "importer": "backend/engine/tools/_file_edits.py",
+          "lineno": 20,
+          "names": [
+            "parse_bool_argument",
+            "require_tool_argument",
+            "set_security_risk",
+            "validate_security_risk"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/tools/_tool_handlers.py",
+          "lineno": 18,
+          "names": [
+            "parse_bool_argument",
+            "require_tool_argument",
+            "set_security_risk",
+            "validate_security_risk"
+          ],
+          "is_type_checking": false
+        }
+      ]
     },
     "backend.engine.memory_manager": {
       "module_path": "backend.engine.memory_manager",
@@ -9680,7 +9801,7 @@
       "imported_by": [
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 57,
+          "lineno": 58,
           "names": [
             "ContextMemoryManager"
           ],
@@ -9705,10 +9826,10 @@
     "backend.engine.orchestrator": {
       "module_path": "backend.engine.orchestrator",
       "file_path": "backend/engine/orchestrator.py",
-      "byte_size": 39486,
-      "loc": 919,
+      "byte_size": 45712,
+      "loc": 1040,
       "class_count": 1,
-      "def_count": 3,
+      "def_count": 4,
       "importer_count": 0,
       "intra_package_imports": [
         "backend.core.config",
@@ -9735,6 +9856,7 @@
         "backend.inference.llm_registry",
         "backend.ledger.action",
         "backend.ledger.action.agent",
+        "backend.ledger.action.message",
         "backend.ledger.event",
         "backend.ledger.observation",
         "backend.ledger.observation.error",
@@ -9934,6 +10056,88 @@
       "def_count": 0,
       "importer_count": 0,
       "intra_package_imports": [],
+      "imported_by": []
+    },
+    "backend.engine.tools._file_edits": {
+      "module_path": "backend.engine.tools._file_edits",
+      "file_path": "backend/engine/tools/_file_edits.py",
+      "byte_size": 34149,
+      "loc": 931,
+      "class_count": 0,
+      "def_count": 26,
+      "importer_count": 0,
+      "intra_package_imports": [
+        "backend.core.editor_recovery",
+        "backend.core.enums",
+        "backend.core.errors",
+        "backend.core.type_safety.path_validation",
+        "backend.core.workspace_resolution",
+        "backend.engine.function_calling_helpers",
+        "backend.engine.tools._file_ops",
+        "backend.engine.tools.atomic_refactor",
+        "backend.execution.utils.file_editor",
+        "backend.inference.tool_names",
+        "backend.ledger.action"
+      ],
+      "imported_by": []
+    },
+    "backend.engine.tools._file_ops": {
+      "module_path": "backend.engine.tools._file_ops",
+      "file_path": "backend/engine/tools/_file_ops.py",
+      "byte_size": 12045,
+      "loc": 379,
+      "class_count": 0,
+      "def_count": 19,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.content_escape_repair",
+        "backend.core.errors",
+        "backend.core.type_safety.path_validation",
+        "backend.core.workspace_resolution",
+        "backend.utils.treesitter_editor"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/engine/tools/_tool_handlers.py",
+          "lineno": 25,
+          "names": [
+            "_relative_display_path",
+            "_safe_workspace_path"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.engine.tools._tool_handlers": {
+      "module_path": "backend.engine.tools._tool_handlers",
+      "file_path": "backend/engine/tools/_tool_handlers.py",
+      "byte_size": 23273,
+      "loc": 604,
+      "class_count": 0,
+      "def_count": 28,
+      "importer_count": 0,
+      "intra_package_imports": [
+        "backend.core.contracts.state",
+        "backend.core.enums",
+        "backend.core.errors",
+        "backend.core.interaction_modes",
+        "backend.core.logger",
+        "backend.engine.function_calling_helpers",
+        "backend.engine.tools",
+        "backend.engine.tools._file_ops",
+        "backend.engine.tools.analyze_project_structure",
+        "backend.engine.tools.bash",
+        "backend.engine.tools.browser_native",
+        "backend.engine.tools.checkpoint",
+        "backend.engine.tools.note",
+        "backend.engine.tools.search_code",
+        "backend.engine.tools.task_tracker",
+        "backend.engine.tools.working_memory",
+        "backend.inference.tool_names",
+        "backend.ledger.action",
+        "backend.ledger.action.agent",
+        "backend.ledger.action.mcp"
+      ],
       "imported_by": []
     },
     "backend.engine.tools.analyze_project_structure": {
