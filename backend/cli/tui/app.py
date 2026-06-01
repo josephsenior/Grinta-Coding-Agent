@@ -3616,13 +3616,13 @@ class GrintaScreen(Screen):
         if kind == 'under_threshold':
             max_retries = 2
             note = (
-                f"agent is replying in prose; reminding it to use a tool call "
-                f"({count}/{max_retries + 1})"
+                f'agent is replying in prose; reminding it to use a tool call '
+                f'({count}/{max_retries + 1})'
             )
         elif kind == 'threshold_breached':
             note = (
-                f"agent kept replying in prose {count} times — surfacing the "
-                f"last reply and pausing for input"
+                f'agent kept replying in prose {count} times — surfacing the '
+                f'last reply and pausing for input'
             )
         else:
             return

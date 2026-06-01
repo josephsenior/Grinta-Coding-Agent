@@ -10,7 +10,6 @@ attributes. The orchestrator detects that sentinel via
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Callable
 from types import SimpleNamespace
 
 from backend.engine.orchestrator import Orchestrator
@@ -103,7 +102,8 @@ class TestGateSentinelDetection:
     """The orchestrator's gate-handling block in ``_execute_llm_step`` is
     inline (not factored out), so we test it via a small helper that mimics
     the same detection logic. This keeps the test isolated from the
-    orchestrator's heavy LLM plumbing."""
+    orchestrator's heavy LLM plumbing.
+    """
 
     @staticmethod
     def _detect_and_handle(orch: Orchestrator, actions: list[object]) -> object:
