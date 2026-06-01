@@ -76,6 +76,18 @@ if TYPE_CHECKING:
     from backend.ledger.stream import EventStream
 
 
+def _safe_plain_text_count(executor: Any) -> int:
+    """Read the executor's plain-text counter defensively.
+
+    Some unit tests substitute the executor with a ``MagicMock`` that does
+    not have a real ``_consecutive_plain_text_blocks`` attribute, so
+    ``getattr`` would return another ``MagicMock`` and the ``> 0`` check
+    would raise ``TypeError``. Treat any non-int value as zero.
+    """
+    raw = getattr(executor, '_consecutive_plain_text_blocks', 0)
+    return raw if isinstance(raw, int) else 0
+
+
 def _normalize_recoverable_error_signature(e: Exception) -> str:
     """Normalize error signature for reliable loop detection.
 
@@ -658,9 +670,7 @@ class Orchestrator(Agent):
             # transition the agent into AWAITING_USER_INPUT. Reset the
             # counter because the loop is about to yield control. Read the
             # pre-reset count for the callback so the UI can show "X/3".
-            breach_count = getattr(
-                self.executor, '_consecutive_plain_text_blocks', 0
-            )
+            breach_count = _safe_plain_text_count(self.executor)
             self._reset_step_recovery_counters()
             try:
                 self._on_plain_text_gate('threshold_breached', breach_count)
@@ -673,13 +683,16 @@ class Orchestrator(Agent):
             try:
                 self._on_plain_text_gate(
                     'under_threshold',
-                    getattr(self.executor, '_consecutive_plain_text_blocks', 0),
+                    _safe_plain_text_count(self.executor),
                 )
             except Exception:
                 logger.debug('Plain-text gate callback failed', exc_info=True)
             return self._promote_gate_sentinel(first, breached=False)
         # Real tool call: clear the plain-text streak.
-        if getattr(self.executor, '_consecutive_plain_text_blocks', 0) > 0:
+        current_count = _safe_plain_text_count(self.executor)
+        if current_count > 0 and hasattr(
+            self.executor, '_consecutive_plain_text_blocks'
+        ):
             self.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
         self._queue_additional_actions(actions[1:])
         return actions[0]
@@ -753,9 +766,7 @@ class Orchestrator(Agent):
         first = actions[0]
         if getattr(first, '_gate_threshold_breach', False) is True:
             # Read pre-reset count for the callback; see sync path for rationale.
-            breach_count = getattr(
-                self.executor, '_consecutive_plain_text_blocks', 0
-            )
+            breach_count = _safe_plain_text_count(self.executor)
             self._reset_step_recovery_counters()
             try:
                 self._on_plain_text_gate('threshold_breached', breach_count)
@@ -766,12 +777,15 @@ class Orchestrator(Agent):
             try:
                 self._on_plain_text_gate(
                     'under_threshold',
-                    getattr(self.executor, '_consecutive_plain_text_blocks', 0),
+                    _safe_plain_text_count(self.executor),
                 )
             except Exception:
                 logger.debug('Plain-text gate callback failed', exc_info=True)
             return self._promote_gate_sentinel(first, breached=False)
-        if getattr(self.executor, '_consecutive_plain_text_blocks', 0) > 0:
+        current_count = _safe_plain_text_count(self.executor)
+        if current_count > 0 and hasattr(
+            self.executor, '_consecutive_plain_text_blocks'
+        ):
             self.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
         self._queue_additional_actions(actions[1:])
         return actions[0]
