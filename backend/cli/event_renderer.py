@@ -52,6 +52,7 @@ from backend.cli.theme import (
     STYLE_BOLD_DIM,
     STYLE_DIM,
     accessible_mode_enabled,
+    get_grinta_pygments_style,
 )
 from backend.cli.tool_call_display import (
     looks_like_streaming_tool_arguments,
@@ -491,7 +492,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
     async def add_user_message(self, text: str) -> None:
         """Print a user turn — rounded panel, high-contrast label."""
-        body = Markdown((text or '').rstrip())
+        body = Markdown((text or '').rstrip(), code_theme=get_grinta_pygments_style())
         panel = Panel(
             Padding(body, CALLOUT_PANEL_PADDING),
             title=Text('  You  ', style=STYLE_BOLD_DIM),
@@ -575,7 +576,13 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._print_or_buffer(
             Padding(Rule(title, style=STYLE_DIM), (1, 0, 1, 0), expand=False)
         )
-        self._print_or_buffer(Padding(Markdown(text), (0, 0, 1, 0), expand=False))
+        self._print_or_buffer(
+            Padding(
+                Markdown(text, code_theme=get_grinta_pygments_style()),
+                (0, 0, 1, 0),
+                expand=False,
+            )
+        )
         self._print_or_buffer(Text(''))
 
     def add_renderable(self, renderable: Any, *, force_terminal: bool = False) -> None:
@@ -1123,7 +1130,12 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         if plain_summary is not None:
             self._append_history(Text(plain_summary, style=LIVE_PANEL_ACCENT_STYLE))
             return
-        self._append_history(Padding(Markdown(display_content), (0, 0, 1, 0)))
+        self._append_history(
+            Padding(
+                Markdown(display_content, code_theme=get_grinta_pygments_style()),
+                (0, 0, 1, 0),
+            )
+        )
 
     @staticmethod
     def _summarize_search_results_block(s: str) -> str:

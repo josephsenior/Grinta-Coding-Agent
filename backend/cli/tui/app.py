@@ -5187,7 +5187,10 @@ class TUIRenderer:
             else:
                 message = getattr(event, 'message', '') or ''
                 if message:
-                    self._tui._write_log(Markdown(message))
+                    from backend.cli.theme import get_grinta_pygments_style
+                    self._tui._write_log(
+                        Markdown(message, code_theme=get_grinta_pygments_style())
+                    )
         elif isinstance(event, UserRejectObservation):
             card = ActivityRenderer.user_reject()
             self._write_card(card)
