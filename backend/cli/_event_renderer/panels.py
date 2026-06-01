@@ -40,6 +40,7 @@ from backend.cli.theme import (
     STYLE_SYSTEM_TAG_SYSTEM,
     STYLE_SYSTEM_TAG_TIMEOUT,
     STYLE_SYSTEM_TAG_WARNING,
+    get_grinta_pygments_style,
 )
 from backend.cli.transcript import format_live_panel
 from backend.core.task_status import (
@@ -159,7 +160,7 @@ def build_task_panel(task_list: list[Any]) -> Any:
         if task_id and task_id != '?':
             desc = f'**{task_id}**  {desc}'
 
-        body = Markdown(desc)
+        body = Markdown(desc, code_theme=get_grinta_pygments_style())
         table.add_row(badge, body)
 
     empty_state: Any = (
@@ -359,7 +360,7 @@ def build_system_notice_panel(
     panel_title = Text(normalized_title, style=accent_style)
 
     # Use Markdown for syntax highlighting if there is any code in the system message
-    body = Markdown((text or '').strip())
+    body = Markdown((text or '').strip(), code_theme=get_grinta_pygments_style())
 
     return Panel(
         body,
