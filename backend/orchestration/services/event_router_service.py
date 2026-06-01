@@ -607,6 +607,13 @@ class EventRouterService:
                 mode,
                 source='EventRouterService.user_message',
             )
+        reset_recovery = getattr(
+            getattr(self._ctrl, 'action_execution', None),
+            'reset_liveness_recovery_counters',
+            None,
+        )
+        if callable(reset_recovery):
+            reset_recovery()
 
         # Assign stream id before pending so pending always references a stable id.
         self._ctrl.event_stream.add_event(recall_action, EventSource.USER)

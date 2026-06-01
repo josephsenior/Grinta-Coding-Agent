@@ -62,6 +62,8 @@ def _make_tool_call_response(args: dict) -> MagicMock:
 def _make_view(events: list[Event]) -> MagicMock:
     """Minimal View mock that supports slicing and len."""
     view = MagicMock()
+    view.events = events
+    view.unhandled_condensation_request = False
     view.__len__ = MagicMock(return_value=len(events))
     view.__iter__ = MagicMock(return_value=iter(events))
     view.__getitem__ = MagicMock(side_effect=events.__getitem__)
@@ -210,6 +212,15 @@ class TestParseLlmResponse:
 
 
 class TestGetCompaction:
+    def test_prepare_view_sections_handles_empty_tail(self):
+        condenser = StructuredSummaryCompactor(llm=None, max_size=4, keep_first=1)
+        events = [_event(0), _event(1)]
+        view = _make_view(events)
+
+        _head, pruned_events, _summary_event = condenser._prepare_view_sections(view)
+
+        assert pruned_events == [events[1]]
+
     async def test_returns_compaction_with_correct_events_dropped(self):
         """Events between keep_first and tail should be dropped; summary replaces them."""
         llm = _make_llm()

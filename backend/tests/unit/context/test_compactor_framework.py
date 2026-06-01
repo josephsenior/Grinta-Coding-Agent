@@ -356,6 +356,14 @@ class TestBaseLLMCompactor:
         assert result.action.summary == '[project]'
         assert result.action.summary_offset == 2
 
+    def test_create_compaction_result_handles_empty_pruned_events(self):
+        c = ConcreteLLMCompactor(llm=None, max_size=10, keep_first=2)
+
+        result = c._create_compaction_result([], 'nothing to summarize')
+
+        assert result.action.pruned == []
+        assert result.action.summary is None
+
     def test_sanitize_workspace_paths_precise_env_and_passthrough(self, monkeypatch):
         monkeypatch.setenv('APP_WORKSPACE_DIR', r'C:\temp\app_workspace_sid_123')
         precise = BaseLLMCompactor._sanitize_workspace_paths(
@@ -453,6 +461,25 @@ class TestBaseLLMCompactor:
             patch.object(c, 'get_compaction', return_value=compaction),
         ):
             assert await c.compact(view) is compaction
+
+    async def test_compact_honors_explicit_condensation_request_below_threshold(self):
+        c = ConcreteLLMCompactor(llm=None, max_size=10)
+        view = View(
+            events=_make_events(3),
+            unhandled_condensation_request=True,
+        )
+        compaction = Compaction(action=CondensationAction(pruned_event_ids=[1]))
+
+        with (
+            patch.object(c._compactor, 'compact', return_value=view.events),
+            patch.object(c, 'should_compact', return_value=False),
+            patch.object(c, '_exceeds_token_budget', return_value=False),
+            patch.object(c, 'get_compaction', return_value=compaction) as get_compaction,
+        ):
+            result = await c.compact(view)
+
+        assert result is compaction
+        get_compaction.assert_called_once()
 
 
 # ===================================================================

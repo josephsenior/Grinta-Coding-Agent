@@ -40,9 +40,10 @@ from backend.ledger.action import (
     Action,
     NullAction,
 )
-from backend.ledger.action.agent import CondensationRequestAction
+from backend.ledger.action.agent import CondensationAction, CondensationRequestAction
 from backend.ledger.action.empty import NullActionReason
 from backend.ledger.observation import ErrorObservation
+from backend.ledger.observation.status import StatusObservation
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
@@ -168,11 +169,14 @@ class ActionExecutionService:
     _MAX_NULL_RECOVERY_ROUNDS = DEFAULT_AGENT_MAX_NULL_RECOVERY_ROUNDS
     _MAX_REPAIR_ATTEMPTS = DEFAULT_AGENT_MAX_REPAIR_ATTEMPTS
     _MAX_IDENTICAL_RETRIES = DEFAULT_AGENT_MAX_IDENTICAL_RETRIES
+    _MAX_CONTEXT_WINDOW_RECOVERY_REQUESTS = 3
 
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
         self._consecutive_null_actions = 0
         self._null_recovery_rounds = 0
+        self._context_window_recovery_attempts = 0
+        self._expected_no_action_recovery = False
 
     def _publish_agent_event(self, event: object) -> None:
         event_stream = self._context.event_stream
@@ -361,6 +365,8 @@ class ActionExecutionService:
             return action
         if isinstance(action, NullAction):
             return await self._handle_consecutive_null_action(action)
+        if not isinstance(action, (CondensationAction, CondensationRequestAction)):
+            self.reset_liveness_recovery_counters()
         self._reset_consecutive_null_actions()
         return action
 
@@ -622,6 +628,41 @@ class ActionExecutionService:
     def _reset_null_recovery_rounds(self) -> None:
         self._null_recovery_rounds = 0
 
+    def reset_liveness_recovery_counters(self) -> None:
+        """Reset turn-scoped recovery counters after a real user/action boundary."""
+        self._context_window_recovery_attempts = 0
+        self._expected_no_action_recovery = False
+
+    def consume_expected_no_action_recovery(self) -> bool:
+        """Return True when the current ``None`` intentionally scheduled work."""
+        expected = self._expected_no_action_recovery
+        self._expected_no_action_recovery = False
+        return expected
+
+    async def handle_unexpected_no_action_while_running(self) -> None:
+        """Liveness guard: RUNNING must not passively stall after a None action."""
+        controller = self._context.get_controller()
+        from backend.core.schemas import AgentState as _AgentState
+
+        if controller.get_agent_state() != _AgentState.RUNNING:
+            return
+
+        event_stream = self._context.event_stream
+        if event_stream is not None:
+            event_stream.add_event(
+                ErrorObservation(
+                    content=(
+                        'Agent step ended without producing an action or scheduling '
+                        'a recovery step. Returning control to you instead of '
+                        'leaving the session stuck in RUNNING.'
+                    ),
+                    error_id='AGENT_STEP_STALLED',
+                    notify_ui_only=True,
+                ),
+                EventSource.AGENT,
+            )
+        await controller.set_agent_state_to(_AgentState.AWAITING_USER_INPUT)
+
     async def execute_action(self, action: Action) -> None:
         # Plugin hook: action_pre
         try:
@@ -666,8 +707,62 @@ class ActionExecutionService:
         agent_config = getattr(agent, 'config', None) if agent is not None else None
         if not getattr(agent_config, 'enable_history_truncation', False):
             raise LLMContextWindowExceedError from exc
+        self._context_window_recovery_attempts += 1
+        if (
+            self._context_window_recovery_attempts
+            > self._MAX_CONTEXT_WINDOW_RECOVERY_REQUESTS
+        ):
+            await self._stop_after_context_recovery_exhausted(exc)
+            return None
+        self._publish_agent_event(
+            StatusObservation(
+                content='Context window exceeded. Compacting context before retrying...',
+                status_type='compaction',
+            )
+        )
         self._publish_agent_event(CondensationRequestAction())
+        self._expected_no_action_recovery = True
+        self._schedule_recovery_step()
         return None
+
+    def _schedule_recovery_step(self) -> None:
+        try:
+            controller = self._context.get_controller()
+            schedule_step_soon = getattr(controller, 'schedule_step_soon', None)
+            if callable(schedule_step_soon):
+                schedule_step_soon()
+        except Exception:
+            logger.debug('Failed to schedule context-window recovery step', exc_info=True)
+
+    async def _stop_after_context_recovery_exhausted(self, exc: Exception) -> None:
+        self._expected_no_action_recovery = False
+        controller = self._context.get_controller()
+        event_stream = self._context.event_stream
+        if event_stream is not None:
+            event_stream.add_event(
+                ErrorObservation(
+                    content=(
+                        'The provider still rejected the prompt after repeated '
+                        'context compaction attempts. I stopped the run instead '
+                        'of leaving the agent stuck in RUNNING. Try resuming with '
+                        'a shorter request, a larger-context model, or ask Grinta '
+                        'to summarize and continue from the current state.'
+                    ),
+                    error_id='CONTEXT_WINDOW_RECOVERY_EXHAUSTED',
+                    notify_ui_only=True,
+                    error_category='context_window',
+                ),
+                EventSource.AGENT,
+            )
+        logger.error(
+            'Context-window recovery exhausted after %d attempts: %s',
+            self._context_window_recovery_attempts,
+            exc,
+        )
+        from backend.core.schemas import AgentState as _AgentState
+
+        if controller.get_agent_state() == _AgentState.RUNNING:
+            await controller.set_agent_state_to(_AgentState.AWAITING_USER_INPUT)
 
     def _handle_malformed_request_error(self, exc: Exception) -> Action | None:
         r"""Recover from ``BadRequestError: Invalid \\escape``-style failures.

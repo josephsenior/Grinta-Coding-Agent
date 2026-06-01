@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from backend.inference.llm_registry import LLMRegistry
 
-from backend.context.compactor.compactor import Compaction, Compactor
+from backend.context.compactor.compactor import Compaction, Compactor, RollingCompactor
 from backend.context.compactor.strategies.auto_selector import select_compactor_config
 from backend.context.view import View
+from backend.core.config.compactor_config import (
+    AmortizedPruningCompactorConfig,
+    CompactorConfig,
+    SmartCompactorConfig,
+    StructuredSummaryCompactorConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,28 +44,114 @@ class AutoCompactor(Compactor):
         self._llm_config = llm_config
         self._llm_registry = llm_registry
         self._cached_delegate: Compactor | None = None
-        self._cached_config_type: str | None = None
+        self._cached_config_key: str | None = None
 
     async def compact(self, view: View) -> View | Compaction:
         """Select the best compactor for the current event stream and delegate."""
         events = list(view.events)
-        config = select_compactor_config(
-            events,
-            llm_config=self._llm_config,
+        explicit_request = bool(
+            getattr(view, 'unhandled_condensation_request', False)
+        )
+        config = (
+            self._select_explicit_request_config(len(events))
+            if explicit_request
+            else select_compactor_config(
+                events,
+                llm_config=self._llm_config,
+            )
         )
         logger.info(
-            'AutoCompactor selected strategy: %s for %d events',
+            'AutoCompactor selected strategy: %s for %d events (explicit_request=%s)',
             config.type,
             len(events),
+            explicit_request,
         )
-        # Reuse cached delegate when the strategy type hasn't changed.
-        if config.type != self._cached_config_type:
+        delegate = self._delegate_for_config(config, explicit_request)
+        result = await delegate.compact(view)
+        if explicit_request and isinstance(result, View):
+            result = await self._force_delegate_compaction(delegate, result)
+        return result
+
+    def _select_explicit_request_config(self, event_count: int) -> CompactorConfig:
+        """Pick a real compactor for provider context-limit recovery."""
+        max_size = max(2, min(200, event_count or 2))
+        keep_first = min(5, max_size // 2)
+        if self._llm_config is not None:
+            return StructuredSummaryCompactorConfig(
+                llm_config=self._llm_config,
+                max_size=max_size,
+                keep_first=keep_first,
+            )
+        return self._deterministic_explicit_request_config(event_count)
+
+    @staticmethod
+    def _deterministic_explicit_request_config(
+        event_count: int,
+    ) -> AmortizedPruningCompactorConfig:
+        max_size = max(4, min(150, event_count or 4))
+        keep_first = min(3, max(0, (max_size // 2) - 1))
+        return AmortizedPruningCompactorConfig(
+            max_size=max_size,
+            keep_first=keep_first,
+        )
+
+    def _delegate_for_config(
+        self, config: CompactorConfig, explicit_request: bool
+    ) -> Compactor:
+        try:
+            return self._cached_or_create_delegate(config)
+        except Exception as exc:
+            if not explicit_request:
+                raise
+            logger.warning(
+                'AutoCompactor explicit-request strategy %s unavailable (%s); '
+                'falling back to a simpler recovery compactor.',
+                config.type,
+                exc,
+            )
+            if self._llm_config is not None and config.type == 'structured':
+                llm_fallback = self._smart_explicit_request_config(config)
+                with contextlib.suppress(Exception):
+                    return self._cached_or_create_delegate(llm_fallback)
+            deterministic_fallback = self._deterministic_explicit_request_config(
+                getattr(config, 'max_size', 0)
+            )
+            return self._cached_or_create_delegate(deterministic_fallback)
+
+    def _smart_explicit_request_config(
+        self, config: CompactorConfig
+    ) -> SmartCompactorConfig:
+        max_size = max(2, int(getattr(config, 'max_size', 200) or 200))
+        keep_first = min(int(getattr(config, 'keep_first', 5) or 0), max_size // 2)
+        return SmartCompactorConfig(
+            llm_config=self._llm_config,
+            max_size=max_size,
+            keep_first=keep_first,
+        )
+
+    def _cached_or_create_delegate(self, config: CompactorConfig) -> Compactor:
+        cache_key = self._cache_key(config)
+        if cache_key != self._cached_config_key:
             self._cached_delegate = Compactor.from_config(config, self._llm_registry)
-            self._cached_config_type = config.type
+            self._cached_config_key = cache_key
         delegate = self._cached_delegate
         if delegate is None:
             raise RuntimeError('Compactor.from_config returned None')
-        return await delegate.compact(view)
+        return delegate
+
+    @staticmethod
+    def _cache_key(config: CompactorConfig) -> str:
+        with contextlib.suppress(Exception):
+            return config.model_dump_json()
+        return repr(config)
+
+    async def _force_delegate_compaction(
+        self, delegate: Compactor, view: View
+    ) -> View | Compaction:
+        if isinstance(delegate, RollingCompactor):
+            logger.info('AutoCompactor forcing delegate compaction for explicit request')
+            return await delegate.get_compaction(view)
+        return view
 
     @classmethod
     def from_config(cls, config: Any, llm_registry: LLMRegistry) -> AutoCompactor:

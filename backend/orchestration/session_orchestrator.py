@@ -850,6 +850,8 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
 
         action = await self.action_execution.get_next_action()
         if action is None:
+            if not self.action_execution.consume_expected_no_action_recovery():
+                await self.action_execution.handle_unexpected_no_action_while_running()
             return
 
         # Reset retry count on successful action execution

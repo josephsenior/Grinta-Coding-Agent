@@ -132,6 +132,29 @@ class ContextMemoryManager:
         state.ack_memory_pressure(source='ContextMemoryManager')
         return condensation_result
 
+    async def _maybe_force_compaction_for_explicit_request(
+        self,
+        state: State,
+        condensation_result: View | object,
+    ) -> object:
+        """Honor an explicit condensation request even if normal thresholds do not fire."""
+        if not self._has_unhandled_condensation_request(state) or not isinstance(
+            condensation_result, View
+        ):
+            return condensation_result
+
+        from backend.context.compactor.compactor import RollingCompactor
+
+        if not isinstance(self.compactor, RollingCompactor):
+            return condensation_result
+
+        logger.info('Explicit condensation request: forcing compaction')
+        try:
+            return await self.compactor.get_compaction(condensation_result)
+        except Exception as exc:
+            logger.warning('Explicit-request compaction failed: %s', exc)
+            return condensation_result
+
     async def condense_history(self, state: State) -> CondensedHistory:
         history = list(getattr(state, 'history', []))
         if not self.compactor:
@@ -155,6 +178,11 @@ class ContextMemoryManager:
         else:
             condensation_result = await self.compactor.compacted_history(state)
 
+        condensation_result = (
+            await self._maybe_force_compaction_for_explicit_request(
+                state, condensation_result
+            )
+        )
         condensation_result = await self._maybe_force_compaction_under_memory_pressure(  # type: ignore[assignment]
             state, history, condensation_result
         )

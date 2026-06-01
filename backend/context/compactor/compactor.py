@@ -351,6 +351,9 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         self, pruned_events: list[Event], summary: str
     ) -> Compaction:
         """Create a compaction result from pruned events and a summary string."""
+        if not pruned_events:
+            return Compaction(action=CondensationAction(pruned_event_ids=[]))
+
         summary = self._sanitize_workspace_paths(summary)
         return Compaction(
             action=CondensationAction(
@@ -487,20 +490,25 @@ class BaseLLMCompactor(RollingCompactor, ABC):
 
     async def compact(self, view: View) -> View | Compaction:
         """Compact, then compact further if thresholds are exceeded."""
+        explicit_request = bool(getattr(view, 'unhandled_condensation_request', False))
         compacted = self._compactor.compact(view.events)
         if len(compacted) < len(view.events):
-            view = View(events=compacted)
+            view = View(
+                events=compacted,
+                unhandled_condensation_request=explicit_request,
+            )
         should = self.should_compact(view)
         budget = self._exceeds_token_budget(view)
         logger.debug(
-            'compact check: len(view)=%d max_size=%d should_compact=%s token_budget=%s exceeds_budget=%s',
+            'compact check: len(view)=%d max_size=%d should_compact=%s token_budget=%s exceeds_budget=%s explicit_request=%s',
             len(view),
             self.max_size,
             should,
             self.token_budget,
             budget,
+            explicit_request,
         )
-        if should or budget:
+        if should or budget or explicit_request:
             return await self.get_compaction(view)
         return view
 

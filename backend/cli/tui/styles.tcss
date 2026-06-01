@@ -96,7 +96,10 @@ CollapsibleSection:focus {
 InfoSidebar {
     background: #080c18;
     padding: 1 1;
-    scrollbar-size: 0 0;
+    scrollbar-color: #64748b #0f172a;
+    scrollbar-color-hover: #94a3b8 #0f172a;
+    scrollbar-color-active: #cbd5e1 #0f172a;
+    scrollbar-size: 1 0;
     overflow-y: auto;
     overflow-x: hidden;
 }
