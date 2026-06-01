@@ -639,7 +639,10 @@ def test_prompt_session_requires_prompt_toolkit() -> None:
     interactive_stream = MagicMock()
     interactive_stream.isatty.return_value = True
 
-    with patch('backend.cli.repl._prompt_toolkit_available', return_value=False):
+    with patch(
+        'backend.cli._repl.slash_command_registry._prompt_toolkit_available',
+        return_value=False,
+    ):
         assert _supports_prompt_session(interactive_stream, interactive_stream) is False
 
 
@@ -1242,7 +1245,10 @@ def test_diff_command_uses_configured_project_root(tmp_path: Path) -> None:
         args=['git', 'diff'], returncode=0, stdout='src/app.py\n', stderr=''
     )
 
-    with patch('backend.cli.repl.subprocess.run', return_value=completed) as run_git:
+    with patch(
+        'backend.cli._repl.slash_commands_mixin.subprocess.run',
+        return_value=completed,
+    ) as run_git:
         result = repl.handle_command('/diff --name-only "src/app file.py"')
 
     assert result is True
