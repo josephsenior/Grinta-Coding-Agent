@@ -163,6 +163,10 @@ class OrchestratorExecutor:
         self._active_stream_iter: Any | None = None
         self._has_active_tasks: bool = False
         self._active_run_mode: str = ''
+        # Per-session state reference and plain-text gate counter. Populated by
+        # ``Orchestrator._execute_llm_step[_async]`` right before each step.
+        self._state: Any | None = None
+        self._consecutive_plain_text_blocks: int = 0
 
     def cancel_step(self) -> None:
         """Signal the current (or next) streaming step to abort early."""
@@ -1516,8 +1520,30 @@ class OrchestratorExecutor:
 
         Plan mode is not gated here — the prompt guidance and tool filtering
         handle the preference for structured finish() calls.
+
+        Behaviour:
+            * Each gate firing increments
+              ``self._consecutive_plain_text_blocks``. The original
+              ``actions`` list is replaced with a single ``MessageAction``
+              sentinel (``suppress_cli=True``, ``wait_for_response=False``).
+              The LLM's prose is stashed on
+              ``sentinel._gate_suppressed_text`` and the original ``actions``
+              list on ``sentinel._gate_suppressed_actions`` so the
+              orchestrator can later choose to surface them.
+            * A terse ``planning_directive`` is set on the executor's
+              ``_state.turn_signals`` so the LLM gets corrective feedback on
+              its next turn.
+            * Once the counter exceeds ``_PLAIN_TEXT_GATE_MAX_RETRIES`` the
+              sentinel is marked ``_gate_threshold_breach=True`` so the
+              orchestrator promotes the suppressed text to
+              ``wait_for_response=True`` and surfaces it to the user.
+
+        A single ``logger.debug`` line replaces the previous two ``WARNING``
+        lines so the log stays quiet while remaining observable in debug
+        builds.
         """
         from backend.ledger.action.message import MessageAction as _MessageAction
+        from backend.ledger.event import EventSource
 
         mode = self._get_agent_mode()
         if is_chat_mode(mode):
@@ -1529,11 +1555,73 @@ class OrchestratorExecutor:
         if not self._has_active_tasks:
             return actions
 
-        logger.warning(
-            'Agent mode plain-text gate: blocking plain text response in agent mode. '
-            'The model must use tool calls (communicate_with_user, finish, or work tools).'
+        self._consecutive_plain_text_blocks += 1
+        breach = (
+            self._consecutive_plain_text_blocks
+            > self._PLAIN_TEXT_GATE_MAX_RETRIES
         )
-        return []
+
+        self._set_plain_text_directive(self._consecutive_plain_text_blocks, breach)
+
+        suppressed_text = ''
+        for a in actions:
+            suppressed_text = getattr(a, 'content', '') or suppressed_text
+
+        logger.debug(
+            'Plain-text gate fired (count=%d, breach=%s): suppressed %d message '
+            'action(s); directive set for next turn.',
+            self._consecutive_plain_text_blocks,
+            breach,
+            len(actions),
+        )
+
+        sentinel = _MessageAction(
+            content='',
+            wait_for_response=False,
+            suppress_cli=True,
+        )
+        sentinel.source = EventSource.AGENT
+        sentinel._gate_suppressed_text = suppressed_text  # type: ignore[attr-defined]
+        sentinel._gate_suppressed_actions = actions  # type: ignore[attr-defined]
+        sentinel._gate_threshold_breach = breach  # type: ignore[attr-defined]
+        return [sentinel]
+
+    # Number of consecutive plain-text fallbacks allowed before the gate
+    # promotes the suppressed text to ``wait_for_response=True`` and the
+    # orchestrator transitions the agent to ``AWAITING_USER_INPUT``. The
+    # breach fires on the (max_retries + 1)-th consecutive gate.
+    _PLAIN_TEXT_GATE_MAX_RETRIES: int = 2
+
+    def _set_plain_text_directive(self, count: int, breach: bool) -> None:
+        """Set a terse planning directive so the LLM gets corrective feedback."""
+        state = getattr(self, '_state', None)
+        if state is None or not hasattr(state, 'set_planning_directive'):
+            return
+        if breach:
+            text = (
+                "Protocol error: you have produced plain prose three times in a "
+                "row. The system will now surface your most recent reply to the "
+                "user and end this turn. Next turn, emit exactly one tool call "
+                "(communicate_with_user, task_tracker, or a work tool) before "
+                "any further narration."
+            )
+        else:
+            text = (
+                f"Protocol error: your previous response was plain prose "
+                f"(attempt {count}). In agent mode while tasks are open you "
+                f"must emit exactly one tool call every turn — for example "
+                f"communicate_with_user to pause for the user, task_tracker to "
+                f"update progress, or a work tool. After "
+                f"{self._PLAIN_TEXT_GATE_MAX_RETRIES} consecutive prose-only "
+                f"turns the system will surface your reply and end the turn."
+            )
+        try:
+            state.set_planning_directive(
+                text,
+                source='OrchestratorExecutor._gate_agent_mode_plain_text',
+            )
+        except Exception:
+            logger.debug('Failed to set plain-text planning directive', exc_info=True)
 
     def _response_to_actions(self, response: ModelResponse) -> list[Action]:
         mcp_tools = self._mcp_tools_provider()
