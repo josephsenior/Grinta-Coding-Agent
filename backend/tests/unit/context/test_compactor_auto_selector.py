@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
+from backend.context.compactor.compactor import Compaction, RollingCompactor
+from backend.context.compactor.strategies.auto_compactor import AutoCompactor
 from backend.context.compactor.strategies.auto_selector import (
     _HIGH_ERROR_RATIO,
     _LONG_SESSION,
@@ -13,6 +17,7 @@ from backend.context.compactor.strategies.auto_selector import (
     compute_signals,
     select_compactor_config,
 )
+from backend.context.view import View
 from backend.core.config.compactor_config import (
     AmortizedPruningCompactorConfig,
     AutoCompactorConfig,
@@ -20,8 +25,10 @@ from backend.core.config.compactor_config import (
     ObservationMaskingCompactorConfig,
     RecentEventsCompactorConfig,
     SmartCompactorConfig,
+    StructuredSummaryCompactorConfig,
 )
 from backend.ledger.action import CmdRunAction, MessageAction
+from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation import CmdOutputObservation, ErrorObservation
 
@@ -181,6 +188,55 @@ class TestSelectCompactorConfig:
         config = select_compactor_config(events, llm_config='llm')
         # Error heuristic should fire before long-session heuristic
         assert isinstance(config, RecentEventsCompactorConfig)
+
+
+# ---------------------------------------------------------------------------
+# AutoCompactor
+# ---------------------------------------------------------------------------
+
+
+class TestAutoCompactor:
+    async def test_explicit_request_bypasses_short_session_noop(self):
+        auto = AutoCompactor(llm_config='condenser_llm', llm_registry=MagicMock())
+        view = View(
+            events=_make_events(5),
+            unhandled_condensation_request=True,
+        )
+        action = CondensationAction(pruned_event_ids=[1])
+        delegate = MagicMock()
+        delegate.compact = AsyncMock(return_value=Compaction(action=action))
+
+        with patch(
+            'backend.context.compactor.strategies.auto_compactor.Compactor.from_config',
+            return_value=delegate,
+        ) as factory:
+            result = await auto.compact(view)
+
+        config = factory.call_args.args[0]
+        assert isinstance(config, StructuredSummaryCompactorConfig)
+        assert isinstance(result, Compaction)
+        assert result.action is action
+
+    async def test_explicit_request_forces_rolling_delegate_compaction(self):
+        auto = AutoCompactor(llm_config=None, llm_registry=MagicMock())
+        view = View(
+            events=_make_events(5),
+            unhandled_condensation_request=True,
+        )
+        action = CondensationAction(pruned_event_ids=[1])
+        compaction = Compaction(action=action)
+        delegate = MagicMock(spec=RollingCompactor)
+        delegate.compact = AsyncMock(return_value=view)
+        delegate.get_compaction = AsyncMock(return_value=compaction)
+
+        with patch(
+            'backend.context.compactor.strategies.auto_compactor.Compactor.from_config',
+            return_value=delegate,
+        ):
+            result = await auto.compact(view)
+
+        delegate.get_compaction.assert_awaited_once_with(view)
+        assert result is compaction
 
 
 # ---------------------------------------------------------------------------

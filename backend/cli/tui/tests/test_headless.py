@@ -40,6 +40,7 @@ from backend.cli.tui.widgets.activity_card import (
 from backend.core.enums import AgentState, EventSource
 from backend.ledger.action import (
     ClarificationRequestAction,
+    FileEditAction,
     FileWriteAction,
     MessageAction,
     ProposalAction,
@@ -1449,6 +1450,54 @@ async def test_tui_file_edit_observation_uses_unified_diff_rows(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_file_edit_action_and_observation_render_single_delta_card(
+    mock_config,
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            FileEditAction(path='demo.txt', command='edit', new_str='gamma\n')
+        )
+        renderer._process_event(
+            FileEditObservation(
+                content='edited',
+                path='demo.txt',
+                prev_exist=True,
+                old_content='alpha\nbeta\n',
+                new_content='alpha\ngamma\n',
+            )
+        )
+        await pilot.pause()
+
+        file_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes
+        ]
+        assert len(file_cards) == 1
+        collapsed_markup = file_cards[0]._build_collapsed_markup()
+        assert 'demo.txt' in collapsed_markup
+        assert '[#54efae]+1[/]' in collapsed_markup
+        assert '[#fd8383]-1[/]' in collapsed_markup
+
+
+@pytest.mark.asyncio
 async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
@@ -1482,6 +1531,15 @@ async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
         diff_text = [row.renderable.plain for row in diff_rows]
         assert any(line.startswith('--- demo.txt') for line in diff_text)
         assert any(line.startswith('+new') for line in diff_text)
+
+        file_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes
+        ]
+        collapsed_markup = file_cards[0]._build_collapsed_markup()
+        assert '[#54efae]+1[/]' in collapsed_markup
+        assert '[#fd8383]-1[/]' in collapsed_markup
 
 
 @pytest.mark.asyncio
@@ -1521,6 +1579,15 @@ async def test_tui_file_edit_observation_uses_diff_preview_rows(mock_config):
         diff_text = [row.renderable.plain for row in diff_rows]
         assert any(line.startswith('--- demo.txt') for line in diff_text)
         assert any(line.startswith('+new') for line in diff_text)
+
+        file_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes
+        ]
+        collapsed_markup = file_cards[0]._build_collapsed_markup()
+        assert '[#54efae]+1[/]' in collapsed_markup
+        assert '[#fd8383]-1[/]' in collapsed_markup
 
 
 @pytest.mark.asyncio

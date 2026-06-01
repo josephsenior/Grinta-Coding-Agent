@@ -23,6 +23,7 @@ from backend.ledger.observation import (
     ErrorObservation,
     NullObservation,
     Observation,
+    StatusObservation,
 )
 from backend.ledger.observation.agent import RecallObservation
 
@@ -39,7 +40,7 @@ class StepDecisionService:
     - Agent messages → step unless waiting for user input
     - Condensation actions → always step
     - NullObservation → step only when it has a cause
-    - AgentStateChangedObservation, RecallObservation, ErrorObservation → never step
+    - AgentStateChangedObservation, RecallObservation, ErrorObservation, StatusObservation → never step
     - All other observations → step
     """
 
@@ -75,5 +76,9 @@ class StepDecisionService:
         # transition to AWAITING_USER_INPUT).  Triggering a step here
         # would bypass retry delays and cause infinite retry loops.
         return not isinstance(
-            event, AgentStateChangedObservation | RecallObservation | ErrorObservation
+            event,
+            AgentStateChangedObservation
+            | RecallObservation
+            | ErrorObservation
+            | StatusObservation,
         )

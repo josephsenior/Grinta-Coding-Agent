@@ -290,6 +290,30 @@ class TestCondenseHistory:
 
         assert result.pending_action is action
 
+    async def test_explicit_request_forces_rolling_compactor(self):
+        m = _make_manager()
+        from backend.context.compactor.compactor import Compaction, RollingCompactor
+        from backend.context.view import View
+
+        fake_view = MagicMock(spec=View)
+        fake_view.events = cast(list[Event], [MagicMock(), MagicMock()])
+        action = CondensationAction(pruned_event_ids=[1])
+        compaction = Compaction(action=action)
+
+        fake_compactor = MagicMock(spec=RollingCompactor)
+        fake_compactor.compacted_history = AsyncMock(return_value=fake_view)
+        fake_compactor.get_compaction = AsyncMock(return_value=compaction)
+        m.compactor = fake_compactor
+
+        state = self._make_state_with_history([MagicMock() for _ in range(5)])
+        state.view.unhandled_condensation_request = True
+
+        result = await m.condense_history(state)
+
+        fake_compactor.get_compaction.assert_awaited_once_with(fake_view)
+        assert result.events == []
+        assert result.pending_action is action
+
 
 # ---------------------------------------------------------------------------
 # get_initial_user_message

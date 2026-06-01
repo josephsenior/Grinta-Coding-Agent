@@ -143,6 +143,7 @@ from backend.ledger.action import (
     ClarificationRequestAction,
     CmdRunAction,
     CondensationAction,
+    CondensationRequestAction,
     DelegateTaskAction,
     EscalateToHumanAction,
     FileEditAction,
@@ -237,7 +238,21 @@ def _format_diff_summary(added: int, removed: int) -> str | None:
         parts.append(f'+{added}')
     if removed:
         parts.append(f'-{removed}')
-    return ' · '.join(parts) if parts else None
+    return ' '.join(parts) if parts else None
+
+
+def _count_unified_diff_changes(diff_text: str | None) -> tuple[int, int]:
+    """Count added and removed payload lines in a unified diff."""
+    if not diff_text:
+        return 0, 0
+    added = 0
+    removed = 0
+    for line in diff_text.splitlines():
+        if line.startswith('+') and not line.startswith('+++'):
+            added += 1
+        elif line.startswith('-') and not line.startswith('---'):
+            removed += 1
+    return added, removed
 
 
 def _encode_unified_diff_text(diff_text: str, *, max_lines: int = 200) -> str | None:
@@ -862,13 +877,12 @@ class ConfirmWidget(Widget):
 
     DEFAULT_CSS = """
     ConfirmWidget {
-        dock: top;
-        height: auto;
-        max-height: 5;
-        background: #0f1729;
+        height: 3;
+        max-height: 3;
+        background: #0a1222;
         border-top: tall #1a2744;
         border-bottom: tall #1a2744;
-        padding: 0 2;
+        padding: 0 1;
         display: none;
     }
     ConfirmWidget.-visible {
@@ -876,25 +890,28 @@ class ConfirmWidget(Widget):
     }
     ConfirmWidget #confirm-bar {
         layout: horizontal;
-        height: auto;
+        height: 1;
         align: left middle;
     }
     ConfirmWidget #confirm-info {
         width: 1fr;
-        height: auto;
+        height: 1;
         color: #cbd5e1;
-        padding: 0 1;
+        padding: 0 1 0 0;
+        content-align: left middle;
     }
     ConfirmWidget #confirm-actions {
-        height: auto;
-        dock: right;
-        margin-left: 2;
+        width: auto;
+        height: 1;
+        align: right middle;
+        margin-left: 1;
     }
     ConfirmWidget #confirm-actions Button {
         min-width: 0;
         width: auto;
         margin-left: 1;
         height: 1;
+        padding: 0 2;
     }
     ConfirmWidget Button.-primary {
         background: #2563eb;
@@ -929,6 +946,16 @@ class ConfirmWidget(Widget):
     }
     """
 
+    _ACTION_VERBS: dict[str, str] = {
+        'Run Command': 'execute',
+        'Edit File': 'edit',
+        'Write File': 'write',
+        'Read File': 'read',
+        'MCP Tool': 'use',
+        'Browser': 'use',
+        'Delegate': 'delegate',
+    }
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._decision_event: asyncio.Event = asyncio.Event()
@@ -952,16 +979,16 @@ class ConfirmWidget(Widget):
         recommended: int | None = None,
     ) -> None:
         """Populate the confirmation bar with action details."""
+        verb = self._ACTION_VERBS.get(action_type, action_type.lower())
         if target:
-            truncated = target if len(target) <= 50 else target[:47] + '...'
+            truncated = target if len(target) <= 72 else target[:69] + '...'
             info = (
-                f'[bold cyan]{action_type}[/] '
-                f'[dim]→[/] '
-                f'[white]{truncated}[/]  '
-                f'[{risk_class}]{risk_label}[/]'
+                f'[dim]Agent wants to {verb}[/] '
+                f'[white]{truncated}[/] '
+                f'[{risk_class}]({risk_label} risk)[/]'
             )
         else:
-            info = f'[bold cyan]{action_type}[/]  [{risk_class}]{risk_label}[/]'
+            info = f'[dim]Agent wants to {verb}[/] [{risk_class}]({risk_label} risk)[/]'
 
         info_static = self.query_one('#confirm-info', Static)
         info_static.update(info)
@@ -985,7 +1012,6 @@ class ConfirmWidget(Widget):
 
     def hide(self) -> None:
         self.remove_class('-visible')
-        self._decision = None
 
     async def wait_for_decision(self) -> str | None:
         """Block until the user clicks a button."""
@@ -1717,8 +1743,8 @@ class GrintaScreen(Screen):
 
         with Horizontal(id='app-layout'):
             with Vertical(id='left-column'):
-                yield ConfirmWidget(id='confirm-widget')
                 yield Transcript(id='main-display')
+                yield ConfirmWidget(id='confirm-widget')
                 yield ListView(id='suggestions-list', classes='-hidden')
                 with InputBar(id='input-bar'):
                     yield Label(id='input-hint')
@@ -3785,6 +3811,42 @@ class GrintaScreen(Screen):
         'HIGH': ('High', 'bold red'),
     }
 
+    @staticmethod
+    def _normalize_risk_key(risk: Any) -> str:
+        """Return the display key used by the confirmation risk map."""
+        if risk is None:
+            return 'UNKNOWN'
+
+        name = getattr(risk, 'name', None)
+        if isinstance(name, str) and name:
+            return name.upper()
+
+        value = getattr(risk, 'value', risk)
+        if isinstance(value, int):
+            return {
+                -1: 'UNKNOWN',
+                0: 'LOW',
+                1: 'MEDIUM',
+                2: 'HIGH',
+            }.get(value, 'UNKNOWN')
+
+        risk_text = str(value).strip().upper()
+        try:
+            return {
+                -1: 'UNKNOWN',
+                0: 'LOW',
+                1: 'MEDIUM',
+                2: 'HIGH',
+            }[int(risk_text)]
+        except (KeyError, TypeError, ValueError):
+            pass
+
+        if '.' in risk_text:
+            risk_text = risk_text.rsplit('.', 1)[-1]
+        if risk_text in GrintaScreen._RISK_LABELS:
+            return risk_text
+        return 'UNKNOWN'
+
     async def _handle_confirmation_dialog(self) -> None:
         """Show inline confirmation widget and wait for user decision."""
         pending = None
@@ -3808,20 +3870,20 @@ class GrintaScreen(Screen):
 
             risk = getattr(pending, 'security_risk', None)
             if risk is not None:
-                risk_raw = str(risk)
+                risk_raw = self._normalize_risk_key(risk)
 
         risk_label, risk_class = self._RISK_LABELS.get(
-            risk_raw, ('· Unknown', 'confirm-risk-unknown')
+            risk_raw, ('Unknown', 'dim')
         )
 
         options: list[tuple[str, str]] = [
-            ('approve', 'Approve'),
-            ('reject', 'Reject'),
+            ('approve', 'Accept'),
         ]
 
         ac = getattr(self._controller, 'autonomy_controller', None)
         if ac is not None and hasattr(ac, 'remember_always_allow'):
             options.append(('always', 'Always'))
+        options.append(('reject', 'Reject'))
 
         widget = self.query_one('#confirm-widget', ConfirmWidget)
         widget.configure(
@@ -3909,6 +3971,7 @@ class TUIRenderer:
         self._worker_completed: int = 0
         self._worker_failed: int = 0
         self._condensation_count: int = 0
+        self._last_active_card: Any | None = None
         self._last_browser_action_card: Any | None = None
         self._last_browser_cmd: str = ''
 
@@ -3918,15 +3981,15 @@ class TUIRenderer:
 
     def add_to_history(self, renderable: Any) -> None:
         """Add a finalized renderable or widget to the transcript."""
+        self.commit_live_thinking()
+        self.clear_live_response()
+
         self._history.append(renderable)
         self._history.append(Text(''))
         overflow = len(self._history) - _TUI_HISTORY_RENDER_LIMIT
         if overflow > 0:
             del self._history[:overflow]
             self._history_items_dropped += overflow
-
-        self.commit_live_thinking()
-        self.clear_live_response()
 
         display = self._tui._get_display()
         if type(display).__name__ == 'MagicMock':
@@ -4014,7 +4077,7 @@ class TUIRenderer:
             self._live_response_widget = None
 
     def commit_live_thinking(self) -> None:
-        """Commit live reasoning into transcript as a CollapsibleSection."""
+        """Freeze the current live thinking block at its transcript position."""
         display = self._tui._get_display()
         if type(display).__name__ == 'MagicMock':
             if self._live_thinking_dirty:
@@ -4026,28 +4089,35 @@ class TUIRenderer:
             return
 
         if self._live_thinking_widget:
-            self._live_thinking_widget.stop()
             thoughts = list(self._live_thinking_widget._thoughts)
-            self._live_thinking_widget.remove()
-            self._live_thinking_widget = None
-
             if thoughts and self._live_thinking_dirty:
-                display = self._tui._get_display()
-                if type(display).__name__ != 'MagicMock':
-                    content = Text('\n  '.join(thoughts), style='rgb(150,154,189)')
-                    display.append_widget(
-                        Static(
-                            Text.assemble(
-                                ('Thinking:', 'bold #5eead4'),
-                                '  ',
-                                content,
-                            )
-                        )
+                self._live_thinking_widget.finalize()
+                self._history.append(
+                    Text.assemble(
+                        ('Thinking:', 'bold #5eead4'),
+                        '  ',
+                        Text('\n  '.join(thoughts), style='rgb(150,154,189)'),
                     )
+                )
+                self._history.append(Text(''))
+                overflow = len(self._history) - _TUI_HISTORY_RENDER_LIMIT
+                if overflow > 0:
+                    del self._history[:overflow]
+                    self._history_items_dropped += overflow
+            else:
+                self._live_thinking_widget.remove()
+            self._live_thinking_widget = None
             self._live_thinking_dirty = False
 
             self._live_thinking = ''
             self._live_thinking_dirty = False
+
+    def _finalize_live_thinking(self) -> None:
+        finalize = getattr(self._tui, 'finalize_thinking', None)
+        if callable(finalize):
+            finalize()
+        else:
+            self.commit_live_thinking()
 
     def clear_history(self) -> None:
         self._live_thinking_widget = None
@@ -4254,6 +4324,7 @@ class TUIRenderer:
         collapsed: bool = True,
     ) -> Any:
         """Write an activity card to the transcript using native ActivityCard widget."""
+        self.commit_live_thinking()
         self._clear_last_active_card_processing()
 
         extra_content = None
@@ -4327,12 +4398,13 @@ class TUIRenderer:
         secondary: str | None = None,
         secondary_kind: str = 'neutral',
         extra_content: str | None = None,
-        collapsed: bool = False,
+        collapsed: bool = True,
     ) -> None:
         from backend.cli.tui.widgets.activity_card import (
             ActivityCard as TUIActivityCard,
         )
 
+        self.commit_live_thinking()
         self._clear_last_active_card_processing()
         status_map = {'ok': 'ok', 'err': 'err', 'warn': 'warn', 'neutral': 'neutral'}
         status = status_map.get(secondary_kind, 'neutral')
@@ -4423,7 +4495,7 @@ class TUIRenderer:
                 secondary_kind=secondary_kind,
                 extra_content=extra_content,
             )
-            widget = self._write_card(card, collapsed=collapse_after_update)
+            widget = self._write_card(card, collapsed=True)
             if session_id:
                 self._terminal_cards_by_session[session_key] = widget
             else:
@@ -4443,8 +4515,7 @@ class TUIRenderer:
         if extra_content:
             widget.append_content(extra_content)
 
-        if collapse_after_update:
-            widget.set_collapsed(True)
+        del collapse_after_update
 
         widget.set_processing(processing)
         if processing:
@@ -4470,6 +4541,7 @@ class TUIRenderer:
             ActivityCard as TUIActivityCard,
         )
 
+        self.commit_live_thinking()
         card = ActivityRenderer.shell_command(command)
         widget = TUIActivityCard(
             verb=card.verb,
@@ -4479,6 +4551,7 @@ class TUIRenderer:
             outcome=card.secondary,
             extra_content=None,
             collapsed=True,
+            collapsible=True,
         )
         widget.set_processing(True)
         self._clear_last_active_card_processing()
@@ -4535,7 +4608,6 @@ class TUIRenderer:
         extra_content = '\n'.join(extra_parts)
 
         widget.update_content(extra_content)
-        widget.set_collapsed(False)
         widget.set_processing(False)
         self._tui.set_current_operation(
             f'{card.verb} {card.detail}'.strip(),
@@ -4612,6 +4684,22 @@ class TUIRenderer:
             with self._pending_lock:
                 self._drain_scheduled = False
 
+    @staticmethod
+    def _is_visible_thinking_text(text: str) -> bool:
+        thought = (text or '').strip()
+        return bool(thought) and thought != 'Your thought has been logged.'
+
+    def _is_live_thinking_event(self, event: Any) -> bool:
+        if isinstance(event, AgentThinkAction):
+            if bool(getattr(event, 'suppress_cli', False)):
+                return False
+            thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
+            return self._is_visible_thinking_text(thought)
+        if isinstance(event, AgentThinkObservation):
+            thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
+            return self._is_visible_thinking_text(thought)
+        return isinstance(event, StreamingChunkAction)
+
     def _process_event(self, event: Any) -> None:
         self._update_metrics(event)
         if isinstance(event, NullAction) or isinstance(event, NullObservation):
@@ -4648,6 +4736,9 @@ class TUIRenderer:
             ),
         ):
             self._tools_in_turn += 1
+
+        if not self._is_live_thinking_event(event):
+            self._finalize_live_thinking()
 
         if isinstance(event, MessageAction):
             if self._is_user_source(source):
@@ -4705,14 +4796,18 @@ class TUIRenderer:
 
             if cmd == 'create_file':
                 file_text = getattr(event, 'file_text', '') or ''
-                card = ActivityRenderer.file_create(
-                    path,
-                    line_count=_count_text_lines(file_text),
+                self._tui.set_current_operation(
+                    f'Created {path}'.strip(),
+                    meta=f'+{_count_text_lines(file_text)}' if file_text else 'Running',
+                    active=True,
                 )
-                self._write_card(card)
             else:
-                card = ActivityRenderer.file_edit(verb, path, line_range)
-                self._write_card(card)
+                op_detail = f'{path} · {line_range}' if line_range else path
+                self._tui.set_current_operation(
+                    f'{verb} {op_detail}'.strip(),
+                    meta='Running',
+                    active=True,
+                )
         elif isinstance(event, FileWriteAction):
             content = getattr(event, 'content', '') or ''
             card = ActivityRenderer.file_create(
@@ -4749,16 +4844,7 @@ class TUIRenderer:
                     per_file = _split_combined_diff(diff_text)
                     if per_file:
                         for fp, file_diff in per_file:
-                            f_added = sum(
-                                1
-                                for line in file_diff.splitlines()
-                                if line.startswith('+') and not line.startswith('+++')
-                            )
-                            f_removed = sum(
-                                1
-                                for line in file_diff.splitlines()
-                                if line.startswith('-') and not line.startswith('---')
-                            )
+                            f_added, f_removed = _count_unified_diff_changes(file_diff)
                             encoded = _encode_unified_diff_text(file_diff)
                             if encoded:
                                 self._write_tui_file_card(
@@ -4767,7 +4853,6 @@ class TUIRenderer:
                                     secondary=_format_diff_summary(f_added, f_removed),
                                     secondary_kind='ok' if f_added else 'neutral',
                                     extra_content=encoded,
-                                    collapsed=_should_collapse_file_diff(encoded),
                                 )
                     else:
                         self._write_card(
@@ -4777,8 +4862,11 @@ class TUIRenderer:
                     self._write_card(ActivityRenderer.file_edit('Edited', path or '?'))
             else:
                 encoded_diff = self._extract_file_edit_group_rows(event)
+                diff_text = None
                 if not encoded_diff:
                     diff_text = self._extract_file_edit_diff(event)
+                    if not (added or removed):
+                        added, removed = _count_unified_diff_changes(diff_text)
                     encoded_diff = (
                         _encode_unified_diff_text(diff_text) if diff_text else None
                     )
@@ -4789,7 +4877,6 @@ class TUIRenderer:
                         secondary=_format_diff_summary(added, removed),
                         secondary_kind='ok' if added and not removed else 'neutral',
                         extra_content=encoded_diff,
-                        collapsed=_should_collapse_file_diff(encoded_diff),
                     )
                 else:
                     card = ActivityRenderer.file_edit(
@@ -4802,13 +4889,14 @@ class TUIRenderer:
         elif isinstance(event, FileWriteObservation):
             diff_text = self._extract_file_observation_diff(event)
             if diff_text:
+                encoded_diff = _encode_unified_diff_text(diff_text)
+                added, removed = _count_unified_diff_changes(diff_text)
                 self._write_tui_file_card(
                     'Edited',
                     event.path,
-                    secondary=None,
-                    secondary_kind='neutral',
-                    extra_content=_encode_unified_diff_text(diff_text),
-                    collapsed=_should_collapse_file_diff(diff_text),
+                    secondary=_format_diff_summary(added, removed),
+                    secondary_kind='ok' if added and not removed else 'neutral',
+                    extra_content=encoded_diff,
                 )
         elif isinstance(event, MCPAction):
             card = ActivityRenderer.mcp_tool(event.name, event.arguments)
@@ -5025,6 +5113,9 @@ class TUIRenderer:
             )
         elif isinstance(event, RecallAction):
             # Don't show memory recall as a visible card - it's an internal operation
+            pass
+        elif isinstance(event, CondensationRequestAction):
+            # Don't show condensation requests - they're internal; CondensationAction shows the result
             pass
         elif isinstance(event, RecallObservation):
             pass
@@ -5408,10 +5499,14 @@ class TUIRenderer:
             return
 
         thinking = (action.thinking_accumulated or '').strip()
-        if thinking and thinking != 'Your thought has been logged.':
-            self._tui.add_thinking(thinking)
-
         content = self._normalize_final_response_text(action.accumulated or '')
+
+        if self._is_visible_thinking_text(thinking):
+            self._tui.add_thinking(thinking)
+            if content or action.is_final:
+                self._finalize_live_thinking()
+        elif content or action.is_final:
+            self._finalize_live_thinking()
 
         if action.is_final:
             self._commit_final_response(content)

@@ -37,6 +37,14 @@ class StateSummary(BaseModel):
     pending_tasks: str = Field(
         default='', description='List of tasks that still need to be done.'
     )
+    latest_user_request: str = Field(
+        default='',
+        description='The most recent explicit user request or correction that is still active.',
+    )
+    current_working_step: str = Field(
+        default='',
+        description='The exact next step the agent was about to perform before compaction.',
+    )
     current_state: str = Field(
         default='',
         description='Current variables, data structures, or other relevant state information.',
@@ -63,6 +71,18 @@ class StateSummary(BaseModel):
     )
     error_messages: str = Field(
         default='', description='List of key error messages encountered.'
+    )
+    exact_commands_and_results: str = Field(
+        default='',
+        description='Important commands/tool calls and their exact outcome, including paths and exit statuses when known.',
+    )
+    verification_status: str = Field(
+        default='',
+        description='What has been verified, what failed verification, and what still needs to be rerun.',
+    )
+    known_failures_or_avoid: str = Field(
+        default='',
+        description='Specific failed approaches, user rejected approaches, and constraints that must not be repeated.',
     )
     branch_created: str = Field(
         default='',
@@ -129,6 +149,8 @@ class StateSummary(BaseModel):
             f'**User Context**: {self.user_context}',
             f'**Completed Tasks**: {self.completed_tasks}',
             f'**Pending Tasks**: {self.pending_tasks}',
+            f'**Latest User Request**: {self.latest_user_request}',
+            f'**Current Working Step**: {self.current_working_step}',
             f'**Current State**: {self.current_state}',
             '## Code Changes',
             f'**Files Modified**: {self.files_modified}',
@@ -140,6 +162,9 @@ class StateSummary(BaseModel):
             f'**Tests Passing**: {self.tests_passing}',
             f'**Failing Tests**: {self.failing_tests}',
             f'**Error Messages**: {self.error_messages}',
+            f'**Exact Commands And Results**: {self.exact_commands_and_results}',
+            f'**Verification Status**: {self.verification_status}',
+            f'**Known Failures Or Avoid**: {self.known_failures_or_avoid}',
             '## Version Control',
             f'**Branch Created**: {self.branch_created}',
             f'**Branch Name**: {self.branch_name}',
@@ -175,6 +200,8 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         """
         # Prepare view sections
         _head, pruned_events, summary_event = self._prepare_view_sections(view)
+        if not pruned_events:
+            return self._create_compaction_result(pruned_events, '')
 
         # Build prompt for LLM
         prompt = self._build_condensation_prompt(summary_event, pruned_events)
@@ -245,8 +272,11 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         else:
             summary_event = AgentCondensationObservation('No events summarized')
 
-        # Get pruned events (exclude summary events)
-        pruned_slice = view[self.keep_first : -events_from_tail]
+        # Get pruned events (exclude summary events). Build the stop index
+        # explicitly so tail_count=0 means "through the end", not slice stop 0.
+        tail_count = max(0, events_from_tail)
+        stop = len(view) - tail_count if tail_count else len(view)
+        pruned_slice = view[self.keep_first : stop]
         pruned_events: list[Event] = [
             event
             for event in pruned_slice
@@ -271,8 +301,12 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             'Capture all relevant information, especially:\n'
             '- The verbatim original user objective (this is non-negotiable)\n'
             '- User requirements that were explicitly stated\n'
+            '- The latest user correction/request if it changed the task direction\n'
             '- Work that has been completed\n'
             '- Tasks that remain pending\n'
+            '- The immediate next step the agent should take after compaction\n'
+            '- Exact file paths, commands, test names, failing assertions, and provider errors\n'
+            '- Explicit approaches the user rejected or asked not to repeat\n'
             '- Current state of code, variables, and data structures\n'
             '- The status of any version control operations\n\n'
         )

@@ -25,6 +25,7 @@ from backend.ledger.action import (
     NullAction,
 )
 from backend.ledger.action.agent import CondensationRequestAction
+from backend.ledger.observation import ErrorObservation, StatusObservation
 from backend.orchestration.services.action_execution_service import (
     ActionExecutionService,
 )
@@ -403,16 +404,68 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         exc = ContextWindowExceededError('Context too large')
         mock_is_ctx_error.return_value = True
         self.mock_context.agent.config.enable_history_truncation = True
+        mock_controller = MagicMock()
+        self.mock_context.get_controller.return_value = mock_controller
 
         result = await self.service._handle_context_window_error(exc)  # type: ignore[reportPrivateUsage]
 
         # Should emit condensation request
         self.assertIsNone(result)
-        self.mock_context.event_stream.add_event.assert_called_once()
+        self.assertEqual(self.mock_context.event_stream.add_event.call_count, 2)
 
-        # Check for CondensationRequestAction
-        call_args = self.mock_context.event_stream.add_event.call_args[0]
-        self.assertIsInstance(call_args[0], CondensationRequestAction)
+        first_event = self.mock_context.event_stream.add_event.call_args_list[0][0][0]
+        second_event = self.mock_context.event_stream.add_event.call_args_list[1][0][0]
+        self.assertIsInstance(first_event, StatusObservation)
+        self.assertIsInstance(second_event, CondensationRequestAction)
+        mock_controller.schedule_step_soon.assert_called_once()
+
+    @patch(
+        'backend.orchestration.services.action_execution_service.is_context_window_error'
+    )
+    async def test_handle_context_window_error_stops_after_recovery_exhausted(
+        self, mock_is_ctx_error: MagicMock
+    ):
+        """Repeated context-window recovery must not leave the agent RUNNING forever."""
+        from backend.core.schemas import AgentState
+
+        exc = ContextWindowExceededError('Context too large')
+        mock_is_ctx_error.return_value = True
+        self.mock_context.agent.config.enable_history_truncation = True
+        mock_controller = MagicMock()
+        mock_controller.get_agent_state.return_value = AgentState.RUNNING
+        mock_controller.set_agent_state_to = AsyncMock()
+        self.mock_context.get_controller.return_value = mock_controller
+
+        for _ in range(self.service._MAX_CONTEXT_WINDOW_RECOVERY_REQUESTS + 1):
+            result = await self.service._handle_context_window_error(exc)  # type: ignore[reportPrivateUsage]
+
+        self.assertIsNone(result)
+        final_event = self.mock_context.event_stream.add_event.call_args_list[-1][0][0]
+        self.assertIsInstance(final_event, ErrorObservation)
+        self.assertEqual(final_event.error_id, 'CONTEXT_WINDOW_RECOVERY_EXHAUSTED')
+        self.assertTrue(final_event.notify_ui_only)
+        mock_controller.set_agent_state_to.assert_awaited_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+
+    async def test_unexpected_no_action_while_running_returns_to_user(self):
+        """A None action with no scheduled recovery should not leave RUNNING stale."""
+        from backend.core.schemas import AgentState
+
+        mock_controller = MagicMock()
+        mock_controller.get_agent_state.return_value = AgentState.RUNNING
+        mock_controller.set_agent_state_to = AsyncMock()
+        self.mock_context.get_controller.return_value = mock_controller
+
+        await self.service.handle_unexpected_no_action_while_running()
+
+        final_event = self.mock_context.event_stream.add_event.call_args[0][0]
+        self.assertIsInstance(final_event, ErrorObservation)
+        self.assertEqual(final_event.error_id, 'AGENT_STEP_STALLED')
+        self.assertTrue(final_event.notify_ui_only)
+        mock_controller.set_agent_state_to.assert_awaited_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
 
     @patch(
         'backend.orchestration.services.action_execution_service.is_context_window_error'

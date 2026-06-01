@@ -12,6 +12,7 @@ from backend.ledger.observation import (
     AgentStateChangedObservation,
     NullObservation,
     Observation,
+    StatusObservation,
 )
 from backend.ledger.observation.agent import RecallObservation
 from backend.orchestration.services.step_decision_service import StepDecisionService
@@ -134,6 +135,14 @@ class TestStepDecisionService(unittest.TestCase):
     def test_should_step_recall_observation(self):
         """Test should_step returns False for RecallObservation."""
         observation = MagicMock(spec=RecallObservation)
+
+        result = self.service.should_step(observation)
+
+        self.assertFalse(result)
+
+    def test_should_not_step_status_observation(self):
+        """Status observations are UI-only progress signals, not step triggers."""
+        observation = StatusObservation(content='Compacting', status_type='compaction')
 
         result = self.service.should_step(observation)
 

@@ -8,7 +8,7 @@ import pytest
 
 from backend.ledger import EventSource
 from backend.ledger.action.agent import CondensationRequestAction
-from backend.ledger.observation import ErrorObservation
+from backend.ledger.observation import ErrorObservation, StatusObservation
 from backend.orchestration.services.action_execution_service import (
     ActionExecutionService,
 )
@@ -229,10 +229,12 @@ class TestHandleContextWindowError:
                 Exception('context too long')
             )
         assert result is None
-        # Should have added a CondensationRequestAction
-        ctx.event_stream.add_event.assert_called_once()
-        args = ctx.event_stream.add_event.call_args[0]
-        assert isinstance(args[0], CondensationRequestAction)
+        assert ctx.event_stream.add_event.call_count == 2
+        first_event = ctx.event_stream.add_event.call_args_list[0].args[0]
+        second_event = ctx.event_stream.add_event.call_args_list[1].args[0]
+        assert isinstance(first_event, StatusObservation)
+        assert first_event.status_type == 'compaction'
+        assert isinstance(second_event, CondensationRequestAction)
 
     @pytest.mark.asyncio
     async def test_context_window_without_truncation_raises(self):

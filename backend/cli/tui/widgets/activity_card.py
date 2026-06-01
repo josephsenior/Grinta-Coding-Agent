@@ -187,6 +187,27 @@ def _decode_split_diff_line(line: str) -> tuple[str, str, str, str] | None:
     return left, right, left_kind, right_kind
 
 
+def _format_file_delta_outcome(outcome: str) -> str | None:
+    """Return independently colored +N/-N file delta tokens."""
+    tokens = outcome.replace(',', ' ').replace('·', ' ').split()
+    if not tokens:
+        return None
+
+    parts: list[str] = []
+    has_delta = False
+    for token in tokens:
+        if token.startswith('+') and token[1:].isdigit():
+            parts.append(f'[{NAVY_READY}]{token}[/]')
+            has_delta = True
+        elif token.startswith('-') and token[1:].isdigit():
+            parts.append(f'[{NAVY_ERROR}]{token}[/]')
+            has_delta = True
+        else:
+            parts.append(f'[{NAVY_TEXT_DIM}]{token}[/]')
+
+    return '  '.join(parts) if has_delta else None
+
+
 class ActivityCard(Container):
     """Compact activity card with collapsed/expanded states.
 
@@ -295,6 +316,7 @@ class ActivityCard(Container):
         outcome: str | None = None,
         extra_content: str | None = None,
         collapsed: bool = True,
+        collapsible: bool = True,
         diff_encoded: bool = False,
         show_meta: bool = False,
         id: str | None = None,
@@ -307,10 +329,11 @@ class ActivityCard(Container):
         self._outcome = outcome
         self._extra_content = extra_content
         self._collapsed = collapsed
+        self._collapsible = collapsible
         self._diff_encoded = diff_encoded
         self._show_meta = show_meta
         self.processing = False
-        self.can_focus = bool(extra_content)
+        self.can_focus = bool(extra_content) or collapsible
         self._meta_lines: list[str] = []
 
         self.add_class(f'category-{badge_category}')
@@ -379,14 +402,22 @@ class ActivityCard(Container):
         detail_part = self._detail
         outcome_part = ''
         if self._outcome:
-            outcome_color = (
-                NAVY_READY
-                if status == 'ok'
-                else NAVY_ERROR
-                if status == 'err'
-                else NAVY_TEXT_DIM
+            file_delta = (
+                _format_file_delta_outcome(self._outcome)
+                if self._badge_category == 'files'
+                else None
             )
-            outcome_part = f'  [{outcome_color}]{self._outcome}[/]'
+            if file_delta:
+                outcome_part = f'  {file_delta}'
+            else:
+                outcome_color = (
+                    NAVY_READY
+                    if status == 'ok'
+                    else NAVY_ERROR
+                    if status == 'err'
+                    else NAVY_TEXT_DIM
+                )
+                outcome_part = f'  [{outcome_color}]{self._outcome}[/]'
 
         return f'{pulse}{icon_part} {verb_part}  {detail_part}{outcome_part}'
 
@@ -479,7 +510,7 @@ class ActivityCard(Container):
                 id='collapsed-row',
                 classes='card-collapsed-text',
             )
-            if self._extra_content:
+            if self._collapsible:
                 yield Static(self._caret_char(), id='caret', classes='card-caret')
 
         if self._extra_content:
@@ -562,12 +593,12 @@ class ActivityCard(Container):
 
     def action_toggle(self) -> None:
         """Action handler for enter/space keypresses."""
-        if self._extra_content:
+        if self._collapsible:
             self.toggle_extra()
 
     def on_click(self, event: events.Click) -> None:
         """Handle click events to toggle expansion."""
-        if self._extra_content:
+        if self._collapsible:
             clicked = event.widget
             if clicked and clicked.id in (
                 'collapsed-row',
@@ -587,7 +618,6 @@ class ActivityCard(Container):
         self._extra_content = extra_content
         self.can_focus = True
         if not self.is_mounted:
-            self._collapsed = False
             return
 
         try:
@@ -595,13 +625,9 @@ class ActivityCard(Container):
             body.remove_children()
             for renderable in self._extra_renderables():
                 body.mount(renderable)
-            body.display = True
+            body.display = not self._collapsed
         except Exception:
             pass
-
-        if self._collapsed:
-            self._collapsed = False
-            self._sync_visibility()
 
     def append_content(self, text: str) -> None:
         """Append content to the extra section."""
@@ -612,7 +638,6 @@ class ActivityCard(Container):
         self.can_focus = True
 
         if not self.is_mounted:
-            self._collapsed = False
             return
 
         self.update_content(self._extra_content)
@@ -735,15 +760,19 @@ class ThinkingIndicator(Static):
         self._step_count = len(self._thoughts)
         self._update_display()
 
+    def finalize(self) -> None:
+        """Freeze the current streamed thinking text in place."""
+        self._update_display(streaming=False)
+
     def stop(self) -> None:
         """Stop the thinking indicator."""
         self.add_class('-hidden')
 
-    def _update_display(self) -> None:
+    def _update_display(self, *, streaming: bool = True) -> None:
         import time
 
         elapsed = int(time.monotonic() - self._start_time) if self._start_time else 0
-        dots = '.' * (elapsed % 4)
+        dots = '.' * (elapsed % 4) if streaming else ''
 
         thoughts_text = Text('\n  '.join(self._thoughts), style='rgb(150,154,189)')
         self.update(
