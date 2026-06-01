@@ -95,6 +95,8 @@ class TestPlainTextProtocolGate:
         executor._planner = SimpleNamespace(_config=SimpleNamespace(mode=mode))
         executor._has_active_tasks = active_tasks
         executor._active_run_mode = mode
+        executor._state = None
+        executor._consecutive_plain_text_blocks = 0
         return executor
 
     def test_chat_mode_allows_plain_text(self):
@@ -119,7 +121,10 @@ class TestPlainTextProtocolGate:
 
         assert result == [action]
 
-    def test_agent_mode_with_active_tasks_still_blocks_plain_text(self):
+    def test_agent_mode_with_active_tasks_emits_suppressed_sentinel(self):
+        """Gate must return a sentinel (not an empty list) carrying the
+        suppressed text so the orchestrator can later surface it on a
+        threshold breach."""
         executor = self._make_executor('agent', active_tasks=True)
         action = MessageAction(content='plain answer')
 
@@ -127,7 +132,74 @@ class TestPlainTextProtocolGate:
             [action], _make_result('plain').response
         )
 
-        assert result == []
+        assert len(result) == 1
+        sentinel = result[0]
+        assert isinstance(sentinel, MessageAction)
+        assert sentinel.content == ''
+        assert sentinel.wait_for_response is False
+        assert sentinel.suppress_cli is True
+        assert sentinel._gate_suppressed_text == 'plain answer'
+        assert sentinel._gate_suppressed_actions == [action]
+        assert sentinel._gate_threshold_breach is False
+        # First gate firing must increment the counter but stay
+        # under-threshold.
+        assert executor._consecutive_plain_text_blocks == 1
+
+    def test_threshold_breach_marks_sentinel(self):
+        """After _PLAIN_TEXT_GATE_MAX_RETRIES + 1 consecutive gate fires, the
+        sentinel is marked as a threshold breach so the orchestrator promotes
+        the suppressed text and yields to the user."""
+        executor = self._make_executor('agent', active_tasks=True)
+        action = MessageAction(content='plain answer')
+        max_retries = executor._PLAIN_TEXT_GATE_MAX_RETRIES
+
+        # Fire the gate enough times to trigger the breach.
+        last_result = None
+        for _ in range(max_retries + 1):
+            last_result = executor._gate_agent_mode_plain_text(
+                [action], _make_result('plain').response
+            )
+
+        assert last_result is not None
+        assert len(last_result) == 1
+        sentinel = last_result[0]
+        assert sentinel._gate_threshold_breach is True
+        assert executor._consecutive_plain_text_blocks == max_retries + 1
+
+    def test_set_planning_directive_called_when_state_attached(self):
+        """When the executor has a state ref, the gate must set a planning
+        directive so the LLM gets corrective feedback on its next turn."""
+        from backend.orchestration.state.state import State
+
+        executor = self._make_executor('agent', active_tasks=True)
+        state = MagicMock(spec=State)
+        executor._state = state
+        action = MessageAction(content='plain answer')
+
+        executor._gate_agent_mode_plain_text(
+            [action], _make_result('plain').response
+        )
+
+        state.set_planning_directive.assert_called_once()
+        args, _ = state.set_planning_directive.call_args
+        assert 'attempt 1' in args[0]
+
+    def test_set_planning_directive_breach_message(self):
+        from backend.orchestration.state.state import State
+
+        executor = self._make_executor('agent', active_tasks=True)
+        state = MagicMock(spec=State)
+        executor._state = state
+        action = MessageAction(content='plain answer')
+
+        for _ in range(executor._PLAIN_TEXT_GATE_MAX_RETRIES + 1):
+            executor._gate_agent_mode_plain_text(
+                [action], _make_result('plain').response
+            )
+
+        # The most recent directive should mention the breach.
+        args, _ = state.set_planning_directive.call_args
+        assert 'surface' in args[0].lower()
 
     def test_plan_mode_allows_plain_text_without_task_tracker_state(self):
         executor = self._make_executor('plan', active_tasks=False)

@@ -3590,7 +3590,46 @@ class GrintaScreen(Screen):
             conversation_stats=conversation_stats,
             headless_mode=True,
         )
+        # Register the agent-mode plain-text-gate callback so the user gets a
+        # smooth inline note when the engine gates the LLM's prose, and a
+        # footer note when the threshold is breached. The callback is fired
+        # synchronously from the agent thread; ``add_system_message`` is
+        # thread-safe and writes a dim line to the transcript.
+        callback = getattr(agent, '_on_plain_text_gate', None)
+        if callable(callback):
+            try:
+                agent._on_plain_text_gate = self._handle_plain_text_gate_event
+            except Exception:
+                logger.debug('Failed to register plain-text-gate callback', exc_info=True)
         return controller
+
+    def _handle_plain_text_gate_event(self, kind: str, count: int) -> None:
+        """Render a dim inline note when the engine gates the LLM's prose.
+
+        ``kind`` is ``"under_threshold"`` (loop continues, prose suppressed) or
+        ``"threshold_breached"`` (prose surfaced, agent goes to
+        ``AWAITING_USER_INPUT``). ``count`` is the post-increment gate-firings
+        streak.
+        """
+        if not self._renderer or not getattr(self, '_write_log', None):
+            return
+        if kind == 'under_threshold':
+            max_retries = 2
+            note = (
+                f"agent is replying in prose; reminding it to use a tool call "
+                f"({count}/{max_retries + 1})"
+            )
+        elif kind == 'threshold_breached':
+            note = (
+                f"agent kept replying in prose {count} times — surfacing the "
+                f"last reply and pausing for input"
+            )
+        else:
+            return
+        try:
+            self.add_system_message(note)
+        except Exception:
+            logger.debug('Failed to render plain-text-gate note', exc_info=True)
 
     async def _run_agent_loop(self) -> None:
         if self._controller is None:

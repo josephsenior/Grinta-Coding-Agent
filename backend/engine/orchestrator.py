@@ -17,6 +17,7 @@ import contextlib
 import os
 import re
 from collections import deque
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import backend.engine.function_calling as orchestrator_function_calling
@@ -163,6 +164,14 @@ class Orchestrator(Agent):
         self._current_delimiter_token: str | None = None
         self._consecutive_invalid_protocol_outputs = 0
         self.event_stream: EventStream | None = None
+        # Callback hook invoked when the executor's plain-text gate fires.
+        # ``kind`` is either ``"under_threshold"`` or ``"threshold_breached"``;
+        # ``count`` is the post-increment gate-firings streak. TUI/CLI assign
+        # a real handler during startup; the default no-op keeps the
+        # orchestrator testable in isolation.
+        self._on_plain_text_gate: Callable[[str, int], None] = (
+            lambda kind, count: None
+        )
 
         # Safety / hallucination systems
         self.safety_manager: SafetyManagerProtocol = OrchestratorSafetyManager()
@@ -382,6 +391,12 @@ class Orchestrator(Agent):
         self._consecutive_context_errors = 0
         self._recoverable_tool_error_signature = ''
         self._recoverable_tool_error_count = 0
+        # The plain-text gate is a *positive* signal of LLM progress: when the
+        # LLM emits a real tool call (or the loop is otherwise reset) the
+        # consecutive streak is no longer meaningful, so clear it.
+        executor = getattr(self, 'executor', None)
+        if executor is not None and hasattr(executor, '_consecutive_plain_text_blocks'):
+            executor._consecutive_plain_text_blocks = 0
 
     async def _astep_normal_path(self, state: State) -> Action:
         """Happy path: optional exit/deferred/pending handling then LLM step."""
@@ -611,6 +626,7 @@ class Orchestrator(Agent):
         try:
             self.executor._has_active_tasks = self._has_active_tasks_in_state(state)  # type: ignore[attr-defined]
             self.executor._active_run_mode = self._active_run_mode_for_state(state)  # type: ignore[attr-defined]
+            self.executor._state = state  # type: ignore[attr-defined]
             result = self.executor.execute(params, self.event_stream)
             self._consecutive_invalid_protocol_outputs = 0
         except Exception:
@@ -632,6 +648,39 @@ class Orchestrator(Agent):
         actions = result.actions or []
         if not actions:
             return self._build_fallback_action(result)
+        # Detect plain-text-gate sentinel returned by the executor. The
+        # sentinel is the only action in the list when the gate fired; on
+        # real tool calls the executor leaves the actions list untouched and
+        # the first action is a real tool.
+        first = actions[0]
+        if getattr(first, '_gate_threshold_breach', False) is True:
+            # Threshold breach: surface the suppressed text to the user and
+            # transition the agent into AWAITING_USER_INPUT. Reset the
+            # counter because the loop is about to yield control. Read the
+            # pre-reset count for the callback so the UI can show "X/3".
+            breach_count = getattr(
+                self.executor, '_consecutive_plain_text_blocks', 0
+            )
+            self._reset_step_recovery_counters()
+            try:
+                self._on_plain_text_gate('threshold_breached', breach_count)
+            except Exception:
+                logger.debug('Plain-text gate callback failed', exc_info=True)
+            return self._promote_gate_sentinel(first, breached=True)
+        if getattr(first, '_gate_suppressed_text', None) is not None:
+            # Under-threshold: stay in the loop, keep counter; callback
+            # notifies the UI that a gate fired.
+            try:
+                self._on_plain_text_gate(
+                    'under_threshold',
+                    getattr(self.executor, '_consecutive_plain_text_blocks', 0),
+                )
+            except Exception:
+                logger.debug('Plain-text gate callback failed', exc_info=True)
+            return self._promote_gate_sentinel(first, breached=False)
+        # Real tool call: clear the plain-text streak.
+        if getattr(self.executor, '_consecutive_plain_text_blocks', 0) > 0:
+            self.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
         self._queue_additional_actions(actions[1:])
         return actions[0]
 
@@ -676,6 +725,7 @@ class Orchestrator(Agent):
         try:
             self.executor._has_active_tasks = self._has_active_tasks_in_state(state)  # type: ignore[attr-defined]
             self.executor._active_run_mode = self._active_run_mode_for_state(state)  # type: ignore[attr-defined]
+            self.executor._state = state  # type: ignore[attr-defined]
             result = await self.executor.async_execute(params, self.event_stream)
             self._consecutive_invalid_protocol_outputs = 0
         except Exception:
@@ -698,6 +748,31 @@ class Orchestrator(Agent):
         actions = result.actions or []
         if not actions:
             return self._build_fallback_action(result)
+        # Detect plain-text-gate sentinel returned by the executor. Mirrors
+        # the sync path above.
+        first = actions[0]
+        if getattr(first, '_gate_threshold_breach', False) is True:
+            # Read pre-reset count for the callback; see sync path for rationale.
+            breach_count = getattr(
+                self.executor, '_consecutive_plain_text_blocks', 0
+            )
+            self._reset_step_recovery_counters()
+            try:
+                self._on_plain_text_gate('threshold_breached', breach_count)
+            except Exception:
+                logger.debug('Plain-text gate callback failed', exc_info=True)
+            return self._promote_gate_sentinel(first, breached=True)
+        if getattr(first, '_gate_suppressed_text', None) is not None:
+            try:
+                self._on_plain_text_gate(
+                    'under_threshold',
+                    getattr(self.executor, '_consecutive_plain_text_blocks', 0),
+                )
+            except Exception:
+                logger.debug('Plain-text gate callback failed', exc_info=True)
+            return self._promote_gate_sentinel(first, breached=False)
+        if getattr(self.executor, '_consecutive_plain_text_blocks', 0) > 0:
+            self.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
         self._queue_additional_actions(actions[1:])
         return actions[0]
 
@@ -803,6 +878,38 @@ class Orchestrator(Agent):
         )
         fallback.source = EventSource.AGENT
         return fallback
+
+    def _promote_gate_sentinel(self, sentinel: Action, *, breached: bool) -> Action:
+        """Rewrite the plain-text gate sentinel into a user-facing message.
+
+        Under-threshold: the sentinel is already a ``MessageAction`` with
+        ``suppress_cli=True`` and ``wait_for_response=False`` so the loop
+        continues. Returned as-is.
+
+        Threshold breach: surface the suppressed text so the user actually
+        sees it, and switch ``wait_for_response=True`` so the loop yields
+        control back to the user. ``suppress_cli`` is dropped so the renderer
+        emits the text normally.
+        """
+        from backend.ledger.action.message import MessageAction as _MessageAction
+
+        if not isinstance(sentinel, _MessageAction):
+            return sentinel
+        if not breached:
+            return sentinel
+        suppressed = getattr(sentinel, '_gate_suppressed_text', '') or ''
+        suppressed_actions = getattr(sentinel, '_gate_suppressed_actions', None) or []
+        thought = ''
+        for orig in suppressed_actions:
+            thought = getattr(orig, 'thought', '') or thought
+        promoted = _MessageAction(
+            content=suppressed,
+            thought=thought,
+            wait_for_response=True,
+            suppress_cli=False,
+        )
+        promoted.source = getattr(sentinel, 'source', EventSource.AGENT)
+        return promoted
 
     def _queue_additional_actions(self, actions: list[Action]) -> None:
         for pending in actions:
