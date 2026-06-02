@@ -4,22 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import inspect
 import threading
-import time
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.utils.async_utils import (
     get_main_event_loop,
-    run_or_schedule,
     set_main_event_loop,
 )
 
 if TYPE_CHECKING:
     from backend.core.config import AgentConfig, LLMConfig
-    from backend.ledger.event import Event
-    from backend.orchestration.conversation_stats import ConversationStats
     from backend.orchestration.replay import ReplayManager
     from backend.orchestration.state.state_tracker import StateTracker
     from backend.persistence.files import FileStore
@@ -37,14 +32,22 @@ from backend.ledger.action import (
     Action,
     MessageAction,
     PlaybookFinishAction,
-    SystemMessageAction,
 )
-from backend.ledger.observation import (
-    AgentStateChangedObservation,
-    ErrorObservation,
-    Observation,
+from backend.orchestration._session_orchestrator_action_mixin import (
+    _SessionOrchestratorActionMixin,
 )
-from backend.ledger.observation_cause import attach_observation_cause
+from backend.orchestration._session_orchestrator_lifecycle_mixin import (
+    _SessionOrchestratorLifecycleMixin,
+)
+from backend.orchestration._session_orchestrator_parallel_mixin import (
+    _SessionOrchestratorParallelMixin,
+)
+from backend.orchestration._session_orchestrator_state_mixin import (
+    _SessionOrchestratorStateMixin,
+)
+from backend.orchestration._session_orchestrator_step_mixin import (
+    _SessionOrchestratorStepMixin,
+)
 from backend.orchestration.action_scheduler import ActionScheduler
 from backend.orchestration.memory_pressure import MemoryPressureMonitor
 from backend.orchestration.orchestration_config import (
@@ -55,15 +58,7 @@ from backend.orchestration.rate_governor import LLMRateGovernor
 from backend.orchestration.session_orchestrator_accessors import (
     SessionOrchestratorAccessorsMixin,
 )
-from backend.orchestration.state.state import State
 from backend.orchestration.tool_pipeline import ToolInvocationContext
-
-
-from backend.orchestration._session_orchestrator_action_mixin import _SessionOrchestratorActionMixin
-from backend.orchestration._session_orchestrator_lifecycle_mixin import _SessionOrchestratorLifecycleMixin
-from backend.orchestration._session_orchestrator_parallel_mixin import _SessionOrchestratorParallelMixin
-from backend.orchestration._session_orchestrator_state_mixin import _SessionOrchestratorStateMixin
-from backend.orchestration._session_orchestrator_step_mixin import _SessionOrchestratorStepMixin
 
 TRAFFIC_CONTROL_REMINDER = (
     "Please click on resume button if you'd like to continue, or start a new task."
@@ -90,12 +85,16 @@ def _invoke_zero_arg_callback(callback: Callable[[], object]) -> object:
     return callback()
 
 
-
-
 class SessionOrchestrator(
-    _SessionOrchestratorStepMixin, _SessionOrchestratorLifecycleMixin, _SessionOrchestratorParallelMixin, _SessionOrchestratorStateMixin, _SessionOrchestratorActionMixin
+    SessionOrchestratorAccessorsMixin,
+    _SessionOrchestratorStepMixin,
+    _SessionOrchestratorLifecycleMixin,
+    _SessionOrchestratorParallelMixin,
+    _SessionOrchestratorStateMixin,
+    _SessionOrchestratorActionMixin,
 ):
     """Main orchestrator class. 6 core methods live here; 46 in mixins."""
+
     """Coordinates agent loop execution, event stream handling, and runtime interactions."""
     config: OrchestrationConfig
     services: OrchestrationServices
@@ -125,6 +124,7 @@ class SessionOrchestrator(
     runtime: Any
     tool_pipeline: Any
     _lifecycle: LifecyclePhase
+
     def __init__(self, config: OrchestrationConfig) -> None:
         """Initializes a new instance of the SessionOrchestrator class."""
         self.config = config
@@ -215,6 +215,7 @@ class SessionOrchestrator(
         # session" baseline. Now that the pipeline is initialized, the
         # rollback middleware will correctly capture the checkpoint.
         self._create_phase_boundary_checkpoint('init_to_active')
+
     def step(self) -> None:
         """Trigger agent to take one step asynchronously.
 
@@ -246,6 +247,7 @@ class SessionOrchestrator(
                 main_loop.call_soon_threadsafe(self._create_step_task)
             else:
                 self._create_step_task()
+
     async def _step(self) -> None:
         """Execute one agent step.
 
@@ -274,6 +276,7 @@ class SessionOrchestrator(
             finally:
                 self._step_owner_task = None
                 self._step_pending = False
+
     async def _step_inner(self) -> None:
         """Inner step logic, guarded by _step_lock."""
         await self._ensure_runtime_connected()
@@ -390,6 +393,7 @@ class SessionOrchestrator(
                 and not self._closed
             ):
                 self.step()
+
     async def close(self, set_stop_state: bool = True) -> None:
         """Closes the agent controller, canceling any ongoing tasks and unsubscribing from the event stream.
 
@@ -433,15 +437,13 @@ class SessionOrchestrator(
             with contextlib.suppress(Exception):
                 stream.close()
             self._lifecycle = LifecyclePhase.CLOSED
+
     @property
     def _closed(self) -> bool:
         """Read-only view that is True when lifecycle is CLOSING or CLOSED."""
         return self._lifecycle in (LifecyclePhase.CLOSING, LifecyclePhase.CLOSED)
 
 
-
 # --------------------------------------------------------------------------- #
 # Backward-compat re-exports (used by tests via monkeypatch.setattr).
 # --------------------------------------------------------------------------- #
-from backend.utils.async_utils import run_or_schedule  # noqa: F401, E402
-
