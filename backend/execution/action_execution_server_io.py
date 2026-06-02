@@ -107,10 +107,16 @@ from backend.execution.action_execution_server_helpers import (
     resolve_workspace_file_path as _resolve_workspace_file_path_impl,
 )
 from backend.execution.action_execution_server_helpers import (
+    should_poll_terminal_input_delta as _should_poll_terminal_input_delta_impl,
+)
+from backend.execution.action_execution_server_helpers import (
     should_rewrite_python3_to_python as _should_rewrite_python3_to_python_impl,
 )
 from backend.execution.action_execution_server_helpers import (
     strip_ansi_obs_text as _strip_ansi_obs_text_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    terminal_input_preflight_error as _terminal_input_preflight_error_impl,
 )
 from backend.execution.action_execution_server_helpers import (
     terminal_mode as _terminal_mode_impl,
@@ -119,7 +125,13 @@ from backend.execution.action_execution_server_helpers import (
     terminal_open_guardrail_error as _terminal_open_guardrail_error_impl,
 )
 from backend.execution.action_execution_server_helpers import (
+    terminal_output_state as _terminal_output_state_impl,
+)
+from backend.execution.action_execution_server_helpers import (
     terminal_read_empty_hints as _terminal_read_empty_hints_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    terminal_shell_kind as _terminal_shell_kind_impl,
 )
 from backend.execution.action_execution_server_helpers import (
     uses_powershell_shell_contract as _uses_powershell_shell_contract_impl,
@@ -569,6 +581,38 @@ class RuntimeExecutorIOAndTerminalMixin:
     ) -> dict[str, Any]:
         return _terminal_read_empty_hints_impl(mode=mode, has_new_output=has_new_output)
 
+    @staticmethod
+    def _terminal_shell_kind(session: Any) -> str:
+        return _terminal_shell_kind_impl(session)
+
+    @staticmethod
+    def _terminal_input_preflight_error(
+        command: str,
+        *,
+        shell_kind: str,
+    ) -> ErrorObservation | None:
+        return _terminal_input_preflight_error_impl(
+            command,
+            shell_kind=shell_kind,
+        )
+
+    @staticmethod
+    def _terminal_output_state(
+        content: str,
+        *,
+        default: str,
+        shell_kind: str,
+    ) -> str:
+        return _terminal_output_state_impl(
+            content,
+            default=default,
+            shell_kind=shell_kind,
+        )
+
+    @staticmethod
+    def _should_poll_terminal_input_delta(session: Any) -> bool:
+        return _should_poll_terminal_input_delta_impl(session)
+
     def _read_terminal_with_mode(
         self,
         *,
@@ -682,6 +726,7 @@ class RuntimeExecutorIOAndTerminalMixin:
             session = self.session_manager.create_session(
                 session_id=session_id, cwd=cwd, interactive=True
             )
+            shell_kind = self._terminal_shell_kind(session)
 
             resize_err = self._apply_terminal_resize_if_requested(
                 session, action.rows, action.cols
@@ -707,6 +752,28 @@ class RuntimeExecutorIOAndTerminalMixin:
                 return resize_err
 
             if action.command:
+                preflight_err = self._terminal_input_preflight_error(
+                    action.command,
+                    shell_kind=shell_kind,
+                )
+                if preflight_err is not None:
+                    self.session_manager.close_session(session_id)
+                    self._clear_terminal_read_cursor(session_id)
+                    preflight_err.tool_result = {
+                        'tool': 'terminal_manager',
+                        'ok': False,
+                        'error_code': 'TERMINAL_INPUT_PREFLIGHT_REJECTED',
+                        'retryable': True,
+                        'state': 'SESSION_NOT_OPENED',
+                        'payload': {
+                            'session_id': session_id,
+                            'shell_kind': shell_kind,
+                            'command_was_sent': False,
+                        },
+                        'progress': False,
+                    }
+                    return preflight_err
+
                 predicted_cwd, policy_error = (
                     self._evaluate_interactive_terminal_command(
                         action.command,
@@ -752,6 +819,11 @@ class RuntimeExecutorIOAndTerminalMixin:
                     offset=0,
                 )
             )
+            state = self._terminal_output_state(
+                content,
+                default='SESSION_OPENED',
+                shell_kind=shell_kind,
+            )
             self._terminal_sessions_awaiting_interaction.append(session_id)
             self._terminal_open_commands_no_interaction.append(
                 self._normalize_terminal_command(action.command or '')
@@ -762,7 +834,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                 next_offset=next_offset,
                 has_new_output=has_new_output,
                 dropped_chars=dropped_chars,
-                state='SESSION_OPENED',
+                state=state,
             )
             empty_hints = self._terminal_read_empty_hints(
                 mode='delta', has_new_output=has_new_output
@@ -772,10 +844,11 @@ class RuntimeExecutorIOAndTerminalMixin:
                 'ok': True,
                 'error_code': None,
                 'retryable': False,
-                'state': 'SESSION_OPENED',
+                'state': state,
                 'next_actions': ['read', 'input'],
                 'payload': {
                     'session_id': session_id,
+                    'shell_kind': shell_kind,
                     'mode': 'delta',
                     'next_offset': next_offset,
                     'has_new_output': has_new_output,
@@ -825,11 +898,37 @@ class RuntimeExecutorIOAndTerminalMixin:
             if resize_err is not None:
                 return resize_err
 
-            if action.control is not None and str(action.control).strip() != '':
-                session.write_input(str(action.control), is_control=True)
-
+            shell_kind = self._terminal_shell_kind(session)
             write_content = action.input
             predicted_cwd: Path | None = None
+            if write_content and not action.is_control:
+                policy_line = write_content.rstrip('\r\n')
+                preflight_err = self._terminal_input_preflight_error(
+                    policy_line,
+                    shell_kind=shell_kind,
+                )
+                if preflight_err is not None:
+                    preflight_err.tool_result = {
+                        'tool': 'terminal_manager',
+                        'ok': False,
+                        'error_code': 'TERMINAL_INPUT_PREFLIGHT_REJECTED',
+                        'retryable': True,
+                        'state': 'SESSION_UNCHANGED',
+                        'next_actions': ['input', 'read'],
+                        'payload': {
+                            'session_id': action.session_id,
+                            'shell_kind': shell_kind,
+                            'command_was_sent': False,
+                        },
+                        'progress': False,
+                    }
+                    return preflight_err
+
+            sent_input = False
+            if action.control is not None and str(action.control).strip() != '':
+                session.write_input(str(action.control), is_control=True)
+                sent_input = True
+
             if write_content:
                 if not action.is_control:
                     policy_line = write_content.rstrip('\r\n')
@@ -852,6 +951,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                     to_send = f'{to_send}\n'
 
                 session.write_input(to_send, is_control=action.is_control)
+                sent_input = True
             if predicted_cwd is not None and hasattr(session, '_cwd'):
                 session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
             # Poll for new bytes after sending input instead of a flat sleep.
@@ -867,10 +967,11 @@ class RuntimeExecutorIOAndTerminalMixin:
             _input_waited = 0.0
             read_offset = self._get_terminal_read_cursor(action.session_id)
             _probe_reads = 0
-            # Only probe-loop when reading from start-of-buffer. For established
-            # sessions (cursor > 0), repeated probes can duplicate/destructively
-            # consume reads in some shell backends.
-            if read_offset <= 0:
+            # Probe-loop only for PTY-backed sessions, where delta reads are
+            # explicitly non-destructive. This closes the PowerShell/ConPTY race
+            # even after the cursor has advanced, while avoiding destructive
+            # polling on legacy shell backends.
+            if sent_input and self._should_poll_terminal_input_delta(session):
                 while _input_waited < _input_poll_timeout:
                     await asyncio.sleep(_input_poll_interval)
                     _input_waited += _input_poll_interval
@@ -886,6 +987,11 @@ class RuntimeExecutorIOAndTerminalMixin:
                     mode='delta',
                     offset=read_offset,
                 )
+            )
+            state = self._terminal_output_state(
+                content,
+                default='SESSION_INTERACTED',
+                shell_kind=shell_kind,
             )
             # #region agent log
             try:
@@ -921,17 +1027,18 @@ class RuntimeExecutorIOAndTerminalMixin:
                 next_offset=next_offset,
                 has_new_output=has_new_output,
                 dropped_chars=dropped_chars,
-                state='SESSION_INTERACTED',
+                state=state,
             )
             obs.tool_result = {
                 'tool': 'terminal_manager',
                 'ok': True,
                 'error_code': None,
                 'retryable': False,
-                'state': 'SESSION_INTERACTED',
+                'state': state,
                 'next_actions': ['read', 'input'],
                 'payload': {
                     'session_id': action.session_id,
+                    'shell_kind': shell_kind,
                     'mode': 'delta',
                     'next_offset': next_offset,
                     'has_new_output': has_new_output,
@@ -991,8 +1098,14 @@ class RuntimeExecutorIOAndTerminalMixin:
             empty_hints = self._terminal_read_empty_hints(
                 mode=mode, has_new_output=has_new_output
             )
+            shell_kind = self._terminal_shell_kind(session)
             state = (
                 'SESSION_OUTPUT_DELTA' if mode == 'delta' else 'SESSION_OUTPUT_SNAPSHOT'
+            )
+            state = self._terminal_output_state(
+                content,
+                default=state,
+                shell_kind=shell_kind,
             )
             obs = TerminalObservation(
                 session_id=action.session_id,
@@ -1011,6 +1124,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                 'next_actions': ['read', 'input'],
                 'payload': {
                     'session_id': action.session_id,
+                    'shell_kind': shell_kind,
                     'mode': mode,
                     'request_offset': action.offset,
                     'next_offset': next_offset,

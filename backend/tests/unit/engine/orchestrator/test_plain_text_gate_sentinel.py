@@ -11,6 +11,9 @@ from __future__ import annotations
 
 from collections import deque
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from backend.engine.orchestrator import Orchestrator
 from backend.ledger.action import MessageAction
@@ -156,3 +159,22 @@ class TestGateSentinelDetection:
         assert result is real
         assert executor._consecutive_plain_text_blocks == 0  # type: ignore[attr-defined]
         assert orch._gate_callbacks == []  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_normal_step_keeps_under_threshold_gate_counter() -> None:
+    orch, _executor = _make_orchestrator_with_executor()
+    sentinel = _make_under_threshold_sentinel('plain answer')
+    orch._check_exit_command = lambda _state: None  # type: ignore[method-assign]
+    orch._execute_llm_step_async = AsyncMock(return_value=sentinel)  # type: ignore[method-assign]
+    orch._reset_step_recovery_counters = MagicMock()  # type: ignore[method-assign]
+    orch.memory_manager = SimpleNamespace(
+        condense_history=AsyncMock(
+            return_value=SimpleNamespace(pending_action=None, events=[])
+        )
+    )
+
+    result = await orch._astep_normal_path(SimpleNamespace())
+
+    assert result is sentinel
+    orch._reset_step_recovery_counters.assert_not_called()  # type: ignore[attr-defined]

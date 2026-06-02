@@ -79,14 +79,51 @@ class TestBuildFallbackAction:
             'Which Python version should I target?',
         ],
     )
-    def test_any_non_empty_text_does_not_pause_loop(self, text: str) -> None:
+    def test_any_non_empty_text_yields_when_no_active_tasks(self, text: str) -> None:
         orch = _make_orchestrator()
         action = _build_fallback_action(orch, _make_result(text))
         assert isinstance(action, MessageAction)
-        assert action.wait_for_response is False, (
-            'Any text-only LLM response must continue the loop; '
-            'use communicate_with_user to pause for real user input'
+        assert action.wait_for_response is True
+
+    def test_active_task_fallback_text_uses_plain_text_gate(self) -> None:
+        orch = _make_orchestrator()
+        executor = TestPlainTextProtocolGate()._make_executor(
+            'agent',
+            active_tasks=True,
         )
+        orch.executor = executor
+        callbacks: list[tuple[str, int]] = []
+        orch._on_plain_text_gate = lambda kind, count: callbacks.append((kind, count))  # type: ignore[assignment]
+
+        action = _build_fallback_action(orch, _make_result('plain answer'))
+
+        assert isinstance(action, MessageAction)
+        assert action.content == ''
+        assert action.wait_for_response is False
+        assert action.suppress_cli is True
+        assert action._gate_suppressed_text == 'plain answer'  # type: ignore[attr-defined]
+        assert executor._consecutive_plain_text_blocks == 1
+        assert callbacks == [('under_threshold', 1)]
+
+    def test_active_task_fallback_gate_breach_yields_to_user(self) -> None:
+        orch = _make_orchestrator()
+        executor = TestPlainTextProtocolGate()._make_executor(
+            'agent',
+            active_tasks=True,
+        )
+        executor._consecutive_plain_text_blocks = executor._PLAIN_TEXT_GATE_MAX_RETRIES
+        orch.executor = executor
+        callbacks: list[tuple[str, int]] = []
+        orch._on_plain_text_gate = lambda kind, count: callbacks.append((kind, count))  # type: ignore[assignment]
+
+        action = _build_fallback_action(orch, _make_result('plain answer'))
+
+        assert isinstance(action, MessageAction)
+        assert action.content == 'plain answer'
+        assert action.wait_for_response is True
+        assert action.suppress_cli is False
+        assert executor._consecutive_plain_text_blocks == 0
+        assert callbacks == [('threshold_breached', 3)]
 
 
 class TestPlainTextProtocolGate:

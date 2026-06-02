@@ -1295,6 +1295,47 @@ async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config)
 
 
 @pytest.mark.asyncio
+async def test_tui_final_stream_is_preview_until_message_action(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        final_stream = StreamingChunkAction(
+            accumulated='Plain preview.',
+            is_final=True,
+        )
+        final_stream.source = EventSource.AGENT
+        renderer._process_event(final_stream)
+
+        assert renderer._last_final_response_text == ''
+        assert renderer._live_response == 'Plain preview.'
+        assert renderer._history == []
+
+        suppressed = MessageAction(content='', suppress_cli=True)
+        suppressed.source = EventSource.AGENT
+        renderer._process_event(suppressed)
+
+        assert renderer._last_final_response_text == ''
+        assert renderer._live_response == ''
+        assert renderer._history == []
+
+
+@pytest.mark.asyncio
 async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()

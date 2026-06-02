@@ -199,28 +199,26 @@ class TaskValidationService:
         if not lesson or not str(lesson).strip():
             return
 
-        from datetime import datetime
         from pathlib import Path
 
         from backend.core.workspace_resolution import workspace_agent_state_dir
+        from backend.engine.tools.lesson_store import append_markdown_lesson
 
         file_store = self._context.get_controller().config.file_store
         project_root = Path(file_store.root) if file_store else None
         memories_path = workspace_agent_state_dir(project_root) / 'lessons.md'
 
         try:
-            memories_path.parent.mkdir(parents=True, exist_ok=True)
-
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
             initial_task = self._context.get_controller()._get_initial_task()
             summary = initial_task.description[:100] if initial_task else 'Task'
-
-            entry = f'\n## {timestamp} — {summary}\n{lesson}\n'
-
-            with open(memories_path, 'a', encoding='utf-8') as f:  # noqa: ASYNC230
-                f.write(entry)
-
-            logger.info('Saved lessons learned to %s', memories_path)
+            if append_markdown_lesson(
+                memories_path,
+                str(lesson),
+                summary=summary,
+            ):
+                logger.info('Saved lessons learned to %s', memories_path)
+            else:
+                logger.info('Skipped duplicate lesson learned for %s', memories_path)
         except Exception as e:
             logger.warning('Failed to save lessons learned: %s', e)
 

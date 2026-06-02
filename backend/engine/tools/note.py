@@ -165,15 +165,15 @@ def append_to_note(key: str, value: str, max_entries: int = 50) -> None:
     v = (value or '').strip()
     if not v:
         return
+    from backend.engine.tools.lesson_store import append_deduped_note_entry
+
     notes, updated = _parse_notes_blob(_read_notes_blob())
     existing = notes.get(key, '').strip()
-    stamp = time.strftime('%Y-%m-%d %H:%M', time.gmtime())
-    new_entry = f'- [{stamp}] {v}'
-    lines = existing.splitlines() if existing else []
-    lines.append(new_entry)
-    if len(lines) > max_entries:
-        lines = lines[-max_entries:]
-    notes[key] = '\n'.join(lines)
+    notes[key], _inserted = append_deduped_note_entry(
+        existing,
+        v,
+        max_entries=max_entries,
+    )
     updated[key] = time.time()
     _write_notes_blob(notes, updated)
 
