@@ -174,7 +174,7 @@ class ActivityRenderer:
     @staticmethod
     def file_read(path: str, line_range: str = '') -> ActivityCard:
         """Create an activity card for a file read."""
-        detail = f'{path}  [{NAVY_TEXT_DIM}]·  {line_range}[/]' if line_range else path
+        detail = f'{path}  [{NAVY_TEXT_DIM}]·[/] [{NAVY_WAITING}]{line_range}[/]' if line_range else path
         return ActivityCard(
             verb='Read',
             detail=detail,

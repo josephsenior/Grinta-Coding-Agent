@@ -4393,6 +4393,7 @@ class TUIRenderer:
             outcome=card.secondary,
             extra_content=extra_content,
             collapsed=collapsed,
+            collapsible=card.is_collapsible,
         )
 
         is_tool = card.badge_category in (
@@ -4789,10 +4790,10 @@ class TUIRenderer:
             start = getattr(event, 'start', 0)
             end = getattr(event, 'end', -1)
             if view_range and len(view_range) == 2:
-                line_range = f'L{view_range[0]}:L{view_range[1]}'
+                line_range = f'{view_range[0]}:{view_range[1]}'
             elif start not in (0, 1) or end != -1:
                 end_str = str(end) if end != -1 else 'end'
-                line_range = f'L{start}:{end_str}'
+                line_range = f'{start}:{end_str}'
             else:
                 line_range = ''
             card = ActivityRenderer.file_read(path, line_range)
@@ -4814,9 +4815,9 @@ class TUIRenderer:
                 else:
                     line_range = ''
             elif not cmd:
-                end_str = f'L{end}' if end != -1 else 'end'
+                end_str = str(end) if end != -1 else 'end'
                 verb = 'Edited'
-                line_range = f'L{start}:{end_str}'
+                line_range = f'{start}:{end_str}'
             elif cmd == 'edit':
                 edit_mode = getattr(event, 'edit_mode', '')
                 if (
@@ -4825,7 +4826,7 @@ class TUIRenderer:
                     and end_line is not None
                 ):
                     verb = 'Edited'
-                    line_range = f'L{start_line}:L{end_line}'
+                    line_range = f'{start_line}:{end_line}'
                 else:
                     verb = 'Edited'
                     line_range = ''
