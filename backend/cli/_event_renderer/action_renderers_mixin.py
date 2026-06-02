@@ -437,8 +437,8 @@ class ActionRenderersMixin(_ActionRenderersBase):
             if include_stats and insert_line is not None:
                 stats = f'line {insert_line}'
         elif not cmd:
-            end_str = f'L{end}' if end != -1 else 'end'
-            verb, detail = 'Edited', f'{path} · L{start}:{end_str}'
+            end_str = str(end) if end != -1 else 'end'
+            verb, detail = 'Edited', f'{path} · {start}:{end_str}'
         else:
             verb, detail = 'Edited', path
         badge_label = self._file_badge_label(action)
@@ -481,10 +481,10 @@ class ActionRenderersMixin(_ActionRenderersBase):
         start = getattr(action, 'start', 0)
         end = getattr(action, 'end', -1)
         if view_range and len(view_range) == 2:
-            detail = f'{path} · L{view_range[0]}:L{view_range[1]}'
+            detail = f'{path} · {view_range[0]}:{view_range[1]}'
         elif start not in (0, 1) or end != -1:
             end_str = str(end) if end != -1 else 'end'
-            detail = f'{path} · L{start}:{end_str}'
+            detail = f'{path} · {start}:{end_str}'
         else:
             detail = path
         self._buffer_pending_activity(

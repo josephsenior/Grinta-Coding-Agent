@@ -285,4 +285,6 @@ class OrchestratorExecutor(
 # Backward-compat re-exports. Originals live in _executor_types.py.
 # Tests and external callers access these as module-level attributes on
 # `backend.engine.executor` (e.g., `executor_module.orchestrator_function_calling`).
+# ExecutionResult and _AsyncStreamingState are imported at the top because the
+# core method bodies use them at runtime; the rest are re-exported here.
 # ---------------------------------------------------------------------------
