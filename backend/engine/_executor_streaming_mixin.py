@@ -14,14 +14,9 @@ from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
 from backend.engine._executor_types import (
-    _INLINE_CLOSE_THINK_RE,  # noqa: F401
-    _INLINE_OPEN_THINK_RE,  # noqa: F401
-    _MAX_CHECKPOINT_CACHE_SIZE,  # noqa: F401
-    ExecutionResult,  # noqa: F401
-    ModelResponse,  # noqa: F401
-    _AsyncStreamingState,  # noqa: F401
-    _FunctionCallingProxy,  # noqa: F401
-    orchestrator_function_calling,  # noqa: F401
+    _AsyncStreamingState,
+    _INLINE_CLOSE_THINK_RE,
+    _INLINE_OPEN_THINK_RE,
 )
 
 if TYPE_CHECKING:
@@ -456,7 +451,9 @@ def _extract_delta_text(delta: dict[str, Any]) -> str:
     return ''.join(parts)
 
 
-def _extract_fallback_content(self, fallback: Any, fallback_message: Any | None) -> str:
+def _extract_fallback_content(
+    self, fallback: Any, fallback_message: Any | None
+) -> str:
     fallback_content_raw = getattr(fallback, 'content', None)
     fallback_content = (
         self._content_to_str(fallback_content_raw)
@@ -521,7 +518,9 @@ def _finalize_stream_tool_calls(
             extract_tool_calls_from_text_markers,
         )
 
-        text_tool_calls = extract_tool_calls_from_text_markers(state.content_accumulate)
+        text_tool_calls = extract_tool_calls_from_text_markers(
+            state.content_accumulate
+        )
         if text_tool_calls:
             logger.info(
                 'Extracted %d text-format tool call(s) from streaming content; treating as structured tool calls.',
@@ -628,8 +627,8 @@ async def _ingest_stream_tool_call_chunk(
     raw_name = function.get('name') if isinstance(function, dict) else None
     if isinstance(raw_name, str) and raw_name:
         current_name = state.tool_calls_dict[idx]['function']['name']
-        state.tool_calls_dict[idx]['function']['name'] = self._merge_stream_fragment(
-            current_name, raw_name
+        state.tool_calls_dict[idx]['function']['name'] = (
+            self._merge_stream_fragment(current_name, raw_name)
         )
 
     raw_args = function.get('arguments') if isinstance(function, dict) else None
@@ -637,8 +636,8 @@ async def _ingest_stream_tool_call_chunk(
         return
 
     current_args = state.tool_calls_dict[idx]['function']['arguments']
-    state.tool_calls_dict[idx]['function']['arguments'] = self._merge_stream_fragment(
-        current_args, raw_args
+    state.tool_calls_dict[idx]['function']['arguments'] = (
+        self._merge_stream_fragment(current_args, raw_args)
     )
     if event_stream:
         logger.debug(
@@ -808,7 +807,7 @@ def _visible_stream_content(content_accumulate: str) -> str:
     return redact_streamed_tool_call_markers(content_accumulate).strip()
 
 
+
 class _ExecutorStreamingMixin:
     """Mixin: streaming. Methods defined at module level for clean extraction."""
-
     pass
