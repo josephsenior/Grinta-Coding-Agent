@@ -43,6 +43,8 @@ if TYPE_CHECKING:
 class _ExecutorResponseMixin:
     """Mixin: response handling and agent-mode gating. All 11 methods defined below."""
 
+    _PLAIN_TEXT_GATE_MAX_RETRIES: int = 2
+
     @staticmethod
     def _build_recoverable_tool_call_error_action(exc: Exception) -> Action:
         return _build_recoverable_tool_call_error_action_impl(exc)
