@@ -76,3 +76,17 @@ def test_append_to_note_caps_entry_count(monkeypatch, tmp_path):
     # Only the most recent entries are retained.
     assert 'lesson 2' in lines[0]
     assert 'lesson 4' in lines[-1]
+
+
+def test_append_to_note_dedupes_repeated_lessons(monkeypatch, tmp_path):
+    notes_path = tmp_path / 'agent_notes.json'
+    monkeypatch.setattr(note_tools, '_notes_path', lambda: notes_path)
+
+    note_tools.append_to_note('lessons', 'PowerShell terminal needs submitted input')
+    note_tools.append_to_note('lessons', 'PowerShell terminal needs submitted input')
+
+    payload = json.loads(notes_path.read_text(encoding='utf-8'))
+    lines = payload['lessons'].splitlines()
+    assert len(lines) == 1
+    assert 'PowerShell terminal needs submitted input' in lines[0]
+    assert '(seen 2x)' in lines[0]

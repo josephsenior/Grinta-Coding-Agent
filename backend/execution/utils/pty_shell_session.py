@@ -100,6 +100,20 @@ def _argv_looks_like_bash(argv: list[str]) -> bool:
     return 'bash' in base
 
 
+def _argv_shell_kind(argv: list[str]) -> str:
+    """Return the interactive shell dialect implied by *argv*."""
+    if not argv or not argv[0]:
+        return 'unknown'
+    base = os.path.basename(argv[0].lower())
+    if base in {'pwsh', 'pwsh.exe', 'powershell', 'powershell.exe'}:
+        return 'powershell'
+    if base in {'cmd', 'cmd.exe'}:
+        return 'cmd'
+    if _argv_looks_like_bash(argv):
+        return 'bash'
+    return base.rsplit('.', 1)[0] or 'unknown'
+
+
 def _norm_tty_text(text: str) -> str:
     """Normalize CRLF so PS1 JSON regex/JSON sees stable newlines (Windows PTYs)."""
     return text.replace('\r\n', '\n').replace('\r', '\n')
@@ -224,6 +238,11 @@ class PtyInteractiveShellSession(BaseShellSession):
                 return False
             return True
         return _argv_looks_like_bash(self._shell_argv)
+
+    @property
+    def shell_kind(self) -> str:
+        """Human-readable shell dialect for terminal input preflight."""
+        return _argv_shell_kind(self._shell_argv)
 
     def _ps1_wait_timeout(self) -> float:
         t = 2.0 * float(self.NO_CHANGE_TIMEOUT_SECONDS)
@@ -488,6 +507,7 @@ class PtyInteractiveShellSession(BaseShellSession):
 
 __all__ = [
     'PtyInteractiveShellSession',
+    '_argv_shell_kind',
     '_argv_looks_like_bash',
     '_default_shell_argv',
     '_output_between_last_two_ps1',

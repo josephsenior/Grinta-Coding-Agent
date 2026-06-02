@@ -4780,6 +4780,9 @@ class TUIRenderer:
         if not self._is_live_thinking_event(event):
             self._finalize_live_thinking()
 
+        if not isinstance(event, (MessageAction, StreamingChunkAction)):
+            self.clear_live_response()
+
         if isinstance(event, MessageAction):
             if self._is_user_source(source):
                 return
@@ -5552,7 +5555,10 @@ class TUIRenderer:
             self._finalize_live_thinking()
 
         if action.is_final:
-            self._commit_final_response(content)
+            if content:
+                self.update_live_response(content)
+            else:
+                self.clear_live_response()
             return
 
         if content:

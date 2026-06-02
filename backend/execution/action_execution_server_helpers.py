@@ -45,6 +45,11 @@ _POWERSHELL_BUILTIN_COMMANDS = frozenset(
         'Remove-Item',
     }
 )
+_COPIED_BASH_PROMPT_RE = re.compile(r'^\s*\$\s+\S')
+_COPIED_PS_PROMPT_RE = re.compile(r'^\s*PS\s+.+?>\s+\S', re.IGNORECASE)
+_COPIED_PS_CONTINUATION_RE = re.compile(r'^\s*>>\s+\S')
+_PS_CONTINUATION_PROMPT_RE = re.compile(r'(?:^|\n)\s*>>\s*$')
+_PS_READY_PROMPT_RE = re.compile(r'(?:^|\n)PS\s+.+?>\s*$')
 
 
 def resolve_workspace_path(path: str, working_dir: str, workspace_root: str) -> Path:
@@ -560,6 +565,84 @@ def terminal_read_empty_hints(*, mode: str, has_new_output: bool) -> dict[str, A
         'snapshot_empty': True,
         'empty_reason': 'no_printable_output_in_buffer',
     }
+
+
+def terminal_shell_kind(session: Any) -> str:
+    """Best-effort shell dialect for interactive-terminal policy."""
+    explicit = getattr(session, 'shell_kind', None)
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip().lower()
+    cls_name = session.__class__.__name__.lower()
+    if 'powershell' in cls_name:
+        return 'powershell'
+    if 'bash' in cls_name:
+        return 'bash'
+    return 'unknown'
+
+
+def terminal_input_preflight_error(
+    command: str,
+    *,
+    shell_kind: str,
+) -> ErrorObservation | None:
+    """Reject copied prompt artifacts before they reach the interactive shell."""
+    text = command or ''
+    if not text.strip():
+        return None
+
+    if _COPIED_BASH_PROMPT_RE.match(text):
+        return ErrorObservation(
+            content=(
+                'TERMINAL_INPUT_REJECTED: input appears to include a copied shell '
+                'prompt prefix (`$ `). Send only the command text, without the prompt. '
+                'Use `execute_powershell` / `execute_bash` for ordinary one-shot commands.'
+            )
+        )
+
+    if _COPIED_PS_PROMPT_RE.match(text):
+        return ErrorObservation(
+            content=(
+                'TERMINAL_INPUT_REJECTED: input appears to include a copied PowerShell '
+                'prompt (`PS ...>`). Send only the command text after the prompt.'
+            )
+        )
+
+    if shell_kind == 'powershell' and _COPIED_PS_CONTINUATION_RE.match(text):
+        return ErrorObservation(
+            content=(
+                "TERMINAL_INPUT_REJECTED: input appears to include PowerShell's "
+                'continuation prompt (`>>`). This is shell state, not command text. '
+                'Send a complete PowerShell command, or send `C-c` to cancel the '
+                'continuation before retrying.'
+            )
+        )
+
+    return None
+
+
+def terminal_output_state(
+    content: str,
+    *,
+    default: str,
+    shell_kind: str,
+) -> str:
+    """Classify terminal output so the agent can react to shell state."""
+    if shell_kind != 'powershell' or not content:
+        return default
+    normalized = content.replace('\r\n', '\n').replace('\r', '\n')
+    if _PS_CONTINUATION_PROMPT_RE.search(normalized):
+        return 'SESSION_CONTINUATION_PROMPT'
+    if _PS_READY_PROMPT_RE.search(normalized):
+        return default
+    return default
+
+
+def should_poll_terminal_input_delta(session: Any) -> bool:
+    """Return True for PTY sessions where delta reads are non-destructive."""
+    session_attrs = vars(session) if hasattr(session, '__dict__') else {}
+    if session_attrs.get('_pty') is not None:
+        return True
+    return session.__class__.__name__ == 'PtyInteractiveShellSession'
 
 
 def _snapshot_terminal_read(session: Any) -> tuple[str, int | None, bool, int | None]:

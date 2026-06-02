@@ -456,6 +456,34 @@ async def test_sandboxed_local_allows_interactive_terminal_run(mock_executor, tm
 
 
 @pytest.mark.asyncio
+async def test_terminal_run_rejects_copied_shell_prompt_before_sending_input(
+    mock_executor,
+    tmp_path,
+) -> None:
+    workspace = tmp_path / 'workspace'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.session_manager.sessions = {}
+
+    session = MagicMock()
+    session.cwd = str(workspace)
+    session.shell_kind = 'powershell'
+    mock_executor.session_manager.create_session.return_value = session
+
+    obs = await mock_executor.terminal_run(
+        TerminalRunAction(command='$ pytest', cwd=str(workspace))
+    )
+
+    assert isinstance(obs, ErrorObservation)
+    assert 'TERMINAL_INPUT_REJECTED' in obs.content
+    assert obs.tool_result['error_code'] == 'TERMINAL_INPUT_PREFLIGHT_REJECTED'
+    assert obs.tool_result['state'] == 'SESSION_NOT_OPENED'
+    assert obs.tool_result['payload']['command_was_sent'] is False
+    session.write_input.assert_not_called()
+    mock_executor.session_manager.close_session.assert_called_once_with('terminal_1')
+
+
+@pytest.mark.asyncio
 async def test_read_blocks_when_session_cwd_drifts_outside_workspace(
     mock_executor, tmp_path
 ):
@@ -913,6 +941,55 @@ async def test_terminal_input_post_read_uses_stored_cursor(mock_executor, tmp_pa
     assert obs.has_new_output is False
     read_output_since.assert_called_once_with(250)
     assert mock_executor._terminal_read_cursor['t-cursor'] == 300
+
+
+@pytest.mark.asyncio
+async def test_terminal_input_polls_pty_delta_after_existing_cursor(
+    mock_executor,
+    tmp_path,
+) -> None:
+    """PTY-backed sessions should wait for fresh bytes even after prior reads."""
+    workspace = tmp_path / 'w'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+
+    offsets_seen: list[int] = []
+
+    def read_since(off: int):
+        offsets_seen.append(int(off))
+        responses = [
+            ('', 250, 0),
+            ('ok\n', 253, 0),
+            ('ok\n', 253, 0),
+        ]
+        return responses[min(len(offsets_seen) - 1, len(responses) - 1)]
+
+    class PtyInteractiveShellSession:
+        def __init__(self) -> None:
+            self.cwd = str(workspace)
+            self.shell_kind = 'powershell'
+            self._pty = object()
+            self.write_input = MagicMock()
+            self.read_output_since = MagicMock(side_effect=read_since)
+
+    session = PtyInteractiveShellSession()
+    mock_executor.session_manager.get_session.return_value = session
+    mock_executor._terminal_read_cursor['t-pty'] = 250
+
+    with patch(
+        'backend.execution.action_execution_server.asyncio.sleep', return_value=None
+    ):
+        obs = await mock_executor.terminal_input(
+            TerminalInputAction(session_id='t-pty', input='echo ok')
+        )
+
+    assert obs.__class__.__name__ == 'TerminalObservation'
+    assert obs.content == 'ok\n'
+    assert obs.has_new_output is True
+    assert offsets_seen == [250, 250, 250]
+    session.write_input.assert_called_once_with('echo ok\n', is_control=False)
+    assert session.read_output_since.call_count == 3
+    assert mock_executor._terminal_read_cursor['t-pty'] == 253
 
 
 def test_pty_output_transcript_caption_notes_no_new_bytes_when_flag_false() -> None:

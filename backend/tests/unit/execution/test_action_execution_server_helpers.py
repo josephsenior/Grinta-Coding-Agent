@@ -212,6 +212,66 @@ def test_terminal_read_modes_and_resize() -> None:
     )
 
 
+def test_terminal_input_preflight_rejects_copied_prompt_artifacts() -> None:
+    bash_prompt = h.terminal_input_preflight_error(
+        '$ pytest',
+        shell_kind='powershell',
+    )
+    assert isinstance(bash_prompt, ErrorObservation)
+    assert 'TERMINAL_INPUT_REJECTED' in bash_prompt.content
+    assert 'copied shell prompt' in bash_prompt.content
+
+    assert (
+        h.terminal_input_preflight_error(
+            '$env:PATH',
+            shell_kind='powershell',
+        )
+        is None
+    )
+
+    ps_prompt = h.terminal_input_preflight_error(
+        'PS C:\\repo> Get-ChildItem',
+        shell_kind='powershell',
+    )
+    assert isinstance(ps_prompt, ErrorObservation)
+    assert 'copied PowerShell prompt' in ps_prompt.content
+
+    continuation = h.terminal_input_preflight_error(
+        '>> Get-ChildItem',
+        shell_kind='powershell',
+    )
+    assert isinstance(continuation, ErrorObservation)
+    assert 'continuation prompt' in continuation.content
+
+
+def test_terminal_output_state_detects_powershell_continuation_prompt() -> None:
+    assert (
+        h.terminal_output_state(
+            'incomplete string\n>> ',
+            default='SESSION_INTERACTED',
+            shell_kind='powershell',
+        )
+        == 'SESSION_CONTINUATION_PROMPT'
+    )
+    assert (
+        h.terminal_output_state(
+            'incomplete string\n>> ',
+            default='SESSION_INTERACTED',
+            shell_kind='bash',
+        )
+        == 'SESSION_INTERACTED'
+    )
+
+
+def test_should_poll_terminal_input_delta_only_for_pty_sessions() -> None:
+    class PtyInteractiveShellSession:
+        pass
+
+    assert h.should_poll_terminal_input_delta(PtyInteractiveShellSession()) is True
+    assert h.should_poll_terminal_input_delta(SimpleNamespace(_pty=object())) is True
+    assert h.should_poll_terminal_input_delta(SimpleNamespace()) is False
+
+
 def test_file_read_edit_helpers() -> None:
     ex = _executor()
     ex.file_editor = object()

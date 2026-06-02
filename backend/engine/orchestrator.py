@@ -88,6 +88,18 @@ def _safe_plain_text_count(executor: Any) -> int:
     return raw if isinstance(raw, int) else 0
 
 
+def _safe_executor_has_active_tasks(executor: Any) -> bool:
+    raw = getattr(executor, '_has_active_tasks', False)
+    return raw if isinstance(raw, bool) else False
+
+
+def _is_unbreached_plain_text_gate_sentinel(action: Any) -> bool:
+    return (
+        getattr(action, '_gate_suppressed_text', None) is not None
+        and getattr(action, '_gate_threshold_breach', False) is not True
+    )
+
+
 def _normalize_recoverable_error_signature(e: Exception) -> str:
     """Normalize error signature for reliable loop detection.
 
@@ -427,7 +439,8 @@ class Orchestrator(Agent):
         if condensed.pending_action is not None:
             self._emit_compaction_status()
         action = await self._execute_llm_step_async(state, condensed)
-        self._reset_step_recovery_counters()
+        if not _is_unbreached_plain_text_gate_sentinel(action):
+            self._reset_step_recovery_counters()
         return action
 
     async def _astep_handle_context_limit_error(self, state: State) -> Action:
@@ -660,34 +673,10 @@ class Orchestrator(Agent):
         actions = result.actions or []
         if not actions:
             return self._build_fallback_action(result)
-        # Detect plain-text-gate sentinel returned by the executor. The
-        # sentinel is the only action in the list when the gate fired; on
-        # real tool calls the executor leaves the actions list untouched and
-        # the first action is a real tool.
         first = actions[0]
-        if getattr(first, '_gate_threshold_breach', False) is True:
-            # Threshold breach: surface the suppressed text to the user and
-            # transition the agent into AWAITING_USER_INPUT. Reset the
-            # counter because the loop is about to yield control. Read the
-            # pre-reset count for the callback so the UI can show "X/3".
-            breach_count = _safe_plain_text_count(self.executor)
-            self._reset_step_recovery_counters()
-            try:
-                self._on_plain_text_gate('threshold_breached', breach_count)
-            except Exception:
-                logger.debug('Plain-text gate callback failed', exc_info=True)
-            return self._promote_gate_sentinel(first, breached=True)
-        if getattr(first, '_gate_suppressed_text', None) is not None:
-            # Under-threshold: stay in the loop, keep counter; callback
-            # notifies the UI that a gate fired.
-            try:
-                self._on_plain_text_gate(
-                    'under_threshold',
-                    _safe_plain_text_count(self.executor),
-                )
-            except Exception:
-                logger.debug('Plain-text gate callback failed', exc_info=True)
-            return self._promote_gate_sentinel(first, breached=False)
+        gated = self._handle_plain_text_gate_action(first)
+        if gated is not None:
+            return gated
         # Real tool call: clear the plain-text streak.
         current_count = _safe_plain_text_count(self.executor)
         if current_count > 0 and hasattr(
@@ -761,27 +750,10 @@ class Orchestrator(Agent):
         actions = result.actions or []
         if not actions:
             return self._build_fallback_action(result)
-        # Detect plain-text-gate sentinel returned by the executor. Mirrors
-        # the sync path above.
         first = actions[0]
-        if getattr(first, '_gate_threshold_breach', False) is True:
-            # Read pre-reset count for the callback; see sync path for rationale.
-            breach_count = _safe_plain_text_count(self.executor)
-            self._reset_step_recovery_counters()
-            try:
-                self._on_plain_text_gate('threshold_breached', breach_count)
-            except Exception:
-                logger.debug('Plain-text gate callback failed', exc_info=True)
-            return self._promote_gate_sentinel(first, breached=True)
-        if getattr(first, '_gate_suppressed_text', None) is not None:
-            try:
-                self._on_plain_text_gate(
-                    'under_threshold',
-                    _safe_plain_text_count(self.executor),
-                )
-            except Exception:
-                logger.debug('Plain-text gate callback failed', exc_info=True)
-            return self._promote_gate_sentinel(first, breached=False)
+        gated = self._handle_plain_text_gate_action(first)
+        if gated is not None:
+            return gated
         current_count = _safe_plain_text_count(self.executor)
         if current_count > 0 and hasattr(
             self.executor, '_consecutive_plain_text_blocks'
@@ -849,17 +821,40 @@ class Orchestrator(Agent):
                 return normalize_interaction_mode(active_mode)
         return normalize_interaction_mode(getattr(self.config, 'mode', 'agent'))
 
+    def _handle_plain_text_gate_action(self, action: Action) -> Action | None:
+        """Return the promoted gate action when *action* is a plain-text sentinel."""
+        if getattr(action, '_gate_threshold_breach', False) is True:
+            breach_count = _safe_plain_text_count(self.executor)
+            self._reset_step_recovery_counters()
+            try:
+                self._on_plain_text_gate('threshold_breached', breach_count)
+            except Exception:
+                logger.debug('Plain-text gate callback failed', exc_info=True)
+            return self._promote_gate_sentinel(action, breached=True)
+
+        if getattr(action, '_gate_suppressed_text', None) is not None:
+            try:
+                self._on_plain_text_gate(
+                    'under_threshold',
+                    _safe_plain_text_count(self.executor),
+                )
+            except Exception:
+                logger.debug('Plain-text gate callback failed', exc_info=True)
+            return self._promote_gate_sentinel(action, breached=False)
+
+        return None
+
     def _build_fallback_action(self, result) -> Action:
         """Create a message action when the LLM returns no tool calls.
 
-        Always ``wait_for_response=False`` so the loop continues regardless of
-        what the model emitted (planning blobs, narration, leaked reasoning).
-        If the model genuinely wants to pause for user input it must call an
-        explicit tool (``communicate_with_user``) — not rely on this path.
+        The normal parser maps non-tool prose to a user-facing message. This
+        fallback preserves that contract when parsing produced no durable action,
+        while still routing active-task agent-mode prose through the plain-text
+        protocol gate.
 
         Empty text → raises :class:`LLMNoActionError` so the recovery machinery
         in :class:`ActionExecutionService` can issue corrective feedback and retry.
-        Text-only → wraps in :class:`MessageAction` (loop continues).
+        Text-only → yields to the user unless the active-task gate suppresses it.
         """
         message_text = ''
         if result.response and getattr(result.response, 'choices', None):
@@ -884,13 +879,24 @@ class Orchestrator(Agent):
             reasoning = getattr(message, 'reasoning_content', '') or ''
 
         logger.warning(
-            'LLM returned text-only response with no tool calls — continuing loop. '
-            'Model should use explicit tool calls instead of plain text output.'
+            'LLM returned text-only response with no tool calls; yielding to user '
+            'unless active-task agent-mode gate suppresses it.'
         )
         fallback = MessageAction(
-            content=message_text, thought=reasoning, wait_for_response=False
+            content=message_text, thought=reasoning, wait_for_response=True
         )
         fallback.source = EventSource.AGENT
+        executor = getattr(self, 'executor', None)
+        gate = getattr(executor, '_gate_agent_mode_plain_text', None)
+        if _safe_executor_has_active_tasks(executor) and callable(gate):
+            try:
+                gated_actions = list(gate([fallback], result.response))
+            except Exception:
+                logger.debug('Plain-text fallback gate failed', exc_info=True)
+            else:
+                if gated_actions:
+                    gated = self._handle_plain_text_gate_action(gated_actions[0])
+                    return gated if gated is not None else gated_actions[0]
         return fallback
 
     def _promote_gate_sentinel(self, sentinel: Action, *, breached: bool) -> Action:
