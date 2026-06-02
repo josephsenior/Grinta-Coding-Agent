@@ -1,34 +1,27 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-06-01T23:43:22.870365+00:00",
+  "generated_at": "2026-06-02T01:25:31.360376+00:00",
   "repository_root": "C:/Users/GIGABYTE/Desktop/Grinta",
   "options": {
     "include_tests": false
   },
   "summary": {
-    "module_count": 604,
-    "import_count": 5563,
-    "type_checking_only_import_count": 373,
+    "module_count": 608,
+    "import_count": 5590,
+    "type_checking_only_import_count": 377,
     "parse_failure_count": 0,
     "import_classification": {
-      "stdlib": 2253,
+      "stdlib": 2264,
       "third_party": 450,
-      "internal": 2860
+      "internal": 2876
     }
   },
   "biggest_files": [
     {
       "module_path": "backend.cli.tui.app",
       "file_path": "backend/cli/tui/app.py",
-      "byte_size": 214634,
-      "loc": 5618,
-      "importer_count": 1
-    },
-    {
-      "module_path": "backend.engine.executor",
-      "file_path": "backend/engine/executor.py",
-      "byte_size": 62870,
-      "loc": 1665,
+      "byte_size": 214672,
+      "loc": 5619,
       "importer_count": 1
     },
     {
@@ -191,6 +184,13 @@
       "byte_size": 34205,
       "loc": 974,
       "importer_count": 1
+    },
+    {
+      "module_path": "backend.engine.tools._file_edits",
+      "file_path": "backend/engine/tools/_file_edits.py",
+      "byte_size": 34149,
+      "loc": 931,
+      "importer_count": 0
     }
   ],
   "most_imported": [
@@ -198,7 +198,7 @@
       "module_path": "backend.core.logger",
       "file_path": "backend/core/logger.py",
       "byte_size": 18140,
-      "importer_count": 146
+      "importer_count": 149
     },
     {
       "module_path": "backend.core.constants",
@@ -339,10 +339,10 @@
       "importer_count": 9
     },
     {
-      "module_path": "backend.engine.common",
-      "file_path": "backend/engine/common.py",
-      "byte_size": 27405,
-      "importer_count": 9
+      "module_path": "backend.cli.tool_call_display",
+      "file_path": "backend/cli/tool_call_display.py",
+      "byte_size": 2138,
+      "importer_count": 8
     }
   ],
   "public_surface": {
@@ -690,7 +690,7 @@
     "backend.cli._event_renderer.action_renderers_mixin": {
       "module_path": "backend.cli._event_renderer.action_renderers_mixin",
       "file_path": "backend/cli/_event_renderer/action_renderers_mixin.py",
-      "byte_size": 33059,
+      "byte_size": 33054,
       "loc": 847,
       "class_count": 1,
       "def_count": 0,
@@ -1291,7 +1291,7 @@
     "backend.cli._event_renderer.unified_renderer": {
       "module_path": "backend.cli._event_renderer.unified_renderer",
       "file_path": "backend/cli/_event_renderer/unified_renderer.py",
-      "byte_size": 21554,
+      "byte_size": 21572,
       "loc": 657,
       "class_count": 3,
       "def_count": 2,
@@ -1869,7 +1869,7 @@
       "imported_by": [
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5402,
+          "lineno": 5403,
           "names": [
             "extract_file_summary"
           ],
@@ -2386,7 +2386,7 @@
       "imported_by": [
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5221,
+          "lineno": 5222,
           "names": [
             "is_structured_plan_finish"
           ],
@@ -2708,7 +2708,7 @@
         },
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5229,
+          "lineno": 5230,
           "names": [
             "get_grinta_pygments_style"
           ],
@@ -2762,48 +2762,48 @@
       ],
       "imported_by": [
         {
-          "importer": "backend/engine/common.py",
-          "lineno": 468,
+          "importer": "backend/engine/_executor_streaming_mixin.py",
+          "lineno": 267,
+          "names": [
+            "redact_streamed_tool_call_markers"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/_executor_streaming_mixin.py",
+          "lineno": 296,
+          "names": [
+            "redact_streamed_tool_call_markers"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/_executor_streaming_mixin.py",
+          "lineno": 322,
+          "names": [
+            "redact_streamed_tool_call_markers"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/_executor_streaming_mixin.py",
+          "lineno": 789,
+          "names": [
+            "redact_streamed_tool_call_markers"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/_executor_streaming_mixin.py",
+          "lineno": 509,
           "names": [
             "extract_tool_calls_from_text_markers"
           ],
           "is_type_checking": false
         },
         {
-          "importer": "backend/engine/executor.py",
-          "lineno": 506,
-          "names": [
-            "redact_streamed_tool_call_markers"
-          ],
-          "is_type_checking": false
-        },
-        {
-          "importer": "backend/engine/executor.py",
-          "lineno": 535,
-          "names": [
-            "redact_streamed_tool_call_markers"
-          ],
-          "is_type_checking": false
-        },
-        {
-          "importer": "backend/engine/executor.py",
-          "lineno": 1031,
-          "names": [
-            "redact_streamed_tool_call_markers"
-          ],
-          "is_type_checking": false
-        },
-        {
-          "importer": "backend/engine/executor.py",
-          "lineno": 1388,
-          "names": [
-            "redact_streamed_tool_call_markers"
-          ],
-          "is_type_checking": false
-        },
-        {
-          "importer": "backend/engine/executor.py",
-          "lineno": 1009,
+          "importer": "backend/engine/common.py",
+          "lineno": 468,
           "names": [
             "extract_tool_calls_from_text_markers"
           ],
@@ -2852,7 +2852,7 @@
         },
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5455,
+          "lineno": 5456,
           "names": [
             "strip_pseudo_xml_function_calls"
           ],
@@ -2860,7 +2860,7 @@
         },
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 4862,
+          "lineno": 4863,
           "names": [
             "strip_indentation_warnings"
           ],
@@ -2882,8 +2882,8 @@
     "backend.cli.tui.app": {
       "module_path": "backend.cli.tui.app",
       "file_path": "backend/cli/tui/app.py",
-      "byte_size": 214634,
-      "loc": 5618,
+      "byte_size": 214672,
+      "loc": 5619,
       "class_count": 17,
       "def_count": 18,
       "importer_count": 1,
@@ -4901,8 +4901,8 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/engine/executor.py",
-          "lineno": 21,
+          "importer": "backend/engine/_executor_lifecycle_mixin.py",
+          "lineno": 15,
           "names": [
             "DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY",
             "DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS"
@@ -5974,7 +5974,7 @@
         },
         {
           "importer": "backend/engine/executor.py",
-          "lineno": 25,
+          "lineno": 10,
           "names": [
             "ModelProviderError"
           ],
@@ -6335,8 +6335,8 @@
       "intra_package_imports": [],
       "imported_by": [
         {
-          "importer": "backend/engine/executor.py",
-          "lineno": 26,
+          "importer": "backend/engine/_executor_response_mixin.py",
+          "lineno": 11,
           "names": [
             "is_chat_mode",
             "normalize_interaction_mode"
@@ -6645,7 +6645,7 @@
       "loc": 548,
       "class_count": 3,
       "def_count": 17,
-      "importer_count": 146,
+      "importer_count": 149,
       "intra_package_imports": [
         "backend.core.constants",
         "backend.core.log_formatters",
@@ -6677,6 +6677,30 @@
           "is_type_checking": false
         },
         {
+          "importer": "backend/engine/_executor_lifecycle_mixin.py",
+          "lineno": 19,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/_executor_response_mixin.py",
+          "lineno": 15,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/_executor_streaming_mixin.py",
+          "lineno": 15,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
           "importer": "backend/engine/action_verifier.py",
           "lineno": 12,
           "names": [
@@ -6694,7 +6718,7 @@
         },
         {
           "importer": "backend/engine/executor.py",
-          "lineno": 30,
+          "lineno": 11,
           "names": [
             "app_logger"
           ],
@@ -8890,16 +8914,16 @@
       "intra_package_imports": [],
       "imported_by": [
         {
-          "importer": "backend/engine/common.py",
-          "lineno": 18,
+          "importer": "backend/engine/_executor_streaming_mixin.py",
+          "lineno": 366,
           "names": [
             "parse_tool_arguments_object"
           ],
           "is_type_checking": false
         },
         {
-          "importer": "backend/engine/executor.py",
-          "lineno": 1432,
+          "importer": "backend/engine/common.py",
+          "lineno": 18,
           "names": [
             "parse_tool_arguments_object"
           ],
@@ -9419,6 +9443,127 @@
       ],
       "imported_by": []
     },
+    "backend.engine._executor_lifecycle_mixin": {
+      "module_path": "backend.engine._executor_lifecycle_mixin",
+      "file_path": "backend/engine/_executor_lifecycle_mixin.py",
+      "byte_size": 13573,
+      "loc": 368,
+      "class_count": 1,
+      "def_count": 0,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.constants",
+        "backend.core.logger",
+        "backend.engine._executor_types",
+        "backend.engine.streaming_checkpoint",
+        "backend.inference.exceptions",
+        "backend.inference.llm_utils",
+        "backend.ledger.persistence"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/engine/executor.py",
+          "lineno": 22,
+          "names": [
+            "_ExecutorLifecycleMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.engine._executor_response_mixin": {
+      "module_path": "backend.engine._executor_response_mixin",
+      "file_path": "backend/engine/_executor_response_mixin.py",
+      "byte_size": 8672,
+      "loc": 211,
+      "class_count": 1,
+      "def_count": 0,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.interaction_modes",
+        "backend.core.logger",
+        "backend.engine._executor_types",
+        "backend.engine.executor_response_helpers",
+        "backend.ledger.action.message",
+        "backend.ledger.event"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/engine/executor.py",
+          "lineno": 23,
+          "names": [
+            "_ExecutorResponseMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.engine._executor_streaming_mixin": {
+      "module_path": "backend.engine._executor_streaming_mixin",
+      "file_path": "backend/engine/_executor_streaming_mixin.py",
+      "byte_size": 28796,
+      "loc": 791,
+      "class_count": 1,
+      "def_count": 0,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.cli.tool_call_display",
+        "backend.core.logger",
+        "backend.core.tool_arguments_json",
+        "backend.engine._executor_types",
+        "backend.engine.common",
+        "backend.inference.direct_clients",
+        "backend.inference.exceptions",
+        "backend.inference.llm_utils",
+        "backend.ledger.action.message",
+        "backend.ledger.event",
+        "backend.ledger.observation"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/engine/executor.py",
+          "lineno": 24,
+          "names": [
+            "_ExecutorStreamingMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.engine._executor_types": {
+      "module_path": "backend.engine._executor_types",
+      "file_path": "backend/engine/_executor_types.py",
+      "byte_size": 2452,
+      "loc": 81,
+      "class_count": 4,
+      "def_count": 0,
+      "importer_count": 2,
+      "intra_package_imports": [],
+      "imported_by": [
+        {
+          "importer": "backend/engine/executor.py",
+          "lineno": 25,
+          "names": [
+            "ExecutionResult",
+            "_AsyncStreamingState"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/engine/executor.py",
+          "lineno": 291,
+          "names": [
+            "_INLINE_CLOSE_THINK_RE",
+            "_INLINE_OPEN_THINK_RE",
+            "_MAX_CHECKPOINT_CACHE_SIZE",
+            "ModelResponse",
+            "_FunctionCallingProxy",
+            "orchestrator_function_calling"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
     "backend.engine.action_verifier": {
       "module_path": "backend.engine.action_verifier",
       "file_path": "backend/engine/action_verifier.py",
@@ -9442,7 +9587,7 @@
       "loc": 724,
       "class_count": 4,
       "def_count": 28,
-      "importer_count": 9,
+      "importer_count": 8,
       "intra_package_imports": [
         "backend.cli.tool_call_display",
         "backend.core.errors",
@@ -9454,14 +9599,6 @@
         "backend.ledger.serialization.event"
       ],
       "imported_by": [
-        {
-          "importer": "backend/engine/executor.py",
-          "lineno": 1433,
-          "names": [
-            "extract_assistant_message"
-          ],
-          "is_type_checking": false
-        },
         {
           "importer": "backend/engine/executor_response_helpers.py",
           "lineno": 38,
@@ -9626,29 +9763,21 @@
     "backend.engine.executor": {
       "module_path": "backend.engine.executor",
       "file_path": "backend/engine/executor.py",
-      "byte_size": 62870,
-      "loc": 1665,
-      "class_count": 5,
+      "byte_size": 11608,
+      "loc": 298,
+      "class_count": 1,
       "def_count": 0,
       "importer_count": 1,
       "intra_package_imports": [
-        "backend.cli.tool_call_display",
-        "backend.core.constants",
         "backend.core.errors",
-        "backend.core.interaction_modes",
         "backend.core.logger",
-        "backend.core.tool_arguments_json",
         "backend.engine",
-        "backend.engine.common",
-        "backend.engine.executor_response_helpers",
+        "backend.engine._executor_lifecycle_mixin",
+        "backend.engine._executor_response_mixin",
+        "backend.engine._executor_streaming_mixin",
+        "backend.engine._executor_types",
         "backend.engine.streaming_checkpoint",
-        "backend.inference.direct_clients",
-        "backend.inference.exceptions",
-        "backend.inference.llm_utils",
-        "backend.ledger.action.message",
-        "backend.ledger.event",
-        "backend.ledger.observation",
-        "backend.ledger.persistence"
+        "backend.inference.exceptions"
       ],
       "imported_by": [
         {
