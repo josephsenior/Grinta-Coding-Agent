@@ -14,9 +14,14 @@ from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
 from backend.engine._executor_types import (
-    _INLINE_CLOSE_THINK_RE,
-    _INLINE_OPEN_THINK_RE,
-    _AsyncStreamingState,
+    _INLINE_CLOSE_THINK_RE,  # noqa: F401
+    _INLINE_OPEN_THINK_RE,  # noqa: F401
+    _MAX_CHECKPOINT_CACHE_SIZE,  # noqa: F401
+    ExecutionResult,  # noqa: F401
+    ModelResponse,  # noqa: F401
+    _AsyncStreamingState,  # noqa: F401
+    _FunctionCallingProxy,  # noqa: F401
+    orchestrator_function_calling,  # noqa: F401
 )
 
 if TYPE_CHECKING:
