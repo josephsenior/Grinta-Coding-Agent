@@ -1991,7 +1991,7 @@ def test_start_live_passes_vertical_overflow_crop() -> None:
     """
     console = _make_console()
     loop = asyncio.new_event_loop()
-    with patch('backend.cli.event_renderer.Live') as live_cls:
+    with patch('backend.cli._event_renderer._live_mixin.Live') as live_cls:
         try:
             live_cls.return_value = MagicMock()
             r = CLIEventRenderer(console, HUDBar(), ReasoningDisplay(), loop=loop)
