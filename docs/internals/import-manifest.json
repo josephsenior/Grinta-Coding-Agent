@@ -1,34 +1,27 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-06-02T01:25:31.360376+00:00",
+  "generated_at": "2026-06-02T13:43:10.458687+00:00",
   "repository_root": "C:/Users/GIGABYTE/Desktop/Grinta",
   "options": {
     "include_tests": false
   },
   "summary": {
-    "module_count": 608,
-    "import_count": 5590,
-    "type_checking_only_import_count": 377,
+    "module_count": 614,
+    "import_count": 5754,
+    "type_checking_only_import_count": 403,
     "parse_failure_count": 0,
     "import_classification": {
-      "stdlib": 2264,
+      "stdlib": 2308,
       "third_party": 450,
-      "internal": 2876
+      "internal": 2996
     }
   },
   "biggest_files": [
     {
       "module_path": "backend.cli.tui.app",
       "file_path": "backend/cli/tui/app.py",
-      "byte_size": 214672,
-      "loc": 5619,
-      "importer_count": 1
-    },
-    {
-      "module_path": "backend.orchestration.session_orchestrator",
-      "file_path": "backend/orchestration/session_orchestrator.py",
-      "byte_size": 61638,
-      "loc": 1452,
+      "byte_size": 214872,
+      "loc": 5625,
       "importer_count": 1
     },
     {
@@ -67,6 +60,13 @@
       "importer_count": 1
     },
     {
+      "module_path": "backend.execution.action_execution_server_io",
+      "file_path": "backend/execution/action_execution_server_io.py",
+      "byte_size": 50052,
+      "loc": 1244,
+      "importer_count": 0
+    },
+    {
       "module_path": "backend.engine.prompts.section_renderers",
       "file_path": "backend/engine/prompts/section_renderers.py",
       "byte_size": 48397,
@@ -83,15 +83,8 @@
     {
       "module_path": "backend.engine.orchestrator",
       "file_path": "backend/engine/orchestrator.py",
-      "byte_size": 45712,
-      "loc": 1040,
-      "importer_count": 0
-    },
-    {
-      "module_path": "backend.execution.action_execution_server_io",
-      "file_path": "backend/execution/action_execution_server_io.py",
-      "byte_size": 45691,
-      "loc": 1130,
+      "byte_size": 45391,
+      "loc": 1046,
       "importer_count": 0
     },
     {
@@ -179,6 +172,13 @@
       "importer_count": 6
     },
     {
+      "module_path": "backend.execution.action_execution_server_helpers",
+      "file_path": "backend/execution/action_execution_server_helpers.py",
+      "byte_size": 35029,
+      "loc": 1008,
+      "importer_count": 42
+    },
+    {
       "module_path": "backend.utils.lsp_client",
       "file_path": "backend/utils/lsp_client.py",
       "byte_size": 34205,
@@ -198,37 +198,37 @@
       "module_path": "backend.core.logger",
       "file_path": "backend/core/logger.py",
       "byte_size": 18140,
-      "importer_count": 149
+      "importer_count": 154
     },
     {
       "module_path": "backend.core.constants",
       "file_path": "backend/core/constants.py",
       "byte_size": 27352,
-      "importer_count": 54
+      "importer_count": 59
     },
     {
       "module_path": "backend.core.enums",
       "file_path": "backend/core/enums.py",
       "byte_size": 7571,
-      "importer_count": 48
+      "importer_count": 57
     },
     {
       "module_path": "backend.execution.action_execution_server_helpers",
       "file_path": "backend/execution/action_execution_server_helpers.py",
-      "byte_size": 32007,
-      "importer_count": 38
+      "byte_size": 35029,
+      "importer_count": 42
     },
     {
       "module_path": "backend.core.errors",
       "file_path": "backend/core/errors.py",
       "byte_size": 14551,
-      "importer_count": 37
+      "importer_count": 38
     },
     {
       "module_path": "backend.ledger.event",
       "file_path": "backend/ledger/event.py",
       "byte_size": 7918,
-      "importer_count": 28
+      "importer_count": 33
     },
     {
       "module_path": "backend.core.workspace_resolution",
@@ -261,6 +261,12 @@
       "importer_count": 15
     },
     {
+      "module_path": "backend.ledger.observation_cause",
+      "file_path": "backend/ledger/observation_cause.py",
+      "byte_size": 1828,
+      "importer_count": 15
+    },
+    {
       "module_path": "backend.core.interaction_modes",
       "file_path": "backend/core/interaction_modes.py",
       "byte_size": 1427,
@@ -289,12 +295,6 @@
       "file_path": "backend/context/compactor/compactor.py",
       "byte_size": 20354,
       "importer_count": 11
-    },
-    {
-      "module_path": "backend.ledger.observation_cause",
-      "file_path": "backend/ledger/observation_cause.py",
-      "byte_size": 1828,
-      "importer_count": 10
     },
     {
       "module_path": "backend.engine.contracts",
@@ -1869,7 +1869,7 @@
       "imported_by": [
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5403,
+          "lineno": 5406,
           "names": [
             "extract_file_summary"
           ],
@@ -2386,7 +2386,7 @@
       "imported_by": [
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5222,
+          "lineno": 5225,
           "names": [
             "is_structured_plan_finish"
           ],
@@ -2708,7 +2708,7 @@
         },
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5230,
+          "lineno": 5233,
           "names": [
             "get_grinta_pygments_style"
           ],
@@ -2852,7 +2852,7 @@
         },
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 5456,
+          "lineno": 5459,
           "names": [
             "strip_pseudo_xml_function_calls"
           ],
@@ -2860,7 +2860,7 @@
         },
         {
           "importer": "backend/cli/tui/app.py",
-          "lineno": 4863,
+          "lineno": 4866,
           "names": [
             "strip_indentation_warnings"
           ],
@@ -2882,8 +2882,8 @@
     "backend.cli.tui.app": {
       "module_path": "backend.cli.tui.app",
       "file_path": "backend/cli/tui/app.py",
-      "byte_size": 214672,
-      "loc": 5619,
+      "byte_size": 214872,
+      "loc": 5625,
       "class_count": 17,
       "def_count": 18,
       "importer_count": 1,
@@ -4832,7 +4832,7 @@
       "loc": 555,
       "class_count": 0,
       "def_count": 1,
-      "importer_count": 54,
+      "importer_count": 59,
       "intra_package_imports": [],
       "imported_by": [
         {
@@ -5137,6 +5137,51 @@
             "CMD_OUTPUT_PS1_BEGIN",
             "CMD_OUTPUT_PS1_END",
             "MAX_CMD_OUTPUT_SIZE"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_action_mixin.py",
+          "lineno": 18,
+          "names": [
+            "DEFAULT_AGENT_STEP_DRAIN_LIMIT",
+            "DEFAULT_PENDING_ACTION_TIMEOUT"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_lifecycle_mixin.py",
+          "lineno": 18,
+          "names": [
+            "DEFAULT_AGENT_STEP_DRAIN_LIMIT",
+            "DEFAULT_PENDING_ACTION_TIMEOUT"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_parallel_mixin.py",
+          "lineno": 18,
+          "names": [
+            "DEFAULT_AGENT_STEP_DRAIN_LIMIT",
+            "DEFAULT_PENDING_ACTION_TIMEOUT"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_state_mixin.py",
+          "lineno": 18,
+          "names": [
+            "DEFAULT_AGENT_STEP_DRAIN_LIMIT",
+            "DEFAULT_PENDING_ACTION_TIMEOUT"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_step_mixin.py",
+          "lineno": 18,
+          "names": [
+            "DEFAULT_AGENT_STEP_DRAIN_LIMIT",
+            "DEFAULT_PENDING_ACTION_TIMEOUT"
           ],
           "is_type_checking": false
         },
@@ -5523,7 +5568,7 @@
       "loc": 268,
       "class_count": 20,
       "def_count": 0,
-      "importer_count": 48,
+      "importer_count": 57,
       "intra_package_imports": [],
       "imported_by": [
         {
@@ -5573,7 +5618,7 @@
         },
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 581,
+          "lineno": 594,
           "names": [
             "ActionSecurityRisk"
           ],
@@ -5881,6 +5926,79 @@
           "is_type_checking": false
         },
         {
+          "importer": "backend/orchestration/_session_orchestrator_action_mixin.py",
+          "lineno": 22,
+          "names": [
+            "LifecyclePhase"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_lifecycle_mixin.py",
+          "lineno": 22,
+          "names": [
+            "LifecyclePhase"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_lifecycle_mixin.py",
+          "lineno": 78,
+          "names": [
+            "AgentState"
+          ],
+          "is_type_checking": true
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_parallel_mixin.py",
+          "lineno": 22,
+          "names": [
+            "LifecyclePhase"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_parallel_mixin.py",
+          "lineno": 78,
+          "names": [
+            "AgentState"
+          ],
+          "is_type_checking": true
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_state_mixin.py",
+          "lineno": 22,
+          "names": [
+            "LifecyclePhase"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_state_mixin.py",
+          "lineno": 78,
+          "names": [
+            "AgentState",
+            "LifecyclePhase"
+          ],
+          "is_type_checking": true
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_step_mixin.py",
+          "lineno": 22,
+          "names": [
+            "LifecyclePhase"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_step_mixin.py",
+          "lineno": 78,
+          "names": [
+            "AgentState"
+          ],
+          "is_type_checking": true
+        },
+        {
           "importer": "backend/orchestration/action_scheduler.py",
           "lineno": 13,
           "names": [
@@ -5945,7 +6063,7 @@
       "loc": 482,
       "class_count": 48,
       "def_count": 1,
-      "importer_count": 37,
+      "importer_count": 38,
       "intra_package_imports": [],
       "imported_by": [
         {
@@ -6104,7 +6222,7 @@
         },
         {
           "importer": "backend/execution/action_execution_server_helpers.py",
-          "lineno": 834,
+          "lineno": 917,
           "names": [
             "FunctionCallValidationError",
             "ToolExecutionError"
@@ -6177,6 +6295,22 @@
           "is_type_checking": false
         },
         {
+          "importer": "backend/orchestration/_session_orchestrator_step_mixin.py",
+          "lineno": 79,
+          "names": [
+            "AgentRuntimeDisconnectedError"
+          ],
+          "is_type_checking": true
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_step_mixin.py",
+          "lineno": 200,
+          "names": [
+            "AgentRuntimeDisconnectedError"
+          ],
+          "is_type_checking": false
+        },
+        {
           "importer": "backend/orchestration/agent.py",
           "lineno": 27,
           "names": [
@@ -6242,14 +6376,6 @@
           "names": [
             "AgentRuntimeDisconnectedError",
             "LLMContextWindowExceedError"
-          ],
-          "is_type_checking": false
-        },
-        {
-          "importer": "backend/orchestration/session_orchestrator.py",
-          "lineno": 580,
-          "names": [
-            "AgentRuntimeDisconnectedError"
           ],
           "is_type_checking": false
         },
@@ -6645,7 +6771,7 @@
       "loc": 548,
       "class_count": 3,
       "def_count": 17,
-      "importer_count": 149,
+      "importer_count": 154,
       "intra_package_imports": [
         "backend.core.constants",
         "backend.core.log_formatters",
@@ -7376,6 +7502,46 @@
         {
           "importer": "backend/ledger/stream_stats.py",
           "lineno": 9,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_action_mixin.py",
+          "lineno": 23,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_lifecycle_mixin.py",
+          "lineno": 23,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_parallel_mixin.py",
+          "lineno": 23,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_state_mixin.py",
+          "lineno": 23,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_step_mixin.py",
+          "lineno": 23,
           "names": [
             "app_logger"
           ],
@@ -9379,7 +9545,7 @@
         },
         {
           "importer": "backend/orchestration/services/task_validation_service.py",
-          "lineno": 205,
+          "lineno": 204,
           "names": [
             "workspace_agent_state_dir"
           ],
@@ -9823,7 +9989,7 @@
       "imported_by": [
         {
           "importer": "backend/engine/orchestrator.py",
-          "lineno": 820,
+          "lineno": 792,
           "names": [
             "try_batch_file_reads"
           ],
@@ -9884,7 +10050,7 @@
         },
         {
           "importer": "backend/execution/action_execution_server_helpers.py",
-          "lineno": 835,
+          "lineno": 918,
           "names": [
             "_handle_multi_edit_command"
           ],
@@ -9981,10 +10147,10 @@
     "backend.engine.orchestrator": {
       "module_path": "backend.engine.orchestrator",
       "file_path": "backend/engine/orchestrator.py",
-      "byte_size": 45712,
-      "loc": 1040,
+      "byte_size": 45391,
+      "loc": 1046,
       "class_count": 1,
-      "def_count": 4,
+      "def_count": 6,
       "importer_count": 0,
       "intra_package_imports": [
         "backend.core.config",
@@ -10592,6 +10758,34 @@
         }
       ]
     },
+    "backend.engine.tools.lesson_store": {
+      "module_path": "backend.engine.tools.lesson_store",
+      "file_path": "backend/engine/tools/lesson_store.py",
+      "byte_size": 4223,
+      "loc": 141,
+      "class_count": 0,
+      "def_count": 7,
+      "importer_count": 2,
+      "intra_package_imports": [],
+      "imported_by": [
+        {
+          "importer": "backend/engine/tools/note.py",
+          "lineno": 168,
+          "names": [
+            "append_deduped_note_entry"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/services/task_validation_service.py",
+          "lineno": 205,
+          "names": [
+            "append_markdown_lesson"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
     "backend.engine.tools.lsp_query": {
       "module_path": "backend.engine.tools.lsp_query",
       "file_path": "backend/engine/tools/lsp_query.py",
@@ -10651,7 +10845,7 @@
     "backend.engine.tools.note": {
       "module_path": "backend.engine.tools.note",
       "file_path": "backend/engine/tools/note.py",
-      "byte_size": 7521,
+      "byte_size": 7441,
       "loc": 211,
       "class_count": 0,
       "def_count": 11,
@@ -10661,6 +10855,7 @@
         "backend.core.workspace_resolution",
         "backend.engine.contracts",
         "backend.engine.tools.common",
+        "backend.engine.tools.lesson_store",
         "backend.ledger.action"
       ],
       "imported_by": [
@@ -11070,11 +11265,11 @@
     "backend.execution.action_execution_server_helpers": {
       "module_path": "backend.execution.action_execution_server_helpers",
       "file_path": "backend/execution/action_execution_server_helpers.py",
-      "byte_size": 32007,
-      "loc": 925,
+      "byte_size": 35029,
+      "loc": 1008,
       "class_count": 0,
-      "def_count": 53,
-      "importer_count": 38,
+      "def_count": 57,
+      "importer_count": 42,
       "intra_package_imports": [
         "backend.core.enums",
         "backend.core.errors",
@@ -11328,7 +11523,7 @@
           "importer": "backend/execution/action_execution_server_io.py",
           "lineno": 109,
           "names": [
-            "should_rewrite_python3_to_python"
+            "should_poll_terminal_input_delta"
           ],
           "is_type_checking": false
         },
@@ -11336,7 +11531,7 @@
           "importer": "backend/execution/action_execution_server_io.py",
           "lineno": 112,
           "names": [
-            "strip_ansi_obs_text"
+            "should_rewrite_python3_to_python"
           ],
           "is_type_checking": false
         },
@@ -11344,7 +11539,7 @@
           "importer": "backend/execution/action_execution_server_io.py",
           "lineno": 115,
           "names": [
-            "terminal_mode"
+            "strip_ansi_obs_text"
           ],
           "is_type_checking": false
         },
@@ -11352,7 +11547,7 @@
           "importer": "backend/execution/action_execution_server_io.py",
           "lineno": 118,
           "names": [
-            "terminal_open_guardrail_error"
+            "terminal_input_preflight_error"
           ],
           "is_type_checking": false
         },
@@ -11360,7 +11555,7 @@
           "importer": "backend/execution/action_execution_server_io.py",
           "lineno": 121,
           "names": [
-            "terminal_read_empty_hints"
+            "terminal_mode"
           ],
           "is_type_checking": false
         },
@@ -11368,7 +11563,7 @@
           "importer": "backend/execution/action_execution_server_io.py",
           "lineno": 124,
           "names": [
-            "uses_powershell_shell_contract"
+            "terminal_open_guardrail_error"
           ],
           "is_type_checking": false
         },
@@ -11376,7 +11571,7 @@
           "importer": "backend/execution/action_execution_server_io.py",
           "lineno": 127,
           "names": [
-            "validate_interactive_session_scope"
+            "terminal_output_state"
           ],
           "is_type_checking": false
         },
@@ -11384,13 +11579,45 @@
           "importer": "backend/execution/action_execution_server_io.py",
           "lineno": 130,
           "names": [
-            "validate_workspace_scoped_cwd"
+            "terminal_read_empty_hints"
           ],
           "is_type_checking": false
         },
         {
           "importer": "backend/execution/action_execution_server_io.py",
           "lineno": 133,
+          "names": [
+            "terminal_shell_kind"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/action_execution_server_io.py",
+          "lineno": 136,
+          "names": [
+            "uses_powershell_shell_contract"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/action_execution_server_io.py",
+          "lineno": 139,
+          "names": [
+            "validate_interactive_session_scope"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/action_execution_server_io.py",
+          "lineno": 142,
+          "names": [
+            "validate_workspace_scoped_cwd"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/action_execution_server_io.py",
+          "lineno": 145,
           "names": [
             "workspace_root"
           ],
@@ -11401,8 +11628,8 @@
     "backend.execution.action_execution_server_io": {
       "module_path": "backend.execution.action_execution_server_io",
       "file_path": "backend/execution/action_execution_server_io.py",
-      "byte_size": 45691,
-      "loc": 1130,
+      "byte_size": 50052,
+      "loc": 1244,
       "class_count": 1,
       "def_count": 0,
       "importer_count": 0,
@@ -12942,10 +13169,10 @@
     "backend.execution.utils.pty_shell_session": {
       "module_path": "backend.execution.utils.pty_shell_session",
       "file_path": "backend/execution/utils/pty_shell_session.py",
-      "byte_size": 18837,
-      "loc": 495,
+      "byte_size": 19506,
+      "loc": 515,
       "class_count": 1,
-      "def_count": 5,
+      "def_count": 6,
       "importer_count": 1,
       "intra_package_imports": [
         "backend.core.logger",
@@ -15300,7 +15527,7 @@
       "loc": 244,
       "class_count": 1,
       "def_count": 0,
-      "importer_count": 28,
+      "importer_count": 33,
       "intra_package_imports": [
         "backend.core.schemas",
         "backend.inference.metrics",
@@ -15390,6 +15617,47 @@
             "EventSource"
           ],
           "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_action_mixin.py",
+          "lineno": 79,
+          "names": [
+            "EventSource"
+          ],
+          "is_type_checking": true
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_lifecycle_mixin.py",
+          "lineno": 96,
+          "names": [
+            "EventSource"
+          ],
+          "is_type_checking": true
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_parallel_mixin.py",
+          "lineno": 80,
+          "names": [
+            "EventSource"
+          ],
+          "is_type_checking": true
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_state_mixin.py",
+          "lineno": 80,
+          "names": [
+            "Event",
+            "EventSource"
+          ],
+          "is_type_checking": true
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_step_mixin.py",
+          "lineno": 80,
+          "names": [
+            "Event"
+          ],
+          "is_type_checking": true
         },
         {
           "importer": "backend/orchestration/agent.py",
@@ -16409,12 +16677,60 @@
       "loc": 62,
       "class_count": 0,
       "def_count": 1,
-      "importer_count": 10,
+      "importer_count": 15,
       "intra_package_imports": [
         "backend.core.logger",
         "backend.ledger.event"
       ],
       "imported_by": [
+        {
+          "importer": "backend/orchestration/_session_orchestrator_action_mixin.py",
+          "lineno": 37,
+          "names": [
+            "attach_observation_cause"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_lifecycle_mixin.py",
+          "lineno": 37,
+          "names": [
+            "attach_observation_cause"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_lifecycle_mixin.py",
+          "lineno": 355,
+          "names": [
+            "attach_observation_cause"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_parallel_mixin.py",
+          "lineno": 37,
+          "names": [
+            "attach_observation_cause"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_state_mixin.py",
+          "lineno": 37,
+          "names": [
+            "attach_observation_cause"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/_session_orchestrator_step_mixin.py",
+          "lineno": 37,
+          "names": [
+            "attach_observation_cause"
+          ],
+          "is_type_checking": false
+        },
         {
           "importer": "backend/orchestration/middleware/blackboard.py",
           "lineno": 24,
@@ -16465,7 +16781,7 @@
         },
         {
           "importer": "backend/orchestration/services/task_validation_service.py",
-          "lineno": 235,
+          "lineno": 233,
           "names": [
             "attach_observation_cause"
           ],
@@ -16473,7 +16789,7 @@
         },
         {
           "importer": "backend/orchestration/services/task_validation_service.py",
-          "lineno": 316,
+          "lineno": 314,
           "names": [
             "attach_observation_cause"
           ],
@@ -16482,14 +16798,6 @@
         {
           "importer": "backend/orchestration/session_orchestrator.py",
           "lineno": 47,
-          "names": [
-            "attach_observation_cause"
-          ],
-          "is_type_checking": false
-        },
-        {
-          "importer": "backend/orchestration/session_orchestrator.py",
-          "lineno": 333,
           "names": [
             "attach_observation_cause"
           ],
@@ -16840,6 +17148,200 @@
       ],
       "imported_by": []
     },
+    "backend.orchestration._session_orchestrator_action_mixin": {
+      "module_path": "backend.orchestration._session_orchestrator_action_mixin",
+      "file_path": "backend/orchestration/_session_orchestrator_action_mixin.py",
+      "byte_size": 7109,
+      "loc": 253,
+      "class_count": 1,
+      "def_count": 2,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.constants",
+        "backend.core.enums",
+        "backend.core.logger",
+        "backend.core.schemas",
+        "backend.ledger",
+        "backend.ledger.action",
+        "backend.ledger.observation",
+        "backend.ledger.observation_cause",
+        "backend.orchestration.action_scheduler",
+        "backend.orchestration.memory_pressure",
+        "backend.orchestration.orchestration_config",
+        "backend.orchestration.rate_governor",
+        "backend.orchestration.session_orchestrator_accessors",
+        "backend.orchestration.state.state",
+        "backend.orchestration.tool_pipeline",
+        "backend.utils.async_utils"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/orchestration/session_orchestrator.py",
+          "lineno": 62,
+          "names": [
+            "_SessionOrchestratorActionMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.orchestration._session_orchestrator_lifecycle_mixin": {
+      "module_path": "backend.orchestration._session_orchestrator_lifecycle_mixin",
+      "file_path": "backend/orchestration/_session_orchestrator_lifecycle_mixin.py",
+      "byte_size": 13611,
+      "loc": 522,
+      "class_count": 1,
+      "def_count": 2,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.constants",
+        "backend.core.enums",
+        "backend.core.logger",
+        "backend.core.schemas",
+        "backend.ledger",
+        "backend.ledger.action",
+        "backend.ledger.observation",
+        "backend.ledger.observation_cause",
+        "backend.orchestration.action_scheduler",
+        "backend.orchestration.file_state_tracker",
+        "backend.orchestration.memory_pressure",
+        "backend.orchestration.middleware.destructive_command",
+        "backend.orchestration.orchestration_config",
+        "backend.orchestration.pre_exec_diff",
+        "backend.orchestration.rate_governor",
+        "backend.orchestration.rollback_middleware",
+        "backend.orchestration.session_orchestrator_accessors",
+        "backend.orchestration.state.state",
+        "backend.orchestration.tool_pipeline",
+        "backend.orchestration.tool_result_validator",
+        "backend.orchestration.tool_telemetry",
+        "backend.utils.async_utils"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/orchestration/session_orchestrator.py",
+          "lineno": 63,
+          "names": [
+            "_SessionOrchestratorLifecycleMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.orchestration._session_orchestrator_parallel_mixin": {
+      "module_path": "backend.orchestration._session_orchestrator_parallel_mixin",
+      "file_path": "backend/orchestration/_session_orchestrator_parallel_mixin.py",
+      "byte_size": 17841,
+      "loc": 754,
+      "class_count": 1,
+      "def_count": 2,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.constants",
+        "backend.core.enums",
+        "backend.core.logger",
+        "backend.core.schemas",
+        "backend.ledger",
+        "backend.ledger.action",
+        "backend.ledger.observation",
+        "backend.ledger.observation_cause",
+        "backend.orchestration.action_scheduler",
+        "backend.orchestration.memory_pressure",
+        "backend.orchestration.orchestration_config",
+        "backend.orchestration.rate_governor",
+        "backend.orchestration.session_orchestrator_accessors",
+        "backend.orchestration.state.state",
+        "backend.orchestration.tool_pipeline",
+        "backend.utils.async_utils"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/orchestration/session_orchestrator.py",
+          "lineno": 64,
+          "names": [
+            "_SessionOrchestratorParallelMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.orchestration._session_orchestrator_state_mixin": {
+      "module_path": "backend.orchestration._session_orchestrator_state_mixin",
+      "file_path": "backend/orchestration/_session_orchestrator_state_mixin.py",
+      "byte_size": 12528,
+      "loc": 577,
+      "class_count": 1,
+      "def_count": 2,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.constants",
+        "backend.core.enums",
+        "backend.core.logger",
+        "backend.core.schemas",
+        "backend.ledger",
+        "backend.ledger.action",
+        "backend.ledger.observation",
+        "backend.ledger.observation_cause",
+        "backend.orchestration.action_scheduler",
+        "backend.orchestration.memory_pressure",
+        "backend.orchestration.orchestration_config",
+        "backend.orchestration.rate_governor",
+        "backend.orchestration.session_orchestrator_accessors",
+        "backend.orchestration.state.state",
+        "backend.orchestration.tool_pipeline",
+        "backend.utils.async_utils",
+        "backend.validation.task_metadata",
+        "backend.validation.task_validator"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/orchestration/session_orchestrator.py",
+          "lineno": 65,
+          "names": [
+            "_SessionOrchestratorStateMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.orchestration._session_orchestrator_step_mixin": {
+      "module_path": "backend.orchestration._session_orchestrator_step_mixin",
+      "file_path": "backend/orchestration/_session_orchestrator_step_mixin.py",
+      "byte_size": 9465,
+      "loc": 367,
+      "class_count": 1,
+      "def_count": 2,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.constants",
+        "backend.core.enums",
+        "backend.core.errors",
+        "backend.core.logger",
+        "backend.core.schemas",
+        "backend.ledger",
+        "backend.ledger.action",
+        "backend.ledger.observation",
+        "backend.ledger.observation_cause",
+        "backend.orchestration.action_scheduler",
+        "backend.orchestration.memory_pressure",
+        "backend.orchestration.orchestration_config",
+        "backend.orchestration.rate_governor",
+        "backend.orchestration.session_orchestrator_accessors",
+        "backend.orchestration.state.state",
+        "backend.orchestration.tool_pipeline",
+        "backend.utils.async_utils"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/orchestration/session_orchestrator.py",
+          "lineno": 66,
+          "names": [
+            "_SessionOrchestratorStepMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
     "backend.orchestration.action_parser": {
       "module_path": "backend.orchestration.action_parser",
       "file_path": "backend/orchestration/action_parser.py",
@@ -17133,7 +17635,7 @@
       "loc": 288,
       "class_count": 3,
       "def_count": 4,
-      "importer_count": 1,
+      "importer_count": 0,
       "intra_package_imports": [
         "backend.core.logger",
         "backend.core.os_capabilities",
@@ -17141,16 +17643,7 @@
         "backend.ledger.observation",
         "backend.orchestration.tool_pipeline"
       ],
-      "imported_by": [
-        {
-          "importer": "backend/orchestration/session_orchestrator.py",
-          "lineno": 230,
-          "names": [
-            "FileStateMiddleware"
-          ],
-          "is_type_checking": false
-        }
-      ]
+      "imported_by": []
     },
     "backend.orchestration.health": {
       "module_path": "backend.orchestration.health",
@@ -17295,22 +17788,13 @@
       "loc": 200,
       "class_count": 1,
       "def_count": 1,
-      "importer_count": 1,
+      "importer_count": 0,
       "intra_package_imports": [
         "backend.core.logger",
         "backend.core.rollback.rollback_manager",
         "backend.orchestration.tool_pipeline"
       ],
-      "imported_by": [
-        {
-          "importer": "backend/orchestration/session_orchestrator.py",
-          "lineno": 231,
-          "names": [
-            "DestructiveCommandMiddleware"
-          ],
-          "is_type_checking": false
-        }
-      ]
+      "imported_by": []
     },
     "backend.orchestration.middleware.logging_mw": {
       "module_path": "backend.orchestration.middleware.logging_mw",
@@ -17432,23 +17916,14 @@
       "loc": 200,
       "class_count": 1,
       "def_count": 0,
-      "importer_count": 1,
+      "importer_count": 0,
       "intra_package_imports": [
         "backend.core.logger",
         "backend.execution.utils.diff",
         "backend.ledger.action",
         "backend.orchestration.tool_pipeline"
       ],
-      "imported_by": [
-        {
-          "importer": "backend/orchestration/session_orchestrator.py",
-          "lineno": 234,
-          "names": [
-            "PreExecDiffMiddleware"
-          ],
-          "is_type_checking": false
-        }
-      ]
+      "imported_by": []
     },
     "backend.orchestration.progress_tracker": {
       "module_path": "backend.orchestration.progress_tracker",
@@ -17530,23 +18005,14 @@
       "loc": 244,
       "class_count": 1,
       "def_count": 1,
-      "importer_count": 1,
+      "importer_count": 0,
       "intra_package_imports": [
         "backend.core.enums",
         "backend.core.logger",
         "backend.core.rollback.rollback_manager",
         "backend.orchestration.tool_pipeline"
       ],
-      "imported_by": [
-        {
-          "importer": "backend/orchestration/session_orchestrator.py",
-          "lineno": 235,
-          "names": [
-            "RollbackMiddleware"
-          ],
-          "is_type_checking": false
-        }
-      ]
+      "imported_by": []
     },
     "backend.orchestration.runtime_late_error_guard": {
       "module_path": "backend.orchestration.runtime_late_error_guard",
@@ -18097,8 +18563,8 @@
     "backend.orchestration.services.task_validation_service": {
       "module_path": "backend.orchestration.services.task_validation_service",
       "file_path": "backend/orchestration/services/task_validation_service.py",
-      "byte_size": 13831,
-      "loc": 352,
+      "byte_size": 13806,
+      "loc": 350,
       "class_count": 1,
       "def_count": 2,
       "importer_count": 0,
@@ -18107,6 +18573,7 @@
         "backend.core.schemas",
         "backend.core.task_status",
         "backend.core.workspace_resolution",
+        "backend.engine.tools.lesson_store",
         "backend.engine.tools.task_tracker",
         "backend.ledger",
         "backend.ledger.action",
@@ -18119,37 +18586,33 @@
     "backend.orchestration.session_orchestrator": {
       "module_path": "backend.orchestration.session_orchestrator",
       "file_path": "backend/orchestration/session_orchestrator.py",
-      "byte_size": 61638,
-      "loc": 1452,
+      "byte_size": 20574,
+      "loc": 449,
       "class_count": 1,
       "def_count": 2,
       "importer_count": 1,
       "intra_package_imports": [
         "backend.core.constants",
         "backend.core.enums",
-        "backend.core.errors",
         "backend.core.logger",
         "backend.core.schemas",
         "backend.ledger",
         "backend.ledger.action",
         "backend.ledger.observation",
         "backend.ledger.observation_cause",
+        "backend.orchestration._session_orchestrator_action_mixin",
+        "backend.orchestration._session_orchestrator_lifecycle_mixin",
+        "backend.orchestration._session_orchestrator_parallel_mixin",
+        "backend.orchestration._session_orchestrator_state_mixin",
+        "backend.orchestration._session_orchestrator_step_mixin",
         "backend.orchestration.action_scheduler",
-        "backend.orchestration.file_state_tracker",
         "backend.orchestration.memory_pressure",
-        "backend.orchestration.middleware.destructive_command",
         "backend.orchestration.orchestration_config",
-        "backend.orchestration.pre_exec_diff",
         "backend.orchestration.rate_governor",
-        "backend.orchestration.rollback_middleware",
         "backend.orchestration.session_orchestrator_accessors",
         "backend.orchestration.state.state",
         "backend.orchestration.tool_pipeline",
-        "backend.orchestration.tool_result_validator",
-        "backend.orchestration.tool_telemetry",
-        "backend.utils.async_utils",
-        "backend.validation.task_metadata",
-        "backend.validation.task_validator"
+        "backend.utils.async_utils"
       ],
       "imported_by": [
         {
