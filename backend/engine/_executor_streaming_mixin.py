@@ -416,6 +416,7 @@ class _ExecutorStreamingMixin:
                     exc,
                 )
 
+    @staticmethod
     def _extract_delta_reasoning(delta: dict[str, Any]) -> str:
         for alt_key in ('reasoning_content', 'reasoning'):
             alt_val = delta.get(alt_key)
@@ -423,6 +424,7 @@ class _ExecutorStreamingMixin:
                 return alt_val
         return ''
 
+    @staticmethod
     def _extract_delta_text(delta: dict[str, Any]) -> str:
         delta_content = delta.get('content')
         if isinstance(delta_content, str):
@@ -457,6 +459,7 @@ class _ExecutorStreamingMixin:
             return self._content_to_str(fallback_message.get('content'))
         return self._content_to_str(getattr(fallback_message, 'content', None))
 
+    @staticmethod
     def _extract_fallback_message(fallback: Any) -> Any | None:
         choices = getattr(fallback, 'choices', None)
         if not isinstance(choices, list) or not choices:
@@ -466,6 +469,7 @@ class _ExecutorStreamingMixin:
             return first_choice.get('message')
         return getattr(first_choice, 'message', None)
 
+    @staticmethod
     def _extract_fallback_reasoning(
         fallback: Any,
         fallback_message: Any | None,
@@ -482,6 +486,7 @@ class _ExecutorStreamingMixin:
                 return reasoning
         return ''
 
+    @staticmethod
     def _extract_fallback_tool_calls(
         fallback: Any,
         fallback_message: Any | None,
@@ -639,6 +644,7 @@ class _ExecutorStreamingMixin:
             event_stream.add_event(ev, EventSource.AGENT)
             await asyncio.sleep(0)
 
+    @staticmethod
     def _merge_stream_fragment(existing: str, incoming: str) -> str:
         r"""Merge streamed fragments with safe append-only defaults."""
         if not incoming:
@@ -778,6 +784,7 @@ class _ExecutorStreamingMixin:
             'is_estimated': True,
         }
 
+    @staticmethod
     def _visible_stream_content(content_accumulate: str) -> str:
         from backend.cli.tool_call_display import redact_streamed_tool_call_markers
 
