@@ -16,23 +16,11 @@ from backend.core.logger import app_logger as logger
 from backend.engine._executor_types import ModelResponse, orchestrator_function_calling
 from backend.engine.executor_response_helpers import (
     build_recoverable_tool_call_error_action as _build_recoverable_tool_call_error_action_impl,
-)
-from backend.engine.executor_response_helpers import (
     content_to_str as _content_to_str_impl,
-)
-from backend.engine.executor_response_helpers import (
     extract_last_user_text as _extract_last_user_text_impl,
-)
-from backend.engine.executor_response_helpers import (
     extract_recent_user_text as _extract_recent_user_text_impl,
-)
-from backend.engine.executor_response_helpers import (
     extract_response_text as _extract_response_text_impl,
-)
-from backend.engine.executor_response_helpers import (
     is_recoverable_tool_call_error as _is_recoverable_tool_call_error_impl,
-)
-from backend.engine.executor_response_helpers import (
     without_blank_agent_messages as _without_blank_agent_messages_impl,
 )
 
@@ -54,7 +42,6 @@ def _extract_last_user_text(self, messages: list[dict[str, Any]]) -> str:
 
 def _extract_recent_user_text(self, messages: list[dict[str, Any]]) -> str:
     return _extract_recent_user_text_impl(messages)
-
 
 def _extract_response_text(self, response: ModelResponse) -> str:
     return _extract_response_text_impl(response)
@@ -103,7 +90,10 @@ def _gate_agent_mode_plain_text(
         return actions
 
     self._consecutive_plain_text_blocks += 1
-    breach = self._consecutive_plain_text_blocks > self._PLAIN_TEXT_GATE_MAX_RETRIES
+    breach = (
+        self._consecutive_plain_text_blocks
+        > self._PLAIN_TEXT_GATE_MAX_RETRIES
+    )
 
     self._set_plain_text_directive(self._consecutive_plain_text_blocks, breach)
 
@@ -213,7 +203,7 @@ def _without_blank_agent_messages(actions: list[Action]) -> list[Action]:
     return _without_blank_agent_messages_impl(actions)
 
 
+
 class _ExecutorResponseMixin:
     """Mixin: response/agent-mode. Methods defined at module level."""
-
     pass

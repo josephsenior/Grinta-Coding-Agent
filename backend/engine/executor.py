@@ -279,3 +279,10 @@ class OrchestratorExecutor(
         )
         checkpoint.commit(ckpt_token)
         return ExecutionResult(actions, response, execution_time, error_message)
+
+
+# ---------------------------------------------------------------------------
+# Backward-compat re-exports. Originals live in _executor_types.py.
+# Tests and external callers access these as module-level attributes on
+# `backend.engine.executor` (e.g., `executor_module.orchestrator_function_calling`).
+# ---------------------------------------------------------------------------

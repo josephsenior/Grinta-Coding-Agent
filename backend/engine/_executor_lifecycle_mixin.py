@@ -95,7 +95,6 @@ def _apply_context_window_preflight(
     guarded[field_name] = desired_completion
     return guarded
 
-
 def _checkpoint_anchor_event_id(event_stream: EventStream | None) -> int | None:
     if event_stream is None:
         return None
@@ -104,7 +103,6 @@ def _checkpoint_anchor_event_id(event_stream: EventStream | None) -> int | None:
     except Exception:
         return None
     return latest if isinstance(latest, int) and latest >= 0 else None
-
 
 def _checkpoint_is_superseded_by_persisted_control_event(
     self,
@@ -118,7 +116,6 @@ def _checkpoint_is_superseded_by_persisted_control_event(
         return False
     latest_critical_id = self._latest_persisted_critical_event_id(event_stream)
     return latest_critical_id is not None and latest_critical_id > anchor_event_id
-
 
 def _checkpoint_recovery_policy(self) -> tuple[float, bool]:
     config = getattr(self._planner, '_config', None)
@@ -149,11 +146,9 @@ def _checkpoint_recovery_policy(self) -> tuple[float, bool]:
 
     return max_checkpoint_age_sec, discard_stale_on_recovery
 
-
 def _checkpoint_session_key(event_stream: EventStream | None) -> str:
     sid = getattr(event_stream, 'sid', None)
     return sid if isinstance(sid, str) and sid else '__global__'
-
 
 def _estimate_request_tokens(self, call_params: dict[str, Any]) -> int:
     from backend.inference.llm_utils import get_token_count
@@ -184,7 +179,6 @@ def _estimate_request_tokens(self, call_params: dict[str, Any]) -> int:
         model=model,
     )
     return prompt_tokens + extra_tokens
-
 
 def _get_checkpoint(self, event_stream: EventStream | None) -> StreamingCheckpoint:
     session_key = self._checkpoint_session_key(event_stream)
@@ -235,9 +229,10 @@ def _get_checkpoint(self, event_stream: EventStream | None) -> StreamingCheckpoi
             evicted_ckpt.discard()
         except Exception:
             pass
-        logger.debug('Evicted streaming checkpoint for %s (cache full)', evicted_key)
+        logger.debug(
+            'Evicted streaming checkpoint for %s (cache full)', evicted_key
+        )
     return checkpoint
-
 
 def _latest_persisted_critical_event_id(
     event_stream: EventStream,
@@ -256,7 +251,6 @@ def _latest_persisted_critical_event_id(
             exc,
         )
     return None
-
 
 def _llm_input_token_limit(self) -> int:
     llm = self._llm
@@ -279,13 +273,11 @@ def _llm_input_token_limit(self) -> int:
                 return fallback
     return 0
 
-
 def _llm_model_name(llm: Any) -> str | None:
     model = getattr(getattr(llm, 'config', None), 'model', None)
     if isinstance(model, str) and model.strip():
         return model
     return None
-
 
 def _llm_output_token_limit(self) -> int | None:
     llm = self._llm
@@ -298,10 +290,8 @@ def _llm_output_token_limit(self) -> int | None:
 
     return self._positive_int(getattr(config, 'max_output_tokens', None))
 
-
 def _minimum_viable_completion_tokens() -> int:
     return 64
-
 
 def _positive_int(value: Any) -> int | None:
     if isinstance(value, bool):
@@ -320,7 +310,6 @@ def _positive_int(value: Any) -> int | None:
             return iv if iv > 0 else None
     return None
 
-
 def _preflight_completion_field(
     call_params: dict[str, Any],
 ) -> tuple[str, int | None]:
@@ -329,27 +318,25 @@ def _preflight_completion_field(
             call_params.get('max_completion_tokens')
         )
     if 'max_tokens' in call_params:
-        return 'max_tokens', _positive_int(call_params.get('max_tokens'))
+        return 'max_tokens', _positive_int(
+            call_params.get('max_tokens')
+        )
     return 'max_tokens', None
-
 
 def _preflight_margin(limit: int) -> int:
     if limit <= 0:
         return 0
     return max(128, min(1024, limit // 100))
 
-
 def _sanitize_checkpoint_key(session_key: str) -> str:
     safe = Path(session_key).name.replace('..', '_')
     return safe.replace('/', '_').replace('\\', '_')
-
 
 def _serialize_preflight_payload(value: Any) -> str:
     try:
         return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
     except Exception:
         return str(value)
-
 
 def _timeout_from_env(
     env_var: str,
@@ -369,5 +356,4 @@ def _timeout_from_env(
 
 class _ExecutorLifecycleMixin:
     """Mixin: preflight + checkpoint. Methods defined at module level."""
-
     pass
