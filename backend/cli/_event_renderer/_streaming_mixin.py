@@ -10,21 +10,12 @@ that class via multiple inheritance.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import re
-import time
-from collections import deque
-from contextlib import contextmanager
+import textwrap
 from typing import TYPE_CHECKING, Any
 
-from rich import box
-from rich.console import Console, ConsoleOptions, Group, RenderResult
-from rich.live import Live
 from rich.markdown import Markdown
 from rich.padding import Padding
-from rich.panel import Panel
-from rich.style import Style
 from rich.text import Text
 
 from backend.cli._event_renderer.constants import (
@@ -32,39 +23,6 @@ from backend.cli._event_renderer.constants import (
 )
 from backend.cli._event_renderer.constants import (
     THINK_STRIP_RE as _THINK_STRIP_RE,
-)
-from backend.cli._event_renderer.error_panel import (
-    build_error_panel as _build_error_panel,
-)
-from backend.cli._event_renderer.error_panel import (
-    use_recoverable_notice_style as _use_recoverable_notice_style,
-)
-from backend.cli._event_renderer.panels import (
-    PendingActivityCard,
-)
-from backend.cli._event_renderer.panels import (
-    build_delegate_worker_panel as _build_delegate_worker_panel,
-)
-from backend.cli._event_renderer.panels import (
-    build_system_notice_panel as _build_system_notice_panel,
-)
-from backend.cli._event_renderer.panels import (
-    build_task_panel as _build_task_panel,
-)
-from backend.cli._event_renderer.panels import (
-    delegate_worker_panel_signature as _delegate_worker_panel_signature,
-)
-from backend.cli._event_renderer.panels import (
-    normalize_system_title as _normalize_system_title,
-)
-from backend.cli._event_renderer.panels import (
-    task_panel_signature as _task_panel_signature,
-)
-from backend.cli._event_renderer.sidebar import (
-    build_sidebar as _build_sidebar,
-)
-from backend.cli._event_renderer.sidebar import (
-    compute_main_width as _compute_main_width,
 )
 from backend.cli._event_renderer.text_utils import (
     normalize_reasoning_text as _normalize_reasoning_text,
@@ -75,31 +33,10 @@ from backend.cli._event_renderer.text_utils import (
 from backend.cli._event_renderer.text_utils import (
     show_reasoning_text as _show_reasoning_text,
 )
-from backend.cli.hud import HUDBar
 from backend.cli.layout_tokens import (
-    ACTIVITY_BLOCK_BOTTOM_PAD,
-    ACTIVITY_CARD_TITLE_SHELL,
-    CALLOUT_PANEL_PADDING,
     LIVE_PANEL_ACCENT_STYLE,
-    frame_live_body,
-    frame_transcript_body,
-    gap_below_live_section,
-    spacer_live_section,
 )
-from backend.cli.path_links import file_uri_for_path, linkify_plain
-from backend.cli.status_chrome import rich_fake_prompt_group, status_fields_from_hud
 from backend.cli.theme import (
-    CLR_ERR_BODY,
-    CLR_ERR_ICON,
-    CLR_STATUS_ERR,
-    CLR_STATUS_WARN,
-    CLR_USER_BG,
-    CLR_USER_BORDER,
-    CLR_WARN_BODY,
-    CLR_WARN_ICON,
-    STYLE_BOLD_DIM,
-    STYLE_DIM,
-    accessible_mode_enabled,
     get_grinta_pygments_style,
 )
 from backend.cli.tool_call_display import (
@@ -108,23 +45,8 @@ from backend.cli.tool_call_display import (
     tool_headline,
     try_format_message_as_tool_json,
 )
-from backend.cli.transcript import (
-    format_activity_block,
-    format_activity_shell_block,
-    format_activity_turn_header,
-    format_ground_truth_tool_line,
-)
-from backend.core.enums import AgentState, EventSource
-from backend.ledger import EventStreamSubscriber
 from backend.ledger.action import (
-    Action,
-    NullAction,
     StreamingChunkAction,
-)
-from backend.ledger.observation import (
-    AgentStateChangedObservation,
-    NullObservation,
-    Observation,
 )
 
 if TYPE_CHECKING:
@@ -132,6 +54,7 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
 
 class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object):
     """Mixin class — see module docstring."""
@@ -168,6 +91,7 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
         # Always force redraw on streaming updates; throttling here made token
         # output feel delayed vs. the model (refresh() only coalesces to ~20fps).
         self.refresh(force=True)
+
     def _handle_streaming_tool_call(self, action: StreamingChunkAction) -> None:
         tool_name = action.tool_call_name or 'tool'
         _icon, headline = tool_headline(tool_name, use_icons=self._cli_tool_icons)
@@ -184,6 +108,7 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
         # Thinking spinner for the entire duration of the tool call stream.
         self._streaming_accumulated = ''
         self.refresh()
+
     def _absorb_streaming_thinking_field(
         self,
         action: StreamingChunkAction,
@@ -196,6 +121,7 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
         if cleaned_thinking:
             self._ensure_reasoning()
             self._reasoning.set_streaming_thought(cleaned_thinking)
+
     def _absorb_inline_streaming_thinking(self, raw: str) -> None:
         think_match = _THINK_EXTRACT_RE.search(raw)
         if not think_match:
@@ -208,12 +134,15 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
         # Strip thinking from the streaming preview.
         display_text = _THINK_STRIP_RE.sub('', raw).strip()
         self._streaming_accumulated = _sanitize_visible_transcript_text(display_text)
+
     _STATE_HUD_UPDATES: dict[Any, tuple[str, str]] = {
         # Populated lazily in :meth:`_state_hud_updates`.
     }
+
     def _ensure_reasoning(self) -> None:
         if not self._reasoning.active:
             self._reasoning.start()
+
     def _append_assistant_message(
         self, display_content: str | Any, *, attachments: list[Any] | None = None
     ) -> None:
@@ -247,6 +176,7 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
             self._append_assistant_body(display_content)
         for attachment in attachments or []:
             self._append_history(attachment)
+
     def _append_assistant_body(self, display_content: str) -> None:
         """Render the body of an assistant message that isn't a tool JSON."""
         s = display_content.strip()
@@ -264,6 +194,7 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
                 (0, 0, 1, 0),
             )
         )
+
     def _apply_reasoning_text(self, text: str) -> None:
         """Update the reasoning display while keeping tagged tool payloads out of the transcript."""
         action_label, thought = _normalize_reasoning_text(text)
@@ -274,6 +205,7 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
             self._reasoning.update_action(action_label)
         if thought and _show_reasoning_text():
             self._reasoning.commit_thought(thought)
+
     def _flush_thinking_block(self) -> None:
         """Print accumulated thoughts as a persistent dim block.
 
@@ -282,6 +214,7 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
         static block at the bottom.
         """
         return
+
     def _stop_reasoning(self) -> None:
         """Flush any accumulated thoughts to static output, then stop the spinner.
 
@@ -290,12 +223,14 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
         """
         self._flush_thinking_block()
         self._reasoning.stop()
+
     def _clear_streaming_preview(self) -> None:
         self._streaming_accumulated = ''
         self._streaming_final = False
         self._stream_wrap_width = None
         self._reasoning._streaming_line = ''
         self.refresh()
+
     @staticmethod
     def _tail_preview_text(
         content: str,
