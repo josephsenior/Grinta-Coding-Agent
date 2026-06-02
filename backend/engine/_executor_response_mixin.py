@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 class _ExecutorResponseMixin:
     """Mixin: response handling and agent-mode gating. All 11 methods defined below."""
 
+    @staticmethod
     def _build_recoverable_tool_call_error_action(exc: Exception) -> Action:
         return _build_recoverable_tool_call_error_action_impl(exc)
 
@@ -139,6 +140,7 @@ class _ExecutorResponseMixin:
         config = getattr(self._planner, '_config', None)
         return normalize_interaction_mode(getattr(config, 'mode', 'agent'))
 
+    @staticmethod
     def _is_recoverable_tool_call_error(exc: Exception) -> bool:
         return _is_recoverable_tool_call_error_impl(exc)
 
@@ -202,5 +204,6 @@ class _ExecutorResponseMixin:
         except Exception:
             logger.debug('Failed to set plain-text planning directive', exc_info=True)
 
+    @staticmethod
     def _without_blank_agent_messages(actions: list[Action]) -> list[Action]:
         return _without_blank_agent_messages_impl(actions)

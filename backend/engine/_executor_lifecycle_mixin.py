@@ -98,6 +98,7 @@ class _ExecutorLifecycleMixin:
         guarded[field_name] = desired_completion
         return guarded
 
+    @staticmethod
     def _checkpoint_anchor_event_id(event_stream: EventStream | None) -> int | None:
         if event_stream is None:
             return None
@@ -149,6 +150,7 @@ class _ExecutorLifecycleMixin:
 
         return max_checkpoint_age_sec, discard_stale_on_recovery
 
+    @staticmethod
     def _checkpoint_session_key(event_stream: EventStream | None) -> str:
         sid = getattr(event_stream, 'sid', None)
         return sid if isinstance(sid, str) and sid else '__global__'
@@ -237,6 +239,7 @@ class _ExecutorLifecycleMixin:
             )
         return checkpoint
 
+    @staticmethod
     def _latest_persisted_critical_event_id(
         event_stream: EventStream,
     ) -> int | None:
@@ -276,6 +279,7 @@ class _ExecutorLifecycleMixin:
                     return fallback
         return 0
 
+    @staticmethod
     def _llm_model_name(llm: Any) -> str | None:
         model = getattr(getattr(llm, 'config', None), 'model', None)
         if isinstance(model, str) and model.strip():
@@ -293,9 +297,11 @@ class _ExecutorLifecycleMixin:
 
         return self._positive_int(getattr(config, 'max_output_tokens', None))
 
+    @staticmethod
     def _minimum_viable_completion_tokens() -> int:
         return 64
 
+    @staticmethod
     def _positive_int(value: Any) -> int | None:
         if isinstance(value, bool):
             return None
@@ -313,6 +319,7 @@ class _ExecutorLifecycleMixin:
                 return iv if iv > 0 else None
         return None
 
+    @staticmethod
     def _preflight_completion_field(
         call_params: dict[str, Any],
     ) -> tuple[str, int | None]:
@@ -326,21 +333,25 @@ class _ExecutorLifecycleMixin:
             )
         return 'max_tokens', None
 
+    @staticmethod
     def _preflight_margin(limit: int) -> int:
         if limit <= 0:
             return 0
         return max(128, min(1024, limit // 100))
 
+    @staticmethod
     def _sanitize_checkpoint_key(session_key: str) -> str:
         safe = Path(session_key).name.replace('..', '_')
         return safe.replace('/', '_').replace('\\', '_')
 
+    @staticmethod
     def _serialize_preflight_payload(value: Any) -> str:
         try:
             return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
         except Exception:
             return str(value)
 
+    @staticmethod
     def _timeout_from_env(
         env_var: str,
         default: float,
