@@ -6,34 +6,34 @@ re-exports GeminiClient for backward compat (via PEP 562 __getattr__).
 
 from __future__ import annotations
 
-import asyncio
+# google-genai subclasses aiohttp.ClientSession; aiohttp emits DeprecationWarning
+# while ``_api_client`` is loading. A local catch is reliable regardless of
+# PYTHONWARNINGS / filter registration order.
+import warnings
 from collections.abc import AsyncIterator
 from typing import Any, cast
 
 import httpx
 
-# google-genai subclasses aiohttp.ClientSession; aiohttp emits DeprecationWarning
-# while ``_api_client`` is loading. A local catch is reliable regardless of
-# PYTHONWARNINGS / filter registration order.
-import warnings
-
 with warnings.catch_warnings():
     warnings.simplefilter('ignore', DeprecationWarning)
     from google import genai
 
+from backend.core import json_compat as json
 from backend.core.logger import app_logger as logger
 from backend.inference.direct_clients import (
     DirectLLMClient,
     LLMResponse,
     _normalize_timeout_seconds,
 )
-from google.genai.types import HttpOptions  # noqa: I001
+
 
 def _gemini_timeout_ms(timeout: float | int | None) -> int:
     normalized = _normalize_timeout_seconds(timeout)
     if normalized is None:
         return 45000
     return max(1, int(normalized * 1000))
+
 
 class GeminiClient(DirectLLMClient):
     """Client for Google Gemini."""
