@@ -1295,7 +1295,7 @@ async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config)
 
 
 @pytest.mark.asyncio
-async def test_tui_final_stream_is_preview_until_message_action(mock_config):
+async def test_tui_final_stream_commits_response(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -1322,17 +1322,56 @@ async def test_tui_final_stream_is_preview_until_message_action(mock_config):
         final_stream.source = EventSource.AGENT
         renderer._process_event(final_stream)
 
-        assert renderer._last_final_response_text == ''
-        assert renderer._live_response == 'Plain preview.'
-        assert renderer._history == []
+        assert renderer._last_final_response_text == 'Plain preview.'
+        assert renderer._live_response == ''
+        assert len(renderer._history) == 2
+        assert isinstance(renderer._history[0], AgentMessage)
 
         suppressed = MessageAction(content='', suppress_cli=True)
         suppressed.source = EventSource.AGENT
         renderer._process_event(suppressed)
 
-        assert renderer._last_final_response_text == ''
+        assert renderer._last_final_response_text == 'Plain preview.'
         assert renderer._live_response == ''
-        assert renderer._history == []
+        assert len(renderer._history) == 2
+
+
+@pytest.mark.asyncio
+async def test_tui_streamed_response_commits_before_tool_action(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        stream = StreamingChunkAction(
+            accumulated='I will inspect the workspace.',
+            is_final=False,
+        )
+        stream.source = EventSource.AGENT
+        renderer._process_event(stream)
+
+        command = CmdRunAction(command='Get-Location')
+        command.source = EventSource.AGENT
+        renderer._process_event(command)
+
+        assert renderer._last_final_response_text == 'I will inspect the workspace.'
+        assert renderer._live_response == ''
+        assert len(renderer._history) == 2
+        assert isinstance(renderer._history[0], AgentMessage)
 
 
 @pytest.mark.asyncio

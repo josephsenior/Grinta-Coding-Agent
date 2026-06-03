@@ -133,7 +133,7 @@ async def test_read_binary_file_returns_binary_error(mock_executor) -> None:
     with (
         patch('os.path.isfile', return_value=True),
         patch(
-            'backend.execution.action_execution_server_io.is_binary', return_value=True
+            'backend.execution._aes_io_file_mixin.is_binary', return_value=True
         ),
     ):
         out = await mock_executor.read(FileReadAction(path='foo.bin'))
@@ -177,7 +177,7 @@ async def test_read_dispatches_by_extension(mock_executor) -> None:
             mock_executor, '_resolve_workspace_file_path', return_value='C:/ws/a.png'
         ),
         patch(
-            'backend.execution.action_execution_server_io.read_image_file',
+            'backend.execution._aes_io_file_mixin.read_image_file',
             return_value=FileReadObservation(path='a.png', content='img'),
         ) as img,
     ):
@@ -210,10 +210,10 @@ async def test_write_success_path(mock_executor) -> None:
         patch.object(
             mock_executor, '_resolve_workspace_file_path', return_value='C:/ws/a.txt'
         ),
-        patch('backend.execution.action_execution_server_io.ensure_directory_exists'),
+        patch('backend.execution._aes_io_file_mixin.ensure_directory_exists'),
         patch('os.path.exists', return_value=False),
         patch(
-            'backend.execution.action_execution_server_io.write_file_content',
+            'backend.execution._aes_io_file_mixin.write_file_content',
             return_value=None,
         ),
     ):

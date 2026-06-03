@@ -1,0 +1,748 @@
+"""Dialog classes extracted from backend.cli.tui.app.
+
+Pure code motion: class bodies are byte-identical to the
+pre-split version. ConfirmWidget and the Grinta*Dialog classes
+are self-contained Textual widgets/dialogs.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import shutil
+from pathlib import Path
+from typing import Any
+
+from textual.app import ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal, Vertical
+from textual.widget import Widget
+from textual.widgets import (
+    Button,
+    Checkbox,
+    DataTable,
+    Input,
+    Label,
+    Select,
+    Static,
+    TextArea,
+)
+
+from backend.cli.config_manager import AppConfig
+from backend.cli.theme import (
+    NAVY_ERROR,
+    NAVY_READY,
+    NAVY_TEXT_DIM,
+    NAVY_TEXT_MUTED,
+    NAVY_TEXT_SECONDARY,
+    NAVY_TEXT_TERTIARY,
+)
+from backend.cli.tui.widgets.dialogs import ModalDialog
+
+
+class ConfirmWidget(Widget):
+    """Inline confirmation bar that appears when the agent needs approval.
+
+    Renders as a single compact row inside the main page rather than
+    a blocking modal overlay.
+    """
+
+    DEFAULT_CSS = """
+    ConfirmWidget {
+        height: 3;
+        max-height: 3;
+        background: #0a1222;
+        border-top: tall #1a2744;
+        border-bottom: tall #1a2744;
+        padding: 0 1;
+        display: none;
+    }
+    ConfirmWidget.-visible {
+        display: block;
+    }
+    ConfirmWidget #confirm-bar {
+        layout: horizontal;
+        height: 1;
+        align: left middle;
+    }
+    ConfirmWidget #confirm-info {
+        width: 1fr;
+        height: 1;
+        color: #cbd5e1;
+        padding: 0 1 0 0;
+        content-align: left middle;
+    }
+    ConfirmWidget #confirm-actions {
+        width: auto;
+        height: 1;
+        align: right middle;
+        margin-left: 1;
+    }
+    ConfirmWidget #confirm-actions Button {
+        min-width: 0;
+        width: auto;
+        margin-left: 1;
+        height: 1;
+        padding: 0 2;
+    }
+    ConfirmWidget Button.-primary {
+        background: #2563eb;
+        color: #ffffff;
+    }
+    ConfirmWidget Button.-default {
+        background: #1e293b;
+        color: #94a3b8;
+    }
+    ConfirmWidget .confirm-label {
+        color: #64748b;
+    }
+    ConfirmWidget .confirm-type {
+        color: #7dd3fc;
+        text-style: bold;
+    }
+    ConfirmWidget .confirm-target {
+        color: #e2e8f0;
+        text-style: italic;
+    }
+    ConfirmWidget .confirm-risk-low {
+        color: #4ade80;
+    }
+    ConfirmWidget .confirm-risk-medium {
+        color: #fbbf24;
+    }
+    ConfirmWidget .confirm-risk-high {
+        color: #f87171;
+    }
+    ConfirmWidget .confirm-risk-unknown {
+        color: #94a3b8;
+    }
+    """
+
+    _ACTION_VERBS: dict[str, str] = {
+        'Run Command': 'execute',
+        'Edit File': 'edit',
+        'Write File': 'write',
+        'Read File': 'read',
+        'MCP Tool': 'use',
+        'Browser': 'use',
+        'Delegate': 'delegate',
+    }
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._decision_event: asyncio.Event = asyncio.Event()
+        self._decision: str | None = None
+        self._options: list[tuple[str, str]] = []
+        self._recommended: int | None = None
+
+    def compose(self) -> ComposeResult:
+        with Horizontal(id='confirm-bar'):
+            yield Static('', id='confirm-info')
+            with Horizontal(id='confirm-actions'):
+                pass
+
+    def configure(
+        self,
+        action_type: str,
+        risk_label: str,
+        risk_class: str,
+        target: str,
+        options: list[tuple[str, str]],
+        recommended: int | None = None,
+    ) -> None:
+        """Populate the confirmation bar with action details."""
+        verb = self._ACTION_VERBS.get(action_type, action_type.lower())
+        if target:
+            truncated = target if len(target) <= 72 else target[:69] + '...'
+            info = (
+                f'[dim]Agent wants to {verb}[/] '
+                f'[white]{truncated}[/] '
+                f'[{risk_class}]({risk_label} risk)[/]'
+            )
+        else:
+            info = f'[dim]Agent wants to {verb}[/] [{risk_class}]({risk_label} risk)[/]'
+
+        info_static = self.query_one('#confirm-info', Static)
+        info_static.update(info)
+
+        actions = self.query_one('#confirm-actions', Horizontal)
+        actions.remove_children()
+        self._options = options
+        self._recommended = recommended
+        for i, (key, label) in enumerate(options):
+            btn = Button(
+                label,
+                id=f'confirm-{key}',
+                variant='primary' if i == (recommended or 0) else 'default',
+            )
+            actions.mount(btn)
+
+    def show(self) -> None:
+        self.add_class('-visible')
+        self._decision = None
+        self._decision_event.clear()
+
+    def hide(self) -> None:
+        self.remove_class('-visible')
+
+    async def wait_for_decision(self) -> str | None:
+        """Block until the user clicks a button."""
+        await self._decision_event.wait()
+        return self._decision
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        for key, _label in self._options:
+            if event.button.id == f'confirm-{key}':
+                self._decision = key
+                self._decision_event.set()
+                self.hide()
+                return
+
+
+class GrintaConfirmDialog(ModalDialog[str | None]):
+    """Modal confirmation dialog for one-off confirmations."""
+
+    DEFAULT_CSS = """
+    GrintaConfirmDialog > #dialog-container {
+        width: 50;
+    }
+    """
+
+    def __init__(
+        self,
+        title: str,
+        body: str,
+        options: list[tuple[str, str]],
+        recommended: int | None = None,
+    ) -> None:
+        super().__init__()
+        self._dialog_title = title
+        self._dialog_body = body
+        self._options = options
+        self._recommended = recommended
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id='dialog-container'):
+            yield Label(f'[bold]{self._dialog_title}[/]', id='dialog-title')
+            yield Static(self._dialog_body, id='dialog-body')
+            with Horizontal(id='dialog-buttons'):
+                for i, (key, label) in enumerate(self._options):
+                    yield Button(
+                        label,
+                        id=f'confirm-{key}',
+                        variant='primary'
+                        if i == (self._recommended or 0)
+                        else 'default',
+                    )
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        for key, _label in self._options:
+            if event.button.id == f'confirm-{key}':
+                self.dismiss(key)
+                return
+
+
+class GrintaHelpDialog(ModalDialog[None]):
+    """Dedicated help and shortcuts modal."""
+
+    def compose(self) -> ComposeResult:
+        help_markup = (
+            f'[{NAVY_TEXT_SECONDARY}]/help[/]      [{NAVY_TEXT_TERTIARY}]Show help and shortcuts[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]/clear[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]/settings[/]  [{NAVY_TEXT_TERTIARY}]Open runtime settings[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]/sessions[/]  [{NAVY_TEXT_TERTIARY}]Browse and resume sessions[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]/resume[/]    [{NAVY_TEXT_TERTIARY}]Resume a session directly[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]/quit[/]      [{NAVY_TEXT_TERTIARY}]Exit Grinta[/]\n\n'
+            f'[{NAVY_TEXT_SECONDARY}]Ctrl+C[/]     [{NAVY_TEXT_TERTIARY}]Interrupt agent or copy[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]Ctrl+B[/]     [{NAVY_TEXT_TERTIARY}]Toggle sidebar[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]Ctrl+L[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]Ctrl+Space[/] [{NAVY_TEXT_TERTIARY}]Autocomplete slash commands[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]PageUp/Down[/] [{NAVY_TEXT_TERTIARY}]Scroll transcript[/]\n'
+            f'[{NAVY_TEXT_SECONDARY}]Home/End[/]   [{NAVY_TEXT_TERTIARY}]Jump transcript[/]'
+        )
+        with Vertical(id='dialog-container'):
+            yield Label('[bold]Help[/]', id='dialog-title')
+            yield Static(
+                f'[{NAVY_TEXT_MUTED}]Use the transcript for evidence and the pinned strips for runtime state.[/]\n\n'
+                f'{help_markup}',
+                id='help-body',
+            )
+            with Horizontal(id='dialog-buttons'):
+                yield Button('Close', id='help-close', variant='primary')
+
+    def on_mount(self) -> None:
+        self.query_one('#help-close', Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == 'help-close':
+            self.dismiss(None)
+
+
+class GrintaAddSkillDialog(ModalDialog[dict[str, str] | None]):
+    """Dialog to create a custom skill dynamically."""
+
+    BINDINGS = [
+        *ModalDialog.BINDINGS,
+        Binding('ctrl+s', 'save', 'Save', show=False),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id='dialog-container'):
+            yield Label('[bold]Add Custom Skill[/]', id='dialog-title')
+            yield Label('Skill Name (e.g. react_best_practices)', classes='field-label')
+            yield Input(id='skill-name')
+            yield Label('Instructions (Markdown)', classes='field-label')
+            yield TextArea(id='skill-content')
+            yield Label('', id='dialog-feedback')
+            with Horizontal(id='dialog-buttons'):
+                yield Button('Save', id='settings-save', variant='primary')
+                yield Button('Cancel', id='settings-cancel')
+
+    def on_mount(self) -> None:
+        self.query_one('#skill-name', Input).focus()
+
+    def action_save(self) -> None:
+        self._submit()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == 'settings-save':
+            self._submit()
+        elif event.button.id == 'settings-cancel':
+            self.dismiss(None)
+
+    def _submit(self) -> None:
+        name = self.query_one('#skill-name', Input).value.strip()
+        content = self.query_one('#skill-content', TextArea).text.strip()
+        if not name:
+            self.query_one('#dialog-feedback', Label).update(
+                '[#f05757]Skill name required.[/]'
+            )
+            return
+        if not content:
+            self.query_one('#dialog-feedback', Label).update(
+                '[#f05757]Content required.[/]'
+            )
+            return
+        self.dismiss({'name': name, 'content': content})
+
+
+class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
+    """Dialog to add an MCP Server."""
+
+    BINDINGS = [
+        *ModalDialog.BINDINGS,
+        Binding('ctrl+s', 'save', 'Save', show=False),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id='dialog-container'):
+            yield Label('[bold]Add MCP Server[/]', id='dialog-title')
+            yield Label('Server Name', classes='field-label')
+            yield Input(id='mcp-name')
+            yield Label(
+                'Command or URL (e.g. npx -y @modelcontextprotocol/server-postgres)',
+                classes='field-label',
+            )
+            yield Input(id='mcp-command')
+            yield Label('', id='dialog-feedback')
+            with Horizontal(id='dialog-buttons'):
+                yield Button('Save', id='settings-save', variant='primary')
+                yield Button('Cancel', id='settings-cancel')
+
+    def on_mount(self) -> None:
+        self.query_one('#mcp-name', Input).focus()
+
+    def action_save(self) -> None:
+        self._submit()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == 'settings-save':
+            self._submit()
+        elif event.button.id == 'settings-cancel':
+            self.dismiss(None)
+
+    def _submit(self) -> None:
+        name = self.query_one('#mcp-name', Input).value.strip()
+        cmd = self.query_one('#mcp-command', Input).value.strip()
+        if not name or not cmd:
+            self.query_one('#dialog-feedback', Label).update(
+                '[#f05757]Name and command required.[/]'
+            )
+            return
+        self.dismiss({'name': name, 'command': cmd})
+
+
+class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
+    """Native settings modal for full-screen TUI."""
+
+    BINDINGS = [
+        *ModalDialog.BINDINGS,
+        Binding('ctrl+s', 'save', 'Save', show=False),
+    ]
+
+    def __init__(self, config: AppConfig) -> None:
+        super().__init__()
+        self._config = config
+
+    def compose(self) -> ComposeResult:
+        from backend.cli.config_manager import get_current_model, get_masked_api_key
+
+        current_model = get_current_model(self._config)
+        masked_key = get_masked_api_key(self._config)
+        raw_budget = getattr(self._config, 'max_budget_per_task', None)
+        budget_value = '' if raw_budget is None else f'{float(raw_budget):g}'
+        icons_enabled = bool(getattr(self._config, 'cli_tool_icons', True))
+
+        with Vertical(id='dialog-container'):
+            yield Label('[bold]Settings[/]', id='dialog-title')
+            yield Label(f'Current API key: {masked_key}', id='settings-current-key')
+            yield Label('Model', classes='field-label')
+            yield Input(value=current_model, id='settings-model')
+            yield Label(
+                'API key (leave blank to keep current key)', classes='field-label'
+            )
+            yield Input(password=True, id='settings-api-key')
+            yield Label(
+                'Budget per task (blank/unlimited to keep unlimited)',
+                classes='field-label',
+            )
+            yield Input(value=budget_value, id='settings-budget')
+            yield Checkbox(
+                'Show tool icons in activity cards',
+                value=icons_enabled,
+                id='settings-icons',
+            )
+            yield Label('', id='dialog-feedback')
+            with Horizontal(id='dialog-buttons'):
+                yield Button('Save', id='settings-save', variant='primary')
+                yield Button('Cancel', id='settings-cancel')
+
+    def on_mount(self) -> None:
+        self.query_one('#settings-model', Input).focus()
+
+    def action_save(self) -> None:
+        self._submit()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == 'settings-save':
+            self._submit()
+            return
+        if event.button.id == 'settings-cancel':
+            self.dismiss(None)
+
+    def _set_feedback(self, message: str, *, error: bool = False) -> None:
+        style = NAVY_ERROR if error else NAVY_READY
+        self.query_one('#dialog-feedback', Label).update(f'[{style}]{message}[/]')
+
+    def _submit(self) -> None:
+        model = self.query_one('#settings-model', Input).value.strip()
+        api_key = self.query_one('#settings-api-key', Input).value.strip()
+        budget_raw = self.query_one('#settings-budget', Input).value.strip()
+        icons_enabled = self.query_one('#settings-icons', Checkbox).value
+
+        if not model:
+            self._set_feedback('Model is required.', error=True)
+            return
+
+        budget_value: float | None = None
+        if budget_raw and budget_raw.lower() not in {'unlimited', 'none'}:
+            try:
+                budget_value = float(budget_raw)
+            except ValueError:
+                self._set_feedback(
+                    'Budget must be numeric, unlimited, or empty.', error=True
+                )
+                return
+            if budget_value < 0:
+                self._set_feedback('Budget cannot be negative.', error=True)
+                return
+
+        self.dismiss(
+            {
+                'model': model,
+                'api_key': api_key,
+                'budget': budget_value,
+                'icons': bool(icons_enabled),
+            }
+        )
+
+
+class GrintaSessionsDialog(ModalDialog[str | None]):
+    """Native sessions manager for full-screen TUI."""
+
+    DEFAULT_CSS = """
+    GrintaSessionsDialog > #dialog-container {
+        max-height: 40;
+    }
+    """
+
+    BINDINGS = [
+        *ModalDialog.BINDINGS,
+        Binding('f5', 'refresh', 'Refresh', show=False),
+        Binding('delete', 'delete_selected', 'Delete', show=False),
+    ]
+
+    def __init__(
+        self,
+        config: AppConfig,
+        *,
+        search: str | None = None,
+        sort_by: str = 'updated',
+        limit: int = 20,
+        preview_target: str | None = None,
+        delete_targets: list[str] | None = None,
+    ) -> None:
+        super().__init__()
+        self._config = config
+        self._search = search or ''
+        self._sort_by = sort_by
+        self._limit = max(1, int(limit))
+        self._preview_target = preview_target
+        self._delete_targets = delete_targets or []
+        self._all_entries: list[tuple[str, dict[str, Any], int]] = []
+        self._visible_entries: list[tuple[str, dict[str, Any], int]] = []
+        self._sessions_root: Path | None = None
+
+    def compose(self) -> ComposeResult:
+        options = [
+            ('Updated', 'updated'),
+            ('Created', 'created'),
+            ('Events', 'events'),
+            ('Cost', 'cost'),
+            ('Model', 'model'),
+        ]
+        with Vertical(id='dialog-container'):
+            yield Label('[bold]Sessions[/]', id='dialog-title')
+            with Horizontal(id='sessions-filters'):
+                yield Input(
+                    value=self._search, placeholder='Search…', id='sessions-search'
+                )
+                yield Select(
+                    options=options,
+                    value=self._sort_by,
+                    allow_blank=False,
+                    id='sessions-sort',
+                )
+                yield Input(
+                    value=str(self._limit), restrict=r'\d*', id='sessions-limit'
+                )
+                yield Button('Refresh', id='sessions-refresh')
+            yield DataTable(id='sessions-table')
+            yield Static('', id='sessions-preview')
+            yield Label('', id='dialog-feedback')
+            with Horizontal(id='dialog-buttons'):
+                yield Button('Resume', id='sessions-resume', variant='primary')
+                yield Button('Delete', id='sessions-delete', variant='error')
+                yield Button('Close', id='sessions-close')
+
+    def on_mount(self) -> None:
+        table = self.query_one('#sessions-table', DataTable)
+        table.cursor_type = 'row'
+        table.add_columns('#', 'Session ID', 'Title', 'Events', 'Updated')
+        self._refresh_table()
+        if self._delete_targets:
+            deleted, errors = self._delete_sessions(self._delete_targets)
+            self._set_feedback(
+                f'Deleted {deleted} session(s). {" ".join(errors)}'.strip()
+            )
+            self._refresh_table()
+        if self._preview_target:
+            self._select_target(self._preview_target)
+        self.query_one('#sessions-search', Input).focus()
+
+    def action_refresh(self) -> None:
+        self._refresh_table()
+
+    async def action_delete_selected(self) -> None:
+        sid = self._current_session_id()
+        if not sid:
+            self._set_feedback('No session selected.', error=True)
+            return
+        result = await self.app.push_screen_wait(
+            GrintaConfirmDialog(
+                title='Delete Session',
+                body=f'Permanently delete session {sid[:12]}?',
+                options=[('cancel', 'Cancel'), ('delete', 'Delete')],
+            )
+        )
+        if result != 'delete':
+            return
+        deleted, errors = self._delete_sessions([sid])
+        if deleted:
+            self._set_feedback(f'Deleted session {sid[:12]}.')
+        elif errors:
+            self._set_feedback(errors[0], error=True)
+        self._refresh_table()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        bid = event.button.id
+        if bid == 'sessions-refresh':
+            self._refresh_table()
+            return
+        if bid == 'sessions-delete':
+            self.run_worker(self.action_delete_selected(), exclusive=True)
+            return
+        if bid == 'sessions-resume':
+            sid = self._current_session_id()
+            if sid:
+                self.dismiss(sid)
+            else:
+                self._set_feedback('No session selected.', error=True)
+            return
+        if bid == 'sessions-close':
+            self.dismiss(None)
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        self._update_preview(event.cursor_row)
+
+    def on_data_table_row_double_clicked(
+        self, event: DataTable.RowDoubleClicked
+    ) -> None:
+        sid = self._current_session_id()
+        if sid:
+            self.dismiss(sid)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == 'sessions-search':
+            self._search = event.value.strip()
+            self._refresh_table()
+            return
+        if event.input.id == 'sessions-limit':
+            value = event.value.strip()
+            self._limit = int(value) if value.isdigit() and int(value) > 0 else 20
+            self._refresh_table()
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == 'sessions-sort' and isinstance(event.value, str):
+            self._sort_by = event.value
+            self._refresh_table()
+
+    def _set_feedback(self, message: str, *, error: bool = False) -> None:
+        style = NAVY_ERROR if error else NAVY_READY
+        self.query_one('#dialog-feedback', Label).update(f'[{style}]{message}[/]')
+
+    def _refresh_table(self) -> None:
+        from backend.cli.session_manager import (
+            _filter_sessions_fuzzy,
+            _find_sessions_root,
+            _list_session_entries,
+        )
+
+        self._sessions_root = _find_sessions_root(self._config)
+        table = self.query_one('#sessions-table', DataTable)
+        table.clear()
+        if self._sessions_root is None:
+            self._all_entries = []
+            self._visible_entries = []
+            self._set_feedback('No session storage found.', error=True)
+            self.query_one('#sessions-preview', Static).update('')
+            return
+
+        entries = _list_session_entries(self._sessions_root, sort_by=self._sort_by)
+        self._all_entries = entries
+        if self._search:
+            entries = _filter_sessions_fuzzy(entries, self._search)
+        self._visible_entries = entries[: self._limit]
+        for i, (sid, meta, event_count) in enumerate(self._visible_entries, 1):
+            title = str(meta.get('title') or meta.get('name') or '—')
+            updated = str(meta.get('last_updated_at') or meta.get('created_at') or '—')[
+                :19
+            ]
+            table.add_row(str(i), sid[:12], title, str(event_count), updated, key=sid)
+
+        if self._visible_entries:
+            table.move_cursor(row=0, column=0, animate=False, scroll=False)
+            self._update_preview(0)
+            self._set_feedback(f'{len(self._visible_entries)} session(s) loaded.')
+        else:
+            self.query_one('#sessions-preview', Static).update('')
+            if self._search:
+                self._set_feedback(
+                    f'No sessions matching "{self._search}".', error=True
+                )
+            else:
+                self._set_feedback('No sessions found.', error=True)
+
+    def _select_target(self, target: str) -> None:
+        from backend.cli.session_manager import _resolve_target
+
+        resolved = _resolve_target(self._visible_entries, target)
+        if resolved is None:
+            self._set_feedback(f"No session at '{target}'", error=True)
+            return
+        sid = resolved[0]
+        for idx, item in enumerate(self._visible_entries):
+            if item[0] == sid:
+                table = self.query_one('#sessions-table', DataTable)
+                table.move_cursor(row=idx, column=0, animate=False, scroll=True)
+                self._update_preview(idx)
+                break
+
+    def _current_session_id(self) -> str | None:
+        table = self.query_one('#sessions-table', DataTable)
+        row_index = table.cursor_row
+        if row_index < 0 or row_index >= len(self._visible_entries):
+            return None
+        return self._visible_entries[row_index][0]
+
+    def _update_preview(self, row_index: int) -> None:
+        if row_index < 0 or row_index >= len(self._visible_entries):
+            self.query_one('#sessions-preview', Static).update('')
+            return
+        sid, meta, event_count = self._visible_entries[row_index]
+        lines = []
+        lines.append(f'[bold]ID:[/] {sid}')
+        title = str(meta.get('title') or meta.get('name') or '')
+        if title:
+            lines.append(f'[bold]Title:[/] {title}')
+        model = str(meta.get('llm_model') or '')
+        if model:
+            lines.append(f'[bold]Model:[/] {model}')
+        repo = str(meta.get('selected_repository') or '')
+        if repo:
+            lines.append(f'[bold]Repository:[/] {repo}')
+        branch = str(meta.get('selected_branch') or '')
+        if branch:
+            lines.append(f'[bold]Branch:[/] {branch}')
+        trigger = str(meta.get('trigger') or '')
+        if trigger:
+            lines.append(f'[bold]Trigger:[/] {trigger}')
+        lines.append(f'[bold]Events:[/] {event_count}')
+        cost = float(meta.get('accumulated_cost') or 0)
+        if cost:
+            lines.append(f'[bold]Cost:[/] ${cost:.4f}')
+        total_tokens = int(meta.get('total_tokens') or 0)
+        if total_tokens:
+            prompt_tokens = int(meta.get('prompt_tokens') or 0)
+            completion_tokens = int(meta.get('completion_tokens') or 0)
+            lines.append(
+                f'[bold]Tokens:[/] {total_tokens:,} total'
+                f'  [{NAVY_TEXT_DIM}](p:{prompt_tokens:,} c:{completion_tokens:,})[/]'
+            )
+        updated = str(meta.get('last_updated_at') or meta.get('created_at') or '')
+        if updated:
+            lines.append(f'[bold]Updated:[/] {updated[:19]}')
+        created = str(meta.get('created_at') or '')
+        if created and str(meta.get('last_updated_at') or '') != created:
+            lines.append(f'[bold]Created:[/] {created[:19]}')
+        self.query_one('#sessions-preview', Static).update('\n'.join(lines))
+
+    def _delete_sessions(self, targets: list[str]) -> tuple[int, list[str]]:
+        from backend.cli.session_manager import _resolve_target
+
+        if self._sessions_root is None:
+            return 0, ['No session storage found.']
+
+        deleted = 0
+        errors: list[str] = []
+        for target in targets:
+            resolved = _resolve_target(self._all_entries, target)
+            if resolved is None:
+                errors.append(f"No session at '{target}'.")
+                continue
+            sid = resolved[0]
+            try:
+                shutil.rmtree(self._sessions_root / sid, ignore_errors=False)
+                deleted += 1
+            except Exception as exc:
+                errors.append(f'{sid[:12]}: {exc}')
+        return deleted, errors
