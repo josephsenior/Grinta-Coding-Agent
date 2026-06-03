@@ -16,6 +16,7 @@ from backend.inference._fn_call_examples import IN_CONTEXT_LEARNING_EXAMPLE_PREF
 
 logger = logging.getLogger(__name__)
 
+
 def convert_tool_call_to_string(tool_call: dict) -> str:
     """Convert tool call to content in string format.
 
@@ -184,6 +185,7 @@ def convert_tools_to_description(tools: list[dict]) -> str:
 def _process_system_message(content: Any, system_prompt_suffix: str) -> dict:
     """Process system message by appending the system prompt suffix."""
     from backend.inference._fn_call_to_messages import _raise_unexpected_content_type  # noqa: I001, PLC0415
+
     if isinstance(content, str):
         content += system_prompt_suffix
     elif isinstance(content, list):
@@ -218,6 +220,7 @@ def _add_in_context_learning_example(
 ) -> Any:
     """Add in-context learning example to content."""
     from backend.inference._fn_call_to_messages import _raise_unexpected_content_type  # noqa: I001, PLC0415
+
     if not (example := IN_CONTEXT_LEARNING_EXAMPLE_PREFIX(tools, mode)):
         return content
 
@@ -235,4 +238,3 @@ def _add_example_to_list_content(content: list, example: str) -> list:
     else:
         content.insert(0, {'type': 'text', 'text': example})
     return content
-

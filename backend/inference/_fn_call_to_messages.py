@@ -42,6 +42,7 @@ from backend.inference.tool_result_format import (
 
 logger = logging.getLogger(__name__)
 
+
 def convert_fncall_messages_to_non_fncall_messages(
     messages: list[dict],
     tools: list[dict],
