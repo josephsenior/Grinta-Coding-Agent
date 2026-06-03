@@ -79,7 +79,7 @@ def test_manager_start_and_status_with_generic_adapter(monkeypatch, tmp_path) ->
         def close(self) -> None:
             return None
 
-    monkeypatch.setattr('backend.execution.debugger.DAPDebugSession', FakeSession)
+    monkeypatch.setattr('backend.execution._dap_manager.DAPDebugSession', FakeSession)
     manager = DAPDebugManager(str(tmp_path))
 
     start_obs = manager.handle(
@@ -124,7 +124,7 @@ def test_manager_infers_python_preset_for_py_program(monkeypatch, tmp_path) -> N
         def close(self) -> None:
             return None
 
-    monkeypatch.setattr('backend.execution.debugger.DAPDebugSession', FakeSession)
+    monkeypatch.setattr('backend.execution._dap_manager.DAPDebugSession', FakeSession)
     manager = DAPDebugManager(str(tmp_path))
 
     start_obs = manager.handle(
@@ -158,9 +158,9 @@ def test_manager_maps_pwa_node_adapter_to_js_recipe(monkeypatch, tmp_path) -> No
         def close(self) -> None:
             return None
 
-    monkeypatch.setattr('backend.execution.debugger.DAPDebugSession', FakeSession)
+    monkeypatch.setattr('backend.execution._dap_manager.DAPDebugSession', FakeSession)
     monkeypatch.setattr(
-        'backend.execution.debugger.shutil.which',
+        'backend.execution._dap_adapters.shutil.which',
         lambda cmd: '/fake/js-debug-adapter' if cmd == 'js-debug-adapter' else None,
     )
 
@@ -191,7 +191,7 @@ def test_manager_start_error_includes_startup_phase_metadata(
         def close(self) -> None:
             return None
 
-    monkeypatch.setattr('backend.execution.debugger.DAPDebugSession', FakeSession)
+    monkeypatch.setattr('backend.execution._dap_manager.DAPDebugSession', FakeSession)
     manager = DAPDebugManager(str(tmp_path))
     obs = manager.handle(
         DebuggerAction(debug_action='start', program='app.py', session_id='dbg-phase')
