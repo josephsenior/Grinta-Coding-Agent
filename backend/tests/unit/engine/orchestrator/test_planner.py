@@ -542,9 +542,10 @@ class TestBuildLlmParams:
         assert 'Read-only mode' in joined
         assert 'Use `communicate_with_user` for clarification or blockers.' in joined
         assert 'Use `finish` to deliver the structured plan or blocked outcome.' in joined
-        assert 'status, summary, plan, files_or_areas, risks' in joined
-        assert 'verification, assumptions, next_step' in joined
-        assert 'plan, files_or_areas, and verification must be non-empty' in joined
+        assert 'status, response, summary, sections, evidence' in joined
+        assert 'open_items, next_step' in joined
+        assert 'Recommended Plan' in joined
+        assert 'Verification Strategy' in joined
         assert 'open_questions_or_blockers' not in joined
         assert 'Current mode: AGENT' not in joined
 

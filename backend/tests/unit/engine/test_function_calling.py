@@ -177,6 +177,38 @@ class TestHandleFinishTool:
         assert action.final_thought == 'Task complete'
         assert action.outputs['actions_taken'] == ['Changed the implementation']
 
+    def test_agent_finish_accepts_adaptive_payload(self):
+        action = _handle_finish_tool(
+            {
+                'status': 'completed',
+                'response': 'I finished the UX review and my recommendation is below.',
+                'summary': 'Completed a UX review with a recommendation.',
+                'sections': [
+                    {
+                        'title': 'Recommendation',
+                        'items': ['Keep the dense dashboard layout and simplify the hero copy.'],
+                    },
+                    {
+                        'title': 'Tradeoffs',
+                        'items': ['This favors repeat users over a marketing-style first impression.'],
+                    },
+                ],
+                'evidence': {
+                    'status': 'not_applicable',
+                    'details': 'This was a design critique, not an executable change.',
+                },
+                'open_items': [],
+                'next_step': '',
+            },
+            mode='agent',
+        )
+
+        assert isinstance(action, PlaybookFinishAction)
+        assert action.final_thought.startswith('I finished the UX review')
+        assert action.outputs['mode'] == 'agent'
+        assert action.outputs['sections'][0]['title'] == 'Recommendation'
+        assert action.outputs['evidence']['status'] == 'not_applicable'
+
     def test_plan_finish_accepts_plan_payload(self):
         action = _handle_finish_tool(
             {
@@ -198,6 +230,41 @@ class TestHandleFinishTool:
             'Make the change',
             'Run tests',
         ]
+
+    def test_plan_finish_accepts_adaptive_payload(self):
+        action = _handle_finish_tool(
+            {
+                'status': 'completed',
+                'response': 'Here is the recommended migration plan.',
+                'summary': 'Produced a migration plan with risks and verification.',
+                'sections': [
+                    {
+                        'title': 'Objective',
+                        'items': ['Move the finish contract to a task-aware envelope.'],
+                    },
+                    {
+                        'title': 'Recommended Plan',
+                        'items': ['Update schema.', 'Normalize handler output.', 'Update rendering/tests.'],
+                    },
+                    {
+                        'title': 'Verification Strategy',
+                        'items': ['Run focused finish and renderer tests.'],
+                    },
+                ],
+                'evidence': {
+                    'status': 'planned',
+                    'details': 'Plan is based on the finish schema and renderer paths.',
+                },
+                'open_items': [],
+                'next_step': 'Switch to Agent Mode.',
+            },
+            mode='plan',
+        )
+
+        assert isinstance(action, PlaybookFinishAction)
+        assert action.final_thought == 'Here is the recommended migration plan.'
+        assert action.outputs['mode'] == 'plan'
+        assert action.outputs['sections'][1]['title'] == 'Recommended Plan'
 
     def test_plan_finish_rejects_missing_required_fields(self):
         with pytest.raises(FunctionCallValidationError, match='summary'):
@@ -247,36 +314,23 @@ class TestHandleFinishTool:
                 mode='plan',
             )
 
-    def test_plan_finish_completed_requires_scope_and_verification(self):
-        with pytest.raises(FunctionCallValidationError, match='files_or_areas'):
-            _handle_finish_tool(
-                {
-                    'status': 'completed',
-                    'summary': 'Plan ready',
-                    'plan': ['Inspect files'],
-                    'files_or_areas': [],
-                    'risks': [],
-                    'verification': ['Run focused tests'],
-                    'assumptions': [],
-                    'next_step': 'Switch to Agent Mode',
-                },
-                mode='plan',
-            )
+    def test_plan_finish_completed_does_not_require_code_specific_scope(self):
+        action = _handle_finish_tool(
+            {
+                'status': 'completed',
+                'summary': 'Plan ready',
+                'plan': ['Interview stakeholders', 'Compare workflow options'],
+                'files_or_areas': [],
+                'risks': [],
+                'verification': [],
+                'assumptions': [],
+                'next_step': 'Review the plan',
+            },
+            mode='plan',
+        )
 
-        with pytest.raises(FunctionCallValidationError, match='verification'):
-            _handle_finish_tool(
-                {
-                    'status': 'completed',
-                    'summary': 'Plan ready',
-                    'plan': ['Inspect files'],
-                    'files_or_areas': ['backend/engine'],
-                    'risks': [],
-                    'verification': [],
-                    'assumptions': [],
-                    'next_step': 'Switch to Agent Mode',
-                },
-                mode='plan',
-            )
+        assert action.outputs['sections'][0]['title'] == 'Recommended Plan'
+        assert action.outputs['evidence']['status'] == 'not_applicable'
 
     def test_agent_finish_rejects_plan_payload(self):
         with pytest.raises(FunctionCallValidationError, match='actions_taken'):

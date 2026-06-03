@@ -278,6 +278,7 @@ class TUIRenderer(
         self._worker_completed: int = 0
         self._worker_failed: int = 0
         self._condensation_count: int = 0
+        self._compaction_transcript_active: bool = False
         self._last_active_card: Any | None = None
         self._last_browser_action_card: Any | None = None
         self._last_browser_cmd: str = ''

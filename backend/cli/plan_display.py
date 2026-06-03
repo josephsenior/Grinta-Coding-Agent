@@ -29,7 +29,10 @@ from backend.cli.theme import (
 def is_structured_plan_finish(action: Any) -> bool:
     """Return True when a finish action carries Plan-mode structured outputs."""
     outputs = getattr(action, 'outputs', None)
-    return isinstance(outputs, Mapping) and isinstance(outputs.get('plan'), list)
+    if not isinstance(outputs, Mapping):
+        return False
+    mode = str(outputs.get('mode') or '').strip().lower()
+    return mode == 'plan' or isinstance(outputs.get('plan'), list)
 
 
 def _as_mapping(action_or_outputs: Any) -> Mapping[str, Any]:
@@ -86,6 +89,40 @@ def _bullet_section(title: str, items: list[str]) -> Any | None:
     return Group(_section_heading(title), table)
 
 
+def _structured_sections(value: Any) -> list[tuple[str, list[str]]]:
+    if not isinstance(value, Sequence) or isinstance(value, str):
+        return []
+    sections: list[tuple[str, list[str]]] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            continue
+        title = str(item.get('title') or '').strip()
+        items = _string_list(item.get('items'))
+        if title and items:
+            sections.append((title, items))
+    return sections
+
+
+def _adaptive_section(title: str, items: list[str]) -> Any | None:
+    if not items:
+        return None
+    if 'plan' in title.lower():
+        return _numbered_section(title, items)
+    return _bullet_section(title, items)
+
+
+def _evidence_section(outputs: Mapping[str, Any]) -> Any | None:
+    evidence = outputs.get('evidence')
+    if not isinstance(evidence, Mapping):
+        return None
+    status = str(evidence.get('status') or '').strip()
+    details = str(evidence.get('details') or '').strip()
+    if not status and not details:
+        return None
+    body = f'{status}: {details}' if status and details else status or details
+    return _bullet_section('Evidence / Verification', [body])
+
+
 def _status_title(status: str) -> tuple[str, str]:
     normalized = (status or 'completed').strip().lower()
     if normalized == 'blocked':
@@ -103,6 +140,8 @@ def render_plan_finish_panel(action_or_outputs: Any) -> Panel:
     summary = str(
         outputs.get('summary') or getattr(action_or_outputs, 'final_thought', '') or ''
     ).strip()
+    response = str(outputs.get('response') or summary).strip()
+    structured_sections = _structured_sections(outputs.get('sections'))
     plan = _string_list(outputs.get('plan'))
     files_or_areas = _string_list(outputs.get('files_or_areas'))
     risks = _string_list(outputs.get('risks'))
@@ -111,17 +150,31 @@ def render_plan_finish_panel(action_or_outputs: Any) -> Panel:
     next_step = str(outputs.get('next_step') or '').strip()
 
     parts: list[Any] = []
-    if summary:
-        parts.append(_markdown(summary))
+    if response:
+        parts.append(_markdown(response))
 
-    sections = [
-        _numbered_section('Execution Plan', plan),
-        _bullet_section('Files / Areas', files_or_areas),
-        _bullet_section('Verification', verification),
-        _bullet_section('Risks', risks),
-        _bullet_section('Assumptions', assumptions),
-    ]
-    parts.extend(section for section in sections if section is not None)
+    if structured_sections:
+        parts.extend(
+            section
+            for title, items in structured_sections
+            if (section := _adaptive_section(title, items)) is not None
+        )
+        evidence = _evidence_section(outputs)
+        if evidence is not None:
+            parts.append(evidence)
+        open_items = _string_list(outputs.get('open_items'))
+        open_section = _bullet_section('Open Items', open_items)
+        if open_section is not None:
+            parts.append(open_section)
+    else:
+        sections = [
+            _numbered_section('Execution Plan', plan),
+            _bullet_section('Files / Areas', files_or_areas),
+            _bullet_section('Verification', verification),
+            _bullet_section('Risks', risks),
+            _bullet_section('Assumptions', assumptions),
+        ]
+        parts.extend(section for section in sections if section is not None)
 
     if next_step:
         next_table = Table.grid(expand=True, padding=(0, 1))

@@ -67,6 +67,7 @@ class _AppRendererLiveMixin:
         if not text.strip():
             return
 
+        should_follow = display.should_follow_tail()
         if not self._live_thinking_widget:
             from backend.cli.tui.widgets.activity_card import ThinkingIndicator
 
@@ -75,7 +76,7 @@ class _AppRendererLiveMixin:
             self._live_thinking_widget.start()
 
         self._live_thinking_widget.set_thoughts(text)
-        if not display._user_scrolled_away:
+        if should_follow:
             display.scroll_end(animate=False)
 
     def update_live_response(self, text: str) -> None:
@@ -105,8 +106,9 @@ class _AppRendererLiveMixin:
             self._live_response_widget = AgentMessage(text)
             display.append_widget(self._live_response_widget)
         else:
+            should_follow = display.should_follow_tail()
             self._live_response_widget.update_message(text)
-            if not display._user_scrolled_away:
+            if should_follow:
                 display.scroll_end(animate=False)
 
     def clear_live_response(self) -> None:

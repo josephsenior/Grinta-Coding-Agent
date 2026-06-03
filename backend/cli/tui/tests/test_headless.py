@@ -23,6 +23,7 @@ from backend.cli.tui.app import (
     GrintaSessionsDialog,
     InputBar,
     RendererDrainRequested,
+    TUIRenderer,
     WelcomeWidget,
     _strip_terminal_control_literals,
 )
@@ -40,6 +41,7 @@ from backend.cli.tui.widgets.activity_card import (
 from backend.core.enums import AgentState, EventSource
 from backend.ledger.action import (
     ClarificationRequestAction,
+    CondensationRequestAction,
     FileEditAction,
     FileWriteAction,
     MessageAction,
@@ -51,6 +53,10 @@ from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
+)
+from backend.ledger.observation import (
+    AgentCondensationObservation,
+    StatusObservation,
 )
 from backend.ledger.observation.agent import AgentStateChangedObservation
 from backend.ledger.observation.commands import CmdOutputObservation
@@ -75,6 +81,15 @@ def mock_config():
 def _get_screen(app: GrintaTUIApp) -> GrintaScreen:
     """Helper: query via app.screen since app.query_one uses default screen."""
     return app.screen  # type: ignore[return-value]
+
+
+async def _fill_scrollable_transcript(display, pilot, *, count: int = 80) -> None:
+    for idx in range(count):
+        display.append_widget(Static(f'transcript line {idx}'))
+    await pilot.pause()
+    display.force_scroll_end()
+    await pilot.pause()
+    assert display.max_scroll_y > 0
 
 
 def test_tui_plan_message_renders_structured_plan_card():
@@ -102,6 +117,49 @@ def test_tui_plan_message_renders_structured_plan_card():
     assert 'Plan Ready' in rendered
     assert 'Execution Plan' in rendered
     assert 'backend/cli/hud.py' in rendered
+
+
+def test_tui_plan_message_renders_adaptive_finish_sections():
+    action = SimpleNamespace(
+        final_thought='Here is the recommended plan.',
+        outputs={
+            'mode': 'plan',
+            'status': 'completed',
+            'response': 'Here is the recommended plan.',
+            'summary': 'Produced an adaptive plan.',
+            'sections': [
+                {
+                    'title': 'Objective',
+                    'items': ['Improve finish output across task types.'],
+                },
+                {
+                    'title': 'Recommended Plan',
+                    'items': ['Update schema.', 'Normalize handlers.', 'Verify rendering.'],
+                },
+                {
+                    'title': 'Verification Strategy',
+                    'items': ['Run finish and TUI renderer tests.'],
+                },
+            ],
+            'evidence': {
+                'status': 'planned',
+                'details': 'Based on the finish schema and renderer paths.',
+            },
+            'open_items': ['Decide whether to add a generic Agent finish card.'],
+            'next_step': 'Switch to Agent Mode.',
+        },
+    )
+
+    widget = PlanMessage(action)
+
+    console = RichConsole(record=True, width=100)
+    console.print(widget.renderable)
+    rendered = console.export_text()
+    assert 'Plan Ready' in rendered
+    assert 'Objective' in rendered
+    assert 'Recommended Plan' in rendered
+    assert 'Evidence / Verification' in rendered
+    assert 'Open Items' in rendered
 
 
 @pytest.mark.asyncio
@@ -196,6 +254,87 @@ async def test_tui_activity_card_expanded_output_wraps_in_extra_frame(mock_confi
         body = found.query_one('#expanded-body', Container)
         assert body is not None
         assert body.display is True
+
+
+@pytest.mark.asyncio
+async def test_tui_live_response_follows_tail_when_not_user_scrolled(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(100, 24)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        await _fill_scrollable_transcript(display, pilot)
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer.update_live_response('Starting response.')
+        await pilot.pause()
+        display.force_scroll_end()
+        await pilot.pause()
+
+        renderer.update_live_response(
+            'Starting response.\n' + '\n'.join(f'new line {idx}' for idx in range(20))
+        )
+        await pilot.pause()
+
+        assert display._user_scrolled_away is False
+        assert display._was_at_bottom()
+
+
+@pytest.mark.asyncio
+async def test_tui_live_response_respects_user_scrolled_away(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(100, 24)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        await _fill_scrollable_transcript(display, pilot)
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+        renderer.update_live_response('Starting response.')
+        await pilot.pause()
+        display.force_scroll_end()
+        await pilot.pause()
+
+        display.user_scroll_page_up(animate=False)
+        await pilot.pause()
+        assert display._user_scrolled_away is True
+
+        renderer.update_live_response(
+            'Starting response.\n' + '\n'.join(f'new line {idx}' for idx in range(20))
+        )
+        await pilot.pause()
+
+        assert display._user_scrolled_away is True
+        assert not display._was_at_bottom()
 
 
 @pytest.mark.asyncio
@@ -1372,6 +1511,96 @@ async def test_tui_streamed_response_commits_before_tool_action(mock_config):
         assert renderer._live_response == ''
         assert len(renderer._history) == 2
         assert isinstance(renderer._history[0], AgentMessage)
+
+
+@pytest.mark.asyncio
+async def test_tui_compaction_status_renders_persistent_card(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        hud = HUDBar()
+        renderer = TUIRenderer(
+            console=console,
+            hud=hud,
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        status = StatusObservation(
+            content='Compacting context...',
+            status_type='compaction',
+        )
+        status.source = EventSource.AGENT
+        renderer._process_event(status)
+        await pilot.pause()
+
+        cards = s.query(TUIActivityCard).results()
+        compaction_cards = [
+            card for card in cards if 'category-tool' in card.classes
+        ]
+        assert len(compaction_cards) == 1
+        collapsed = compaction_cards[0].query_one('#collapsed-row')
+        assert 'Compacting (1st)' in str(collapsed.renderable)
+        assert 'context' in str(collapsed.renderable)
+        assert renderer._compaction_transcript_active is True
+        assert renderer._condensation_count == 1
+
+
+@pytest.mark.asyncio
+async def test_tui_condensation_request_reuses_status_card(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            StatusObservation(
+                content='Compacting context...',
+                status_type='compaction',
+            )
+        )
+        renderer._process_event(CondensationRequestAction())
+        renderer._process_event(
+            AgentCondensationObservation('Compacted summary for the next turn.')
+        )
+        await pilot.pause()
+
+        compaction_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-tool' in card.classes
+        ]
+        assert len(compaction_cards) == 2
+
+        started = compaction_cards[0].query_one('#collapsed-row')
+        completed = compaction_cards[1].query_one('#collapsed-row')
+        assert 'Compacting (1st)' in str(started.renderable)
+        assert 'Compacted (1st)' in str(completed.renderable)
+        assert 'Done' in str(completed.renderable)
+        assert renderer._compaction_transcript_active is False
 
 
 @pytest.mark.asyncio

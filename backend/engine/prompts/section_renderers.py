@@ -678,7 +678,7 @@ def _render_autonomy(
         task_sync_instruction = '**Task synchronization:** Update `task_tracker` to `done`, `skipped`, or `blocked` before attempting to finish.'
     else:
         problem_solving_workflow_body = base_workflow
-        task_sync_instruction = '**Plan synchronization:** Keep your working memory and finish summary aligned with what was actually completed before attempting to finish.'
+        task_sync_instruction = '**Plan synchronization:** Keep your working memory, finish response, and finish summary aligned with what was actually completed before attempting to finish.'
 
     lsp_avail = _lsp_available(config)
     error_recovery_pivot_lines = (

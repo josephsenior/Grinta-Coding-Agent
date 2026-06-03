@@ -634,9 +634,10 @@ class OrchestratorPlanner:
             '- Do not mutate files, run mutating commands, or use write/MCP/shell tools.\n'
             '- Use `communicate_with_user` for clarification or blockers.\n'
             '- Use `finish` to deliver the structured plan or blocked outcome.\n\n'
-            '`finish` requires: status, summary, plan, files_or_areas, risks, '
-            "verification, assumptions, next_step. For status='completed', "
-            'plan, files_or_areas, and verification must be non-empty.\n'
+            '`finish` requires: status, response, summary, sections, evidence, '
+            'open_items, next_step. Use sections for Objective, Recommended Plan, '
+            'Scope / Targets, Risks / Tradeoffs, Verification Strategy, and '
+            'Assumptions / Open Questions as applicable.\n'
             '==========================\n'
         )
         return self._apply_control_message(messages, instruction)
@@ -650,8 +651,11 @@ class OrchestratorPlanner:
             '- Natural prose is fine for conversation or explanation when no action is needed.\n'
             '- Use `communicate_with_user` for questions, blockers, or escalation.\n'
             '- Use `finish` to end completed or blocked work.\n\n'
-            '`finish` fields: status, summary, actions_taken, verification, remaining_items, next_step.\n'
-            "If verification was not run, use verification.status='not_run' and explain in details.\n\n"
+            '`finish` requires: status, response, summary, sections, evidence, '
+            'open_items, next_step. Shape section titles to the task while covering '
+            'Outcome, What I Did, Evidence / Verification, Caveats / Open Items, '
+            'and Next Step when applicable.\n'
+            "If verification was not run, use evidence.status='not_run' and explain in details.\n\n"
             '===========================\n'
         )
         return self._apply_control_message(messages, instruction)

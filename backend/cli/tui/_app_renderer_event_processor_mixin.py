@@ -188,6 +188,17 @@ class _AppRendererEventProcessorMixin:
             return self._is_visible_thinking_text(thought)
         return isinstance(event, StreamingChunkAction)
 
+    def _show_compaction_started_card(self) -> None:
+        """Ensure an in-progress compaction is visible in the transcript."""
+        if getattr(self, '_compaction_transcript_active', False):
+            return
+        count = max(self._condensation_count + 1, 1)
+        self._condensation_count = count
+        self._compaction_transcript_active = True
+        card = ActivityRenderer.condensation(count=count)
+        self._write_card(card)
+        self._hud.update_condensation_count(count)
+
     def _process_event(self, event: Any) -> None:
         self._update_metrics(event)
         if isinstance(event, NullAction) or isinstance(event, NullObservation):
@@ -428,8 +439,10 @@ class _AppRendererEventProcessorMixin:
                     cwd=cwd,
                 )
         elif isinstance(event, ErrorObservation):
+            self._compaction_transcript_active = False
             self._tui.add_error(event.content or 'An unknown error occurred')
         elif isinstance(event, SuccessObservation):
+            self._compaction_transcript_active = False
             self._clear_retry_strip('Recovered')
             self._clear_runtime_status('Recovered')
             self._tui.add_success(event.content or 'Done')
@@ -459,6 +472,7 @@ class _AppRendererEventProcessorMixin:
                     'Reducing context to continue the task',
                     active=True,
                 )
+                self._show_compaction_started_card()
                 return
             msg = (event.content or '').strip()
             if msg:
@@ -609,25 +623,23 @@ class _AppRendererEventProcessorMixin:
             # Don't show memory recall as a visible card - it's an internal operation
             pass
         elif isinstance(event, CondensationRequestAction):
-            # Don't show condensation requests - they're internal; CondensationAction shows the result
-            pass
+            self._show_compaction_started_card()
         elif isinstance(event, RecallObservation):
             pass
         elif isinstance(event, RecallFailureObservation):
             pass
         elif isinstance(event, CondensationAction):
-            count = self._condensation_count + 1
-            self._condensation_count = count
-            card = ActivityRenderer.condensation(count=count)
-            self._write_card(card)
-            self._hud.update_condensation_count(count)
+            self._show_compaction_started_card()
         elif isinstance(event, AgentCondensationObservation):
+            self._compaction_transcript_active = False
             self._update_runtime_strip(
                 'Context compacted',
                 'Context compressed successfully',
                 active=False,
             )
             count = max(self._condensation_count, 1)
+            self._condensation_count = count
+            self._hud.update_condensation_count(count)
             card = ActivityRenderer.condensation(count=count, result=event.content)
             self._write_card(card)
         elif isinstance(event, DelegateTaskAction):
