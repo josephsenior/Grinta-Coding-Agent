@@ -172,20 +172,18 @@ class _AppRendererEventProcessorMixin:
             with self._pending_lock:
                 self._drain_scheduled = False
 
-    @staticmethod
-    def _is_visible_thinking_text(text: str) -> bool:
-        thought = (text or '').strip()
-        return bool(thought) and thought != 'Your thought has been logged.'
-
     def _is_live_thinking_event(self, event: Any) -> bool:
         if isinstance(event, AgentThinkAction):
             if bool(getattr(event, 'suppress_cli', False)):
                 return False
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-            return self._is_visible_thinking_text(thought)
+            source_tool = getattr(event, 'source_tool', '') or ''
+            intent = self._classify_thinking_text(thought, source_tool=source_tool)
+            return intent.kind == 'thinking'
         if isinstance(event, AgentThinkObservation):
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-            return self._is_visible_thinking_text(thought)
+            intent = self._classify_thinking_text(thought)
+            return intent.kind == 'thinking'
         return isinstance(event, StreamingChunkAction)
 
     def _show_compaction_started_card(self) -> None:
@@ -205,6 +203,9 @@ class _AppRendererEventProcessorMixin:
             return
 
         source = getattr(event, 'source', None)
+        if isinstance(event, MessageAction) and self._is_user_source(source):
+            self._last_thinking_text_hash = ''
+            self._last_thinking_artifact_hash = ''
 
         # Detect start of agent turn (first tool action after user input)
         if not self._in_agent_turn and not isinstance(
@@ -485,15 +486,10 @@ class _AppRendererEventProcessorMixin:
         elif isinstance(event, AgentThinkAction):
             source_tool = getattr(event, 'source_tool', '') or ''
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-
-            if source_tool == 'search_code' and thought:
-                self._handle_search_code_action(thought)
-            elif thought and thought.strip() != 'Your thought has been logged.':
-                self._tui.add_thinking(thought)
+            self._render_thinking_payload(thought, source_tool=source_tool)
         elif isinstance(event, AgentThinkObservation):
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-            if thought and thought.strip() != 'Your thought has been logged.':
-                self._tui.add_thinking(thought)
+            self._render_thinking_payload(thought)
         elif isinstance(event, BrowserToolAction):
             action_name = getattr(event, 'command', 'browser') or 'browser'
             url = ''

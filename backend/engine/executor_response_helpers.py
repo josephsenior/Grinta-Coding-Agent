@@ -80,10 +80,20 @@ def build_recoverable_tool_call_error_action(exc: Exception) -> Action:
     if len(detail) > 1200:
         detail = f'{detail[:1200]}...'
 
+    extra_hint = ''
+    if 'Invalid task status' in detail:
+        extra_hint = (
+            '\nFor task_tracker status values, use exactly: '
+            '`todo`, `doing`, `done`, `skipped`, `blocked`. '
+            'Translate common aliases as: `in_progress` -> `doing`, '
+            '`completed` -> `done`, `pending` -> `todo`.\n'
+        )
+
     return AgentThinkAction(
         thought=(
             '[TOOL_CALL_RECOVERABLE_ERROR] The previous tool call was invalid and was not executed. '
             f'Details: {detail}\n'
+            f'{extra_hint}'
             'Recover by emitting one corrected tool call with strict JSON arguments: '
             'use double-quoted keys/strings, escape embedded newlines/quotes, include required arguments, '
             'and call an existing tool name only.'

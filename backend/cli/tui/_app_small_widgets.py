@@ -63,13 +63,18 @@ class Transcript(VerticalScroll):
         self._set_user_scrolled_away(not self._was_at_bottom())
 
     def should_follow_tail(self) -> bool:
-        """Return True when live updates should keep the transcript pinned."""
+        """Return True when live updates should keep the transcript pinned.
+
+        Only the user's explicit scroll actions set _user_scrolled_away.
+        During agentic activity the renderer streams new widgets rapidly and
+        the scroll position briefly lags behind max_scroll_y, so we must not
+        treat that transient lag as "user scrolled away".
+        """
         if self._user_scrolled_away:
             return False
-        if self._was_at_bottom():
+        if self.max_scroll_y <= 0:
             return True
-        self._set_user_scrolled_away(True)
-        return False
+        return self._was_at_bottom()
 
     def pause_auto_scroll(self) -> None:
         """Stop live updates from pulling the transcript back to the bottom."""

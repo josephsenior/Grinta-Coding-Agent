@@ -36,10 +36,12 @@ from backend.cli.tui.widgets.activity_card import (
     DiffLine,
     PlanMessage,
     SplitDiffLine,
+    ThinkingIndicator,
     TurnCompletion,
 )
 from backend.core.enums import AgentState, EventSource
 from backend.ledger.action import (
+    AgentThinkAction,
     ClarificationRequestAction,
     CondensationRequestAction,
     FileEditAction,
@@ -56,6 +58,7 @@ from backend.ledger.action.terminal import (
 )
 from backend.ledger.observation import (
     AgentCondensationObservation,
+    AgentThinkObservation,
     StatusObservation,
 )
 from backend.ledger.observation.agent import AgentStateChangedObservation
@@ -1511,6 +1514,118 @@ async def test_tui_streamed_response_commits_before_tool_action(mock_config):
         assert renderer._live_response == ''
         assert len(renderer._history) == 2
         assert isinstance(renderer._history[0], AgentMessage)
+
+
+@pytest.mark.asyncio
+async def test_tui_duplicate_thinking_payload_renders_once(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        thought = 'Inspecting the render path.'
+        renderer._process_event(StreamingChunkAction(thinking_accumulated=thought))
+        renderer._process_event(AgentThinkAction(thought=thought))
+        renderer._process_event(AgentThinkObservation(content=thought))
+        renderer._process_event(
+            FileWriteAction(path='demo.txt', content='finalize thinking')
+        )
+        await pilot.pause()
+
+        thinking_blocks = list(s.query(ThinkingIndicator).results())
+        assert len(thinking_blocks) == 1
+        rendered = str(thinking_blocks[0].renderable)
+        assert rendered.count(thought) == 1
+
+
+@pytest.mark.asyncio
+async def test_tui_search_results_in_thinking_payload_render_as_card(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            AgentThinkAction(
+                thought='<search_results>\nbackend/app.py:12:render thinking\n</search_results>'
+            )
+        )
+        await pilot.pause()
+
+        assert list(s.query(ThinkingIndicator).results()) == []
+        search_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-search' in card.classes
+        ]
+        assert len(search_cards) == 1
+        collapsed = search_cards[0].query_one('#collapsed-row')
+        assert 'Search' in str(collapsed.renderable)
+
+
+@pytest.mark.asyncio
+async def test_tui_internal_thinking_payloads_render_as_activity_cards(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            AgentThinkAction(thought="[WORKING_MEMORY] Updated 'findings' section.")
+        )
+        renderer._process_event(
+            AgentThinkAction(
+                thought='[CHECKPOINT] Saved checkpoint before edit.',
+                source_tool='checkpoint',
+            )
+        )
+        await pilot.pause()
+
+        assert list(s.query(ThinkingIndicator).results()) == []
+        cards = list(s.query(TUIActivityCard).results())
+        memory_cards = [card for card in cards if 'category-memory' in card.classes]
+        tool_cards = [card for card in cards if 'category-tool' in card.classes]
+
+        assert len(memory_cards) == 1
+        assert len(tool_cards) == 1
+        assert 'Memory' in str(memory_cards[0].query_one('#collapsed-row').renderable)
+        assert 'Checkpoint' in str(tool_cards[0].query_one('#collapsed-row').renderable)
 
 
 @pytest.mark.asyncio

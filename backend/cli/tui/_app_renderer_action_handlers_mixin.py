@@ -132,9 +132,8 @@ class _AppRendererActionHandlersMixin:
             return
 
         thought = (getattr(action, 'thought', '') or '').strip()
-        if thought and thought != 'Your thought has been logged.':
-            self._tui.add_thinking(thought)
-            self._tui.finalize_thinking()
+        if thought:
+            self._render_thinking_payload(thought, finalize=True)
 
         content = (getattr(action, 'content', '') or '').strip()
         if not content:
@@ -180,7 +179,7 @@ class _AppRendererActionHandlersMixin:
         content = self._normalize_final_response_text(action.accumulated or '')
 
         if self._is_visible_thinking_text(thinking):
-            self._tui.add_thinking(thinking)
+            self._render_thinking_payload(thinking)
             if content or action.is_final:
                 self._finalize_live_thinking()
         elif content or action.is_final:

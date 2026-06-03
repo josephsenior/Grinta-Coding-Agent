@@ -1184,6 +1184,42 @@ def test_response_to_actions_converts_core_tool_call_validation_error_to_recover
     assert 'bad JSON arguments' in (actions[0].thought or '')
 
 
+def test_response_to_actions_adds_task_status_alias_hint(monkeypatch):
+    from backend.core.errors import FunctionCallValidationError
+    from backend.engine import executor as executor_module
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.ledger.action import AgentThinkAction
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            FunctionCallValidationError(
+                "Invalid task status 'in_progress'. Use one of: blocked, doing, done, skipped, todo."
+            )
+        ),
+    )
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=OrchestratorSafetyManager(),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content='tool call'))]
+    )
+    actions = executor._response_to_actions(response)
+
+    assert len(actions) == 1
+    assert isinstance(actions[0], AgentThinkAction)
+    thought = actions[0].thought or ''
+    assert '`in_progress` -> `doing`' in thought
+    assert '`completed` -> `done`' in thought
+    assert '`pending` -> `todo`' in thought
+
+
 def test_response_to_actions_converts_common_tool_call_validation_error_to_recoverable_action(
     monkeypatch,
 ):

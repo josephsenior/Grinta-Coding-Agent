@@ -23,6 +23,7 @@ from backend.engine.function_calling import (
     combine_thought,
     set_security_risk,
 )
+from backend.engine.tools.task_tracker import create_task_tracker_tool
 from backend.ledger.action import (
     CmdRunAction,
     MessageAction,
@@ -303,6 +304,20 @@ class TestHandleTaskTrackerTool:
         action = cast(TaskTrackingAction, _handle_task_tracker_tool(args))
         assert action.task_list[0]['status'] == 'skipped'
         assert action.task_list[1]['status'] == 'blocked'
+
+    def test_task_tracker_schema_rejects_status_aliases_in_nested_subtasks(self):
+        tool = create_task_tracker_tool()
+        parameters = tool['function']['parameters']
+        task_item = parameters['properties']['task_list']['items']
+        status = task_item['properties']['status']
+        nested_status = (
+            task_item['properties']['subtasks']['items']['properties']['status']
+        )
+
+        assert status['enum'] == ['todo', 'doing', 'done', 'skipped', 'blocked']
+        assert nested_status['enum'] == status['enum']
+        assert 'in_progress' in status['description']
+        assert 'doing' in status['description']
 
     @pytest.mark.parametrize('legacy_status', ['pending', 'in_progress', 'completed'])
     def test_rejects_legacy_task_status_aliases(self, legacy_status: str):
