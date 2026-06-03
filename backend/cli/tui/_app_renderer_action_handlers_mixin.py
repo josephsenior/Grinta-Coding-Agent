@@ -238,7 +238,15 @@ class _AppRendererActionHandlersMixin:
             self._in_agent_turn = False
             if self._tools_in_turn > 0:
                 elapsed = time.monotonic() - self._turn_start_time
-                duration_str = f'{elapsed:.1f}s'
+                total_seconds = int(elapsed)
+                hours, remainder = divmod(total_seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                if hours > 0:
+                    duration_str = f'{hours}h {minutes}m {seconds}s'
+                elif minutes > 0:
+                    duration_str = f'{minutes}m {seconds}s'
+                else:
+                    duration_str = f'{seconds}s'
 
                 from backend.cli.tui.widgets.activity_card import TurnCompletion
 
