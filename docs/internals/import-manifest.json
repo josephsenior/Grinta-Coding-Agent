@@ -1,19 +1,19 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-06-02T23:01:38.877386+00:00",
+  "generated_at": "2026-06-03T00:01:06.069178+00:00",
   "repository_root": "C:/Users/GIGABYTE/Desktop/Grinta",
   "options": {
     "include_tests": false
   },
   "summary": {
-    "module_count": 622,
-    "import_count": 5740,
-    "type_checking_only_import_count": 402,
+    "module_count": 627,
+    "import_count": 5785,
+    "type_checking_only_import_count": 406,
     "parse_failure_count": 0,
     "import_classification": {
-      "stdlib": 2314,
+      "stdlib": 2327,
       "third_party": 460,
-      "internal": 2966
+      "internal": 2998
     }
   },
   "biggest_files": [
@@ -23,13 +23,6 @@
       "byte_size": 214872,
       "loc": 5625,
       "importer_count": 1
-    },
-    {
-      "module_path": "backend.orchestration.services.event_router_service",
-      "file_path": "backend/orchestration/services/event_router_service.py",
-      "byte_size": 55740,
-      "loc": 1327,
-      "importer_count": 0
     },
     {
       "module_path": "backend.execution.debugger",
@@ -172,6 +165,13 @@
       "importer_count": 42
     },
     {
+      "module_path": "backend.orchestration.services._event_router_delegate_mixin",
+      "file_path": "backend/orchestration/services/_event_router_delegate_mixin.py",
+      "byte_size": 34227,
+      "loc": 742,
+      "importer_count": 1
+    },
+    {
       "module_path": "backend.utils.lsp_client",
       "file_path": "backend/utils/lsp_client.py",
       "byte_size": 34205,
@@ -255,15 +255,21 @@
       "importer_count": 17
     },
     {
+      "module_path": "backend.core.interaction_modes",
+      "file_path": "backend/core/interaction_modes.py",
+      "byte_size": 1427,
+      "importer_count": 15
+    },
+    {
       "module_path": "backend.ledger.action.action",
       "file_path": "backend/ledger/action/action.py",
       "byte_size": 1458,
       "importer_count": 15
     },
     {
-      "module_path": "backend.core.interaction_modes",
-      "file_path": "backend/core/interaction_modes.py",
-      "byte_size": 1427,
+      "module_path": "backend.ledger.action.agent",
+      "file_path": "backend/ledger/action/agent.py",
+      "byte_size": 18367,
       "importer_count": 14
     },
     {
@@ -271,6 +277,12 @@
       "file_path": "backend/cli/config_manager.py",
       "byte_size": 25676,
       "importer_count": 12
+    },
+    {
+      "module_path": "backend.ledger.observation_cause",
+      "file_path": "backend/ledger/observation_cause.py",
+      "byte_size": 1828,
+      "importer_count": 11
     },
     {
       "module_path": "backend._canonical",
@@ -291,12 +303,6 @@
       "importer_count": 11
     },
     {
-      "module_path": "backend.ledger.observation_cause",
-      "file_path": "backend/ledger/observation_cause.py",
-      "byte_size": 1828,
-      "importer_count": 10
-    },
-    {
       "module_path": "backend.engine.contracts",
       "file_path": "backend/engine/contracts.py",
       "byte_size": 4643,
@@ -306,12 +312,6 @@
       "module_path": "backend.core.pydantic_compat",
       "file_path": "backend/core/pydantic_compat.py",
       "byte_size": 4972,
-      "importer_count": 10
-    },
-    {
-      "module_path": "backend.ledger.action.agent",
-      "file_path": "backend/ledger/action/agent.py",
-      "byte_size": 18367,
       "importer_count": 10
     },
     {
@@ -4170,6 +4170,14 @@
           "is_type_checking": true
         },
         {
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 73,
+          "names": [
+            "AgentConfig"
+          ],
+          "is_type_checking": false
+        },
+        {
           "importer": "backend/orchestration/services/autonomy_service.py",
           "lineno": 20,
           "names": [
@@ -4184,14 +4192,6 @@
             "AgentConfig"
           ],
           "is_type_checking": true
-        },
-        {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 628,
-          "names": [
-            "AgentConfig"
-          ],
-          "is_type_checking": false
         }
       ]
     },
@@ -5269,6 +5269,15 @@
           "is_type_checking": false
         },
         {
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 74,
+          "names": [
+            "DELEGATE_WORKER_TIMEOUT_SECONDS",
+            "MAX_DELEGATION_DEPTH"
+          ],
+          "is_type_checking": false
+        },
+        {
           "importer": "backend/orchestration/services/action_execution_service.py",
           "lineno": 10,
           "names": [
@@ -5294,15 +5303,6 @@
             "DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS",
             "DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS",
             "DEFAULT_AGENT_MAX_STUCK_DETECTIONS"
-          ],
-          "is_type_checking": false
-        },
-        {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 629,
-          "names": [
-            "DELEGATE_WORKER_TIMEOUT_SECONDS",
-            "MAX_DELEGATION_DEPTH"
           ],
           "is_type_checking": false
         },
@@ -6459,7 +6459,7 @@
       "loc": 54,
       "class_count": 0,
       "def_count": 3,
-      "importer_count": 14,
+      "importer_count": 15,
       "intra_package_imports": [],
       "imported_by": [
         {
@@ -6582,8 +6582,16 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 13,
+          "importer": "backend/orchestration/services/_event_router_actions_mixin.py",
+          "lineno": 16,
+          "names": [
+            "normalize_interaction_mode"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/services/_event_router_user_message_mixin.py",
+          "lineno": 17,
           "names": [
             "CHAT_MODE_NAMES",
             "normalize_interaction_mode"
@@ -8342,16 +8350,16 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/action_execution_service.py",
-          "lineno": 669,
+          "importer": "backend/orchestration/services/_event_router_actions_mixin.py",
+          "lineno": 57,
           "names": [
             "get_plugin_registry"
           ],
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 414,
+          "importer": "backend/orchestration/services/action_execution_service.py",
+          "lineno": 669,
           "names": [
             "get_plugin_registry"
           ],
@@ -8997,19 +9005,19 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 18,
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 268,
           "names": [
-            "ACTIVE_TASK_STATUSES"
+            "TASK_STATUS_PLAN_ICONS",
+            "TASK_STATUS_TODO"
           ],
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 823,
+          "importer": "backend/orchestration/services/_event_router_state_mixin.py",
+          "lineno": 17,
           "names": [
-            "TASK_STATUS_PLAN_ICONS",
-            "TASK_STATUS_TODO"
+            "ACTIVE_TASK_STATUSES"
           ],
           "is_type_checking": false
         },
@@ -10862,8 +10870,8 @@
       ],
       "imported_by": [
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 806,
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 251,
           "names": [
             "_load_notes"
           ],
@@ -11068,8 +11076,8 @@
       ],
       "imported_by": [
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 827,
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 272,
           "names": [
             "TaskTracker"
           ],
@@ -11148,8 +11156,8 @@
       ],
       "imported_by": [
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 790,
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 235,
           "names": [
             "get_full_working_memory"
           ],
@@ -14889,7 +14897,7 @@
       "loc": 505,
       "class_count": 14,
       "def_count": 0,
-      "importer_count": 10,
+      "importer_count": 14,
       "intra_package_imports": [
         "backend.core.enums",
         "backend.core.schemas",
@@ -14926,25 +14934,55 @@
           "is_type_checking": false
         },
         {
+          "importer": "backend/orchestration/services/_event_router_actions_mixin.py",
+          "lineno": 29,
+          "names": [
+            "DelegateTaskAction"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/services/_event_router_delegate_helpers.py",
+          "lineno": 23,
+          "names": [
+            "AgentThinkAction",
+            "RecallAction"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 23,
+          "names": [
+            "DelegateTaskAction"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/services/_event_router_state_mixin.py",
+          "lineno": 23,
+          "names": [
+            "ClarificationRequestAction",
+            "EscalateToHumanAction",
+            "ProposalAction",
+            "UncertaintyAction"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/services/_event_router_user_message_mixin.py",
+          "lineno": 26,
+          "names": [
+            "RecallAction"
+          ],
+          "is_type_checking": false
+        },
+        {
           "importer": "backend/orchestration/services/action_execution_service.py",
           "lineno": 43,
           "names": [
             "CondensationAction",
             "CondensationRequestAction"
-          ],
-          "is_type_checking": false
-        },
-        {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 33,
-          "names": [
-            "AgentThinkAction",
-            "ClarificationRequestAction",
-            "DelegateTaskAction",
-            "EscalateToHumanAction",
-            "ProposalAction",
-            "RecallAction",
-            "UncertaintyAction"
           ],
           "is_type_checking": false
         },
@@ -15014,8 +15052,8 @@
       ],
       "imported_by": [
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 42,
+          "importer": "backend/orchestration/services/_event_router_delegate_helpers.py",
+          "lineno": 27,
           "names": [
             "BrowseInteractiveAction"
           ],
@@ -15046,8 +15084,8 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 43,
+          "importer": "backend/orchestration/services/_event_router_delegate_helpers.py",
+          "lineno": 28,
           "names": [
             "BrowserToolAction"
           ],
@@ -15331,8 +15369,8 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 44,
+          "importer": "backend/orchestration/services/_event_router_actions_mixin.py",
+          "lineno": 32,
           "names": [
             "StreamingChunkAction"
           ],
@@ -15711,8 +15749,8 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 57,
+          "importer": "backend/orchestration/services/_event_router_actions_mixin.py",
+          "lineno": 38,
           "names": [
             "Event"
           ],
@@ -16033,7 +16071,7 @@
       "loc": 160,
       "class_count": 7,
       "def_count": 0,
-      "importer_count": 6,
+      "importer_count": 7,
       "intra_package_imports": [
         "backend.core.enums",
         "backend.core.schemas",
@@ -16054,10 +16092,17 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 50,
+          "importer": "backend/orchestration/services/_event_router_delegate_helpers.py",
+          "lineno": 34,
           "names": [
-            "AgentStateChangedObservation",
+            "AgentStateChangedObservation"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 30,
+          "names": [
             "DelegateTaskObservation"
           ],
           "is_type_checking": false
@@ -16671,7 +16716,7 @@
       "loc": 62,
       "class_count": 0,
       "def_count": 1,
-      "importer_count": 10,
+      "importer_count": 11,
       "intra_package_imports": [
         "backend.core.logger",
         "backend.ledger.event"
@@ -16710,8 +16755,16 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 54,
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 33,
+          "names": [
+            "attach_observation_cause"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/services/_event_router_user_message_mixin.py",
+          "lineno": 32,
           "names": [
             "attach_observation_cause"
           ],
@@ -17306,20 +17359,20 @@
           "is_type_checking": false
         },
         {
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 78,
+          "names": [
+            "Agent"
+          ],
+          "is_type_checking": false
+        },
+        {
           "importer": "backend/orchestration/services/autonomy_service.py",
           "lineno": 8,
           "names": [
             "Agent"
           ],
           "is_type_checking": true
-        },
-        {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 633,
-          "names": [
-            "Agent"
-          ],
-          "is_type_checking": false
         },
         {
           "importer": "backend/orchestration/services/lifecycle_service.py",
@@ -17403,18 +17456,18 @@
       ],
       "imported_by": [
         {
-          "importer": "backend/orchestration/services/autonomy_service.py",
-          "lineno": 21,
+          "importer": "backend/orchestration/services/_event_router_actions_mixin.py",
+          "lineno": 147,
           "names": [
-            "AutonomyController"
+            "AutonomyLevel"
           ],
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 1301,
+          "importer": "backend/orchestration/services/autonomy_service.py",
+          "lineno": 21,
           "names": [
-            "AutonomyLevel"
+            "AutonomyController"
           ],
           "is_type_checking": false
         }
@@ -17441,8 +17494,8 @@
           "is_type_checking": false
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 634,
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 79,
           "names": [
             "Blackboard"
           ],
@@ -17473,8 +17526,8 @@
           "is_type_checking": true
         },
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 635,
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 80,
           "names": [
             "ConversationStats"
           ],
@@ -17785,8 +17838,8 @@
       ],
       "imported_by": [
         {
-          "importer": "backend/orchestration/services/event_router_service.py",
-          "lineno": 636,
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 81,
           "names": [
             "OrchestrationConfig"
           ],
@@ -17976,6 +18029,193 @@
       "intra_package_imports": [],
       "imported_by": []
     },
+    "backend.orchestration.services._event_router_actions_mixin": {
+      "module_path": "backend.orchestration.services._event_router_actions_mixin",
+      "file_path": "backend/orchestration/services/_event_router_actions_mixin.py",
+      "byte_size": 6922,
+      "loc": 167,
+      "class_count": 1,
+      "def_count": 0,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.interaction_modes",
+        "backend.core.plugin",
+        "backend.core.schemas",
+        "backend.ledger",
+        "backend.ledger.action",
+        "backend.ledger.action.agent",
+        "backend.ledger.action.message",
+        "backend.ledger.observation",
+        "backend.orchestration.autonomy",
+        "backend.orchestration.state.state"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/orchestration/services/event_router_service.py",
+          "lineno": 24,
+          "names": [
+            "_EventRouterActionsMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.orchestration.services._event_router_delegate_helpers": {
+      "module_path": "backend.orchestration.services._event_router_delegate_helpers",
+      "file_path": "backend/orchestration/services/_event_router_delegate_helpers.py",
+      "byte_size": 8999,
+      "loc": 283,
+      "class_count": 0,
+      "def_count": 16,
+      "importer_count": 3,
+      "intra_package_imports": [
+        "backend.core.schemas",
+        "backend.ledger.action",
+        "backend.ledger.action.agent",
+        "backend.ledger.action.browse",
+        "backend.ledger.action.browser_tool",
+        "backend.ledger.observation",
+        "backend.ledger.observation.agent"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/orchestration/services/_event_router_delegate_mixin.py",
+          "lineno": 45,
+          "names": [
+            "_build_delegate_progress_observation",
+            "_looks_like_text_tool_call_handoff",
+            "_summarize_delegate_browser_action",
+            "_summarize_delegate_command_action",
+            "_summarize_delegate_error_event",
+            "_summarize_delegate_file_action",
+            "_summarize_delegate_finish_event",
+            "_summarize_delegate_mcp_action",
+            "_summarize_delegate_recall_action",
+            "_summarize_delegate_reject_event",
+            "_summarize_delegate_state_event",
+            "_summarize_delegate_task_tracking_action",
+            "_summarize_delegate_terminal_event",
+            "_summarize_delegate_think_action",
+            "_summarize_delegate_worker_event",
+            "_truncate_delegate_progress"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/services/_event_router_user_message_mixin.py",
+          "lineno": 41,
+          "names": [
+            "_looks_like_text_tool_call_handoff"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/orchestration/services/event_router_service.py",
+          "lineno": 30,
+          "names": [
+            "_build_delegate_progress_observation",
+            "_summarize_delegate_worker_event"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.orchestration.services._event_router_delegate_mixin": {
+      "module_path": "backend.orchestration.services._event_router_delegate_mixin",
+      "file_path": "backend/orchestration/services/_event_router_delegate_mixin.py",
+      "byte_size": 34227,
+      "loc": 742,
+      "class_count": 1,
+      "def_count": 0,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.config.agent_config",
+        "backend.core.constants",
+        "backend.core.schemas",
+        "backend.core.task_status",
+        "backend.engine.tools.note",
+        "backend.engine.tools.task_tracker",
+        "backend.engine.tools.working_memory",
+        "backend.ledger",
+        "backend.ledger.action",
+        "backend.ledger.action.agent",
+        "backend.ledger.observation",
+        "backend.ledger.observation.agent",
+        "backend.ledger.observation_cause",
+        "backend.orchestration.agent",
+        "backend.orchestration.blackboard",
+        "backend.orchestration.conversation_stats",
+        "backend.orchestration.orchestration_config",
+        "backend.orchestration.services._event_router_delegate_helpers",
+        "backend.orchestration.session_orchestrator",
+        "backend.utils.async_utils"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/orchestration/services/event_router_service.py",
+          "lineno": 34,
+          "names": [
+            "_EventRouterDelegateMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.orchestration.services._event_router_state_mixin": {
+      "module_path": "backend.orchestration.services._event_router_state_mixin",
+      "file_path": "backend/orchestration/services/_event_router_state_mixin.py",
+      "byte_size": 3485,
+      "loc": 104,
+      "class_count": 1,
+      "def_count": 0,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.schemas",
+        "backend.core.task_status",
+        "backend.ledger",
+        "backend.ledger.action",
+        "backend.ledger.action.agent"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/orchestration/services/event_router_service.py",
+          "lineno": 37,
+          "names": [
+            "_EventRouterStateMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.orchestration.services._event_router_user_message_mixin": {
+      "module_path": "backend.orchestration.services._event_router_user_message_mixin",
+      "file_path": "backend/orchestration/services/_event_router_user_message_mixin.py",
+      "byte_size": 6922,
+      "loc": 186,
+      "class_count": 1,
+      "def_count": 0,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.interaction_modes",
+        "backend.core.schemas",
+        "backend.ledger",
+        "backend.ledger.action",
+        "backend.ledger.action.agent",
+        "backend.ledger.observation",
+        "backend.ledger.observation_cause",
+        "backend.orchestration.services._event_router_delegate_helpers"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/orchestration/services/event_router_service.py",
+          "lineno": 40,
+          "names": [
+            "_EventRouterUserMessageMixin"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
     "backend.orchestration.services.action_execution_service": {
       "module_path": "backend.orchestration.services.action_execution_service",
       "file_path": "backend/orchestration/services/action_execution_service.py",
@@ -18071,38 +18311,17 @@
     "backend.orchestration.services.event_router_service": {
       "module_path": "backend.orchestration.services.event_router_service",
       "file_path": "backend/orchestration/services/event_router_service.py",
-      "byte_size": 55740,
-      "loc": 1327,
+      "byte_size": 1834,
+      "loc": 58,
       "class_count": 1,
-      "def_count": 16,
+      "def_count": 0,
       "importer_count": 0,
       "intra_package_imports": [
-        "backend.core.config.agent_config",
-        "backend.core.constants",
-        "backend.core.interaction_modes",
-        "backend.core.plugin",
-        "backend.core.schemas",
-        "backend.core.task_status",
-        "backend.engine.tools.note",
-        "backend.engine.tools.task_tracker",
-        "backend.engine.tools.working_memory",
-        "backend.ledger",
-        "backend.ledger.action",
-        "backend.ledger.action.agent",
-        "backend.ledger.action.browse",
-        "backend.ledger.action.browser_tool",
-        "backend.ledger.action.message",
-        "backend.ledger.observation",
-        "backend.ledger.observation.agent",
-        "backend.ledger.observation_cause",
-        "backend.orchestration.agent",
-        "backend.orchestration.autonomy",
-        "backend.orchestration.blackboard",
-        "backend.orchestration.conversation_stats",
-        "backend.orchestration.orchestration_config",
-        "backend.orchestration.session_orchestrator",
-        "backend.orchestration.state.state",
-        "backend.utils.async_utils"
+        "backend.orchestration.services._event_router_actions_mixin",
+        "backend.orchestration.services._event_router_delegate_helpers",
+        "backend.orchestration.services._event_router_delegate_mixin",
+        "backend.orchestration.services._event_router_state_mixin",
+        "backend.orchestration.services._event_router_user_message_mixin"
       ],
       "imported_by": []
     },
