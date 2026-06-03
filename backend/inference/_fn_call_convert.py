@@ -6,20 +6,15 @@ parent module under the per-file LOC budget.
 
 from __future__ import annotations
 
-import copy
-import hashlib
 import json
 import logging
-import re
-import threading
-from collections.abc import Iterable
-from threading import Lock
-from typing import Any, NoReturn, cast
-
-logger = logging.getLogger(__name__)
+from typing import Any
 
 from backend.core.errors import FunctionCallConversionError
 from backend.core.tool_arguments_json import parse_tool_arguments_object
+from backend.inference._fn_call_examples import IN_CONTEXT_LEARNING_EXAMPLE_PREFIX
+
+logger = logging.getLogger(__name__)
 
 def convert_tool_call_to_string(tool_call: dict) -> str:
     """Convert tool call to content in string format.
@@ -188,7 +183,7 @@ def convert_tools_to_description(tools: list[dict]) -> str:
 
 def _process_system_message(content: Any, system_prompt_suffix: str) -> dict:
     """Process system message by appending the system prompt suffix."""
-    from backend.inference._fn_call_to_messages import _raise_unexpected_content_type  # noqa: PLC0415
+    from backend.inference._fn_call_to_messages import _raise_unexpected_content_type  # noqa: I001, PLC0415
     if isinstance(content, str):
         content += system_prompt_suffix
     elif isinstance(content, list):
@@ -222,7 +217,7 @@ def _add_in_context_learning_example(
     mode: str = 'agent',
 ) -> Any:
     """Add in-context learning example to content."""
-    from backend.inference._fn_call_to_messages import _raise_unexpected_content_type  # noqa: PLC0415
+    from backend.inference._fn_call_to_messages import _raise_unexpected_content_type  # noqa: I001, PLC0415
     if not (example := IN_CONTEXT_LEARNING_EXAMPLE_PREFIX(tools, mode)):
         return content
 

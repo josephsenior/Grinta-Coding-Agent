@@ -17,13 +17,19 @@ from this module.
 
 from __future__ import annotations
 
+from backend.inference._fn_call_convert import (  # noqa: F401
+    _add_example_to_list_content,
+    _add_in_context_learning_example,
+    _format_parameter,
+    _format_tool_call_string,
+    _parse_tool_call_arguments,
+    _process_system_message,
+    _process_user_message,
+    _validate_tool_call_structure,
+    convert_tool_call_to_string,
+    convert_tools_to_description,
+)
 from backend.inference._fn_call_examples import (  # noqa: F401
-    IN_CONTEXT_LEARNING_EXAMPLE_PREFIX,
-    IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX,
-    STOP_WORDS,
-    SYSTEM_PROMPT_SUFFIX_TEMPLATE,
-    TOOL_EXAMPLES,
-    ExampleStepBuilder,
     _FN_CALL_PARSE_COUNTER_KEYS,
     _MALFORMED_PAYLOAD_REJECTION,
     _RETRY_GUARD,
@@ -32,6 +38,12 @@ from backend.inference._fn_call_examples import (  # noqa: F401
     _STRICT_PARSE_FAILURE,
     _STRICT_PARSE_SUCCESS,
     _XML_TRAILING_TEXT,
+    IN_CONTEXT_LEARNING_EXAMPLE_PREFIX,
+    IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX,
+    STOP_WORDS,
+    SYSTEM_PROMPT_SUFFIX_TEMPLATE,
+    TOOL_EXAMPLES,
+    ExampleStepBuilder,
     _adapt_example_commands_to_terminal,
     _build_example_footer,
     _build_example_header,
@@ -47,18 +59,6 @@ from backend.inference._fn_call_examples import (  # noqa: F401
     get_example_for_tools,
     get_fn_call_parse_telemetry_counters,
     reset_fn_call_parse_telemetry_counters,
-)
-from backend.inference._fn_call_convert import (  # noqa: F401
-    _add_example_to_list_content,
-    _add_in_context_learning_example,
-    _format_parameter,
-    _format_tool_call_string,
-    _parse_tool_call_arguments,
-    _process_system_message,
-    _process_user_message,
-    _validate_tool_call_structure,
-    convert_tool_call_to_string,
-    convert_tools_to_description,
 )
 from backend.inference._fn_call_to_messages import (  # noqa: F401
     _FN_CLOSE_RE,

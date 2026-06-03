@@ -6,33 +6,16 @@ parent module under the per-file LOC budget.
 
 from __future__ import annotations
 
-import copy
 import hashlib
-import json
 import logging
-import re
-import threading
-from collections.abc import Iterable
 from threading import Lock
-from typing import Any, NoReturn, cast
 
-logger = logging.getLogger(__name__)
-
-from backend.core.errors import (
-    FunctionCallConversionError,
-    FunctionCallValidationError,
-)
-from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_names import (
     CREATE_TOOL_NAME,
     FINISH_TOOL_NAME,
 )
-from backend.inference.tool_result_format import (
-    TOOL_RESULT_BLOCK_PREFIX,
-    TOOL_RESULT_BLOCK_SUFFIX,
-    decode_tool_result_payload,
-    encode_tool_result_payload,
-)
+
+logger = logging.getLogger(__name__)
 
 # coverage: ignore file
 """Convert function calling messages to non-function calling messages and vice versa.
@@ -74,32 +57,8 @@ messages instead of this pseudo-XML path.
 Tool result line syntax is shared via :mod:`backend.inference.tool_result_format`.
 """
 
-import copy
-import hashlib
-import json
-import logging
-import re
-from collections.abc import Iterable
-from threading import Lock
-from typing import Any, NoReturn
 
-from backend.core.errors import (
-    FunctionCallConversionError,
-    FunctionCallValidationError,
-)
-from backend.core.tool_arguments_json import parse_tool_arguments_object
-from backend.inference.tool_names import (
-    CREATE_TOOL_NAME,
-    FINISH_TOOL_NAME,
-)
-from backend.inference.tool_result_format import (
-    TOOL_RESULT_BLOCK_PREFIX,
-    TOOL_RESULT_BLOCK_SUFFIX,
-    decode_tool_result_payload,
-    encode_tool_result_payload,
-)
 
-logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT_SUFFIX_TEMPLATE = '\nYou have access to the following functions:\n\n{description}\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<function=example_function_name>\n<parameter=example_parameter_1>value_1</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format, start with <function= and end with </function>\n- Required parameters MUST be specified\n- In this fallback parser mode, call one function at a time\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after.\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>\n'
 STOP_WORDS = ['</function']

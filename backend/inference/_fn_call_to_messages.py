@@ -7,20 +7,31 @@ parent module under the per-file LOC budget.
 from __future__ import annotations
 
 import copy
-import hashlib
 import json
 import logging
 import re
-import threading
 from collections.abc import Iterable
-from threading import Lock
-from typing import Any, NoReturn, cast
-
-logger = logging.getLogger(__name__)
+from typing import Any, NoReturn
 
 from backend.core.errors import (
     FunctionCallConversionError,
     FunctionCallValidationError,
+)
+from backend.inference._fn_call_convert import (  # noqa: F401
+    _process_system_message,
+    _process_user_message,
+    convert_tools_to_description,
+)
+from backend.inference._fn_call_examples import (  # noqa: F401
+    _MALFORMED_PAYLOAD_REJECTION,
+    _STRICT_PARSE_FAILURE,
+    _STRICT_PARSE_SUCCESS,
+    _XML_TRAILING_TEXT,
+    IN_CONTEXT_LEARNING_EXAMPLE_PREFIX,
+    IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX,
+    SYSTEM_PROMPT_SUFFIX_TEMPLATE,
+    _increment_parse_counter,
+    _log_xml_parser_diagnostics,
 )
 from backend.inference.tool_result_format import (
     TOOL_RESULT_BLOCK_PREFIX,
@@ -29,23 +40,7 @@ from backend.inference.tool_result_format import (
     encode_tool_result_payload,
 )
 
-from backend.inference._fn_call_examples import (  # noqa: F401
-    _increment_parse_counter,
-    _log_xml_parser_diagnostics,
-    SYSTEM_PROMPT_SUFFIX_TEMPLATE,
-    IN_CONTEXT_LEARNING_EXAMPLE_PREFIX,
-    IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX,
-    _MALFORMED_PAYLOAD_REJECTION,
-    _STRICT_PARSE_FAILURE,
-    _STRICT_PARSE_SUCCESS,
-    _XML_TRAILING_TEXT,
-)
-
-from backend.inference._fn_call_convert import (  # noqa: F401
-    convert_tools_to_description,
-    _process_system_message,
-    _process_user_message,
-)
+logger = logging.getLogger(__name__)
 
 def convert_fncall_messages_to_non_fncall_messages(
     messages: list[dict],
