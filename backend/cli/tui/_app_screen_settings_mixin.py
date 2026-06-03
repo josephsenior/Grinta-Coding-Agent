@@ -1,0 +1,240 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from textual import events, work
+
+from backend.cli._event_renderer.panels import task_panel_signature
+from backend.cli.tui._app_constants import _tui_logger
+from backend.cli.tui._app_dialogs import (  # noqa: F401
+    GrintaAddMCPDialog,
+    GrintaAddSkillDialog,
+    GrintaConfirmDialog,
+)
+from backend.cli.tui._app_small_widgets import (
+    InputBar,
+)
+from backend.cli.tui.widgets.collapsible import SidebarRow
+from backend.core.interaction_modes import (
+    AGENT_MODE,
+    VISIBLE_INTERACTION_MODES,
+    is_chat_mode,
+    normalize_interaction_mode,
+)
+
+
+class _AppScreenSettingsMixin:
+    """Settings-related methods of GrintaScreen."""
+
+    def on_focus(self, event: events.Focus) -> None:
+        if event.control and event.control.id == 'input':
+            try:
+                self.query_one('#input-bar', InputBar).remove_class('-blurred')
+            except Exception:
+                pass
+
+    def on_blur(self, event: events.Blur) -> None:
+        if event.control and event.control.id == 'input':
+            try:
+                self.query_one('#input-bar', InputBar).add_class('-blurred')
+            except Exception:
+                pass
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._resize_input_bar()
+
+    def _apply_autonomy_level(self, new_level: str) -> None:
+        level = (new_level or '').strip().lower()
+        if level not in {'conservative', 'balanced', 'full'}:
+            return
+        controller = self._controller
+        if controller is not None:
+            ac = getattr(controller, 'autonomy_controller', None)
+            if ac is not None:
+                ac.autonomy_level = level
+        try:
+            setattr(self._config, 'autonomy_level', level)
+        except Exception:
+            pass
+        self._hud.update_autonomy(level)
+        self._render_hud_bar()
+        self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
+
+    def _apply_mode(self, new_mode: str) -> None:
+        mode = normalize_interaction_mode(new_mode, default='')
+        if mode not in set(VISIBLE_INTERACTION_MODES):
+            return
+        agent_config = self._active_agent_config()
+        if agent_config is not None:
+            agent_config.mode = mode
+        controller = self._controller
+        if controller is not None:
+            agent = getattr(controller, 'agent', None)
+            if agent is not None:
+                running_config = getattr(agent, 'config', None)
+                if running_config is not None:
+                    running_config.mode = mode
+                planner = getattr(agent, 'planner', None)
+                planner_config = getattr(planner, '_config', None)
+                if planner_config is not None:
+                    planner_config.mode = mode
+                if planner is not None and hasattr(planner, 'build_toolset'):
+                    try:
+                        agent.tools = planner.build_toolset()
+                    except Exception:
+                        _tui_logger.debug(
+                            'Failed to rebuild toolset on mode change', exc_info=True
+                        )
+            state = getattr(controller, 'state', None)
+            extra_data = (
+                getattr(state, 'extra_data', None) if state is not None else None
+            )
+            if isinstance(extra_data, dict):
+                if is_chat_mode(mode):
+                    extra_data.pop('active_run_mode', None)
+                else:
+                    extra_data['active_run_mode'] = mode
+
+        self._render_hud_bar()
+        self._update_input_identity(mode)
+        self._toggle_autonomy_tabs_visibility(mode)
+        self.notify(f'Mode: {mode}', severity='information', timeout=2.0)
+
+    def _toggle_autonomy_tabs_visibility(self, mode: str) -> None:
+        mode = normalize_interaction_mode(mode)
+        try:
+            autonomy_tabs = self.query_one('#hud-autonomy')
+            autonomy_tabs.display = mode == AGENT_MODE
+            self.query_one('#hud-label-autonomy').display = mode == AGENT_MODE
+        except Exception:
+            pass
+
+    def on_sidebar_row_selected(self, event: Any) -> None:
+        """Handle SidebarRow selected events and notify the user."""
+        if not isinstance(event, SidebarRow.Selected):
+            return
+        item_id = event.item_id
+        if not item_id:
+            return
+        if item_id.startswith('task:'):
+            task_id = item_id.split(':', 1)[1]
+            desc = 'Unknown task'
+            tasks = task_panel_signature(
+                self._renderer._task_list if self._renderer else []
+            )
+            for tid, _status, description in tasks:
+                if tid == task_id:
+                    desc = description or desc
+                    break
+            self.notify(f'Task {task_id}: {desc}', severity='info', timeout=3.0)
+        elif item_id.startswith('mcp:'):
+            mcp_name = item_id.split(':', 1)[1]
+            self.notify(
+                f'MCP Server: {mcp_name}  |  Press Delete to remove',
+                severity='info',
+                timeout=3.0,
+            )
+        elif item_id.startswith('skill:'):
+            skill_name = item_id.split(':', 1)[1]
+            self.notify(
+                f'Playbook Skill: {skill_name}.md  |  Press Delete to remove',
+                severity='info',
+                timeout=3.0,
+            )
+
+    async def on_sidebar_row_delete_requested(self, event: Any) -> None:
+        """Handle SidebarRow delete events."""
+        if not isinstance(event, SidebarRow.DeleteRequested) or not event.item_id:
+            return
+        item_id = event.item_id
+        if item_id.startswith('skill:'):
+            skill_name = item_id[6:]
+            self.run_worker(self._confirm_delete_skill(skill_name), exclusive=True)
+        elif item_id.startswith('mcp:'):
+            mcp_name = item_id.split(':', 1)[1]
+            self.run_worker(self._confirm_delete_mcp(mcp_name), exclusive=True)
+
+    async def _confirm_delete_skill(self, skill_name: str) -> None:
+        result = await self.app.push_screen_wait(
+            GrintaConfirmDialog(
+                title='Delete Skill',
+                body=f'Are you sure you want to delete {skill_name}.md?',
+                options=[('cancel', 'Cancel'), ('delete', 'Delete')],
+            )
+        )
+        if result == 'delete':
+            self._delete_skill(skill_name)
+
+    async def _confirm_delete_mcp(self, mcp_name: str) -> None:
+        result = await self.app.push_screen_wait(
+            GrintaConfirmDialog(
+                title='Delete MCP Server',
+                body=f"Are you sure you want to remove the server '{mcp_name}'?",
+                options=[('cancel', 'Cancel'), ('delete', 'Remove')],
+            )
+        )
+        if result == 'delete':
+            self._delete_mcp_server(mcp_name)
+
+    def _delete_skill(self, name: str) -> None:
+        if not name.endswith('.md'):
+            name += '.md'
+        skill_path = Path.home() / '.grinta' / 'skills' / name
+        try:
+            if skill_path.exists():
+                skill_path.unlink()
+                self.notify(f'Skill deleted: {name}', severity='information')
+                self._last_sidebar_state = None
+            else:
+                self.notify(f'Skill not found: {name}', severity='warning')
+        except Exception as e:
+            self.notify(f'Failed to delete skill: {e}', severity='error')
+
+    def _delete_mcp_server(self, name: str) -> None:
+        from backend.cli.config_manager import remove_mcp_server
+
+        try:
+            remove_mcp_server(name)
+            self.notify(f'MCP Server removed: {name}', severity='information')
+            self._last_sidebar_state = None
+        except Exception as e:
+            self.notify(f'Failed to remove MCP server: {e}', severity='error')
+
+    @work
+    async def on_collapsible_section_action_clicked(self, event: Any) -> None:
+        """Handle [+] Add clicks on sidebar sections."""
+        if not event.control:
+            return
+
+        if event.control.id == 'sidebar-skills':
+            result = await self.app.push_screen_wait(GrintaAddSkillDialog())
+            if result:
+                self._create_skill(result['name'], result['content'])
+        elif event.control.id == 'sidebar-mcp':
+            result = await self.app.push_screen_wait(GrintaAddMCPDialog())
+            if result:
+                self._add_mcp_server(result['name'], result['command'])
+
+    def _create_skill(self, name: str, content: str) -> None:
+        skills_dir = Path.home() / '.grinta' / 'skills'
+        skills_dir.mkdir(parents=True, exist_ok=True)
+        if not name.endswith('.md'):
+            name += '.md'
+        skill_path = skills_dir / name
+        try:
+            skill_path.write_text(content, encoding='utf-8')
+            self.notify(f'Skill created: {name}', severity='information')
+            self._last_sidebar_state = None  # Force full refresh next tick
+        except Exception as e:
+            self.notify(f'Failed to create skill: {e}', severity='error')
+
+    def _add_mcp_server(self, name: str, command: str) -> None:
+        from backend.cli.config_manager import add_mcp_server
+
+        try:
+            add_mcp_server(name, command=command)
+            self.notify(f'MCP Server added: {name}', severity='information')
+            self._last_sidebar_state = None  # Force full refresh next tick
+        except Exception as e:
+            self.notify(f'Failed to add MCP server: {e}', severity='error')
