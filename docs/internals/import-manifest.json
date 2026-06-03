@@ -1,19 +1,19 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-06-03T00:01:06.069178+00:00",
+  "generated_at": "2026-06-03T00:36:06.679779+00:00",
   "repository_root": "C:/Users/GIGABYTE/Desktop/Grinta",
   "options": {
     "include_tests": false
   },
   "summary": {
-    "module_count": 627,
-    "import_count": 5785,
+    "module_count": 633,
+    "import_count": 5822,
     "type_checking_only_import_count": 406,
     "parse_failure_count": 0,
     "import_classification": {
-      "stdlib": 2327,
+      "stdlib": 2345,
       "third_party": 460,
-      "internal": 2998
+      "internal": 3017
     }
   },
   "biggest_files": [
@@ -23,13 +23,6 @@
       "byte_size": 214872,
       "loc": 5625,
       "importer_count": 1
-    },
-    {
-      "module_path": "backend.execution.debugger",
-      "file_path": "backend/execution/debugger.py",
-      "byte_size": 53932,
-      "loc": 1381,
-      "importer_count": 2
     },
     {
       "module_path": "backend.inference.fn_call_converter",
@@ -191,6 +184,13 @@
       "byte_size": 33054,
       "loc": 847,
       "importer_count": 1
+    },
+    {
+      "module_path": "backend.cli._event_renderer.observation_renderers_mixin",
+      "file_path": "backend/cli/_event_renderer/observation_renderers_mixin.py",
+      "byte_size": 32968,
+      "loc": 867,
+      "importer_count": 1
     }
   ],
   "most_imported": [
@@ -198,7 +198,7 @@
       "module_path": "backend.core.logger",
       "file_path": "backend/core/logger.py",
       "byte_size": 18140,
-      "importer_count": 154
+      "importer_count": 158
     },
     {
       "module_path": "backend.core.constants",
@@ -6781,7 +6781,7 @@
       "loc": 548,
       "class_count": 3,
       "def_count": 17,
-      "importer_count": 154,
+      "importer_count": 158,
       "intra_package_imports": [
         "backend.core.constants",
         "backend.core.log_formatters",
@@ -6965,6 +6965,38 @@
           "is_type_checking": false
         },
         {
+          "importer": "backend/execution/_dap_client.py",
+          "lineno": 18,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/_dap_logging.py",
+          "lineno": 13,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/_dap_manager.py",
+          "lineno": 16,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/_dap_session.py",
+          "lineno": 16,
+          "names": [
+            "app_logger"
+          ],
+          "is_type_checking": false
+        },
+        {
           "importer": "backend/execution/action_execution_server.py",
           "lineno": 29,
           "names": [
@@ -7006,7 +7038,7 @@
         },
         {
           "importer": "backend/execution/debugger.py",
-          "lineno": 19,
+          "lineno": 8,
           "names": [
             "app_logger"
           ],
@@ -11215,6 +11247,198 @@
       ],
       "imported_by": []
     },
+    "backend.execution._dap_adapters": {
+      "module_path": "backend.execution._dap_adapters",
+      "file_path": "backend/execution/_dap_adapters.py",
+      "byte_size": 4588,
+      "loc": 152,
+      "class_count": 0,
+      "def_count": 3,
+      "importer_count": 2,
+      "intra_package_imports": [],
+      "imported_by": [
+        {
+          "importer": "backend/execution/_dap_manager.py",
+          "lineno": 17,
+          "names": [
+            "_language_from_extension",
+            "_resolve_recipe"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/debugger.py",
+          "lineno": 9,
+          "names": [
+            "detect_debug_adapters"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.execution._dap_client": {
+      "module_path": "backend.execution._dap_client",
+      "file_path": "backend/execution/_dap_client.py",
+      "byte_size": 12490,
+      "loc": 320,
+      "class_count": 1,
+      "def_count": 0,
+      "importer_count": 2,
+      "intra_package_imports": [
+        "backend.core.logger",
+        "backend.execution._dap_errors",
+        "backend.execution._dap_logging"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/execution/_dap_session.py",
+          "lineno": 17,
+          "names": [
+            "DAPClient"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/debugger.py",
+          "lineno": 10,
+          "names": [
+            "DAPClient"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.execution._dap_errors": {
+      "module_path": "backend.execution._dap_errors",
+      "file_path": "backend/execution/_dap_errors.py",
+      "byte_size": 858,
+      "loc": 25,
+      "class_count": 2,
+      "def_count": 0,
+      "importer_count": 3,
+      "intra_package_imports": [],
+      "imported_by": [
+        {
+          "importer": "backend/execution/_dap_manager.py",
+          "lineno": 21,
+          "names": [
+            "DAPError"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/_dap_session.py",
+          "lineno": 18,
+          "names": [
+            "DAPError",
+            "DAPStartPhaseError"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/debugger.py",
+          "lineno": 11,
+          "names": [
+            "DAPError",
+            "DAPStartPhaseError"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.execution._dap_logging": {
+      "module_path": "backend.execution._dap_logging",
+      "file_path": "backend/execution/_dap_logging.py",
+      "byte_size": 2337,
+      "loc": 66,
+      "class_count": 0,
+      "def_count": 2,
+      "importer_count": 3,
+      "intra_package_imports": [
+        "backend.core.logger"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/execution/_dap_manager.py",
+          "lineno": 22,
+          "names": [
+            "_dap_log"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/_dap_session.py",
+          "lineno": 19,
+          "names": [
+            "_dap_log"
+          ],
+          "is_type_checking": false
+        },
+        {
+          "importer": "backend/execution/debugger.py",
+          "lineno": 15,
+          "names": [
+            "_dap_log"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.execution._dap_manager": {
+      "module_path": "backend.execution._dap_manager",
+      "file_path": "backend/execution/_dap_manager.py",
+      "byte_size": 11818,
+      "loc": 297,
+      "class_count": 1,
+      "def_count": 0,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.logger",
+        "backend.execution._dap_adapters",
+        "backend.execution._dap_errors",
+        "backend.execution._dap_logging",
+        "backend.execution._dap_session",
+        "backend.ledger.action.debugger",
+        "backend.ledger.observation",
+        "backend.ledger.observation.debugger",
+        "backend.utils.language_tool_aliases"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/execution/debugger.py",
+          "lineno": 16,
+          "names": [
+            "DAPDebugManager"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
+    "backend.execution._dap_session": {
+      "module_path": "backend.execution._dap_session",
+      "file_path": "backend/execution/_dap_session.py",
+      "byte_size": 23580,
+      "loc": 591,
+      "class_count": 1,
+      "def_count": 0,
+      "importer_count": 1,
+      "intra_package_imports": [
+        "backend.core.logger",
+        "backend.execution._dap_client",
+        "backend.execution._dap_errors",
+        "backend.execution._dap_logging"
+      ],
+      "imported_by": [
+        {
+          "importer": "backend/execution/debugger.py",
+          "lineno": 17,
+          "names": [
+            "DAPDebugSession"
+          ],
+          "is_type_checking": false
+        }
+      ]
+    },
     "backend.execution.action_execution_server": {
       "module_path": "backend.execution.action_execution_server",
       "file_path": "backend/execution/action_execution_server.py",
@@ -11827,17 +12051,19 @@
     "backend.execution.debugger": {
       "module_path": "backend.execution.debugger",
       "file_path": "backend/execution/debugger.py",
-      "byte_size": 53932,
-      "loc": 1381,
-      "class_count": 5,
-      "def_count": 5,
+      "byte_size": 881,
+      "loc": 17,
+      "class_count": 0,
+      "def_count": 0,
       "importer_count": 2,
       "intra_package_imports": [
         "backend.core.logger",
-        "backend.ledger.action.debugger",
-        "backend.ledger.observation",
-        "backend.ledger.observation.debugger",
-        "backend.utils.language_tool_aliases"
+        "backend.execution._dap_adapters",
+        "backend.execution._dap_client",
+        "backend.execution._dap_errors",
+        "backend.execution._dap_logging",
+        "backend.execution._dap_manager",
+        "backend.execution._dap_session"
       ],
       "imported_by": [
         {
