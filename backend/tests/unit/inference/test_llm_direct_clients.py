@@ -190,7 +190,7 @@ class TestSharedHttpClients:
 
         with (
             patch('google.genai.types.HttpOptions') as http_options,
-            patch('backend.inference.direct_clients.genai.Client'),
+            patch('backend.inference._direct_clients_gemini.genai.Client'),
         ):
             GeminiClient('gemini-2.5-pro', 'key', timeout=7)
 
@@ -221,7 +221,7 @@ class TestGetDirectClient:
             get_direct_client('claude-3.5-sonnet', api_key='sk-test')
 
     def test_gemini_model(self):
-        with patch('backend.inference.direct_clients.genai'):
+        with patch('backend.inference._direct_clients_gemini.genai'):
             from backend.inference.direct_clients import GeminiClient
 
             client = get_direct_client('google/gemini-pro', api_key='key')

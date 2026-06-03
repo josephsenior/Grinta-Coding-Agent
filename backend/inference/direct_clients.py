@@ -8,23 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import threading
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 import httpx
 from anthropic import Anthropic, AsyncAnthropic
-
-# google-genai subclasses aiohttp.ClientSession; aiohttp emits DeprecationWarning
-# while ``_api_client`` is loading. A local catch is reliable regardless of
-# PYTHONWARNINGS / filter registration order.
-with warnings.catch_warnings():
-    warnings.simplefilter('ignore', DeprecationWarning)
-    from google import genai
-
 from openai import AsyncOpenAI, OpenAI
 
 from backend.cli.tool_call_display import flatten_tool_call_for_history
@@ -713,9 +704,6 @@ class AnthropicClient(DirectLLMClient):
             yield chunk
 
 
-
-
-
 def get_direct_client(
     model: str,
     api_key: str,
@@ -815,6 +803,7 @@ def get_direct_client(
         )
 
     from backend.inference._direct_clients_gemini import GeminiClient  # noqa: I001, PLC0415
+
     if provider == 'google':
         return GeminiClient(model_name=stripped_model, api_key=api_key, timeout=timeout)
 
@@ -842,7 +831,6 @@ def get_direct_client(
         timeout=timeout,
         provider_name=provider,
     )
-
 
 
 def __getattr__(name: str):

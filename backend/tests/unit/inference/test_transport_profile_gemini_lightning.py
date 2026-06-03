@@ -140,7 +140,7 @@ class TestClientRouting:
         client = get_direct_client(GEMINI_MODEL, api_key='key', base_url=LIGHTNING_URL)
         assert client.model_name == GEMINI_MODEL
 
-    @patch('backend.inference.direct_clients.genai')
+    @patch('backend.inference._direct_clients_gemini.genai')
     def test_gemini_native_endpoint_returns_gemini_client(self, _genai):
         """Gemini on its own API → GeminiClient (native SDK, full capabilities)."""
         client = get_direct_client(
