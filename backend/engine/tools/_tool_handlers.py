@@ -121,6 +121,14 @@ def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
 
 
 _FINISH_STATUSES = {'completed', 'blocked', 'failed'}
+_FINISH_EVIDENCE_STATUSES = {
+    'passed',
+    'failed',
+    'partial',
+    'not_run',
+    'not_applicable',
+    'planned',
+}
 
 
 def _finish_tool_name(mode: str = 'agent') -> str:
@@ -176,70 +184,251 @@ def _require_finish_status(arguments: Mapping[str, Any], tool_name: str) -> str:
     return status
 
 
+def _optional_finish_string(arguments: Mapping[str, Any], field: str) -> str:
+    value = arguments.get(field)
+    if value is None:
+        return ''
+    return str(value).strip()
+
+
+def _optional_finish_list(
+    arguments: Mapping[str, Any],
+    field: str,
+    tool_name: str,
+) -> list[Any]:
+    if field not in arguments:
+        return []
+    value = arguments.get(field)
+    if not isinstance(value, list):
+        raise FunctionCallValidationError(
+            f'Argument "{field}" for tool call {tool_name} must be a list.'
+        )
+    return value
+
+
+def _clean_finish_items(value: Any) -> list[str]:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return [stripped] if stripped else []
+    if not isinstance(value, Sequence) or isinstance(value, (bytes, bytearray)):
+        return []
+    return [text for item in value if (text := str(item).strip())]
+
+
+def _normalize_finish_sections(
+    arguments: Mapping[str, Any],
+    field: str,
+    tool_name: str,
+) -> list[dict[str, Any]]:
+    if field not in arguments:
+        return []
+    raw_sections = arguments.get(field)
+    if not isinstance(raw_sections, list):
+        raise FunctionCallValidationError(
+            f'Argument "{field}" for tool call {tool_name} must be a list.'
+        )
+
+    sections: list[dict[str, Any]] = []
+    for index, raw in enumerate(raw_sections, 1):
+        if not isinstance(raw, Mapping):
+            raise FunctionCallValidationError(
+                f'Item {index} in "{field}" for tool call {tool_name} must be an object.'
+            )
+        title = str(raw.get('title') or '').strip()
+        items = _clean_finish_items(raw.get('items', []))
+        if not title:
+            raise FunctionCallValidationError(
+                f'Item {index} in "{field}" for tool call {tool_name} requires a title.'
+            )
+        if not items:
+            raise FunctionCallValidationError(
+                f'Item {index} in "{field}" for tool call {tool_name} requires at least one item.'
+            )
+        sections.append({'title': title, 'items': items})
+    return sections
+
+
+def _finish_section(title: str, items: Any) -> dict[str, Any] | None:
+    cleaned = _clean_finish_items(items)
+    if not cleaned:
+        return None
+    return {'title': title, 'items': cleaned}
+
+
+def _legacy_plan_sections(
+    *,
+    plan: list[Any],
+    files_or_areas: list[Any],
+    risks: list[Any],
+    verification: list[Any],
+    assumptions: list[Any],
+) -> list[dict[str, Any]]:
+    sections: list[dict[str, Any]] = []
+    for section in (
+        _finish_section('Recommended Plan', plan),
+        _finish_section('Scope / Targets', files_or_areas),
+        _finish_section('Risks / Tradeoffs', risks),
+        _finish_section('Verification Strategy', verification),
+        _finish_section('Assumptions / Open Questions', assumptions),
+    ):
+        if section is not None:
+            sections.append(section)
+    return sections
+
+
+def _legacy_agent_sections(*, actions_taken: list[Any]) -> list[dict[str, Any]]:
+    section = _finish_section('What I Did', actions_taken)
+    return [section] if section is not None else []
+
+
+def _normalize_finish_evidence(
+    arguments: Mapping[str, Any],
+    tool_name: str,
+    *,
+    fallback: Mapping[str, Any] | None = None,
+) -> dict[str, str]:
+    raw = arguments.get('evidence')
+    if raw is None:
+        raw = fallback or {}
+    if not isinstance(raw, Mapping):
+        raise FunctionCallValidationError(
+            f'Argument "evidence" for tool call {tool_name} must be an object.'
+        )
+
+    status = str(raw.get('status') or '').strip().lower()
+    details = str(raw.get('details') or '').strip()
+    if not status:
+        status = 'not_run'
+    if status not in _FINISH_EVIDENCE_STATUSES:
+        allowed = ', '.join(sorted(_FINISH_EVIDENCE_STATUSES))
+        raise FunctionCallValidationError(
+            f'Invalid finish evidence status {status!r}; expected one of: {allowed}.'
+        )
+    if not details:
+        raise FunctionCallValidationError(
+            f'Finish evidence for tool call {tool_name} requires non-empty details.'
+        )
+    return {'status': status, 'details': details}
+
+
+def _evidence_from_plan_verification(verification: list[Any]) -> dict[str, str] | None:
+    items = _clean_finish_items(verification)
+    if not items:
+        return None
+    return {
+        'status': 'planned',
+        'details': '; '.join(items),
+    }
+
+
+def _evidence_from_agent_verification(
+    verification: Mapping[str, Any] | None,
+) -> dict[str, str] | None:
+    if not verification:
+        return None
+    status = str(verification.get('status') or '').strip()
+    details = str(verification.get('details') or '').strip()
+    if not status and not details:
+        return None
+    return {'status': status or 'not_run', 'details': details}
+
+
 def _handle_plan_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAction:
     tool_name = _finish_tool_name(PLAN_MODE)
     status = _require_finish_status(arguments, tool_name)
     summary = _require_finish_string(arguments, 'summary', tool_name)
-    plan = _require_finish_list(arguments, 'plan', tool_name)
-    files_or_areas = _require_finish_list(arguments, 'files_or_areas', tool_name)
-    risks = _require_finish_list(arguments, 'risks', tool_name)
-    verification = _require_finish_list(arguments, 'verification', tool_name)
-    assumptions = _require_finish_list(arguments, 'assumptions', tool_name)
-    next_step = _require_finish_string(arguments, 'next_step', tool_name)
+    response = _optional_finish_string(arguments, 'response') or summary
+    plan = _optional_finish_list(arguments, 'plan', tool_name)
+    files_or_areas = _optional_finish_list(arguments, 'files_or_areas', tool_name)
+    risks = _optional_finish_list(arguments, 'risks', tool_name)
+    verification = _optional_finish_list(arguments, 'verification', tool_name)
+    assumptions = _optional_finish_list(arguments, 'assumptions', tool_name)
+    next_step = _optional_finish_string(arguments, 'next_step')
+    sections = _normalize_finish_sections(arguments, 'sections', tool_name)
+    if not sections:
+        sections = _legacy_plan_sections(
+            plan=plan,
+            files_or_areas=files_or_areas,
+            risks=risks,
+            verification=verification,
+            assumptions=assumptions,
+        )
+    evidence = _normalize_finish_evidence(
+        arguments,
+        tool_name,
+        fallback=_evidence_from_plan_verification(verification)
+        or {'status': 'not_applicable', 'details': summary},
+    )
+    open_items = _optional_finish_list(arguments, 'open_items', tool_name)
 
-    if status == 'completed' and not any(str(step).strip() for step in plan):
+    if status == 'completed' and not sections:
         raise FunctionCallValidationError(
-            'Plan Mode finish with status="completed" requires a non-empty plan.'
-        )
-    if status == 'completed' and not any(str(item).strip() for item in files_or_areas):
-        raise FunctionCallValidationError(
-            'Plan Mode finish with status="completed" requires non-empty files_or_areas.'
-        )
-    if status == 'completed' and not any(str(item).strip() for item in verification):
-        raise FunctionCallValidationError(
-            'Plan Mode finish with status="completed" requires non-empty verification.'
+            'Plan Mode finish with status="completed" requires non-empty sections or a non-empty plan.'
         )
 
-    outputs = {
+    outputs: dict[str, Any] = {
+        'mode': 'plan',
         'status': status,
+        'response': response,
         'summary': summary,
+        'sections': sections,
+        'evidence': evidence,
+        'open_items': open_items,
+        'next_step': next_step,
         'plan': plan,
         'files_or_areas': files_or_areas,
         'risks': risks,
         'verification': verification,
         'assumptions': assumptions,
-        'next_step': next_step,
     }
-    return PlaybookFinishAction(final_thought=summary, outputs=outputs)
+    return PlaybookFinishAction(final_thought=response, outputs=outputs)
 
 
 def _handle_agent_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAction:
     tool_name = _finish_tool_name('agent')
     status = _require_finish_status(arguments, tool_name)
     summary = _require_finish_string(arguments, 'summary', tool_name)
-    actions_taken = _require_finish_list(arguments, 'actions_taken', tool_name)
-    verification = _require_finish_dict(arguments, 'verification', tool_name)
-    remaining_items = _require_finish_list(arguments, 'remaining_items', tool_name)
-    next_step = _require_finish_string(arguments, 'next_step', tool_name)
-
-    verification_status = str(verification.get('status') or '').strip()
-    verification_details = str(verification.get('details') or '').strip()
-    if not verification_status or not verification_details:
+    response = _optional_finish_string(arguments, 'response') or summary
+    actions_taken = _optional_finish_list(arguments, 'actions_taken', tool_name)
+    raw_verification = arguments.get('verification')
+    remaining_items = _optional_finish_list(arguments, 'remaining_items', tool_name)
+    next_step = _optional_finish_string(arguments, 'next_step')
+    sections = _normalize_finish_sections(arguments, 'sections', tool_name)
+    if not sections:
+        sections = _legacy_agent_sections(actions_taken=actions_taken)
+    if status == 'completed' and not sections:
         raise FunctionCallValidationError(
-            'Agent Mode finish verification requires non-empty status and details.'
+            'Agent Mode finish with status="completed" requires non-empty actions_taken or sections.'
         )
-    if status == 'completed' and not any(str(item).strip() for item in actions_taken):
+    if raw_verification is None:
+        verification: dict[str, Any] = {}
+    elif isinstance(raw_verification, Mapping):
+        verification = dict(raw_verification)
+    else:
         raise FunctionCallValidationError(
-            'Agent Mode finish with status="completed" requires non-empty actions_taken.'
+            f'Argument "verification" for tool call {tool_name} must be an object.'
         )
+    evidence = _normalize_finish_evidence(
+        arguments,
+        tool_name,
+        fallback=_evidence_from_agent_verification(verification),
+    )
+    open_items = (
+        _optional_finish_list(arguments, 'open_items', tool_name) or remaining_items
+    )
 
     outputs: dict[str, Any] = {
+        'mode': 'agent',
         'status': status,
+        'response': response,
         'summary': summary,
+        'sections': sections,
+        'evidence': evidence,
+        'open_items': open_items,
+        'next_step': next_step,
         'actions_taken': actions_taken,
         'verification': verification,
         'remaining_items': remaining_items,
-        'next_step': next_step,
     }
 
     lessons = arguments.get('lessons_learned')
@@ -255,7 +444,7 @@ def _handle_agent_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAct
         except Exception as exc:
             # Persistence is best-effort; never block finish on scratchpad I/O.
             logger.debug('Failed to persist finish lessons: %s', exc, exc_info=True)
-    return PlaybookFinishAction(final_thought=summary, outputs=outputs)
+    return PlaybookFinishAction(final_thought=response, outputs=outputs)
 
 
 def _handle_finish_tool(

@@ -19,15 +19,15 @@ class _AppScreenActionsMixin:
 
     def action_scroll_up(self) -> None:
         """Scroll transcript up by one page."""
-        self._get_display().scroll_page_up(animate=True)
+        self._get_display().user_scroll_page_up(animate=True)
 
     def action_scroll_down(self) -> None:
         """Scroll transcript down by one page."""
-        self._get_display().scroll_page_down(animate=True)
+        self._get_display().user_scroll_page_down(animate=True)
 
     def action_scroll_home(self) -> None:
         """Scroll transcript to top."""
-        self._get_display().scroll_home(animate=True)
+        self._get_display().user_scroll_home(animate=True)
 
     def action_scroll_end(self) -> None:
         """Scroll transcript to bottom."""
@@ -50,7 +50,7 @@ class _AppScreenActionsMixin:
         self.show_help()
 
     def _scroll_to_bottom(self) -> None:
-        self._get_display().force_scroll_end()
+        self._get_display().user_scroll_end()
 
     @staticmethod
     def _normalize_risk_key(risk: Any) -> str:

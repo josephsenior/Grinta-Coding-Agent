@@ -24,12 +24,14 @@ class TestCreateFinishTool:
         params = tool['function']['parameters']
         assert set(params['required']) == {
             'status',
+            'response',
             'summary',
-            'actions_taken',
-            'verification',
-            'remaining_items',
+            'sections',
+            'evidence',
+            'open_items',
             'next_step',
         }
+        assert 'actions_taken' in params['properties']
         assert 'plan' not in params['properties']
 
     def test_plan_finish_has_plan_params(self):
@@ -37,14 +39,14 @@ class TestCreateFinishTool:
         params = tool['function']['parameters']
         assert set(params['required']) == {
             'status',
+            'response',
             'summary',
-            'plan',
-            'files_or_areas',
-            'risks',
-            'verification',
-            'assumptions',
+            'sections',
+            'evidence',
+            'open_items',
             'next_step',
         }
+        assert 'plan' in params['properties']
         assert 'actions_taken' not in params['properties']
 
     def test_description_nonempty(self):

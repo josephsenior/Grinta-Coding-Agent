@@ -374,6 +374,37 @@ class TestPlaybookFinishAction(unittest.TestCase):
         self.assertIn('Next steps:', f.message)
         self.assertIn('Open sample.html', f.message)
 
+    def test_message_uses_adaptive_finish_sections(self):
+        f = PlaybookFinishAction(
+            final_thought='I finished the review.',
+            outputs={
+                'response': 'I finished the review.',
+                'sections': [
+                    {
+                        'title': 'Recommendation',
+                        'items': ['Keep the workflow focused on repeat use.'],
+                    },
+                    {
+                        'title': 'Tradeoffs',
+                        'items': ['This reduces marketing flair but improves scanning.'],
+                    },
+                ],
+                'evidence': {
+                    'status': 'not_applicable',
+                    'details': 'Design critique; no executable verification applies.',
+                },
+                'open_items': ['Confirm the intended audience.'],
+                'next_step': 'Apply the content hierarchy.',
+            },
+        )
+
+        self.assertIn('I finished the review.', f.message)
+        self.assertIn('Recommendation:', f.message)
+        self.assertIn('Keep the workflow focused', f.message)
+        self.assertIn('Evidence / Verification:', f.message)
+        self.assertIn('Open items:', f.message)
+        self.assertIn('Next step:', f.message)
+
     def test_message_without_thought(self):
         f = PlaybookFinishAction()
         self.assertIn("What's next", f.message)

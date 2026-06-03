@@ -200,6 +200,5 @@ class _AppRendererTerminalMixin:
             active=True,
         )
         display = self._tui._get_display()
-        display.mount(widget)
-        display.scroll_end(animate=False)
+        display.append_widget(widget)
         return widget

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Mapping
 
 from backend.core.enums import RecallType
 from backend.core.schemas import ActionType, AgentState
@@ -42,11 +42,92 @@ class PlaybookFinishAction(Action):
     force_finish: bool = False
     action: ClassVar[str] = ActionType.FINISH
 
+    @staticmethod
+    def _string_items(value: Any) -> list[str]:
+        if isinstance(value, str):
+            stripped = value.strip()
+            return [stripped] if stripped else []
+        if not isinstance(value, list):
+            return []
+        return [text for item in value if (text := str(item).strip())]
+
+    @staticmethod
+    def _list_section(title: str, items: list[str]) -> str | None:
+        if not items:
+            return None
+        return f'{title}:\n' + '\n'.join(f'- {item}' for item in items)
+
+    def _structured_output_sections(self) -> list[str]:
+        raw_sections = self.outputs.get('sections')
+        if not isinstance(raw_sections, list):
+            return []
+
+        sections: list[str] = []
+        for raw in raw_sections:
+            if not isinstance(raw, Mapping):
+                continue
+            title = str(raw.get('title') or '').strip()
+            items = self._string_items(raw.get('items'))
+            if not title or not items:
+                continue
+            formatted = self._list_section(title, items)
+            if formatted:
+                sections.append(formatted)
+        return sections
+
+    def _evidence_section(self) -> str | None:
+        evidence = self.outputs.get('evidence')
+        if isinstance(evidence, Mapping):
+            status = str(evidence.get('status') or '').strip()
+            details = str(evidence.get('details') or '').strip()
+            if status or details:
+                body = (
+                    f'{status}: {details}' if status and details else status or details
+                )
+                return f'Evidence / Verification:\n- {body}'
+
+        verification = self.outputs.get('verification')
+        if isinstance(verification, dict):
+            status = str(verification.get('status') or '').strip()
+            details = str(verification.get('details') or '').strip()
+            if status or details:
+                body = (
+                    f'{status}: {details}' if status and details else status or details
+                )
+                return f'Verification:\n- {body}'
+        elif isinstance(verification, list):
+            items = self._string_items(verification)
+            if items:
+                return 'Verification:\n' + '\n'.join(f'- {item}' for item in items)
+        return None
+
     def _message_sections(self) -> list[str]:
         sections: list[str] = []
-        summary = (self.final_thought or self.thought or '').strip()
-        if summary:
-            sections.append(summary)
+        response = (
+            str(self.outputs.get('response') or '').strip()
+            or (self.final_thought or self.thought or '').strip()
+        )
+        if response:
+            sections.append(response)
+
+        structured_sections = self._structured_output_sections()
+        if structured_sections:
+            sections.extend(structured_sections)
+            evidence = self._evidence_section()
+            if evidence:
+                sections.append(evidence)
+
+            open_items = self._string_items(
+                self.outputs.get('open_items', self.outputs.get('remaining_items'))
+            )
+            open_section = self._list_section('Open items', open_items)
+            if open_section:
+                sections.append(open_section)
+
+            next_step = str(self.outputs.get('next_step') or '').strip()
+            if next_step:
+                sections.append(f'Next step:\n- {next_step}')
+            return sections
 
         plan = self.outputs.get('plan')
         if isinstance(plan, list):

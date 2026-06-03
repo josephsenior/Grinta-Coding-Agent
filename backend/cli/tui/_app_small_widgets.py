@@ -12,7 +12,7 @@ from typing import Any
 import pyperclip
 from textual import events
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Label, Select, Static, TextArea
@@ -34,6 +34,7 @@ class Transcript(VerticalScroll):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._user_scrolled_away = False
+        self._scroll_badge: Static | None = None
 
     def compose(self) -> ComposeResult:
         yield Static(id='scroll-badge', classes='-hidden')
@@ -41,45 +42,97 @@ class Transcript(VerticalScroll):
     def on_mount(self) -> None:
         self._scroll_badge = self.query_one('#scroll-badge', Static)
 
-    def _was_at_bottom(self, threshold: int = 3) -> bool:
-        return self.max_scroll_y - self.scroll_y <= threshold
+    def _was_at_bottom(self, threshold: float = 0.5) -> bool:
+        if self.max_scroll_y <= 0:
+            return True
+        current_distance = self.max_scroll_y - self.scroll_y
+        target_distance = self.max_scroll_y - self.scroll_target_y
+        return current_distance <= threshold or target_distance <= threshold
+
+    def _set_user_scrolled_away(self, value: bool) -> None:
+        self._user_scrolled_away = value
+        badge = self._scroll_badge
+        if badge is None:
+            return
+        if value:
+            badge.remove_class('-hidden')
+        else:
+            badge.add_class('-hidden')
+
+    def _sync_scroll_state_from_position(self) -> None:
+        self._set_user_scrolled_away(not self._was_at_bottom())
+
+    def should_follow_tail(self) -> bool:
+        """Return True when live updates should keep the transcript pinned."""
+        if self._user_scrolled_away:
+            return False
+        if self._was_at_bottom():
+            return True
+        self._set_user_scrolled_away(True)
+        return False
+
+    def pause_auto_scroll(self) -> None:
+        """Stop live updates from pulling the transcript back to the bottom."""
+        if self.max_scroll_y > 0:
+            self._set_user_scrolled_away(True)
 
     def on_scroll(self, _event: Widget.Scroll) -> None:
-        if not self._scroll_badge:
-            return
-        if self._was_at_bottom():
-            if self._user_scrolled_away:
-                self._user_scrolled_away = False
-                self._scroll_badge.add_class('-hidden')
-        else:
-            if not self._user_scrolled_away:
-                self._user_scrolled_away = True
-                self._scroll_badge.remove_class('-hidden')
+        self._sync_scroll_state_from_position()
 
-    def append_widget(self, widget: Static | Container) -> None:
+    def _on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
+        self.pause_auto_scroll()
+        super()._on_mouse_scroll_up(event)
+
+    def _on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
+        super()._on_mouse_scroll_down(event)
+        self.call_after_refresh(self._sync_scroll_state_from_position)
+
+    def user_scroll_page_up(self, *, animate: bool = True) -> None:
+        self.pause_auto_scroll()
+        self.scroll_page_up(animate=animate)
+
+    def user_scroll_page_down(self, *, animate: bool = True) -> None:
+        self.scroll_page_down(
+            animate=animate,
+            on_complete=self._sync_scroll_state_from_position,
+        )
+        self.call_after_refresh(self._sync_scroll_state_from_position)
+
+    def user_scroll_home(self, *, animate: bool = True) -> None:
+        self.pause_auto_scroll()
+        self.scroll_home(
+            animate=animate,
+            on_complete=self._sync_scroll_state_from_position,
+        )
+
+    def user_scroll_end(self, *, animate: bool = False) -> None:
+        self.force_scroll_end(animate=animate)
+
+    def append_widget(self, widget: Widget) -> None:
         """Mount a widget and auto-scroll unless user scrolled up."""
+        should_follow = self.should_follow_tail()
         widget.styles.offset = (0, -1)
         self.mount(widget)
         try:
             widget.animate('offset', (0, 0), duration=0.2)
         except Exception:
             widget.styles.offset = (0, 0)
-        if not self._user_scrolled_away:
+        if should_follow:
             self.scroll_end(animate=False)
 
     def write(self, renderable: Any) -> None:
         """Compatibility method for RichLog interface."""
         self.append_widget(Static(renderable))
 
-    def force_scroll_end(self) -> None:
+    def force_scroll_end(self, *, animate: bool = False) -> None:
         """Scroll to bottom regardless of user scroll state."""
-        self._user_scrolled_away = False
-        self._scroll_badge.add_class('-hidden')
-        self.scroll_end(animate=False)
+        self._set_user_scrolled_away(False)
+        self.scroll_end(animate=animate)
 
     def clear(self) -> None:
         """Compatibility method for RichLog interface."""
         self.remove_children()
+        self._scroll_badge = None
         self._user_scrolled_away = False
         self.mount(Static('', id='scroll-badge', classes='-hidden'))
         self._scroll_badge = self.query_one('#scroll-badge', Static)

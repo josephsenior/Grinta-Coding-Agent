@@ -528,20 +528,19 @@ class ActivityRenderer:
     @staticmethod
     def condensation(count: int = 1, result: str | None = None) -> ActivityCard:
         """Create an activity card for context condensation."""
-        suffix = (
-            'st'
-            if count % 10 == 1 and count % 11 != 1
-            else 'nd'
-            if count % 10 == 2 and count % 11 != 2
-            else 'rd'
-            if count % 10 == 3 and count % 11 != 3
-            else 'th'
-        )
+        suffix = 'th'
+        if count % 100 not in (11, 12, 13):
+            suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(count % 10, 'th')
+        is_complete = result is not None
         return ActivityCard(
-            verb=f'Compressed ({count}{suffix})',
+            verb=f'Compacted ({count}{suffix})'
+            if is_complete
+            else f'Compacting ({count}{suffix})',
             detail='context',
             badge_category='tool',
             extra_lines=[ActivityLine(result)] if result else None,
+            secondary='Done' if is_complete else None,
+            secondary_kind='ok' if is_complete else 'neutral',
             is_collapsible=bool(result),
             start_collapsed=False,
         )
