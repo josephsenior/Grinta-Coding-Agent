@@ -23,9 +23,60 @@ _TASK_TRACKER_DESCRIPTION = (
     'Use `update` with a task_list to create or overwrite the plan. '
     'Use `view` (without a task_list) to read the current plan. '
     'Use `update_status` to change a single task status by ID (no need to re-emit full list). '
-    'Statuses: `todo`, `doing`, `done`, `skipped`, `blocked` '
-    '(terminal states for finish are done, skipped, blocked).'
+    'Statuses must be exactly one of: `todo`, `doing`, `done`, `skipped`, `blocked`. '
+    'Use `doing`, not `in_progress`; use `done`, not `completed`; use `todo`, not `pending`. '
+    'Terminal states for finish are `done`, `skipped`, `blocked`.'
 )
+
+_TASK_STATUS_DESCRIPTION = (
+    'Current status. Must be exactly one of: todo, doing, done, skipped, blocked. '
+    'Use doing, not in_progress; done, not completed; todo, not pending.'
+)
+
+
+def _task_step_schema(depth: int = 2) -> dict[str, Any]:
+    """Return the task-list item schema, including bounded nested subtasks."""
+    properties: dict[str, Any] = {
+        'id': {
+            'type': 'string',
+            'description': "Unique identifier (e.g. '1', '1.1').",
+        },
+        'description': {
+            'type': 'string',
+            'description': 'Concise description of the step.',
+        },
+        'status': {
+            'type': 'string',
+            'description': _TASK_STATUS_DESCRIPTION,
+            'enum': [
+                TASK_STATUS_TODO,
+                TASK_STATUS_DOING,
+                TASK_STATUS_DONE,
+                TASK_STATUS_SKIPPED,
+                TASK_STATUS_BLOCKED,
+            ],
+        },
+        'result': {
+            'type': 'string',
+            'description': 'Optional result or note captured for this step.',
+        },
+        'tags': {
+            'type': 'array',
+            'description': 'Optional tags for this step.',
+            'items': {'type': 'string'},
+        },
+    }
+    properties['subtasks'] = {
+        'type': 'array',
+        'description': 'Optional child steps following the same task item shape.',
+        'items': _task_step_schema(depth - 1) if depth > 0 else {'type': 'object'},
+    }
+    return {
+        'type': 'object',
+        'properties': properties,
+        'required': ['id', 'description', 'status'],
+        'additionalProperties': False,
+    }
 
 
 class TaskTracker:
@@ -147,48 +198,7 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
             'task_list': {
                 'type': 'array',
                 'description': 'The complete ordered list of plan steps. Must include ALL steps - not just the update. Required for `update`.',
-                'items': {
-                    'type': 'object',
-                    'properties': {
-                        'id': {
-                            'type': 'string',
-                            'description': "Unique identifier (e.g. '1', '1.1').",
-                        },
-                        'description': {
-                            'type': 'string',
-                            'description': 'Concise description of the step.',
-                        },
-                        'status': {
-                            'type': 'string',
-                            'description': (
-                                'Current status: todo | doing | done | skipped | blocked.'
-                            ),
-                            'enum': [
-                                TASK_STATUS_TODO,
-                                TASK_STATUS_DOING,
-                                TASK_STATUS_DONE,
-                                TASK_STATUS_SKIPPED,
-                                TASK_STATUS_BLOCKED,
-                            ],
-                        },
-                        'result': {
-                            'type': 'string',
-                            'description': 'Optional result or note captured for this step.',
-                        },
-                        'tags': {
-                            'type': 'array',
-                            'description': 'Optional tags for this step.',
-                            'items': {'type': 'string'},
-                        },
-                        'subtasks': {
-                            'type': 'array',
-                            'description': 'Optional child steps following the same task item shape.',
-                            'items': {'type': 'object'},
-                        },
-                    },
-                    'required': ['id', 'description', 'status'],
-                    'additionalProperties': False,
-                },
+                'items': _task_step_schema(),
             },
             'title': {
                 'type': 'string',
@@ -200,7 +210,7 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
             },
             'status': {
                 'type': 'string',
-                'description': "For 'update_status': new status value. One of: todo, doing, done, skipped, blocked.",
+                'description': f"For 'update_status': new status value. {_TASK_STATUS_DESCRIPTION}",
                 'enum': [
                     TASK_STATUS_TODO,
                     TASK_STATUS_DOING,

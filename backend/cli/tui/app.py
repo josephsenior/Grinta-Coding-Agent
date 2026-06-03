@@ -39,6 +39,9 @@ from backend.cli.tui._app_renderer_live_mixin import _AppRendererLiveMixin  # no
 from backend.cli.tui._app_renderer_terminal_mixin import (
     _AppRendererTerminalMixin,  # noqa: F401
 )
+from backend.cli.tui._app_renderer_thinking_mixin import (
+    _AppRendererThinkingMixin,  # noqa: F401
+)
 from backend.cli.tui._app_screen_actions_mixin import (
     _AppScreenActionsMixin,  # noqa: F401
 )
@@ -216,6 +219,7 @@ class TUIRenderer(
     _AppRendererLiveMixin,
     _AppRendererDisplayMixin,
     _AppRendererTerminalMixin,
+    _AppRendererThinkingMixin,
     _AppRendererEventProcessorMixin,
     _AppRendererActionHandlersMixin,
 ):
@@ -262,6 +266,8 @@ class TUIRenderer(
         self._live_response: str = ''
         self._live_response_dirty: bool = False
         self._last_final_response_text: str = ''
+        self._last_thinking_text_hash: str = ''
+        self._last_thinking_artifact_hash: str = ''
 
         # Turn tracking for grouping tool calls by agent turn
         self._turn_count: int = 0

@@ -46,6 +46,8 @@ class _AppRendererDisplayMixin:
         self._live_thinking_dirty = False
         self._live_response = ''
         self._live_response_dirty = False
+        self._last_thinking_text_hash = ''
+        self._last_thinking_artifact_hash = ''
         try:
             self._tui._get_display().clear()
         except (AttributeError, NoMatches):
