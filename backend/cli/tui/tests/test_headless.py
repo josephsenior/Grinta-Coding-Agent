@@ -1159,7 +1159,7 @@ async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
             loop=loop,
         )
         renderer._task_list = [
-            {'id': '1', 'description': 'Persist task panel', 'status': 'doing'}
+            {'id': '1', 'description': 'Persist task panel', 'status': 'in_progress'}
         ]
         renderer._refresh_display()
 
@@ -1191,7 +1191,7 @@ async def test_tui_task_sidebar_does_not_clear_on_ambiguous_empty_update_payload
             loop=loop,
         )
         renderer._task_list = [
-            {'id': '1', 'description': 'Persist task panel', 'status': 'doing'}
+            {'id': '1', 'description': 'Persist task panel', 'status': 'in_progress'}
         ]
         renderer._refresh_display()
 
@@ -1231,7 +1231,7 @@ async def test_tui_task_sidebar_allows_explicit_empty_update_clear(
             loop=loop,
         )
         renderer._task_list = [
-            {'id': '1', 'description': 'Persist task panel', 'status': 'doing'}
+            {'id': '1', 'description': 'Persist task panel', 'status': 'in_progress'}
         ]
         renderer._refresh_display()
 
@@ -1996,7 +1996,7 @@ async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config)
 
         renderer._process_event(
             AgentThinkAction(
-                thought="[TOOL_CALL_RECOVERABLE_ERROR] Details: Invalid task status 'in_progress'. Use one of: blocked, doing, done, skipped, todo."
+                thought="[TOOL_CALL_RECOVERABLE_ERROR] Details: Invalid task status 'doing'. Use one of: blocked, in_progress, done, skipped, todo."
             )
         )
         # The mock config causes the background bootstrap to fail with an
@@ -2017,7 +2017,7 @@ async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config)
         history_text = '\n'.join(
             str(r) for r in renderer._history if r is not None
         )
-        assert "Invalid task status 'in_progress'" in history_text
+        assert "Invalid task status 'doing'" in history_text
 
 
 @pytest.mark.asyncio

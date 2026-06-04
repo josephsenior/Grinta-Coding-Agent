@@ -82,7 +82,7 @@ That is where this chapter starts leaning on two later ones. [13. The Hidden Pla
 
 But providing that information is not enough. The task validation service independently checks the plan state. It walks the task tracker, recursively finds every step that is not marked as done, and if any remain active, it blocks the finish with a specific error. The agent then has to go back, actually complete the work, update the tracker, and try again.
 
-The task tracker itself is more than a checklist. It is a persistent JSON file (`active_plan.json`) that the agent maintains throughout the session with `update` and `view` operations. Each step has three states — `todo`, `doing`, and `done` — and the tracker enforces ordering. The validation service reads this file and performs recursive descent through nested steps, because a parent step with three child steps is only "done" when all three children are done. That recursive check matters because the agent sometimes marks a high-level step as complete while leaving sub-steps unfinished.
+The task tracker itself is more than a checklist. It is a persistent JSON file (`active_plan.json`) that the agent maintains throughout the session with `update` and `view` operations. Each step has three states — `todo`, `in_progress`, and `done` — and the tracker enforces ordering. The validation service reads this file and performs recursive descent through nested steps, because a parent step with three child steps is only "done" when all three children are done. That recursive check matters because the agent sometimes marks a high-level step as complete while leaving sub-steps unfinished.
 
 This is not a quality-of-life feature. It is an integrity constraint.
 

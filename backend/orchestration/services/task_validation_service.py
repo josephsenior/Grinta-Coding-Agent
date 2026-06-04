@@ -174,7 +174,7 @@ class TaskValidationService:
     def _collect_non_terminal_steps(
         self, steps: list[Any]
     ) -> list[tuple[str, str, str]]:
-        """Return visible plan steps that are still todo or doing."""
+        """Return visible plan steps that are still todo or in_progress."""
         active_steps: list[tuple[str, str, str]] = []
         for step in steps or []:
             step_id, description, status, subtasks = _step_identity(step)

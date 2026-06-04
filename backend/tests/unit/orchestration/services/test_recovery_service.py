@@ -255,11 +255,11 @@ class TestRecoveryService:
 
 
 class TestTaskReconciliationDirective:
-    """RecoveryService should inject a planning directive when doing steps exist."""
+    """RecoveryService should inject a planning directive when in_progress steps exist."""
 
     @pytest.fixture()
-    def state_with_doing_step(self):
-        step = MagicMock(status='doing', id='2')
+    def state_with_in_progress_step(self):
+        step = MagicMock(status='in_progress', id='2')
         plan = MagicMock(steps=[step])
         state = MagicMock()
         state.turn_signals = MagicMock(planning_directive=None)
@@ -270,25 +270,25 @@ class TestTaskReconciliationDirective:
         return state
 
     @pytest.mark.asyncio
-    async def test_survivable_error_with_doing_step_injects_directive(
+    async def test_survivable_error_with_in_progress_step_injects_directive(
         self,
         mock_context,
         ctrl,
-        state_with_doing_step,
+        state_with_in_progress_step,
     ):
-        ctrl.state = state_with_doing_step
+        ctrl.state = state_with_in_progress_step
         ctrl.get_agent_state.return_value = AgentState.RUNNING
 
         svc = RecoveryService(mock_context)
         await svc.react_to_exception(RuntimeError('tool failed'))
 
-        state_with_doing_step.set_planning_directive.assert_called_once()
-        directive = state_with_doing_step.set_planning_directive.call_args[0][0]
+        state_with_in_progress_step.set_planning_directive.assert_called_once()
+        directive = state_with_in_progress_step.set_planning_directive.call_args[0][0]
         assert 'task_tracker' in directive
-        assert 'doing' in directive
+        assert 'in_progress' in directive
 
     @pytest.mark.asyncio
-    async def test_survivable_error_without_doing_step_no_directive(
+    async def test_survivable_error_without_in_progress_step_no_directive(
         self,
         mock_context,
         ctrl,
@@ -314,16 +314,16 @@ class TestTaskReconciliationDirective:
         self,
         mock_context,
         ctrl,
-        state_with_doing_step,
+        state_with_in_progress_step,
     ):
-        state_with_doing_step.turn_signals.planning_directive = 'already set'
-        ctrl.state = state_with_doing_step
+        state_with_in_progress_step.turn_signals.planning_directive = 'already set'
+        ctrl.state = state_with_in_progress_step
         ctrl.get_agent_state.return_value = AgentState.RUNNING
 
         svc = RecoveryService(mock_context)
         await svc.react_to_exception(RuntimeError('tool failed'))
 
-        state_with_doing_step.set_planning_directive.assert_not_called()
+        state_with_in_progress_step.set_planning_directive.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_no_directive_when_no_plan_exists(

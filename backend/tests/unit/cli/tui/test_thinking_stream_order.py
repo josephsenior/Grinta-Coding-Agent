@@ -15,6 +15,7 @@ from backend.cli.tui.widgets.activity_card import (
 )
 from backend.cli.tui.widgets.activity_card import ThinkingIndicator
 from backend.ledger.action import FileWriteAction, StreamingChunkAction
+from textual.widgets import Static
 
 
 @pytest.fixture
@@ -31,9 +32,8 @@ def mock_config():
 
 
 def _plain_text(widget: ThinkingIndicator) -> str:
-    renderable = widget.renderable
-    plain = getattr(renderable, 'plain', None)
-    return plain if isinstance(plain, str) else str(renderable)
+    body = widget.query_one('#thinking-body', Static)
+    return str(body.renderable)
 
 
 @pytest.mark.asyncio

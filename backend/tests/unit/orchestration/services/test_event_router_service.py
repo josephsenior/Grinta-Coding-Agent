@@ -187,7 +187,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(
                     id='1',
                     description='Still working',
-                    status='doing',
+                    status='in_progress',
                     subtasks=[],
                 )
             ]
@@ -212,7 +212,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(
                     id='1',
                     description='Still working',
-                    status='doing',
+                    status='in_progress',
                     subtasks=[],
                 )
             ]
@@ -554,7 +554,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             task_list=[
                 {
                     'description': 'Top level',
-                    'status': 'doing',
+                    'status': 'in_progress',
                     'result': 'progress note',
                     'subtasks': [{'description': 'Nested child', 'status': 'done'}],
                 }

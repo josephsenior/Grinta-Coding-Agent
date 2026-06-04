@@ -39,7 +39,7 @@ class TestTaskTrackingMixin(TestCase):
         """Test handling task update command."""
         task_list = [
             {'description': 'Task 1', 'status': 'todo', 'result': 'Do something'},
-            {'description': 'Task 2', 'status': 'doing', 'result': 'Working on it'},
+            {'description': 'Task 2', 'status': 'in_progress', 'result': 'Working on it'},
         ]
         action = TaskTrackingAction(command='update', task_list=task_list)
 
@@ -139,7 +139,7 @@ class TestTaskTrackingMixin(TestCase):
 
     def test_handle_task_update_action_noop_update_skips_write(self):
         """No-op task updates should still return a task observation without rewriting TASKS.md."""
-        task_list = [{'id': '1', 'description': 'Task 1', 'status': 'doing'}]
+        task_list = [{'id': '1', 'description': 'Task 1', 'status': 'in_progress'}]
         action = TaskTrackingAction(
             command='update',
             task_list=task_list,
@@ -179,7 +179,7 @@ class TestTaskTrackingMixin(TestCase):
 
     def test_handle_task_view_action_preserves_hydrated_task_list(self):
         """View responses should carry the hydrated plan so UI sidebars do not clear."""
-        hydrated = [{'id': '1', 'description': 'Persisted task', 'status': 'doing'}]
+        hydrated = [{'id': '1', 'description': 'Persisted task', 'status': 'in_progress'}]
         action = TaskTrackingAction(command='view', task_list=hydrated)
         task_file_path = '/path/to/TASKS.md'
         stored_content = '# Task List\n\n1. 🔄 Persisted task\n'
@@ -225,7 +225,7 @@ class TestTaskTrackingMixin(TestCase):
         """Test task list content generation with all status types."""
         task_list = [
             {'description': 'Task 1', 'status': 'todo', 'result': 'Note 1'},
-            {'description': 'Task 2', 'status': 'doing', 'result': 'Note 2'},
+            {'description': 'Task 2', 'status': 'in_progress', 'result': 'Note 2'},
             {'description': 'Task 3', 'status': 'done', 'result': 'Note 3'},
             {'description': 'Task 4', 'status': 'skipped', 'result': 'N/A'},
             {'description': 'Task 5', 'status': 'blocked', 'result': 'Waiting'},
@@ -235,7 +235,7 @@ class TestTaskTrackingMixin(TestCase):
 
         self.assertIn('# Task List', content)
         self.assertIn('1. ⏳ **Task 1** `[todo]`', content)
-        self.assertIn('2. 🔄 **Task 2** `[doing]`', content)
+        self.assertIn('2. 🔄 **Task 2** `[in_progress]`', content)
         self.assertIn('3. ✅ **Task 3** `[done]`', content)
         self.assertIn('4. ⏭️ **Task 4** `[skipped]`', content)
         self.assertIn('5. 🚫 **Task 5** `[blocked]`', content)

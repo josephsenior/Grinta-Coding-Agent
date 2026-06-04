@@ -107,7 +107,7 @@ class TestIdentifyEssentialEvents:
 
     def test_keeps_task_tracking_actions(self):
         sc = SmartCompactor(llm=None, keep_first=0)
-        tracker = TaskTrackingAction(task_list=[{'id': '1', 'status': 'doing'}])
+        tracker = TaskTrackingAction(task_list=[{'id': '1', 'status': 'in_progress'}])
         tracker.id = 9
         events = [_event(0), tracker]
 
@@ -117,12 +117,12 @@ class TestIdentifyEssentialEvents:
 
 
 class TestPlanAnchors:
-    def test_anchor_active_plan_events_uses_doing_ids(self):
+    def test_anchor_active_plan_events_uses_in_progress_ids(self):
         sc = SmartCompactor(llm=None)
         events = [_event(1)]
         essential: set[int] = set()
 
-        sc._load_doing_task_ids = MagicMock(return_value={'task-1'})  # type: ignore[method-assign]
+        sc._load_in_progress_task_ids = MagicMock(return_value={'task-1'})  # type: ignore[method-assign]
         sc._anchor_by_task_ids = MagicMock()  # type: ignore[method-assign]
         sc._anchor_last_task_tracker = MagicMock()  # type: ignore[method-assign]
 
@@ -144,16 +144,16 @@ class TestPlanAnchors:
         non_list.write_text('{"id": 1}', encoding='utf-8')
         assert sc._parse_tasks_from_plan(non_list) == []
 
-    def test_extract_doing_ids_uses_id_or_description(self):
+    def test_extract_in_progress_ids_uses_id_or_description(self):
         sc = SmartCompactor(llm=None)
         tasks = [
-            {'id': 1, 'status': 'doing'},
-            {'description': 'fallback', 'status': 'doing'},
+            {'id': 1, 'status': 'in_progress'},
+            {'description': 'fallback', 'status': 'in_progress'},
             {'id': 2, 'status': 'done'},
             'skip',
         ]
 
-        assert sc._extract_doing_ids(tasks) == {'1', 'fallback'}
+        assert sc._extract_in_progress_ids(tasks) == {'1', 'fallback'}
 
     def test_anchor_last_task_tracker_adds_latest_tracker(self):
         sc = SmartCompactor(llm=None)

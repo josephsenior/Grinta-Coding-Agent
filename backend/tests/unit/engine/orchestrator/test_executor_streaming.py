@@ -1250,7 +1250,7 @@ def test_response_to_actions_adds_task_status_alias_hint(monkeypatch):
         'response_to_actions',
         lambda *args, **kwargs: (_ for _ in ()).throw(
             FunctionCallValidationError(
-                "Invalid task status 'in_progress'. Use one of: blocked, doing, done, skipped, todo."
+                "Invalid task status 'doing'. Use one of: blocked, in_progress, done, skipped, todo."
             )
         ),
     )
@@ -1270,9 +1270,7 @@ def test_response_to_actions_adds_task_status_alias_hint(monkeypatch):
     assert len(actions) == 1
     assert isinstance(actions[0], AgentThinkAction)
     thought = actions[0].thought or ''
-    assert '`in_progress` -> `doing`' in thought
-    assert '`completed` -> `done`' in thought
-    assert '`pending` -> `todo`' in thought
+    assert '`todo`, `in_progress`, `done`, `skipped`, `blocked`' in thought
 
 
 def test_response_to_actions_converts_common_tool_call_validation_error_to_recoverable_action(

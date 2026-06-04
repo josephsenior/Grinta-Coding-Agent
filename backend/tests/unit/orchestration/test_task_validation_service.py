@@ -107,7 +107,7 @@ class TestHandleFinish:
         ctx = _make_context(has_validator=True)
         controller = ctx.get_controller()
         controller.state.plan = SimpleNamespace(
-            steps=[SimpleNamespace(id='1', description='Still running', status='doing')]
+            steps=[SimpleNamespace(id='1', description='Still running', status='in_progress')]
         )
         svc = TaskValidationService(ctx)
 
