@@ -1,0 +1,91 @@
+"""Tests for token-budget-aware prompt event windowing."""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+from backend.context.prompt_window import select_prompt_events
+from backend.ledger.action import CmdRunAction, MessageAction
+from backend.ledger.event import Event, EventSource
+from backend.ledger.observation import CmdOutputObservation
+from backend.ledger.observation.agent import AgentCondensationObservation
+
+
+def _with_id(event: Event, event_id: int) -> Event:
+    event.id = event_id
+    return event
+
+
+def _user_message(text: str, event_id: int) -> MessageAction:
+    event = MessageAction(content=text)
+    event.source = EventSource.USER
+    return _with_id(event, event_id)  # type: ignore[return-value]
+
+
+def _run_chunk(event_id: int, label: str, payload: str = '') -> list[Event]:
+    action = _with_id(CmdRunAction(command=f'echo {label}'), event_id)
+    observation = _with_id(
+        CmdOutputObservation(content=payload or f'output {label}', command=f'echo {label}'),
+        event_id + 1,
+    )
+    return [action, observation]
+
+
+def test_returns_full_history_when_within_budget() -> None:
+    events = [_user_message('start', 1), *_run_chunk(2, 'small')]
+    cfg = SimpleNamespace(
+        prompt_history_token_budget=10_000,
+        prompt_history_min_events=1,
+        prompt_history_max_events=100,
+        model='gpt-4o',
+    )
+
+    result = select_prompt_events(events, cfg)
+
+    assert result.windowed is False
+    assert result.events == events
+
+
+def test_window_preserves_summary_and_recent_action_observation_chunk() -> None:
+    summary = _with_id(
+        AgentCondensationObservation(content='summary of older work'),
+        2,
+    )
+    old_chunk = _run_chunk(3, 'old', payload='old payload ' * 200)
+    recent_chunk = _run_chunk(101, 'recent', payload='recent payload')
+    events = [_user_message('start', 1), summary, *old_chunk, *recent_chunk]
+    cfg = SimpleNamespace(
+        prompt_history_token_budget=80,
+        prompt_history_min_events=1,
+        prompt_history_max_events=10,
+        model='gpt-4o',
+    )
+
+    result = select_prompt_events(events, cfg)
+
+    assert result.windowed is True
+    assert summary in result.events
+    assert recent_chunk[0] in result.events
+    assert recent_chunk[1] in result.events
+    assert old_chunk[0] not in result.events
+    assert old_chunk[1] not in result.events
+
+
+def test_event_count_guard_windows_many_tiny_events_without_token_budget() -> None:
+    events = [_user_message('start', 1)]
+    for idx in range(2, 30, 2):
+        events.extend(_run_chunk(idx, f'cmd-{idx}', payload='ok'))
+    cfg = SimpleNamespace(
+        prompt_history_token_budget=None,
+        max_input_tokens=None,
+        prompt_history_min_events=1,
+        prompt_history_max_events=6,
+        model='gpt-4o',
+    )
+
+    result = select_prompt_events(events, cfg)
+
+    assert result.windowed is True
+    assert result.selected_events <= 6
+    assert events[-2] in result.events
+    assert events[-1] in result.events

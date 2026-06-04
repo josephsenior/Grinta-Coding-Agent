@@ -9,7 +9,6 @@ if TYPE_CHECKING:
 from backend.context.compactor.compactor import Compaction, Compactor
 from backend.context.view import View
 from backend.ledger.observation import Observation
-from backend.ledger.observation.agent import AgentCondensationObservation
 
 if TYPE_CHECKING:
     from backend.inference.llm_registry import LLMRegistry
@@ -40,8 +39,8 @@ class ObservationMaskingCompactor(Compactor):
         Notes:
             - Non-destructive: Events are masked, not removed (keeps event count for indexing)
             - Observation-specific: Only Observation instances are masked, other event types pass through
-            - Converted to AgentCondensationObservation: Masked observations become observations of type
-              AgentCondensationObservation with content "<MASKED>"
+            - Converted to a plain Observation placeholder so masking does not
+              trigger post-condensation recovery side effects.
             - Use case: Chained before summarization to reduce LLM prompt size
             - Examples: attention_window=5 → mask observations at positions 0 through (len(view) - 5)
 
@@ -59,7 +58,7 @@ class ObservationMaskingCompactor(Compactor):
         results: list[Event] = []
         for i, event in enumerate(view):
             if isinstance(event, Observation) and i < len(view) - self.attention_window:
-                results.append(AgentCondensationObservation('<MASKED>'))
+                results.append(Observation('<MASKED>'))
             else:
                 results.append(event)
         return View(events=results)

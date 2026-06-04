@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
@@ -482,6 +483,49 @@ class TestBuildMessages:
 
         result = m.build_messages([], MagicMock(), MagicMock())
         assert result == []
+
+    def test_windows_events_before_processing(self):
+        from backend.ledger.action import CmdRunAction, MessageAction
+        from backend.ledger.event import EventSource
+        from backend.ledger.observation import CmdOutputObservation
+
+        m = _make_manager()
+        m.conversation_memory = MagicMock()
+        m.conversation_memory.process_events.return_value = []
+        initial_user = MessageAction(content='start')
+        initial_user.source = EventSource.USER
+        initial_user.id = 1
+        events: list[Event] = [initial_user]
+        event_id = 2
+        for idx in range(20):
+            action = CmdRunAction(command=f'echo {idx}')
+            action.id = event_id
+            event_id += 1
+            observation = CmdOutputObservation(
+                content=f'payload {idx} ' * 80,
+                command=f'echo {idx}',
+            )
+            observation.id = event_id
+            event_id += 1
+            events.extend([action, observation])
+        llm_config = SimpleNamespace(
+            max_message_chars=None,
+            vision_is_active=False,
+            model='gpt-4o',
+            caching_prompt=False,
+            prompt_history_token_budget=120,
+            prompt_history_min_events=1,
+            prompt_history_max_events=8,
+        )
+
+        m.build_messages(events, initial_user, llm_config)
+
+        processed_events = m.conversation_memory.process_events.call_args.kwargs[
+            'condensed_history'
+        ]
+        assert len(processed_events) < len(events)
+        assert events[-2] in processed_events
+        assert events[-1] in processed_events
 
     def test_sets_cache_prompt_on_first_text_content(self):
         from backend.core.message import Message, TextContent

@@ -148,6 +148,33 @@ class TestGetNextAction:
         assert result is None
 
     @pytest.mark.asyncio
+    async def test_no_action_error_exhaustion_pauses_with_visible_protocol_error(self):
+        from backend.core.errors import LLMNoActionError
+        from backend.core.schemas import AgentState
+
+        ctx = _make_context()
+        ctx.agent.step.side_effect = LLMNoActionError(
+            'Agent mode requires a tool action, but the model returned plain text '
+            'with no tool call.'
+        )
+        controller = MagicMock()
+        controller.get_agent_state.return_value = AgentState.RUNNING
+        controller.set_agent_state_to = AsyncMock()
+        ctx.get_controller.return_value = controller
+
+        svc = ActionExecutionService(ctx)
+        result = await svc.get_next_action()
+
+        assert result is None
+        controller.set_agent_state_to.assert_awaited_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+        final_event = ctx.event_stream.add_event.call_args_list[-1].args[0]
+        assert isinstance(final_event, ErrorObservation)
+        assert final_event.error_id == 'LLM_NO_ACTION_REPAIR_EXHAUSTED'
+        assert final_event.agent_only is False
+
+    @pytest.mark.asyncio
     async def test_response_error_returns_none(self):
         from backend.core.errors import LLMResponseError
 

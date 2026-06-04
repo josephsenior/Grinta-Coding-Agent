@@ -27,6 +27,7 @@ from backend.core.config.compactor_config import (
     SmartCompactorConfig,
     StructuredSummaryCompactorConfig,
 )
+from backend.core.config.llm_config import LLMConfig
 from backend.ledger.action import CmdRunAction, MessageAction
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import Event, EventSource
@@ -292,6 +293,47 @@ class TestAutoCompactor:
 
         config = factory.call_args.args[0]
         assert isinstance(config, SmartCompactorConfig)
+        assert result is view
+
+    async def test_background_long_session_uses_structured_when_supported(self):
+        llm_config = LLMConfig.model_validate({'model': 'openai/gpt-4o'})
+        auto = AutoCompactor(llm_config=llm_config, llm_registry=MagicMock())
+        view = View(events=_make_events(_LONG_SESSION + 10))
+        delegate = MagicMock()
+        delegate.compact = AsyncMock(return_value=view)
+
+        with patch(
+            'backend.context.compactor.strategies.auto_compactor.Compactor.from_config',
+            return_value=delegate,
+        ) as factory:
+            result = await auto.compact_background(view)
+
+        config = factory.call_args.args[0]
+        assert isinstance(config, StructuredSummaryCompactorConfig)
+        assert result is view
+
+    async def test_background_falls_back_when_structured_delegate_unavailable(self):
+        llm_config = LLMConfig.model_validate({'model': 'openai/gpt-4o'})
+        auto = AutoCompactor(llm_config=llm_config, llm_registry=MagicMock())
+        view = View(events=_make_events(_LONG_SESSION + 10))
+        delegate = MagicMock()
+        delegate.compact = AsyncMock(return_value=view)
+
+        def make_delegate(config, registry):
+            del registry
+            if isinstance(config, StructuredSummaryCompactorConfig):
+                raise ValueError('function calling unavailable')
+            return delegate
+
+        with patch(
+            'backend.context.compactor.strategies.auto_compactor.Compactor.from_config',
+            side_effect=make_delegate,
+        ) as factory:
+            result = await auto.compact_background(view)
+
+        configs = [call.args[0] for call in factory.call_args_list]
+        assert isinstance(configs[0], StructuredSummaryCompactorConfig)
+        assert isinstance(configs[1], SmartCompactorConfig)
         assert result is view
 
     def test_status_prediction_for_normal_long_session(self):

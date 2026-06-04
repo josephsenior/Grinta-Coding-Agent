@@ -270,6 +270,15 @@ def get_working_memory_prompt_block(char_budget: int = 2000) -> str:
     return '\n'.join(lines)
 
 
+def _working_memory_already_contains_note(existing: str, key: str, value: str) -> bool:
+    existing_text = existing.strip()
+    note_text = value.strip()
+    if not existing_text or not note_text:
+        return False
+    entry_text = f'[{key}] {note_text}'
+    return note_text in existing_text or entry_text in existing_text
+
+
 def sync_scratchpad_to_working_memory(notes: dict[str, str]) -> list[str]:
     """Sync scratchpad notes to working_memory sections.
 
@@ -322,6 +331,8 @@ def sync_scratchpad_to_working_memory(notes: dict[str, str]) -> list[str]:
             # Append to existing content if section already has data
             existing = memory.get(section, '')
             if existing:
+                if _working_memory_already_contains_note(existing, key, value):
+                    continue
                 memory[section] = f'{existing}\n\n[{key}] {value}'
             else:
                 memory[section] = value

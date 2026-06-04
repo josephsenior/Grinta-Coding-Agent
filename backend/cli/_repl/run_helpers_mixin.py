@@ -390,45 +390,11 @@ class RunHelpersMixin:
             self._announce_chat_ready(agent, session, renderer)
             self._hud.update_ledger('Healthy')
             self._invalidate_prompt_session(session)
-            # Register the plain-text-gate callback so the CLI shows a smooth
-            # note when the engine gates the LLM's prose, and a footer note
-            # when the threshold is breached. Mirrors the TUI registration.
-            self._register_plain_text_gate_callback(agent, renderer)
             chat_ready_done.set()
             return True
         except Exception as exc:
             self._handle_bootstrap_failure(exc, renderer, session, engine_init_exc)
             return False
-
-    def _register_plain_text_gate_callback(self, agent: Any, renderer: Any) -> None:
-        """Wire ``agent._on_plain_text_gate`` to the CLI renderer."""
-        if agent is None or renderer is None:
-            return
-        if not hasattr(agent, '_on_plain_text_gate'):
-            return
-
-        def _on_gate(kind: str, count: int) -> None:
-            if kind == 'under_threshold':
-                note = (
-                    f'agent is replying in prose; reminding it to use a tool '
-                    f'call ({count}/3)'
-                )
-            elif kind == 'threshold_breached':
-                note = (
-                    f'agent kept replying in prose {count} times — surfacing '
-                    f'the last reply and pausing for input'
-                )
-            else:
-                return
-            try:
-                renderer.add_system_message(note, title='gate')
-            except Exception:
-                logger.debug('CLI plain-text-gate note failed', exc_info=True)
-
-        try:
-            agent._on_plain_text_gate = _on_gate
-        except Exception:
-            logger.debug('Failed to register CLI plain-text-gate callback', exc_info=True)
 
     def _announce_chat_ready(
         self,

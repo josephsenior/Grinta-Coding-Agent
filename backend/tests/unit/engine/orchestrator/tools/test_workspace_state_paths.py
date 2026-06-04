@@ -75,6 +75,20 @@ def test_working_memory_clear_section_all_clears_all_sections(
         assert section not in payload
 
 
+def test_scratchpad_sync_is_idempotent(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.workspace_agent_state_dir',
+        lambda project_root=None: tmp_path,
+    )
+    notes = {'plan': 'keep the hot path deterministic'}
+
+    assert wm.sync_scratchpad_to_working_memory(notes) == ['plan']
+    assert wm.sync_scratchpad_to_working_memory(notes) == []
+
+    payload = json.loads((tmp_path / 'working_memory.json').read_text(encoding='utf-8'))
+    assert payload['plan'].count('keep the hot path deterministic') == 1
+
+
 def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         'backend.core.workspace_resolution.workspace_agent_state_dir',

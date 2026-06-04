@@ -334,6 +334,15 @@ class _SessionOrchestratorParallelMixin:
                     state_copy.history = list(history) if history else []
 
                     async def _run_bg():
+                        import inspect
+
+                        background_compact = getattr(
+                            compactor, 'compacted_history_background', None
+                        )
+                        if callable(background_compact):
+                            background_result = background_compact(state_copy)
+                            if inspect.isawaitable(background_result):
+                                return await background_result
                         return await compactor.compacted_history(state_copy)
 
                     self.memory_pressure.start_prewarm(_run_bg)

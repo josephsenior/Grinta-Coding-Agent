@@ -146,6 +146,15 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             'enable_vector_memory and the optional [rag] extra.'
         ),
     )
+    prompt_render_cache_enabled: bool = Field(
+        default=True,
+        description='Cache pure event-to-message prompt rendering between turns.',
+    )
+    prompt_render_cache_max_entries: int = Field(
+        default=1024,
+        ge=0,
+        description='Maximum cached event render entries; 0 disables the cache.',
+    )
     disabled_playbooks: list[str] = Field(
         default_factory=list, description='List of playbooks disabled for this agent'
     )

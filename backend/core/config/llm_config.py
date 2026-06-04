@@ -148,6 +148,34 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     max_output_tokens: int | None = Field(
         default=None, ge=1, description='The maximum number of output tokens'
     )
+    prompt_history_windowing_enabled: bool = Field(
+        default=True,
+        description='Bound rendered conversation history before prompt assembly.',
+    )
+    prompt_history_token_budget: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            'Optional explicit token budget for rendered conversation history. '
+            'When unset, max_input_tokens * prompt_history_budget_ratio is used.'
+        ),
+    )
+    prompt_history_budget_ratio: float = Field(
+        default=0.50,
+        ge=0.05,
+        le=0.95,
+        description='Fraction of max_input_tokens reserved for conversation history.',
+    )
+    prompt_history_min_events: int = Field(
+        default=150,
+        ge=1,
+        description='Minimum event count before count-based prompt windowing can activate.',
+    )
+    prompt_history_max_events: int = Field(
+        default=240,
+        ge=1,
+        description='Safety cap for rendered prompt history events after causal windowing.',
+    )
     input_cost_per_token: float | None = Field(
         default=None, ge=0.0, description='The cost per input token'
     )
