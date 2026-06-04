@@ -48,12 +48,11 @@ class ConfirmWidget(Widget):
 
     DEFAULT_CSS = """
     ConfirmWidget {
-        height: 3;
-        max-height: 3;
+        height: auto;
         background: #0a1222;
         border-top: tall #1a2744;
         border-bottom: tall #1a2744;
-        padding: 0 1;
+        padding: 1 1 0 1;
         display: none;
     }
     ConfirmWidget.-visible {
@@ -61,28 +60,24 @@ class ConfirmWidget(Widget):
     }
     ConfirmWidget #confirm-bar {
         layout: horizontal;
-        height: 1;
+        height: 3;
         align: left middle;
     }
     ConfirmWidget #confirm-info {
         width: 1fr;
-        height: 1;
+        height: 3;
         color: #cbd5e1;
         padding: 0 1 0 0;
         content-align: left middle;
     }
     ConfirmWidget #confirm-actions {
         width: auto;
-        height: 1;
+        height: 3;
         align: right middle;
         margin-left: 1;
     }
     ConfirmWidget #confirm-actions Button {
-        min-width: 0;
-        width: auto;
         margin-left: 1;
-        height: 1;
-        padding: 0 2;
     }
     ConfirmWidget Button.-primary {
         background: #2563eb;
