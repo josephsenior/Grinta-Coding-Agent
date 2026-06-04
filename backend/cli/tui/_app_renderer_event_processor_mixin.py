@@ -178,11 +178,15 @@ class _AppRendererEventProcessorMixin:
                 return False
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
             source_tool = getattr(event, 'source_tool', '') or ''
-            intent = self._classify_thinking_text(thought, source_tool=source_tool)
+            kind = getattr(event, 'kind', '') or ''
+            intent = self._classify_thinking_text(
+                thought, source_tool=source_tool, kind=kind
+            )
             return intent.kind == 'thinking'
         if isinstance(event, AgentThinkObservation):
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-            intent = self._classify_thinking_text(thought)
+            kind = getattr(event, 'kind', '') or ''
+            intent = self._classify_thinking_text(thought, kind=kind)
             return intent.kind == 'thinking'
         return isinstance(event, StreamingChunkAction)
 
@@ -508,10 +512,14 @@ class _AppRendererEventProcessorMixin:
         elif isinstance(event, AgentThinkAction):
             source_tool = getattr(event, 'source_tool', '') or ''
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-            self._render_thinking_payload(thought, source_tool=source_tool)
+            kind = getattr(event, 'kind', '') or ''
+            self._render_thinking_payload(
+                thought, source_tool=source_tool, kind=kind
+            )
         elif isinstance(event, AgentThinkObservation):
             thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-            self._render_thinking_payload(thought)
+            kind = getattr(event, 'kind', '') or ''
+            self._render_thinking_payload(thought, kind=kind)
         elif isinstance(event, BrowserToolAction):
             action_name = getattr(event, 'command', 'browser') or 'browser'
             url = ''

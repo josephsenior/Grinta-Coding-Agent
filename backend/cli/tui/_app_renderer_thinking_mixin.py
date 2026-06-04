@@ -95,20 +95,17 @@ class _AppRendererThinkingMixin:
         text: str,
         *,
         source_tool: str = '',
+        kind: str = '',
     ) -> ThinkingRenderIntent:
         thought = self._canonical_thinking_text(text)
         if not self._is_visible_thinking_text(thought):
             return ThinkingRenderIntent(kind='suppress')
 
-        if '[TOOL_CALL_RECOVERABLE_ERROR]' in thought:
-            cleaned_error = thought.replace('[TOOL_CALL_RECOVERABLE_ERROR]', '').strip()
-            prefix1 = "The previous tool call was invalid and was not executed. Details:"
-            if cleaned_error.startswith(prefix1):
-                cleaned_error = cleaned_error[len(prefix1):].strip()
-            lines = cleaned_error.splitlines()
-            detail_line = lines[0].strip() if lines else cleaned_error
-            if detail_line.lower().startswith("details:"):
-                detail_line = detail_line[8:].strip()
+        if kind in (
+            'recoverable_error',
+            'recoverable_error_escalated',
+        ):
+            detail_line = self._first_meaningful_line(thought)
             return ThinkingRenderIntent(
                 kind='error',
                 text=thought,
@@ -116,17 +113,11 @@ class _AppRendererThinkingMixin:
                 tag='ERROR',
             )
 
-        if '[TOOL_CALL_RECOVERABLE_ERROR_ESCALATED]' in thought:
-            cleaned_error = thought.replace('[TOOL_CALL_RECOVERABLE_ERROR_ESCALATED]', '').strip()
-            return ThinkingRenderIntent(
-                kind='error',
-                text=thought,
-                detail=cleaned_error,
-                tag='ERROR',
+        if kind == 'truncated':
+            detail_line = (
+                "Previous tool call arguments were stream-truncated "
+                "(JSON never closed)."
             )
-
-        if '[TOOL_CALL_TRUNCATED]' in thought:
-            detail_line = "Previous tool call arguments were stream-truncated (JSON never closed)."
             return ThinkingRenderIntent(
                 kind='error',
                 text=thought,
@@ -203,6 +194,14 @@ class _AppRendererThinkingMixin:
 
         return ThinkingRenderIntent(kind='thinking', text=thought)
 
+    @staticmethod
+    def _first_meaningful_line(text: str) -> str:
+        for line in (text or '').splitlines():
+            stripped = line.strip()
+            if stripped:
+                return stripped
+        return (text or '').strip()
+
     def _should_render_thinking_text(self, text: str) -> bool:
         thought = self._canonical_thinking_text(text)
         if not self._is_visible_thinking_text(thought):
@@ -230,9 +229,12 @@ class _AppRendererThinkingMixin:
         *,
         source_tool: str = '',
         finalize: bool = False,
+        kind: str = '',
     ) -> bool:
         """Render a thinking-like payload according to its normalized intent."""
-        intent = self._classify_thinking_text(text, source_tool=source_tool)
+        intent = self._classify_thinking_text(
+            text, source_tool=source_tool, kind=kind
+        )
         if intent.kind == 'suppress':
             return True
 

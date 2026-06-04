@@ -1996,7 +1996,8 @@ async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config)
 
         renderer._process_event(
             AgentThinkAction(
-                thought="[TOOL_CALL_RECOVERABLE_ERROR] Details: Invalid task status 'doing'. Use one of: blocked, in_progress, done, skipped, todo."
+                thought="Invalid task status 'doing'. Use one of: blocked, in_progress, done, skipped, todo.",
+                kind=AgentThinkAction.KIND_RECOVERABLE_ERROR,
             )
         )
         # The mock config causes the background bootstrap to fail with an

@@ -133,7 +133,8 @@ class _AppRendererActionHandlersMixin:
 
         thought = (getattr(action, 'thought', '') or '').strip()
         if thought:
-            self._render_thinking_payload(thought, finalize=True)
+            kind = getattr(action, 'kind', '') or ''
+            self._render_thinking_payload(thought, finalize=True, kind=kind)
 
         content = (getattr(action, 'content', '') or '').strip()
         if not content:

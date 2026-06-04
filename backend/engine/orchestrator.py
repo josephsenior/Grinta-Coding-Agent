@@ -523,18 +523,20 @@ class Orchestrator(Agent):
         ):
             return AgentThinkAction(
                 thought=(
-                    '[TOOL_CALL_RECOVERABLE_ERROR_ESCALATED] The same invalid tool call pattern '
+                    'The same invalid tool call pattern '
                     'repeated 3 times and was blocked. You must change strategy now: '
                     're-read relevant file context and emit a different corrected action '
                     '(or switch tool), not a near-identical retry.'
-                )
+                ),
+                kind=AgentThinkAction.KIND_RECOVERABLE_ERROR_ESCALATED,
             )
 
         return AgentThinkAction(
             thought=(
-                f'[TOOL_CALL_RECOVERABLE_ERROR] {str(e)}\n'
+                f'{str(e)}\n'
                 'Please emit a corrected tool call with valid JSON arguments.'
-            )
+            ),
+            kind=AgentThinkAction.KIND_RECOVERABLE_ERROR,
         )
 
     async def astep(self, state: State) -> Action:
