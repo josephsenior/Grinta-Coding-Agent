@@ -125,7 +125,7 @@ class _AppRendererThinkingMixin:
                 tag='ERROR',
             )
 
-        if source_tool == 'search_code' or '<search_results>' in thought:
+        if source_tool == 'search_code' or '[SEARCH_RESULTS]' in thought:
             return ThinkingRenderIntent(
                 kind='search',
                 text=thought,

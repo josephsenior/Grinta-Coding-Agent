@@ -93,7 +93,7 @@ def _normalize_search_inputs(pattern: str, file_pattern: str) -> tuple[str, str]
 def _invalid_search_regex_action(message: str) -> AgentThinkAction:
     return AgentThinkAction(
         source_tool='search_code',
-        thought=f'<search_results>\n{message}\n</search_results>',
+        thought=f'[SEARCH_RESULTS]\n{message}',
     )
 
 
@@ -216,7 +216,7 @@ def _python_search_file_matches(
 
 
 def _search_results_action(content: str) -> AgentThinkAction:
-    return AgentThinkAction(thought=f'<search_results>\n{content}\n</search_results>')
+    return AgentThinkAction(thought=f'[SEARCH_RESULTS]\n{content}')
 
 
 def create_search_code_tool() -> dict:
@@ -525,7 +525,7 @@ def _search_with_python(
     if not os.path.exists(path):
         return AgentThinkAction(
             source_tool='search_code',
-            thought=f'<search_results>\nPath does not exist: {path}\n</search_results>',
+            thought=f'[SEARCH_RESULTS]\nPath does not exist: {path}',
         )
 
     regex, regex_error = _compile_python_search_regex(

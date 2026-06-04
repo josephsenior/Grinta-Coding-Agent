@@ -199,7 +199,7 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
     def _append_assistant_body(self, display_content: str) -> None:
         """Render the body of an assistant message that isn't a tool JSON."""
         s = display_content.strip()
-        if '<search_results>' in s:
+        if '[SEARCH_RESULTS]' in s:
             summary = self._summarize_search_results_block(s)
             self._append_history(Text(summary, style=LIVE_PANEL_ACCENT_STYLE))
             return
