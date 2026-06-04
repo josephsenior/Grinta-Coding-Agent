@@ -242,6 +242,16 @@ class AgentThinkAction(Action):
         source_tool (str): When set, identifies the tool that produced this think action
             (e.g. 'checkpoint') so the CLI can render a proper
             activity row instead of generic reasoning text.
+        kind (str): Internal classification tag used by the renderer to decide how
+            to display the thought. Empty string means a normal reasoning thought.
+            Known values:
+              - ``'recoverable_error'`` -- the LLM's last tool call was invalid and
+                the thought contains recovery guidance. Render as an error card.
+              - ``'recoverable_error_escalated'`` -- the same recoverable error has
+                fired repeatedly and was blocked. Render as a louder error card.
+              - ``'truncated'`` -- the LLM's tool call arguments were stream-truncated.
+                Render as an error card.
+            The kind is metadata only and is NOT included in the LLM-facing text.
         action (str): The action type, namely ActionType.THINK.
 
     """
@@ -249,7 +259,12 @@ class AgentThinkAction(Action):
     thought: str = ''
     suppress_cli: bool = False
     source_tool: str = ''
+    kind: str = ''
     action: ClassVar[str] = ActionType.THINK
+
+    KIND_RECOVERABLE_ERROR: ClassVar[str] = 'recoverable_error'
+    KIND_RECOVERABLE_ERROR_ESCALATED: ClassVar[str] = 'recoverable_error_escalated'
+    KIND_TRUNCATED: ClassVar[str] = 'truncated'
 
     @property
     def message(self) -> str:

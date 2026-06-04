@@ -1235,7 +1235,8 @@ def test_response_to_actions_converts_core_tool_call_validation_error_to_recover
 
     assert len(actions) == 1
     assert isinstance(actions[0], AgentThinkAction)
-    assert '[TOOL_CALL_RECOVERABLE_ERROR]' in (actions[0].thought or '')
+    assert '[TOOL_CALL_RECOVERABLE_ERROR]' not in (actions[0].thought or '')
+    assert actions[0].kind == AgentThinkAction.KIND_RECOVERABLE_ERROR
     assert 'bad JSON arguments' in (actions[0].thought or '')
 
 
@@ -1303,7 +1304,8 @@ def test_response_to_actions_converts_common_tool_call_validation_error_to_recov
 
     assert len(actions) == 1
     assert isinstance(actions[0], AgentThinkAction)
-    assert '[TOOL_CALL_RECOVERABLE_ERROR]' in (actions[0].thought or '')
+    assert '[TOOL_CALL_RECOVERABLE_ERROR]' not in (actions[0].thought or '')
+    assert actions[0].kind == AgentThinkAction.KIND_RECOVERABLE_ERROR
     assert 'malformed tool call payload' in (actions[0].thought or '')
 
 

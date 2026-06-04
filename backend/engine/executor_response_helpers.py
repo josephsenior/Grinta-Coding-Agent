@@ -65,15 +65,16 @@ def build_recoverable_tool_call_error_action(exc: Exception) -> Action:
     if isinstance(exc, TruncatedToolArgumentsError):
         return AgentThinkAction(
             thought=(
-                '[TOOL_CALL_TRUNCATED] The previous tool call arguments were '
-                'stream-truncated — the JSON object was never closed, meaning '
-                'the model stopped generating before finishing the payload. '
+                'The previous tool call arguments were stream-truncated — '
+                'the JSON object was never closed, meaning the model stopped '
+                'generating before finishing the payload. '
                 'This commonly happens with very large file bodies. '
                 'Please re-issue the same tool call with the complete, valid '
                 'JSON arguments. If the file body is very large, consider '
                 'splitting it: create a minimal stub first, then extend with '
                 'replace_string or symbol edits.'
-            )
+            ),
+            kind=AgentThinkAction.KIND_TRUNCATED,
         )
 
     detail = str(exc).strip() or exc.__class__.__name__
@@ -89,10 +90,11 @@ def build_recoverable_tool_call_error_action(exc: Exception) -> Action:
 
     return AgentThinkAction(
         thought=(
-            f'[TOOL_CALL_RECOVERABLE_ERROR] {detail}\n'
+            f'{detail}\n'
             f'{extra_hint}'
             'Recover by emitting one corrected tool call with strict JSON arguments.'
-        )
+        ),
+        kind=AgentThinkAction.KIND_RECOVERABLE_ERROR,
     )
 
 
