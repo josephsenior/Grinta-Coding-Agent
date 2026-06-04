@@ -56,7 +56,7 @@ class _EventRendererActivityMixin(CLIEventRenderer if TYPE_CHECKING else object)
     @staticmethod
     def _search_results_payload(s: str) -> str:
         m = re.search(
-            r'<search_results>\s*(?P<payload>.*?)\s*</search_results>', s, re.S
+            r'\[SEARCH_RESULTS\]\s*(?P<payload>.*)', s, re.S
         )
         return m.group('payload') if m else s
 

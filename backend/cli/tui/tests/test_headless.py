@@ -1918,7 +1918,7 @@ async def test_tui_search_results_in_thinking_payload_render_as_card(mock_config
 
         renderer._process_event(
             AgentThinkAction(
-                thought='<search_results>\nbackend/app.py:12:render thinking\n</search_results>'
+                thought='[SEARCH_RESULTS]\nbackend/app.py:12:render thinking'
             )
         )
         await pilot.pause()

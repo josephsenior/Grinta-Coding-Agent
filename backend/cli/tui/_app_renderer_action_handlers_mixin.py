@@ -32,8 +32,8 @@ class _AppRendererActionHandlersMixin:
         """Handle search_code action and render as a card."""
         import re
 
-        # Strip <search_results> tags
-        content = re.sub(r'</?search_results>', '', thought).strip()
+        # Strip the [SEARCH_RESULTS] opener only (no close tag is emitted)
+        content = re.sub(r'^\[SEARCH_RESULTS\]\s*', '', thought).strip()
         if not content:
             return
 
