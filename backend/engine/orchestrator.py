@@ -16,6 +16,7 @@ import asyncio
 import contextlib
 import os
 import re
+import time
 from collections import deque
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -410,6 +411,25 @@ class Orchestrator(Agent):
         except Exception:
             logger.debug('Failed to emit compaction status', exc_info=True)
 
+    def _emit_compaction_status_if_needed(self, state: State) -> bool:
+        """Emit compaction status before a foreground condensation blocks."""
+        predictor = getattr(
+            self.memory_manager,
+            'should_emit_compaction_status',
+            None,
+        )
+        if not callable(predictor):
+            return False
+        try:
+            should_emit = bool(predictor(state))
+        except Exception:
+            logger.debug('Failed to predict compaction status', exc_info=True)
+            return False
+        if not should_emit:
+            return False
+        self._emit_compaction_status()
+        return True
+
     def _reset_step_recovery_counters(self) -> None:
         """Clear context-limit and recoverable tool-call replay counters."""
         self._consecutive_context_errors = 0
@@ -435,8 +455,9 @@ class Orchestrator(Agent):
             self._reset_step_recovery_counters()
             return pending
 
+        emitted_compaction_status = self._emit_compaction_status_if_needed(state)
         condensed = await self.memory_manager.condense_history(state)
-        if condensed.pending_action is not None:
+        if condensed.pending_action is not None and not emitted_compaction_status:
             self._emit_compaction_status()
         action = await self._execute_llm_step_async(state, condensed)
         if not _is_unbreached_plain_text_gate_sentinel(action):
@@ -464,8 +485,9 @@ class Orchestrator(Agent):
             ) from None
 
         try:
+            emitted_compaction_status = self._emit_compaction_status_if_needed(state)
             condensed = await self.memory_manager.condense_history(state)
-            if condensed.pending_action is not None:
+            if condensed.pending_action is not None and not emitted_compaction_status:
                 self._emit_compaction_status()
             action = await self._execute_llm_step_async(state, condensed)
             self._consecutive_context_errors = 0
@@ -532,10 +554,8 @@ class Orchestrator(Agent):
 
         return AgentThinkAction(
             thought=(
-                '[TOOL_CALL_RECOVERABLE_ERROR] The previous tool call was invalid and was not executed. '
-                f'Details: {str(e)}\n'
-                'I will emit one corrected tool call with valid JSON arguments '
-                '(double-quoted keys/strings, escaped newlines/quotes, required arguments present).'
+                f'[TOOL_CALL_RECOVERABLE_ERROR] {str(e)}\n'
+                'Please emit a corrected tool call with valid JSON arguments.'
             )
         )
 
@@ -706,11 +726,14 @@ class Orchestrator(Agent):
         )
 
         def _prepare_params() -> dict[str, Any]:
+            prepare_started = time.perf_counter()
+            messages_started = time.perf_counter()
             messages = self.memory_manager.build_messages(
                 condensed_history=condensed.events,
                 initial_user_message=initial_user_message,
                 llm_config=self.llm.config,
             )
+            messages_elapsed = time.perf_counter() - messages_started
             _prompt_role_debug.log_prompt_roles_after_build_messages(
                 messages,
                 astep_id=astep_id,
@@ -718,10 +741,35 @@ class Orchestrator(Agent):
                 pending_condensation=condensed.pending_action is not None,
                 history_event_count=len(state.history),
             )
+            serialize_started = time.perf_counter()
             serialized_messages = message_serializer.serialize_messages(messages)
-            return self.planner.build_llm_params(serialized_messages, state, self.tools)
+            serialize_elapsed = time.perf_counter() - serialize_started
+            planner_started = time.perf_counter()
+            params = self.planner.build_llm_params(
+                serialized_messages, state, self.tools
+            )
+            logger.info(
+                'Orchestrator._prepare_params built params '
+                '(history_events=%d condensed_events=%d messages=%d '
+                'pending_condensation=%s build_messages=%.3fs serialize=%.3fs '
+                'planner=%.3fs elapsed=%.3fs)',
+                len(state.history),
+                len(condensed.events),
+                len(messages),
+                condensed.pending_action is not None,
+                messages_elapsed,
+                serialize_elapsed,
+                time.perf_counter() - planner_started,
+                time.perf_counter() - prepare_started,
+            )
+            return params
 
+        params_started = time.perf_counter()
         params = await asyncio.to_thread(_prepare_params)
+        logger.info(
+            'Orchestrator._execute_llm_step_async prepared LLM params in %.3fs',
+            time.perf_counter() - params_started,
+        )
         self._sync_executor_llm()
 
         try:
@@ -888,7 +936,7 @@ class Orchestrator(Agent):
         fallback.source = EventSource.AGENT
         executor = getattr(self, 'executor', None)
         gate = getattr(executor, '_gate_agent_mode_plain_text', None)
-        if _safe_executor_has_active_tasks(executor) and callable(gate):
+        if isinstance(executor, OrchestratorExecutor) and callable(gate):
             try:
                 gated_actions = list(gate([fallback], result.response))
             except Exception:
@@ -906,10 +954,9 @@ class Orchestrator(Agent):
         ``suppress_cli=True`` and ``wait_for_response=False`` so the loop
         continues. Returned as-is.
 
-        Threshold breach: surface the suppressed text so the user actually
-        sees it, and switch ``wait_for_response=True`` so the loop yields
-        control back to the user. ``suppress_cli`` is dropped so the renderer
-        emits the text normally.
+        Threshold breach: surface a protocol message, not the suppressed model
+        prose, and switch ``wait_for_response=True`` so the loop yields control
+        back to the user.
         """
         from backend.ledger.action.message import MessageAction as _MessageAction
 
@@ -917,14 +964,13 @@ class Orchestrator(Agent):
             return sentinel
         if not breached:
             return sentinel
-        suppressed = getattr(sentinel, '_gate_suppressed_text', '') or ''
-        suppressed_actions = getattr(sentinel, '_gate_suppressed_actions', None) or []
-        thought = ''
-        for orig in suppressed_actions:
-            thought = getattr(orig, 'thought', '') or thought
         promoted = _MessageAction(
-            content=suppressed,
-            thought=thought,
+            content=(
+                'Protocol error: Agent mode requires an action, but the model '
+                'produced plain text repeatedly. I stopped instead of treating '
+                'that text as a final answer. Please retry or switch to Chat mode '
+                'for free-form conversation.'
+            ),
             wait_for_response=True,
             suppress_cli=False,
         )

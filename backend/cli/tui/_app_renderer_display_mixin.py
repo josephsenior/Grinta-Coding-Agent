@@ -300,6 +300,51 @@ class _AppRendererDisplayMixin:
         display.append_widget(widget)
         return widget
 
+    def _update_activity_card_outcome(
+        self,
+        widget: Any,
+        *,
+        status: str,
+        outcome: str | None = None,
+        extra_content: str | None = None,
+        collapse: bool = True,
+        operation_label: str | None = None,
+    ) -> None:
+        """Update an in-flight activity card to its final state in-place.
+
+        Used to merge an action card with its observation card so the user only
+        sees a single transition (e.g. ``• Analyzed`` → ``✓ Analyzed completed``)
+        instead of two separate cards.
+        """
+        if widget is None:
+            return
+        if self._last_active_card is widget:
+            self._last_active_card = None
+        try:
+            widget.set_processing(False)
+        except Exception:
+            pass
+        try:
+            widget.set_status(status, outcome=outcome)
+        except Exception:
+            pass
+        if extra_content is not None:
+            try:
+                widget.update_content(extra_content)
+            except Exception:
+                pass
+        if collapse:
+            try:
+                widget.collapse()
+            except Exception:
+                pass
+        if operation_label is not None:
+            self._tui.set_current_operation(
+                operation_label,
+                meta=outcome or 'Completed',
+                active=False,
+            )
+
     def _write_tui_file_card(
         self,
         verb: str,

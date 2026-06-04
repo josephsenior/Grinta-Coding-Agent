@@ -85,11 +85,11 @@ class TestBuildFallbackAction:
         assert isinstance(action, MessageAction)
         assert action.wait_for_response is True
 
-    def test_active_task_fallback_text_uses_plain_text_gate(self) -> None:
+    def test_agent_mode_fallback_text_uses_plain_text_gate(self) -> None:
         orch = _make_orchestrator()
         executor = TestPlainTextProtocolGate()._make_executor(
             'agent',
-            active_tasks=True,
+            active_tasks=False,
         )
         orch.executor = executor
         callbacks: list[tuple[str, int]] = []
@@ -105,11 +105,11 @@ class TestBuildFallbackAction:
         assert executor._consecutive_plain_text_blocks == 1
         assert callbacks == [('under_threshold', 1)]
 
-    def test_active_task_fallback_gate_breach_yields_to_user(self) -> None:
+    def test_agent_mode_fallback_gate_breach_yields_protocol_message(self) -> None:
         orch = _make_orchestrator()
         executor = TestPlainTextProtocolGate()._make_executor(
             'agent',
-            active_tasks=True,
+            active_tasks=False,
         )
         executor._consecutive_plain_text_blocks = executor._PLAIN_TEXT_GATE_MAX_RETRIES
         orch.executor = executor
@@ -119,7 +119,8 @@ class TestBuildFallbackAction:
         action = _build_fallback_action(orch, _make_result('plain answer'))
 
         assert isinstance(action, MessageAction)
-        assert action.content == 'plain answer'
+        assert 'Protocol error' in action.content
+        assert 'plain answer' not in action.content
         assert action.wait_for_response is True
         assert action.suppress_cli is False
         assert executor._consecutive_plain_text_blocks == 0
@@ -146,7 +147,7 @@ class TestPlainTextProtocolGate:
 
         assert result == [action]
 
-    def test_agent_mode_without_active_tasks_preserves_existing_plain_text_behavior(
+    def test_agent_mode_without_active_tasks_emits_suppressed_sentinel(
         self,
     ):
         executor = self._make_executor('agent', active_tasks=False)
@@ -156,7 +157,15 @@ class TestPlainTextProtocolGate:
             [action], _make_result('plain').response
         )
 
-        assert result == [action]
+        assert len(result) == 1
+        sentinel = result[0]
+        assert isinstance(sentinel, MessageAction)
+        assert sentinel.content == ''
+        assert sentinel.wait_for_response is False
+        assert sentinel.suppress_cli is True
+        assert sentinel._gate_suppressed_text == 'plain answer'
+        assert sentinel._gate_suppressed_actions == [action]
+        assert sentinel._gate_threshold_breach is False
 
     def test_agent_mode_with_active_tasks_emits_suppressed_sentinel(self):
         """Gate must return a sentinel (not an empty list) carrying the
@@ -185,8 +194,8 @@ class TestPlainTextProtocolGate:
 
     def test_threshold_breach_marks_sentinel(self):
         """After _PLAIN_TEXT_GATE_MAX_RETRIES + 1 consecutive gate fires, the
-        sentinel is marked as a threshold breach so the orchestrator promotes
-        the suppressed text and yields to the user.
+        sentinel is marked as a threshold breach so the orchestrator stops with
+        a protocol message instead of surfacing the suppressed text.
         """
         executor = self._make_executor('agent', active_tasks=True)
         action = MessageAction(content='plain answer')
@@ -239,7 +248,7 @@ class TestPlainTextProtocolGate:
 
         # The most recent directive should mention the breach.
         args, _ = state.set_planning_directive.call_args
-        assert 'surface' in args[0].lower()
+        assert 'stop' in args[0].lower()
 
     def test_plan_mode_allows_plain_text_without_task_tracker_state(self):
         executor = self._make_executor('plan', active_tasks=False)

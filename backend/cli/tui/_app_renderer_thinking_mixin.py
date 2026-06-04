@@ -28,6 +28,7 @@ ThinkingIntentKind = Literal[
     'code',
     'tool',
     'suppress',
+    'error',
 ]
 
 
@@ -98,6 +99,40 @@ class _AppRendererThinkingMixin:
         thought = self._canonical_thinking_text(text)
         if not self._is_visible_thinking_text(thought):
             return ThinkingRenderIntent(kind='suppress')
+
+        if '[TOOL_CALL_RECOVERABLE_ERROR]' in thought:
+            cleaned_error = thought.replace('[TOOL_CALL_RECOVERABLE_ERROR]', '').strip()
+            prefix1 = "The previous tool call was invalid and was not executed. Details:"
+            if cleaned_error.startswith(prefix1):
+                cleaned_error = cleaned_error[len(prefix1):].strip()
+            lines = cleaned_error.splitlines()
+            detail_line = lines[0].strip() if lines else cleaned_error
+            if detail_line.lower().startswith("details:"):
+                detail_line = detail_line[8:].strip()
+            return ThinkingRenderIntent(
+                kind='error',
+                text=thought,
+                detail=detail_line,
+                tag='ERROR',
+            )
+
+        if '[TOOL_CALL_RECOVERABLE_ERROR_ESCALATED]' in thought:
+            cleaned_error = thought.replace('[TOOL_CALL_RECOVERABLE_ERROR_ESCALATED]', '').strip()
+            return ThinkingRenderIntent(
+                kind='error',
+                text=thought,
+                detail=cleaned_error,
+                tag='ERROR',
+            )
+
+        if '[TOOL_CALL_TRUNCATED]' in thought:
+            detail_line = "Previous tool call arguments were stream-truncated (JSON never closed)."
+            return ThinkingRenderIntent(
+                kind='error',
+                text=thought,
+                detail=detail_line,
+                tag='ERROR',
+            )
 
         if source_tool == 'search_code' or '<search_results>' in thought:
             return ThinkingRenderIntent(
@@ -291,6 +326,19 @@ class _AppRendererThinkingMixin:
                 badge_category='tool',
                 title='Tool',
                 body=text,
+            )
+
+        if intent.kind == 'error':
+            return ActivityCard(
+                verb='Invalid Tool Call',
+                detail=intent.detail,
+                badge_category='error',
+                title='Error',
+                secondary='failed',
+                secondary_kind='err',
+                extra_lines=[],
+                is_collapsible=False,
+                start_collapsed=True,
             )
 
         return None

@@ -23,6 +23,14 @@ THINK_STRIP_RE = re.compile(
     r'<(?:redacted_thinking|think)>.*?(?:</(?:redacted_thinking|think)>|$)',
     re.DOTALL | re.IGNORECASE,
 )
+# Strip only *closed* think blocks when building the streaming display preview.
+# THINK_STRIP_RE uses |$ which eats everything after an unclosed opening tag,
+# causing sentence merging on subsequent streaming chunks.  This variant
+# requires the explicit closing tag so partial blocks are left untouched.
+THINK_STRIP_CLOSED_RE = re.compile(
+    r'<(?:redacted_thinking|think)>.*?</(?:redacted_thinking|think)>',
+    re.DOTALL | re.IGNORECASE,
+)
 INTERNAL_THINK_TAG_RE = re.compile(
     r'^\[(?P<tag>[A-Z0-9_]+)\](?:\s*(?P<payload>.*))?$',
     re.DOTALL,

@@ -202,12 +202,19 @@ class MCPClient(BaseModel):
                 cwd = str(Path.cwd().resolve())
             except OSError:
                 cwd = None
+
+        from backend.core.logger import get_log_dir
+        log_dir = get_log_dir()
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = Path(log_dir) / f"mcp_{cfg.name}_stderr.log"
+
         transport = StdioTransport(
             command=cfg.command,
             args=cfg.args or [],
             env=cfg.env,
             cwd=cwd,
             keep_alive=False,
+            log_file=log_file,
         )
         self.client = Client(transport, timeout=_mcp_reconnect_session_timeout_sec())
 
@@ -358,12 +365,19 @@ class MCPClient(BaseModel):
                     cwd = str(Path.cwd().resolve())
                 except OSError:
                     cwd = None
+
+            from backend.core.logger import get_log_dir
+            log_dir = get_log_dir()
+            os.makedirs(log_dir, exist_ok=True)
+            log_file = Path(log_dir) / f"mcp_{server.name}_stderr.log"
+
             transport = StdioTransport(
                 command=server.command,
                 args=server.args or [],
                 env=server.env,
                 cwd=cwd,
                 keep_alive=False,
+                log_file=log_file,
             )
             self.client = Client(transport, timeout=connect_timeout)
             self._server_config = server

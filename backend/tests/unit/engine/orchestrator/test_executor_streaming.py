@@ -49,6 +49,36 @@ def _mark_checkpoint_stale(checkpoint) -> None:
     checkpoint._wal_path.write_text(json.dumps(raw), encoding='utf-8')
 
 
+def test_final_stream_event_with_tool_call_suppresses_draft_reply():
+    from backend.engine.executor import OrchestratorExecutor
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=MagicMock(),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+    event_stream = MagicMock()
+
+    executor._emit_final_stream_event(
+        event_stream,
+        content_accumulate='I will inspect the workspace.',
+        visible_accum='I will inspect the workspace.',
+        tool_calls_list=[
+            {
+                'id': 'call_1',
+                'type': 'function',
+                'function': {'name': 'read', 'arguments': '{}'},
+            }
+        ],
+    )
+
+    emitted = event_stream.add_event.call_args.args[0]
+    assert emitted.is_final is True
+    assert emitted.accumulated == ''
+    assert emitted.suppress_live_response is True
+
+
 def test_executor_emits_streaming_chunk_actions(monkeypatch):
     """Executor should emit StreamingChunkAction events even when provider streaming is unavailable."""
     # The executor keeps a proxy to a module name under the `app.*` namespace.
@@ -1031,10 +1061,10 @@ def test_get_checkpoint_blocks_resumed_session_without_superseding_control_event
         resumed_stream.close()
 
 
-def test_response_to_actions_passes_through_plain_message_after_guard_disabled(
+def test_response_to_actions_gates_plain_message_in_agent_mode(
     monkeypatch,
 ):
-    """Hallucination guard is disabled — plain messages always pass through."""
+    """Agent mode is action-only; plain messages become suppressed sentinels."""
     from backend.engine import executor as executor_module
     from backend.engine.executor import OrchestratorExecutor
     from backend.ledger.action import MessageAction
@@ -1067,10 +1097,13 @@ def test_response_to_actions_passes_through_plain_message_after_guard_disabled(
     actions = executor._response_to_actions(response)
 
     assert len(actions) == 1
-    assert actions[0].content == "I've created grinta_feedback.md for you."  # type: ignore
+    assert isinstance(actions[0], MessageAction)
+    assert actions[0].content == ''
+    assert actions[0].suppress_cli is True
+    assert actions[0]._gate_suppressed_text == "I've created grinta_feedback.md for you."  # type: ignore[attr-defined]
 
 
-def test_response_to_actions_allows_conversational_plain_message(monkeypatch):
+def test_response_to_actions_gates_conversational_plain_message(monkeypatch):
     from backend.engine import executor as executor_module
     from backend.engine.executor import OrchestratorExecutor
     from backend.ledger.action import MessageAction
@@ -1106,8 +1139,10 @@ def test_response_to_actions_allows_conversational_plain_message(monkeypatch):
 
     assert len(actions) == 1
     assert isinstance(actions[0], MessageAction)
+    assert actions[0].content == ''
+    assert actions[0].suppress_cli is True
     assert (
-        actions[0].content
+        actions[0]._gate_suppressed_text  # type: ignore[attr-defined]
         == 'I have prepared a rating of the system and the tools for you.'
     )
 
@@ -1252,3 +1287,40 @@ def test_response_to_actions_converts_common_tool_call_validation_error_to_recov
     assert isinstance(actions[0], AgentThinkAction)
     assert '[TOOL_CALL_RECOVERABLE_ERROR]' in (actions[0].thought or '')
     assert 'malformed tool call payload' in (actions[0].thought or '')
+
+
+def test_fallback_completion_inline_thinking_parsing():
+    """Verify that fallback completions containing inline thinking tags are parsed correctly."""
+    from backend.engine._executor_types import _AsyncStreamingState
+    from backend.engine.executor import OrchestratorExecutor
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=MagicMock(),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    state = _AsyncStreamingState()
+    # Partially accumulated stream content:
+    state.content_accumulate = 'Let me start by:\n1. Doing research\n2. Exploring the current directory to '
+    state.thinking_accumulate = 'Raft-based key-value store simulation.'
+
+    # Non-streaming fallback response carrying both inline thinking and full content:
+    fallback_text = (
+        "<think>Raft-based key-value store simulation.</think>"
+        "Let me start by:\n1. Doing research\n2. Exploring the current directory to understand what's there"
+    )
+    fallback = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content=fallback_text))]
+    )
+
+    # Apply fallback
+    import anyio
+    anyio.run(executor._apply_fallback_completion, fallback, state, None)
+
+    # Check results: content and thinking should be parsed and merged with no duplicates!
+    assert state.thinking_accumulate == 'Raft-based key-value store simulation.'
+    assert state.content_accumulate == (
+        "Let me start by:\n1. Doing research\n2. Exploring the current directory to understand what's there"
+    )

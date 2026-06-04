@@ -257,6 +257,7 @@ class TUIRenderer(
         self._live_response_widget: Any | None = None
         self._task_list: list[dict[str, Any]] = []
         self._last_sidebar_state: Any = None
+        self._streaming_active: bool = False
 
         # Unit test compatibility
         self._history: list[Any] = []
@@ -288,6 +289,9 @@ class TUIRenderer(
         self._last_active_card: Any | None = None
         self._last_browser_action_card: Any | None = None
         self._last_browser_cmd: str = ''
+        self._pending_lsp_card: Any | None = None
+        self._pending_mcp_card: Any | None = None
+        self._pending_delegate_card: Any | None = None
 
 
 # ── Re-exports for backward compatibility ──

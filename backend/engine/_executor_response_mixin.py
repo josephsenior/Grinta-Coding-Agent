@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from backend.core.interaction_modes import (
+    AGENT_MODE,
     is_chat_mode,
     normalize_interaction_mode,
 )
@@ -64,10 +65,11 @@ class _ExecutorResponseMixin:
     def _gate_agent_mode_plain_text(
         self, actions: list[Action], response: ModelResponse
     ) -> list[Action]:
-        """Block plain-text responses in AGENT mode when active tasks exist.
+        """Block plain-text responses in Agent mode.
 
-        Plan mode is not gated here — the prompt guidance and tool filtering
-        handle the preference for structured finish() calls.
+        Chat and Plan modes are not gated here. Agent mode has a stricter
+        protocol: every model turn must resolve to a tool action, a
+        ``communicate_with_user`` handoff, or ``finish``.
 
         Behaviour:
             * Each gate firing increments
@@ -83,8 +85,8 @@ class _ExecutorResponseMixin:
               its next turn.
             * Once the counter exceeds ``_PLAIN_TEXT_GATE_MAX_RETRIES`` the
               sentinel is marked ``_gate_threshold_breach=True`` so the
-              orchestrator promotes the suppressed text to
-              ``wait_for_response=True`` and surfaces it to the user.
+              orchestrator stops the turn with a protocol message. The
+              suppressed model prose is never treated as a final answer.
 
         A single ``logger.debug`` line replaces the previous two ``WARNING``
         lines so the log stays quiet while remaining observable in debug
@@ -94,13 +96,10 @@ class _ExecutorResponseMixin:
         from backend.ledger.event import EventSource
 
         mode = self._get_agent_mode()
-        if is_chat_mode(mode):
+        if is_chat_mode(mode) or normalize_interaction_mode(mode) != AGENT_MODE:
             return actions
 
         if not actions or not all(isinstance(a, _MessageAction) for a in actions):
-            return actions
-
-        if not self._has_active_tasks:
             return actions
 
         self._consecutive_plain_text_blocks += 1
@@ -183,20 +182,19 @@ class _ExecutorResponseMixin:
         if breach:
             text = (
                 'Protocol error: you have produced plain prose three times in a '
-                'row. The system will now surface your most recent reply to the '
-                'user and end this turn. Next turn, emit exactly one tool call '
-                '(communicate_with_user, task_tracker, or a work tool) before '
-                'any further narration.'
+                'row. The system will now stop this turn instead of treating '
+                'that prose as a final answer. Next turn, emit exactly one '
+                'action: finish to answer, communicate_with_user to ask, or a '
+                'work tool to continue.'
             )
         else:
             text = (
                 f'Protocol error: your previous response was plain prose '
-                f'(attempt {count}). In agent mode while tasks are open you '
-                f'must emit exactly one tool call every turn — for example '
-                f'communicate_with_user to pause for the user, task_tracker to '
-                f'update progress, or a work tool. After '
+                f'(attempt {count}). In Agent mode you must emit exactly one '
+                f'action every turn: finish to answer, communicate_with_user '
+                f'to ask, or a work tool to continue. After '
                 f'{self._PLAIN_TEXT_GATE_MAX_RETRIES} consecutive prose-only '
-                f'turns the system will surface your reply and end the turn.'
+                f'turns the system will stop instead of surfacing the prose.'
             )
         try:
             state.set_planning_directive(

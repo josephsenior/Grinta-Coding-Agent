@@ -108,6 +108,44 @@ class TestContextMemoryManagerInit:
 
 
 # ---------------------------------------------------------------------------
+# should_emit_compaction_status
+# ---------------------------------------------------------------------------
+
+
+class TestShouldEmitCompactionStatus:
+    def _make_state(self) -> MagicMock:
+        state = MagicMock()
+        state.history = []
+        state.view = MagicMock(unhandled_condensation_request=False)
+        state.turn_signals = MagicMock(
+            prewarmed_compaction=None,
+            memory_pressure=None,
+        )
+        return state
+
+    def test_false_without_compactor(self):
+        m = _make_manager()
+        assert m.should_emit_compaction_status(self._make_state()) is False
+
+    def test_true_for_explicit_request(self):
+        m = _make_manager()
+        m.compactor = MagicMock()
+        state = self._make_state()
+        state.view.unhandled_condensation_request = True
+
+        assert m.should_emit_compaction_status(state) is True
+
+    def test_delegates_to_compactor_predictor(self):
+        m = _make_manager()
+        predictor = MagicMock(return_value=True)
+        m.compactor = MagicMock(should_emit_compaction_status=predictor)
+        state = self._make_state()
+
+        assert m.should_emit_compaction_status(state) is True
+        predictor.assert_called_once_with(state.view)
+
+
+# ---------------------------------------------------------------------------
 # initialize and _init_compactor
 # ---------------------------------------------------------------------------
 

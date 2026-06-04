@@ -637,6 +637,18 @@ class ActivityCard(Container):
             self._extra_content = text
         self.can_focus = True
 
+        # Retroactively enable collapsibility if the card was born without it
+        # (e.g. a terminal card that got output after being created with no content).
+        if not self._collapsible:
+            self._collapsible = True
+            if self.is_mounted:
+                try:
+                    row = self.query_one('#collapsed-row-container', Horizontal)
+                    if not row.query('#caret'):
+                        row.mount(Static(self._caret_char(), id='caret', classes='card-caret'))
+                except Exception:
+                    pass
+
         if not self.is_mounted:
             return
 

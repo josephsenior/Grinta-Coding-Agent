@@ -144,6 +144,7 @@ class TestStreamingChunkAction(unittest.TestCase):
         self.assertEqual(c.chunk, '')
         self.assertEqual(c.accumulated, '')
         self.assertFalse(c.is_final)
+        self.assertFalse(c.suppress_live_response)
 
     def test_str_streaming(self):
         c = StreamingChunkAction(chunk='tok', accumulated='hello tok')

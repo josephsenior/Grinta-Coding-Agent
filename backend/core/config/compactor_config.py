@@ -142,6 +142,14 @@ class AutoCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=None,
         description='LLM config name made available to LLM-based strategies when auto-selected.',
     )
+    allow_llm_hot_path: bool = Field(
+        default=False,
+        description=(
+            'Allow normal-turn auto compaction to use LLM-backed strategies. '
+            'Disabled by default so long sessions do not add hidden LLM calls '
+            'before the main agent step; explicit condensation may still use LLM summaries.'
+        ),
+    )
     model_config = ConfigDict(extra='forbid')
 
 

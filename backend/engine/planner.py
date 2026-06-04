@@ -643,21 +643,9 @@ class OrchestratorPlanner:
         return self._apply_control_message(messages, instruction)
 
     def _inject_agent_mode_instructions(self, messages: list, state: State) -> list:
-        instruction = (
-            '\n\n=== CURRENT MODE: AGENT ===\n'
-            'This is the authoritative current-mode instruction for this turn.\n'
-            'Current mode: AGENT\n\n'
-            '- Use real tool/function calls when performing work.\n'
-            '- Natural prose is fine for conversation or explanation when no action is needed.\n'
-            '- Use `communicate_with_user` for questions, blockers, or escalation.\n'
-            '- Use `finish` to end completed or blocked work.\n\n'
-            '`finish` requires: status, response, summary, sections, evidence, '
-            'open_items, next_step. Shape section titles to the task while covering '
-            'Outcome, What I Did, Evidence / Verification, Caveats / Open Items, '
-            'and Next Step when applicable.\n'
-            "If verification was not run, use evidence.status='not_run' and explain in details.\n\n"
-            '===========================\n'
-        )
+        # Minimal per-turn mode signal — just enough for the agent to know its mode,
+        # like the OS/env one-liner. Full rules are already in the system prompt and tool schemas.
+        instruction = '\n\nCurrent mode: AGENT'
         return self._apply_control_message(messages, instruction)
 
     def _inject_chat_mode_instructions(self, messages: list, state: State) -> list:

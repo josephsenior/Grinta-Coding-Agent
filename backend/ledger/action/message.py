@@ -93,6 +93,7 @@ class StreamingChunkAction(Action):
     is_final: bool = False  # True when streaming is complete
     is_tool_call: bool = False  # True when streaming tool call arguments (not content)
     tool_call_name: str = ''  # Name of the tool being called (e.g. "execute_bash")
+    suppress_live_response: bool = False  # True when draft content must not be committed
     thinking_chunk: str = ''  # New thinking/reasoning token from the model
     thinking_accumulated: str = ''  # All thinking text accumulated so far
     action: ClassVar[str] = ActionType.STREAMING_CHUNK

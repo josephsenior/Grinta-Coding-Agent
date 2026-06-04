@@ -521,8 +521,8 @@ class ActivityRenderer:
             secondary=secondary,
             secondary_kind=secondary_kind,
             extra_lines=extra_lines,
-            is_collapsible=bool(extra_lines),
-            start_collapsed=bool(extra_lines),
+            is_collapsible=True,
+            start_collapsed=True,
         )
 
     @staticmethod

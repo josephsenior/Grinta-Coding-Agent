@@ -189,16 +189,13 @@ class ActionRenderersMixin(_ActionRenderersBase):
         content = (action.content or '').strip()
 
         if not thought:
+            # Only use committed thought lines (from AgentThinkAction events).
+            # _streaming_line is a transient live-panel buffer that must NOT be
+            # committed to the transcript — it is the last streamed reasoning
+            # preview and would duplicate content that is also in action.content.
             captured_thoughts = host._reasoning.snapshot_thoughts()
             if captured_thoughts:
                 thought = '\n'.join(captured_thoughts)
-
-            streaming_line = host._reasoning.get_streaming_line()
-            if streaming_line and streaming_line.strip():
-                if thought:
-                    thought = f'{thought}\n{streaming_line}'
-                else:
-                    thought = streaming_line
 
         if not thought:
             display_content = content
