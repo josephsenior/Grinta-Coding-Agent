@@ -100,9 +100,14 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
         result = await self.service.get_next_action()
 
-        # Should return None and emit error
+        # Should return None, emit hidden repair feedback, then a visible pause notice.
         self.assertIsNone(result)
-        self.mock_context.event_stream.add_event.assert_called_once()
+        self.assertEqual(self.mock_context.event_stream.add_event.call_count, 2)
+        final_event = self.mock_context.event_stream.add_event.call_args_list[-1].args[
+            0
+        ]
+        self.assertEqual(final_event.error_id, 'LLM_NO_ACTION_REPAIR_EXHAUSTED')
+        self.assertFalse(final_event.agent_only)
 
     async def test_get_next_action_response_error(self):
         """Test get_next_action handles LLMResponseError."""

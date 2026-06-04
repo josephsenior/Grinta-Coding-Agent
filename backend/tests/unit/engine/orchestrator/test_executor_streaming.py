@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backend.core.errors import LLMNoActionError
 from backend.engine.safety import OrchestratorSafetyManager
 from backend.inference.exceptions import ContextWindowExceededError
 
@@ -16,6 +17,12 @@ from backend.inference.exceptions import ContextWindowExceededError
 class _Safety:
     def apply(self, response_text, actions):
         return True, actions
+
+
+def _event_stream(sid: str):
+    event_stream = MagicMock()
+    event_stream.sid = sid
+    return event_stream
 
 
 def _assert_stream_chunk(
@@ -58,7 +65,7 @@ def test_final_stream_event_with_tool_call_suppresses_draft_reply():
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
-    event_stream = MagicMock()
+    event_stream = _event_stream('test-final-stream-tool-call')
 
     executor._emit_final_stream_event(
         event_stream,
@@ -105,7 +112,7 @@ def test_executor_emits_streaming_chunk_actions(monkeypatch):
     )
 
     planner = MagicMock()
-    event_stream = MagicMock()
+    event_stream = _event_stream('test-sync-streaming-chunks')
 
     executor = OrchestratorExecutor(
         llm=llm,
@@ -195,7 +202,7 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
     llm = MagicMock()
     llm.astream = fake_astream
 
-    event_stream = MagicMock()
+    event_stream = _event_stream('test-async-real-streaming-chunks')
 
     executor = OrchestratorExecutor(
         llm=llm,
@@ -288,7 +295,12 @@ def test_async_execute_preserves_streamed_reasoning_content(monkeypatch):
         mcp_tools_provider=lambda: {},
     )
 
-    result = asyncio.run(executor.async_execute({'messages': []}, MagicMock()))
+    result = asyncio.run(
+        executor.async_execute(
+            {'messages': []},
+            _event_stream('test-streamed-reasoning-content'),
+        )
+    )
 
     resp = result.response
     assert resp is not None
@@ -353,7 +365,12 @@ def test_async_execute_clamps_completion_budget_before_stream_call(monkeypatch):
     params = {'messages': [{'role': 'user', 'content': 'x' * 2000}]}
     expected = executor._apply_context_window_preflight(dict(params))
 
-    asyncio.run(executor.async_execute(params, MagicMock()))
+    asyncio.run(
+        executor.async_execute(
+            params,
+            _event_stream('test-completion-budget-clamp'),
+        )
+    )
 
     assert captured['max_tokens'] == expected['max_tokens']
     assert captured['max_tokens'] < 300
@@ -398,7 +415,12 @@ def test_async_execute_raises_preflight_context_error_before_provider_call(
     params = {'messages': [{'role': 'user', 'content': 'x' * 3000}]}
 
     with pytest.raises(ContextWindowExceededError):
-        asyncio.run(executor.async_execute(params, MagicMock()))
+        asyncio.run(
+            executor.async_execute(
+                params,
+                _event_stream('test-preflight-context-error'),
+            )
+        )
 
     llm.astream.assert_not_called()
 
@@ -455,7 +477,12 @@ def test_async_execute_does_not_timeout_active_reasoning_stream(monkeypatch, tmp
         mcp_tools_provider=lambda: {},
     )
 
-    result = asyncio.run(executor.async_execute({'messages': []}, MagicMock()))
+    result = asyncio.run(
+        executor.async_execute(
+            {'messages': []},
+            _event_stream('test-non-streaming-fallback'),
+        )
+    )
 
     assert result.response is not None
     assert result.response.content == 'done'
@@ -511,7 +538,10 @@ def test_cancel_step_cancels_active_stream_and_discards_checkpoint(
         )
 
         task = asyncio.create_task(
-            executor.async_execute({'messages': []}, MagicMock())
+            executor.async_execute(
+                {'messages': []},
+                _event_stream('test-streaming-cancel'),
+            )
         )
         await asyncio.wait_for(first_chunk_seen.wait(), timeout=1)
 
@@ -529,7 +559,7 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
     """async_execute should accumulate streamed tool call deltas into complete tool calls."""
     import backend.engine.function_calling as fc
     from backend.engine.executor import OrchestratorExecutor
-    from backend.ledger.action import MessageAction
+    from backend.ledger.action import AgentThinkAction
 
     sys.modules.setdefault('app.engine.function_calling', fc)
 
@@ -539,7 +569,7 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
         executor_module.orchestrator_function_calling,
         'response_to_actions',
         lambda response, **kwargs: [
-            MessageAction(content='tool_call_detected', wait_for_response=True)
+            AgentThinkAction(thought='tool_call_detected')
         ],
     )
 
@@ -594,7 +624,8 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
         mcp_tools_provider=lambda: {},
     )
 
-    result = asyncio.run(executor.async_execute({'messages': []}, MagicMock()))
+    event_stream = _event_stream('test-stream-accumulates-tool-calls')
+    result = asyncio.run(executor.async_execute({'messages': []}, event_stream))
 
     # The response should have assembled the tool call from fragments
     resp = result.response
@@ -611,7 +642,7 @@ def test_async_execute_handles_cumulative_tool_call_name_and_args(monkeypatch):
     """Stream assembly should not duplicate tool names for cumulative chunks."""
     import backend.engine.function_calling as fc
     from backend.engine.executor import OrchestratorExecutor
-    from backend.ledger.action import MessageAction
+    from backend.ledger.action import AgentThinkAction
 
     sys.modules.setdefault('app.engine.function_calling', fc)
 
@@ -621,7 +652,7 @@ def test_async_execute_handles_cumulative_tool_call_name_and_args(monkeypatch):
         executor_module.orchestrator_function_calling,
         'response_to_actions',
         lambda response, **kwargs: [
-            MessageAction(content='tool_call_detected', wait_for_response=True)
+            AgentThinkAction(thought='tool_call_detected')
         ],
     )
 
@@ -682,7 +713,8 @@ def test_async_execute_handles_cumulative_tool_call_name_and_args(monkeypatch):
         mcp_tools_provider=lambda: {},
     )
 
-    result = asyncio.run(executor.async_execute({'messages': []}, MagicMock()))
+    event_stream = _event_stream('test-stream-cumulative-tool-call')
+    result = asyncio.run(executor.async_execute({'messages': []}, event_stream))
 
     resp = result.response
     assert resp is not None
@@ -698,7 +730,7 @@ def _stream_chunks_to_tool_args(chunks: list[str]) -> str:
     """Drive `chunks` through the live streaming path and return assembled args."""
     import backend.engine.function_calling as fc
     from backend.engine.executor import OrchestratorExecutor
-    from backend.ledger.action import MessageAction
+    from backend.ledger.action import AgentThinkAction
 
     sys.modules.setdefault('app.engine.function_calling', fc)
     from backend.engine import executor as executor_module
@@ -707,7 +739,7 @@ def _stream_chunks_to_tool_args(chunks: list[str]) -> str:
 
     def _record(response, **kwargs):
         captured['response'] = response
-        return [MessageAction(content='tc_detected', wait_for_response=True)]
+        return [AgentThinkAction(thought='tc_detected')]
 
     executor_module.orchestrator_function_calling.response_to_actions = _record  # type: ignore[assignment]
 
@@ -749,7 +781,8 @@ def _stream_chunks_to_tool_args(chunks: list[str]) -> str:
         mcp_tools_provider=lambda: {},
     )
 
-    asyncio.run(executor.async_execute({'messages': []}, MagicMock()))
+    event_stream = _event_stream(f'test-stream-chunks-{abs(hash(tuple(chunks)))}')
+    asyncio.run(executor.async_execute({'messages': []}, event_stream))
     resp = captured.get('response')
     assert resp is not None
     assert resp.tool_calls is not None
@@ -842,7 +875,7 @@ def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_pro
 
     monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
 
-    event_stream = MagicMock()
+    event_stream = _event_stream('sid-1')
     event_stream.sid = 'sid-1'
     control_event = AgentStateChangedObservation('', agent_state=AgentState.FINISHED)
     control_event.id = 9
@@ -874,7 +907,7 @@ def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
 
     monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
 
-    event_stream = MagicMock()
+    event_stream = _event_stream('sid-2')
     event_stream.sid = 'sid-2'
     event_stream.search_events.return_value = []
 
@@ -905,7 +938,7 @@ def test_get_checkpoint_blocks_stale_wal_when_auto_discard_disabled(
 
     monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
 
-    event_stream = MagicMock()
+    event_stream = _event_stream('sid-3')
     event_stream.sid = 'sid-stale'
     event_stream.search_events.return_value = []
 
@@ -1064,7 +1097,7 @@ def test_get_checkpoint_blocks_resumed_session_without_superseding_control_event
 def test_response_to_actions_gates_plain_message_in_agent_mode(
     monkeypatch,
 ):
-    """Agent mode is action-only; plain messages become suppressed sentinels."""
+    """Agent mode is action-only; plain messages raise repairable protocol errors."""
     from backend.engine import executor as executor_module
     from backend.engine.executor import OrchestratorExecutor
     from backend.ledger.action import MessageAction
@@ -1094,13 +1127,8 @@ def test_response_to_actions_gates_plain_message_in_agent_mode(
         ]
     )
 
-    actions = executor._response_to_actions(response)
-
-    assert len(actions) == 1
-    assert isinstance(actions[0], MessageAction)
-    assert actions[0].content == ''
-    assert actions[0].suppress_cli is True
-    assert actions[0]._gate_suppressed_text == "I've created grinta_feedback.md for you."  # type: ignore[attr-defined]
+    with pytest.raises(LLMNoActionError):
+        executor._response_to_actions(response)
 
 
 def test_response_to_actions_gates_conversational_plain_message(monkeypatch):
@@ -1135,16 +1163,8 @@ def test_response_to_actions_gates_conversational_plain_message(monkeypatch):
         ]
     )
 
-    actions = executor._response_to_actions(response)
-
-    assert len(actions) == 1
-    assert isinstance(actions[0], MessageAction)
-    assert actions[0].content == ''
-    assert actions[0].suppress_cli is True
-    assert (
-        actions[0]._gate_suppressed_text  # type: ignore[attr-defined]
-        == 'I have prepared a rating of the system and the tools for you.'
-    )
+    with pytest.raises(LLMNoActionError):
+        executor._response_to_actions(response)
 
 
 def test_response_to_actions_allows_structured_non_runnable_action(monkeypatch):

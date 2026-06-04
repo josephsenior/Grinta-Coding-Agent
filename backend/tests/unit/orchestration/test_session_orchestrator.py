@@ -953,6 +953,34 @@ class TestPostExecution(unittest.IsolatedAsyncioTestCase):
             'WARNING', source='SessionOrchestrator'
         )
 
+    async def test_warning_prewarm_uses_background_compaction_hook(self):
+        if hasattr(self.ctrl.state_tracker.state, 'metrics'):
+            del self.ctrl.state_tracker.state.metrics
+        self.ctrl.config.agent._last_llm_latency = None
+        self.ctrl.memory_pressure.should_condense.return_value = True
+        self.ctrl.memory_pressure.is_critical.return_value = False
+        self.ctrl.memory_pressure.is_prewarming = False
+        self.ctrl.memory_pressure.has_prewarmed = False
+        self.ctrl.memory_pressure._last_rss_mb = 500.0
+        self.ctrl.state_tracker.state.history = [MessageAction(content='start')]
+        self.ctrl.state_tracker.state.turn_signals = MagicMock()
+        self.ctrl.state_tracker.state.set_memory_pressure = MagicMock()
+
+        compactor = SimpleNamespace(
+            compacted_history_background=AsyncMock(return_value='background'),
+            compacted_history=AsyncMock(return_value='foreground'),
+        )
+        self.ctrl.config.agent.memory_manager = SimpleNamespace(compactor=compactor)
+
+        await self.ctrl._handle_post_execution()
+
+        coro_factory = self.ctrl.memory_pressure.start_prewarm.call_args.args[0]
+        result = await coro_factory()
+
+        assert result == 'background'
+        compactor.compacted_history_background.assert_awaited_once()
+        compactor.compacted_history.assert_not_awaited()
+
 
 # ── Action context management ────────────────────────────────────────
 

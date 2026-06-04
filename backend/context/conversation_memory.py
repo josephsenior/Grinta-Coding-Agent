@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import os
 from collections import OrderedDict
@@ -27,6 +28,7 @@ from backend.context.message_formatting import (
 )
 from backend.context.observation_processors import convert_observation_to_message
 from backend.context.prompt_assembly import process_recall_observation
+from backend.context.prompt_window import event_fingerprint
 from backend.context.tool_call_tracker import (
     filter_unmatched_tool_calls,
     flush_resolved_tool_calls,
@@ -52,6 +54,8 @@ from backend.ledger.observation.status import StatusObservation
 from backend.utils.prompt import PromptManager
 
 _MAX_SYSTEM_CONTEXT_SUMMARY_CHARS = 2000
+_PROMPT_RENDERER_VERSION = 'context-memory-render-v1'
+_DEFAULT_RENDER_CACHE_MAX = 1024
 
 
 def _tool_ok_for_observation(obs: Observation) -> bool | None:
@@ -110,6 +114,15 @@ class ContextMemory:
         self._ctx = ContextTracker(vector_store=vector_store)
         self._indexed_event_ids: OrderedDict[str, None] = OrderedDict()
         self._indexed_event_ids_max: int = 10000
+        self._render_cache: OrderedDict[str, list[Message]] = OrderedDict()
+        self._render_cache_max: int = self._config_int(
+            'prompt_render_cache_max_entries',
+            _DEFAULT_RENDER_CACHE_MAX,
+        )
+        self._render_cache_enabled: bool = self._config_bool(
+            'prompt_render_cache_enabled',
+            True,
+        )
 
     # Delegate context-tracking API to ContextTracker
     @property
@@ -298,14 +311,24 @@ class ContextMemory:
         self._auto_track_event_context(event)
         self._index_event_for_semantic_recall(event)
 
+        cache_key = self._render_cache_key(
+            event,
+            max_message_chars=max_message_chars,
+            vision_is_active=vision_is_active,
+        )
+        if cache_key is not None:
+            cached = self._render_cache_get(cache_key)
+            if cached is not None:
+                return cached
+
         if is_action_event(event):
-            return self._process_action(
+            messages = self._process_action(
                 action=cast(Action, event),
                 pending_tool_call_action_messages=tool_state.pending_action_messages,
                 vision_is_active=vision_is_active,
             )
-        if is_observation_event(event):
-            return self._process_observation(
+        elif is_observation_event(event):
+            messages = self._process_observation(
                 obs=cast(Observation, event),
                 tool_call_id_to_message=tool_state.tool_call_messages,
                 max_message_chars=max_message_chars,
@@ -314,7 +337,100 @@ class ContextMemory:
                 current_index=index,
                 events=events,
             )
-        return self._fallback_message_for_generic_event(event)
+        else:
+            messages = self._fallback_message_for_generic_event(event)
+
+        if cache_key is not None:
+            self._render_cache_set(cache_key, messages)
+        return messages
+
+    def _render_cache_key(
+        self,
+        event: Event,
+        *,
+        max_message_chars: int | None,
+        vision_is_active: bool,
+    ) -> str | None:
+        """Return cache key for pure event-to-message rendering, if safe."""
+        if not self._is_render_cacheable_event(event):
+            return None
+        payload = '|'.join(
+            (
+                _PROMPT_RENDERER_VERSION,
+                event_fingerprint(event),
+                f'max_chars={max_message_chars}',
+                f'vision={int(vision_is_active)}',
+                f'som={int(bool(self.agent_config.enable_som_visual_browsing))}',
+            )
+        )
+        return hashlib.sha1(payload.encode('utf-8', 'ignore')).hexdigest()
+
+    def _is_render_cacheable_event(self, event: Event) -> bool:
+        """Keep cache use away from events whose rendering mutates tool state."""
+        if not self._render_cache_enabled or self._render_cache_max <= 0:
+            return False
+        if getattr(event, 'tool_call_metadata', None) is not None:
+            return False
+        if is_instance_of(event, RecallObservation) or is_instance_of(
+            event, StatusObservation
+        ):
+            return False
+        if is_action_event(event):
+            return type(event).__name__ in {
+                'MessageAction',
+                'SystemMessageAction',
+                'CmdRunAction',
+                'AgentThinkAction',
+                'ClarificationRequestAction',
+                'ProposalAction',
+                'UncertaintyAction',
+                'EscalateToHumanAction',
+            }
+        return is_observation_event(event)
+
+    def _render_cache_get(self, key: str) -> list[Message] | None:
+        cached = self._render_cache.get(key)
+        if cached is None:
+            return None
+        self._render_cache.move_to_end(key)
+        return self._clone_messages(cached)
+
+    def _render_cache_set(self, key: str, messages: list[Message]) -> None:
+        self._render_cache[key] = self._clone_messages(messages)
+        self._render_cache.move_to_end(key)
+        while len(self._render_cache) > self._render_cache_max:
+            self._render_cache.popitem(last=False)
+
+    @staticmethod
+    def _clone_messages(messages: list[Message]) -> list[Message]:
+        return [
+            msg.model_copy(deep=True)
+            if hasattr(msg, 'model_copy')
+            else copy.deepcopy(msg)
+            for msg in messages
+        ]
+
+    def _config_bool(self, name: str, default: bool) -> bool:
+        value = getattr(self.agent_config, name, default)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() not in {'0', 'false', 'no', 'off'}
+        return default
+
+    def _config_int(self, name: str, default: int) -> int:
+        value = getattr(self.agent_config, name, default)
+        if isinstance(value, bool):
+            return default
+        if isinstance(value, int) and value >= 0:
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = int(value)
+            except ValueError:
+                return default
+            return parsed if parsed >= 0 else default
+        return default
 
     def _fallback_message_for_generic_event(self, event: Any) -> list[Message]:
         """Convert generic event doubles to user messages when possible."""

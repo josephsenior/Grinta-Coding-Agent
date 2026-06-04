@@ -15,6 +15,7 @@ from backend.context.pre_condensation_snapshot import (
     load_snapshot,
     save_snapshot,
 )
+from backend.context.prompt_window import select_prompt_events
 from backend.context.view import View
 from backend.core.logger import app_logger as logger
 from backend.core.message import Message, TextContent
@@ -388,21 +389,43 @@ class ContextMemoryManager:
             raise RuntimeError('Conversation memory is not initialized')
 
         events = list(condensed_history)
+        window_started = time.perf_counter()
+        prompt_window = select_prompt_events(events, llm_config)
+        events_for_prompt = prompt_window.events
+        window_elapsed = time.perf_counter() - window_started
+        if prompt_window.windowed:
+            logger.info(
+                'ContextMemoryManager.prompt_window selected %d/%d events '
+                '(dropped=%d estimated_tokens=%d selected_tokens=%d budget=%s '
+                'protected=%d reason=%s fingerprint=%s elapsed=%.3fs)',
+                prompt_window.selected_events,
+                prompt_window.original_events,
+                prompt_window.dropped_events,
+                prompt_window.estimated_tokens,
+                prompt_window.selected_estimated_tokens,
+                prompt_window.token_budget,
+                prompt_window.protected_events,
+                prompt_window.reason,
+                prompt_window.cache_fingerprint,
+                window_elapsed,
+            )
         started = time.perf_counter()
         messages = self.conversation_memory.process_events(
-            condensed_history=events,
+            condensed_history=events_for_prompt,
             initial_user_action=initial_user_message,
             max_message_chars=getattr(llm_config, 'max_message_chars', None),
             vision_is_active=getattr(llm_config, 'vision_is_active', False),
         )
         elapsed = time.perf_counter() - started
-        if elapsed >= 0.25 or len(events) >= 100:
+        if elapsed >= 0.25 or len(events_for_prompt) >= 100 or prompt_window.windowed:
             logger.info(
-                'ContextMemoryManager.build_messages processed %d events into %d '
-                'messages in %.3fs',
+                'ContextMemoryManager.build_messages processed %d/%d events into %d '
+                'messages in %.3fs (window=%.3fs)',
+                len(events_for_prompt),
                 len(events),
                 len(messages),
                 elapsed,
+                window_elapsed,
             )
 
         if not messages:

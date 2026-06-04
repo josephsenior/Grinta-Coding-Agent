@@ -18,7 +18,6 @@ import os
 import re
 import time
 from collections import deque
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import backend.engine.function_calling as orchestrator_function_calling
@@ -39,7 +38,7 @@ from backend.core.errors import (
     ModelProviderError,
     ToolExecutionError,
 )
-from backend.core.interaction_modes import normalize_interaction_mode
+from backend.core.interaction_modes import AGENT_MODE, normalize_interaction_mode
 from backend.core.logger import app_logger as logger
 from backend.engine import message_serializer
 from backend.engine import prompt_role_debug as _prompt_role_debug
@@ -87,18 +86,6 @@ def _safe_plain_text_count(executor: Any) -> int:
     """
     raw = getattr(executor, '_consecutive_plain_text_blocks', 0)
     return raw if isinstance(raw, int) else 0
-
-
-def _safe_executor_has_active_tasks(executor: Any) -> bool:
-    raw = getattr(executor, '_has_active_tasks', False)
-    return raw if isinstance(raw, bool) else False
-
-
-def _is_unbreached_plain_text_gate_sentinel(action: Any) -> bool:
-    return (
-        getattr(action, '_gate_suppressed_text', None) is not None
-        and getattr(action, '_gate_threshold_breach', False) is not True
-    )
 
 
 def _normalize_recoverable_error_signature(e: Exception) -> str:
@@ -189,14 +176,6 @@ class Orchestrator(Agent):
         self._current_delimiter_token: str | None = None
         self._consecutive_invalid_protocol_outputs = 0
         self.event_stream: EventStream | None = None
-        # Callback hook invoked when the executor's plain-text gate fires.
-        # ``kind`` is either ``"under_threshold"`` or ``"threshold_breached"``;
-        # ``count`` is the post-increment gate-firings streak. TUI/CLI assign
-        # a real handler during startup; the default no-op keeps the
-        # orchestrator testable in isolation.
-        self._on_plain_text_gate: Callable[[str, int], None] = (
-            lambda kind, count: None
-        )
 
         # Safety / hallucination systems
         self.safety_manager: SafetyManagerProtocol = OrchestratorSafetyManager()
@@ -460,8 +439,7 @@ class Orchestrator(Agent):
         if condensed.pending_action is not None and not emitted_compaction_status:
             self._emit_compaction_status()
         action = await self._execute_llm_step_async(state, condensed)
-        if not _is_unbreached_plain_text_gate_sentinel(action):
-            self._reset_step_recovery_counters()
+        self._reset_step_recovery_counters()
         return action
 
     async def _astep_handle_context_limit_error(self, state: State) -> Action:
@@ -693,10 +671,6 @@ class Orchestrator(Agent):
         actions = result.actions or []
         if not actions:
             return self._build_fallback_action(result)
-        first = actions[0]
-        gated = self._handle_plain_text_gate_action(first)
-        if gated is not None:
-            return gated
         # Real tool call: clear the plain-text streak.
         current_count = _safe_plain_text_count(self.executor)
         if current_count > 0 and hasattr(
@@ -798,10 +772,6 @@ class Orchestrator(Agent):
         actions = result.actions or []
         if not actions:
             return self._build_fallback_action(result)
-        first = actions[0]
-        gated = self._handle_plain_text_gate_action(first)
-        if gated is not None:
-            return gated
         current_count = _safe_plain_text_count(self.executor)
         if current_count > 0 and hasattr(
             self.executor, '_consecutive_plain_text_blocks'
@@ -869,40 +839,17 @@ class Orchestrator(Agent):
                 return normalize_interaction_mode(active_mode)
         return normalize_interaction_mode(getattr(self.config, 'mode', 'agent'))
 
-    def _handle_plain_text_gate_action(self, action: Action) -> Action | None:
-        """Return the promoted gate action when *action* is a plain-text sentinel."""
-        if getattr(action, '_gate_threshold_breach', False) is True:
-            breach_count = _safe_plain_text_count(self.executor)
-            self._reset_step_recovery_counters()
-            try:
-                self._on_plain_text_gate('threshold_breached', breach_count)
-            except Exception:
-                logger.debug('Plain-text gate callback failed', exc_info=True)
-            return self._promote_gate_sentinel(action, breached=True)
-
-        if getattr(action, '_gate_suppressed_text', None) is not None:
-            try:
-                self._on_plain_text_gate(
-                    'under_threshold',
-                    _safe_plain_text_count(self.executor),
-                )
-            except Exception:
-                logger.debug('Plain-text gate callback failed', exc_info=True)
-            return self._promote_gate_sentinel(action, breached=False)
-
-        return None
-
     def _build_fallback_action(self, result) -> Action:
-        """Create a message action when the LLM returns no tool calls.
+        """Create a message action when non-agent modes return no tool calls.
 
         The normal parser maps non-tool prose to a user-facing message. This
-        fallback preserves that contract when parsing produced no durable action,
-        while still routing active-task agent-mode prose through the plain-text
-        protocol gate.
+        fallback preserves that contract for Chat/Plan-style modes when parsing
+        produced no durable action.
 
         Empty text → raises :class:`LLMNoActionError` so the recovery machinery
         in :class:`ActionExecutionService` can issue corrective feedback and retry.
-        Text-only → yields to the user unless the active-task gate suppresses it.
+        Agent-mode text-only output → also raises :class:`LLMNoActionError` so
+        prose never becomes an executable ``MessageAction``.
         """
         message_text = ''
         if result.response and getattr(result.response, 'choices', None):
@@ -921,61 +868,33 @@ class Orchestrator(Agent):
                 'instructions provided in that observation to continue.'
             )
 
+        executor = getattr(self, 'executor', None)
+        config = getattr(self, 'config', None)
+        active_mode = normalize_interaction_mode(
+            getattr(executor, '_active_run_mode', None),
+            default=normalize_interaction_mode(getattr(config, 'mode', 'agent')),
+        )
+        if active_mode == AGENT_MODE:
+            raise LLMNoActionError(
+                'Agent mode requires a tool action, but the model returned plain text '
+                'with no tool call.'
+            )
+
         # Extract reasoning content from response if available
         reasoning = ''
         if message is not None:
             reasoning = getattr(message, 'reasoning_content', '') or ''
 
         logger.warning(
-            'LLM returned text-only response with no tool calls; yielding to user '
-            'unless active-task agent-mode gate suppresses it.'
+            'LLM returned text-only response with no tool calls in %s mode; '
+            'yielding to user.',
+            active_mode,
         )
         fallback = MessageAction(
             content=message_text, thought=reasoning, wait_for_response=True
         )
         fallback.source = EventSource.AGENT
-        executor = getattr(self, 'executor', None)
-        gate = getattr(executor, '_gate_agent_mode_plain_text', None)
-        if isinstance(executor, OrchestratorExecutor) and callable(gate):
-            try:
-                gated_actions = list(gate([fallback], result.response))
-            except Exception:
-                logger.debug('Plain-text fallback gate failed', exc_info=True)
-            else:
-                if gated_actions:
-                    gated = self._handle_plain_text_gate_action(gated_actions[0])
-                    return gated if gated is not None else gated_actions[0]
         return fallback
-
-    def _promote_gate_sentinel(self, sentinel: Action, *, breached: bool) -> Action:
-        """Rewrite the plain-text gate sentinel into a user-facing message.
-
-        Under-threshold: the sentinel is already a ``MessageAction`` with
-        ``suppress_cli=True`` and ``wait_for_response=False`` so the loop
-        continues. Returned as-is.
-
-        Threshold breach: surface a protocol message, not the suppressed model
-        prose, and switch ``wait_for_response=True`` so the loop yields control
-        back to the user.
-        """
-        from backend.ledger.action.message import MessageAction as _MessageAction
-
-        if not isinstance(sentinel, _MessageAction):
-            return sentinel
-        if not breached:
-            return sentinel
-        promoted = _MessageAction(
-            content=(
-                'Protocol error: Agent mode requires an action, but the model '
-                'produced plain text repeatedly. I stopped instead of treating '
-                'that text as a final answer. Please retry or switch to Chat mode '
-                'for free-form conversation.'
-            ),
-            wait_for_response=True,
-            suppress_cli=False,
-        )
-        promoted.source = getattr(sentinel, 'source', EventSource.AGENT)
-        return promoted
 
     def _queue_additional_actions(self, actions: list[Action]) -> None:
         for pending in actions:

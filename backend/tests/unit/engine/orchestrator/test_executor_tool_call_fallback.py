@@ -28,9 +28,10 @@ def _make_result(content: str) -> SimpleNamespace:
 def _make_orchestrator() -> Orchestrator:
     """Construct an Orchestrator with all heavy dependencies mocked out."""
     orch = object.__new__(Orchestrator)
+    orch.config = SimpleNamespace(mode='agent')
     orch.llm = MagicMock()
     orch.planner = MagicMock()
-    orch.executor = MagicMock()
+    orch.executor = SimpleNamespace(_active_run_mode='agent')
     orch.tools = MagicMock()
     orch.memory_manager = MagicMock()
     orch.event_stream = MagicMock()
@@ -79,52 +80,24 @@ class TestBuildFallbackAction:
             'Which Python version should I target?',
         ],
     )
-    def test_any_non_empty_text_yields_when_no_active_tasks(self, text: str) -> None:
+    def test_agent_mode_non_empty_text_raises_llm_no_action_error(
+        self, text: str
+    ) -> None:
         orch = _make_orchestrator()
-        action = _build_fallback_action(orch, _make_result(text))
-        assert isinstance(action, MessageAction)
-        assert action.wait_for_response is True
+        with pytest.raises(LLMNoActionError):
+            _build_fallback_action(orch, _make_result(text))
 
-    def test_agent_mode_fallback_text_uses_plain_text_gate(self) -> None:
+    @pytest.mark.parametrize('mode', ['chat', 'plan'])
+    def test_non_agent_modes_yield_plain_text(self, mode: str) -> None:
         orch = _make_orchestrator()
-        executor = TestPlainTextProtocolGate()._make_executor(
-            'agent',
-            active_tasks=False,
-        )
-        orch.executor = executor
-        callbacks: list[tuple[str, int]] = []
-        orch._on_plain_text_gate = lambda kind, count: callbacks.append((kind, count))  # type: ignore[assignment]
+        orch.config = SimpleNamespace(mode=mode)
+        orch.executor = SimpleNamespace(_active_run_mode=mode)
 
         action = _build_fallback_action(orch, _make_result('plain answer'))
 
         assert isinstance(action, MessageAction)
-        assert action.content == ''
-        assert action.wait_for_response is False
-        assert action.suppress_cli is True
-        assert action._gate_suppressed_text == 'plain answer'  # type: ignore[attr-defined]
-        assert executor._consecutive_plain_text_blocks == 1
-        assert callbacks == [('under_threshold', 1)]
-
-    def test_agent_mode_fallback_gate_breach_yields_protocol_message(self) -> None:
-        orch = _make_orchestrator()
-        executor = TestPlainTextProtocolGate()._make_executor(
-            'agent',
-            active_tasks=False,
-        )
-        executor._consecutive_plain_text_blocks = executor._PLAIN_TEXT_GATE_MAX_RETRIES
-        orch.executor = executor
-        callbacks: list[tuple[str, int]] = []
-        orch._on_plain_text_gate = lambda kind, count: callbacks.append((kind, count))  # type: ignore[assignment]
-
-        action = _build_fallback_action(orch, _make_result('plain answer'))
-
-        assert isinstance(action, MessageAction)
-        assert 'Protocol error' in action.content
-        assert 'plain answer' not in action.content
+        assert action.content == 'plain answer'
         assert action.wait_for_response is True
-        assert action.suppress_cli is False
-        assert executor._consecutive_plain_text_blocks == 0
-        assert callbacks == [('threshold_breached', 3)]
 
 
 class TestPlainTextProtocolGate:
@@ -147,72 +120,27 @@ class TestPlainTextProtocolGate:
 
         assert result == [action]
 
-    def test_agent_mode_without_active_tasks_emits_suppressed_sentinel(
+    def test_agent_mode_without_active_tasks_raises_llm_no_action_error(
         self,
     ):
         executor = self._make_executor('agent', active_tasks=False)
         action = MessageAction(content='plain answer')
 
-        result = executor._gate_agent_mode_plain_text(
-            [action], _make_result('plain').response
-        )
-
-        assert len(result) == 1
-        sentinel = result[0]
-        assert isinstance(sentinel, MessageAction)
-        assert sentinel.content == ''
-        assert sentinel.wait_for_response is False
-        assert sentinel.suppress_cli is True
-        assert sentinel._gate_suppressed_text == 'plain answer'
-        assert sentinel._gate_suppressed_actions == [action]
-        assert sentinel._gate_threshold_breach is False
-
-    def test_agent_mode_with_active_tasks_emits_suppressed_sentinel(self):
-        """Gate must return a sentinel (not an empty list) carrying the
-        suppressed text so the orchestrator can later surface it on a
-        threshold breach.
-        """
-        executor = self._make_executor('agent', active_tasks=True)
-        action = MessageAction(content='plain answer')
-
-        result = executor._gate_agent_mode_plain_text(
-            [action], _make_result('plain').response
-        )
-
-        assert len(result) == 1
-        sentinel = result[0]
-        assert isinstance(sentinel, MessageAction)
-        assert sentinel.content == ''
-        assert sentinel.wait_for_response is False
-        assert sentinel.suppress_cli is True
-        assert sentinel._gate_suppressed_text == 'plain answer'
-        assert sentinel._gate_suppressed_actions == [action]
-        assert sentinel._gate_threshold_breach is False
-        # First gate firing must increment the counter but stay
-        # under-threshold.
-        assert executor._consecutive_plain_text_blocks == 1
-
-    def test_threshold_breach_marks_sentinel(self):
-        """After _PLAIN_TEXT_GATE_MAX_RETRIES + 1 consecutive gate fires, the
-        sentinel is marked as a threshold breach so the orchestrator stops with
-        a protocol message instead of surfacing the suppressed text.
-        """
-        executor = self._make_executor('agent', active_tasks=True)
-        action = MessageAction(content='plain answer')
-        max_retries = executor._PLAIN_TEXT_GATE_MAX_RETRIES
-
-        # Fire the gate enough times to trigger the breach.
-        last_result = None
-        for _ in range(max_retries + 1):
-            last_result = executor._gate_agent_mode_plain_text(
+        with pytest.raises(LLMNoActionError):
+            executor._gate_agent_mode_plain_text(
                 [action], _make_result('plain').response
             )
+        assert executor._consecutive_plain_text_blocks == 1
 
-        assert last_result is not None
-        assert len(last_result) == 1
-        sentinel = last_result[0]
-        assert sentinel._gate_threshold_breach is True
-        assert executor._consecutive_plain_text_blocks == max_retries + 1
+    def test_agent_mode_with_active_tasks_raises_llm_no_action_error(self):
+        executor = self._make_executor('agent', active_tasks=True)
+        action = MessageAction(content='plain answer')
+
+        with pytest.raises(LLMNoActionError):
+            executor._gate_agent_mode_plain_text(
+                [action], _make_result('plain').response
+            )
+        assert executor._consecutive_plain_text_blocks == 1
 
     def test_set_planning_directive_called_when_state_attached(self):
         """When the executor has a state ref, the gate must set a planning
@@ -225,30 +153,14 @@ class TestPlainTextProtocolGate:
         executor._state = state
         action = MessageAction(content='plain answer')
 
-        executor._gate_agent_mode_plain_text(
-            [action], _make_result('plain').response
-        )
-
-        state.set_planning_directive.assert_called_once()
-        args, _ = state.set_planning_directive.call_args
-        assert 'attempt 1' in args[0]
-
-    def test_set_planning_directive_breach_message(self):
-        from backend.orchestration.state.state import State
-
-        executor = self._make_executor('agent', active_tasks=True)
-        state = MagicMock(spec=State)
-        executor._state = state
-        action = MessageAction(content='plain answer')
-
-        for _ in range(executor._PLAIN_TEXT_GATE_MAX_RETRIES + 1):
+        with pytest.raises(LLMNoActionError):
             executor._gate_agent_mode_plain_text(
                 [action], _make_result('plain').response
             )
 
-        # The most recent directive should mention the breach.
+        state.set_planning_directive.assert_called_once()
         args, _ = state.set_planning_directive.call_args
-        assert 'stop' in args[0].lower()
+        assert 'attempt 1' in args[0]
 
     def test_plan_mode_allows_plain_text_without_task_tracker_state(self):
         executor = self._make_executor('plan', active_tasks=False)

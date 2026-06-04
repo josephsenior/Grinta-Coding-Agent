@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from backend.core.errors import LLMNoActionError
 from backend.core.interaction_modes import (
     AGENT_MODE,
     is_chat_mode,
@@ -63,37 +64,20 @@ class _ExecutorResponseMixin:
         return _extract_response_text_impl(response)
 
     def _gate_agent_mode_plain_text(
-        self, actions: list[Action], response: ModelResponse
+        self, actions: list[Action], _response: ModelResponse
     ) -> list[Action]:
-        """Block plain-text responses in Agent mode.
+        """Reject plain-text responses in Agent mode.
 
         Chat and Plan modes are not gated here. Agent mode has a stricter
         protocol: every model turn must resolve to a tool action, a
         ``communicate_with_user`` handoff, or ``finish``.
 
-        Behaviour:
-            * Each gate firing increments
-              ``self._consecutive_plain_text_blocks``. The original
-              ``actions`` list is replaced with a single ``MessageAction``
-              sentinel (``suppress_cli=True``, ``wait_for_response=False``).
-              The LLM's prose is stashed on
-              ``sentinel._gate_suppressed_text`` and the original ``actions``
-              list on ``sentinel._gate_suppressed_actions`` so the
-              orchestrator can later choose to surface them.
-            * A terse ``planning_directive`` is set on the executor's
-              ``_state.turn_signals`` so the LLM gets corrective feedback on
-              its next turn.
-            * Once the counter exceeds ``_PLAIN_TEXT_GATE_MAX_RETRIES`` the
-              sentinel is marked ``_gate_threshold_breach=True`` so the
-              orchestrator stops the turn with a protocol message. The
-              suppressed model prose is never treated as a final answer.
-
-        A single ``logger.debug`` line replaces the previous two ``WARNING``
-        lines so the log stays quiet while remaining observable in debug
-        builds.
+        When the parser returns only ``MessageAction`` objects in Agent mode,
+        raise ``LLMNoActionError``. ``ActionExecutionService`` owns the retry
+        policy for repairable model-output errors, so prose never becomes a
+        user-facing action and the event router cannot race against it.
         """
         from backend.ledger.action.message import MessageAction as _MessageAction
-        from backend.ledger.event import EventSource
 
         mode = self._get_agent_mode()
         if is_chat_mode(mode) or normalize_interaction_mode(mode) != AGENT_MODE:
@@ -103,32 +87,18 @@ class _ExecutorResponseMixin:
             return actions
 
         self._consecutive_plain_text_blocks += 1
-        breach = self._consecutive_plain_text_blocks > self._PLAIN_TEXT_GATE_MAX_RETRIES
 
-        self._set_plain_text_directive(self._consecutive_plain_text_blocks, breach)
+        self._set_plain_text_directive(self._consecutive_plain_text_blocks)
 
-        suppressed_text = ''
-        for a in actions:
-            suppressed_text = getattr(a, 'content', '') or suppressed_text
-
-        logger.debug(
-            'Plain-text gate fired (count=%d, breach=%s): suppressed %d message '
-            'action(s); directive set for next turn.',
+        logger.warning(
+            'Agent-mode LLM response contained plain text with no tool call '
+            '(count=%d); raising repairable no-action error.',
             self._consecutive_plain_text_blocks,
-            breach,
-            len(actions),
         )
-
-        sentinel = _MessageAction(
-            content='',
-            wait_for_response=False,
-            suppress_cli=True,
+        raise LLMNoActionError(
+            'Agent mode requires a tool action, but the model returned plain text '
+            'with no tool call.'
         )
-        sentinel.source = EventSource.AGENT
-        sentinel._gate_suppressed_text = suppressed_text  # type: ignore[attr-defined]
-        sentinel._gate_suppressed_actions = actions  # type: ignore[attr-defined]
-        sentinel._gate_threshold_breach = breach  # type: ignore[attr-defined]
-        return [sentinel]
 
     def _get_agent_mode(self) -> str:
         """Return the active mode string from run state or planner config."""
@@ -174,28 +144,17 @@ class _ExecutorResponseMixin:
         )
         return validated_actions
 
-    def _set_plain_text_directive(self, count: int, breach: bool) -> None:
+    def _set_plain_text_directive(self, count: int) -> None:
         """Set a terse planning directive so the LLM gets corrective feedback."""
         state = getattr(self, '_state', None)
         if state is None or not hasattr(state, 'set_planning_directive'):
             return
-        if breach:
-            text = (
-                'Protocol error: you have produced plain prose three times in a '
-                'row. The system will now stop this turn instead of treating '
-                'that prose as a final answer. Next turn, emit exactly one '
-                'action: finish to answer, communicate_with_user to ask, or a '
-                'work tool to continue.'
-            )
-        else:
-            text = (
-                f'Protocol error: your previous response was plain prose '
-                f'(attempt {count}). In Agent mode you must emit exactly one '
-                f'action every turn: finish to answer, communicate_with_user '
-                f'to ask, or a work tool to continue. After '
-                f'{self._PLAIN_TEXT_GATE_MAX_RETRIES} consecutive prose-only '
-                f'turns the system will stop instead of surfacing the prose.'
-            )
+        text = (
+            f'Protocol error: your previous response was plain prose '
+            f'(attempt {count}). In Agent mode you must emit exactly one '
+            f'tool action every turn: finish to answer, communicate_with_user '
+            f'to ask, or a work tool to continue.'
+        )
         try:
             state.set_planning_directive(
                 text,

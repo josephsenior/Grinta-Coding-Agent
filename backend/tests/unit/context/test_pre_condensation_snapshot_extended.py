@@ -9,11 +9,12 @@ from unittest.mock import patch
 
 from backend.context import pre_condensation_snapshot as snapshot_module
 from backend.context.pre_condensation_snapshot import extract_snapshot
+from backend.ledger.action.agent import AgentThinkAction
 from backend.ledger.action.commands import CmdRunAction
-from backend.ledger.action.files import FileEditAction
+from backend.ledger.action.files import FileEditAction, FileWriteAction
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.error import ErrorObservation
-from backend.ledger.observation.files import FileEditObservation
+from backend.ledger.observation.files import FileEditObservation, FileReadObservation
 
 
 def _fake_event(name: str, **attrs):
@@ -92,6 +93,76 @@ class TestPreCondensationSnapshot(unittest.TestCase):
             outcome_contains='FAILED (exit=1)',
         )
 
+    def test_extract_snapshot_records_test_results(self):
+        events = [
+            CmdRunAction(command='python -m pytest -q'),
+            CmdOutputObservation(
+                content='2 passed in 0.10s',
+                command='python -m pytest -q',
+                exit_code=0,
+            ),
+            CmdRunAction(command='npm test'),
+            CmdOutputObservation(
+                content='FAIL src/app.test.ts\nexpected true',
+                command='npm test',
+                exit_code=1,
+            ),
+        ]
+
+        snapshot = extract_snapshot(events)
+
+        assert snapshot['test_results'] == [
+            {
+                'command': 'python -m pytest -q',
+                'status': 'passed',
+                'exit_code': 0,
+                'output': '2 passed in 0.10s',
+            },
+            {
+                'command': 'npm test',
+                'status': 'failed',
+                'exit_code': 1,
+                'output': 'FAIL src/app.test.ts\nexpected true',
+            },
+        ]
+
+    def test_extract_snapshot_records_file_hashes(self):
+        events = [
+            FileReadObservation(path='src/read.py', content='print("read")\n'),
+            FileWriteAction(path='src/write.py', content='print("write")\n'),
+            FileEditObservation(
+                content='edited',
+                path='src/edit.py',
+                new_content='print("edit")\n',
+                new_content_hash='abc123def456',
+            ),
+        ]
+
+        snapshot = extract_snapshot(events)
+
+        files = snapshot['files_touched']
+        assert files['src/read.py']['hash_source'] == 'read_observation'
+        assert files['src/read.py']['size'] == len('print("read")\n')
+        assert files['src/write.py']['hash_source'] == 'write_content'
+        assert files['src/write.py']['type'] == 'write'
+        assert files['src/edit.py']['sha256'] == 'abc123def456'
+        assert files['src/edit.py']['hash_source'] == 'edit_observation'
+
+    def test_extract_snapshot_records_invalidated_assumptions(self):
+        events = [
+            AgentThinkAction(
+                thought='Assumption invalidated: the parser error was not caused by TOML.'
+            ),
+            AgentThinkAction(thought='Use the simpler branch here'),
+        ]
+
+        snapshot = extract_snapshot(events)
+
+        assert snapshot['invalidated_assumptions'] == [
+            'Assumption invalidated: the parser error was not caused by TOML.'
+        ]
+        assert snapshot['decisions'] == ['Use the simpler branch here']
+
     def test_format_snapshot_for_injection(self):
         from backend.context.pre_condensation_snapshot import (
             format_snapshot_for_injection,
@@ -100,6 +171,17 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         snapshot = {
             'events_condensed': 10,
             'files_touched': {'test.py': {'action': 'edit'}},
+            'invalidated_assumptions': [
+                'Assumption invalidated: the timeout was not network-related.'
+            ],
+            'test_results': [
+                {
+                    'command': 'pytest -q',
+                    'status': 'failed',
+                    'exit_code': 1,
+                    'output': 'FAILED test_parser.py',
+                }
+            ],
             'attempted_approaches': [
                 {
                     'type': 'command',
@@ -115,6 +197,10 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         assert 'test.py' in formatted
         assert 'FAILED approaches' in formatted
         assert 'pytest' in formatted
+        assert 'Test results before condensation' in formatted
+        assert 'FAILED (exit=1): pytest -q' in formatted
+        assert 'Invalidated assumptions' in formatted
+        assert 'timeout was not network-related' in formatted
 
     def test_file_edit_observation_benign_error_word_is_success(self):
         """Diff/code mentioning 'error' must not mark the approach as FAILED."""
@@ -307,7 +393,9 @@ class TestPreCondensationSnapshot(unittest.TestCase):
             (snapshot_module._format_files_section, {}),
             (snapshot_module._format_errors_section, []),
             (snapshot_module._format_decisions_section, []),
+            (snapshot_module._format_invalidated_assumptions_section, []),
             (snapshot_module._format_commands_section, []),
+            (snapshot_module._format_test_results_section, []),
             (snapshot_module._format_approaches_section, []),
         ):
             assert formatter(payload) == []  # type: ignore[arg-type]

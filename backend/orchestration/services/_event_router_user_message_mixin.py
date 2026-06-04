@@ -180,7 +180,5 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
                 context=source,
             )
             self._ctrl.event_stream.add_event(observation, EventSource.ENVIRONMENT)
-        if self._ctrl.get_agent_state() != AgentState.RUNNING:
-            await self._ctrl.set_agent_state_to(AgentState.RUNNING)
         action.suppress_cli = True
         action.wait_for_response = False

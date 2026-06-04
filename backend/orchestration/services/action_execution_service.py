@@ -443,6 +443,37 @@ class ActionExecutionService:
         if controller.get_agent_state() == _AgentState.RUNNING:  # type: ignore[attr-defined]
             await controller.set_agent_state_to(_AgentState.ERROR)  # type: ignore[attr-defined]
 
+    async def _pause_after_llm_no_action_repair_exhausted(
+        self,
+        controller: object,
+        *,
+        attempts: int,
+    ) -> None:
+        from backend.core.schemas import AgentState as _AgentState
+
+        event_stream = self._context.event_stream
+        if event_stream is not None:
+            event_stream.add_event(
+                ErrorObservation(
+                    content=(
+                        'Protocol error: Agent mode requires a tool action, but the '
+                        f'model kept replying without one after {attempts} attempts. '
+                        'I paused the run instead of treating that prose as an answer. '
+                        'Retry the request, or switch to Chat mode for free-form replies.'
+                    ),
+                    error_id='LLM_NO_ACTION_REPAIR_EXHAUSTED',
+                    agent_only=False,
+                ),
+                EventSource.AGENT,
+            )
+        else:
+            logger.warning(
+                'ActionExecutionService could not publish no-action repair exhaustion '
+                'because event_stream is unavailable'
+            )
+        if controller.get_agent_state() == _AgentState.RUNNING:  # type: ignore[attr-defined]
+            await controller.set_agent_state_to(_AgentState.AWAITING_USER_INPUT)  # type: ignore[attr-defined]
+
     async def _handle_repairable_action_error(
         self,
         exc: Exception,
@@ -474,6 +505,12 @@ class ActionExecutionService:
                 identical_error_count,
                 error_signature,
             )
+            if isinstance(exc, LLMNoActionError):
+                await self._pause_after_llm_no_action_repair_exhausted(
+                    controller,
+                    attempts=identical_error_count,
+                )
+                return False, error_logged, error_signature, identical_error_count
             await self._set_controller_error_if_running(controller)
             return False, error_logged, error_signature, identical_error_count
 
@@ -481,6 +518,17 @@ class ActionExecutionService:
             await self._yield_for_repair_retry()
             return True, error_logged, error_signature, identical_error_count
 
+        if isinstance(exc, LLMNoActionError):
+            logger.error(
+                'get_next_action exhausted %d no-action repair attempts; '
+                'pausing for user input',
+                max_repair_attempts,
+            )
+            await self._pause_after_llm_no_action_repair_exhausted(
+                controller,
+                attempts=max_repair_attempts + 1,
+            )
+            return False, error_logged, error_signature, identical_error_count
         logger.error(
             'get_next_action exhausted %d repair attempts; transitioning to ERROR state',
             max_repair_attempts,

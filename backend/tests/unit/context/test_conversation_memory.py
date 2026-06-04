@@ -28,6 +28,7 @@ from backend.ledger.action.mcp import MCPAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation import AgentThinkObservation, ErrorObservation
 from backend.ledger.observation.commands import CmdOutputObservation
+from backend.ledger.observation.files import FileEditObservation
 from backend.ledger.observation.mcp import MCPObservation
 from backend.ledger.tool import ToolCallMetadata, build_tool_call_metadata
 
@@ -341,6 +342,83 @@ class TestToolPairingMessageShape:
         assert not any(m.role == 'assistant' and m.tool_calls for m in messages)
         assert not any(m.role == 'tool' for m in messages)
         assert sum(1 for m in messages if m.role == 'user') >= 2
+
+
+class TestPromptRenderCache:
+    def test_reuses_stable_observation_rendering(self, monkeypatch):
+        mem = _make_memory()
+        initial_user = MessageAction(content='start')
+        initial_user.source = EventSource.USER
+        obs = CmdOutputObservation(content='ok', command='pytest -q', exit_code=0)
+
+        calls = 0
+        original = mem._get_message_for_observation
+
+        def counted(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(mem, '_get_message_for_observation', counted)
+
+        mem.process_events([obs], initial_user, max_message_chars=None)
+        mem.process_events([obs], initial_user, max_message_chars=None)
+
+        assert calls == 1
+
+    def test_file_hash_change_invalidates_render_cache(self, monkeypatch):
+        mem = _make_memory()
+        initial_user = MessageAction(content='start')
+        initial_user.source = EventSource.USER
+        obs = FileEditObservation(
+            content='edited',
+            path='src/app.py',
+            new_content='print("one")\n',
+            new_content_hash='hash_one',
+        )
+
+        calls = 0
+        original = mem._get_message_for_observation
+
+        def counted(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(mem, '_get_message_for_observation', counted)
+
+        mem.process_events([obs], initial_user, max_message_chars=None)
+        obs.new_content_hash = 'hash_two'
+        mem.process_events([obs], initial_user, max_message_chars=None)
+
+        assert calls == 2
+
+    def test_tool_observations_are_not_render_cached(self, monkeypatch):
+        mem = _make_memory()
+        initial_user = MessageAction(content='start')
+        initial_user.source = EventSource.USER
+        obs = MCPObservation(content='{"ok": true}', name='remote_tool', arguments={})
+        obs.tool_call_metadata = ToolCallMetadata(
+            function_name='remote_tool',
+            tool_call_id='call_uncached',
+            model_response={'id': 'resp_uncached'},
+            total_calls_in_response=1,
+        )
+
+        calls = 0
+        original = mem._get_message_for_observation
+
+        def counted(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(mem, '_get_message_for_observation', counted)
+
+        mem.process_events([obs], initial_user, max_message_chars=None)
+        mem.process_events([obs], initial_user, max_message_chars=None)
+
+        assert calls == 2
 
 
 class TestStaticHelpers:

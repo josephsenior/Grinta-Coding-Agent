@@ -18,6 +18,7 @@ Extracted context:
 from __future__ import annotations
 
 import json
+import hashlib
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -31,6 +32,8 @@ if TYPE_CHECKING:
 _MAX_ERRORS = 10
 _MAX_DECISIONS = 15
 _MAX_COMMANDS = 10
+_MAX_TEST_RESULTS = 8
+_MAX_INVALIDATED_ASSUMPTIONS = 12
 _MAX_CONTENT_LENGTH = 500
 
 
@@ -129,7 +132,9 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
         'files_touched': {},
         'recent_errors': [],
         'decisions': [],
+        'invalidated_assumptions': [],
         'recent_commands': [],
+        'test_results': [],
         'attempted_approaches': [],
     }
 
@@ -137,10 +142,42 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
         _extract_file_info(event, snapshot)
         _extract_errors(event, snapshot)
         _extract_decisions(event, snapshot)
+        _extract_invalidated_assumptions(event, snapshot)
         _extract_commands(event, snapshot)
 
     _extract_attempted_approaches(events, snapshot)
+    _extract_test_results(events, snapshot)
     return snapshot
+
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode('utf-8', 'ignore')).hexdigest()
+
+
+def _update_file_record(
+    files: dict,
+    path: str,
+    *,
+    action: str,
+    record_type: str,
+    content: str | None = None,
+    content_hash: str | None = None,
+    hash_source: str | None = None,
+) -> None:
+    if not path:
+        return
+    record = dict(files.get(path, {}))
+    record.update({'action': action, 'type': record_type})
+    if content_hash:
+        record['sha256'] = content_hash
+        if hash_source:
+            record['hash_source'] = hash_source
+    elif content is not None:
+        record['sha256'] = _sha256_text(content)
+        record['size'] = len(content)
+        if hash_source:
+            record['hash_source'] = hash_source
+    files[path] = record
 
 
 def _extract_edit_file_info(event: Event, files: dict) -> None:
@@ -148,14 +185,77 @@ def _extract_edit_file_info(event: Event, files: dict) -> None:
     path = getattr(event, 'path', '')
     if path:
         command = getattr(event, 'command', 'edit')
-        files[path] = {'action': command, 'type': 'edit'}
+        content_hash = getattr(event, 'new_content_hash', None)
+        new_content = getattr(event, 'new_content', None)
+        payload_content = (
+            getattr(event, 'file_text', None)
+            or getattr(event, 'new_str', None)
+            or getattr(event, 'content', None)
+        )
+        if isinstance(content_hash, str) and content_hash:
+            _update_file_record(
+                files,
+                path,
+                action=command,
+                record_type='edit',
+                content_hash=content_hash,
+                hash_source='edit_observation',
+            )
+        elif isinstance(new_content, str):
+            _update_file_record(
+                files,
+                path,
+                action=command,
+                record_type='edit',
+                content=new_content,
+                hash_source='new_content',
+            )
+        elif isinstance(payload_content, str) and payload_content:
+            _update_file_record(
+                files,
+                path,
+                action=command,
+                record_type='edit',
+                content=payload_content,
+                hash_source='edit_payload',
+            )
+        else:
+            _update_file_record(files, path, action=command, record_type='edit')
 
 
 def _extract_read_file_info(event: Event, files: dict) -> None:
     """Extract file path from FileRead* events."""
     path = getattr(event, 'path', '')
     if path and path not in files:
-        files[path] = {'action': 'read', 'type': 'read'}
+        content = getattr(event, 'content', None)
+        if isinstance(content, str):
+            _update_file_record(
+                files,
+                path,
+                action='read',
+                record_type='read',
+                content=content,
+                hash_source='read_observation',
+            )
+        else:
+            _update_file_record(files, path, action='read', record_type='read')
+
+
+def _extract_write_file_info(event: Event, files: dict) -> None:
+    """Extract file path and hash from FileWrite* events."""
+    path = getattr(event, 'path', '')
+    content = getattr(event, 'content', None)
+    if isinstance(content, str):
+        _update_file_record(
+            files,
+            path,
+            action='write',
+            record_type='write',
+            content=content,
+            hash_source='write_content',
+        )
+    elif path:
+        _update_file_record(files, path, action='write', record_type='write')
 
 
 def _extract_cmd_run_file_paths(event: Event, files: dict) -> None:
@@ -178,6 +278,8 @@ def _extract_file_info(event: Event, snapshot: dict) -> None:
 
     if cls_name in ('FileEditAction', 'FileEditObservation'):
         _extract_edit_file_info(event, files)
+    elif cls_name in ('FileWriteAction', 'FileWriteObservation'):
+        _extract_write_file_info(event, files)
     elif cls_name in ('FileReadAction', 'FileReadObservation'):
         _extract_read_file_info(event, files)
     elif cls_name == 'CmdRunAction':
@@ -239,8 +341,71 @@ def _extract_decisions(event: Event, snapshot: dict) -> None:
                 },
             )
         # #endregion
-        if thought and not should_skip:
+        if thought and not should_skip and not _is_invalidated_assumption_text(thought):
             snapshot['decisions'].append(thought[:_MAX_CONTENT_LENGTH])
+
+
+_INVALIDATION_MARKERS = (
+    'invalidated',
+    'was wrong',
+    'were wrong',
+    'not true',
+    'false assumption',
+    'does not hold',
+    'did not hold',
+    'contradicted',
+    'turns out',
+)
+_ASSUMPTION_MARKERS = (
+    'assumption',
+    'assumed',
+    'hypothesis',
+    'thought',
+    'believed',
+    'expected',
+    'previously',
+    'initially',
+)
+
+
+def _event_reasoning_text(event: Event) -> str:
+    for attr in ('thought', 'content', 'message'):
+        value = getattr(event, attr, None)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ''
+
+
+def _is_invalidated_assumption_text(text: str) -> bool:
+    lower = text.lower()
+    has_invalidation = any(marker in lower for marker in _INVALIDATION_MARKERS)
+    has_assumption = any(marker in lower for marker in _ASSUMPTION_MARKERS)
+    return has_invalidation and (has_assumption or 'turns out' in lower)
+
+
+def _extract_invalidated_assumptions(event: Event, snapshot: dict) -> None:
+    """Extract assumptions or hypotheses that were explicitly corrected."""
+    invalidated = snapshot.get('invalidated_assumptions')
+    if (
+        not isinstance(invalidated, list)
+        or len(invalidated) >= _MAX_INVALIDATED_ASSUMPTIONS
+    ):
+        return
+    cls_name = type(event).__name__
+    if cls_name not in (
+        'AgentThinkAction',
+        'AgentThinkObservation',
+        'MessageAction',
+        'ErrorObservation',
+    ):
+        return
+    text = _event_reasoning_text(event)
+    if not text:
+        return
+    if _is_invalidated_assumption_text(text):
+        clipped = text[:_MAX_CONTENT_LENGTH]
+        if clipped not in invalidated:
+            invalidated.append(clipped)
 
 
 def _extract_commands(event: Event, snapshot: dict) -> None:
@@ -265,6 +430,48 @@ def _extract_commands(event: Event, snapshot: dict) -> None:
             else:
                 truncated = lines
             commands[-1]['output'] = '\n'.join(truncated)[:_MAX_CONTENT_LENGTH]
+
+
+def _summarize_command_output(content: str) -> str:
+    lines = content.strip().split('\n')
+    if len(lines) > 8:
+        lines = lines[:2] + ['... (truncated) ...'] + lines[-3:]
+    return '\n'.join(lines)[:_MAX_CONTENT_LENGTH]
+
+
+def _extract_test_results(events: list[Event], snapshot: dict) -> None:
+    """Extract command/output pairs for test runs."""
+    from backend.validation.command_classification import is_test_run_command
+
+    results = snapshot['test_results']
+    pending: dict[str, Any] | None = None
+    for event in events:
+        if len(results) >= _MAX_TEST_RESULTS:
+            return
+        cls_name = type(event).__name__
+        if cls_name == 'CmdRunAction':
+            command = str(getattr(event, 'command', ''))
+            pending = (
+                {
+                    'command': command[:_MAX_CONTENT_LENGTH],
+                    'event_id': getattr(event, 'id', None),
+                }
+                if is_test_run_command(command)
+                else None
+            )
+            continue
+        if cls_name != 'CmdOutputObservation' or pending is None:
+            continue
+        exit_code = getattr(event, 'exit_code', None)
+        status = 'passed' if exit_code == 0 else 'failed'
+        result = {
+            'command': pending['command'],
+            'status': status,
+            'exit_code': exit_code,
+            'output': _summarize_command_output(str(getattr(event, 'content', ''))),
+        }
+        results.append(result)
+        pending = None
 
 
 def _extract_attempted_approaches(events: list[Event], snapshot: dict) -> None:
@@ -412,7 +619,13 @@ def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
     parts.extend(_format_files_section(snapshot.get('files_touched', {})))
     parts.extend(_format_errors_section(snapshot.get('recent_errors', [])))
     parts.extend(_format_decisions_section(snapshot.get('decisions', [])))
+    parts.extend(
+        _format_invalidated_assumptions_section(
+            snapshot.get('invalidated_assumptions', [])
+        )
+    )
     parts.extend(_format_commands_section(snapshot.get('recent_commands', [])))
+    parts.extend(_format_test_results_section(snapshot.get('test_results', [])))
     parts.extend(_format_approaches_section(snapshot.get('attempted_approaches', [])))
     parts.append('</RESTORED_CONTEXT>')
     return '\n'.join(parts)
@@ -445,7 +658,16 @@ def _format_files_section(files: dict) -> list[str]:
         return []
     lines = ['\nFiles touched before condensation:']
     for path, info in list(files.items())[:30]:
-        lines.append(f'  {info.get("action", "?")}: {path}')
+        suffix = ''
+        file_hash = info.get('sha256')
+        if isinstance(file_hash, str) and file_hash:
+            short_hash = file_hash[:16]
+            size = info.get('size')
+            suffix = f' [sha256:{short_hash}'
+            if isinstance(size, int):
+                suffix += f', size={size}'
+            suffix += ']'
+        lines.append(f'  {info.get("action", "?")}: {path}{suffix}')
     return lines
 
 
@@ -481,6 +703,18 @@ def _format_decisions_section(decisions: list) -> list[str]:
     return lines
 
 
+def _format_invalidated_assumptions_section(invalidated: list) -> list[str]:
+    """Format assumptions that should not be relied on after recovery."""
+    if not invalidated:
+        return []
+    lines = [
+        f'\nInvalidated assumptions ({len(invalidated)}) - do not rely on these:'
+    ]
+    for item in invalidated[-8:]:
+        lines.append(f'  - {str(item)[:200]}')
+    return lines
+
+
 def _format_commands_section(commands: list) -> list[str]:
     """Format recent commands section."""
     if not commands:
@@ -491,6 +725,22 @@ def _format_commands_section(commands: list) -> list[str]:
         lines.append(f'  $ {cmd}')
         if 'output' in cmd_info:
             lines.append(f'    → {cmd_info["output"][:150]}')
+    return lines
+
+
+def _format_test_results_section(results: list) -> list[str]:
+    """Format recent test command outcomes."""
+    if not results:
+        return []
+    lines = [f'\nTest results before condensation ({len(results)}):']
+    for result in results[-5:]:
+        command = str(result.get('command', ''))[:150]
+        status = str(result.get('status', '?')).upper()
+        exit_code = result.get('exit_code')
+        lines.append(f'  {status} (exit={exit_code}): {command}')
+        output = str(result.get('output', '')).strip()
+        if output:
+            lines.append(f'    output: {output[:200]}')
     return lines
 
 

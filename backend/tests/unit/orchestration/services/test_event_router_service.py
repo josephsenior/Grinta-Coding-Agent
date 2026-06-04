@@ -200,6 +200,31 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(action.suppress_cli)
         self.assertFalse(action.wait_for_response)
 
+    async def test_rejected_agent_message_does_not_resume_paused_turn(self):
+        action = MessageAction(content='I am done.')
+        action.source = EventSource.AGENT
+        action.wait_for_response = True
+        self.mock_controller.get_agent_state.return_value = (
+            AgentState.AWAITING_USER_INPUT
+        )
+        self.mock_controller.state.plan = SimpleNamespace(
+            steps=[
+                SimpleNamespace(
+                    id='1',
+                    description='Still working',
+                    status='doing',
+                    subtasks=[],
+                )
+            ]
+        )
+
+        await self.service._handle_action(action)
+
+        self.mock_controller.set_agent_state_to.assert_not_called()
+        self.mock_controller.state.set_planning_directive.assert_called_once()
+        self.assertTrue(action.suppress_cli)
+        self.assertFalse(action.wait_for_response)
+
     async def test_handle_action_message_from_agent_terminal_plan_allows_handoff(
         self,
     ):
