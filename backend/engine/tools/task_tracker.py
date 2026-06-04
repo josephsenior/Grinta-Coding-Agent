@@ -6,7 +6,7 @@ from typing import Any
 
 from backend.core.task_status import (
     TASK_STATUS_BLOCKED,
-    TASK_STATUS_DOING,
+    TASK_STATUS_IN_PROGRESS,
     TASK_STATUS_DONE,
     TASK_STATUS_SKIPPED,
     TASK_STATUS_TODO,
@@ -23,14 +23,12 @@ _TASK_TRACKER_DESCRIPTION = (
     'Use `update` with a task_list to create or overwrite the plan. '
     'Use `view` (without a task_list) to read the current plan. '
     'Use `update_status` to change a single task status by ID (no need to re-emit full list). '
-    'Statuses must be exactly one of: `todo`, `doing`, `done`, `skipped`, `blocked`. '
-    'Use `doing`, not `in_progress`; use `done`, not `completed`; use `todo`, not `pending`. '
+    'Statuses must be exactly one of: `todo`, `in_progress`, `done`, `skipped`, `blocked`. '
     'Terminal states for finish are `done`, `skipped`, `blocked`.'
 )
 
 _TASK_STATUS_DESCRIPTION = (
-    'Current status. Must be exactly one of: todo, doing, done, skipped, blocked. '
-    'Use doing, not in_progress; done, not completed; todo, not pending.'
+    'Current status. Must be exactly one of: todo, in_progress, done, skipped, blocked.'
 )
 
 
@@ -50,7 +48,7 @@ def _task_step_schema(depth: int = 2) -> dict[str, Any]:
             'description': _TASK_STATUS_DESCRIPTION,
             'enum': [
                 TASK_STATUS_TODO,
-                TASK_STATUS_DOING,
+                TASK_STATUS_IN_PROGRESS,
                 TASK_STATUS_DONE,
                 TASK_STATUS_SKIPPED,
                 TASK_STATUS_BLOCKED,
@@ -142,7 +140,7 @@ class TaskTracker:
         """
         valid_statuses = {
             TASK_STATUS_TODO,
-            TASK_STATUS_DOING,
+            TASK_STATUS_IN_PROGRESS,
             TASK_STATUS_DONE,
             TASK_STATUS_SKIPPED,
             TASK_STATUS_BLOCKED,
@@ -213,7 +211,7 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
                 'description': f"For 'update_status': new status value. {_TASK_STATUS_DESCRIPTION}",
                 'enum': [
                     TASK_STATUS_TODO,
-                    TASK_STATUS_DOING,
+                    TASK_STATUS_IN_PROGRESS,
                     TASK_STATUS_DONE,
                     TASK_STATUS_SKIPPED,
                     TASK_STATUS_BLOCKED,

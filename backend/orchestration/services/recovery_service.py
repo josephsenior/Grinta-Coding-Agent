@@ -576,14 +576,14 @@ class RecoveryService:
             return
 
     def _inject_task_reconciliation_directive(self, controller, exc: Exception) -> None:
-        """Inject a directive requiring task_tracker reconciliation when ``doing`` steps exist.
+        """Inject a directive requiring task_tracker reconciliation when ``in_progress`` steps exist.
 
         After a survivable error the model continues, but if a plan step is
-        still marked ``doing`` the model tends to ignore it.  This directive
+        still marked ``in_progress`` the model tends to ignore it.  This directive
         forces the next turn to explicitly reconcile the plan via
         ``task_tracker update`` before doing any other work.
         """
-        from backend.core.task_status import TASK_STATUS_DOING
+        from backend.core.task_status import TASK_STATUS_IN_PROGRESS
 
         state = getattr(controller, 'state', None)
         if state is None or not hasattr(state, 'set_planning_directive'):
@@ -601,28 +601,28 @@ class RecoveryService:
         if plan is None:
             return
 
-        doing_steps = [
+        in_progress_steps = [
             s
             for s in getattr(plan, 'steps', [])
-            if getattr(s, 'status', '') == TASK_STATUS_DOING
+            if getattr(s, 'status', '') == TASK_STATUS_IN_PROGRESS
         ]
-        if not doing_steps:
+        if not in_progress_steps:
             return
 
-        ids = ', '.join(getattr(s, 'id', '?') for s in doing_steps)
+        ids = ', '.join(getattr(s, 'id', '?') for s in in_progress_steps)
         directive = (
             f'A recoverable error just occurred while plan step(s) [{ids}] '
-            f'had status "doing". Before any other work, call task_tracker '
+            f'had status "in_progress". Before any other work, call task_tracker '
             f'update to reconcile the plan: move failed steps back to "todo" '
-            f'(with a result note), or keep them "doing" if you intend to '
-            f'retry immediately. Do NOT leave stale "doing" steps unaddressed.'
+            f'(with a result note), or keep them "in_progress" if you intend to '
+            f'retry immediately. Do NOT leave stale "in_progress" steps unaddressed.'
         )
         state.set_planning_directive(
             directive,
             source=f'RecoveryService.task_reconciliation({type(exc).__name__})',
         )
         logger.info(
-            'Injected task-reconciliation directive for doing steps: %s',
+            'Injected task-reconciliation directive for in_progress steps: %s',
             ids,
         )
 

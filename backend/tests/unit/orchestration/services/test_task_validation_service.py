@@ -60,7 +60,7 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         action = PlaybookFinishAction(outputs={})
         action.force_finish = True
         self.mock_controller.state.plan = SimpleNamespace(
-            steps=[SimpleNamespace(id='1', description='Do work', status='doing')]
+            steps=[SimpleNamespace(id='1', description='Do work', status='in_progress')]
         )
 
         result = await self.service.handle_finish(action)
@@ -221,7 +221,7 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result)
         self.mock_controller.event_stream.add_event.assert_called_once()
 
-    async def test_handle_finish_blocks_when_plan_has_doing_steps(self):
+    async def test_handle_finish_blocks_when_plan_has_in_progress_steps(self):
         action = PlaybookFinishAction(outputs={})
         self.mock_controller.task_validator = None
         self.mock_controller.state.plan = SimpleNamespace(
@@ -229,7 +229,7 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(
                     id='1',
                     description='Implement CLI interface',
-                    status='doing',
+                    status='in_progress',
                     subtasks=[],
                 )
             ]
@@ -286,7 +286,7 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
                     {
                         'id': '1',
                         'description': 'Implement CLI interface',
-                        'status': 'doing',
+                        'status': 'in_progress',
                     }
                 ]
             )

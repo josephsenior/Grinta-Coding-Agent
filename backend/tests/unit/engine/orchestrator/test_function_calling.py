@@ -314,12 +314,11 @@ class TestHandleTaskTrackerTool:
             task_item['properties']['subtasks']['items']['properties']['status']
         )
 
-        assert status['enum'] == ['todo', 'doing', 'done', 'skipped', 'blocked']
+        assert status['enum'] == ['todo', 'in_progress', 'done', 'skipped', 'blocked']
         assert nested_status['enum'] == status['enum']
         assert 'in_progress' in status['description']
-        assert 'doing' in status['description']
 
-    @pytest.mark.parametrize('legacy_status', ['pending', 'in_progress', 'completed'])
+    @pytest.mark.parametrize('legacy_status', ['pending', 'doing', 'completed'])
     def test_rejects_legacy_task_status_aliases(self, legacy_status: str):
         args = {
             'command': 'update',
@@ -340,7 +339,7 @@ class TestHandleTaskTrackerTool:
         monkeypatch.setenv('APP_WORKSPACE_DIR', str(tmp_path))
         args = {
             'command': 'update',
-            'task_list': [{'id': '1', 'description': 'step', 'status': 'doing'}],
+            'task_list': [{'id': '1', 'description': 'step', 'status': 'in_progress'}],
         }
 
         first = _handle_task_tracker_tool(args)

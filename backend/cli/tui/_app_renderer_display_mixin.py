@@ -61,7 +61,7 @@ class _AppRendererDisplayMixin:
 
         _TASK_TO_SIDEBAR_STATUS = {
             'done': 'ok',
-            'doing': 'running',
+            'in_progress': 'running',
             'blocked': 'err',
             'todo': 'neutral',
             'skipped': 'warn',

@@ -478,7 +478,7 @@ def _build_context_discipline_section(
                 '- Use task_tracker for multi-step, multi-file, risky, long-running, or recovery-heavy tasks.',
                 '- For small/local tasks, do not create tracker overhead; act, verify, and finish.',
                 '- If task_tracker was used for this run, keep it synced before finish.',
-                "- Update status \u2192 'doing' when starting, 'done' after proof, 'blocked' with reason.",
+                "- Update status \u2192 'in_progress' when starting, 'done' after proof, 'blocked' with reason.",
                 '- For multi-step tasks: task_tracker(view) at turn start to re-anchor.',
             ]
         )
@@ -660,8 +660,8 @@ def _render_autonomy(
             '<TASK_TRACKING>\n'
             '**task_tracker**: For multi-step tasks, use `view` to inspect the plan and `update` to replace the full `task_list`.\n'
             'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task without re-emitting the full list. Optional `result` field captures outcome.\n'
-            'Allowed statuses: `todo`, `doing`, `done`, `skipped`, `blocked`.\n'
-            '**Completion**: Before `finish`, no task should remain `todo` or `doing`. Mark truly completed work `done`, intentionally omitted work `skipped`, and only genuinely blocked work `blocked` with a reason.'
+            'Allowed statuses: `todo`, `in_progress`, `done`, `skipped`, `blocked`.\n'
+            '**Completion**: Before `finish`, no task should remain `todo` or `in_progress`. Mark truly completed work `done`, intentionally omitted work `skipped`, and only genuinely blocked work `blocked` with a reason.'
             '</TASK_TRACKING>'
         )
     else:
@@ -805,7 +805,7 @@ def _render_critical(
         terminal_manager_rule = ''
 
     task_tracker_antipattern = (
-        '- **Calling `finish` with `task_tracker` items still `todo` or `doing`.** Sync the tracker first.'
+        '- **Calling `finish` with `task_tracker` items still `todo` or `in_progress`.** Sync the tracker first.'
         if tracker_on
         else ''
     )

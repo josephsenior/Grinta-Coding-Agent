@@ -94,7 +94,7 @@ class TestCreateTaskTrackerTool:
         status_prop = items.get('properties', {}).get('status', {})
         status_enum = status_prop.get('enum', [])
         assert 'todo' in status_enum
-        assert 'doing' in status_enum
+        assert 'in_progress' in status_enum
         assert 'done' in status_enum
         assert 'skipped' in status_enum
         assert 'blocked' in status_enum

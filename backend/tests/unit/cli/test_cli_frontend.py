@@ -3121,21 +3121,21 @@ async def test_renderer_handles_task_tracking_action() -> None:
 
 def test_task_panel_signature_accepts_planstep_payloads() -> None:
     steps = [
-        PlanStep(id='1', description='Implement task tracker', status='doing'),
+        PlanStep(id='1', description='Implement task tracker', status='in_progress'),
         PlanStep(id='2', description='Verify sidebar refresh', status='done'),
     ]
 
     signature = task_panel_signature(steps)
 
     assert signature == (
-        ('1', 'doing', 'Implement task tracker'),
+        ('1', 'in_progress', 'Implement task tracker'),
         ('2', 'done', 'Verify sidebar refresh'),
     )
 
 
 def test_task_sidebar_panel_renders_planstep_payloads() -> None:
     steps = [
-        PlanStep(id='1', description='Implement task tracker', status='doing'),
+        PlanStep(id='1', description='Implement task tracker', status='in_progress'),
         PlanStep(id='2', description='Verify sidebar refresh', status='done'),
     ]
 
@@ -3169,7 +3169,7 @@ async def test_renderer_syncs_task_panel_from_update_action_before_observation()
                 {
                     'id': '1',
                     'description': 'Analyze manifest structure',
-                    'status': 'doing',
+                    'status': 'in_progress',
                 }
             ],
         )
@@ -3223,7 +3223,7 @@ async def test_renderer_task_tracking_observation_replaces_previous_panel() -> N
                 {
                     'id': '1',
                     'description': 'Analyze manifest structure',
-                    'status': 'doing',
+                    'status': 'in_progress',
                 }
             ],
         )
@@ -3257,7 +3257,7 @@ async def test_renderer_shows_noop_task_tracker_message_for_update() -> None:
                 {
                     'id': '1',
                     'description': 'Analyze manifest structure',
-                    'status': 'doing',
+                    'status': 'in_progress',
                 }
             ],
         )
@@ -3415,7 +3415,7 @@ async def test_renderer_sanitizes_task_tracking_prompt_markup_in_messages() -> N
         content=(
             '<TASK_TRACKING>\n'
             'task_tracker: update\n'
-            'Allowed statuses: todo, doing, done\n'
+            'Allowed statuses: todo, in_progress, done\n'
             '</TASK_TRACKING>\n'
             'Applied the patch and reran the test.'
         )

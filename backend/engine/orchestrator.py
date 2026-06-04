@@ -822,12 +822,12 @@ class Orchestrator(Agent):
 
     @staticmethod
     def _has_active_tasks_in_state(state: State) -> bool:
-        """Check if state history contains any task in 'todo' or 'doing' status."""
+        """Check if state history contains any task in 'todo' or 'in_progress' status."""
         for event in getattr(state, 'history', []):
             if isinstance(event, TaskTrackingObservation):
                 for task in getattr(event, 'task_list', []):
                     status = (task.get('status') or '').lower()
-                    if status in ('todo', 'doing'):
+                    if status in ('todo', 'in_progress'):
                         return True
         return False
 

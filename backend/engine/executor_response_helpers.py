@@ -84,9 +84,7 @@ def build_recoverable_tool_call_error_action(exc: Exception) -> Action:
     if 'Invalid task status' in detail:
         extra_hint = (
             '\nFor task_tracker status values, use exactly: '
-            '`todo`, `doing`, `done`, `skipped`, `blocked`. '
-            'Translate common aliases as: `in_progress` -> `doing`, '
-            '`completed` -> `done`, `pending` -> `todo`.\n'
+            '`todo`, `in_progress`, `done`, `skipped`, `blocked`.\n'
         )
 
     return AgentThinkAction(

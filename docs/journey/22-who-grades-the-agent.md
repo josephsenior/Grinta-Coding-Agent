@@ -39,7 +39,7 @@ That architecture removes the model's ability to "declare victory" without survi
 
 One of the strongest checks is also one of the simplest.
 
-The validator walks the task plan tree and recursively finds non-terminal steps. If anything is still `todo` or `doing`, finish is blocked and the agent is pushed back into working state.
+The validator walks the task plan tree and recursively finds non-terminal steps. If anything is still `todo` or `in_progress`, finish is blocked and the agent is pushed back into working state.
 
 The feedback is explicit, not vague. The system reports which steps are still active and instructs the agent to update task tracking honestly.
 

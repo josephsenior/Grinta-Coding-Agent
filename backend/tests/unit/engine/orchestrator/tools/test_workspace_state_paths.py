@@ -95,7 +95,7 @@ def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) 
         lambda project_root=None: tmp_path,
     )
     tracker = TaskTracker(tmp_path)
-    task_list = [{'id': '1', 'description': 'Do it', 'status': 'doing'}]
+    task_list = [{'id': '1', 'description': 'Do it', 'status': 'in_progress'}]
 
     tracker.save_to_file(task_list)
 
@@ -104,7 +104,7 @@ def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) 
         {
             'id': '1',
             'description': 'Do it',
-            'status': 'doing',
+            'status': 'in_progress',
             'result': None,
             'tags': [],
             'subtasks': [],
@@ -112,7 +112,7 @@ def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) 
     ]
 
 
-def test_smart_compactor_reads_doing_ids_from_app_plan(tmp_path, monkeypatch) -> None:
+def test_smart_compactor_reads_in_progress_ids_from_app_plan(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,
@@ -123,7 +123,7 @@ def test_smart_compactor_reads_doing_ids_from_app_plan(tmp_path, monkeypatch) ->
         json.dumps(
             [
                 {'id': '1', 'description': 'one', 'status': 'done'},
-                {'id': '2', 'description': 'two', 'status': 'doing'},
+                {'id': '2', 'description': 'two', 'status': 'in_progress'},
             ]
         ),
         encoding='utf-8',
@@ -131,4 +131,4 @@ def test_smart_compactor_reads_doing_ids_from_app_plan(tmp_path, monkeypatch) ->
 
     compactor = SmartCompactor(llm=None)
 
-    assert compactor._load_doing_task_ids() == {'2'}
+    assert compactor._load_in_progress_task_ids() == {'2'}
