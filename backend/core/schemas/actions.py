@@ -490,6 +490,10 @@ class StreamingChunkActionSchema(ActionSchemaV1):
         description='True when streaming tool call arguments (not content)',
     )
     tool_call_name: str = Field(default='', description='Name of the tool being called')
+    suppress_live_response: bool = Field(
+        default=False,
+        description='True when streamed draft content must not be committed',
+    )
     thinking_chunk: str = Field(
         default='', description='New thinking/reasoning token from the model'
     )

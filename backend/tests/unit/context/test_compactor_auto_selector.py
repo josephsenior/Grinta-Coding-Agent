@@ -158,10 +158,30 @@ class TestSelectCompactorConfig:
         config = select_compactor_config(events)
         assert isinstance(config, RecentEventsCompactorConfig)
 
-    def test_long_session_with_llm_returns_smart(self):
+    def test_long_session_with_llm_defaults_to_amortized(self):
         events = _make_events(_LONG_SESSION + 10)
         config = select_compactor_config(events, llm_config='condenser_llm')
+        assert isinstance(config, AmortizedPruningCompactorConfig)
+
+    def test_long_session_with_llm_hot_path_allowed_returns_smart(self):
+        events = _make_events(_LONG_SESSION + 10)
+        config = select_compactor_config(
+            events,
+            llm_config='condenser_llm',
+            allow_llm_hot_path=True,
+        )
         assert isinstance(config, SmartCompactorConfig)
+        assert config.llm_config == 'condenser_llm'
+
+    def test_long_session_with_function_calling_hot_path_returns_structured(self):
+        events = _make_events(_LONG_SESSION + 10)
+        config = select_compactor_config(
+            events,
+            llm_config='condenser_llm',
+            supports_function_calling=True,
+            allow_llm_hot_path=True,
+        )
+        assert isinstance(config, StructuredSummaryCompactorConfig)
         assert config.llm_config == 'condenser_llm'
 
     def test_long_session_no_llm_returns_amortized(self):
@@ -238,6 +258,54 @@ class TestAutoCompactor:
         delegate.get_compaction.assert_awaited_once_with(view)
         assert result is compaction
 
+    async def test_normal_long_session_with_llm_uses_bounded_delegate(self):
+        auto = AutoCompactor(llm_config='condenser_llm', llm_registry=MagicMock())
+        view = View(events=_make_events(_LONG_SESSION + 10))
+        delegate = MagicMock()
+        delegate.compact = AsyncMock(return_value=view)
+
+        with patch(
+            'backend.context.compactor.strategies.auto_compactor.Compactor.from_config',
+            return_value=delegate,
+        ) as factory:
+            result = await auto.compact(view)
+
+        config = factory.call_args.args[0]
+        assert isinstance(config, AmortizedPruningCompactorConfig)
+        assert result is view
+
+    async def test_normal_long_session_can_opt_into_llm_hot_path(self):
+        auto = AutoCompactor(
+            llm_config='condenser_llm',
+            llm_registry=MagicMock(),
+            allow_llm_hot_path=True,
+        )
+        view = View(events=_make_events(_LONG_SESSION + 10))
+        delegate = MagicMock()
+        delegate.compact = AsyncMock(return_value=view)
+
+        with patch(
+            'backend.context.compactor.strategies.auto_compactor.Compactor.from_config',
+            return_value=delegate,
+        ) as factory:
+            result = await auto.compact(view)
+
+        config = factory.call_args.args[0]
+        assert isinstance(config, SmartCompactorConfig)
+        assert result is view
+
+    def test_status_prediction_for_normal_long_session(self):
+        auto = AutoCompactor(llm_config='condenser_llm', llm_registry=MagicMock())
+        view = View(events=_make_events(_LONG_SESSION + 10))
+
+        assert auto.should_emit_compaction_status(view) is True
+
+    def test_status_prediction_skips_medium_masking_session(self):
+        auto = AutoCompactor(llm_config='condenser_llm', llm_registry=MagicMock())
+        view = View(events=_make_events(_MEDIUM_SESSION + 10))
+
+        assert auto.should_emit_compaction_status(view) is False
+
 
 # ---------------------------------------------------------------------------
 # AutoCompactorConfig
@@ -252,6 +320,14 @@ class TestAutoCompactorConfig:
     def test_with_llm_config(self):
         cfg = AutoCompactorConfig(llm_config='my_llm')
         assert cfg.llm_config == 'my_llm'
+
+    def test_llm_hot_path_disabled_by_default(self):
+        cfg = AutoCompactorConfig()
+        assert cfg.allow_llm_hot_path is False
+
+    def test_can_enable_llm_hot_path(self):
+        cfg = AutoCompactorConfig(allow_llm_hot_path=True)
+        assert cfg.allow_llm_hot_path is True
 
     def test_rejects_extra_fields(self):
         with pytest.raises(Exception):

@@ -141,13 +141,12 @@ class _AppRendererLiveMixin:
             thoughts = list(self._live_thinking_widget._thoughts)
             if thoughts and self._live_thinking_dirty:
                 self._live_thinking_widget.finalize()
-                self._history.append(
-                    Text.assemble(
-                        ('Thinking:', 'bold #5eead4'),
-                        '  ',
-                        Text('\n  '.join(thoughts), style='rgb(150,154,189)'),
-                    )
+                snapshot = Text.assemble(
+                    ('Thinking:', 'bold #5eead4'),
+                    '  ',
+                    Text('\n  '.join(thoughts), style='rgb(150,154,189)'),
                 )
+                self._history.append(snapshot)
                 self._history.append(Text(''))
                 overflow = len(self._history) - _TUI_HISTORY_RENDER_LIMIT
                 if overflow > 0:

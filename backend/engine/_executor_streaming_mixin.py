@@ -35,18 +35,26 @@ class _ExecutorStreamingMixin:
     ) -> None:
         fallback_message = self._extract_fallback_message(fallback)
         fallback_content = self._extract_fallback_content(fallback, fallback_message)
-        if fallback_content:
-            await self._emit_stream_text_piece(
-                state,
-                fallback_content,
-                event_stream,
-            )
-
         fallback_reasoning = self._extract_fallback_reasoning(
             fallback,
             fallback_message,
         )
-        if fallback_reasoning:
+
+        if fallback_content:
+            # If the fallback content contains inline thinking tags (like <think>...</think>),
+            # we must process it through the text delta parser so the tags are stripped and
+            # the thinking/content streams are correctly separated/routed. Directly passing
+            # raw content with tags to _emit_stream_text_piece causes duplication/merging
+            # issues with the already-accumulated (stripped) stream content.
+            pseudo_delta: dict[str, Any] = {'content': fallback_content}
+            if fallback_reasoning:
+                pseudo_delta['reasoning_content'] = fallback_reasoning
+            await self._process_stream_text_delta(
+                pseudo_delta,
+                state,
+                event_stream,
+            )
+        elif fallback_reasoning:
             await self._emit_stream_thinking_piece(
                 state,
                 fallback_reasoning,
@@ -251,6 +259,7 @@ class _ExecutorStreamingMixin:
             chunk='',
             accumulated=draft_reply_accum,
             is_final=True,
+            suppress_live_response=bool(tool_calls_list),
         )
         ev.source = EventSource.AGENT
         event_stream.add_event(ev, EventSource.AGENT)

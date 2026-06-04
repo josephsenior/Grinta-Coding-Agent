@@ -9,7 +9,6 @@ the optimal compactor dynamically instead of using a fixed strategy.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Sequence
 
@@ -22,11 +21,10 @@ from backend.core.config.compactor_config import (
     SmartCompactorConfig,
     StructuredSummaryCompactorConfig,
 )
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event
-
-logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +116,7 @@ def select_compactor_config(
     llm_config: object | None = None,
     fallback: CompactorConfig | None = None,
     supports_function_calling: bool = False,
+    allow_llm_hot_path: bool = False,
 ) -> CompactorConfig:
     """Pick the best compactor config for the current task context.
 
@@ -131,6 +130,11 @@ def select_compactor_config(
         (e.g. ``"llm"``). When ``None`` LLM-based strategies are skipped.
     fallback:
         Config returned when events are too few to decide meaningfully.
+    supports_function_calling:
+        Whether the active compactor LLM can use tool/function calling.
+    allow_llm_hot_path:
+        When False, normal long-session compaction uses a bounded deterministic
+        strategy instead of making hidden LLM calls before the main agent step.
 
     Returns:
     -------
@@ -166,9 +170,10 @@ def select_compactor_config(
             keep_first=3, max_events=min(sig.total_events, 80)
         )
 
-    # 4. Long session with LLM available → structured summary (if function-calling) or smart
+    # 4. Long normal session. Keep the synchronous pre-LLM path bounded by
+    # default; explicit condensation/recovery paths can still use LLM summaries.
     if sig.total_events >= _LONG_SESSION:
-        if llm_config:
+        if llm_config and allow_llm_hot_path:
             if supports_function_calling:
                 logger.info(
                     'Auto-select compactor: structured (long session + function calling, %d events)',
@@ -188,9 +193,10 @@ def select_compactor_config(
                 max_size=200,
                 keep_first=5,
             )
-        # No LLM → amortized pruning
+        reason = 'LLM hot path disabled' if llm_config else 'no LLM'
         logger.info(
-            'Auto-select compactor: amortized (long session, no LLM, %d events)',
+            'Auto-select compactor: amortized (long session, %s, %d events)',
+            reason,
             sig.total_events,
         )
         return AmortizedPruningCompactorConfig(max_size=150, keep_first=3)

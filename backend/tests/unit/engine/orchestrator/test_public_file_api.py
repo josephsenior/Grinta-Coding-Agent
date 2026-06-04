@@ -185,7 +185,7 @@ def test_read_symbols_accepts_qualified_names_without_path(monkeypatch, tmp_path
     assert 'return "user"' in result['content']
 
 
-def test_create_file_public_action_never_overwrites_and_rejects_serialized(
+def test_create_file_public_action_overwrites_by_default_and_rejects_serialized(
     monkeypatch, tmp_path
 ):
     _use_tmp_workspace(monkeypatch, tmp_path)
@@ -203,17 +203,19 @@ def test_create_file_public_action_never_overwrites_and_rejects_serialized(
     assert isinstance(action, FileEditAction)
     assert action.command == 'create_file'
     assert action.file_text == 'print("ok")\n'
-    assert action.overwrite_existing is False
+    assert action.overwrite_existing is True
 
-    with pytest.raises(FunctionCallValidationError, match='File already exists'):
-        _handle_create_tool(
-            {
-                'type': 'file',
-                'path': 'existing.py',
-                'content': 'print("new")\n',
-                'security_risk': 'LOW',
-            }
-        )
+    existing_action = _handle_create_tool(
+        {
+            'type': 'file',
+            'path': 'existing.py',
+            'content': 'print("new")\n',
+            'security_risk': 'LOW',
+        }
+    )
+    assert isinstance(existing_action, FileEditAction)
+    assert existing_action.command == 'create_file'
+    assert existing_action.overwrite_existing is True
 
     with pytest.raises(FunctionCallValidationError, match='CONTENT_APPEARS_SERIALIZED'):
         _handle_create_tool(

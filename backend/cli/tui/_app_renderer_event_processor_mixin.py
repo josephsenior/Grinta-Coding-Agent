@@ -217,7 +217,7 @@ class _AppRendererEventProcessorMixin:
             self._turn_start_time = time.monotonic()
 
         # Count tools in current turn
-        if self._in_agent_turn and isinstance(
+        is_tool_execution_event = isinstance(
             event,
             (
                 FileReadAction,
@@ -234,15 +234,19 @@ class _AppRendererEventProcessorMixin:
                 RecallAction,
                 DelegateTaskAction,
             ),
-        ):
+        )
+        if self._in_agent_turn and is_tool_execution_event:
             self._tools_in_turn += 1
 
-        if not self._is_live_thinking_event(event):
+        if not self._is_live_thinking_event(event) and not getattr(self, '_streaming_active', False):
             self._finalize_live_thinking()
 
         if not isinstance(event, (MessageAction, StreamingChunkAction)):
             if self._live_response_dirty:
-                self._commit_final_response(self._live_response)
+                if is_tool_execution_event:
+                    self.clear_live_response()
+                else:
+                    self._commit_final_response(self._live_response)
             else:
                 self.clear_live_response()
 
@@ -406,7 +410,8 @@ class _AppRendererEventProcessorMixin:
                 )
         elif isinstance(event, MCPAction):
             card = ActivityRenderer.mcp_tool(event.name, event.arguments)
-            self._write_card(card)
+            widget = self._write_card(card)
+            self._pending_mcp_card = widget
         elif isinstance(event, CmdRunAction):
             cmd = getattr(event, 'command', '') or ''
             if not getattr(event, 'hidden', False):
@@ -418,7 +423,24 @@ class _AppRendererEventProcessorMixin:
                 result=event.content or '',
                 success=True,
             )
-            self._write_card(card)
+            preview = None
+            if event.content:
+                truncated = event.content[:200] + (
+                    '...' if len(event.content) > 200 else ''
+                )
+                preview = f'  {truncated}'
+            pending = self._pending_mcp_card
+            if pending is not None:
+                self._update_activity_card_outcome(
+                    pending,
+                    status='ok',
+                    outcome='completed',
+                    extra_content=preview,
+                    operation_label=f'Called {event.name}'.strip(),
+                )
+                self._pending_mcp_card = None
+            else:
+                self._write_card(card)
         elif isinstance(event, CmdOutputObservation):
             output = (event.content or '').strip()
             exit_code = getattr(event, 'exit_code', None)
@@ -513,26 +535,34 @@ class _AppRendererEventProcessorMixin:
             self._last_browser_cmd = 'browse'
         elif isinstance(event, BrowserScreenshotObservation):
             url = getattr(event, 'image_path', '') or ''
+            content = (event.content or '').strip()
             card = ActivityRenderer.browser_action(
-                'screenshot', url, result=event.content or 'captured'
+                'screenshot', url, result=content or 'captured'
             )
-            widget = self._write_card(card)
             prev = getattr(self, '_last_browser_action_card', None)
-            if prev is not None and getattr(self, '_last_browser_cmd', '') in (
-                'screenshot',
-                'browse',
-                'browser',
-            ):
-                try:
-                    prev.set_processing(False)
-                    if self._last_active_card is prev:
-                        self._last_active_card = None
-                except Exception:
-                    pass
+            last_cmd = getattr(self, '_last_browser_cmd', '') or ''
+            if prev is not None and last_cmd not in ('', 'screenshot'):
+                extra_parts = []
+                if url:
+                    extra_parts.append(f'URL: {url}')
+                if content:
+                    extra_parts.append(content[:200])
+                preview = '\n'.join(extra_parts) if extra_parts else None
+                self._update_activity_card_outcome(
+                    prev,
+                    status='ok',
+                    outcome='done',
+                    extra_content=preview,
+                    operation_label=f'Browser {last_cmd}'.strip(),
+                )
+                self._last_browser_action_card = None
+            else:
+                self._write_card(card)
         elif isinstance(event, LspQueryAction):
             symbol = getattr(event, 'symbol', '') or getattr(event, 'query', '') or ''
             card = ActivityRenderer.lsp_query(symbol)
-            self._write_card(card)
+            widget = self._write_card(card)
+            self._pending_lsp_card = widget
         elif isinstance(event, LspQueryObservation):
             content = (event.content or '').strip()
             symbol = getattr(event, 'symbol', '') or ''
@@ -540,7 +570,23 @@ class _AppRendererEventProcessorMixin:
             card = ActivityRenderer.lsp_query(
                 symbol, result=content, available=available
             )
-            self._write_card(card)
+            preview = None
+            if content:
+                truncated = content[:200] + ('...' if len(content) > 200 else '')
+                preview = f'  {truncated}'
+            pending = self._pending_lsp_card
+            if pending is not None:
+                status = 'ok' if available else 'err'
+                self._update_activity_card_outcome(
+                    pending,
+                    status=status,
+                    outcome=card.secondary or 'completed',
+                    extra_content=preview,
+                    operation_label=f'Analyzed {symbol}'.strip(),
+                )
+                self._pending_lsp_card = None
+            else:
+                self._write_card(card)
         elif isinstance(event, TerminalRunAction):
             cmd = getattr(event, 'command', '') or ''
             session_id = getattr(event, 'session_id', '') or ''
@@ -655,7 +701,8 @@ class _AppRendererEventProcessorMixin:
                 self._active_worker_tasks.append(self._summarize_worker_task(task))
             self._sync_worker_strip()
             card = ActivityRenderer.delegation(task, worker)
-            self._write_card(card)
+            widget = self._write_card(card)
+            self._pending_delegate_card = widget
         elif isinstance(event, DelegateTaskObservation):
             content = (event.content or '').strip()
             success = bool(getattr(event, 'success', True))
@@ -679,7 +726,23 @@ class _AppRendererEventProcessorMixin:
                 result=error_message or content,
                 success=success,
             )
-            self._write_card(card)
+            preview = None
+            detail = error_message or content
+            if detail:
+                truncated = detail[:200] + ('...' if len(detail) > 200 else '')
+                preview = f'  {truncated}'
+            pending = self._pending_delegate_card
+            if pending is not None:
+                self._update_activity_card_outcome(
+                    pending,
+                    status='ok' if success else 'err',
+                    outcome='completed' if success else 'failed',
+                    extra_content=preview,
+                    operation_label=f'Delegated {resolved_task}'.strip(),
+                )
+                self._pending_delegate_card = None
+            else:
+                self._write_card(card)
         elif isinstance(event, PlaybookFinishAction):
             from backend.cli.plan_display import is_structured_plan_finish
             from backend.cli.tui.widgets.activity_card import PlanMessage

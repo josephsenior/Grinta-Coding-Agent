@@ -175,19 +175,46 @@ class _AppRendererActionHandlersMixin:
         if action.is_tool_call:
             return
 
+        self._streaming_active = not action.is_final
+
         thinking = (action.thinking_accumulated or '').strip()
         content = self._normalize_final_response_text(action.accumulated or '')
 
+        # Debug: log raw thinking_accumulated so we can see if duplication is
+        # in the data or in the rendering layer.
+        if thinking:
+            _chunk_n = getattr(self, '_dbg_chunk_n', 0) + 1
+            self._dbg_chunk_n = _chunk_n
+            if _chunk_n % 5 == 1:
+                import logging as _logging
+                _log = _logging.getLogger(__name__)
+                _log.info(
+                    '[streaming-dbg] chunk=%d thinking_accumulated len=%d '
+                    'head=%r tail=%r',
+                    _chunk_n, len(thinking),
+                    thinking[:80], thinking[-80:],
+                )
+
         if self._is_visible_thinking_text(thinking):
             self._render_thinking_payload(thinking)
-            if content or action.is_final:
+            # Only finalize the thinking block when the stream ends.
+            # Finalizing on every intermediate chunk that has content destroys
+            # the ThinkingIndicator widget mid-stream; the next chunk then
+            # re-creates it and populates it with the full thinking_accumulated
+            # (which re-includes all previously finalized text), causing the
+            # thinking content to appear duplicated in the transcript.
+            if action.is_final:
                 self._finalize_live_thinking()
-        elif content or action.is_final:
+        elif action.is_final:
             self._finalize_live_thinking()
 
         if action.is_final:
-            if content:
-                self._commit_final_response(content)
+            if bool(getattr(action, 'suppress_live_response', False)):
+                self.clear_live_response()
+                return
+            final_text = content or self._live_response
+            if final_text:
+                self._commit_final_response(final_text)
             else:
                 self.clear_live_response()
             return
@@ -213,6 +240,14 @@ class _AppRendererActionHandlersMixin:
             pass
 
         self._current_state = state
+        if state in (
+            AgentState.AWAITING_USER_INPUT,
+            AgentState.FINISHED,
+            AgentState.ERROR,
+            AgentState.STOPPED,
+        ):
+            self._streaming_active = False
+
         current_label = (self._hud.state.agent_state_label or '').strip()
         if state == AgentState.RATE_LIMITED:
             self._hud.update_ledger('Backoff')

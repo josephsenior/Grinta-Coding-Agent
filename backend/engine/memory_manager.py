@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -100,6 +101,45 @@ class ContextMemoryManager:
             return False
         return len(action.pruned) == 0
 
+    def should_emit_compaction_status(self, state: State) -> bool:
+        """Return True when foreground condensation is likely to emit an action."""
+        if not self.compactor:
+            return False
+        history = list(getattr(state, 'history', []))
+        turn_signals = getattr(state, 'turn_signals', None)
+        if getattr(turn_signals, 'prewarmed_compaction', None) is not None:
+            return True
+        if self._has_unhandled_condensation_request(state):
+            return True
+        if (
+            self._memory_pressure_signal(state)
+            and len(history) >= _MIN_HISTORY_EVENTS_FOR_FORCED_COMPACTION
+        ):
+            return True
+
+        view = getattr(state, 'view', None)
+        if view is None:
+            return False
+
+        predictor = getattr(self.compactor, 'should_emit_compaction_status', None)
+        if callable(predictor):
+            try:
+                return bool(predictor(view))
+            except Exception:
+                logger.debug('Compaction status prediction failed', exc_info=True)
+                return False
+
+        from backend.context.compactor.compactor import RollingCompactor
+
+        if isinstance(self.compactor, RollingCompactor):
+            try:
+                return bool(self.compactor.should_compact(view))
+            except Exception:
+                logger.debug(
+                    'Rolling compactor status prediction failed', exc_info=True
+                )
+        return False
+
     async def _maybe_force_compaction_under_memory_pressure(
         self,
         state: State,
@@ -156,12 +196,21 @@ class ContextMemoryManager:
             return condensation_result
 
     async def condense_history(self, state: State) -> CondensedHistory:
+        started = time.perf_counter()
         history = list(getattr(state, 'history', []))
         if not self.compactor:
+            logger.debug(
+                'ContextMemoryManager.condense_history skipped: no compactor '
+                '(history_events=%d elapsed=%.3fs)',
+                len(history),
+                time.perf_counter() - started,
+            )
             return CondensedHistory(history, None)
 
         # Auto-extract critical context before compaction may discard events
+        snapshot_started = time.perf_counter()
         self._extract_pre_condensation_snapshot(state, history)
+        snapshot_elapsed = time.perf_counter() - snapshot_started
 
         # Check if we have a pre-warmed condensation from the background task
         turn_signals = getattr(state, 'turn_signals', None)
@@ -176,8 +225,18 @@ class ContextMemoryManager:
             if action:
                 action.is_prewarmed = True
         else:
+            compaction_started = time.perf_counter()
             condensation_result = await self.compactor.compacted_history(state)
+            logger.info(
+                'ContextMemoryManager.condense_history compactor returned %s '
+                '(history_events=%d snapshot=%.3fs compactor=%.3fs)',
+                type(condensation_result).__name__,
+                len(history),
+                snapshot_elapsed,
+                time.perf_counter() - compaction_started,
+            )
 
+        postprocess_started = time.perf_counter()
         condensation_result = (
             await self._maybe_force_compaction_for_explicit_request(
                 state, condensation_result
@@ -192,6 +251,13 @@ class ContextMemoryManager:
             # Compaction did not fire — clean up the staged snapshot
             # so it cannot be injected stale on a future turn or session.
             delete_snapshot()
+            logger.info(
+                'ContextMemoryManager.condense_history finished with View '
+                '(events=%d postprocess=%.3fs elapsed=%.3fs)',
+                len(condensation_result.events),
+                time.perf_counter() - postprocess_started,
+                time.perf_counter() - started,
+            )
             return CondensedHistory(condensation_result.events, None)
 
         # Compaction fired — promote the staged snapshot so it survives.
@@ -204,12 +270,25 @@ class ContextMemoryManager:
             logger.info('Ignoring no-op condensation action without explicit request')
             if memory_pressure:
                 state.ack_memory_pressure(source='ContextMemoryManager')
+            logger.info(
+                'ContextMemoryManager.condense_history finished with ignored no-op '
+                '(history_events=%d elapsed=%.3fs)',
+                len(history),
+                time.perf_counter() - started,
+            )
             return CondensedHistory(history, None)
 
         if memory_pressure:
             state.ack_memory_pressure(source='ContextMemoryManager')
 
         # Compaction occurred — attach the snapshot for post-recovery injection
+        logger.info(
+            'ContextMemoryManager.condense_history finished with pending action %s '
+            '(postprocess=%.3fs elapsed=%.3fs)',
+            type(action).__name__,
+            time.perf_counter() - postprocess_started,
+            time.perf_counter() - started,
+        )
         return CondensedHistory([], action)
 
     def _extract_pre_condensation_snapshot(
@@ -309,12 +388,22 @@ class ContextMemoryManager:
             raise RuntimeError('Conversation memory is not initialized')
 
         events = list(condensed_history)
+        started = time.perf_counter()
         messages = self.conversation_memory.process_events(
             condensed_history=events,
             initial_user_action=initial_user_message,
             max_message_chars=getattr(llm_config, 'max_message_chars', None),
             vision_is_active=getattr(llm_config, 'vision_is_active', False),
         )
+        elapsed = time.perf_counter() - started
+        if elapsed >= 0.25 or len(events) >= 100:
+            logger.info(
+                'ContextMemoryManager.build_messages processed %d events into %d '
+                'messages in %.3fs',
+                len(events),
+                len(messages),
+                elapsed,
+            )
 
         if not messages:
             return messages

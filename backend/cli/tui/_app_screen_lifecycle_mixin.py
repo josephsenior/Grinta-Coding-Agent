@@ -576,10 +576,6 @@ class _AppScreenLifecycleMixin:
             )
             raise
         loop_count = 0
-        import time as _time
-
-        _poll_started = _time.monotonic()
-        _max_poll_seconds = 3600  # 1 hour hard cap for the polling loop
         while True:
             _tui_logger.debug('_dispatch_to_agent: entering poll loop')
             while True:
@@ -614,16 +610,6 @@ class _AppScreenLifecycleMixin:
                         logger.info(
                             '[TUI] _dispatch_to_agent: agent task done, state=%s', state
                         )
-                        break
-                    # Hard timeout: prevent infinite polling if the agent gets stuck.
-                    if _time.monotonic() - _poll_started > _max_poll_seconds:
-                        _tui_logger.debug('_dispatch_to_agent: poll timeout reached')
-                        logger.error(
-                            '[TUI] _dispatch_to_agent: poll timeout after %.0fs in state=%s',
-                            _max_poll_seconds,
-                            state,
-                        )
-                        self.add_error('Agent timed out — check app.log')
                         break
                 except Exception as exc:
                     _tui_logger.debug(

@@ -91,12 +91,9 @@ def build_recoverable_tool_call_error_action(exc: Exception) -> Action:
 
     return AgentThinkAction(
         thought=(
-            '[TOOL_CALL_RECOVERABLE_ERROR] The previous tool call was invalid and was not executed. '
-            f'Details: {detail}\n'
+            f'[TOOL_CALL_RECOVERABLE_ERROR] {detail}\n'
             f'{extra_hint}'
-            'Recover by emitting one corrected tool call with strict JSON arguments: '
-            'use double-quoted keys/strings, escape embedded newlines/quotes, include required arguments, '
-            'and call an existing tool name only.'
+            'Recover by emitting one corrected tool call with strict JSON arguments.'
         )
     )
 

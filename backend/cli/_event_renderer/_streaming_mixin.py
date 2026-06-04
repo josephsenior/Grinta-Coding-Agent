@@ -11,6 +11,7 @@ that class via multiple inheritance.
 from __future__ import annotations
 
 import logging
+import re
 import textwrap
 from typing import TYPE_CHECKING, Any
 
@@ -22,7 +23,7 @@ from backend.cli._event_renderer.constants import (
     THINK_EXTRACT_RE as _THINK_EXTRACT_RE,
 )
 from backend.cli._event_renderer.constants import (
-    THINK_STRIP_RE as _THINK_STRIP_RE,
+    THINK_STRIP_CLOSED_RE as _THINK_STRIP_CLOSED_RE,
 )
 from backend.cli._event_renderer.text_utils import (
     normalize_reasoning_text as _normalize_reasoning_text,
@@ -67,6 +68,14 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
         # lines and looked like duplicate ``$ cmd`` reasoning (not LLM thinking).
         if action.is_tool_call:
             self._handle_streaming_tool_call(action)
+            return
+
+        if bool(getattr(action, 'suppress_live_response', False)):
+            self._streaming_accumulated = ''
+            self._streaming_final = action.is_final
+            if action.is_final:
+                self._hud.state.llm_calls += 1
+            self.refresh(force=True)
             return
 
         # Route <redacted_thinking> content to the reasoning display so the user sees
@@ -131,8 +140,18 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
         if thinking_text and _show_reasoning_text():
             self._ensure_reasoning()
             self._reasoning.set_streaming_thought(thinking_text)
-        # Strip thinking from the streaming preview.
-        display_text = _THINK_STRIP_RE.sub('', raw).strip()
+        # Strip only *closed* think blocks from the streaming display preview.
+        # Using THINK_STRIP_CLOSED_RE (requires explicit closing tag) prevents
+        # the sentence-merging bug: THINK_STRIP_RE's |$ alternative would eat
+        # everything from an unclosed opening tag to EOF, making the next chunk
+        # continue immediately after the last pre-tag word with no boundary.
+        display_text = _THINK_STRIP_CLOSED_RE.sub('', raw).strip()
+        # Also drop any leftover unclosed opening tag at the end of the chunk
+        # (the tag itself is not content — its body arrives in the next chunk).
+        display_text = re.sub(
+            r'<(?:redacted_thinking|think)>[^<]*$', '', display_text,
+            flags=re.DOTALL | re.IGNORECASE,
+        ).strip()
         self._streaming_accumulated = _sanitize_visible_transcript_text(display_text)
 
     _STATE_HUD_UPDATES: dict[Any, tuple[str, str]] = {

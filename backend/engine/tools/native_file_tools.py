@@ -100,9 +100,8 @@ def create_read_tool() -> ChatCompletionToolParam:
                 'type': 'boolean',
                 'description': 'Whether type=symbols includes private/underscore-prefixed symbols.',
             },
-            'security_risk': get_security_risk_param(),
         },
-        required=['type', 'security_risk'],
+        required=['type'],
     )
 
 
@@ -129,9 +128,8 @@ def create_find_symbols_tool() -> ChatCompletionToolParam:
                 'type': 'boolean',
                 'description': 'Whether to include private/underscore-prefixed symbols.',
             },
-            'security_risk': get_security_risk_param(),
         },
-        required=['query', 'security_risk'],
+        required=['query'],
     )
 
 
@@ -139,7 +137,7 @@ def create_create_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=CREATE_TOOL_NAME,
         description=(
-            'Create a new file or a new code symbol. type=file never overwrites. '
+            'Create a new file or a new code symbol. type=file overwrites existing files by default. '
             'type=symbol inserts a complete new symbol relative to an existing symbol.'
         ),
         properties={

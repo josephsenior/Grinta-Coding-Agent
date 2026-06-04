@@ -44,13 +44,17 @@ from backend.ledger.action import (
     AgentThinkAction,
     ClarificationRequestAction,
     CondensationRequestAction,
+    DelegateTaskAction,
     FileEditAction,
     FileWriteAction,
     MessageAction,
     ProposalAction,
     StreamingChunkAction,
 )
+from backend.ledger.action.browser_tool import BrowserToolAction
+from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.commands import CmdRunAction
+from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
@@ -61,9 +65,15 @@ from backend.ledger.observation import (
     AgentThinkObservation,
     StatusObservation,
 )
-from backend.ledger.observation.agent import AgentStateChangedObservation
+from backend.ledger.observation.agent import (
+    AgentStateChangedObservation,
+    DelegateTaskObservation,
+)
+from backend.ledger.observation.browser_screenshot import BrowserScreenshotObservation
+from backend.ledger.observation.code_nav import LspQueryObservation
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.files import FileEditObservation, FileWriteObservation
+from backend.ledger.observation.mcp import MCPObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
 from backend.ledger.observation.terminal import TerminalObservation
 
@@ -1369,6 +1379,202 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_lsp_query_merges_action_and_observation_into_single_card(
+    mock_config,
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            LspQueryAction(
+                file='app.py',
+                command='find_definition',
+                line=1,
+                column=1,
+                symbol='MyClass',
+            )
+        )
+        renderer._process_event(
+            LspQueryObservation(
+                content='app.py:10:1 - class MyClass',
+                available=True,
+            )
+        )
+        await pilot.pause()
+
+        code_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-code' in card.classes
+        ]
+        assert len(code_cards) == 1
+        assert 'processing' not in code_cards[0].classes
+        collapsed = code_cards[0].query_one('#collapsed-row')
+        rendered = str(collapsed.renderable)
+        assert 'Analyzed' in rendered
+        assert 'MyClass' in rendered
+        assert 'completed' in rendered
+
+
+@pytest.mark.asyncio
+async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
+    mock_config,
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            MCPAction(name='search_docs', arguments={'q': 'ranking'})
+        )
+        renderer._process_event(
+            MCPObservation(
+                name='search_docs',
+                arguments={'q': 'ranking'},
+                content='Result snippet for ranking.',
+            )
+        )
+        await pilot.pause()
+
+        mcp_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-mcp' in card.classes
+        ]
+        assert len(mcp_cards) == 1
+        assert 'processing' not in mcp_cards[0].classes
+        collapsed = mcp_cards[0].query_one('#collapsed-row')
+        rendered = str(collapsed.renderable)
+        assert 'Called' in rendered
+        assert 'search_docs' in rendered
+        assert 'completed' in rendered
+
+
+@pytest.mark.asyncio
+async def test_tui_delegate_task_merges_action_and_observation_into_single_card(
+    mock_config,
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            DelegateTaskAction(
+                task_description='Investigate flaky test',
+            )
+        )
+        renderer._process_event(
+            DelegateTaskObservation(
+                content='Worker finished successfully.',
+                success=True,
+            )
+        )
+        await pilot.pause()
+
+        worker_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-workers' in card.classes
+        ]
+        assert len(worker_cards) == 1
+        assert 'processing' not in worker_cards[0].classes
+        collapsed = worker_cards[0].query_one('#collapsed-row')
+        rendered = str(collapsed.renderable)
+        assert 'Delegated' in rendered
+        assert 'completed' in rendered
+
+
+@pytest.mark.asyncio
+async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            BrowserToolAction(
+                command='navigate',
+                params={'url': 'https://example.com'},
+            )
+        )
+        renderer._process_event(
+            BrowserScreenshotObservation(
+                image_path='/tmp/snap.png',
+                content='page captured',
+            )
+        )
+        await pilot.pause()
+
+        browser_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-browser' in card.classes
+        ]
+        assert len(browser_cards) == 1
+        assert 'processing' not in browser_cards[0].classes
+        collapsed = browser_cards[0].query_one('#collapsed-row')
+        rendered = str(collapsed.renderable)
+        assert 'Navigate' in rendered
+        assert 'done' in rendered
+
+
+@pytest.mark.asyncio
 async def test_tui_agent_message_action_renders_response(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
@@ -1479,7 +1685,98 @@ async def test_tui_final_stream_commits_response(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_streamed_response_commits_before_tool_action(mock_config):
+async def test_tui_final_stream_empty_accumulated_commits_live_response(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        # Stream chunk with content (not final)
+        chunk = StreamingChunkAction(
+            accumulated='Live content preview.',
+            is_final=False,
+        )
+        chunk.source = EventSource.AGENT
+        renderer._process_event(chunk)
+
+        assert renderer._live_response == 'Live content preview.'
+        assert len(renderer._history) == 0
+
+        # Final stream chunk with empty content
+        final_stream = StreamingChunkAction(
+            accumulated='',
+            is_final=True,
+        )
+        final_stream.source = EventSource.AGENT
+        renderer._process_event(final_stream)
+
+        # Should fall back to live response and commit it
+        assert renderer._last_final_response_text == 'Live content preview.'
+        assert renderer._live_response == ''
+        assert len(renderer._history) == 2
+        assert isinstance(renderer._history[0], AgentMessage)
+
+
+@pytest.mark.asyncio
+async def test_tui_final_stream_suppresses_live_response_for_tool_call(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        chunk = StreamingChunkAction(
+            accumulated='I will inspect the workspace.',
+            is_final=False,
+        )
+        chunk.source = EventSource.AGENT
+        renderer._process_event(chunk)
+
+        assert renderer._live_response == 'I will inspect the workspace.'
+        assert len(renderer._history) == 0
+
+        final_stream = StreamingChunkAction(
+            accumulated='',
+            is_final=True,
+            suppress_live_response=True,
+        )
+        final_stream.source = EventSource.AGENT
+        renderer._process_event(final_stream)
+
+        assert renderer._last_final_response_text == ''
+        assert renderer._live_response == ''
+        assert len(renderer._history) == 0
+
+
+@pytest.mark.asyncio
+async def test_tui_streamed_response_clears_before_tool_action(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -1510,10 +1807,9 @@ async def test_tui_streamed_response_commits_before_tool_action(mock_config):
         command.source = EventSource.AGENT
         renderer._process_event(command)
 
-        assert renderer._last_final_response_text == 'I will inspect the workspace.'
+        assert renderer._last_final_response_text == ''
         assert renderer._live_response == ''
-        assert len(renderer._history) == 2
-        assert isinstance(renderer._history[0], AgentMessage)
+        assert len(renderer._history) == 0
 
 
 @pytest.mark.asyncio
@@ -1626,6 +1922,42 @@ async def test_tui_internal_thinking_payloads_render_as_activity_cards(mock_conf
         assert len(tool_cards) == 1
         assert 'Memory' in str(memory_cards[0].query_one('#collapsed-row').renderable)
         assert 'Checkpoint' in str(tool_cards[0].query_one('#collapsed-row').renderable)
+
+
+@pytest.mark.asyncio
+async def test_tui_recoverable_error_renders_as_error_activity_card(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            AgentThinkAction(
+                thought="[TOOL_CALL_RECOVERABLE_ERROR] Details: Invalid task status 'in_progress'. Use one of: blocked, doing, done, skipped, todo."
+            )
+        )
+        await pilot.pause()
+
+        assert list(s.query(ThinkingIndicator).results()) == []
+        cards = list(s.query(TUIActivityCard).results())
+        error_cards = [card for card in cards if 'category-error' in card.classes]
+
+        assert len(error_cards) == 1
+        collapsed_text = str(error_cards[0].query_one('#collapsed-row').renderable)
+        assert 'Invalid Tool Call' in collapsed_text
+        assert 'Invalid task status' in collapsed_text
 
 
 @pytest.mark.asyncio

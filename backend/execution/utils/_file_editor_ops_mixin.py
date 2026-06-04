@@ -645,7 +645,7 @@ class _FileEditorOpsMixin:
         overwrite_existing: bool,
     ) -> ToolResult | None:
         """Early exits before validation / disk write."""
-        if is_create and file_existed:
+        if is_create and file_existed and not overwrite_existing:
             return ToolResult(
                 output='',
                 error=(

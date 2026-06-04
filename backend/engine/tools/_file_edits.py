@@ -120,10 +120,8 @@ def _handle_read_range_public(arguments: Mapping[str, Any]) -> Action:
         str(path),
         {
             'view_range': [start_i, end_i],
-            'security_risk': arguments.get('security_risk'),
         },
     )
-    set_security_risk(action, arguments)
     return action
 
 
@@ -307,7 +305,6 @@ def _handle_read_symbols_public(arguments: Mapping[str, Any]) -> AgentThinkActio
 
 
 def _handle_find_symbols_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
-    validate_security_risk(arguments, FIND_SYMBOLS_TOOL_NAME)
     query = str(
         require_tool_argument(arguments, 'query', FIND_SYMBOLS_TOOL_NAME)
     ).strip()
@@ -333,14 +330,12 @@ def _handle_find_symbols_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
 
 
 def _handle_read_tool(arguments: Mapping[str, Any]) -> Action:
-    validate_security_risk(arguments, READ_TOOL_NAME)
     read_type = (
         str(require_tool_argument(arguments, 'type', READ_TOOL_NAME)).strip().lower()
     )
     if read_type == 'file':
         path = require_tool_argument(arguments, 'path', READ_TOOL_NAME)
         action = _build_read_file_action(str(path), {})
-        set_security_risk(action, arguments)
         return action
     if read_type == 'range':
         return _handle_read_range_public(arguments)
@@ -414,13 +409,8 @@ def _handle_create_tool(arguments: Mapping[str, Any]) -> Action:
     if create_type == 'file':
         path = require_tool_argument(arguments, 'path', CREATE_TOOL_NAME)
         content = require_tool_argument(arguments, 'content', CREATE_TOOL_NAME)
-        safe_path = _safe_workspace_path(str(path), must_exist=False)
-        if safe_path.exists():
-            raise FunctionCallValidationError(
-                'File already exists. Use edit_symbols or replace_string for modifications.'
-            )
         normalized_args['file_text'] = str(content)
-        normalized_args['overwrite_existing'] = False
+        normalized_args['overwrite_existing'] = True
         action = _build_create_file_action(str(path), normalized_args)
         set_security_risk(action, arguments)
         return action

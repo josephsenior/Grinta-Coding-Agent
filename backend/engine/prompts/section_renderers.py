@@ -418,7 +418,9 @@ def _render_security(cli_mode: bool = True) -> str:
     return (
         '# 🔐 Security Risk Policy\n'
         '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
-        '`browser`, and the file tools `read`, `find_symbols`, `create`, `replace_string`, `edit_symbols`, and `multiedit`. '
+        '`browser`, `terminal_manager` (when `action=open`), '
+        'and the file write tools `create`, `replace_string`, `edit_symbols`, and `multiedit`. '
+        'Read-only tools (`read`, `find_symbols`) do **not** require it. '
         'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
         'The server may escalate your risk label; it never lowers it. Missing or invalid values '
         'fail the call.\n\n'
@@ -582,10 +584,9 @@ def _build_autonomy_block(_mode: str, *, checkpoints_on: bool) -> str:
     )
     return (
         '<AUTONOMY>\n'
-        'Follow the active mode protocol injected for the current turn. For implementation work, '
-        'drive the request through tools and verification; for discussion or planning work, keep '
-        'the response aligned with the active protocol. The runtime may '
-        'interrupt a tool call to surface a user decision; treat that decision as '
+        'For implementation work, drive the request through tools and verification; '
+        'for discussion or planning work, keep the response aligned with the active protocol. '
+        'The runtime may interrupt a tool call to surface a user decision; treat that decision as '
         'authoritative and continue from where you stopped. On tool failure, make '
         'the next action a corrected retry or a different tool (e.g. `read` \u2192 `edit_symbols`, '
         'or `read` \u2192 `replace_string`) and auto-retry recoverable errors before reporting back.'

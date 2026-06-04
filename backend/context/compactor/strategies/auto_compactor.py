@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import contextlib
-import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -18,8 +18,7 @@ from backend.core.config.compactor_config import (
     SmartCompactorConfig,
     StructuredSummaryCompactorConfig,
 )
-
-logger = logging.getLogger(__name__)
+from backend.core.logger import app_logger as logger
 
 
 class AutoCompactor(Compactor):
@@ -35,6 +34,7 @@ class AutoCompactor(Compactor):
         self,
         llm_config: object | None,
         llm_registry: LLMRegistry,
+        allow_llm_hot_path: bool = False,
     ) -> None:
         super().__init__()
         # NOTE: This is intentionally *not* just a model string.
@@ -43,11 +43,13 @@ class AutoCompactor(Compactor):
         # - a named LLM config section (e.g. "llm")
         self._llm_config = llm_config
         self._llm_registry = llm_registry
+        self._allow_llm_hot_path = allow_llm_hot_path
         self._cached_delegate: Compactor | None = None
         self._cached_config_key: str | None = None
 
     async def compact(self, view: View) -> View | Compaction:
         """Select the best compactor for the current event stream and delegate."""
+        started = time.perf_counter()
         events = list(view.events)
         explicit_request = bool(
             getattr(view, 'unhandled_condensation_request', False)
@@ -58,19 +60,52 @@ class AutoCompactor(Compactor):
             else select_compactor_config(
                 events,
                 llm_config=self._llm_config,
+                allow_llm_hot_path=self._allow_llm_hot_path,
             )
         )
         logger.info(
-            'AutoCompactor selected strategy: %s for %d events (explicit_request=%s)',
+            'AutoCompactor selected strategy: %s for %d events '
+            '(explicit_request=%s allow_llm_hot_path=%s)',
             config.type,
             len(events),
             explicit_request,
+            self._allow_llm_hot_path,
         )
         delegate = self._delegate_for_config(config, explicit_request)
         result = await delegate.compact(view)
         if explicit_request and isinstance(result, View):
             result = await self._force_delegate_compaction(delegate, result)
+        elapsed = time.perf_counter() - started
+        logger.info(
+            'AutoCompactor finished strategy=%s result=%s events=%d elapsed=%.3fs',
+            config.type,
+            type(result).__name__,
+            len(events),
+            elapsed,
+        )
         return result
+
+    def should_emit_compaction_status(self, view: View) -> bool:
+        """Predict whether this auto-selection will produce a condensation action."""
+        events = list(view.events)
+        if getattr(view, 'unhandled_condensation_request', False):
+            return True
+        config = select_compactor_config(
+            events,
+            llm_config=self._llm_config,
+            allow_llm_hot_path=self._allow_llm_hot_path,
+        )
+        return self._config_emits_compaction_action(config, len(events))
+
+    @staticmethod
+    def _config_emits_compaction_action(
+        config: CompactorConfig,
+        event_count: int,
+    ) -> bool:
+        config_type = getattr(config, 'type', '')
+        if config_type in {'amortized', 'structured', 'smart'}:
+            return event_count > int(getattr(config, 'max_size', 0) or 0)
+        return False
 
     def _select_explicit_request_config(self, event_count: int) -> CompactorConfig:
         """Pick a real compactor for provider context-limit recovery."""
@@ -161,7 +196,11 @@ class AutoCompactor(Compactor):
             # This ensures LLM-based compactors inherit the *primary* LLM configuration
             # instead of treating a model id as a config-section name.
             llm_config = config.llm_config
-        return cls(llm_config=llm_config, llm_registry=llm_registry)
+        return cls(
+            llm_config=llm_config,
+            llm_registry=llm_registry,
+            allow_llm_hot_path=bool(getattr(config, 'allow_llm_hot_path', False)),
+        )
 
 
 def _register_config():

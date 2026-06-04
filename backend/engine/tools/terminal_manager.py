@@ -1,6 +1,7 @@
 from typing import Any
 
 from backend.core.errors import FunctionCallValidationError
+from backend.engine.function_calling_helpers import validate_security_risk
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
@@ -115,12 +116,22 @@ def create_terminal_manager_tool() -> dict[str, Any]:
                             "'snapshot' returns the current full buffer view."
                         ),
                     },
+                    'security_risk': {
+                        'type': 'string',
+                        'enum': ['LOW', 'MEDIUM', 'HIGH'],
+                        'description': (
+                            "Required when action='open'. Classify the risk of the command you are launching: "
+                            "LOW for safe project commands (e.g. running tests, listing files), "
+                            "MEDIUM for project-scoped installs or scripts, "
+                            "HIGH for system-level or potentially destructive commands."
+                        ),
+                    },
                 },
                 'required': ['action'],
                 'allOf': [
                     {
                         'if': {'properties': {'action': {'const': 'open'}}},
-                        'then': {'required': ['command']},
+                        'then': {'required': ['command', 'security_risk']},
                     },
                     {
                         'if': {'properties': {'action': {'const': 'input'}}},
@@ -168,6 +179,7 @@ def handle_terminal_manager_tool(arguments: dict) -> Any:
         cmd = arguments.get('command')
         if not cmd:
             raise ValueError("Terminal 'open' action requires 'command'")
+        validate_security_risk(arguments, TERMINAL_MANAGER_TOOL_NAME)
         return TerminalRunAction(
             command=cmd,
             cwd=arguments.get('cwd'),

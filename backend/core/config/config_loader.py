@@ -464,8 +464,8 @@ def _ensure_active_agent_auto_compactor(cfg: AppConfig) -> None:
         isinstance(compactor_config, AutoCompactorConfig)
         and compactor_config.llm_config is None
     ):
-        agent_config.compactor_config = AutoCompactorConfig(
-            llm_config=cfg.get_llm_config_from_agent(cfg.default_agent)
+        agent_config.compactor_config = compactor_config.model_copy(
+            update={'llm_config': cfg.get_llm_config_from_agent(cfg.default_agent)}
         )
 
 

@@ -122,6 +122,16 @@ def test_streaming_chunk_action_schema():
     assert action.action_type == 'streaming_chunk'
     assert action.chunk == 'Hello'
     assert action.accumulated == 'Hello'
+    assert action.suppress_live_response is False
+
+    suppressing = StreamingChunkActionSchema(
+        action_type='streaming_chunk',
+        chunk='',
+        accumulated='',
+        is_final=True,
+        suppress_live_response=True,
+    )
+    assert suppressing.suppress_live_response is True
 
 
 def test_task_tracking_action_schema():

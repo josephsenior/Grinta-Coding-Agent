@@ -125,6 +125,28 @@ class TestFinalization:
         assert isinstance(compactor_cfg, AutoCompactorConfig)
         assert compactor_cfg.llm_config.model == 'openai/gpt-4.1'  # type: ignore
 
+    def test_finalize_config_preserves_auto_compactor_hot_path_flag(self, tmp_path):
+        cfg = AppConfig()
+        cfg.cache_dir = str(tmp_path / 'cache')
+        cfg.get_agent_config(cfg.default_agent).compactor_config = AutoCompactorConfig(
+            allow_llm_hot_path=True
+        )
+
+        with (
+            patch('backend.core.config.config_loader.get_file_store') as mock_get_store,
+            patch('pathlib.Path.mkdir'),
+        ):
+            mock_store = MagicMock()
+            mock_get_store.return_value = mock_store
+            mock_store.read.return_value = 'secret'
+
+            finalize_config(cfg)
+
+        compactor_cfg = cfg.get_agent_config(cfg.default_agent).compactor_config
+        assert isinstance(compactor_cfg, AutoCompactorConfig)
+        assert compactor_cfg.allow_llm_hot_path is True
+        assert compactor_cfg.llm_config is not None
+
     def test_finalize_config_loads_bundled_mcp_servers(self, tmp_path):
         cfg = AppConfig()
         cfg.cache_dir = str(tmp_path / 'cache')

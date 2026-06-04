@@ -23,6 +23,7 @@ from backend.cli.theme import (
     CLR_SECONDARY,
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
+    CLR_STATUS_ERR,
 )
 
 
@@ -67,6 +68,7 @@ _BADGES: dict[str, ToolBadge] = {
     'checkpoint': ToolBadge('Checkpoint', CLR_CARD_TITLE, CLR_CARD_TITLE, '├'),
     'tool': ToolBadge('Tool', CLR_SECONDARY, CLR_SECONDARY, '├'),
     'recall': ToolBadge('Recall', CLR_STATUS_OK, CLR_STATUS_OK, '├'),
+    'error': ToolBadge('Error', CLR_STATUS_ERR, CLR_STATUS_ERR, '├'),
 }
 
 # Fallback badge
@@ -82,6 +84,8 @@ def badge_for_tool_name(tool_name: str) -> ToolBadge:
     """Infer the badge category from tool name."""
     name = tool_name.lower()
 
+    if 'error' in name:
+        return _BADGES['error']
     if 'bash' in name or 'powershell' in name or 'shell' in name:
         return _BADGES['shell']
     if 'file' in name or 'symbol' in name:

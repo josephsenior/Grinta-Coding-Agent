@@ -42,6 +42,9 @@ async def test_get_compaction_prunes_middle_events() -> None:
     comp = await c.get_compaction(view)
     assert isinstance(comp, Compaction)
     assert len(comp.action.pruned_event_ids) >= 1  # type: ignore[arg-type]
+    assert comp.action.summary is not None
+    assert 'Deterministic compaction pruned' in comp.action.summary
+    assert comp.action.summary_offset == 1
 
 
 async def test_compact_returns_view_when_under_threshold() -> None:

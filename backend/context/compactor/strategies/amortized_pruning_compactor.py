@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import TYPE_CHECKING, Any
 
 from backend.context.compactor.compactor import Compaction, RollingCompactor
@@ -61,10 +62,44 @@ class AmortizedPruningCompactor(RollingCompactor):
         tail = view[-events_from_tail:]
         event_ids_to_keep = {event.id for event in head + tail}
         event_ids_to_prune = sorted({event.id for event in view} - event_ids_to_keep)
+        pruned_events = [
+            event for event in view if getattr(event, 'id', None) in event_ids_to_prune
+        ]
+        summary = self._build_recovery_summary(pruned_events)
         # Use explicit list to avoid claiming we pruned protected head events
         # when keep_first > 0 makes the range non-contiguous.
-        action = CondensationAction(pruned_event_ids=event_ids_to_prune)
+        action = CondensationAction(
+            pruned_event_ids=event_ids_to_prune,
+            summary=summary,
+            summary_offset=self.keep_first,
+        )
         return Compaction(action=action)
+
+    @staticmethod
+    def _build_recovery_summary(pruned_events: list) -> str:
+        """Build a small non-LLM summary that triggers snapshot restoration."""
+        event_count = len(pruned_events)
+        type_counts = Counter(type(event).__name__ for event in pruned_events)
+        top_types = ', '.join(
+            f'{name}={count}' for name, count in type_counts.most_common(5)
+        )
+        ids = [
+            event_id
+            for event in pruned_events
+            if isinstance((event_id := getattr(event, 'id', None)), int)
+        ]
+        details: list[str] = []
+        if ids:
+            details.append(f'ids {min(ids)}-{max(ids)}')
+        if top_types:
+            details.append(top_types)
+        details.append('bounded non-LLM hot path')
+        return (
+            f'Deterministic compaction pruned {event_count} older events '
+            f'({"; ".join(details)}). Use the restored context '
+            'snapshot below for files, errors, commands, decisions, and attempted '
+            'approaches captured before compaction.'
+        )
 
     def should_compact(self, view: View) -> bool:
         """Check if view exceeds max_size threshold.
