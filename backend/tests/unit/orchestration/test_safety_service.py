@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 
+from backend.ledger import EventSource
 from backend.ledger.action import (
     ActionConfirmationStatus,
     ActionSecurityRisk,
@@ -15,6 +16,7 @@ from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
 )
+from backend.orchestration.autonomy import AutonomyLevel
 from backend.orchestration.services.safety_service import SafetyService
 
 
@@ -181,6 +183,21 @@ class TestApplyConfirmationState:
         )
         assert action.confirmation_state is None  # untouched
 
+    def test_full_autonomy_never_marks_awaiting_confirmation(self):
+        autonomy = MagicMock()
+        autonomy.current_level = AutonomyLevel.FULL.value
+        autonomy.should_request_confirmation.return_value = True
+        ctx = _make_context(autonomy_controller=autonomy)
+        svc = SafetyService(ctx)
+        action = FileEditAction(path='demo.py', command='create_file', file_text='x')
+
+        svc.apply_confirmation_state(
+            action, is_high_security_risk=True, is_ask_for_every_action=True
+        )
+
+        assert action.confirmation_state == ActionConfirmationStatus.CONFIRMED
+        autonomy.should_request_confirmation.assert_not_called()
+
 
 # ── finalize_pending_action ──────────────────────────────────────────
 
@@ -198,6 +215,9 @@ class TestFinalizePendingAction:
         assert action._id is None
         ctx.emit_event.assert_called_once()
         ctx.clear_pending_action.assert_called_once()
+        assert ctx.mock_calls.index(call.clear_pending_action()) < ctx.mock_calls.index(
+            call.emit_event(action, EventSource.AGENT)
+        )
 
     def test_rejected(self):
         action = _as_action(

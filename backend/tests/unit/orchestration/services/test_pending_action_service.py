@@ -1,5 +1,6 @@
 """Tests for PendingActionService."""
 
+import math
 import time
 import unittest
 from unittest.mock import MagicMock, patch
@@ -8,9 +9,11 @@ from backend.core.constants import (
     BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR,
 )
+from backend.ledger.action import ActionConfirmationStatus
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.debugger import DebuggerAction
+from backend.ledger.action.files import FileEditAction
 from backend.orchestration.services.pending_action_service import PendingActionService
 
 
@@ -355,6 +358,23 @@ class TestPendingActionService(unittest.TestCase):
         action = service.get()
 
         self.assertEqual(action, mock_action)
+        self.mock_controller.event_stream.add_event.assert_not_called()
+
+    @patch('time.time')
+    def test_awaiting_confirmation_does_not_time_out(self, mock_time):
+        """User approval wait time must not count as tool execution delay."""
+        service = PendingActionService(self.mock_context, timeout=1.0)
+        action = FileEditAction(path='demo.py', command='create_file', file_text='x')
+        action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
+
+        mock_time.return_value = 100.0
+        service.set(action)
+
+        mock_time.return_value = 100.0 + 86400.0
+        self.assertEqual(service.get(), action)
+        self.assertTrue(
+            math.isinf(service._effective_timeout_seconds(service._timeout, action))
+        )
         self.mock_controller.event_stream.add_event.assert_not_called()
 
     @patch('time.time')

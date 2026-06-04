@@ -45,6 +45,15 @@ class AutonomyLevel(str, Enum):
     FULL = 'full'
 
 
+def normalize_autonomy_level(level: object) -> str:
+    """Return the stable string value for an autonomy level."""
+    raw = getattr(level, 'value', level)
+    text = str(raw or AutonomyLevel.BALANCED.value).strip().lower()
+    if '.' in text:
+        text = text.rsplit('.', 1)[-1].lower()
+    return text
+
+
 class AutonomyController:
     """Controller for managing autonomous agent behavior.
 
@@ -76,6 +85,11 @@ class AutonomyController:
             self.autonomy_level,
             self.auto_retry,
         )
+
+    @property
+    def current_level(self) -> str:
+        """Normalized current autonomy level."""
+        return normalize_autonomy_level(self.autonomy_level)
 
     @staticmethod
     def action_signature(action: Action) -> str:
@@ -120,10 +134,11 @@ class AutonomyController:
         # already bypasses confirmation entirely).
         if self.is_always_allowed(action):
             return False
-        if self.autonomy_level == AutonomyLevel.FULL.value:
+        level = self.current_level
+        if level == AutonomyLevel.FULL.value:
             # Full autonomy: never ask
             return False
-        if self.autonomy_level == AutonomyLevel.CONSERVATIVE.value:
+        if level == AutonomyLevel.CONSERVATIVE.value:
             # Conservative: always ask
             return True
         # Balanced: ask only for high-risk actions

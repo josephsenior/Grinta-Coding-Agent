@@ -245,5 +245,5 @@ class StateTransitionService:
             else ActionConfirmationStatus.REJECTED
         )
         pending_action._id = None
-        self._context.emit_event(pending_action, EventSource.AGENT)
         self._context.clear_pending_action()
+        self._context.emit_event(pending_action, EventSource.AGENT)

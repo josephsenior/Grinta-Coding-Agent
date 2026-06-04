@@ -36,10 +36,12 @@ warnings.filterwarnings(
 
 def _create_console(*args: Any, **kwargs: Any) -> Any:
     from rich.console import Console as RichConsole
+    from rich.theme import Theme as RichTheme
 
-    from backend.cli.theme import no_color_enabled
+    from backend.cli.theme import grinta_rich_theme_styles, no_color_enabled
 
     kwargs.setdefault('no_color', no_color_enabled())
+    kwargs.setdefault('theme', RichTheme(grinta_rich_theme_styles()))
     return RichConsole(*args, **kwargs)
 
 

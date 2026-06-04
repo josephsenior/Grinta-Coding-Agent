@@ -20,6 +20,17 @@ if TYPE_CHECKING:
     )
 
 
+def _autonomy_level(autonomy: object | None) -> str:
+    if autonomy is None:
+        return ''
+    current = getattr(autonomy, 'current_level', None)
+    if isinstance(current, str):
+        return current
+    from backend.orchestration.autonomy import normalize_autonomy_level
+
+    return normalize_autonomy_level(getattr(autonomy, 'autonomy_level', ''))
+
+
 class SafetyService:
     """Manages security analysis and confirmation workflow for actions."""
 
@@ -36,6 +47,15 @@ class SafetyService:
     def action_requires_confirmation(self, action: Action) -> bool:
         """Return True when action type is subject to confirmation flow."""
         return isinstance(action, self._CONFIRMATION_TYPES)
+
+    def confirmation_disabled_by_autonomy(self) -> bool:
+        """True when the configured autonomy level forbids confirmation prompts."""
+        from backend.orchestration.autonomy import AutonomyLevel
+
+        return (
+            _autonomy_level(self._context.autonomy_controller)
+            == AutonomyLevel.FULL.value
+        )
 
     def evaluate_security_risk(self, action: Action) -> tuple[bool, bool]:
         """Return (is_high_risk, ask_for_every_action) tuple."""
@@ -86,6 +106,13 @@ class SafetyService:
         autonomy = self._context.autonomy_controller
         self._context.get_controller()
 
+        if self.confirmation_disabled_by_autonomy():
+            logger.debug(
+                '[Full autonomy] Executing action without confirmation: %s',
+                type(action).__name__,
+            )
+            return
+
         if autonomy and autonomy.should_request_confirmation(action):
             action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
         else:
@@ -109,5 +136,5 @@ class SafetyService:
             else ActionConfirmationStatus.REJECTED
         )
         pending_action._id = None  # allow event re-emission
-        self._context.emit_event(pending_action, EventSource.AGENT)
         self._context.clear_pending_action()
+        self._context.emit_event(pending_action, EventSource.AGENT)

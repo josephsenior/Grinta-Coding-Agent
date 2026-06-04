@@ -128,6 +128,8 @@ class ConfirmWidget(Widget):
         self._decision: str | None = None
         self._options: list[tuple[str, str]] = []
         self._recommended: int | None = None
+        self._button_render_count = 0
+        self._button_id_to_key: dict[str, str] = {}
 
     def compose(self) -> ComposeResult:
         with Horizontal(id='confirm-bar'):
@@ -163,10 +165,14 @@ class ConfirmWidget(Widget):
         actions.remove_children()
         self._options = options
         self._recommended = recommended
+        self._button_render_count += 1
+        self._button_id_to_key = {}
         for i, (key, label) in enumerate(options):
+            button_id = f'confirm-{key}-{self._button_render_count}'
+            self._button_id_to_key[button_id] = key
             btn = Button(
                 label,
-                id=f'confirm-{key}',
+                id=button_id,
                 variant='primary' if i == (recommended or 0) else 'default',
             )
             actions.mount(btn)
@@ -185,12 +191,12 @@ class ConfirmWidget(Widget):
         return self._decision
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        for key, _label in self._options:
-            if event.button.id == f'confirm-{key}':
-                self._decision = key
-                self._decision_event.set()
-                self.hide()
-                return
+        key = self._button_id_to_key.get(str(event.button.id or ''))
+        if key is None:
+            return
+        self._decision = key
+        self._decision_event.set()
+        self.hide()
 
 
 class GrintaConfirmDialog(ModalDialog[str | None]):

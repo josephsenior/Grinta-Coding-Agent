@@ -161,7 +161,11 @@ class OrchestrationContext:
         await self._controller.set_agent_state_to(agent_state)
 
     def trigger_step(self) -> None:
-        """Proxy to `SessionOrchestrator.step`."""
+        """Wake the controller without racing an active step teardown."""
+        schedule_step_soon = getattr(self._controller, 'schedule_step_soon', None)
+        if callable(schedule_step_soon):
+            schedule_step_soon()
+            return
         self._controller.step()
 
     @property

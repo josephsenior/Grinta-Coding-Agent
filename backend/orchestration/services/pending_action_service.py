@@ -17,7 +17,7 @@ from backend.core.constants import (
 from backend.core.logger import app_logger as logger
 from backend.core.timeout_policy import effective_cmd_run_pending_timeout_seconds
 from backend.ledger import EventSource
-from backend.ledger.action import Action
+from backend.ledger.action import Action, ActionConfirmationStatus
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation_cause import attach_observation_cause
 
@@ -63,6 +63,15 @@ def _identity_pending_timeout(base: float, _action: Action) -> float:
 
 def _infinite_pending_timeout(_base: float, _action: Action) -> float:
     return math.inf
+
+
+def _is_awaiting_confirmation(action: Action) -> bool:
+    state = getattr(action, 'confirmation_state', None)
+    state = getattr(state, 'value', state)
+    return (
+        str(state or '').strip().lower()
+        == ActionConfirmationStatus.AWAITING_CONFIRMATION.value
+    )
 
 
 def _delegate_task_pending_timeout(base: float, action: Action) -> float:
@@ -119,6 +128,8 @@ class PendingActionService:
         Delegated tasks run sub-agents with a configurable timeout (default 5 minutes).
         Terminal* actions (terminal_manager) use a high floor like CmdRunAction.
         """
+        if _is_awaiting_confirmation(action):
+            return math.inf
         if base <= 0:
             return math.inf
 

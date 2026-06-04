@@ -22,7 +22,9 @@ from backend.ledger.action import (
 )
 from backend.ledger.action.agent import (
     ClarificationRequestAction,
+    ConfirmRequestAction,
     EscalateToHumanAction,
+    InformAction,
     ProposalAction,
     UncertaintyAction,
 )
@@ -71,6 +73,8 @@ class _EventRouterStateMixin(EventRouterService if TYPE_CHECKING else object):
             action,
             (
                 ClarificationRequestAction,
+                ConfirmRequestAction,
+                InformAction,
                 ProposalAction,
                 UncertaintyAction,
                 EscalateToHumanAction,

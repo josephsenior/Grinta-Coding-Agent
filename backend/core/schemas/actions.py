@@ -406,6 +406,46 @@ class ClarificationRequestActionSchema(ActionSchemaV1):
     context: str = Field(default='', description='Why clarification is needed')
 
 
+class ConfirmRequestActionSchema(ActionSchemaV1):
+    """Schema for ConfirmRequestAction.
+
+    An action where the agent requires explicit user OK before a risky step.
+    Used for destructive or irreversible actions. The orchestrator pauses
+    until the user picks one of the two options; on timeout the default_index
+    is selected (1 = deny, the safe choice).
+    """
+
+    action_type: Literal['confirm'] = Field(
+        ActionType.CONFIRM.value, frozen=True
+    )
+    runnable: bool = Field(False, frozen=True)
+    question: str = Field(..., description='The confirm question')
+    options: list[str] = Field(
+        default_factory=list,
+        description='Exactly two options: positive then negative',
+    )
+    default_index: int = Field(
+        default=1,
+        description='0=auto-confirm on timeout, 1=auto-deny (safe default)',
+    )
+    context: str = Field(default='', description='Why confirmation is needed')
+
+
+class InformActionSchema(ActionSchemaV1):
+    """Schema for InformAction.
+
+    A non-blocking status update from the agent. The orchestrator does NOT
+    pause; the user sees the message in the transcript and the agent continues.
+    """
+
+    action_type: Literal['inform'] = Field(
+        ActionType.INFORM.value, frozen=True
+    )
+    runnable: bool = Field(False, frozen=True)
+    text: str = Field(..., description='The status update to share')
+    context: str = Field(default='', description='Optional background')
+
+
 class EscalateToHumanActionSchema(ActionSchemaV1):
     """Schema for EscalateToHumanAction.
 
@@ -623,6 +663,8 @@ ActionSchemaUnion = (
     | DebuggerActionSchema
     | AgentThinkActionSchema
     | ClarificationRequestActionSchema
+    | ConfirmRequestActionSchema
+    | InformActionSchema
     | EscalateToHumanActionSchema
     | MCPActionSchema
     | ProposalActionSchema

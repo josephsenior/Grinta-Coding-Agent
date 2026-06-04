@@ -143,8 +143,29 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
 
         In FULL autonomy mode, the agent continues without pausing.
         In BALANCED or CONSERVATIVE mode, the agent pauses and waits for user input.
+
+        Exceptions:
+          - ``InformAction`` never pauses (it's a non-blocking status update).
+          - In FULL autonomy, even explicit confirm requests do not pause; the
+            safety validator remains the hard stop for forbidden operations.
         """
-        from backend.orchestration.autonomy import AutonomyLevel
+        from backend.ledger.action.agent import (
+            ConfirmRequestAction,
+            InformAction,
+        )
+        from backend.orchestration.autonomy import (
+            AutonomyLevel,
+            normalize_autonomy_level,
+        )
+
+        if isinstance(action, InformAction):
+            # Non-blocking; just log it and let the turn continue.
+            self._ctrl.log(
+                'debug',
+                'Meta-cognition inform action (non-blocking).',
+                extra={'action_type': type(action).__name__},
+            )
+            return
 
         autonomy_ctrl = getattr(self._ctrl, 'autonomy_controller', None)
         autonomy_level = (
@@ -152,10 +173,23 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
             if autonomy_ctrl
             else AutonomyLevel.BALANCED.value
         )
+        autonomy_level = normalize_autonomy_level(autonomy_level)
+
+        if (
+            isinstance(action, ConfirmRequestAction)
+            and autonomy_level == AutonomyLevel.FULL.value
+        ):
+            self._ctrl.log(
+                'debug',
+                'Meta-cognition confirm action ignored in full autonomy.',
+                extra={'action_type': type(action).__name__},
+            )
+            return
 
         agent = getattr(self._ctrl, 'agent', None)
         config = getattr(agent, 'config', None)
         mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+
         should_pause = mode == 'plan' or autonomy_level != AutonomyLevel.FULL.value
 
         if should_pause:

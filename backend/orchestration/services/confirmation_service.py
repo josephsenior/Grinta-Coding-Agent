@@ -141,6 +141,14 @@ class ConfirmationService:
         if not self._safety_service.action_requires_confirmation(action):
             return
 
+        from backend.orchestration.services.safety_service import SafetyService
+
+        if (
+            isinstance(self._safety_service, SafetyService)
+            and self._safety_service.confirmation_disabled_by_autonomy()
+        ):
+            return
+
         await self._safety_service.analyze_security(action)
         is_high_security_risk, is_ask_for_every_action = (
             self._safety_service.evaluate_security_risk(action)

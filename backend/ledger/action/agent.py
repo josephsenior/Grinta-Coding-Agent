@@ -501,7 +501,8 @@ class ClarificationRequestAction(Action):
 
     Attributes:
         question (str): The clarification question
-        options (list): Optional multiple choice options
+        options (list): Optional multiple choice options. Each entry is a plain
+            label, or a dict ``{"label": str, "description": str}``.
         context (str): Why clarification is needed
         thought (str): The agent's reasoning
         action (str): The action type, namely ActionType.CLARIFICATION
@@ -521,6 +522,67 @@ class ClarificationRequestAction(Action):
 
 
 @dataclass
+class ConfirmRequestAction(Action):
+    """An action where the agent requires explicit user OK before a risky step.
+
+    Used for destructive or irreversible actions. The orchestrator pauses
+    until the user picks one of the two options. A configurable default
+    (``config.communicate_confirm_timeout_seconds``) auto-denies if the
+    user does not respond in time.
+
+    Attributes:
+        question (str): What is being asked, e.g. "Delete the user table?"
+        options (list): Exactly two options: positive ("Yes, do it") then
+            negative ("No, abort"). Each may be a label or a
+            ``{"label": str, "description": str}`` dict.
+        default_index (int): 0 = auto-confirm on timeout, 1 = auto-deny.
+            Defaults to 1 (safe default).
+        context (str): Why this is needed; shown under the prompt.
+        thought (str): The agent's reasoning.
+        action (str): The action type, namely ActionType.CONFIRM.
+
+    """
+
+    question: str = ''
+    options: list[str] = field(default_factory=list)
+    default_index: int = 1
+    context: str = ''
+    thought: str = ''
+    action: ClassVar[str] = ActionType.CONFIRM
+
+    @property
+    def message(self) -> str:
+        """Get confirm request message."""
+        return f'Confirm required: {self.question}'
+
+
+@dataclass
+class InformAction(Action):
+    """A non-blocking status update from the agent to the user.
+
+    The orchestrator does NOT pause for this. The user sees the message in
+    the transcript but the agent continues with the next turn immediately.
+
+    Attributes:
+        text (str): The update to share.
+        context (str): Optional background.
+        thought (str): The agent's reasoning.
+        action (str): The action type, namely ActionType.INFORM.
+
+    """
+
+    text: str = ''
+    context: str = ''
+    thought: str = ''
+    action: ClassVar[str] = ActionType.INFORM
+
+    @property
+    def message(self) -> str:
+        """Get the user-facing message."""
+        return self.text if self.text else 'Status update'
+
+
+@dataclass
 class EscalateToHumanAction(Action):
     """An action where the agent requests escalation to human assistance.
 
@@ -529,7 +591,9 @@ class EscalateToHumanAction(Action):
 
     Attributes:
         reason (str): Why escalation is being requested
-        attempts_made (list): Summary of approaches already tried
+        attempts_made (list): Summary of approaches already tried. Each entry
+            is either a plain string (legacy) or a dict with ``action`` /
+            ``result`` keys for richer escalation cards.
         specific_help_needed (str): What kind of help is needed
         thought (str): The agent's explanation
         action (str): The action type, namely ActionType.ESCALATE

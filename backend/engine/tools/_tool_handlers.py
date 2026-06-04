@@ -738,56 +738,178 @@ def _handle_execute_mcp_tool_tool(arguments: dict[str, Any]) -> MCPAction:
     return MCPAction(name=tool_name, arguments=inner_args)
 
 
+def _normalize_communicate_options(
+    raw_options: Sequence[Any],
+) -> tuple[list[str], list[dict[str, str]]]:
+    """Normalize LLM-supplied options into (labels, structured) parallel lists.
+
+    Accepts either a plain string or a ``{"label": str, "description": str}`` dict.
+    Returns the flat labels (for the simple options field) and the structured
+    descriptors (for the renderer's rich display).
+    """
+    labels: list[str] = []
+    structured: list[dict[str, str]] = []
+    for opt in raw_options:
+        if isinstance(opt, str):
+            labels.append(opt)
+            structured.append({'label': opt, 'description': ''})
+        elif isinstance(opt, Mapping):
+            label = str(opt.get('label', '') or '').strip()
+            description = str(opt.get('description', '') or '').strip()
+            if not label:
+                continue
+            labels.append(label)
+            structured.append({'label': label, 'description': description})
+        else:
+            labels.append(str(opt))
+            structured.append({'label': str(opt), 'description': ''})
+    return labels, structured
+
+
+def _format_attempts(raw_attempts: Sequence[Any]) -> list[str]:
+    """Render structured attempts as compact strings for the escalation card."""
+    out: list[str] = []
+    for attempt in raw_attempts:
+        if isinstance(attempt, Mapping):
+            action = str(attempt.get('action', '') or '').strip()
+            result = str(attempt.get('result', '') or '').strip()
+            if action and result:
+                out.append(f'{action} \u2192 {result}')
+            elif action:
+                out.append(action)
+        elif attempt:
+            out.append(str(attempt))
+    return out
+
+
 def _handle_communicate_tool(arguments: Mapping[str, Any]) -> Action:
     """Route the unified communicate tool to the specific Action class based on intent."""
-    intent = cast(str, arguments.get('intent', 'clarification'))
+    intent = cast(str, arguments.get('intent', '')).strip().lower()
+    if not intent:
+        intent = 'clarification'
+
+    valid_intents = (
+        'clarification',
+        'uncertainty',
+        'proposal',
+        'confirm',
+        'inform',
+        'escalate',
+    )
+    if intent not in valid_intents:
+        from backend.core.errors import FunctionCallValidationError
+
+        raise FunctionCallValidationError(
+            f'communicate_with_user: unknown intent {intent!r}. '
+            f'Valid intents: {", ".join(valid_intents)}.'
+        )
+
     message = cast(str, arguments.get('message', ''))
-    options = cast(Sequence[str], arguments.get('options', []))
+    raw_options = cast(Sequence[Any], arguments.get('options') or [])
+    option_labels, option_structured = _normalize_communicate_options(raw_options)
     context = cast(str, arguments.get('context', ''))
     thought = cast(str, arguments.get('thought', ''))
 
     if intent == 'uncertainty':
         from backend.ledger.action.agent import UncertaintyAction
 
+        raw_level = arguments.get('uncertainty_level', 0.5)
+        try:
+            level = float(raw_level)
+        except (TypeError, ValueError):
+            level = 0.5
+        level = max(0.0, min(1.0, level))
         return UncertaintyAction(
-            uncertainty_level=0.5,
-            specific_concerns=[message],
+            uncertainty_level=level,
+            specific_concerns=[message] if message else [],
             requested_information=context,
             thought=thought,
         )
 
-    elif intent == 'proposal':
+    if intent == 'proposal':
         from backend.ledger.action.agent import ProposalAction
 
-        # Format the options cleanly for the existing UI
         formatted_options: list[dict[str, Any]] = (
-            [{'approach': opt, 'pros': [], 'cons': []} for opt in options]
-            if options
-            else [{'approach': message}]
+            [
+                {
+                    'approach': s['label'],
+                    'description': s.get('description', ''),
+                    'pros': [],
+                    'cons': [],
+                }
+                for s in option_structured
+            ]
+            if option_structured
+            else [{'approach': message, 'pros': [], 'cons': []}]
         )
+        raw_recommended = arguments.get('recommended', 0)
+        try:
+            recommended = int(raw_recommended)
+        except (TypeError, ValueError):
+            recommended = 0
+        if formatted_options:
+            recommended = max(0, min(recommended, len(formatted_options) - 1))
         return ProposalAction(
             options=formatted_options,
             rationale=context or message,
             thought=thought,
-            recommended=0,
+            recommended=recommended,
         )
 
-    elif intent == 'escalate':
-        from backend.ledger.action.agent import EscalateToHumanAction
+    if intent == 'confirm':
+        from backend.ledger.action.agent import ConfirmRequestAction
 
-        return EscalateToHumanAction(
-            reason=message,
-            attempts_made=[context] if context else [],
-            specific_help_needed='',
-            thought=thought,
-        )
-
-    else:  # Default to clarification
-        from backend.ledger.action.agent import ClarificationRequestAction
-
-        return ClarificationRequestAction(
+        if not option_labels:
+            option_labels = ['Yes, do it', 'No, abort']
+            option_structured = [
+                {'label': 'Yes, do it', 'description': ''},
+                {'label': 'No, abort', 'description': ''},
+            ]
+        raw_default = arguments.get('default_index', 1)
+        try:
+            default_index = int(raw_default)
+        except (TypeError, ValueError):
+            default_index = 1
+        default_index = 0 if default_index == 0 else 1
+        return ConfirmRequestAction(
             question=message,
-            options=list(options),
+            options=option_labels,
+            default_index=default_index,
             context=context,
             thought=thought,
         )
+
+    if intent == 'inform':
+        from backend.ledger.action.agent import InformAction
+
+        return InformAction(
+            text=message,
+            context=context,
+            thought=thought,
+        )
+
+    if intent == 'escalate':
+        from backend.ledger.action.agent import EscalateToHumanAction
+
+        raw_attempts = cast(Sequence[Any], arguments.get('attempts') or [])
+        structured_attempts = _format_attempts(raw_attempts)
+        if not structured_attempts and context:
+            structured_attempts = [context]
+        return EscalateToHumanAction(
+            reason=message,
+            attempts_made=structured_attempts,
+            specific_help_needed=cast(
+                str, arguments.get('specific_help_needed', '')
+            ).strip(),
+            thought=thought,
+        )
+
+    # Default: clarification
+    from backend.ledger.action.agent import ClarificationRequestAction
+
+    return ClarificationRequestAction(
+        question=message,
+        options=option_labels,
+        context=context,
+        thought=thought,
+    )

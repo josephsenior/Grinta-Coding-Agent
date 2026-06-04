@@ -142,6 +142,25 @@ class TestEmitEvent:
         es.add_event.assert_called_once_with('event', 'source')
 
 
+class TestTriggerStep:
+    def test_prefers_deferred_scheduler(self):
+        controller = MagicMock()
+        ctx = OrchestrationContext(_controller=controller)
+
+        ctx.trigger_step()
+
+        controller.schedule_step_soon.assert_called_once_with()
+        controller.step.assert_not_called()
+
+    def test_falls_back_to_step_when_deferred_scheduler_missing(self):
+        controller = MagicMock(spec=['step'])
+        ctx = OrchestrationContext(_controller=controller)
+
+        ctx.trigger_step()
+
+        controller.step.assert_called_once_with()
+
+
 # ── pop_action_context ───────────────────────────────────────────────
 
 

@@ -77,12 +77,22 @@ class WelcomeWidget(Vertical):
                 logo_static.update(_get_welcome_figlet())
             else:
                 logo_static.update('[#6f83aa bold]GRINTA[/]')
-        self._selected = 0
+        # Preserve any selection set before mount (e.g. by a pre-selection
+        # call on the active communicate card). Default to 0 otherwise.
+        self._selected = getattr(self, '_selected', 0)
         self._items = list(self.query('.welcome-item'))
         self._cascade_timers: list[Any] = []
         for item in self._items:
             item.display = False
-        self._cascade(0)
+        self._cascade(self._selected)
+
+    def _cascade(self, idx: int) -> None:
+        if idx >= len(self._items):
+            self._highlight(self._selected)
+            return
+        self._items[idx].display = True
+        timer = self.set_timer(0.15, lambda i=idx: self._cascade(i + 1))
+        self._cascade_timers.append(timer)
 
     def on_unmount(self) -> None:
         for timer in self._cascade_timers:
@@ -92,13 +102,12 @@ class WelcomeWidget(Vertical):
                 pass
         self._cascade_timers.clear()
 
-    def _cascade(self, idx: int) -> None:
-        if idx >= len(self._items):
-            self._highlight(0)
-            return
-        self._items[idx].display = True
-        timer = self.set_timer(0.15, lambda i=idx: self._cascade(i + 1))
-        self._cascade_timers.append(timer)
+    @property
+    def header(self) -> str:
+        """Public accessor for the header text (used by callers that want
+        to reference the card's question/title in a reply, e.g. to scaffold
+        a user reply that preserves question context)."""
+        return self._header_text
 
     def _highlight(self, idx: int) -> None:
         for i, item in enumerate(self._items):
@@ -155,6 +164,7 @@ class CommunicatePromptWidget(WelcomeWidget):
         context: str = '',
         details: list[str] | None = None,
         options: list[tuple[str, str, str, bool]] | None = None,
+        preselected_index: int = 0,
     ) -> None:
         details_text = ' '.join(details or [])
         helper = 'Use up/down + Enter, or click an option.'
@@ -173,15 +183,21 @@ class CommunicatePromptWidget(WelcomeWidget):
         self._values = [option[1] for option in (options or [])]
         self._active = bool(self._values)
         self._submitted: int | None = None
+        # Clamp to valid range; -1 means "leave default".
+        n = len(self._values)
+        if 0 <= preselected_index < n:
+            self._selected = preselected_index
 
     def on_mount(self) -> None:
-        self._selected = 0
+        # Preserve any selection set before mount (e.g. by a pre-selection
+        # call on the active communicate card). Default to 0 otherwise.
+        self._selected = getattr(self, '_selected', 0)
         self._items = list(self.query('.welcome-item'))
         self._cascade_timers = []
         for item in self._items:
             item.display = True
         if self._items:
-            self._highlight(0)
+            self._highlight(self._selected)
 
     @property
     def has_options(self) -> bool:

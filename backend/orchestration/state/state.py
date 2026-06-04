@@ -201,9 +201,17 @@ def normalize_plan_step_payload(step: Any, idx: int | None = None) -> dict[str, 
     tags = step.get('tags', [])
     if tags is None:
         tags = []
-    if not isinstance(tags, list):
-        msg = "Plan step 'tags' must be a list"
-        raise TypeError(msg)
+    elif isinstance(tags, str):
+        # Be forgiving: the LLM sometimes sends a bare comma-separated string
+        # instead of a list. Split on commas (and trim whitespace) so the
+        # agent doesn't have to re-issue the whole plan.
+        tags = [t.strip() for t in tags.split(',') if t.strip()]
+    elif not isinstance(tags, list):
+        # Wrap a single non-list value (e.g. an int) in a list so we don't
+        # reject otherwise-valid payloads over a schema quirk.
+        tags = [tags]
+    # Coerce non-string items to strings to keep the type contract stable.
+    tags = [str(t) for t in tags if t is not None]
 
     normalized_subtasks = [
         normalize_plan_step_payload(substep, i + 1)

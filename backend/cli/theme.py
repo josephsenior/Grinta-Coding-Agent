@@ -625,6 +625,30 @@ NAVY_RUNNING_OLD = '#5fb3b3'  # old teal
 _apply_theme_overrides()
 
 
+def grinta_rich_theme_styles() -> dict[str, str]:
+    """Return Rich theme overrides used by CLI and TUI renderables."""
+    if no_color_enabled():
+        return {
+            'markdown.code': 'bold',
+            'repr.number': 'bold',
+            'repr.string': 'bold',
+            'repr.bool': 'bold',
+            'repr.none': 'dim',
+            'repr.url': 'underline',
+            'repr.uuid': 'dim',
+        }
+
+    return {
+        'markdown.code': f'bold {NAVY_TEXT_PRIMARY} on #101829',
+        'repr.number': NAVY_TEXT_PRIMARY,
+        'repr.string': NAVY_READY,
+        'repr.bool': NAVY_BRAND,
+        'repr.none': NAVY_TEXT_MUTED,
+        'repr.url': NAVY_BRAND,
+        'repr.uuid': NAVY_TEXT_MUTED,
+    }
+
+
 def prompt_toolkit_style_dict() -> dict[str, str]:
     """Return ``Style.from_dict`` mapping; respects :func:`no_color_enabled`."""
     if no_color_enabled():

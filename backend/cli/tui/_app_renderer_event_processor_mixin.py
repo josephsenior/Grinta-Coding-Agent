@@ -15,6 +15,9 @@ from rich.text import (
     Text,
 )
 
+from backend.cli._event_renderer.text_utils import (
+    truncate_activity_detail,
+)
 from backend.cli._event_renderer.unified_renderer import (
     ActivityRenderer,
 )
@@ -51,15 +54,18 @@ from backend.ledger.action import (
     AgentThinkAction,
     BrowseInteractiveAction,
     BrowserToolAction,
+    ChangeAgentStateAction,
     ClarificationRequestAction,
     CmdRunAction,
     CondensationAction,
     CondensationRequestAction,
+    ConfirmRequestAction,
     DelegateTaskAction,
     EscalateToHumanAction,
     FileEditAction,
     FileReadAction,
     FileWriteAction,
+    InformAction,
     LspQueryAction,
     MCPAction,
     MessageAction,
@@ -98,10 +104,53 @@ from backend.ledger.observation import (
     TerminalObservation,
     UserRejectObservation,
 )
+from backend.orchestration.autonomy import normalize_autonomy_level
 
 
 class _AppRendererEventProcessorMixin:
     """event drain/activity + per-event processing + diff extraction."""
+
+    @staticmethod
+    def _compact_file_card_path(path: str) -> str:
+        """Keep file tool card headlines to one compact row."""
+        return truncate_activity_detail(path or '?', 80)
+
+    def _remember_pending_file_card(self, attr: str, path: str, widget: Any) -> None:
+        queues = getattr(self, attr, None)
+        if queues is None:
+            return
+        queues[(path or '').strip()].append(widget)
+
+    def _take_pending_file_card(self, attr: str, path: str) -> Any | None:
+        queues = getattr(self, attr, None)
+        if queues is None:
+            return None
+        key = (path or '').strip()
+        queue = queues.get(key)
+        if not queue:
+            return None
+        widget = queue.popleft()
+        if not queue:
+            queues.pop(key, None)
+        return widget
+
+    def _has_pending_file_card(self, attr: str, path: str) -> bool:
+        queues = getattr(self, attr, None)
+        if queues is None:
+            return False
+        queue = queues.get((path or '').strip())
+        return bool(queue)
+
+    def _is_full_autonomy(self) -> bool:
+        controller = getattr(self._tui, '_controller', None)
+        ac = getattr(controller, 'autonomy_controller', None)
+        raw_level = getattr(ac, 'autonomy_level', '') if ac is not None else ''
+        level = normalize_autonomy_level(raw_level)
+        if level:
+            return level == 'full'
+        hud = getattr(self._tui, '_hud', None)
+        state = getattr(hud, 'state', None)
+        return normalize_autonomy_level(getattr(state, 'autonomy_level', '')) == 'full'
 
     def drain_events(self) -> None:
         with self._pending_lock:
@@ -205,6 +254,8 @@ class _AppRendererEventProcessorMixin:
         self._update_metrics(event)
         if isinstance(event, NullAction) or isinstance(event, NullObservation):
             return
+        if isinstance(event, ChangeAgentStateAction):
+            return
 
         source = getattr(event, 'source', None)
         if isinstance(event, MessageAction) and self._is_user_source(source):
@@ -270,8 +321,16 @@ class _AppRendererEventProcessorMixin:
                 line_range = f'{start}:{end_str}'
             else:
                 line_range = ''
-            card = ActivityRenderer.file_read(path, line_range)
-            self._write_card(card)
+            card = ActivityRenderer.file_read(
+                self._compact_file_card_path(path),
+                line_range,
+            )
+            widget = self._write_card(card)
+            self._remember_pending_file_card(
+                '_pending_file_read_cards_by_path',
+                path,
+                widget,
+            )
         elif isinstance(event, FileEditAction):
             cmd = getattr(event, 'command', '')
             path = event.path
@@ -310,10 +369,20 @@ class _AppRendererEventProcessorMixin:
 
             if cmd == 'create_file':
                 file_text = getattr(event, 'file_text', '') or ''
-                self._tui.set_current_operation(
-                    f'Created {path}'.strip(),
-                    meta=f'+{_count_text_lines(file_text)}' if file_text else 'Running',
-                    active=True,
+                if self._has_pending_file_card(
+                    '_pending_file_create_cards_by_path',
+                    path,
+                ):
+                    return
+                card = ActivityRenderer.file_create(
+                    self._compact_file_card_path(path),
+                    line_count=_count_text_lines(file_text),
+                )
+                widget = self._write_card(card)
+                self._remember_pending_file_card(
+                    '_pending_file_create_cards_by_path',
+                    path,
+                    widget,
                 )
             else:
                 op_detail = f'{path} · {line_range}' if line_range else path
@@ -325,13 +394,27 @@ class _AppRendererEventProcessorMixin:
         elif isinstance(event, FileWriteAction):
             content = getattr(event, 'content', '') or ''
             card = ActivityRenderer.file_create(
-                event.path,
+                self._compact_file_card_path(event.path),
                 line_count=_count_text_lines(content),
-                preview_content=content,
             )
             self._write_card(card)
         elif isinstance(event, FileReadObservation):
-            pass
+            path = getattr(event, 'path', '') or ''
+            pending = self._take_pending_file_card(
+                '_pending_file_read_cards_by_path',
+                path,
+            )
+            operation_label = f'Read {self._compact_file_card_path(path)}'.strip()
+            if pending is not None:
+                self._update_activity_card_outcome(
+                    pending,
+                    status='ok',
+                    operation_label=operation_label,
+                )
+            else:
+                card = ActivityRenderer.file_read(self._compact_file_card_path(path))
+                card.secondary_kind = 'ok'
+                self._write_card(card)
         elif isinstance(event, FileEditObservation):
             # Strip agent-facing indentation warnings from user-visible content
             from backend.cli.transcript import strip_indentation_warnings
@@ -342,13 +425,26 @@ class _AppRendererEventProcessorMixin:
             path = (getattr(event, 'path', '') or '').strip()
             added = event.added
             removed = event.removed
+            pending_create = self._take_pending_file_card(
+                '_pending_file_create_cards_by_path',
+                path,
+            )
+            if pending_create is not None:
+                new_content = getattr(event, 'new_content', '') or ''
+                line_count = added or _count_text_lines(new_content)
+                self._update_activity_card_outcome(
+                    pending_create,
+                    status='ok',
+                    outcome=f'+{line_count}' if line_count else None,
+                    operation_label=f'Created {self._compact_file_card_path(path)}'.strip(),
+                )
+                return
 
             if not getattr(event, 'prev_exist', True):
                 new_content = getattr(event, 'new_content', '') or ''
                 card = ActivityRenderer.file_create(
-                    path or event.path,
+                    self._compact_file_card_path(path or event.path),
                     line_count=added or _count_text_lines(new_content),
-                    preview_content=new_content,
                 )
                 self._write_card(card)
             elif not path or path == '.':
@@ -788,6 +884,11 @@ class _AppRendererEventProcessorMixin:
             self._handle_state_change(event)
         elif isinstance(event, ClarificationRequestAction):
             self._tui.add_communicate_clarification(event)
+        elif isinstance(event, ConfirmRequestAction):
+            if not self._is_full_autonomy():
+                self._tui.add_communicate_confirm(event)
+        elif isinstance(event, InformAction):
+            self._tui.add_communicate_inform(event)
         elif isinstance(event, UncertaintyAction):
             self._tui.add_communicate_uncertainty(event)
         elif isinstance(event, ProposalAction):

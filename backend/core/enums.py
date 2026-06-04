@@ -91,6 +91,8 @@ class ActionType(str, Enum):
     UNCERTAINTY = 'uncertainty'
     PROPOSAL = 'proposal'
     CLARIFICATION = 'clarification'
+    CONFIRM = 'confirm'
+    INFORM = 'inform'
     ESCALATE = 'escalate'
     DELEGATE_TASK = 'delegate_task'
     BLACKBOARD = 'blackboard'
