@@ -23,7 +23,9 @@ from backend.ledger.action import (
 )
 from backend.ledger.action.agent import (
     ClarificationRequestAction,
+    ConfirmRequestAction,
     EscalateToHumanAction,
+    InformAction,
     ProposalAction,
     UncertaintyAction,
 )
@@ -37,6 +39,8 @@ from backend.ledger.action.terminal import (
 
 _META_COGNITION_ACTION_TYPES = (
     ClarificationRequestAction,
+    ConfirmRequestAction,
+    InformAction,
     ProposalAction,
     UncertaintyAction,
     EscalateToHumanAction,

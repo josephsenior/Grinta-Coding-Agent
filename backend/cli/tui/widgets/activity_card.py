@@ -19,7 +19,7 @@ from rich.syntax import Syntax
 from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal
 from textual.widgets import Static
 
 from backend.cli.theme import (
@@ -599,11 +599,28 @@ class ActivityCard(Container):
         if self._collapsible:
             self.toggle_extra()
 
+    def _clicked_inside_expanded_body(self, widget: Any) -> bool:
+        node = widget
+        while node is not None and node is not self:
+            if getattr(node, 'id', None) == 'expanded-body':
+                return True
+            classes = getattr(node, 'classes', ())
+            if 'card-expanded-body' in classes:
+                return True
+            node = getattr(node, 'parent', None)
+        return False
+
     def on_click(self, event: events.Click) -> None:
         """Handle click events to toggle expansion."""
         if self._collapsible:
             clicked = event.widget
-            if clicked and clicked.id in (
+            if not self._collapsed and self._clicked_inside_expanded_body(clicked):
+                self.collapse()
+                event.prevent_default()
+                event.stop()
+                return
+            clicked_id = getattr(clicked, 'id', None)
+            if clicked_id in (
                 'collapsed-row',
                 'caret',
                 'collapsed-row-container',
@@ -748,8 +765,10 @@ class PlanMessage(Static):
 
 
 class ThinkingIndicator(Container):
-    """Live thinking/reasoning indicator that collapses into a borderless,
-    expandable ``Thought for Ns`` card once the agent finishes its turn.
+    """Live thinking/reasoning indicator.
+
+    Collapses into a borderless, expandable ``Thought for Ns`` card once the
+    agent finishes its turn.
 
     States:
     - **streaming**: header shows ``Thinking: (Xs)...`` with body visible
@@ -837,8 +856,10 @@ class ThinkingIndicator(Container):
         self._update_display()
 
     def finalize(self) -> None:
-        """Freeze the current streamed thinking and collapse into a single
-        line ``Thought for Ns`` card. The user can click to expand it again.
+        """Freeze the current streamed thinking.
+
+        Collapse into a single line ``Thought for Ns`` card. The user can click
+        to expand it again.
         """
         import time
 
@@ -853,8 +874,11 @@ class ThinkingIndicator(Container):
         self.add_class('-hidden')
 
     def toggle(self) -> None:
-        """Toggle between collapsed and expanded states (only meaningful
-        after ``finalize()``; while streaming the body is always shown)."""
+        """Toggle between collapsed and expanded states.
+
+        Only meaningful after ``finalize()``; while streaming the body is
+        always shown.
+        """
         if not self._finalized:
             return
         self._collapsed = not self._collapsed

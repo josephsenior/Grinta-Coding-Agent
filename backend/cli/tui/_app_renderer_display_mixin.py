@@ -35,6 +35,8 @@ class _AppRendererDisplayMixin:
         self._pending_terminal_command = None
         self._pending_terminal_card = None
         self._pending_shell_cards_by_command = defaultdict(deque)
+        self._pending_file_read_cards_by_path = defaultdict(deque)
+        self._pending_file_create_cards_by_path = defaultdict(deque)
         self._active_worker_tasks = []
         self._worker_recent_results.clear()
         self._worker_completed = 0
@@ -234,13 +236,11 @@ class _AppRendererDisplayMixin:
     ) -> Any:
         """Write an activity card to the transcript using native ActivityCard widget.
 
-        ``collapsed`` defaults to ``card.start_collapsed`` so that renderer methods
-        which already decided the initial expansion (e.g. small file previews
-        starting open, large ones starting closed) are honoured. Pass an explicit
-        value to override.
+        ``collapsed`` defaults to compact so expandable tool cards never open
+        unsolicited. Callers may still opt into an expanded state explicitly.
         """
         if collapsed is None:
-            collapsed = card.start_collapsed
+            collapsed = True
         self.commit_live_thinking()
         self._clear_last_active_card_processing()
 
@@ -285,7 +285,7 @@ class _AppRendererDisplayMixin:
             'workers',
             'code',
         )
-        is_active = is_tool and (not card.secondary or card.secondary_kind == 'neutral')
+        is_active = is_tool and card.secondary_kind == 'neutral'
         if is_active:
             widget.set_processing(True)
             self._clear_last_active_card_processing()

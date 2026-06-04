@@ -196,7 +196,7 @@ class ActivityRenderer:
     @staticmethod
     def file_read(path: str, line_range: str = '') -> ActivityCard:
         """Create an activity card for a file read."""
-        detail = f'{path}  [{NAVY_TEXT_DIM}]·[/] [{NAVY_WAITING}]{line_range}[/]' if line_range else path
+        detail = f'{path}  [{NAVY_WAITING}]{line_range}[/]' if line_range else path
         return ActivityCard(
             verb='Read',
             detail=detail,
@@ -286,15 +286,6 @@ class ActivityRenderer:
     ) -> ActivityCard:
         """Create an activity card for file creation."""
         secondary = f'+{line_count}' if line_count else None
-        extra_lines: list[ActivityLine] = []
-        if preview_content:
-            lines = preview_content.rstrip('\n').split('\n')
-            extra_lines.append(ActivityLine(f'Path: {path}', indent=0))
-            extra_lines.append(ActivityLine(f'Added: +{line_count}', indent=0))
-            extra_lines.append(ActivityLine('─' * 40, indent=0))
-            for line in lines:
-                extra_lines.append(ActivityLine(line, indent=0))
-        should_collapse = bool(preview_content) and len(preview_content) > 500
         return ActivityCard(
             verb='Created',
             detail=path,
@@ -302,9 +293,6 @@ class ActivityRenderer:
             title='Files',
             secondary=secondary,
             secondary_kind='ok' if secondary else 'neutral',
-            extra_lines=extra_lines,
-            is_collapsible=bool(preview_content),
-            start_collapsed=should_collapse,
             syntax_language=_lexer_for_path(path),
         )
 

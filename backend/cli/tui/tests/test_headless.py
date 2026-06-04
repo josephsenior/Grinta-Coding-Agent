@@ -15,6 +15,7 @@ from textual.widgets import Label, Select, Static, TextArea
 from backend.cli._event_renderer.unified_renderer import ActivityRenderer
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
+from backend.cli.theme import grinta_rich_theme_styles
 from backend.cli.tui.app import (
     HUD,
     CommunicatePromptWidget,
@@ -44,12 +45,17 @@ from backend.ledger.action import (
     AgentThinkAction,
     ClarificationRequestAction,
     CondensationRequestAction,
+    ConfirmRequestAction,
     DelegateTaskAction,
+    EscalateToHumanAction,
     FileEditAction,
+    FileReadAction,
     FileWriteAction,
+    InformAction,
     MessageAction,
     ProposalAction,
     StreamingChunkAction,
+    UncertaintyAction,
 )
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
@@ -72,7 +78,11 @@ from backend.ledger.observation.agent import (
 from backend.ledger.observation.browser_screenshot import BrowserScreenshotObservation
 from backend.ledger.observation.code_nav import LspQueryObservation
 from backend.ledger.observation.commands import CmdOutputObservation
-from backend.ledger.observation.files import FileEditObservation, FileWriteObservation
+from backend.ledger.observation.files import (
+    FileEditObservation,
+    FileReadObservation,
+    FileWriteObservation,
+)
 from backend.ledger.observation.mcp import MCPObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
 from backend.ledger.observation.terminal import TerminalObservation
@@ -94,6 +104,17 @@ def mock_config():
 def _get_screen(app: GrintaTUIApp) -> GrintaScreen:
     """Helper: query via app.screen since app.query_one uses default screen."""
     return app.screen  # type: ignore[return-value]
+
+
+def test_grinta_rich_theme_overrides_inline_markdown_code(monkeypatch):
+    monkeypatch.delenv('NO_COLOR', raising=False)
+    monkeypatch.delenv('GRINTA_NO_COLOR', raising=False)
+
+    style = grinta_rich_theme_styles()['markdown.code']
+
+    assert 'cyan' not in style.lower()
+    assert 'magenta' not in style.lower()
+    assert '#101829' in style
 
 
 async def _fill_scrollable_transcript(display, pilot, *, count: int = 80) -> None:
@@ -267,6 +288,84 @@ async def test_tui_activity_card_expanded_output_wraps_in_extra_frame(mock_confi
         body = found.query_one('#expanded-body', Container)
         assert body is not None
         assert body.display is True
+
+
+@pytest.mark.asyncio
+async def test_tui_activity_card_body_click_collapses(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        data = ActivityRenderer.terminal_output('line1\nline2', session_id='term-1')
+        mounted = TUIActivityCard(
+            verb=data.verb,
+            detail=data.detail,
+            badge_category=data.badge_category,
+            status='ok',
+            outcome=data.secondary,
+            extra_content='line1\nline2',
+            collapsed=False,
+        )
+        s.query_one('#main-display').mount(mounted)
+        await pilot.pause()
+
+        found = s.query_one(TUIActivityCard)
+        extra = found.query_one('#extra', Static)
+
+        event = SimpleNamespace(
+            widget=extra,
+            prevented=False,
+            stopped=False,
+            prevent_default=lambda: setattr(event, 'prevented', True),
+            stop=lambda: setattr(event, 'stopped', True),
+        )
+        found.on_click(event)
+
+        body = found.query_one('#expanded-body', Container)
+        assert found._collapsed is True
+        assert body.display is False
+        assert event.prevented is True
+        assert event.stopped is True
+
+
+@pytest.mark.asyncio
+async def test_tui_renderer_writes_expandable_cards_collapsed_by_default(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        card = ActivityRenderer.shell_command(
+            'python fail.py',
+            output='Traceback\nboom',
+            exit_code=1,
+        )
+        assert card.is_collapsible is True
+        assert card.start_collapsed is False
+
+        widget = renderer._write_card(card)
+        await pilot.pause()
+
+        body = widget.query_one('#expanded-body', Container)
+        assert widget._collapsed is True
+        assert body.display is False
 
 
 @pytest.mark.asyncio
@@ -469,7 +568,11 @@ async def test_tui_communicate_clarification_supports_keyboard_selection(
         await pilot.press('enter')
         await pilot.pause()
 
-        assert captured == ['Refactor the public API']
+        # The chosen value is wrapped in a scaffold that includes the
+        # question, so the LLM can see what was being asked.
+        assert len(captured) == 1
+        assert 'Refactor the public API' in captured[0]
+        assert 'Which direction should I take?' in captured[0]
 
 
 @pytest.mark.asyncio
@@ -526,7 +629,306 @@ async def test_tui_communicate_proposal_click_submits_selected_option(
         await pilot.pause()
 
         assert clicked
-        assert captured == ['Patch the current flow']
+        assert len(captured) == 1
+        assert 'Patch the current flow' in captured[0]
+
+
+@pytest.mark.asyncio
+async def test_tui_communicate_proposal_marks_recommended_in_label(
+    mock_config, monkeypatch
+):
+    """Proposal with `recommended=1` labels the second option as recommended.
+
+    We deliberately do NOT pre-highlight the recommended option: the
+    ``(recommended)`` suffix is the cue, and the user navigates to it.
+    Pre-selection would race the widget's mount order.
+    """
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        s._hide_welcome()
+        s._write_log = display.append_widget  # type: ignore[method-assign]
+        s.add_communicate_proposal(
+            ProposalAction(
+                rationale='Two options.',
+                recommended=1,
+                options=[
+                    {'name': 'Option A', 'description': 'first'},
+                    {'name': 'Option B', 'description': 'second'},
+                    {'name': 'Option C', 'description': 'third'},
+                ],
+            )
+        )
+        await pilot.pause()
+        await pilot.pause()
+
+        card = s.query_one(CommunicatePromptWidget)
+        # The recommended option carries a visual suffix; the other two
+        # do not. No pre-selection: the user navigates with arrow keys.
+        assert 'Option B (recommended)' in card._suggestions
+        assert 'Option A (recommended)' not in card._suggestions
+        assert 'Option C (recommended)' not in card._suggestions
+        # The default selection is the first option, as before.
+        assert card.current_value == 'Option A'
+
+
+@pytest.mark.asyncio
+async def test_tui_communicate_uncertainty_renders_informational_card(
+    mock_config, monkeypatch
+):
+    """Uncertainty action renders a card with the concerns but doesn't block input."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        s._hide_welcome()
+        s._write_log = display.append_widget  # type: ignore[method-assign]
+
+        s.add_communicate_uncertainty(
+            UncertaintyAction(
+                uncertainty_level=0.2,
+                specific_concerns=['maybe wrong file', 'maybe wrong regex'],
+                requested_information='the exact file path',
+                thought='I am not sure which file to look at.',
+            )
+        )
+        await pilot.pause()
+
+        # The card exists in the transcript.
+        cards = list(display.query(CommunicatePromptWidget))
+        assert len(cards) == 1
+        card = cards[0]
+        # Header carries the title; subheader carries the concerns.
+        assert 'Needs Context' in card._header_text
+        assert 'maybe wrong file' in card._subheader_text
+        assert 'the exact file path' in card._subheader_text
+
+        # Uncertainty is non-blocking: the active communicate card is None.
+        assert s._active_communicate_card is None
+
+
+@pytest.mark.asyncio
+async def test_tui_communicate_escalate_renders_structured_attempts(
+    mock_config, monkeypatch
+):
+    """Escalation card renders structured attempts as readable lines."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        s._hide_welcome()
+        s._write_log = display.append_widget  # type: ignore[method-assign]
+
+        s.add_communicate_escalate(
+            EscalateToHumanAction(
+                reason='All ripgrep variants returned empty.',
+                attempts_made=[
+                    {'action': 'rg --files', 'result': 'no match'},
+                    {'action': 'rg pattern', 'result': 'permission denied'},
+                ],
+                specific_help_needed='Confirm the file path or paste the file content.',
+            )
+        )
+        await pilot.pause()
+
+        cards = list(display.query(CommunicatePromptWidget))
+        assert len(cards) == 1
+        card = cards[0]
+        # Header carries the title; subheader carries the attempts and help.
+        assert 'Need Your Input' in card._header_text
+        assert 'rg --files' in card._subheader_text
+        assert 'permission denied' in card._subheader_text
+        assert 'Help needed' in card._subheader_text
+
+
+@pytest.mark.asyncio
+async def test_tui_communicate_confirm_renders_with_safe_default_selected(
+    mock_config, monkeypatch
+):
+    """Confirm card always blocks; default_index=1 (deny) is pre-selected."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        captured: list[str] = []
+
+        async def _fake_handle_input(text: str) -> None:
+            captured.append(text)
+
+        s._handle_input = _fake_handle_input  # type: ignore[method-assign]
+        s._hide_welcome()
+        s._write_log = display.append_widget  # type: ignore[method-assign]
+
+        s.add_communicate_confirm(
+            ConfirmRequestAction(
+                question='Delete the user table?',
+                options=['Yes, do it', 'No, abort'],
+                default_index=1,
+            )
+        )
+        await pilot.pause()
+        await pilot.pause()
+
+        card = s.query_one(CommunicatePromptWidget)
+        # The deny option (index 1) is pre-selected for safety.
+        assert card.current_value == 'No, abort'
+
+        # Confirm always blocks; the active card is set.
+        assert s._active_communicate_card is card
+
+        await pilot.press('enter')
+        await pilot.pause()
+
+        # Entering on "No, abort" submits it as the user reply.
+        assert len(captured) == 1
+        assert 'No, abort' in captured[0]
+
+
+@pytest.mark.asyncio
+async def test_tui_communicate_inform_renders_without_blocking(
+    mock_config, monkeypatch
+):
+    """Inform action writes a card but never blocks the input."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        s._hide_welcome()
+        s._write_log = display.append_widget  # type: ignore[method-assign]
+
+        s.add_communicate_inform(
+            InformAction(
+                text='I created helper.py and tests for the parser.',
+                context='Two new files added.',
+            )
+        )
+        await pilot.pause()
+
+        cards = list(display.query(CommunicatePromptWidget))
+        assert len(cards) == 1
+        card = cards[0]
+        # Header carries the title; subheader/context carry the body text.
+        assert 'Status' in card._header_text
+        assert 'helper.py' in card._header_text or 'helper.py' in card._subheader_text
+
+        # Inform never blocks; the active card is None.
+        assert s._active_communicate_card is None
+
+
+@pytest.mark.asyncio
+async def test_tui_communicate_selection_scaffolds_user_reply_with_question(
+    mock_config, monkeypatch
+):
+    """When the user picks a communicate option, the LLM sees the question context."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        captured: list[str] = []
+
+        async def _fake_handle_input(text: str) -> None:
+            captured.append(text)
+
+        s._handle_input = _fake_handle_input  # type: ignore[method-assign]
+        s._hide_welcome()
+        s._write_log = display.append_widget  # type: ignore[method-assign]
+        s.add_communicate_clarification(
+            ClarificationRequestAction(
+                question='Which direction should I take?',
+                options=['Keep the API as-is', 'Refactor the public API'],
+            )
+        )
+        await pilot.pause()
+
+        card = s.query_one(CommunicatePromptWidget)
+        await pilot.press('down')
+        await pilot.pause()
+        await pilot.press('enter')
+        await pilot.pause()
+
+        # The captured text should now include the question scaffolding,
+        # so the LLM knows what was being asked even if the conversation
+        # has scrolled out of view.
+        assert len(captured) == 1
+        reply = captured[0]
+        assert 'Refactor the public API' in reply
+        assert 'Which direction should I take?' in reply
+        assert 'user answered the prompt' in reply
+
+
+@pytest.mark.asyncio
+async def test_tui_communicate_clarification_supports_structured_options(
+    mock_config, monkeypatch
+):
+    """Clarification options with {label, description} dicts are rendered."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        s._hide_welcome()
+        s._write_log = display.append_widget  # type: ignore[method-assign]
+
+        s.add_communicate_clarification(
+            ClarificationRequestAction(
+                question='Which library?',
+                options=[
+                    {'label': 'requests', 'description': 'simple, sync'},
+                    {'label': 'httpx', 'description': 'async support'},
+                ],
+            )
+        )
+        await pilot.pause()
+
+        cards = list(display.query(CommunicatePromptWidget))
+        assert len(cards) == 1
+        card = cards[0]
+        # The card has the values, and submitting one works.
+        assert card.has_options is True
+        assert 'requests' in card._values
+        assert 'httpx' in card._values
 
 
 @pytest.mark.asyncio
@@ -2179,9 +2581,12 @@ async def test_tui_file_write_renders_compact_create_card(mock_config):
             if 'category-files' in card.classes
         ]
         assert len(file_cards) == 1
-        collapsed = file_cards[0].query_one('#collapsed-row')
+        card = file_cards[0]
+        collapsed = card.query_one('#collapsed-row')
         assert 'demo.txt' in str(collapsed.renderable)
         assert '+2' in str(collapsed.renderable)
+        assert card._collapsible is False
+        assert card.query_one('#expanded-body').display is False
 
 
 @pytest.mark.asyncio
@@ -2220,6 +2625,146 @@ async def test_tui_file_write_does_not_dump_created_file_body(mock_config):
         assert len(file_cards) == 1
         collapsed = file_cards[0].query_one('#collapsed-row')
         assert 'demo.txt' in str(collapsed.renderable)
+
+
+@pytest.mark.asyncio
+async def test_tui_file_edit_create_action_renders_non_expandable_card(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        create_action = FileEditAction(
+            path='created.txt',
+            command='create_file',
+            file_text='alpha\nbeta',
+        )
+        renderer._process_event(create_action)
+        renderer._process_event(create_action)
+        await pilot.pause()
+
+        file_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes
+        ]
+        assert len(file_cards) == 1
+        card = file_cards[0]
+        collapsed = card.query_one('#collapsed-row')
+        assert 'Created' in str(collapsed.renderable)
+        assert 'created.txt' in str(collapsed.renderable)
+        assert '+2' in str(collapsed.renderable)
+        assert card._collapsible is False
+        assert not list(card.query('#caret').results())
+        assert card.query_one('#expanded-body').display is False
+
+        renderer._process_event(
+            FileEditObservation(
+                path='created.txt',
+                content='created',
+                prev_exist=False,
+                new_content='alpha\nbeta',
+            )
+        )
+        await pilot.pause()
+
+        file_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes
+        ]
+        assert len(file_cards) == 1
+
+
+@pytest.mark.asyncio
+async def test_tui_file_read_card_completes_without_expanded_body(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        long_path = 'backend/cli/tui/some/really/long/path/that/should/not/stretch/read_card.py'
+        renderer._process_event(FileReadAction(path=long_path))
+        await pilot.pause()
+
+        file_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes
+        ]
+        assert len(file_cards) == 1
+        assert file_cards[0]._collapsible is False
+        assert file_cards[0].query_one('#expanded-body').display is False
+
+        renderer._process_event(
+            FileReadObservation(path=long_path, content='alpha\nbeta\ngamma')
+        )
+        await pilot.pause()
+
+        file_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes
+        ]
+        assert len(file_cards) == 1
+        card = file_cards[0]
+        collapsed_markup = card._build_collapsed_markup()
+        assert 'Read' in collapsed_markup
+        assert 'lines' not in collapsed_markup.lower()
+        assert '#f6ff8f' not in collapsed_markup
+        assert '[blink' not in collapsed_markup
+        assert len(card._detail) <= 80
+        assert card._collapsible is False
+        assert not list(card.query('#caret').results())
+        assert card.query_one('#expanded-body').display is False
+
+        renderer._process_event(
+            FileReadAction(path='backend/cli/tui/ranged_read.py', view_range=[50, 100])
+        )
+        renderer._process_event(
+            FileReadObservation(
+                path='backend/cli/tui/ranged_read.py',
+                content='selected\nrange',
+            )
+        )
+        await pilot.pause()
+
+        ranged_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes and 'ranged_read.py' in card._detail
+        ]
+        assert len(ranged_cards) == 1
+        ranged_markup = ranged_cards[0]._build_collapsed_markup()
+        assert '50:100' in ranged_markup
+        assert '#f6ff8f' in ranged_markup
+        assert 'lines' not in ranged_markup.lower()
 
 
 @pytest.mark.asyncio

@@ -382,6 +382,8 @@ class ContextMemory:
                 'CmdRunAction',
                 'AgentThinkAction',
                 'ClarificationRequestAction',
+                'ConfirmRequestAction',
+                'InformAction',
                 'ProposalAction',
                 'UncertaintyAction',
                 'EscalateToHumanAction',

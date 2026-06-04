@@ -1,7 +1,7 @@
 """Tests for StateTransitionService."""
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
@@ -171,8 +171,15 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
         # Should emit action
         self.mock_context.emit_event.assert_called_with(mock_pending, EventSource.AGENT)
 
-        # Should clear pending action
+        # Should clear the approval pending row before re-emitting the confirmed
+        # action, so the fresh execution row is not immediately wiped out.
         self.mock_context.clear_pending_action.assert_called_once()
+        self.assertLess(
+            self.mock_context.mock_calls.index(call.clear_pending_action()),
+            self.mock_context.mock_calls.index(
+                call.emit_event(mock_pending, EventSource.AGENT)
+            ),
+        )
 
     async def test_set_agent_state_user_rejected_emits_pending(self):
         """Test set_agent_state to USER_REJECTED emits pending action."""

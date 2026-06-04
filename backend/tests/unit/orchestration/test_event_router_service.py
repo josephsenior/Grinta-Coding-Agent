@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,6 +15,7 @@ from backend.ledger.action import (
     MessageAction,
     PlaybookFinishAction,
 )
+from backend.ledger.action.agent import ConfirmRequestAction
 from backend.ledger.observation import Observation
 from backend.orchestration.services.event_router_service import EventRouterService
 
@@ -119,6 +121,17 @@ class TestHandleAction:
         action.wait_for_response = True
         await svc._handle_action(action)
         ctrl.set_agent_state_to.assert_called_with(AgentState.AWAITING_USER_INPUT)
+
+    @pytest.mark.asyncio
+    async def test_confirm_request_does_not_pause_in_full_autonomy_plan_mode(self):
+        ctrl = _make_controller()
+        ctrl.autonomy_controller = SimpleNamespace(autonomy_level='full')
+        ctrl.agent = SimpleNamespace(config=SimpleNamespace(mode='plan'))
+        svc = EventRouterService(ctrl)
+
+        await svc._handle_action(ConfirmRequestAction(question='Continue?'))
+
+        ctrl.set_agent_state_to.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_message_action_from_agent_no_wait(self):

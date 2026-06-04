@@ -280,6 +280,8 @@ class TUIRenderer(
         self._pending_terminal_command: str | None = None
         self._pending_terminal_card: Any | None = None
         self._pending_shell_cards_by_command: dict[str, deque[Any]] = defaultdict(deque)
+        self._pending_file_read_cards_by_path: dict[str, deque[Any]] = defaultdict(deque)
+        self._pending_file_create_cards_by_path: dict[str, deque[Any]] = defaultdict(deque)
         self._active_worker_tasks: list[str] = []
         self._worker_recent_results: deque[str] = deque(maxlen=3)
         self._worker_completed: int = 0

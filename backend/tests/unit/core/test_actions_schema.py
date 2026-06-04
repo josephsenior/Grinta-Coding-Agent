@@ -9,8 +9,10 @@ from backend.core.schemas.actions import (
     ClarificationRequestActionSchema,
     CondensationActionSchema,
     CondensationRequestActionSchema,
+    ConfirmRequestActionSchema,
     DelegateTaskActionSchema,
     EscalateToHumanActionSchema,
+    InformActionSchema,
     MCPActionSchema,
     ProposalActionSchema,
     RecallActionSchema,
@@ -71,6 +73,32 @@ def test_escalate_to_human_action_schema():
     assert action.action_type == 'escalate'
     assert action.reason == 'Cannot solve'
     assert len(action.attempts_made) == 2
+
+
+def test_confirm_request_action_schema():
+    data = {
+        'action_type': 'confirm',
+        'question': 'Delete the table?',
+        'options': ['Yes, do it', 'No, abort'],
+        'default_index': 1,
+    }
+    action = ConfirmRequestActionSchema(**data)
+    assert action.action_type == 'confirm'
+    assert action.question == 'Delete the table?'
+    assert action.options == ['Yes, do it', 'No, abort']
+    # Safe default: deny on timeout.
+    assert action.default_index == 1
+
+
+def test_inform_action_schema():
+    data = {
+        'action_type': 'inform',
+        'text': 'Created 2 helper files.',
+        'context': 'Phase 1 complete.',
+    }
+    action = InformActionSchema(**data)
+    assert action.action_type == 'inform'
+    assert action.text == 'Created 2 helper files.'
 
 
 def test_mcp_action_schema():

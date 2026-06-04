@@ -8,6 +8,7 @@ from backend.cli.tui._app_dialogs import ConfirmWidget
 from backend.cli.tui._app_small_widgets import Transcript
 from backend.core.enums import AgentState, EventSource
 from backend.ledger.action import ChangeAgentStateAction
+from backend.orchestration.autonomy import normalize_autonomy_level
 
 
 class _AppScreenActionsMixin:
@@ -90,6 +91,12 @@ class _AppScreenActionsMixin:
             return risk_text
         return 'UNKNOWN'
 
+    def _is_full_autonomy(self) -> bool:
+        controller = getattr(self, '_controller', None)
+        ac = getattr(controller, 'autonomy_controller', None)
+        raw_level = getattr(ac, 'autonomy_level', '') if ac is not None else ''
+        return normalize_autonomy_level(raw_level) == 'full'
+
     async def _handle_confirmation_dialog(self) -> None:
         """Show inline confirmation widget and wait for user decision."""
         pending = None
@@ -99,6 +106,13 @@ class _AppScreenActionsMixin:
                 pending = action_service.get_pending_action()
         except Exception:
             pass
+
+        if self._is_full_autonomy():
+            self._event_stream.add_event(
+                ChangeAgentStateAction(agent_state=AgentState.USER_CONFIRMED),
+                EventSource.USER,
+            )
+            return
 
         action_type_raw = type(pending).__name__ if pending else 'Unknown'
         action_type = self._ACTION_TYPE_LABELS.get(action_type_raw, action_type_raw)

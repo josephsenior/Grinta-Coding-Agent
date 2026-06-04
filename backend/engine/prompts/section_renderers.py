@@ -659,8 +659,9 @@ def _render_autonomy(
         task_tracker_discipline_block = (
             '<TASK_TRACKING>\n'
             '**task_tracker**: For multi-step tasks, use `view` to inspect the plan and `update` to replace the full `task_list`.\n'
-            'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task without re-emitting the full list. Optional `result` field captures outcome.\n'
+            'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task status by ID. Optional `result` field captures outcome.\n'
             'Allowed statuses: `todo`, `in_progress`, `done`, `skipped`, `blocked`.\n'
+            'Each step object has: `id` (string, e.g. "1" or "1.1"), `description` (string), `status` (one of the allowed statuses), `result` (optional string), `tags` (optional LIST of strings — never a bare string), `subtasks` (optional recursive list of the same shape).\n'
             '**Completion**: Before `finish`, no task should remain `todo` or `in_progress`. Mark truly completed work `done`, intentionally omitted work `skipped`, and only genuinely blocked work `blocked` with a reason.'
             '</TASK_TRACKING>'
         )
@@ -1049,7 +1050,14 @@ def _render_interaction_tail(
     )
     communicate_tool_section = (
         '<COMMUNICATE_TOOL>\n'
-        'Use `communicate_with_user` for clarification, uncertainty, risky-action options, or escalation after 3 failed attempts on a sub-task. On escalation, include a brief post-mortem and one specific question. Do not ask mid-task questions in plain text; use this tool so the turn ends cleanly and waits for user input.\n'
+        'Use `communicate_with_user` to interact with the user. Pick the right intent:\n'
+        '  - `clarification` (default): ask a question, optionally with multiple-choice options. Use `options` with `{label, description?}` objects.\n'
+        '  - `proposal`: offer 2+ alternative approaches; set `recommended` to the index of the one you think is best.\n'
+        '  - `confirm`: require explicit user OK before a destructive or irreversible action. Provide exactly two options; the safe option (deny) is pre-selected.\n'
+        '  - `inform`: share a non-blocking status update; the turn continues.\n'
+        '  - `uncertainty`: flag low confidence; supply `uncertainty_level` (0.0-1.0) and a list of specific concerns.\n'
+        '  - `escalate`: after 3 failed attempts on a sub-task, hand off to the human; include a structured `attempts` list and a `specific_help_needed` sentence.\n'
+        'Do not ask mid-task questions in plain text; use this tool so the turn ends cleanly and waits for user input.\n'
         '</COMMUNICATE_TOOL>'
         if meta_cognition
         else ''

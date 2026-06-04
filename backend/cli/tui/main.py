@@ -18,18 +18,10 @@ from textual.app import App
 
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
+from backend.cli.theme import grinta_rich_theme_styles
 
 # ── Rich theme for consistent markup in RichLog/Static widgets ─────────────
-_RICH_THEME = RichTheme(
-    {
-        'repr.number': '#e9e9e9',
-        'repr.string': '#54efae',
-        'repr.bool': '#91abec',
-        'repr.none': '#969aad',
-        'repr.url': '#91abec',
-        'repr.uuid': '#969aad',
-    }
-)
+_RICH_THEME = RichTheme(grinta_rich_theme_styles())
 
 if TYPE_CHECKING:
     from backend.cli.config_manager import AppConfig
