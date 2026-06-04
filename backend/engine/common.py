@@ -366,6 +366,22 @@ def common_response_to_actions(
 
     all_tool_calls = native_tool_calls + text_marker_tool_calls + xml_tool_calls
 
+    actions: list[Action] = []
+    
+    text_content = _coerce_message_content_text(content)
+    if text_content.strip():
+        from backend.ledger.action import MessageAction
+        
+        cot = extract_redacted_thinking_inner(_raw_message_content_text(content)).strip()
+        actions.append(
+            MessageAction(
+                content=text_content,
+                thought=cot,
+                wait_for_response=False if all_tool_calls else bool(text_content.strip()),
+                suppress_cli=False,
+            )
+        )
+
     if all_tool_calls:
         # Pass mcp_tool_names through tool_call object for the factory function
         for tc in all_tool_calls:
@@ -378,27 +394,22 @@ def common_response_to_actions(
         # process_tool_calls sees the merged list.
         assistant_msg.tool_calls = all_tool_calls
 
-        actions = process_tool_calls(
+        actions.extend(process_tool_calls(
             assistant_msg,
             response,
             create_action_fn,
             extract_thought_from_message,
             combine_thought_fn,
-        )
-    else:
-        text_content = _coerce_message_content_text(content)
-        cot = extract_redacted_thinking_inner(
-            _raw_message_content_text(content)
-        ).strip()
+        ))
+    elif not actions:
         from backend.ledger.action import MessageAction
-
-        actions = [
+        actions.append(
             MessageAction(
-                content=text_content,
-                thought=cot,
-                wait_for_response=bool(text_content.strip()),
+                content='',
+                thought='',
+                wait_for_response=False,
             )
-        ]
+        )
 
     set_response_id_for_actions(actions, response)
     return actions

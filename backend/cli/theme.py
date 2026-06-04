@@ -259,7 +259,7 @@ def _apply_theme_overrides() -> None:
         CLR_CARD_TITLE = 'bold #91abec'
         CLR_THINKING_BORDER = '#1b233a'
         CLR_LIVE_PANEL_BORDER = '#1b233a'
-        CLR_THOUGHT_BODY = '#8f9fc1'
+        CLR_THOUGHT_BODY = 'dim white'
         CLR_SECTION_RULE = '#32416a'
         CLR_RISK_HIGH = 'bold #fd8383'
         CLR_RISK_MEDIUM = '#f6ff8f'

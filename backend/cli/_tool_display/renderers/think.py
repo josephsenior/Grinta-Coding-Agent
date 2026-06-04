@@ -43,10 +43,11 @@ def render_think(thought: str, source_tool: str = '') -> list[Any]:
                 if len(pl) > 100:
                     pl = pl[:97] + '…'
                 escaped = markup_escape(pl)
-                lines.append(f'  [{CLR_THOUGHT_BODY}]{escaped}[/{CLR_THOUGHT_BODY}]')
+                # Aligned with _ACTIVITY_SECONDARY_INDENT (4 spaces)
+                lines.append(f'    [{CLR_THOUGHT_BODY}]{escaped}[/{CLR_THOUGHT_BODY}]')
             if len(para_lines) > 6:
                 lines.append(
-                    f'  [{CLR_THOUGHT_BODY}]… ({len(para_lines) - 6} more lines)[/{CLR_THOUGHT_BODY}]'
+                    f'    [{CLR_THOUGHT_BODY}]… ({len(para_lines) - 6} more lines)[/{CLR_THOUGHT_BODY}]'
                 )
 
     return lines
