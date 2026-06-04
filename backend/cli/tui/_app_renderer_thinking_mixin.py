@@ -250,6 +250,10 @@ class _AppRendererThinkingMixin:
             self._handle_search_code_action(intent.text)
             return True
 
+        if intent.kind == 'error':
+            self._tui.add_error(intent.detail or intent.text)
+            return True
+
         card = self._thinking_artifact_card(intent)
         if card is not None:
             self._write_card(card)
@@ -326,19 +330,6 @@ class _AppRendererThinkingMixin:
                 badge_category='tool',
                 title='Tool',
                 body=text,
-            )
-
-        if intent.kind == 'error':
-            return ActivityCard(
-                verb='Invalid Tool Call',
-                detail=intent.detail,
-                badge_category='error',
-                title='Error',
-                secondary='failed',
-                secondary_kind='err',
-                extra_lines=[],
-                is_collapsible=False,
-                start_collapsed=True,
             )
 
         return None

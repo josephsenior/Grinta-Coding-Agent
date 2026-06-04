@@ -189,6 +189,7 @@ class _AppRendererTerminalMixin:
             extra_content=None,
             collapsed=True,
             collapsible=True,
+            syntax_language=card.syntax_language,
         )
         widget.set_processing(True)
         self._clear_last_active_card_processing()

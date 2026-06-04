@@ -1842,8 +1842,59 @@ async def test_tui_duplicate_thinking_payload_renders_once(mock_config):
 
         thinking_blocks = list(s.query(ThinkingIndicator).results())
         assert len(thinking_blocks) == 1
-        rendered = str(thinking_blocks[0].renderable)
+        rendered = str(thinking_blocks[0].query_one('#thinking-body', Static).renderable)
         assert rendered.count(thought) == 1
+
+
+@pytest.mark.asyncio
+async def test_tui_thinking_indicator_collapses_into_expandable_card(mock_config):
+    """After thinking ends, the block collapses to ``Thought for Ns ▸`` with
+    a hidden body. Clicking (or pressing enter) toggles expansion."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        thought = 'Plotting the next move.'
+        renderer._process_event(StreamingChunkAction(thinking_accumulated=thought))
+        renderer._process_event(
+            FileWriteAction(path='demo.txt', content='finalize thinking')
+        )
+        await asyncio.sleep(0.2)
+
+        # Exactly one ThinkingIndicator, and it has collapsed.
+        blocks = list(s.query(ThinkingIndicator).results())
+        assert len(blocks) == 1
+        block = blocks[0]
+        assert block._finalized is True
+        assert block._collapsed is True
+
+        body = block.query_one('#thinking-body', Static)
+        assert '-hidden' in body.classes
+        # The thought is still in the body — just hidden.
+        assert thought in str(body.renderable)
+
+        # Toggle via the public action (same as the enter/space binding).
+        block.action_toggle()
+        assert block._collapsed is False
+        assert '-hidden' not in body.classes
+
+        # Toggle back to collapsed.
+        block.action_toggle()
+        assert block._collapsed is True
+        assert '-hidden' in body.classes
 
 
 @pytest.mark.asyncio
@@ -1925,7 +1976,7 @@ async def test_tui_internal_thinking_payloads_render_as_activity_cards(mock_conf
 
 
 @pytest.mark.asyncio
-async def test_tui_recoverable_error_renders_as_error_activity_card(mock_config):
+async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -1948,16 +1999,25 @@ async def test_tui_recoverable_error_renders_as_error_activity_card(mock_config)
                 thought="[TOOL_CALL_RECOVERABLE_ERROR] Details: Invalid task status 'in_progress'. Use one of: blocked, doing, done, skipped, todo."
             )
         )
-        await pilot.pause()
+        # The mock config causes the background bootstrap to fail with an
+        # AgentNotRegisteredError, which keeps `pilot.pause()` from settling
+        # (a pending message sits in the screen's call_later queue). Yield
+        # briefly to let the Static error widget mount, then assert directly
+        # against the renderer's history.
+        await asyncio.sleep(0.3)
 
         assert list(s.query(ThinkingIndicator).results()) == []
+        # Recoverable errors now render as a plain bold red message — same path
+        # as the "no tools detected" ErrorObservation — not as an ActivityCard.
         cards = list(s.query(TUIActivityCard).results())
         error_cards = [card for card in cards if 'category-error' in card.classes]
+        assert error_cards == []
 
-        assert len(error_cards) == 1
-        collapsed_text = str(error_cards[0].query_one('#collapsed-row').renderable)
-        assert 'Invalid Tool Call' in collapsed_text
-        assert 'Invalid task status' in collapsed_text
+        # The error must be in the renderer's history (the source of truth).
+        history_text = '\n'.join(
+            str(r) for r in renderer._history if r is not None
+        )
+        assert "Invalid task status 'in_progress'" in history_text
 
 
 @pytest.mark.asyncio

@@ -230,9 +230,17 @@ class _AppRendererDisplayMixin:
         self,
         card: ActivityCard,
         *,
-        collapsed: bool = True,
+        collapsed: bool | None = None,
     ) -> Any:
-        """Write an activity card to the transcript using native ActivityCard widget."""
+        """Write an activity card to the transcript using native ActivityCard widget.
+
+        ``collapsed`` defaults to ``card.start_collapsed`` so that renderer methods
+        which already decided the initial expansion (e.g. small file previews
+        starting open, large ones starting closed) are honoured. Pass an explicit
+        value to override.
+        """
+        if collapsed is None:
+            collapsed = card.start_collapsed
         self.commit_live_thinking()
         self._clear_last_active_card_processing()
 
@@ -264,6 +272,7 @@ class _AppRendererDisplayMixin:
             extra_content=extra_content,
             collapsed=collapsed,
             collapsible=card.is_collapsible,
+            syntax_language=card.syntax_language,
         )
 
         is_tool = card.badge_category in (
@@ -309,6 +318,7 @@ class _AppRendererDisplayMixin:
         extra_content: str | None = None,
         collapse: bool = True,
         operation_label: str | None = None,
+        syntax_language: str | None = None,
     ) -> None:
         """Update an in-flight activity card to its final state in-place.
 
@@ -328,6 +338,11 @@ class _AppRendererDisplayMixin:
             widget.set_status(status, outcome=outcome)
         except Exception:
             pass
+        if syntax_language is not None:
+            try:
+                widget.set_syntax_language(syntax_language)
+            except Exception:
+                pass
         if extra_content is not None:
             try:
                 widget.update_content(extra_content)
@@ -372,6 +387,7 @@ class _AppRendererDisplayMixin:
             extra_content=extra_content,
             collapsed=collapsed,
             diff_encoded=True,
+            syntax_language='diff',
         )
         self._tui.set_current_operation(
             f'{verb} {detail}'.strip(),

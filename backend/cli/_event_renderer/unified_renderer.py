@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from pygments.lexers import guess_lexer_for_filename
+from pygments.util import ClassNotFound
 from rich.text import Text
 
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
@@ -45,6 +47,24 @@ def _looks_error_heavy(text: str | None) -> bool:
     return bool(_ERROR_HEAVY_PATTERN.search(text))
 
 
+def _lexer_for_path(path: str) -> str | None:
+    """Return a Pygments lexer name for ``path`` based on its extension.
+
+    Determined entirely from the filename — no content is inspected, so the
+    result is identical for the same path regardless of body. Returns
+    ``None`` for paths with no recognised extension.
+    """
+    if not path:
+        return None
+    try:
+        lexer = guess_lexer_for_filename(path, '')
+    except ClassNotFound:
+        return None
+    if lexer.name.lower() in {'text', 'text only', 'plain text'}:
+        return None
+    return lexer.name
+
+
 @dataclass
 class ActivityLine:
     """A single line in an activity card."""
@@ -70,6 +90,7 @@ class ActivityCard:
     extra_lines: list[ActivityLine] = field(default_factory=list)
     is_collapsible: bool = False
     start_collapsed: bool = False
+    syntax_language: str | None = None
 
     _KIND_COLORS = {
         'ok': NAVY_READY,
@@ -169,6 +190,7 @@ class ActivityRenderer:
             extra_lines=extra_lines,
             is_collapsible=bool(output),
             start_collapsed=should_collapse,
+            syntax_language='console',
         )
 
     @staticmethod
@@ -180,6 +202,7 @@ class ActivityRenderer:
             detail=detail,
             badge_category='files',
             title='Files',
+            syntax_language=_lexer_for_path(path),
         )
 
     @staticmethod
@@ -239,6 +262,7 @@ class ActivityRenderer:
             extra_lines=extra_lines,
             is_collapsible=bool(diff_lines),
             start_collapsed=should_collapse,
+            syntax_language='diff',
         )
 
     @staticmethod
@@ -281,6 +305,7 @@ class ActivityRenderer:
             extra_lines=extra_lines,
             is_collapsible=bool(preview_content),
             start_collapsed=should_collapse,
+            syntax_language=_lexer_for_path(path),
         )
 
     @staticmethod
@@ -497,6 +522,7 @@ class ActivityRenderer:
             extra_lines=extra_lines,
             is_collapsible=bool(extra_lines),
             start_collapsed=should_collapse,
+            syntax_language='console',
         )
 
     @staticmethod
@@ -523,6 +549,7 @@ class ActivityRenderer:
             extra_lines=extra_lines,
             is_collapsible=True,
             start_collapsed=True,
+            syntax_language='console',
         )
 
     @staticmethod
