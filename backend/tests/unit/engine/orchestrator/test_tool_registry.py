@@ -315,7 +315,9 @@ class TestModeToolVisibility:
             'lsp',
             'recall',
             'communicate_with_user',
+            'create_task_tracker',
             'finish',
+            'task_tracker',
         } <= names
         assert {
             'create',
@@ -328,8 +330,6 @@ class TestModeToolVisibility:
             'call_mcp_tool',
             'browser_tool',
             'checkpoint',
-            'create_task_tracker',
-            'task_tracker',
             'note',
             'memory_manager',
             'delegate_task',

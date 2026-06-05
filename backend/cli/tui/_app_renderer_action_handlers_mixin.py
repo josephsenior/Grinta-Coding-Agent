@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import time
 from typing import Any
 
@@ -11,9 +10,6 @@ from backend.cli._event_renderer.text_utils import (
 )
 from backend.cli._event_renderer.unified_renderer import (
     ActivityRenderer,
-)
-from backend.cli.transcript import (
-    strip_pseudo_xml_function_calls,
 )
 from backend.core.enums import (
     AgentState,
@@ -90,26 +86,7 @@ class _AppRendererActionHandlersMixin:
 
     @staticmethod
     def _normalize_final_response_text(text: str) -> str:
-        content = strip_pseudo_xml_function_calls(text or '')
-        content = re.sub(
-            r'\s*<minimax:tool_call\b[^>]*>.*?(?:</minimax:tool_call>|\Z)',
-            '',
-            content,
-            flags=re.DOTALL | re.IGNORECASE,
-        )
-        content = re.sub(
-            r'\s*<tool_call\b[^>]*>.*?(?:</tool_call>|\Z)',
-            '',
-            content,
-            flags=re.DOTALL | re.IGNORECASE,
-        )
-        content = re.sub(
-            r'\s*<function_calls\b[^>]*>.*?(?:</function_calls>|\Z)',
-            '',
-            content,
-            flags=re.DOTALL | re.IGNORECASE,
-        )
-        return sanitize_visible_transcript_text(content).strip()
+        return sanitize_visible_transcript_text(text or '').strip()
 
     def _commit_final_response(self, text: str) -> None:
         """Commit a final assistant response once, regardless of event shape."""

@@ -101,8 +101,8 @@ _NEXT_STEP_PARAM = {
 }
 
 _PLAN_FINISH_DESCRIPTION = (
-    'Finish a Plan Mode run with a consistent, task-aware plan result. Plan Mode is read-only; '
-    'use communicate_with_user for clarification before finishing. Use blocked only '
+    'Finish a Plan Mode run with a consistent, task-aware plan result. Plan Mode is codebase read-only; '
+    'task tracking and communicate_with_user are allowed before finishing. Use blocked only '
     'when planning cannot continue. The response should read naturally to the user; '
     'sections should usually cover objective, recommended plan, scope/targets, '
     'risks/tradeoffs, verification strategy, and assumptions/open questions.'

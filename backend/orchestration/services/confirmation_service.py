@@ -141,12 +141,14 @@ class ConfirmationService:
         if not self._safety_service.action_requires_confirmation(action):
             return
 
-        from backend.orchestration.services.safety_service import SafetyService
-
-        if (
-            isinstance(self._safety_service, SafetyService)
-            and self._safety_service.confirmation_disabled_by_autonomy()
-        ):
+        confirmation_disabled = getattr(
+            self._safety_service,
+            'confirmation_disabled_by_autonomy',
+            None,
+        )
+        if callable(confirmation_disabled) and confirmation_disabled() is True:
+            if hasattr(action, 'confirmation_state'):
+                action.confirmation_state = ActionConfirmationStatus.CONFIRMED
             return
 
         await self._safety_service.analyze_security(action)

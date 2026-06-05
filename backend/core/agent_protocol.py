@@ -1,15 +1,20 @@
-"""Agent-mode task-run protocol helpers.
+"""Agent/Plan task-run protocol helpers.
 
-The protocol is intentionally derived from the task tracker.  Agent mode stays
-conversational until the agent explicitly creates or updates a tracker; after
-that, unfinished tracker items are the only source of "work remains" truth.
+The protocol is intentionally derived from the task tracker.  Agent and Plan
+modes stay conversational until the agent explicitly creates or updates a
+tracker; after that, unfinished tracker items are the only source of "work
+remains" truth.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from backend.core.interaction_modes import AGENT_MODE, normalize_interaction_mode
+from backend.core.interaction_modes import (
+    AGENT_MODE,
+    PLAN_MODE,
+    normalize_interaction_mode,
+)
 from backend.core.task_status import (
     ACTIVE_TASK_STATUSES,
     TASK_STATUS_BLOCKED,
@@ -31,6 +36,14 @@ TERMINAL_FINISH_DIRECTIVE = (
     'Note any skipped or blocked items in your summary.'
 )
 ABANDONED_RETRY_PROMPT = "Run didn't complete — want to continue from where it left off?"
+
+
+PROTOCOL_MODES = frozenset({AGENT_MODE, PLAN_MODE})
+
+
+def is_protocol_mode(mode: object) -> bool:
+    """Return True when tracker-driven protocol enforcement should apply."""
+    return normalize_interaction_mode(mode) in PROTOCOL_MODES
 
 
 def is_agent_mode(mode: object) -> bool:
@@ -269,8 +282,8 @@ def skipped_or_blocked_steps(state: object | None) -> list[Any]:
 
 
 def prepare_next_agent_step(state: object | None, mode: object) -> None:
-    """Inject pending protocol directives before the next Agent-mode LLM step."""
-    if state is None or not is_agent_mode(mode):
+    """Inject pending protocol directives before the next Agent/Plan LLM step."""
+    if state is None or not is_protocol_mode(mode):
         return
 
     directive = pop_pending_directive(state)

@@ -107,6 +107,8 @@ class SafetyService:
         self._context.get_controller()
 
         if self.confirmation_disabled_by_autonomy():
+            if hasattr(action, 'confirmation_state'):
+                action.confirmation_state = ActionConfirmationStatus.CONFIRMED
             logger.debug(
                 '[Full autonomy] Executing action without confirmation: %s',
                 type(action).__name__,

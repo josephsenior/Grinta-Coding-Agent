@@ -249,6 +249,24 @@ class TestSafetyService(unittest.IsolatedAsyncioTestCase):
             ActionConfirmationStatus.AWAITING_CONFIRMATION,
         )
 
+    def test_apply_confirmation_state_full_autonomy_sets_confirmed(self):
+        """Full autonomy must not leave stale awaiting-confirmation state."""
+        action = CmdRunAction(command='test')
+        action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
+
+        mock_autonomy = MagicMock()
+        mock_autonomy.current_level = 'full'
+        mock_autonomy.autonomy_level = 'balanced'
+        mock_autonomy.should_request_confirmation.return_value = True
+        self.mock_context.autonomy_controller = mock_autonomy
+
+        self.service.apply_confirmation_state(
+            action, is_high_security_risk=True, is_ask_for_every_action=True
+        )
+
+        self.assertEqual(action.confirmation_state, ActionConfirmationStatus.CONFIRMED)
+        mock_autonomy.should_request_confirmation.assert_not_called()
+
     def test_finalize_pending_action_confirmed(self):
         """Test finalize_pending_action with confirmation."""
         mock_pending = MagicMock()

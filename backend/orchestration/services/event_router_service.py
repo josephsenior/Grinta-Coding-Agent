@@ -13,12 +13,6 @@ if TYPE_CHECKING:
 
 
 _DELEGATE_PROGRESS_STATUS = 'delegate_progress'
-_TEXT_TOOL_CALL_MARKERS = (
-    '<minimax:tool_call',
-    '</minimax:tool_call>',
-    '<tool_call',
-    '</tool_call>',
-)
 
 
 from backend.orchestration.services._event_router_actions_mixin import (  # noqa: F401, E402

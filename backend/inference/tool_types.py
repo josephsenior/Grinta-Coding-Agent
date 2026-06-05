@@ -1,6 +1,15 @@
 from __future__ import annotations
 
+import re
 from typing import Any, NotRequired, TypedDict
+
+
+_TOOL_CALL_NAME_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_-]*$')
+
+
+def is_valid_tool_call_name(name: Any) -> bool:
+    """Return whether *name* is a provider/tool-call function name."""
+    return isinstance(name, str) and bool(_TOOL_CALL_NAME_RE.fullmatch(name.strip()))
 
 
 class FunctionChunkArgs(TypedDict):
@@ -58,6 +67,7 @@ class PromptTokensDetails:
 
 __all__ = [
     'FunctionChunkArgs',
+    'is_valid_tool_call_name',
     'make_function_chunk',
     'make_tool_param',
     'PromptTokensDetails',

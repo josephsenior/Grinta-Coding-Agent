@@ -26,10 +26,12 @@ from backend.cli._tool_display.preview import (
     try_format_message_as_tool_json,
 )
 from backend.cli._tool_display.redact import (
+    contains_tool_transport_markup,
     extract_tool_calls_from_text_markers,
     redact_internal_result_markers,
     redact_streamed_tool_call_markers,
     redact_task_list_json_blobs,
+    strip_bracket_tool_transport_blocks,
     strip_protocol_echo_blocks,
     strip_tool_call_marker_lines,
 )
@@ -42,6 +44,7 @@ from backend.cli._tool_display.summarize import (
 )
 
 __all__ = [
+    'contains_tool_transport_markup',
     'extract_tool_calls_from_text_markers',
     'flatten_tool_call_for_history',
     'format_tool_activity_rows',
@@ -54,6 +57,7 @@ __all__ = [
     'redact_internal_result_markers',
     'redact_streamed_tool_call_markers',
     'redact_task_list_json_blobs',
+    'strip_bracket_tool_transport_blocks',
     'streaming_args_hint',
     'strip_protocol_echo_blocks',
     'strip_tool_call_marker_lines',

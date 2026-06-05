@@ -211,7 +211,8 @@ def _process_single_tool_call(
     if normalized_mode == PLAN_MODE and tool_name not in PLAN_MODE_ALLOWED_TOOLS:
         raise FunctionCallValidationError(
             f'Tool `{tool_name}` is not available in Plan Mode. '
-            'Plan Mode is read-only; use inspection tools, communicate_with_user, or finish.'
+            'Plan Mode is read-only; use inspection tools, task tracking, '
+            'communicate_with_user, or finish.'
         )
     if tool_name == 'file_editor':
         raise FunctionCallValidationError(

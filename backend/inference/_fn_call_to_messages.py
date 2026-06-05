@@ -385,7 +385,7 @@ def _trim_system_prompt_suffix(content: Any, system_prompt_suffix: str) -> Any:
 
 
 _FN_OPEN_RE = re.compile(
-    '<\\s*function(?:(?:\\s*=\\s*|\\s+name\\s*=\\s*[\x27\x22]?)([a-zA-Z0-9_\\-]+)[\x27\x22]?)?\\s*>',
+    '<\\s*function(?:\\s*=\\s*|\\s+name\\s*=\\s*[\x27\x22]?)([a-zA-Z0-9_\\-]+)[\x27\x22]?\\s*>',
     re.IGNORECASE,
 )
 _FN_CLOSE_RE = re.compile(r'</\s*function\s*>', re.IGNORECASE)

@@ -22,6 +22,7 @@ from backend.inference.fn_call_converter import (
     _fix_stopword,
     _format_parameter,
     _format_tool_call_string,
+    _parse_function_call_from_text,
     _parse_tool_call_arguments,
     _validate_enum_constraint,
     _validate_parameter_allowed,
@@ -245,6 +246,22 @@ class TestFixStopword:
     def test_multiple_function_tags_unchanged(self):
         s = '<function=a>\n</function>\n<function=b>\n</function>'
         assert _fix_stopword(s) == s
+
+
+class TestParseFunctionCallFromText:
+    def test_nameless_function_tag_is_not_a_tool_call(self):
+        content = '<function>\n<parameter=command>pwd</parameter>\n</function>'
+        assert _parse_function_call_from_text(content) is None
+
+    def test_named_function_tag_still_parses(self):
+        content = (
+            '<function=execute_powershell>\n'
+            '<parameter=command>pwd</parameter>\n'
+            '</function>'
+        )
+        parsed = _parse_function_call_from_text(content)
+        assert parsed is not None
+        assert parsed['fn_name'] == 'execute_powershell'
 
 
 # ── strict malformed parameter handling ────────────────────────────────

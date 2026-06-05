@@ -30,17 +30,14 @@ from backend.ledger.observation import (
     ErrorObservation,
 )
 from backend.ledger.observation_cause import attach_observation_cause
+from backend.orchestration.services._event_router_delegate_helpers import (
+    _looks_like_text_tool_call_handoff,
+)
 
 if TYPE_CHECKING:
     from backend.orchestration.services.event_router_service import EventRouterService
 
 logger = logging.getLogger(__name__)
-
-
-# Re-export for use by `_intercept_text_tool_call_handoff` below.
-from backend.orchestration.services._event_router_delegate_helpers import (  # noqa: E402; noqa: F401
-    _looks_like_text_tool_call_handoff,
-)
 
 
 class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else object):
@@ -66,13 +63,13 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
     def _set_pending_recall(
         self, recall_action: RecallAction, recall_type: RecallType
     ) -> None:
-        pending_service = getattr(self._ctrl, "pending_action_service", None)
+        pending_service = getattr(self._ctrl, 'pending_action_service', None)
         if recall_type == RecallType.WORKSPACE_CONTEXT:
             if pending_service is not None:
                 pending_service.set(recall_action)
                 return
 
-            action_service = getattr(self._ctrl, "action_service", None)
+            action_service = getattr(self._ctrl, 'action_service', None)
             if action_service is not None:
                 action_service.set_pending_action(recall_action)
             return
@@ -80,13 +77,13 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
         if pending_service is not None:
             pending_service.set(None)
 
-        cb_svc = getattr(self._ctrl, "circuit_breaker_service", None)
+        cb_svc = getattr(self._ctrl, 'circuit_breaker_service', None)
         if cb_svc is not None:
             cb_svc.reset_for_new_turn()
 
-        state = getattr(self._ctrl, "state", None)
+        state = getattr(self._ctrl, 'state', None)
         if state is not None:
-            state.extra_data.pop("__step_guard_warning_trip_counts", None)
+            state.extra_data.pop('__step_guard_warning_trip_counts', None)
 
     async def _ensure_running_for_user_message(self) -> None:
         if self._ctrl.get_agent_state() != AgentState.RUNNING:
@@ -94,28 +91,28 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
 
     async def _handle_user_message(self, action: MessageAction) -> None:
         """Handle user message: log, create recall, set pending, start agent."""
-        log_level = "info" if _os.getenv("LOG_ALL_EVENTS") in ("true", "1") else "debug"
+        log_level = 'info' if _os.getenv('LOG_ALL_EVENTS') in ('true', '1') else 'debug'
         self._ctrl.log(
             log_level,
             str(action),
-            extra={"msg_type": "ACTION", "event_source": EventSource.USER},
+            extra={'msg_type': 'ACTION', 'event_source': EventSource.USER},
         )
         recall_type = self._recall_type_for_user_message(action)
         recall_action = RecallAction(query=action.content, recall_type=recall_type)
-        agent = getattr(self._ctrl, "agent", None)
-        config = getattr(agent, "config", None)
-        mode = normalize_interaction_mode(getattr(config, "mode", "agent"))
+        agent = getattr(self._ctrl, 'agent', None)
+        config = getattr(agent, 'config', None)
+        mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
         if mode in CHAT_MODE_NAMES:
-            self._ctrl.state.extra_data.pop("active_run_mode", None)
+            self._ctrl.state.extra_data.pop('active_run_mode', None)
         else:
             self._ctrl.state.set_extra(
-                "active_run_mode",
+                'active_run_mode',
                 mode,
-                source="EventRouterService.user_message",
+                source='EventRouterService.user_message',
             )
         reset_recovery = getattr(
-            getattr(self._ctrl, "action_execution", None),
-            "reset_liveness_recovery_counters",
+            getattr(self._ctrl, 'action_execution', None),
+            'reset_liveness_recovery_counters',
             None,
         )
         if callable(reset_recovery):
@@ -127,31 +124,34 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
         await self._ensure_running_for_user_message()
 
     async def _intercept_text_tool_call_handoff(self, action: MessageAction) -> bool:
-        content = str(getattr(action, "content", "") or "")
+        content = str(getattr(action, 'content', '') or '')
         if not _looks_like_text_tool_call_handoff(content):
             return False
 
         guidance = (
-            "Protocol error: provider-specific text tool-call markup was returned "
-            "instead of a valid Grinta tool action."
+            'The previous response contained raw tool-call transport text instead '
+            'of a usable Grinta tool action. Re-emit exactly one valid tool call '
+            'with structured arguments.'
         )
         await self._reject_agent_message_handoff(
             action,
             guidance,
-            source="EventRouterService._intercept_text_tool_call_handoff",
-            error_id="TEXT_TOOL_CALL_FORMAT_INCOMPLETE",
+            source='EventRouterService._intercept_text_tool_call_handoff',
+            error_id='TEXT_TOOL_CALL_FORMAT_INCOMPLETE',
         )
         return True
 
     async def _intercept_protocol_message_handoff(self, action: MessageAction) -> bool:
         guidance = (
-            "Protocol error: assistant message returned during active task execution."
+            'The previous response returned plain assistant text while active task '
+            'work remained. Continue with a valid tool call, finish, or '
+            'communicate_with_user.'
         )
         await self._reject_agent_message_handoff(
             action,
             guidance,
-            source="EventRouterService._intercept_protocol_message_handoff",
-            error_id="ASSISTANT_MESSAGE_PROTOCOL_ERROR",
+            source='EventRouterService._intercept_protocol_message_handoff',
+            error_id='ASSISTANT_MESSAGE_PROTOCOL_ERROR',
         )
         return True
 
@@ -163,8 +163,8 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
         source: str,
         error_id: str,
     ) -> None:
-        state = getattr(self._ctrl, "state", None)
-        if state is not None and hasattr(state, "set_planning_directive"):
+        state = getattr(self._ctrl, 'state', None)
+        if state is not None and hasattr(state, 'set_planning_directive'):
             state.set_planning_directive(
                 guidance,
                 source=source,

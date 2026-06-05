@@ -196,6 +196,24 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
             is_ask_for_every_action=False,
         )
 
+    async def test_evaluate_action_skips_confirmation_when_autonomy_disables_it(self):
+        """Full autonomy should not analyze or mark an action as awaiting approval."""
+        self.mock_safety_service.action_requires_confirmation.return_value = True
+        self.mock_safety_service.confirmation_disabled_by_autonomy = MagicMock(
+            return_value=True
+        )
+        mock_action = MagicMock()
+        mock_action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
+
+        await self.service.evaluate_action(mock_action)
+
+        self.mock_safety_service.analyze_security.assert_not_called()
+        self.mock_safety_service.apply_confirmation_state.assert_not_called()
+        self.assertEqual(
+            mock_action.confirmation_state,
+            ActionConfirmationStatus.CONFIRMED,
+        )
+
     async def test_evaluate_action_high_risk_and_ask_every_action(self):
         """Test evaluate_action with both high risk and ask every action flags."""
         self.mock_safety_service.action_requires_confirmation.return_value = True

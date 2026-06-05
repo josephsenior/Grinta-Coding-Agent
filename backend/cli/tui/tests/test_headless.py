@@ -2543,7 +2543,11 @@ async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_con
         renderer._process_event(final_stream)
 
         final_message = MessageAction(
-            content='<function_calls></function_calls>\nFinal answer.'
+            content=(
+                '<function_calls></function_calls>\n'
+                '<function name="read"><parameter name="path">a.py</parameter></function>\n'
+                'Final answer.'
+            )
         )
         final_message.source = EventSource.AGENT
         renderer._process_event(final_message)
@@ -3209,6 +3213,27 @@ async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
     )
     # The 200-char run must remain on a single line — no width=80 pre-wrap.
     assert 'x' * 200 in plain
+
+
+@pytest.mark.asyncio
+async def test_tui_protocol_status_is_unlabeled_dim_text(mock_config):
+    from backend.cli.tui._app_screen_messages_mixin import (
+        _AppScreenMessagesMixin,
+    )
+
+    stub = _AppScreenMessagesMixin.__new__(_AppScreenMessagesMixin)
+    captured: list[object] = []
+    stub.finalize_thinking = lambda: None  # type: ignore[attr-defined]
+    stub._write_log = lambda renderable: captured.append(renderable)  # type: ignore[attr-defined]
+
+    stub.add_protocol_status('[END_TOOL_CALL]\nWorking through the next edit.')
+
+    assert len(captured) == 1
+    rendered = captured[0]
+    plain = str(getattr(rendered, 'plain', rendered))
+    assert plain == 'Working through the next edit.'
+    assert 'Status' not in plain
+    assert 'Continue with a tool call' not in plain
 
 
 @pytest.mark.asyncio

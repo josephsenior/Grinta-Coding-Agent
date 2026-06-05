@@ -242,6 +242,16 @@ def _coerce_message_content_text(content: Any) -> str:
     return strip_thinking_tags(_raw_message_content_text(content))
 
 
+def _coerce_visible_message_content_text(content: Any) -> str:
+    """Return assistant prose after removing internal tool transport."""
+    text = _coerce_message_content_text(content)
+    if not text:
+        return ''
+    from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+
+    return redact_streamed_tool_call_markers(text).strip()
+
+
 def _canonicalize_tool_call_arguments(
     tool_call: Any, arguments: dict[str, Any]
 ) -> None:
@@ -367,17 +377,17 @@ def common_response_to_actions(
     all_tool_calls = native_tool_calls + text_marker_tool_calls + xml_tool_calls
 
     actions: list[Action] = []
-    
-    text_content = _coerce_message_content_text(content)
-    if text_content.strip():
+
+    text_content = _coerce_visible_message_content_text(content)
+    if text_content.strip() and not all_tool_calls:
         from backend.ledger.action import MessageAction
-        
+
         cot = extract_redacted_thinking_inner(_raw_message_content_text(content)).strip()
         actions.append(
             MessageAction(
                 content=text_content,
                 thought=cot,
-                wait_for_response=False if all_tool_calls else bool(text_content.strip()),
+                wait_for_response=bool(text_content.strip()),
                 suppress_cli=False,
             )
         )
@@ -470,10 +480,12 @@ def _filter_native_tool_calls_superseded_by_xml(
 
 
 def _extract_text_marker_tool_calls_from_content(content_text: str) -> list[Any]:
+    lowered = content_text.lower()
     if (
         not content_text
-        or 'tool_call' not in content_text
-        and '[Tool call]' not in content_text
+        or 'tool_call' not in lowered
+        and '[tool call]' not in lowered
+        and '<invoke' not in lowered
     ):
         return []
     from backend.cli.tool_call_display import extract_tool_calls_from_text_markers

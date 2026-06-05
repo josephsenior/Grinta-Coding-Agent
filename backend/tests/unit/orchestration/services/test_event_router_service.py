@@ -293,9 +293,30 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         directive = self.mock_controller.state.set_planning_directive.call_args[0][0]
         self.assertEqual(
             directive,
-            'Protocol error: provider-specific text tool-call markup was returned '
-            'instead of a valid Grinta tool action.',
+            'The previous response contained raw tool-call transport text instead '
+            'of a usable Grinta tool action. Re-emit exactly one valid tool call '
+            'with structured arguments.',
         )
+        self.assertTrue(action.suppress_cli)
+        self.assertFalse(action.wait_for_response)
+
+    async def test_handle_action_message_from_agent_intercepts_split_tool_handoff(
+        self,
+    ):
+        action = MessageAction(
+            content=(
+                "I'll inspect the file.\n"
+                ']<]minimax[>[<tool_call>\n'
+                '<invoke name="read"><parameter name="path">a.py</parameter></invoke>'
+            )
+        )
+        action.source = EventSource.AGENT
+        action.wait_for_response = True
+
+        await self.service._handle_action(action)
+
+        self.mock_controller.set_agent_state_to.assert_not_called()
+        self.mock_controller.state.set_planning_directive.assert_called_once()
         self.assertTrue(action.suppress_cli)
         self.assertFalse(action.wait_for_response)
 

@@ -64,6 +64,26 @@ class TestLLMResponse:
         assert len(tc_list) == 1
         assert tc_list[0].function.name == 'f'
 
+    def test_malformed_tool_call_name_is_dropped(self):
+        tcs = [
+            {
+                'id': 'bad',
+                'type': 'function',
+                'function': {'name': 'Progress! <invoke name="read"', 'arguments': '{}'},
+            },
+            {
+                'id': 'good',
+                'type': 'function',
+                'function': {'name': 'read_file', 'arguments': '{}'},
+            },
+        ]
+        resp = LLMResponse(content='', model='m', usage={}, tool_calls=tcs)
+        assert resp.tool_calls == [tcs[1]]
+        tc_list = resp.choices[0].message.tool_calls
+        assert tc_list is not None
+        assert len(tc_list) == 1
+        assert tc_list[0].function.name == 'read_file'
+
     def test_to_dict(self):
         resp = LLMResponse(
             content='reply',
