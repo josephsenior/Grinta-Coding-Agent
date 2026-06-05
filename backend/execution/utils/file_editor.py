@@ -4,9 +4,13 @@ Provides robust file editing capabilities with proper error handling,
 validation, and atomic operations. Designed for production agent environments.
 
 Split into sibling mixin modules in 2026-06 to keep this file under the 40 KB cap:
-  - backend.execution.utils._file_editor_view_mixin      (read-only view)
-  - backend.execution.utils._file_editor_ops_mixin       (edit/write/read-write)
-  - backend.execution.utils._file_editor_rollback_mixin  (undo/backup/rollback/transaction)
+  - backend.execution.utils._file_editor_view_mixin         (read-only view)
+  - backend.execution.utils._file_editor_ops_mixin          (thin mixin; edit/write/read-write)
+  - backend.execution.utils._file_editor_diff_helpers       (diff/context)
+  - backend.execution.utils._file_editor_io_helpers          (IO/encoding/message)
+  - backend.execution.utils._file_editor_read_write_helpers (read/write/insert/replace)
+  - backend.execution.utils._file_editor_edit_helpers        (edit/write/receipt/verify)
+  - backend.execution.utils._file_editor_rollback_mixin     (undo/backup/rollback/transaction)
 Pure code motion: no logic changes. The flat re-export shim at the bottom
 preserves back-compat with callers using ``from backend.execution.utils.file_editor
 import ...``.
@@ -24,18 +28,15 @@ from backend.core.type_safety.path_validation import (
     SafePath,
 )
 from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
-from backend.execution.utils._file_editor_ops_mixin import (
-    _FileEditorOpsMixin,
-    _FileReadMeta,
-)
-from backend.execution.utils._file_editor_types import ToolResult
+from backend.execution.utils._file_editor_io_helpers import _FileReadMeta
+from backend.execution.utils._file_editor_ops_mixin import _FileEditorOpsMixin
 from backend.execution.utils._file_editor_rollback_mixin import (
     ToolError,
     _FileEditorRollbackMixin,
 )
+from backend.execution.utils._file_editor_types import ToolResult
 from backend.execution.utils._file_editor_view_mixin import _FileEditorViewMixin
 from backend.execution.utils.file_editor_edit_mixin import FileEditorEditOpsMixin
-
 
 _GLOBAL_UNDO_HISTORY: dict[str, deque[str | None]] = defaultdict(
     lambda: deque(maxlen=32)
@@ -92,6 +93,13 @@ class FileEditor(
         # Last transaction rollback results, shaped like normal editor results
         # so callers/tests can inspect the emitted before/after payloads.
         self._last_rollback_results: list[ToolResult] = []
+        # Per-path timestamp (monotonic) of the most recent successful write.
+        # Used by ``_handle_replace_string`` to detect "stale old_string" cases
+        # where the model has chained several ``replace_string`` calls on the
+        # same file in a single turn and the file no longer matches the
+        # previously-read content. Bounded to avoid unbounded growth in long
+        # sessions.
+        self._recent_writes: dict[str, float] = {}
 
     def _io_meta_key(self, file_path: Path) -> str:
         return self._undo_key(file_path)
@@ -307,36 +315,41 @@ class FileEditor(
 # Flat re-export shim for back-compat
 # ---------------------------------------------------------------------------
 # Helpers and methods previously defined in this module have been moved to:
-#   - backend.execution.utils._file_editor_view_mixin      (view)
-#   - backend.execution.utils._file_editor_ops_mixin       (edit/write)
-#   - backend.execution.utils._file_editor_rollback_mixin  (undo/rollback/transaction/indent)
+#   - backend.execution.utils._file_editor_diff_helpers      (diff/context)
+#   - backend.execution.utils._file_editor_io_helpers         (IO/encoding/message)
+#   - backend.execution.utils._file_editor_read_write_helpers (read/write/insert/replace)
+#   - backend.execution.utils._file_editor_edit_helpers       (edit/write/receipt/verify)
+#   - backend.execution.utils._file_editor_view_mixin         (view)
+#   - backend.execution.utils._file_editor_rollback_mixin     (undo/rollback/transaction/indent)
 # Kept as flat re-exports for in-repo callers.
-from backend.execution.utils._file_editor_ops_mixin import (  # noqa: E402, F401
-    _FileEditorOpsMixin,
-    _FileReadMeta,
-    _LARGE_EXISTING_CODE_FILE_LINES,
+from backend.execution.utils._file_editor_diff_helpers import (  # noqa: E402, F401
+    _find_changed_ranges,
+    _format_context_window,
+    _format_range_lines,
+    _merge_ranges_with_context,
+    _to_changed_line_spans,
+)
+from backend.execution.utils._file_editor_io_helpers import (  # noqa: E402, F401
     _CODE_FILE_SUFFIXES,
+    _LARGE_EXISTING_CODE_FILE_LINES,
     _QUOTE_TRANSLATE,
     _compose_create_file_success_message,
     _compose_write_success_message,
     _encode_disk_payload,
-    _find_changed_ranges,
-    _format_context_window,
-    _format_range_lines,
     _is_large_existing_code_file,
-    _merge_ranges_with_context,
     _normalize_newlines_for_metadata,
-    _to_changed_line_spans,
     normalize_quotes,
+)
+from backend.execution.utils._file_editor_ops_mixin import (  # noqa: E402, F401
+    _FileEditorOpsMixin,
 )
 from backend.execution.utils._file_editor_rollback_mixin import (  # noqa: E402, F401
     _FileEditorRollbackMixin,
-    ToolError,
 )
 from backend.execution.utils._file_editor_view_mixin import (  # noqa: E402, F401
-    _FileEditorViewMixin,
     _check_block_indent_after_colon,
     _check_first_line_indent,
     _detect_indentation_mismatch,
+    _FileEditorViewMixin,
     _get_line_indent,
 )

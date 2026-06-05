@@ -431,6 +431,37 @@ class TestFileEditorReplaceString:
         assert result.error is not None
         assert result.error_code == 'OLD_STRING_NOT_FOUND'
         assert path.read_text() == 'alpha\n'
+        # Error message should always tell the model to re-read the file.
+        assert 'Re-read the file' in (result.error or '')
+
+    def test_old_string_not_found_hints_recent_write_on_same_path(self):
+        """A second ``replace_string`` on the same path within the same
+        session should get the more specific "stale working copy" hint,
+        because the first edit just changed the file."""
+        path = self._write('node.py', 'def foo():\n    return 1\n')
+
+        first = self.editor(
+            command='replace_string',
+            path='node.py',
+            old_string='def foo():\n    return 1\n',
+            new_str='def foo():\n    return 2\n',
+        )
+        assert first.error is None
+        assert path.read_text() == 'def foo():\n    return 2\n'
+
+        # Model's old_string still references the pre-edit content.
+        second = self.editor(
+            command='replace_string',
+            path='node.py',
+            old_string='def foo():\n    return 1\n',
+            new_str='def foo():\n    return 3\n',
+        )
+        assert second.error_code == 'OLD_STRING_NOT_FOUND'
+        assert second.error is not None
+        assert 'Re-read the file' in second.error
+        # The same-path hint should be appended.
+        assert 'previous edit in this turn' in second.error
+        assert path.read_text() == 'def foo():\n    return 2\n'
 
     def test_rejects_multiple_matches_without_replace_all(self):
         path = self._write('doc.md', 'x\nx\n')
