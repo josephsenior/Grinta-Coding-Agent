@@ -114,9 +114,7 @@ def _consume_pending_action(orch: Orchestrator) -> Action | None:
     return impl(orch)
 
 
-async def _astep_handle_context_limit_error(
-    orch: Orchestrator, state: State
-) -> Action:
+async def _astep_handle_context_limit_error(orch: Orchestrator, state: State) -> Action:
     """Condense/retry after ContextLimitError; may degrade or raise."""
     orch._consecutive_context_errors = (
         getattr(orch, '_consecutive_context_errors', 0) + 1
@@ -193,9 +191,7 @@ async def _attempt_graceful_context_degradation(
         logger.error('Graceful degradation insufficient — context still overflows')
         return None
     except Exception as exc:  # pragma: no cover — defensive
-        logger.error(
-            'Graceful degradation raised unexpectedly: %s', exc, exc_info=True
-        )
+        logger.error('Graceful degradation raised unexpectedly: %s', exc, exc_info=True)
         return None
 
 
@@ -391,9 +387,7 @@ async def _execute_llm_step_async(
         serialized_messages = message_serializer.serialize_messages(messages)
         serialize_elapsed = time.perf_counter() - serialize_started
         planner_started = time.perf_counter()
-        params = orch.planner.build_llm_params(
-            serialized_messages, state, orch.tools
-        )
+        params = orch.planner.build_llm_params(serialized_messages, state, orch.tools)
         logger.info(
             'Orchestrator._prepare_params built params '
             '(history_events=%d condensed_events=%d messages=%d '

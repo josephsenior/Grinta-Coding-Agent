@@ -531,9 +531,7 @@ class _ExecutorStreamingMixin:
                 )
                 for index, tool_call in enumerate(text_tool_calls):
                     state.tool_calls_dict[index] = tool_call
-                tool_calls_list = self._valid_stream_tool_calls(
-                    state.tool_calls_dict
-                )
+                tool_calls_list = self._valid_stream_tool_calls(state.tool_calls_dict)
 
         return tool_calls_list or None
 
