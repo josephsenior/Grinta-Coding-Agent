@@ -111,7 +111,7 @@ class TestHandleBlockedInvocation(unittest.TestCase):
             ) as mock_tm,
             patch('backend.ledger.observation_cause.attach_observation_cause'),
             patch(
-                'backend.orchestration._session_orchestrator_lifecycle_mixin.ErrorObservation'
+                'backend.orchestration.session_orchestrator_mixins._session_orchestrator_lifecycle_mixin.ErrorObservation'
             ) as mock_err_cls,
         ):
             mock_obs = MagicMock()
@@ -146,7 +146,7 @@ class TestHandleBlockedInvocation(unittest.TestCase):
             ) as mock_tm,
             patch('backend.ledger.observation_cause.attach_observation_cause'),
             patch(
-                'backend.orchestration._session_orchestrator_lifecycle_mixin.ErrorObservation'
+                'backend.orchestration.session_orchestrator_mixins._session_orchestrator_lifecycle_mixin.ErrorObservation'
             ) as mock_err_cls,
         ):
             mock_obs = MagicMock()
@@ -425,18 +425,18 @@ class TestLogging(unittest.TestCase):
     def setUp(self):
         self.ctrl = _make_controller()
 
-    @patch('backend.orchestration._session_orchestrator_action_mixin.logger')
+    @patch('backend.orchestration.session_orchestrator_mixins._session_orchestrator_action_mixin.logger')
     def test_log_info(self, mock_logger):
         self.ctrl.log('info', 'Hello')
         mock_logger.info.assert_called_once()
 
-    @patch('backend.orchestration._session_orchestrator_action_mixin.logger')
+    @patch('backend.orchestration.session_orchestrator_mixins._session_orchestrator_action_mixin.logger')
     def test_log_includes_session_id(self, mock_logger):
         self.ctrl.log('debug', 'Testing')
         call_kwargs = mock_logger.debug.call_args
         self.assertIn('session_id', call_kwargs.kwargs.get('extra', {}))
 
-    @patch('backend.orchestration._session_orchestrator_action_mixin.logger')
+    @patch('backend.orchestration.session_orchestrator_mixins._session_orchestrator_action_mixin.logger')
     def test_log_merges_extra(self, mock_logger):
         self.ctrl.log('warning', 'Alert', extra={'custom_key': 'val'})
         call_kwargs = mock_logger.warning.call_args
@@ -1067,7 +1067,7 @@ class TestReset(unittest.TestCase):
         self.ctrl.config.agent.reset = MagicMock()
 
         with patch(
-            'backend.orchestration._session_orchestrator_parallel_mixin.ErrorObservation'
+            'backend.orchestration.session_orchestrator_mixins._session_orchestrator_parallel_mixin.ErrorObservation'
         ) as mock_obs_cls:
             mock_obs = MagicMock()
             mock_obs_cls.return_value = mock_obs
@@ -1089,7 +1089,7 @@ class TestReset(unittest.TestCase):
         self.ctrl.config.agent.reset = MagicMock()
 
         with patch(
-            'backend.orchestration._session_orchestrator_parallel_mixin.ErrorObservation'
+            'backend.orchestration.session_orchestrator_mixins._session_orchestrator_parallel_mixin.ErrorObservation'
         ) as mock_obs_cls:
             self.ctrl.mark_user_interrupt_stop()
             self.ctrl._reset()
@@ -1242,7 +1242,7 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         """Line 353 and 357 (indirectly via on_event)."""
         event = MagicMock()
         with patch(
-            'backend.orchestration._session_orchestrator_step_mixin.run_or_schedule'
+            'backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin.run_or_schedule'
         ) as mock_run:
             self.ctrl.on_event(event)
             mock_run.assert_called_once()
@@ -1308,8 +1308,8 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
             self.ctrl.services.action_execution.execute_action.call_count, 2
         )
 
-    async def test_step_still_called_after_state_change(self):
-        """Production always calls step() at end of _step_inner when no pending action."""
+    async def test_step_scheduled_after_non_blocking_action(self):
+        """Non-blocking actions must defer the next step instead of losing a wakeup."""
         from backend.core.schemas import AgentState
 
         self.ctrl.services.step_prerequisites.can_step.return_value = True
@@ -1317,22 +1317,12 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         self.ctrl._sync_budget_flag_with_metrics = MagicMock()
         self.ctrl.services.retry.retry_count = 0
 
-        state = {'value': AgentState.RUNNING}
-        self.ctrl.get_agent_state = MagicMock(side_effect=lambda: state['value'])
+        self.ctrl.get_agent_state = MagicMock(return_value=AgentState.RUNNING)
         self.ctrl.services.action_execution.get_next_action = AsyncMock(
             return_value=MagicMock()
         )
-
-        async def _execute_action(_action):
-            async def _flip_state():
-                state['value'] = AgentState.AWAITING_USER_INPUT
-
-            asyncio.create_task(_flip_state())
-
-        self.ctrl.services.action_execution.execute_action = AsyncMock(
-            side_effect=_execute_action
-        )
-        self.ctrl.step = MagicMock()
+        self.ctrl.services.action_execution.execute_action = AsyncMock()
+        self.ctrl.schedule_step_soon = MagicMock()
 
         with (
             patch.object(self.ctrl, '_run_control_flags_safely', return_value=True),
@@ -1353,7 +1343,7 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         ):
             await self.ctrl._step()
 
-        self.ctrl.step.assert_called_once()
+        self.ctrl.schedule_step_soon.assert_called_once()
 
     async def test_parallel_batch_failure_requeues_failed_actions_for_serial_retry(
         self,
@@ -1567,7 +1557,7 @@ class TestStepDispatch(unittest.TestCase):
 
         with (
             patch(
-                'backend.orchestration._session_orchestrator_step_mixin.get_main_event_loop',
+                'backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin.get_main_event_loop',
                 return_value=mock_loop,
             ),
             patch.object(self.ctrl, 'step') as mock_step,
@@ -1582,11 +1572,11 @@ class TestStepDispatch(unittest.TestCase):
 
         with (
             patch(
-                'backend.orchestration._session_orchestrator_step_mixin.get_main_event_loop',
+                'backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin.get_main_event_loop',
                 return_value=None,
             ),
             patch(
-                'backend.orchestration._session_orchestrator_step_mixin.asyncio.get_running_loop',
+                'backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin.asyncio.get_running_loop',
                 return_value=mock_loop,
             ),
             patch.object(self.ctrl, 'step') as mock_step,
@@ -1715,7 +1705,7 @@ class TestStepDispatch(unittest.TestCase):
         """Line 355-357 coverage."""
         coro = MagicMock()
         with patch(
-            'backend.orchestration._session_orchestrator_step_mixin.run_or_schedule'
+            'backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin.run_or_schedule'
         ) as mock_run:
             self.ctrl._schedule_coroutine(coro)
             mock_run.assert_called_once_with(coro)
@@ -1771,7 +1761,7 @@ class TestStepDispatch(unittest.TestCase):
             patch.object(self.ctrl, '_can_drain_pending', return_value=True),
             patch.object(self.ctrl, '_handle_post_execution', new_callable=AsyncMock),
             patch(
-                'backend.orchestration._session_orchestrator_step_mixin.drain_background_tasks',
+                'backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin.drain_background_tasks',
                 new_callable=AsyncMock,
             ),
         ):

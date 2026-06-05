@@ -6,7 +6,7 @@ import sys
 import types
 from unittest.mock import MagicMock, patch
 
-from backend.context.local_vector_store import ChromaDBBackend, SQLiteBM25Backend
+from backend.context.vector_store import ChromaDBBackend, SQLiteBM25Backend
 
 
 def test_chromadb_backend_defaults_to_project_storage_memory_chroma(tmp_path) -> None:
@@ -37,7 +37,7 @@ def test_chromadb_backend_defaults_to_project_storage_memory_chroma(tmp_path) ->
             },
         ),
         patch(
-            'backend.context.local_vector_store.get_active_local_data_root',
+            'backend.context.vector_store._local_vector_store.get_active_local_data_root',
             return_value=str(tmp_path / '.grinta' / 'storage'),
         ),
     ):
@@ -51,7 +51,7 @@ def test_sqlite_bm25_backend_defaults_to_project_storage_memory_sqlite(
     tmp_path,
 ) -> None:
     with patch(
-        'backend.context.local_vector_store.get_active_local_data_root',
+        'backend.context.vector_store._local_vector_store.get_active_local_data_root',
         return_value=str(tmp_path / '.grinta' / 'storage'),
     ):
         backend = SQLiteBM25Backend()

@@ -33,21 +33,6 @@ from backend.ledger.action import (
     MessageAction,
     PlaybookFinishAction,
 )
-from backend.orchestration._session_orchestrator_action_mixin import (
-    _SessionOrchestratorActionMixin,
-)
-from backend.orchestration._session_orchestrator_lifecycle_mixin import (
-    _SessionOrchestratorLifecycleMixin,
-)
-from backend.orchestration._session_orchestrator_parallel_mixin import (
-    _SessionOrchestratorParallelMixin,
-)
-from backend.orchestration._session_orchestrator_state_mixin import (
-    _SessionOrchestratorStateMixin,
-)
-from backend.orchestration._session_orchestrator_step_mixin import (
-    _SessionOrchestratorStepMixin,
-)
 from backend.orchestration.action_scheduler import ActionScheduler
 from backend.orchestration.memory_pressure import MemoryPressureMonitor
 from backend.orchestration.orchestration_config import (
@@ -57,6 +42,21 @@ from backend.orchestration.orchestration_config import (
 from backend.orchestration.rate_governor import LLMRateGovernor
 from backend.orchestration.session_orchestrator_accessors import (
     SessionOrchestratorAccessorsMixin,
+)
+from backend.orchestration.session_orchestrator_mixins._session_orchestrator_action_mixin import (
+    _SessionOrchestratorActionMixin,
+)
+from backend.orchestration.session_orchestrator_mixins._session_orchestrator_lifecycle_mixin import (
+    _SessionOrchestratorLifecycleMixin,
+)
+from backend.orchestration.session_orchestrator_mixins._session_orchestrator_parallel_mixin import (
+    _SessionOrchestratorParallelMixin,
+)
+from backend.orchestration.session_orchestrator_mixins._session_orchestrator_state_mixin import (
+    _SessionOrchestratorStateMixin,
+)
+from backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin import (
+    _SessionOrchestratorStepMixin,
 )
 from backend.orchestration.tool_pipeline import ToolInvocationContext
 
@@ -392,7 +392,7 @@ class SessionOrchestrator(
                 and self.get_agent_state() == AgentState.RUNNING
                 and not self._closed
             ):
-                self.step()
+                self.schedule_step_soon()
 
     async def close(self, set_stop_state: bool = True) -> None:
         """Closes the agent controller, canceling any ongoing tasks and unsubscribing from the event stream.

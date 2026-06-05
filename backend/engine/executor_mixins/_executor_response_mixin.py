@@ -30,7 +30,7 @@ from backend.core.interaction_modes import (
     normalize_interaction_mode,
 )
 from backend.core.logger import app_logger as logger
-from backend.engine._executor_types import ModelResponse, orchestrator_function_calling
+from backend.engine.executor_mixins._executor_types import ModelResponse, orchestrator_function_calling
 from backend.engine.executor_response_helpers import (
     build_recoverable_tool_call_error_action as _build_recoverable_tool_call_error_action_impl,
 )

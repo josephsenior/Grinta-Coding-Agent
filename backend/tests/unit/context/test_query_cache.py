@@ -6,8 +6,12 @@ import inspect
 import time
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from backend.context.local_vector_store import ChromaDBBackend, SQLiteBM25Backend
-from backend.context.vector_store import EnhancedVectorStore, QueryCache
+from backend.context.vector_store import (
+    ChromaDBBackend,
+    EnhancedVectorStore,
+    QueryCache,
+    SQLiteBM25Backend,
+)
 
 
 class TestQueryCacheInit:
@@ -157,11 +161,11 @@ class TestVectorStoreWarmup:
 
         with (
             patch(
-                'backend.context.local_vector_store.ChromaDBBackend',
+                'backend.context.vector_store._local_vector_store.ChromaDBBackend',
                 return_value=fake_backend,
             ),
             patch(
-                'backend.context.vector_store.SQLiteBM25Backend',
+                'backend.context.vector_store._vector_store.SQLiteBM25Backend',
                 return_value=MagicMock(),
             ),
         ):
