@@ -77,6 +77,20 @@ class _SessionOrchestratorStepMixin:
         if self._closed:
             return
 
+        # Record that a step is being scheduled.  The no-step-progress
+        # watchdog reads this to know that the agent is not genuinely stuck
+        # — a slow LLM streaming response is expected to take longer than
+        # the watchdog timeout, but as long as step() keeps getting called
+        # the watchdog stays quiet.
+        cb = getattr(self, 'circuit_breaker', None) or getattr(
+            self, '_circuit_breaker', None
+        )
+        if cb is not None and hasattr(cb, 'record_step_call'):
+            try:
+                cb.record_step_call()
+            except Exception:
+                pass
+
         main_loop = get_main_event_loop()
 
         if main_loop is not None and main_loop.is_running():
@@ -110,6 +124,9 @@ class _SessionOrchestratorStepMixin:
         # have been blocked at step().
 
         if self._step_task and not self._step_task.done():
+            # Mirror the counter bump in step() so the in-flight _step
+            # task's finally block knows NOT to clobber _step_pending.
+            self._step_seq += 1
             self._step_pending = True
 
             return
@@ -208,8 +225,16 @@ class _SessionOrchestratorStepMixin:
 
         # cleared by observation_service.trigger_step), etc.
 
+        # IMPORTANT: must funnel through ``schedule_step_soon`` (not a direct
+        # ``self.step()``) to dodge the race documented in
+        # :meth:`schedule_step_soon`.  A direct call here races with the
+        # in-flight ``_step`` task's ``finally`` block: the call sees the
+        # previous ``_step_task`` as still alive, sets ``_step_pending = True``,
+        # returns — and the just-finishing ``_step`` task immediately clears
+        # ``_step_pending`` in its teardown, leaving the agent with no
+        # re-queued step and visibly stuck in ``AgentState.RUNNING`` forever.
         if not self._closed and self.should_step(event):
-            self.step()
+            self.schedule_step_soon()
 
     def _schedule_coroutine(self, coro: Coroutine[Any, Any, Any]) -> None:
         """Schedule a coroutine using the current or new event loop."""

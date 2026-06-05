@@ -23,6 +23,8 @@ from backend.core.constants import (
     DEFAULT_AGENT_MAX_ERROR_RATE,
     DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS,
     DEFAULT_AGENT_MAX_STUCK_DETECTIONS,
+    DEFAULT_NO_STEP_PROGRESS_TIMEOUT_SECONDS,
+    DEFAULT_STUCK_AUTO_RECOVER_COOLDOWN_SECONDS,
     DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE,
     DEFAULT_TEXT_EDITOR_SYNTAX_SWITCH,
 )
@@ -70,6 +72,19 @@ class CircuitBreakerConfig:
     # Adaptive scaling — when enabled, thresholds scale with task complexity
     # and iteration budget so that complex tasks get more breathing room.
     adaptive: bool = True
+
+    # No-step-progress watchdog.  If state==RUNNING for at least this many
+    # seconds with no recorded ``step()`` call, the watchdog fires.  Set
+    # ``<= 0`` to disable the watchdog entirely.
+    no_step_progress_timeout_seconds: float = (
+        DEFAULT_NO_STEP_PROGRESS_TIMEOUT_SECONDS
+    )
+    # Cooldown between auto-recovery attempts.  After the watchdog issues
+    # one ``schedule_step_soon`` to recover, it waits this long before
+    # declaring a second stall fatal.
+    auto_recover_cooldown_seconds: float = (
+        DEFAULT_STUCK_AUTO_RECOVER_COOLDOWN_SECONDS
+    )
 
     def scaled(self, complexity: float, max_iterations: int) -> CircuitBreakerConfig:
         """Return a copy with thresholds scaled for the given task.
@@ -161,12 +176,24 @@ class CircuitBreaker:
         # a single global counter that trips too early.
         self._per_tool_errors: dict[str, int] = {}
 
+        # No-step-progress watchdog state.  The watchdog fires when the
+        # controller stays in AgentState.RUNNING for too long without
+        # anyone calling step()/schedule_step_soon().  This catches the
+        # ``_step_pending``-clearing race that previously left the agent
+        # silently polling forever.
+        self._last_step_call_ts: float | None = None
+        self._auto_recover_attempts: int = 0
+        self._last_auto_recover_ts: float | None = None
+
         logger.info(
             'CircuitBreaker initialized: max_consecutive_errors=%s, '
-            'max_high_risk_actions=%s (adaptive=%s)',
+            'max_high_risk_actions=%s (adaptive=%s) '
+            'no_step_progress_timeout=%.0fs auto_recover_cooldown=%.0fs',
             config.max_consecutive_errors,
             config.max_high_risk_actions,
             config.adaptive,
+            config.no_step_progress_timeout_seconds,
+            config.auto_recover_cooldown_seconds,
         )
 
     def _trip_if_file_edit_syntax(
@@ -302,6 +329,128 @@ class CircuitBreaker:
         """Record a stuck loop detection event."""
         self.stuck_detection_count += 1
 
+    def record_step_call(self, ts: float | None = None) -> None:
+        """Mark that ``step()`` (or ``schedule_step_soon()``) was just invoked.
+
+        The no-step-progress watchdog uses this timestamp to detect the
+        ``_step_pending``-clearing race: if state is RUNNING but no step
+        request has been recorded for too long, something dropped the
+        re-trigger and we need to (auto-)recover.
+
+        Call this from:
+        - ``SessionOrchestrator.step()`` (direct entry)
+        - ``SessionOrchestrator.schedule_step_soon()`` (deferred entry)
+        """
+        import time as _time
+
+        self._last_step_call_ts = (
+            ts if ts is not None else _time.monotonic()
+        )
+        # Any new step call resets the auto-recover counter so a successful
+        # sequence of steps that happens to be slow doesn't get penalised
+        # by stale state from a previous stall.
+        if self._auto_recover_attempts > 0:
+            self._auto_recover_attempts = 0
+            self._last_auto_recover_ts = None
+
+    def check_no_step_progress(
+        self,
+        agent_state: 'AgentState | None' = None,
+        now: float | None = None,
+    ) -> CircuitBreakerResult | None:
+        """Watchdog: detect RUNNING state with no recent step() call.
+
+        Returns:
+            - ``None`` if everything is healthy (state != RUNNING, or a
+              step call was recorded within the configured timeout).
+            - ``CircuitBreakerResult(action='auto_recover_once')`` on the
+              first stall in a cooldown window.  The caller is expected to
+              invoke ``controller.schedule_step_soon()`` as the recovery.
+            - ``CircuitBreakerResult(action='stop', tripped=True)`` when a
+              second stall occurs within ``auto_recover_cooldown_seconds``,
+              indicating a persistent race that auto-recovery can't fix.
+        """
+        if not self.config.enabled:
+            return None
+
+        timeout = self.config.no_step_progress_timeout_seconds
+        if timeout <= 0:
+            return None  # watchdog disabled
+
+        # Only meaningful while the agent is supposed to be running.
+        # Note: AgentState.RUNNING.value is 'running' (lowercase), so we use
+        # .name == 'RUNNING' to match the enum member name.
+        if agent_state is None:
+            agent_state = getattr(self, '_cached_state', None)
+        if agent_state is None:
+            return None
+        if not (hasattr(agent_state, 'name') and agent_state.name == 'RUNNING'):
+            return None
+
+        if self._last_step_call_ts is None:
+            return None  # never had a step call — nothing to compare to
+
+        import time as _time
+
+        current = now if now is not None else _time.monotonic()
+        elapsed = current - self._last_step_call_ts
+        if elapsed < timeout:
+            return None
+
+        # First stall inside the cooldown window → auto-recover once.
+        cooldown = self.config.auto_recover_cooldown_seconds
+        if (
+            self._last_auto_recover_ts is None
+            or (current - self._last_auto_recover_ts) > cooldown
+        ):
+            self._auto_recover_attempts += 1
+            self._last_auto_recover_ts = current
+            logger.warning(
+                'No-step-progress watchdog: no step() call for %.1fs in RUNNING; '
+                'issuing auto-recover (attempt %d, cooldown=%.0fs)',
+                elapsed,
+                self._auto_recover_attempts,
+                cooldown,
+            )
+            return CircuitBreakerResult(
+                tripped=False,
+                reason=(
+                    f'No step() call recorded for {elapsed:.1f}s while in '
+                    f'RUNNING; auto-recover attempt {self._auto_recover_attempts}'
+                ),
+                action='auto_recover_once',
+                recommendation=(
+                    'The agent loop appears stalled in RUNNING state with no '
+                    'scheduled step.  Issuing one schedule_step_soon() to '
+                    'recover.'
+                ),
+            )
+
+        # Second stall within the cooldown window → fatal.
+        logger.error(
+            'No-step-progress watchdog: auto-recover did not help after %.1fs; '
+            'forcing ERROR state to break the stall loop',
+            elapsed,
+        )
+        return CircuitBreakerResult(
+            tripped=True,
+            reason=(
+                f'Agent stuck in RUNNING with no step progress for '
+                f'{elapsed:.1f}s after auto-recover attempt'
+            ),
+            action='stop',
+            recommendation=(
+                'The agent loop is stuck in RUNNING state.  This usually '
+                'indicates the _step_pending race documented in '
+                'schedule_step_soon().  Stopping the agent to surface the '
+                'issue to the user.'
+            ),
+        )
+
+    def update_cached_state(self, agent_state: 'AgentState | None') -> None:
+        """Cache the latest AgentState so the watchdog can read it lazily."""
+        self._cached_state = agent_state
+
     def record_progress_signal(self, note: str = '') -> None:
         """Reduce stuck-detection pressure when a progress observation is received.
 
@@ -403,6 +552,12 @@ class CircuitBreaker:
         self.recent_errors.clear()
         self.recent_actions_success.clear()
         self._per_tool_errors.clear()
+        # No-step-progress watchdog state.  Reset on full breaker reset so a
+        # new session starts with a clean slate (and so a recovered stall
+        # doesn't carry over into the next user message).
+        self._last_step_call_ts = None
+        self._auto_recover_attempts = 0
+        self._last_auto_recover_ts = None
         logger.info('Circuit breaker reset')
 
     def reset_task_counters(self) -> None:

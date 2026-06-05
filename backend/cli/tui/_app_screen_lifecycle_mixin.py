@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time as _time
 from typing import Any
 
 from textual.app import ComposeResult
@@ -37,6 +38,7 @@ from backend.core.bootstrap.setup import (
     create_runtime,
     generate_sid,
 )
+from backend.core.constants import DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS
 from backend.core.enums import AgentState, EventSource
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventStream, EventStreamSubscriber
@@ -535,6 +537,7 @@ class _AppScreenLifecycleMixin:
             )
             raise
         loop_count = 0
+        _started_at = _time.monotonic()
         while True:
             _tui_logger.debug('_dispatch_to_agent: entering poll loop')
             while True:
@@ -545,6 +548,39 @@ class _AppScreenLifecycleMixin:
                         await asyncio.sleep(0.5)
                     loop_count += 1
                     state = self._controller.get_agent_state()
+
+                    # Hard timeout: if the agent has been in RUNNING state for too
+                    # long without transitioning, surface the stall clearly
+                    # rather than polling forever (which was the previous
+                    # behaviour and masked the _step_pending race).
+                    _elapsed = _time.monotonic() - _started_at
+                    if _elapsed > DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS:
+                        _tui_logger.error(
+                            '_dispatch_to_agent: TIMEOUT after %.0fs '
+                            '(poll #%d, state=%s) — forcing ERROR to break stall',
+                            _elapsed,
+                            loop_count,
+                            state,
+                        )
+                        logger.error(
+                            '[TUI] _dispatch_to_agent: STALL TIMEOUT after %.0fs '
+                            '(poll #%d, state=%s). '
+                            'This usually indicates the _step_pending race condition. '
+                            'Forcing ERROR state.',
+                            _elapsed,
+                            loop_count,
+                            state,
+                            extra={'msg_type': 'TUI_DISPATCH_STALL_TIMEOUT'},
+                        )
+                        try:
+                            await self._controller.set_agent_state_to(
+                                AgentState.ERROR
+                            )
+                        except Exception:
+                            pass
+                        state = AgentState.ERROR
+                        break
+
                     if loop_count == 1 or loop_count % 20 == 0:
                         _tui_logger.debug(
                             f'_dispatch_to_agent: poll #{loop_count}, state={state}'

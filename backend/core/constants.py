@@ -60,8 +60,36 @@ RECALL_PIPELINE_TIMEOUT_SECONDS = 90.0
 DEFAULT_PENDING_ACTION_TIMEOUT = 120.0
 # Hard cap on how long run_agent_until_done polls before forcing termination.
 # 0 or negative = disabled (no hard cap).  Env override allows long sessions.
+# Default raised from 0 → 1800s (30 min) so a silent stall in the agent loop
+# surfaces as ERROR state within a bounded time window instead of looping
+# forever.  Set GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS=0 to restore the
+# pre-fix behavior.
 DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS = float(
-    os.getenv('GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS', '0')
+    os.getenv('GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS', '1800')
+)
+# Hard cap on how long the TUI ``_dispatch_to_agent`` poll loop will wait
+# for the agent to leave ``AgentState.RUNNING`` before forcing ERROR.
+# Catches the symptom of the agent-stuck-in-RUNNING race: a 30-min default
+# keeps legitimate long-running tasks working but prevents the previous
+# 4-hour silent poll loops.  Set GRINTA_TUI_DISPATCH_TIMEOUT_SECONDS=0 to
+# disable the cap entirely.
+DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS = float(
+    os.getenv('GRINTA_TUI_DISPATCH_TIMEOUT_SECONDS', '1800')
+)
+# How long the controller may go with state==RUNNING and no recorded
+# ``step()`` call before the no-step-progress watchdog fires.  120s is
+# generous enough to absorb a slow LLM streaming response but short enough
+# that a genuine stuck-in-RUNNING race surfaces within a couple of minutes.
+# Set GRINTA_NO_STEP_PROGRESS_TIMEOUT_SECONDS=0 to disable the watchdog.
+DEFAULT_NO_STEP_PROGRESS_TIMEOUT_SECONDS = float(
+    os.getenv('GRINTA_NO_STEP_PROGRESS_TIMEOUT_SECONDS', '120')
+)
+# Cooldown between auto-recover attempts by the no-step-progress watchdog.
+# After a recovery ``schedule_step_soon`` is issued, the watchdog waits this
+# long before declaring a second stall fatal.  Bounds the worst-case stall
+# at roughly (timeout + cooldown) seconds.
+DEFAULT_STUCK_AUTO_RECOVER_COOLDOWN_SECONDS = float(
+    os.getenv('GRINTA_STUCK_AUTO_RECOVER_COOLDOWN_SECONDS', '60')
 )
 # MCP (stdio/SSE) can exceed the default (npx cold start, slow servers). Pending actions use max(base, this).
 MCP_PENDING_ACTION_TIMEOUT_FLOOR = 180.0

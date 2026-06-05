@@ -165,9 +165,10 @@ async def run_agent_until_done(
                 and _time.monotonic() - _started > _max_poll_seconds
             ):
                 logger.error(
-                    'run_agent_until_done: timeout after %.0fs in state=%s',
+                    'run_agent_until_done: HARD TIMEOUT after %.0fs in state=%s',
                     _max_poll_seconds,
                     controller.state.agent_state,
+                    extra={'msg_type': 'AGENT_HARD_TIMEOUT'},
                 )
                 try:
                     await controller.set_agent_state_to(AgentState.ERROR)

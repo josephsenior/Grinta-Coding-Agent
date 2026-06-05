@@ -171,8 +171,22 @@ class StepGuardService:
         if not cb_service:
             return True
 
+        # Feed the latest state into the circuit breaker so the watchdog
+        # can read it without a direct controller reference.
+        agent_state = controller.get_agent_state()
+        if hasattr(cb_service, 'update_cached_state'):
+            cb_service.update_cached_state(agent_state)
+
         result = cb_service.check()
         if not result or not result.tripped:
+            # Even when the primary check passes, run the no-step-progress
+            # watchdog.  This is a safety net for the
+            # _step_pending race that is not prevented by Edit 1 alone.
+            watchdog_result = await self._check_no_step_progress_watchdog(
+                controller, cb_service, agent_state
+            )
+            if watchdog_result is not None:
+                return watchdog_result
             return True
 
         if self._warning_trip_enabled():
@@ -237,6 +251,75 @@ class StepGuardService:
         )
         await controller.set_agent_state_to(target_state)
         return False
+
+    async def _check_no_step_progress_watchdog(
+        self,
+        controller: 'SessionOrchestrator',
+        cb_service: object,
+        agent_state: 'AgentState',
+    ) -> bool | None:
+        """Run the no-step-progress watchdog and handle its result.
+
+        Returns ``None`` if the watchdog is disabled or not triggered.
+        Returns ``True`` if the watchdog fired but auto-recovered.
+        Returns ``False`` if the watchdog determined the agent is stuck and
+        should be stopped.
+        """
+        watchdog_fn = getattr(cb_service, 'check_no_step_progress', None)
+        if not callable(watchdog_fn):
+            return None
+
+        try:
+            result = watchdog_fn(agent_state=agent_state)
+        except Exception as exc:
+            logger.debug(
+                'No-step-progress watchdog raised: %s', exc, exc_info=True
+            )
+            return None
+
+        if result is None:
+            return None
+
+        action = getattr(result, 'action', '')
+        if action == 'auto_recover_once':
+            logger.warning(
+                'NO_STEP_PROGRESS_WATCHDOG: %.0fs stall detected in RUNNING; '
+                'issuing one schedule_step_soon() to recover',
+                getattr(result, 'reason', ''),
+            )
+            try:
+                controller.schedule_step_soon()
+            except Exception:
+                pass
+            return True  # keep stepping (auto-recover in progress)
+
+        if action == 'stop':
+            logger.error(
+                'NO_STEP_PROGRESS_WATCHDOG: stall persisted after auto-recover; '
+                'forcing ERROR state'
+            )
+            error_obs = ErrorObservation(
+                content=(
+                    'NO STEP PROGRESS WATCHDOG: The agent loop has been stuck in '
+                    'RUNNING state for too long with no scheduled step().  '
+                    'This indicates the _step_pending race condition.  '
+                    f'Reason: {getattr(result, "reason", "unknown")}'
+                ),
+                error_id='NO_STEP_PROGRESS_WATCHDOG',
+            )
+            attach_observation_cause(
+                error_obs,
+                _pending_action_for_observation_cause(controller),
+                context='step_guard.no_step_progress_watchdog',
+            )
+            controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
+            try:
+                await controller.set_agent_state_to(AgentState.ERROR)
+            except Exception:
+                pass
+            return False
+
+        return None
 
     async def _handle_stuck_detection(self, controller: 'SessionOrchestrator') -> bool:
         stuck_service = getattr(controller, 'stuck_service', None)

@@ -170,6 +170,15 @@ class SessionOrchestrator(
         # the dropped request is re-queued after the current step completes.
         # Protected by _step_lock to avoid races with drain_loop's read/write.
         self._step_pending = False
+        # Monotonic counter incremented every time ``step()`` is asked to
+        # re-queue a request (i.e. an in-flight step task is still alive).
+        # ``_step`` captures this counter on entry and only clears
+        # ``_step_pending`` in its ``finally`` if the counter is unchanged
+        # — this prevents the racy ``_step_pending`` wipe documented in
+        # :meth:`schedule_step_soon`.  Even if Edit 1 (use
+        # ``schedule_step_soon`` from ``_on_event``) is somehow bypassed,
+        # this counter is the second line of defence.
+        self._step_seq: int = 0
         # Suppresses memory-pressure condensation signalling during batch drain
         # so that pending actions are not disrupted mid-batch.
         self._draining_batch = False
@@ -234,11 +243,28 @@ class SessionOrchestrator(
         if self._closed:
             return
 
+        # Record that a step was requested — the no-step-progress watchdog
+        # uses this to detect a controller that's stuck in RUNNING with no
+        # one calling step().  Failure to record here is non-fatal: the
+        # watchdog is a safety net, not a primary control.
+        cb = getattr(self, 'circuit_breaker', None) or getattr(
+            self, '_circuit_breaker', None
+        )
+        if cb is not None and hasattr(cb, 'record_step_call'):
+            try:
+                cb.record_step_call()
+            except Exception:
+                pass
+
         # Atomic gate: prevents two threads from both seeing _step_task as done
         # and both creating step tasks.  The gate is held for the entire
         # call_soon_threadsafe window so no other thread can interleave.
         with self._step_gate:
             if self._step_task and not self._step_task.done():
+                # Bump _step_seq so the in-flight ``_step`` task's ``finally``
+                # block does NOT clear ``_step_pending`` (it's a fresh
+                # re-queue that arrived during the task's teardown window).
+                self._step_seq += 1
                 self._step_pending = True
                 return
 
@@ -262,6 +288,12 @@ class SessionOrchestrator(
         """
         async with self._step_lock:
             self._step_owner_task = asyncio.current_task()
+            # Capture the ``_step_seq`` counter on entry.  If a fresh
+            # ``step()`` call bumps the counter while we're still inside
+            # the drain loop, the ``finally`` block must NOT clobber the
+            # corresponding ``_step_pending = True`` — that fresh request
+            # belongs to a newer step and must survive our teardown.
+            entry_seq = self._step_seq
             try:
                 drained_count = 0
                 while drained_count < DEFAULT_AGENT_STEP_DRAIN_LIMIT:
@@ -275,7 +307,18 @@ class SessionOrchestrator(
                         break
             finally:
                 self._step_owner_task = None
-                self._step_pending = False
+                # Only clear _step_pending if no fresh request arrived
+                # during our teardown.  This closes the race that
+                # ``schedule_step_soon`` (and the previous direct
+                # ``self.step()`` in ``_on_event``) used to lose requests
+                # to the ``finally`` wipe.
+                if self._step_seq == entry_seq:
+                    self._step_pending = False
+                else:
+                    # Newer request arrived — keep _step_pending set so
+                    # the new _step task (already created via
+                    # call_soon_threadsafe) sees it on its first pass.
+                    self._step_pending = True
 
     async def _step_inner(self) -> None:
         """Inner step logic, guarded by _step_lock."""
