@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.core.errors import LLMNoActionError
 from backend.engine.safety import OrchestratorSafetyManager
 from backend.inference.exceptions import ContextWindowExceededError
 
@@ -1097,7 +1096,7 @@ def test_get_checkpoint_blocks_resumed_session_without_superseding_control_event
 def test_response_to_actions_gates_plain_message_in_agent_mode(
     monkeypatch,
 ):
-    """Agent mode is action-only; plain messages raise repairable protocol errors."""
+    """Before tracker commitment, Agent mode can answer in plain prose."""
     from backend.engine import executor as executor_module
     from backend.engine.executor import OrchestratorExecutor
     from backend.ledger.action import MessageAction
@@ -1127,8 +1126,11 @@ def test_response_to_actions_gates_plain_message_in_agent_mode(
         ]
     )
 
-    with pytest.raises(LLMNoActionError):
-        executor._response_to_actions(response)
+    actions = executor._response_to_actions(response)
+
+    assert len(actions) == 1
+    assert isinstance(actions[0], MessageAction)
+    assert actions[0].content == "I've created grinta_feedback.md for you."
 
 
 def test_response_to_actions_gates_conversational_plain_message(monkeypatch):
@@ -1163,8 +1165,14 @@ def test_response_to_actions_gates_conversational_plain_message(monkeypatch):
         ]
     )
 
-    with pytest.raises(LLMNoActionError):
-        executor._response_to_actions(response)
+    actions = executor._response_to_actions(response)
+
+    assert len(actions) == 1
+    assert isinstance(actions[0], MessageAction)
+    assert (
+        actions[0].content
+        == 'I have prepared a rating of the system and the tools for you.'
+    )
 
 
 def test_response_to_actions_allows_structured_non_runnable_action(monkeypatch):
