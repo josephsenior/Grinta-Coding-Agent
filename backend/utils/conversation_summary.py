@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from backend.core.config import LLMConfig
 from backend.core.logger import app_logger as logger
 from backend.ledger.event import EventSource
-from backend.ledger.event_store import EventStore
+from backend.ledger.event.event_store import EventStore
 
 if TYPE_CHECKING:
     from backend.inference.llm_registry import LLMRegistry

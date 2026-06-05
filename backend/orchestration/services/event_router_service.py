@@ -15,23 +15,23 @@ if TYPE_CHECKING:
 _DELEGATE_PROGRESS_STATUS = 'delegate_progress'
 
 
-from backend.orchestration.services._event_router_actions_mixin import (  # noqa: F401, E402
+from backend.orchestration.services.event_router_mixins._event_router_actions_mixin import (  # noqa: F401, E402
     _EventRouterActionsMixin,
 )
 
 # Re-export helper functions for backward compatibility (tests import these
 # from backend.orchestration.services.event_router_service).
-from backend.orchestration.services._event_router_delegate_helpers import (  # noqa: F401, E402
+from backend.orchestration.services.event_router_mixins._event_router_delegate_helpers import (  # noqa: F401, E402
     _build_delegate_progress_observation,
     _summarize_delegate_worker_event,
 )
-from backend.orchestration.services._event_router_delegate_mixin import (  # noqa: F401, E402
+from backend.orchestration.services.event_router_mixins._event_router_delegate_mixin import (  # noqa: F401, E402
     _EventRouterDelegateMixin,
 )
-from backend.orchestration.services._event_router_state_mixin import (  # noqa: F401, E402
+from backend.orchestration.services.event_router_mixins._event_router_state_mixin import (  # noqa: F401, E402
     _EventRouterStateMixin,
 )
-from backend.orchestration.services._event_router_user_message_mixin import (  # noqa: F401, E402
+from backend.orchestration.services.event_router_mixins._event_router_user_message_mixin import (  # noqa: F401, E402
     _EventRouterUserMessageMixin,
 )
 

@@ -9,14 +9,14 @@ from urllib.parse import urlencode
 import httpx
 from fastapi import status
 
-from backend.ledger.event_store_abc import EventStoreABC
+from backend.ledger.event.event_store_abc import EventStoreABC
 from backend.ledger.serialization.event import event_from_dict
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from backend.ledger.event import Event
-    from backend.ledger.event_filter import EventFilter
+    from backend.ledger.event.event_filter import EventFilter
 
 
 @dataclass

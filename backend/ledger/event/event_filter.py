@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from backend.ledger.serialization.event import event_to_dict
 
 if TYPE_CHECKING:
-    from backend.ledger.event import Event
+    from backend.ledger.event._event import Event
 
 
 @dataclass

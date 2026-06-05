@@ -3,7 +3,7 @@
 from backend.core.logger import app_logger as logger
 from backend.ledger.action.action import Action
 from backend.ledger.action.empty import NullAction
-from backend.ledger.event import Event
+from backend.ledger.event._event import Event
 from backend.ledger.observation import (
     CmdOutputObservation,
     NullObservation,

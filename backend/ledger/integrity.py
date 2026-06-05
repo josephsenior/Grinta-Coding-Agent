@@ -16,8 +16,8 @@ from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:  # pragma: no cover
     from backend.ledger.event import Event
-    from backend.ledger.event_filter import EventFilter
-    from backend.ledger.event_store import EventStore
+    from backend.ledger.event.event_filter import EventFilter
+    from backend.ledger.event.event_store import EventStore
 
 _CHECKSUM_KEY = '_grinta_checksum'
 _CHECKSUM_ALGORITHM = 'sha256'

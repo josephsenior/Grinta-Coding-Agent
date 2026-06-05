@@ -1,11 +1,11 @@
-"""Tests for backend.ledger.event_store — _CachePage and EventStore helpers."""
+"""Tests for backend.ledger.event.event_store — _CachePage and EventStore helpers."""
 
 from __future__ import annotations
 
 import json
 from unittest.mock import MagicMock
 
-from backend.ledger.event_store import _DUMMY_PAGE, EventStore, _CachePage
+from backend.ledger.event.event_store import _DUMMY_PAGE, EventStore, _CachePage
 
 # ===================================================================
 # _CachePage

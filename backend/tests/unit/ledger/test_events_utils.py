@@ -1,10 +1,10 @@
-"""Tests for backend.ledger.event_utils — action/observation pairing utilities."""
+"""Tests for backend.ledger.event.event_utils — action/observation pairing utilities."""
 
 from typing import Any
 from unittest.mock import MagicMock
 
 from backend.ledger.action.empty import NullAction
-from backend.ledger.event_utils import (
+from backend.ledger.event.event_utils import (
     _add_action_observation_pairs,
     _add_orphaned_observations,
     _build_action_and_observation_maps,

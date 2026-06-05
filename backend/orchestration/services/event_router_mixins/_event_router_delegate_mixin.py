@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 # referenced inside `_handle_delegate_task_action` etc.). They were moved
 # out of event_router_service.py to keep that file under the per-file
 # LOC budget.
-from backend.orchestration.services._event_router_delegate_helpers import (  # noqa: E402
+from backend.orchestration.services.event_router_mixins._event_router_delegate_helpers import (  # noqa: E402
     _build_delegate_progress_observation,  # noqa: F401
     _looks_like_text_tool_call_handoff,  # noqa: F401
     _summarize_delegate_browser_action,  # noqa: F401
