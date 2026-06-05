@@ -8,6 +8,7 @@ progress observations from worker events.
 
 from __future__ import annotations
 
+from backend.cli.tool_call_display import contains_tool_transport_markup
 from backend.core.schemas import AgentState
 from backend.ledger.action import (
     Action,
@@ -36,12 +37,6 @@ from backend.ledger.observation.agent import (
 )
 
 _DELEGATE_PROGRESS_STATUS = 'delegate_progress'
-_TEXT_TOOL_CALL_MARKERS = (
-    '<minimax:tool_call',
-    '</minimax:tool_call>',
-    '<tool_call',
-    '</tool_call>',
-)
 
 
 def _truncate_delegate_progress(text: str, limit: int = 120) -> str:
@@ -52,8 +47,7 @@ def _truncate_delegate_progress(text: str, limit: int = 120) -> str:
 
 
 def _looks_like_text_tool_call_handoff(text: str) -> bool:
-    low = (text or '').lower()
-    return any(marker in low for marker in _TEXT_TOOL_CALL_MARKERS)
+    return contains_tool_transport_markup(text)
 
 
 def _summarize_delegate_file_action(

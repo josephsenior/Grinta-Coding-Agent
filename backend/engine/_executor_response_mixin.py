@@ -13,6 +13,7 @@ from backend.core.agent_protocol import (
     CONTINUATION_NUDGE,
     increment_prose_attempts,
     increment_self_extension,
+    is_protocol_mode,
     mark_abandoned,
     prose_attempts,
     reset_prose_attempts,
@@ -25,7 +26,6 @@ from backend.core.agent_protocol import (
     work_remains,
 )
 from backend.core.interaction_modes import (
-    AGENT_MODE,
     is_chat_mode,
     normalize_interaction_mode,
 )
@@ -81,16 +81,18 @@ class _ExecutorResponseMixin:
     def _gate_agent_mode_plain_text(
         self, actions: list[Action], _response: ModelResponse
     ) -> list[Action]:
-        """Apply Agent-mode prose rules based on tracker commitment state.
+        """Apply Agent/Plan prose rules based on tracker commitment state.
 
-        Agent mode is conversational until a task tracker exists. Once the
-        tracker exists, plain prose cannot silently complete unfinished work.
+        Agent/Plan mode is conversational until a task tracker exists. Once
+        the tracker exists, plain prose cannot silently complete unfinished
+        work.
         """
         from backend.ledger.action.agent import PlaybookFinishAction
         from backend.ledger.action.message import MessageAction as _MessageAction
 
         mode = self._get_agent_mode()
-        if is_chat_mode(mode) or normalize_interaction_mode(mode) != AGENT_MODE:
+        normalized_mode = normalize_interaction_mode(mode)
+        if is_chat_mode(normalized_mode) or not is_protocol_mode(normalized_mode):
             return actions
 
         if not actions:
@@ -127,7 +129,7 @@ class _ExecutorResponseMixin:
         if tracker_terminal(state) and terminal_nudge_sent(state):
             if self_extension_count(state) >= 1:
                 logger.warning(
-                    'Agent protocol forcing finish after repeated self-extension '
+                    'Agent/Plan protocol forcing finish after repeated self-extension '
                     'from terminal tracker state.'
                 )
                 return [
@@ -171,7 +173,7 @@ class _ExecutorResponseMixin:
         if current_attempts >= 3:
             mark_abandoned(state)
             logger.warning(
-                'Agent protocol abandoned run after repeated prose while work remained '
+                'Agent/Plan protocol abandoned run after repeated prose while work remained '
                 '(attempts=%d, text=%r).',
                 current_attempts,
                 plain_text[:500],
@@ -191,7 +193,7 @@ class _ExecutorResponseMixin:
             source='OrchestratorExecutor._handle_agent_plain_text_only',
         )
         logger.info(
-            'Agent-mode prose converted to mid-task status card (attempt=%d).',
+            'Agent/Plan prose converted to mid-task status card (attempt=%d).',
             count,
         )
         for action in actions:
@@ -200,14 +202,16 @@ class _ExecutorResponseMixin:
                 action.protocol_status = True
         return actions
 
-    @staticmethod
-    def _synthesize_finish(summary: str, *, forced: bool = False) -> Action:
+    def _synthesize_finish(
+        self, summary: str, *, forced: bool = False, mode: str | None = None
+    ) -> Action:
         """Build a finish action from terminal plain text."""
         from backend.ledger.action.agent import PlaybookFinishAction
 
         clean = (summary or '').strip() or 'All tracked tasks are complete.'
+        finish_mode = normalize_interaction_mode(mode or self._get_agent_mode())
         outputs = {
-            'mode': 'agent',
+            'mode': finish_mode,
             'status': 'completed',
             'response': clean,
             'summary': clean,

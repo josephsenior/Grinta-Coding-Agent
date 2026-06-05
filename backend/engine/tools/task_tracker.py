@@ -22,7 +22,7 @@ from backend.inference.tool_names import (
 )
 
 _CREATE_TASK_TRACKER_DESCRIPTION = (
-    'Create the structured task tracker and begin an Agent-mode task run. '
+    'Create the structured task tracker and begin an Agent/Plan task run. '
     'Use this as the first action when you decide the request requires structured work. '
     'After creation, use `task_tracker` to view the plan or update statuses. '
     'Statuses must be exactly one of: `todo`, `in_progress`, `done`, `skipped`, `blocked`.'

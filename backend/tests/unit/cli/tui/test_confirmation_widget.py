@@ -39,6 +39,18 @@ def test_tui_confirmation_normalizes_enum_risk() -> None:
     assert GrintaScreen._normalize_risk_key('2') == 'HIGH'
 
 
+def test_tui_full_autonomy_uses_current_level() -> None:
+    screen = object.__new__(GrintaScreen)
+    screen._controller = SimpleNamespace(
+        autonomy_controller=SimpleNamespace(
+            current_level='full',
+            autonomy_level='balanced',
+        )
+    )
+
+    assert screen._is_full_autonomy() is True
+
+
 @pytest.mark.asyncio
 async def test_tui_confirmation_widget_renders_visible_content(
     mock_config,
@@ -113,7 +125,12 @@ async def test_tui_confirmation_widget_acceptance_decision_survives_hide(
         await pilot.pause()
 
         waiter = asyncio.create_task(widget.wait_for_decision())
-        button = widget.query_one(f'#confirm-{button_key}', Button)
+        button_id = next(
+            rendered_id
+            for rendered_id, key in widget._button_id_to_key.items()
+            if key == button_key
+        )
+        button = widget.query_one(f'#{button_id}', Button)
         widget.on_button_pressed(SimpleNamespace(button=button))  # type: ignore[arg-type]
 
         result = await asyncio.wait_for(waiter, timeout=1)

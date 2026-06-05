@@ -22,8 +22,10 @@ from backend.engine.function_calling import (
     _handle_task_tracker_tool,
     _process_single_tool_call,
     combine_thought,
+    response_to_actions,
     set_security_risk,
 )
+from backend.engine.tools import create_cmd_run_tool
 from backend.engine.tools.task_tracker import (
     create_create_task_tracker_tool,
     create_task_tracker_tool,
@@ -100,6 +102,26 @@ class TestCombineThought:
         action = MagicMock(spec=[])  # no 'thought' attribute
         result = combine_thought(action, 'some thought')
         assert result is action
+
+
+class TestResponseToActions:
+    def test_native_tool_call_with_content_does_not_emit_duplicate_message(self):
+        tool_name = create_cmd_run_tool()['function']['name']
+        response = _model_response(
+            content='I will run the check.\n[END_TOOL_CALL]',
+            tool_calls=[
+                _native_tool_call(
+                    tool_name,
+                    {'command': 'echo ok', 'security_risk': 'LOW'},
+                )
+            ],
+        )
+
+        actions = response_to_actions(response)
+
+        assert len(actions) == 1
+        assert isinstance(actions[0], CmdRunAction)
+        assert not any(isinstance(action, MessageAction) for action in actions)
 
 
 # ---------------------------------------------------------------------------
@@ -438,6 +460,24 @@ class TestProcessSingleToolCall:
         )
         assert isinstance(action, PlaybookFinishAction)
         assert action.outputs['plan'] == ['Inspect', 'Implement', 'Verify']
+
+    def test_plan_mode_allows_create_task_tracker_tool_call(self):
+        tool_name = create_create_task_tracker_tool()['function']['name']
+        tc = self._make_tool_call(tool_name)
+
+        action = _process_single_tool_call(
+            tc,
+            {
+                'task_list': [
+                    {'id': '1', 'description': 'Draft plan', 'status': 'todo'}
+                ]
+            },
+            mode='plan',
+        )
+
+        assert isinstance(action, TaskTrackingAction)
+        assert action.command == 'create'
+        assert action.task_list[0]['description'] == 'Draft plan'
 
     def test_plan_mode_rejects_mutation_tool_call(self):
         from backend.engine.tools.native_file_tools import create_create_tool

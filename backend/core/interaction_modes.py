@@ -26,12 +26,14 @@ PLAN_MODE_ALLOWED_TOOLS = frozenset(
     {
         'analyze_project_structure',
         'communicate_with_user',
+        'create_task_tracker',
         'find_symbols',
         'finish',
         'lsp',
         'read',
         'recall',
         'search_code',
+        'task_tracker',
     }
 )
 

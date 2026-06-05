@@ -25,6 +25,7 @@ from backend.cli.tool_call_display import (
     redact_streamed_tool_call_markers,
     redact_task_list_json_blobs,
 )
+from backend.cli.transcript import strip_pseudo_xml_function_calls
 from backend.engine import prompt_role_debug as _prompt_role_debug
 
 
@@ -107,7 +108,9 @@ def sanitize_visible_transcript_text(text: str) -> str:
     """Remove internal prompt scaffolding and protocol chatter."""
     stripped = redact_internal_result_markers(
         redact_task_list_json_blobs(
-            redact_streamed_tool_call_markers((text or '').strip())
+            strip_pseudo_xml_function_calls(
+                redact_streamed_tool_call_markers((text or '').strip())
+            )
         )
     )
     if not stripped:

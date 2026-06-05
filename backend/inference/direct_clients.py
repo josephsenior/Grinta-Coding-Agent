@@ -54,6 +54,7 @@ from backend.inference.direct_clients_openai_ops import (
 from backend.inference.direct_clients_openai_ops import (
     strip_unsupported_params as _strip_unsupported_params_impl,
 )
+from backend.inference.tool_types import is_valid_tool_call_name
 
 # Shared httpx pool: reuse provider/base_url transports across sessions so the
 # direct SDK clients do not waste TCP connections on duplicate httpx clients.
@@ -300,6 +301,13 @@ class LLMResponse:
         for i, tc in enumerate(tool_calls):
             # Ensure function arguments are JSON strings
             func = tc.get('function', {})
+            name = func.get('name', '')
+            if not is_valid_tool_call_name(name):
+                logger.warning(
+                    'Ignoring malformed provider tool call with invalid function name: %r',
+                    name,
+                )
+                continue
             args = func.get('arguments', '{}')
             if isinstance(args, dict):
                 args_str = json.dumps(args, ensure_ascii=False, separators=(',', ':'))
@@ -313,12 +321,12 @@ class LLMResponse:
                     'id': tc.get('id', f'call_{i + 1}'),
                     'type': tc.get('type', 'function'),
                     'function': {
-                        'name': func.get('name', ''),
+                        'name': str(name).strip(),
                         'arguments': args_str,
                     },
                 }
             )
-        return normalized
+        return normalized or None
 
     def to_dict(self) -> dict[str, Any]:
         message: dict[str, Any] = {

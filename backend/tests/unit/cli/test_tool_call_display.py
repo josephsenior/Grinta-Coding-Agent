@@ -1,8 +1,11 @@
 """Tests for backend.cli.tool_call_display."""
 
+import json
 import unittest
 
 from backend.cli.tool_call_display import (
+    contains_tool_transport_markup,
+    extract_tool_calls_from_text_markers,
     flatten_tool_call_for_history,
     format_tool_invocation_line,
     looks_like_streaming_tool_arguments,
@@ -84,6 +87,65 @@ class TestToolCallDisplay(unittest.TestCase):
     def test_redact_streamed_tool_call_markers(self) -> None:
         raw = '[Tool call] execute_bash({"command":"pwd"})'
         self.assertEqual(redact_streamed_tool_call_markers(raw).strip(), '')
+
+    def test_redact_removes_bracket_tool_transport(self) -> None:
+        raw = (
+            '[END_TOOL_CALL]\n\n'
+            '[EDIT_DIFF] --- raftkv/rpc.py +++ raftkv/rpc.py\n'
+            '@@ -1 +1 @@\n'
+            '-old\n'
+            '+new\n\n'
+            'Edit applied.'
+        )
+        out = redact_streamed_tool_call_markers(raw)
+        self.assertNotIn('[END_TOOL_CALL]', out)
+        self.assertNotIn('[EDIT_DIFF]', out)
+        self.assertNotIn('--- raftkv/rpc.py', out)
+        self.assertEqual(out.strip(), 'Edit applied.')
+
+    def test_redact_removes_minimax_split_tool_transport(self) -> None:
+        raw = (
+            'Checking the file now.'
+            ']<]minimax[>[<tool_call>\n'
+            ']<]minimax[>[<invoke name="execute_powershell">\n'
+            '<parameter name="command">pwd</parameter>\n'
+            '[END_TOOL_CALL]'
+        )
+        out = redact_streamed_tool_call_markers(raw)
+        self.assertEqual(out.strip(), 'Checking the file now.')
+        self.assertNotIn('minimax', out)
+        self.assertNotIn('<invoke', out)
+        self.assertNotIn('[END_TOOL_CALL]', out)
+
+    def test_extracts_minimax_invoke_tool_call(self) -> None:
+        raw = (
+            ']<]minimax[>[<tool_call>\n'
+            '<invoke name="execute_powershell">\n'
+            '<parameter name="command">pwd</parameter>\n'
+            '<parameter name="security_risk">LOW</parameter>\n'
+            '</invoke>\n'
+            '</minimax:tool_call>'
+        )
+        calls = extract_tool_calls_from_text_markers(raw)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]['function']['name'], 'execute_powershell')
+        args = json.loads(calls[0]['function']['arguments'])
+        self.assertEqual(args['command'], 'pwd')
+        self.assertEqual(args['security_risk'], 'LOW')
+
+    def test_contains_tool_transport_markup_covers_shared_shapes(self) -> None:
+        samples = [
+            '[END_TOOL_CALL]',
+            '[Tool call] read({"path":"a.py"})',
+            ']<]minimax[>[<tool_call>',
+            '<tool_call name="read">{"path":"a.py"}</tool_call>',
+            '<invoke name="read"><parameter name="path">a.py</parameter></invoke>',
+            '<function=read><parameter=path>a.py</parameter></function>',
+        ]
+        for sample in samples:
+            with self.subTest(sample=sample):
+                self.assertTrue(contains_tool_transport_markup(sample))
+        self.assertFalse(contains_tool_transport_markup('plain final answer'))
 
     def test_strip_tool_call_marker_lines_keeps_json_shape(self) -> None:
         raw = '[Tool call] execute_bash({"command":"pwd"})'

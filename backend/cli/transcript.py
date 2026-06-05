@@ -59,8 +59,14 @@ _INDENTATION_WARNINGS_RE = re.compile(
 )
 
 _PSEUDO_XML_FUNCTION_RE = re.compile(
-    r'\s*<function=[^>]+>.*?(?:</function>|\Z)',
-    re.DOTALL,
+    r'\s*<function(?:=[^>\s]+|\s+name\s*=\s*["\']?[^>"\']+["\']?)[^>]*>'
+    r'.*?(?:</function>|\Z)',
+    re.DOTALL | re.IGNORECASE,
+)
+
+_FUNCTION_CALLS_RE = re.compile(
+    r'\s*<function_calls\b[^>]*>.*?(?:</function_calls>|\Z)',
+    re.DOTALL | re.IGNORECASE,
 )
 
 
@@ -71,7 +77,8 @@ def strip_tool_result_validation_annotations(text: str) -> str:
 
 def strip_pseudo_xml_function_calls(text: str) -> str:
     """Remove raw pseudo-XML function calls from user-visible streaming text."""
-    return _PSEUDO_XML_FUNCTION_RE.sub('', text or '').strip()
+    stripped = _FUNCTION_CALLS_RE.sub('', text or '')
+    return _PSEUDO_XML_FUNCTION_RE.sub('', stripped).strip()
 
 
 def strip_indentation_warnings(text: str) -> str:

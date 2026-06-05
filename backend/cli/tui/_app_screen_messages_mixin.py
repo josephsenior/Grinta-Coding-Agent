@@ -11,12 +11,14 @@ from textual.widgets import (
     TextArea,
 )
 
+from backend.cli._event_renderer.text_utils import sanitize_visible_transcript_text
 from backend.cli.theme import (
     MARK_WARN,
     NAVY_BORDER,
     NAVY_ERROR,
     NAVY_READY,
     NAVY_TEXT_MUTED,
+    NAVY_TEXT_PRIMARY,
     NAVY_WAITING,
 )
 from backend.cli.tui._app_constants import _tui_logger
@@ -30,7 +32,6 @@ from backend.cli.tui._app_small_widgets import (
 from backend.cli.tui._app_welcome_widgets import (
     WelcomeWidget,
 )
-from backend.core.agent_protocol import CONTINUATION_NUDGE
 from backend.core.enums import AgentState
 
 
@@ -116,18 +117,14 @@ class _AppScreenMessagesMixin:
         self._write_log(Text.assemble(icon, body))
 
     def add_protocol_status(self, text: str) -> None:
-        """Render active-task prose as a muted status card, not a final answer."""
+        """Render active-task prose as dim inline text, not a final answer."""
         self.finalize_thinking()
-        result = Text()
-        result.append(Text('... Status\n', style=f'italic {NAVY_TEXT_MUTED}'))
-        body = _rich_text(text)
-        body.stylize(f'italic {NAVY_TEXT_MUTED}')
-        result.append_text(body)
-        result.append('\n')
-        nudge = _rich_text(CONTINUATION_NUDGE)
-        nudge.stylize(NAVY_TEXT_MUTED)
-        result.append_text(nudge)
-        self._write_log(result)
+        content = sanitize_visible_transcript_text(text)
+        if not content:
+            return
+        body = _rich_text(content)
+        body.stylize(f'dim {NAVY_TEXT_PRIMARY}')
+        self._write_log(body)
 
     def add_tool_start(self, tool_name: str, *, command: str = '') -> None:
         """Tool call — show in transcript."""

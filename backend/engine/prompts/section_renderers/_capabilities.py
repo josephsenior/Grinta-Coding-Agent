@@ -1,0 +1,143 @@
+"""System capabilities block: runtime-truth statements for the agent.
+
+This block exists so the agent can never lie about its own runtime behavior.
+Every bullet is derived from a live config flag or runtime check — do NOT
+add aspirational text here. If you change a default, this block updates
+automatically on the next prompt assembly.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+
+def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
+    r"""Return ``(lsp_line, dap_line)`` summarizing detected runtimes.
+
+    When ``enable_lsp_query`` / ``enable_debugger`` is false, returns ``''`` for that
+    line so the capability block omits the tool entirely (no \"DISABLED\" bullet).
+    """
+    lsp_enabled = bool(getattr(config, 'enable_lsp_query', True))
+    debugger_enabled = bool(getattr(config, 'enable_debugger', False))
+    try:
+        from backend.utils.runtime_detect import (
+            detection_summary,
+            has_any_debug_adapter,
+            has_any_lsp_server,
+        )
+
+        any_lsp = bool(has_any_lsp_server()) if lsp_enabled else False
+        any_dap = bool(has_any_debug_adapter()) if debugger_enabled else False
+        summary = (
+            detection_summary()
+            if (any_lsp or any_dap)
+            else {
+                'lsp_available': [],
+                'debug_available': [],
+            }
+        )
+    except Exception:
+        any_lsp = False
+        any_dap = False
+        summary = {'lsp_available': [], 'debug_available': []}
+
+    lsp_available = summary.get('lsp_available', []) if any_lsp else []
+    if not lsp_enabled:
+        lsp_line = ''
+    elif lsp_available:
+        lsp_line = (
+            '- **Language servers (LSP / `lsp`)**: detected on PATH → '
+            f'{", ".join(lsp_available)}. Use `lsp` for definition / '
+            'references / hover / diagnostics on these languages. '
+            'For file edits use the public file API tools; `lsp` is read-only. For file reads use `read`.'
+        )
+    else:
+        lsp_line = ''
+
+    if not debugger_enabled:
+        dap_line = ''
+    else:
+        debug_available = summary.get('debug_available', []) if any_dap else []
+        if debug_available:
+            dap_line = (
+                '- **Debug adapters (DAP / `debugger`)**: detected → '
+                f'{", ".join(debug_available)}. The `debugger` tool resolves the right '
+                'adapter automatically from the file extension or `adapter` field; do not '
+                'pass `adapter_command` unless you have a custom binary.'
+            )
+        else:
+            dap_line = ''
+    return lsp_line, dap_line
+
+
+def _render_system_capabilities(
+    config: Any,
+    *,
+    function_calling_mode: str | None,
+    parallel_tool_calls_provider_flag: bool,
+) -> str:
+    """Runtime-truth capability statement.
+
+    This block exists so the agent can never lie about its own runtime behavior.
+    Every bullet is derived from a live config flag or runtime check — do NOT
+    add aspirational text here. If you change a default, this block updates
+    automatically on the next prompt assembly.
+    """
+    parallel_enabled = bool(getattr(config, 'enable_parallel_tool_scheduling', False))
+    checkpoints_on = bool(getattr(config, 'enable_checkpoints', False))
+
+    parallel_line = (
+        (
+            '- **Parallel tool scheduling**: ENABLED for read-only batches '
+            '(`read`, `search_code`, `lsp`).\n'
+            '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
+            'Emit independent reads in a single assistant turn to run them concurrently.\n'
+            '  - **Constraint**: Only read-only observation tools may run concurrently. Mutating tools, file edits, shell commands, terminal sessions, task/memory updates, and finish/communicate actions are executed sequentially in model order.'
+        )
+        if parallel_enabled and parallel_tool_calls_provider_flag
+        else ''
+    )
+
+    condensation_line = (
+        '- **Conversation condensation**: AUTOMATIC and middleware-driven. '
+        'It costs ZERO tool calls and ZERO turns from your budget. '
+        'It uses a 3-tier memory model (working / episodic / semantic) and re-injects a pre-condensation '
+        'snapshot after pruning, so verified facts and the immediate task surface survive. '
+        'Do not describe condensation as "lossy" or as something you must invoke manually.'
+    )
+
+    checkpoint_line = (
+        '- **Checkpoints**: AVAILABLE for coarse-grained rollback of file/edit state. '
+        'Take one before risky multi-step edits when atomic batch tools are not a fit. '
+        '`checkpoint(command="view")` auto-detects modified files from workspace snapshots — no need to manually specify `files_modified`.'
+        if checkpoints_on
+        else ''
+    )
+
+    # Runtime-detected language servers / debug adapters — only when those tools
+    # are enabled in config (omit bullets entirely when gated off).
+    lsp_line, dap_line = _render_runtime_detection_lines(config)
+    detection_block = '\n'.join(line for line in (lsp_line, dap_line) if line)
+    runtime_discovery_hint = (
+        '\nIn particular, **never run shell commands like `Get-Command`/`which`/`where` '
+        'to discover language servers or debug adapters** — the bullets in this section '
+        'for those tools are the authoritative answer.'
+        if detection_block
+        else ''
+    )
+
+    parts = [
+        '# 🧠 System Capabilities (verified at runtime)\n'
+        'The following statements are derived from live config and feature flags. '
+        'Treat them as authoritative — do not contradict them in user-facing replies.'
+        f'{runtime_discovery_hint}\n\n'
+        f'{condensation_line}\n'
+    ]
+    if parallel_line:
+        parts.append(f'{parallel_line}\n')
+    if checkpoint_line:
+        parts.append(f'{checkpoint_line}\n')
+    if detection_block:
+        parts.append(detection_block)
+
+    return '\n'.join(parts)

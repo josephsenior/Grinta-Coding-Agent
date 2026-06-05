@@ -64,6 +64,101 @@ def strip_protocol_echo_blocks(text: str) -> str:
     )
 
 
+_BRACKET_TOOL_SENTINELS = frozenset(
+    {
+        '[TOOL_CALL]',
+        '[TOOL_CALLS]',
+        '[START_TOOL_CALL]',
+        '[START_TOOL_CALLS]',
+        '[BEGIN_TOOL_CALL]',
+        '[BEGIN_TOOL_CALLS]',
+        '[END_TOOL_CALL]',
+        '[END_TOOL_CALLS]',
+        '[/TOOL_CALL]',
+        '[/TOOL_CALLS]',
+    }
+)
+
+_MINIMAX_SPLIT_TOOL_TAG_RE = re.compile(
+    r'\]<?\]minimax\[>\[?<\s*(/?)\s*tool_call\b',
+    re.IGNORECASE,
+)
+
+_INVOKE_BLOCK_RE = re.compile(
+    r'<\s*invoke\s+name\s*=\s*["\']?([A-Za-z_][A-Za-z0-9_-]*)["\']?\s*>'
+    r'(.*?)(?:</\s*invoke\s*>|\Z)',
+    re.DOTALL | re.IGNORECASE,
+)
+
+_INVOKE_PARAMETER_RE = re.compile(
+    r'<\s*parameter(?:(?:\s*=\s*|\s+name\s*=\s*["\']?)'
+    r'([A-Za-z_][A-Za-z0-9_-]*)["\']?)?\s*>'
+    r'(.*?)</\s*parameter\s*>',
+    re.DOTALL | re.IGNORECASE,
+)
+
+_TOOL_TRANSPORT_MARKUP_RE = re.compile(
+    r'^\s*\[/?(?:tool_calls?|start_tool_calls?|begin_tool_calls?|end_tool_calls?)\]\s*$'
+    r'|^\s*\[EDIT_DIFF\]\b'
+    r'|\[Tool call\]'
+    r'|<\s*/?\s*(?:minimax:)?tool_call\b'
+    r'|<\s*invoke\s+name\s*='
+    r'|<\s*function(?:\s*=|\s+name\s*=)',
+    re.MULTILINE | re.IGNORECASE,
+)
+
+
+def _normalize_minimax_split_tool_markup(text: str) -> str:
+    """Normalize MiniMax split-stream wrappers into ordinary XML-like tags."""
+    if 'minimax' not in text.lower():
+        return text
+
+    def repl(match: re.Match[str]) -> str:
+        slash = '/' if match.group(1) else ''
+        return f'<{slash}minimax:tool_call'
+
+    return _MINIMAX_SPLIT_TOOL_TAG_RE.sub(repl, text)
+
+
+def contains_tool_transport_markup(text: str) -> bool:
+    """Return True when text contains raw model/tool transport markup."""
+    if not text:
+        return False
+    normalized = _normalize_minimax_split_tool_markup(text)
+    return bool(_TOOL_TRANSPORT_MARKUP_RE.search(normalized))
+
+
+def strip_bracket_tool_transport_blocks(text: str) -> str:
+    """Drop raw bracket-based tool transport from user-visible text."""
+    if not text or ('[' not in text and '<' not in text):
+        return text
+
+    kept: list[str] = []
+    dropping_edit_diff = False
+    for line in text.splitlines(keepends=True):
+        compact = line.strip()
+        upper = compact.upper()
+        if upper in _BRACKET_TOOL_SENTINELS:
+            continue
+        if upper.startswith('[EDIT_DIFF]'):
+            dropping_edit_diff = True
+            continue
+        if dropping_edit_diff:
+            if compact:
+                continue
+            dropping_edit_diff = False
+            continue
+        if upper in {
+            '<THINK>',
+            '</THINK>',
+            '<REDACTED_THINKING>',
+            '</REDACTED_THINKING>',
+        }:
+            continue
+        kept.append(line)
+    return ''.join(kept)
+
+
 def _balanced_json_object_end(s: str, open_curly: int) -> int | None:
     """Return index after the ``}`` that closes the object starting at *open_curly*."""
     depth = 0
@@ -144,7 +239,10 @@ def _scan_tool_call_close(text: str, end_json: int) -> int | None:
 
 def redact_streamed_tool_call_markers(text: str) -> str:
     """Remove ``[Tool call] name({...})`` spans from assistant-visible text."""
-    text = strip_protocol_echo_blocks(strip_tool_call_marker_lines(text))
+    text = _normalize_minimax_split_tool_markup(text)
+    text = strip_bracket_tool_transport_blocks(
+        strip_protocol_echo_blocks(strip_tool_call_marker_lines(text))
+    )
     text = _redact_xml_tool_call_blocks(text)
     if _TOOL_CALL_PREFIX not in text:
         return text
@@ -177,6 +275,7 @@ def redact_streamed_tool_call_markers(text: str) -> str:
 
 def extract_tool_calls_from_text_markers(text: str) -> list[dict[str, Any]]:
     """Extract structured tool-call dicts from text-encoded tool-call spans."""
+    text = _normalize_minimax_split_tool_markup(text)
     results = _extract_xml_tool_call_blocks(text)
     call_index = len(results)
 
@@ -377,6 +476,11 @@ def _xml_tool_call_to_dict(
                 }
 
     if not name:
+        invoke = _parse_invoke_body(body_text)
+        if invoke is not None:
+            name, arguments = invoke
+
+    if not name:
         return None
 
     if arguments is None:
@@ -392,6 +496,41 @@ def _xml_tool_call_to_dict(
         'type': 'function',
         'function': {'name': str(name), 'arguments': arguments_str},
     }
+
+
+def _parse_invoke_body(body_text: str) -> tuple[str, Any] | None:
+    invoke_m = _INVOKE_BLOCK_RE.search(body_text)
+    if invoke_m is None:
+        return None
+    name = invoke_m.group(1)
+    invoke_body = (invoke_m.group(2) or '').strip()
+    if not invoke_body:
+        return name, {}
+    if invoke_body.startswith('{'):
+        try:
+            payload = json.loads(invoke_body)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(payload, dict):
+            return name, payload
+        return None
+
+    params = {
+        str(match.group(1)): _trim_parameter_body(match.group(2))
+        for match in _INVOKE_PARAMETER_RE.finditer(invoke_body)
+        if match.group(1)
+    }
+    if params:
+        return name, params
+    return None
+
+
+def _trim_parameter_body(value: str) -> str:
+    if value.startswith('\n'):
+        value = value[1:]
+    if value.endswith('\n'):
+        value = value[:-1]
+    return value
 
 
 def redact_internal_result_markers(text: str) -> str:

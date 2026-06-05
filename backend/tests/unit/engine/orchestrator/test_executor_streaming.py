@@ -55,6 +55,50 @@ def _mark_checkpoint_stale(checkpoint) -> None:
     checkpoint._wal_path.write_text(json.dumps(raw), encoding='utf-8')
 
 
+def test_finalize_stream_tool_calls_filters_invalid_streamed_name() -> None:
+    from backend.engine._executor_types import _AsyncStreamingState
+    from backend.engine.executor import OrchestratorExecutor
+
+    executor = object.__new__(OrchestratorExecutor)
+    state = _AsyncStreamingState(content_accumulate='[END_TOOL_CALL]')
+    state.tool_calls_dict[0] = {
+        'id': 'bad',
+        'type': 'function',
+        'function': {
+            'name': 'Progress! <invoke name="execute_powershell',
+            'arguments': '{"command":"pwd"}',
+        },
+    }
+
+    assert executor._finalize_stream_tool_calls(state) is None
+
+
+def test_finalize_stream_tool_calls_recovers_text_marker_after_bad_streamed_name() -> None:
+    from backend.engine._executor_types import _AsyncStreamingState
+    from backend.engine.executor import OrchestratorExecutor
+
+    executor = object.__new__(OrchestratorExecutor)
+    state = _AsyncStreamingState(
+        content_accumulate=(
+            '[Tool call] execute_powershell({"command":"pwd","security_risk":"LOW"})'
+        )
+    )
+    state.tool_calls_dict[0] = {
+        'id': 'bad',
+        'type': 'function',
+        'function': {
+            'name': 'execute_powershell is not registered',
+            'arguments': '{}',
+        },
+    }
+
+    calls = executor._finalize_stream_tool_calls(state)
+
+    assert calls is not None
+    assert len(calls) == 1
+    assert calls[0]['function']['name'] == 'execute_powershell'
+
+
 def test_final_stream_event_with_tool_call_suppresses_draft_reply():
     from backend.engine.executor import OrchestratorExecutor
 

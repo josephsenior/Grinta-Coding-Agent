@@ -18,6 +18,7 @@ from backend.engine._executor_types import (
     _INLINE_OPEN_THINK_RE,
     _AsyncStreamingState,
 )
+from backend.inference.tool_types import is_valid_tool_call_name
 
 if TYPE_CHECKING:
     from backend.engine._executor_types import ModelResponse
@@ -514,7 +515,8 @@ class _ExecutorStreamingMixin:
         self,
         state: _AsyncStreamingState,
     ) -> list[dict[str, Any]] | None:
-        if not state.tool_calls_dict and state.content_accumulate:
+        tool_calls_list = self._valid_stream_tool_calls(state.tool_calls_dict)
+        if not tool_calls_list and state.content_accumulate:
             from backend.cli.tool_call_display import (
                 extract_tool_calls_from_text_markers,
             )
@@ -529,11 +531,29 @@ class _ExecutorStreamingMixin:
                 )
                 for index, tool_call in enumerate(text_tool_calls):
                     state.tool_calls_dict[index] = tool_call
+                tool_calls_list = self._valid_stream_tool_calls(
+                    state.tool_calls_dict
+                )
 
-        tool_calls_list = [
-            state.tool_calls_dict[idx] for idx in sorted(state.tool_calls_dict.keys())
-        ]
         return tool_calls_list or None
+
+    @staticmethod
+    def _valid_stream_tool_calls(
+        tool_calls_dict: dict[int, dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        tool_calls: list[dict[str, Any]] = []
+        for idx in sorted(tool_calls_dict.keys()):
+            tool_call = tool_calls_dict[idx]
+            function = tool_call.get('function') or {}
+            name = function.get('name') if isinstance(function, dict) else ''
+            if is_valid_tool_call_name(name):
+                tool_calls.append(tool_call)
+                continue
+            logger.warning(
+                'Ignoring malformed streamed tool call with invalid function name: %r',
+                name,
+            )
+        return tool_calls
 
     async def _handle_first_chunk_timeout_fallback(
         self,
@@ -638,6 +658,9 @@ class _ExecutorStreamingMixin:
             self._merge_stream_fragment(current_args, raw_args)
         )
         if event_stream:
+            display_name = state.tool_calls_dict[idx]['function']['name']
+            if not is_valid_tool_call_name(display_name):
+                display_name = 'tool'
             logger.debug(
                 'DEBUG: Emitting tool argument chunk of len %d',
                 len(raw_args),
@@ -647,7 +670,7 @@ class _ExecutorStreamingMixin:
                 accumulated=state.tool_calls_dict[idx]['function']['arguments'],
                 is_final=False,
                 is_tool_call=True,
-                tool_call_name=state.tool_calls_dict[idx]['function']['name'],
+                tool_call_name=display_name,
             )
             ev.source = EventSource.AGENT
             event_stream.add_event(ev, EventSource.AGENT)

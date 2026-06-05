@@ -14,6 +14,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from backend.core.agent_protocol import (
+    is_protocol_mode,
     mark_tracker_created,
     reset_terminal_cycle,
     tracker_created,
@@ -197,12 +198,12 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
         config = getattr(agent, 'config', None)
         mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
 
-        if mode == 'agent' and tracker_created(self._ctrl.state):
+        if is_protocol_mode(mode) and tracker_created(self._ctrl.state):
             await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
             return
 
         if isinstance(action, InformAction):
-            # Non-blocking outside committed Agent-mode task runs.
+            # Non-blocking outside committed Agent/Plan task runs.
             self._ctrl.log(
                 'debug',
                 'Meta-cognition inform action (non-blocking).',

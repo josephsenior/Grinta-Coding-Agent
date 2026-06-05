@@ -84,6 +84,12 @@ class TestBuildFallbackAction:
         with pytest.raises(LLMNoActionError):
             _build_fallback_action(orch, result)
 
+    def test_marker_only_content_raises_llm_no_action_error(self) -> None:
+        """Internal tool-call transport residue must not become visible prose."""
+        orch = _make_orchestrator()
+        with pytest.raises(LLMNoActionError):
+            _build_fallback_action(orch, _make_result('[END_TOOL_CALL]'))
+
     @pytest.mark.parametrize(
         'text',
         [
@@ -144,6 +150,35 @@ class TestBuildFallbackAction:
         assert isinstance(action, MessageAction)
         assert action.content == 'plain answer'
         assert action.wait_for_response is True
+
+    def test_plan_mode_fallback_with_active_tracker_returns_status(self) -> None:
+        orch = _make_orchestrator()
+        orch.config = SimpleNamespace(mode='plan')
+        orch.executor = SimpleNamespace(
+            _active_run_mode='plan',
+            _state=_state_with_tasks('in_progress'),
+            _consecutive_plain_text_blocks=0,
+        )
+
+        action = _build_fallback_action(orch, _make_result('Drafting the plan.'))
+
+        assert isinstance(action, MessageAction)
+        assert action.protocol_status is True
+        assert action.wait_for_response is False
+
+    def test_plan_mode_fallback_terminal_tracker_synthesizes_plan_finish(self) -> None:
+        orch = _make_orchestrator()
+        orch.config = SimpleNamespace(mode='plan')
+        orch.executor = SimpleNamespace(
+            _active_run_mode='plan',
+            _state=_state_with_tasks('done'),
+        )
+
+        action = _build_fallback_action(orch, _make_result('Plan is complete.'))
+
+        assert isinstance(action, PlaybookFinishAction)
+        assert action.outputs['mode'] == 'plan'
+        assert action.outputs['summary'] == 'Plan is complete.'
 
 
 class TestPlainTextProtocolGate:
@@ -215,3 +250,30 @@ class TestPlainTextProtocolGate:
         )
 
         assert result == [action]
+
+    def test_plan_mode_with_active_tracker_converts_plain_text_to_status(self):
+        executor = self._make_executor('plan', active_tasks=True)
+        executor._state = _state_with_tasks('in_progress')
+        action = MessageAction(content='plan status')
+
+        result = executor._gate_agent_mode_plain_text(
+            [action], _make_result('plain').response
+        )
+
+        assert result == [action]
+        assert action.protocol_status is True
+        assert action.wait_for_response is False
+
+    def test_plan_mode_terminal_tracker_plain_text_synthesizes_plan_finish(self):
+        executor = self._make_executor('plan', active_tasks=True)
+        executor._state = _state_with_tasks('done')
+        action = MessageAction(content='plan summary')
+
+        result = executor._gate_agent_mode_plain_text(
+            [action], _make_result('plain').response
+        )
+
+        assert len(result) == 1
+        assert isinstance(result[0], PlaybookFinishAction)
+        assert result[0].outputs['mode'] == 'plan'
+        assert result[0].outputs['summary'] == 'plan summary'
