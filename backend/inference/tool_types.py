@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from typing import Any, NotRequired, TypedDict
 
-
 _TOOL_CALL_NAME_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_-]*$')
 
 
