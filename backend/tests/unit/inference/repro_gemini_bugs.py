@@ -5,7 +5,7 @@ from backend.inference.direct_clients import GeminiClient
 
 def test_gemini_client_concatenates_system_messages():
     # Patch genai.Client to prevent any real SDK operations
-    with patch('backend.inference._direct_clients_gemini.genai.Client') as mock_client_class:
+    with patch('backend.inference.direct_clients_gemini_ops.genai.Client') as mock_client_class:
         mock_instance = mock_client_class.return_value
         mock_chats = MagicMock()
         mock_instance.chats = mock_chats
@@ -30,7 +30,7 @@ def test_gemini_client_concatenates_system_messages():
 
 
 def test_gemini_client_maps_tools_correctly():
-    with patch('backend.inference._direct_clients_gemini.genai.Client') as mock_client_class:
+    with patch('backend.inference.direct_clients_gemini_ops.genai.Client') as mock_client_class:
         mock_instance = mock_client_class.return_value
         mock_chats = MagicMock()
         mock_instance.chats = mock_chats
@@ -72,7 +72,7 @@ def test_gemini_client_maps_tools_correctly():
 
 
 def test_gemini_client_sanitizes_kwargs():
-    with patch('backend.inference._direct_clients_gemini.genai.Client') as mock_client_class:
+    with patch('backend.inference.direct_clients_gemini_ops.genai.Client') as mock_client_class:
         mock_instance = mock_client_class.return_value
         mock_chats = MagicMock()
         mock_instance.chats = mock_chats
@@ -109,7 +109,7 @@ def test_gemini_client_sanitizes_kwargs():
 
 
 def test_gemini_client_ignores_trailing_assistant_message_when_building_prompt():
-    with patch('backend.inference._direct_clients_gemini.genai.Client') as mock_client_class:
+    with patch('backend.inference.direct_clients_gemini_ops.genai.Client') as mock_client_class:
         mock_instance = mock_client_class.return_value
         mock_chats = MagicMock()
         mock_instance.chats = mock_chats

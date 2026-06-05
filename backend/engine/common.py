@@ -600,7 +600,7 @@ def _extract_xml_tool_calls_from_content(
     if not content_text or '<function' not in content_text:
         return []
 
-    from backend.inference.fn_call_converter import (
+    from backend.inference.fn_call import (
         _FN_CLOSE_RE,
         _FN_OPEN_RE,
         _iter_parameter_matches,

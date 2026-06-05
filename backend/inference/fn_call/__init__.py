@@ -1,23 +1,24 @@
-"""Slim main file for fn_call_converter.
+"""Tool-call <-> message conversion utilities (fn-call format).
 
-This file re-exports the public API that other modules and tests import.
-The actual implementation is split across 3 dedicated modules:
+Public API re-exports — implementation is split across:
 
-  - backend.inference._fn_call_examples: telemetry, example building,
-    ExampleStepBuilder class, retry-guard helpers, regex constants.
-  - backend.inference._fn_call_convert: tool call conversion (XML/JSON
-    formatting, validation, parsing) and tool descriptions.
-  - backend.inference._fn_call_to_messages: fncall<->non-fncall message
-    conversion routines.
+- :mod:`backend.inference.fn_call._fn_call_examples`: telemetry, example
+  building, ``ExampleStepBuilder`` class, retry-guard helpers, regex constants.
+- :mod:`backend.inference.fn_call._fn_call_convert`: tool call conversion
+  (XML/JSON formatting, validation, parsing) and tool descriptions.
+- :mod:`backend.inference.fn_call._fn_call_to_messages`: fncall <-> non-fncall
+  message conversion routines.
 
 The split was a pure code motion — bytes of logic stay identical to the
-pre-split `fn_call_converter.py`. All public symbols remain importable
-from this module.
+pre-split ``fn_call_converter.py``. All public symbols remain importable from
+this package (and from the historical ``backend.inference.fn_call_converter``
+import path is no longer supported; update callers to import from
+``backend.inference.fn_call``).
 """
 
 from __future__ import annotations
 
-from backend.inference._fn_call_convert import (  # noqa: F401
+from backend.inference.fn_call._fn_call_convert import (  # noqa: F401
     _add_example_to_list_content,
     _add_in_context_learning_example,
     _format_parameter,
@@ -29,7 +30,7 @@ from backend.inference._fn_call_convert import (  # noqa: F401
     convert_tool_call_to_string,
     convert_tools_to_description,
 )
-from backend.inference._fn_call_examples import (  # noqa: F401
+from backend.inference.fn_call._fn_call_examples import (  # noqa: F401
     _FN_CALL_PARSE_COUNTER_KEYS,
     _MALFORMED_PAYLOAD_REJECTION,
     _RETRY_GUARD,
@@ -60,7 +61,7 @@ from backend.inference._fn_call_examples import (  # noqa: F401
     get_fn_call_parse_telemetry_counters,
     reset_fn_call_parse_telemetry_counters,
 )
-from backend.inference._fn_call_to_messages import (  # noqa: F401
+from backend.inference.fn_call._fn_call_to_messages import (  # noqa: F401
     _FN_CLOSE_RE,
     _FN_OPEN_RE,
     _PARAM_BLOCK_RE,

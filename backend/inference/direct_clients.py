@@ -810,7 +810,7 @@ def get_direct_client(
             provider_name='anthropic',
         )
 
-    from backend.inference._direct_clients_gemini import GeminiClient  # noqa: I001, PLC0415
+    from backend.inference.direct_clients_gemini_ops import GeminiClient  # noqa: I001, PLC0415
 
     if provider == 'google':
         return GeminiClient(model_name=stripped_model, api_key=api_key, timeout=timeout)
@@ -845,11 +845,11 @@ def __getattr__(name: str):
     """Lazy module-level attribute access (PEP 562).
 
     Used to expose GeminiClient without creating an import cycle with
-    backend.inference._direct_clients_gemini (which imports
+    backend.inference.direct_clients_gemini_ops (which imports
     DirectLLMClient from us).
     """
     if name == 'GeminiClient':
-        from backend.inference._direct_clients_gemini import GeminiClient
+        from backend.inference.direct_clients_gemini_ops import GeminiClient
 
         return GeminiClient
     raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

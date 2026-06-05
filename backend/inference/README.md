@@ -770,7 +770,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 | `debug_mixin.py` | Debug logging |
 | `metrics.py` | Cost and latency tracking |
 | `model_features.py` | Feature detection |
-| `fn_call_converter.py` | Mock function calling fallback |
+| `fn_call_converter.py` | Mock function calling fallback (split into `fn_call/` package; the entry point is `backend.inference.fn_call`) |
 | `bedrock.py` | AWS Bedrock support |
 | `llm_utils.py` | Utility functions |
 | `llm_registry.py` | Model registry |

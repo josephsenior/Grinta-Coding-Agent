@@ -1,4 +1,4 @@
-"""Tests for backend.inference.fn_call_converter — core conversion utilities."""
+"""Tests for backend.inference.fn_call — core conversion utilities."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from backend.core.errors import (
     FunctionCallConversionError,
     FunctionCallValidationError,
 )
-from backend.inference.fn_call_converter import (
+from backend.inference.fn_call import (
     STOP_WORDS,
     ExampleStepBuilder,
     _convert_parameter_value,

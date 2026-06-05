@@ -458,7 +458,7 @@ class OrchestratorPlanner:
         messages: list, xml_tools: list[ChatCompletionToolParam]
     ) -> list:
         """Append generic text fallback tool descriptions for non-native models."""
-        from backend.inference.fn_call_converter import (
+        from backend.inference.fn_call import (
             convert_tools_to_description,
         )
 

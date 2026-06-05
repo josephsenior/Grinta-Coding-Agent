@@ -139,12 +139,12 @@ class TestGetDirectClientRouting:
         client = get_direct_client('claude-sonnet-4-20250514', api_key='key')
         assert type(client).__name__ == 'AnthropicClient'
 
-    @patch('backend.inference._direct_clients_gemini.genai')
+    @patch('backend.inference.direct_clients_gemini_ops.genai')
     def test_gemini_alias_prefix_rejected(self, _genai):
         with pytest.raises(ValueError):
             get_direct_client('gemini/gemini-2.5-flash', api_key='key')
 
-    @patch('backend.inference._direct_clients_gemini.genai')
+    @patch('backend.inference.direct_clients_gemini_ops.genai')
     def test_google_routing(self, _genai):
         client = get_direct_client('google/gemini-1.5-pro', api_key='key')
         assert type(client).__name__ == 'GeminiClient'

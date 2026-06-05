@@ -56,7 +56,7 @@ def _mark_checkpoint_stale(checkpoint) -> None:
 
 
 def test_finalize_stream_tool_calls_filters_invalid_streamed_name() -> None:
-    from backend.engine._executor_types import _AsyncStreamingState
+    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
     from backend.engine.executor import OrchestratorExecutor
 
     executor = object.__new__(OrchestratorExecutor)
@@ -74,7 +74,7 @@ def test_finalize_stream_tool_calls_filters_invalid_streamed_name() -> None:
 
 
 def test_finalize_stream_tool_calls_recovers_text_marker_after_bad_streamed_name() -> None:
-    from backend.engine._executor_types import _AsyncStreamingState
+    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
     from backend.engine.executor import OrchestratorExecutor
 
     executor = object.__new__(OrchestratorExecutor)
@@ -1363,7 +1363,7 @@ def test_response_to_actions_converts_common_tool_call_validation_error_to_recov
 
 def test_fallback_completion_inline_thinking_parsing():
     """Verify that fallback completions containing inline thinking tags are parsed correctly."""
-    from backend.engine._executor_types import _AsyncStreamingState
+    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
     from backend.engine.executor import OrchestratorExecutor
 
     executor = OrchestratorExecutor(

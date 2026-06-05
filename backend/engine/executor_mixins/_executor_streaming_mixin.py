@@ -13,7 +13,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
-from backend.engine._executor_types import (
+from backend.engine.executor_mixins._executor_types import (
     _INLINE_CLOSE_THINK_RE,
     _INLINE_OPEN_THINK_RE,
     _AsyncStreamingState,
@@ -21,7 +21,7 @@ from backend.engine._executor_types import (
 from backend.inference.tool_types import is_valid_tool_call_name
 
 if TYPE_CHECKING:
-    from backend.engine._executor_types import ModelResponse
+    from backend.engine.executor_mixins._executor_types import ModelResponse
     from backend.ledger.stream import EventStream
 
 

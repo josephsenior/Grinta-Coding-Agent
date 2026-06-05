@@ -19,10 +19,14 @@ if TYPE_CHECKING:
     from .planner import OrchestratorPlanner
     from .safety import OrchestratorSafetyManager
 
-from backend.engine._executor_lifecycle_mixin import _ExecutorLifecycleMixin
-from backend.engine._executor_response_mixin import _ExecutorResponseMixin
-from backend.engine._executor_streaming_mixin import _ExecutorStreamingMixin
-from backend.engine._executor_types import (  # noqa: F401
+from backend.engine.executor_mixins._executor_lifecycle_mixin import (
+    _ExecutorLifecycleMixin,
+)
+from backend.engine.executor_mixins._executor_response_mixin import _ExecutorResponseMixin
+from backend.engine.executor_mixins._executor_streaming_mixin import (
+    _ExecutorStreamingMixin,
+)
+from backend.engine.executor_mixins._executor_types import (  # noqa: F401
     ExecutionResult,
     _AsyncStreamingState,
 )
@@ -288,7 +292,7 @@ class OrchestratorExecutor(
 # ExecutionResult and _AsyncStreamingState are imported at the top because the
 # core method bodies use them at runtime; the rest are re-exported here.
 # ---------------------------------------------------------------------------
-from backend.engine._executor_types import (  # noqa: E402
+from backend.engine.executor_mixins._executor_types import (  # noqa: E402
     _INLINE_CLOSE_THINK_RE,  # noqa: F401
     _INLINE_OPEN_THINK_RE,  # noqa: F401
     _MAX_CHECKPOINT_CACHE_SIZE,  # noqa: F401

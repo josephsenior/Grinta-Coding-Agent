@@ -17,12 +17,12 @@ from backend.core.errors import (
     FunctionCallConversionError,
     FunctionCallValidationError,
 )
-from backend.inference._fn_call_convert import (  # noqa: F401
+from backend.inference.fn_call._fn_call_convert import (  # noqa: F401
     _process_system_message,
     _process_user_message,
     convert_tools_to_description,
 )
-from backend.inference._fn_call_examples import (  # noqa: F401
+from backend.inference.fn_call._fn_call_examples import (  # noqa: F401
     _MALFORMED_PAYLOAD_REJECTION,
     _STRICT_PARSE_FAILURE,
     _STRICT_PARSE_SUCCESS,
