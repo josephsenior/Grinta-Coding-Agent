@@ -141,6 +141,21 @@ class ObservationService:
 
         # Plugin hook: action_post
         assert pending_action is not None  # _matches_pending_action requires this
+        try:
+            from backend.orchestration.file_edit_transaction import (
+                get_file_edit_transaction_coordinator,
+            )
+
+            observation = get_file_edit_transaction_coordinator(
+                controller
+            ).after_observation(pending_action, observation)
+        except Exception:
+            controller.log(
+                'warning',
+                'File edit transaction observation handling failed; continuing with original observation.',
+                extra={'msg_type': 'FILE_EDIT_TRANSACTION_OBSERVE_FAILED'},
+            )
+
         observation = await self._dispatch_action_post_hook(pending_action, observation)
 
         if controller.state.agent_state == AgentState.AWAITING_USER_CONFIRMATION:

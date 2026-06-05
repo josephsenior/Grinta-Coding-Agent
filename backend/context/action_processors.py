@@ -462,6 +462,8 @@ def _handle_message_action(
     action: MessageAction, vision_is_active: bool
 ) -> list[Message]:
     """Handle MessageAction with optional file paths and image content."""
+    if bool(getattr(action, 'transcript_only', False)):
+        return []
     role = _message_role_from_source(getattr(action, 'source', None))
     content = _build_message_content(
         action,

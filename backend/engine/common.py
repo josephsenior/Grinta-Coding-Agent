@@ -379,16 +379,21 @@ def common_response_to_actions(
     actions: list[Action] = []
 
     text_content = _coerce_visible_message_content_text(content)
-    if text_content.strip() and not all_tool_calls:
+    if text_content.strip():
         from backend.ledger.action import MessageAction
 
-        cot = extract_redacted_thinking_inner(_raw_message_content_text(content)).strip()
+        cot = ''
+        if not all_tool_calls:
+            cot = extract_redacted_thinking_inner(
+                _raw_message_content_text(content)
+            ).strip()
         actions.append(
             MessageAction(
                 content=text_content,
                 thought=cot,
-                wait_for_response=bool(text_content.strip()),
+                wait_for_response=not all_tool_calls,
                 suppress_cli=False,
+                transcript_only=bool(all_tool_calls),
             )
         )
 

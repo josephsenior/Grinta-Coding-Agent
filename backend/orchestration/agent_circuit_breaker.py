@@ -23,8 +23,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_MAX_ERROR_RATE,
     DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS,
     DEFAULT_AGENT_MAX_STUCK_DETECTIONS,
-    DEFAULT_TEXT_EDITOR_HARD_PAUSE,
-    DEFAULT_TEXT_EDITOR_HARD_SWITCH,
     DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE,
     DEFAULT_TEXT_EDITOR_SYNTAX_SWITCH,
 )
@@ -198,31 +196,6 @@ class CircuitBreaker:
             system_message=recommendation,
         )
 
-    def _trip_if_file_edit_hard(
-        self, str_replace_hard: int
-    ) -> CircuitBreakerResult | None:
-        if str_replace_hard < DEFAULT_TEXT_EDITOR_HARD_SWITCH:
-            return None
-        recommendation = (
-            'Repeated deterministic file edit failures detected. '
-            'Refresh file context with read_file before reattempting. '
-            'If this persists, switch to a different edit strategy.'
-        )
-        if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE:
-            recommendation = (
-                recommendation
-                + ' file edit retries are now blocked until strategy changes.'
-            )
-        return CircuitBreakerResult(
-            tripped=True,
-            reason=(f'Repeated file edit deterministic failures ({str_replace_hard})'),
-            action='pause'
-            if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE
-            else 'switch_context',
-            recommendation=recommendation,
-            system_message=recommendation,
-        )
-
     def check(self, state: State | None = None) -> CircuitBreakerResult:
         """Check if circuit breaker should trip.
 
@@ -263,8 +236,9 @@ class CircuitBreaker:
                 ),
             )
 
-        # 2.5 Deterministic same-tool failures (file-edit taxonomy)
-        str_replace_hard = self.get_tool_error_count(FILE_EDIT_BUCKET)
+        # 2.5 File-edit syntax failures. Match/path/stale-context errors are
+        # returned directly by the edit tools; adding a second circuit-breaker
+        # warning here caused noisy false positives during multi-edit retries.
         str_replace_syntax = self.get_tool_error_count(FILE_EDIT_SYNTAX_BUCKET)
 
         # Syntax rejects: much higher budget than match-not-found / path /
@@ -276,9 +250,6 @@ class CircuitBreaker:
         # that are generous enough to let the agent iterate on a genuinely
         # hard file rather than trigger a pause on minor churn.
         if trip := self._trip_if_file_edit_syntax(str_replace_syntax):
-            return trip
-
-        if trip := self._trip_if_file_edit_hard(str_replace_hard):
             return trip
 
         # 3. Stuck detections

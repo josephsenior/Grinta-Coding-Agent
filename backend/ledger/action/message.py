@@ -21,6 +21,7 @@ class MessageAction(Action):
         file_urls: URLs of attached files
         image_urls: URLs of attached images
         wait_for_response: Whether to wait for user response
+        transcript_only: Whether to keep this message in the transcript only
 
     """
 
@@ -30,6 +31,7 @@ class MessageAction(Action):
     image_urls: list[str] | None = None
     wait_for_response: bool = False
     suppress_cli: bool = False
+    transcript_only: bool = False
     protocol_status: bool = False
     protocol_abandoned: bool = False
     action: ClassVar[str] = ActionType.MESSAGE
