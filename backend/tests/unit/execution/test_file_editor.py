@@ -434,10 +434,29 @@ class TestFileEditorReplaceString:
         # Error message should always tell the model to re-read the file.
         assert 'Re-read the file' in (result.error or '')
 
+    def test_replace_string_rejects_stale_expected_file_hash(self):
+        path = self._write('doc.md', 'alpha\n')
+        stale_hash = self.editor._sha256_text('alpha\n')
+        path.write_text('alpha\nbeta\n', encoding='utf-8')
+
+        result = self.editor(
+            command='replace_string',
+            path='doc.md',
+            old_string='beta\n',
+            new_str='BETA\n',
+            expected_file_hash=stale_hash,
+        )
+
+        assert result.error is not None
+        assert result.error_code == 'FILE_UNEXPECTEDLY_MODIFIED'
+        assert 'Re-read and retry' in result.error
+        assert path.read_text(encoding='utf-8') == 'alpha\nbeta\n'
+
     def test_old_string_not_found_hints_recent_write_on_same_path(self):
         """A second ``replace_string`` on the same path within the same
         session should get the more specific "stale working copy" hint,
-        because the first edit just changed the file."""
+        because the first edit just changed the file.
+        """
         path = self._write('node.py', 'def foo():\n    return 1\n')
 
         first = self.editor(

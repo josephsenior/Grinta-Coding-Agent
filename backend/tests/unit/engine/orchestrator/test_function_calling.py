@@ -105,7 +105,19 @@ class TestCombineThought:
 
 
 class TestResponseToActions:
-    def test_native_tool_call_with_content_does_not_emit_duplicate_message(self):
+    def test_plain_text_without_tool_calls_persists_message(self):
+        response = _model_response(content='Here is the status update.')
+
+        actions = response_to_actions(response)
+
+        assert len(actions) == 1
+        assert isinstance(actions[0], MessageAction)
+        assert actions[0].content == 'Here is the status update.'
+        assert actions[0].wait_for_response is True
+        assert actions[0].suppress_cli is False
+        assert actions[0].transcript_only is False
+
+    def test_native_tool_call_with_content_persists_transcript_message(self):
         tool_name = create_cmd_run_tool()['function']['name']
         response = _model_response(
             content='I will run the check.\n[END_TOOL_CALL]',
@@ -119,9 +131,12 @@ class TestResponseToActions:
 
         actions = response_to_actions(response)
 
-        assert len(actions) == 1
-        assert isinstance(actions[0], CmdRunAction)
-        assert not any(isinstance(action, MessageAction) for action in actions)
+        assert len(actions) == 2
+        assert isinstance(actions[0], MessageAction)
+        assert actions[0].content == 'I will run the check.'
+        assert actions[0].wait_for_response is False
+        assert actions[0].transcript_only is True
+        assert isinstance(actions[1], CmdRunAction)
 
 
 # ---------------------------------------------------------------------------

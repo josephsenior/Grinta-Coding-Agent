@@ -145,7 +145,6 @@ class _ExecutorResponseMixin:
         for action in actions:
             if isinstance(action, _MessageAction):
                 action.wait_for_response = False
-                action.suppress_cli = True
         return actions
 
     def _handle_agent_plain_text_only(

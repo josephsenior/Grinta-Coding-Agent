@@ -228,6 +228,20 @@ class TestPlainTextProtocolGate:
         assert action.wait_for_response is False
         assert executor._consecutive_plain_text_blocks == 1
 
+    def test_agent_mode_mixed_actions_keep_message_visible(self):
+        executor = self._make_executor('agent', active_tasks=True)
+        executor._state = _state_with_tasks('in_progress')
+        text = MessageAction(content='I will run the check.', transcript_only=True)
+        tool = MagicMock(spec=Action)
+
+        result = executor._gate_agent_mode_plain_text(
+            [text, tool], _make_result('mixed').response
+        )
+
+        assert result == [text, tool]
+        assert text.wait_for_response is False
+        assert text.suppress_cli is False
+
     def test_agent_mode_terminal_tracker_plain_text_synthesizes_finish(self):
         executor = self._make_executor('agent', active_tasks=True)
         executor._state = _state_with_tasks('done')

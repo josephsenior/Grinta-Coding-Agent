@@ -113,22 +113,16 @@ class StepGuardService:
         limit: int,
     ) -> None:
         reason = str(getattr(result, 'reason', 'unknown') or 'unknown')
-        action = str(getattr(result, 'action', 'pause') or 'pause').upper()
-        recommendation = str(getattr(result, 'recommendation', '') or '')
         content = (
-            'CIRCUIT BREAKER WARNING\n\n'
-            f'Reason: {reason}\n'
-            f'Action if escalated: {action}\n'
-            f'Recommendation: {recommendation}\n'
-            'You must change strategy now.\n'
-            f'Warning attempt: {warning_count}/{limit}'
+            f'CIRCUIT_BREAKER_WARNING: {reason}. '
+            f'Try a different approach. ({warning_count}/{limit})'
         )
         GuardBus.emit(
             controller,
             CIRCUIT_WARNING,
             'CIRCUIT_BREAKER_WARNING',
             content,
-            'CIRCUIT WARNING: change strategy immediately; avoid repeating failed pattern; produce one concrete progress action next.',
+            f'CIRCUIT WARNING: {reason}; choose one concrete next action.',
             cause=_pending_action_for_observation_cause(controller),
             cause_context='step_guard.circuit_warning',
         )

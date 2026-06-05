@@ -662,7 +662,7 @@ class TestFileEditTaxonomy:
         assert result.tripped is True
         assert result.action == 'pause'
 
-    def test_hard_bucket_trips_unchanged(self):
+    def test_hard_bucket_does_not_trip_warning(self):
         config = CircuitBreakerConfig(
             max_consecutive_errors=100,
             max_high_risk_actions=100,
@@ -673,8 +673,7 @@ class TestFileEditTaxonomy:
         assert breaker.check(MagicMock()).tripped is False
         breaker.record_error(RuntimeError('no match'), tool_name=FILE_EDIT_BUCKET)
         result = breaker.check(MagicMock())
-        assert result.tripped is True
-        assert result.action == 'switch_context'
+        assert result.tripped is False
 
     def test_record_success_clears_both_str_replace_buckets(self):
         config = CircuitBreakerConfig()

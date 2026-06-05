@@ -231,6 +231,7 @@ class FileEditor(
                     self._extract_content(MISSING, new_str),
                     replace_all=replace_all,
                     dry_run=dry_run,
+                    expected_file_hash=expected_file_hash,
                 )
             if command in (
                 'edit',

@@ -126,6 +126,19 @@ class ActionService:
 
         self._prepare_metrics_for_action(action)
 
+        try:
+            from backend.orchestration.file_edit_transaction import (
+                get_file_edit_transaction_coordinator,
+            )
+
+            get_file_edit_transaction_coordinator(controller).before_action(action)
+        except Exception:
+            controller.log(
+                'warning',
+                'File edit transaction preflight failed; continuing without transaction guard.',
+                extra={'msg_type': 'FILE_EDIT_TRANSACTION_PRECHECK_FAILED'},
+            )
+
         # Lifecycle state for agent message handoffs is decided by the router
         # after protocol validation.
         await _set_waiting_message_state_if_needed(controller, action)

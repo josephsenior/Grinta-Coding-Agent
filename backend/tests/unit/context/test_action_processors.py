@@ -79,6 +79,12 @@ class TestHandleMessageAction:
         msgs = _handle_message_action(action, vision_is_active=False)
         assert msgs[0].role == 'assistant'
 
+    def test_transcript_only_message_is_not_sent_to_model(self):
+        action = MessageAction(content='shown in transcript', transcript_only=True)
+        action._source = EventSource.AGENT
+        msgs = _handle_message_action(action, vision_is_active=False)
+        assert msgs == []
+
     def test_with_images_user(self):
         action = MessageAction(content='look', image_urls=['http://img.png'])
         action._source = EventSource.USER
