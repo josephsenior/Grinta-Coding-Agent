@@ -12,10 +12,12 @@ from textual.widgets import (
 )
 
 from backend.cli.theme import (
+    MARK_WARN,
     NAVY_BORDER,
     NAVY_ERROR,
     NAVY_READY,
     NAVY_TEXT_MUTED,
+    NAVY_WAITING,
 )
 from backend.cli.tui._app_constants import _tui_logger
 from backend.cli.tui._app_helpers import (
@@ -28,6 +30,7 @@ from backend.cli.tui._app_small_widgets import (
 from backend.cli.tui._app_welcome_widgets import (
     WelcomeWidget,
 )
+from backend.core.agent_protocol import CONTINUATION_NUDGE
 from backend.core.enums import AgentState
 
 
@@ -90,17 +93,20 @@ class _AppScreenMessagesMixin:
         self._write_log(body)
 
     def add_error(self, text: str) -> None:
-        import textwrap
-
-        wrapped = textwrap.fill(text, width=80)
-        lines = wrapped.split('\n')
         result = Text()
-        for i, line in enumerate(lines):
-            if i > 0:
-                result.append('\n   ')
-            if i == 0:
-                result.append(Text('✗ ', style=f'bold {NAVY_ERROR}'))
-            result.append(Text(line, style=f'bold {NAVY_ERROR}'))
+        result.append(Text('✗ ', style=f'bold {NAVY_ERROR}'))
+        body = _rich_text(text)
+        body.stylize(f'bold {NAVY_ERROR}')
+        result.append_text(body)
+        self._write_log(result)
+
+    def add_warning(self, text: str) -> None:
+        """Recoverable issue — softer than ``add_error`` (yellow ⚠, wraps to width)."""
+        result = Text()
+        result.append(Text(f'{MARK_WARN} ', style=f'bold {NAVY_WAITING}'))
+        body = _rich_text(text)
+        body.stylize(NAVY_WAITING)
+        result.append_text(body)
         self._write_log(result)
 
     def add_success(self, text: str) -> None:
@@ -108,6 +114,20 @@ class _AppScreenMessagesMixin:
         body = _rich_text(text)
         body.stylize(f'bold {NAVY_READY}')
         self._write_log(Text.assemble(icon, body))
+
+    def add_protocol_status(self, text: str) -> None:
+        """Render active-task prose as a muted status card, not a final answer."""
+        self.finalize_thinking()
+        result = Text()
+        result.append(Text('... Status\n', style=f'italic {NAVY_TEXT_MUTED}'))
+        body = _rich_text(text)
+        body.stylize(f'italic {NAVY_TEXT_MUTED}')
+        result.append_text(body)
+        result.append('\n')
+        nudge = _rich_text(CONTINUATION_NUDGE)
+        nudge.stylize(NAVY_TEXT_MUTED)
+        result.append_text(nudge)
+        self._write_log(result)
 
     def add_tool_start(self, tool_name: str, *, command: str = '') -> None:
         """Tool call — show in transcript."""

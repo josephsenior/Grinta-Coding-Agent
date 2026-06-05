@@ -11,7 +11,7 @@ import pytest
 from backend.core.errors import LLMNoActionError
 from backend.engine.executor import OrchestratorExecutor
 from backend.engine.orchestrator import Orchestrator
-from backend.ledger.action import Action, MessageAction
+from backend.ledger.action import Action, MessageAction, PlaybookFinishAction
 
 
 def _make_result(content: str) -> SimpleNamespace:
@@ -38,6 +38,23 @@ def _make_orchestrator() -> Orchestrator:
     orch.pending_actions = deque()
     orch.deferred_actions = deque()
     return orch
+
+
+def _state_with_tasks(*statuses: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        extra_data={'__agent_protocol_tracker_created': True},
+        plan=SimpleNamespace(
+            steps=[
+                SimpleNamespace(
+                    id=str(index),
+                    description=f'Task {index}',
+                    status=status,
+                    subtasks=[],
+                )
+                for index, status in enumerate(statuses, 1)
+            ]
+        ),
+    )
 
 
 def _build_fallback_action(orch: Orchestrator, result: object) -> Action:
@@ -80,12 +97,41 @@ class TestBuildFallbackAction:
             'Which Python version should I target?',
         ],
     )
-    def test_agent_mode_non_empty_text_raises_llm_no_action_error(
+    def test_agent_mode_non_empty_text_yields_plain_text_before_tracker(
         self, text: str
     ) -> None:
         orch = _make_orchestrator()
-        with pytest.raises(LLMNoActionError):
-            _build_fallback_action(orch, _make_result(text))
+        action = _build_fallback_action(orch, _make_result(text))
+
+        assert isinstance(action, MessageAction)
+        assert action.content == text
+        assert action.wait_for_response is True
+
+    def test_agent_mode_fallback_with_active_tracker_returns_status(self) -> None:
+        orch = _make_orchestrator()
+        orch.executor = SimpleNamespace(
+            _active_run_mode='agent',
+            _state=_state_with_tasks('in_progress'),
+            _consecutive_plain_text_blocks=0,
+        )
+
+        action = _build_fallback_action(orch, _make_result('Still thinking aloud.'))
+
+        assert isinstance(action, MessageAction)
+        assert action.protocol_status is True
+        assert action.wait_for_response is False
+
+    def test_agent_mode_fallback_terminal_tracker_synthesizes_finish(self) -> None:
+        orch = _make_orchestrator()
+        orch.executor = SimpleNamespace(
+            _active_run_mode='agent',
+            _state=_state_with_tasks('done'),
+        )
+
+        action = _build_fallback_action(orch, _make_result('Everything is complete.'))
+
+        assert isinstance(action, PlaybookFinishAction)
+        assert action.outputs['summary'] == 'Everything is complete.'
 
     @pytest.mark.parametrize('mode', ['chat', 'plan'])
     def test_non_agent_modes_yield_plain_text(self, mode: str) -> None:
@@ -120,47 +166,45 @@ class TestPlainTextProtocolGate:
 
         assert result == [action]
 
-    def test_agent_mode_without_active_tasks_raises_llm_no_action_error(
+    def test_agent_mode_without_tracker_allows_plain_text(
         self,
     ):
         executor = self._make_executor('agent', active_tasks=False)
         action = MessageAction(content='plain answer')
 
-        with pytest.raises(LLMNoActionError):
-            executor._gate_agent_mode_plain_text(
-                [action], _make_result('plain').response
-            )
-        assert executor._consecutive_plain_text_blocks == 1
+        result = executor._gate_agent_mode_plain_text(
+            [action], _make_result('plain').response
+        )
 
-    def test_agent_mode_with_active_tasks_raises_llm_no_action_error(self):
+        assert result == [action]
+        assert executor._consecutive_plain_text_blocks == 0
+
+    def test_agent_mode_with_active_tracker_converts_plain_text_to_status(self):
         executor = self._make_executor('agent', active_tasks=True)
+        executor._state = _state_with_tasks('in_progress')
         action = MessageAction(content='plain answer')
 
-        with pytest.raises(LLMNoActionError):
-            executor._gate_agent_mode_plain_text(
-                [action], _make_result('plain').response
-            )
+        result = executor._gate_agent_mode_plain_text(
+            [action], _make_result('plain').response
+        )
+
+        assert result == [action]
+        assert action.protocol_status is True
+        assert action.wait_for_response is False
         assert executor._consecutive_plain_text_blocks == 1
 
-    def test_set_planning_directive_called_when_state_attached(self):
-        """When the executor has a state ref, the gate must set a planning
-        directive so the LLM gets corrective feedback on its next turn.
-        """
-        from backend.orchestration.state.state import State
-
+    def test_agent_mode_terminal_tracker_plain_text_synthesizes_finish(self):
         executor = self._make_executor('agent', active_tasks=True)
-        state = MagicMock(spec=State)
-        executor._state = state
+        executor._state = _state_with_tasks('done')
         action = MessageAction(content='plain answer')
 
-        with pytest.raises(LLMNoActionError):
-            executor._gate_agent_mode_plain_text(
-                [action], _make_result('plain').response
-            )
+        result = executor._gate_agent_mode_plain_text(
+            [action], _make_result('plain').response
+        )
 
-        state.set_planning_directive.assert_called_once()
-        args, _ = state.set_planning_directive.call_args
-        assert 'attempt 1' in args[0]
+        assert len(result) == 1
+        assert isinstance(result[0], PlaybookFinishAction)
+        assert result[0].outputs['summary'] == 'plain answer'
 
     def test_plan_mode_allows_plain_text_without_task_tracker_state(self):
         executor = self._make_executor('plan', active_tasks=False)

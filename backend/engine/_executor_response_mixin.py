@@ -8,7 +8,22 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from backend.core.errors import LLMNoActionError
+from backend.core.agent_protocol import (
+    ABANDONED_RETRY_PROMPT,
+    CONTINUATION_NUDGE,
+    increment_prose_attempts,
+    increment_self_extension,
+    mark_abandoned,
+    prose_attempts,
+    reset_prose_attempts,
+    reset_terminal_cycle,
+    self_extension_count,
+    set_pending_directive,
+    terminal_nudge_sent,
+    tracker_created,
+    tracker_terminal,
+    work_remains,
+)
 from backend.core.interaction_modes import (
     AGENT_MODE,
     is_chat_mode,
@@ -66,38 +81,154 @@ class _ExecutorResponseMixin:
     def _gate_agent_mode_plain_text(
         self, actions: list[Action], _response: ModelResponse
     ) -> list[Action]:
-        """Reject plain-text responses in Agent mode.
+        """Apply Agent-mode prose rules based on tracker commitment state.
 
-        Chat and Plan modes are not gated here. Agent mode has a stricter
-        protocol: every model turn must resolve to a tool action, a
-        ``communicate_with_user`` handoff, or ``finish``.
-
-        When the parser returns only ``MessageAction`` objects in Agent mode,
-        raise ``LLMNoActionError``. ``ActionExecutionService`` owns the retry
-        policy for repairable model-output errors, so prose never becomes a
-        user-facing action and the event router cannot race against it.
+        Agent mode is conversational until a task tracker exists. Once the
+        tracker exists, plain prose cannot silently complete unfinished work.
         """
+        from backend.ledger.action.agent import PlaybookFinishAction
         from backend.ledger.action.message import MessageAction as _MessageAction
 
         mode = self._get_agent_mode()
         if is_chat_mode(mode) or normalize_interaction_mode(mode) != AGENT_MODE:
             return actions
 
-        if not actions or not all(isinstance(a, _MessageAction) for a in actions):
+        if not actions:
             return actions
 
-        self._consecutive_plain_text_blocks += 1
+        state = getattr(self, '_state', None)
+        if any(isinstance(action, PlaybookFinishAction) for action in actions):
+            reset_prose_attempts(state)
+            return actions
 
-        self._set_plain_text_directive(self._consecutive_plain_text_blocks)
+        message_actions = [
+            action for action in actions if isinstance(action, _MessageAction)
+        ]
+        if len(message_actions) != len(actions):
+            return self._handle_agent_mixed_actions(actions, state)
 
-        logger.warning(
-            'Agent-mode LLM response contained plain text with no tool call '
-            '(count=%d); raising repairable no-action error.',
-            self._consecutive_plain_text_blocks,
+        plain_text = '\n\n'.join(
+            str(getattr(action, 'content', '') or '').strip()
+            for action in message_actions
+            if str(getattr(action, 'content', '') or '').strip()
         )
-        raise LLMNoActionError(
-            'Agent mode requires a tool action, but the model returned plain text '
-            'with no tool call.'
+        return self._handle_agent_plain_text_only(
+            actions,
+            state,
+            plain_text=plain_text,
+        )
+
+    def _handle_agent_mixed_actions(
+        self, actions: list[Action], state: object | None
+    ) -> list[Action]:
+        """Handle model responses that contain at least one real tool call."""
+        from backend.ledger.action.message import MessageAction as _MessageAction
+
+        if tracker_terminal(state) and terminal_nudge_sent(state):
+            if self_extension_count(state) >= 1:
+                logger.warning(
+                    'Agent protocol forcing finish after repeated self-extension '
+                    'from terminal tracker state.'
+                )
+                return [
+                    self._synthesize_finish(
+                        'All tracked tasks are terminal; finishing the run.',
+                        forced=True,
+                    )
+                ]
+            increment_self_extension(state)
+            reset_terminal_cycle(state)
+
+        reset_prose_attempts(state)
+        for action in actions:
+            if isinstance(action, _MessageAction):
+                action.wait_for_response = False
+                action.suppress_cli = True
+        return actions
+
+    def _handle_agent_plain_text_only(
+        self,
+        actions: list[Action],
+        state: object | None,
+        *,
+        plain_text: str,
+    ) -> list[Action]:
+        from backend.ledger.action.message import MessageAction as _MessageAction
+
+        if not tracker_created(state):
+            reset_prose_attempts(state)
+            return actions
+
+        if tracker_terminal(state):
+            reset_prose_attempts(state)
+            return [self._synthesize_finish(plain_text)]
+
+        if not work_remains(state):
+            reset_prose_attempts(state)
+            return actions
+
+        current_attempts = prose_attempts(state)
+        if current_attempts >= 3:
+            mark_abandoned(state)
+            logger.warning(
+                'Agent protocol abandoned run after repeated prose while work remained '
+                '(attempts=%d, text=%r).',
+                current_attempts,
+                plain_text[:500],
+            )
+            abandoned = _MessageAction(
+                content=ABANDONED_RETRY_PROMPT,
+                wait_for_response=True,
+            )
+            abandoned.protocol_abandoned = True
+            return [abandoned]
+
+        count = increment_prose_attempts(state)
+        self._consecutive_plain_text_blocks = count
+        set_pending_directive(
+            state,
+            CONTINUATION_NUDGE,
+            source='OrchestratorExecutor._handle_agent_plain_text_only',
+        )
+        logger.info(
+            'Agent-mode prose converted to mid-task status card (attempt=%d).',
+            count,
+        )
+        for action in actions:
+            if isinstance(action, _MessageAction):
+                action.wait_for_response = False
+                action.protocol_status = True
+        return actions
+
+    @staticmethod
+    def _synthesize_finish(summary: str, *, forced: bool = False) -> Action:
+        """Build a finish action from terminal plain text."""
+        from backend.ledger.action.agent import PlaybookFinishAction
+
+        clean = (summary or '').strip() or 'All tracked tasks are complete.'
+        outputs = {
+            'mode': 'agent',
+            'status': 'completed',
+            'response': clean,
+            'summary': clean,
+            'sections': [{'title': 'Summary', 'items': [clean]}],
+            'evidence': {
+                'status': 'not_applicable',
+                'details': 'Synthesized from plain text after tracker completion.',
+            },
+            'open_items': [],
+            'next_step': '',
+            'actions_taken': [],
+            'verification': {
+                'status': 'not_run',
+                'details': 'No separate verification was reported in the final text.',
+            },
+            'remaining_items': [],
+        }
+        return PlaybookFinishAction(
+            final_thought=clean,
+            outputs=outputs,
+            force_finish=forced,
         )
 
     def _get_agent_mode(self) -> str:
@@ -147,21 +278,15 @@ class _ExecutorResponseMixin:
     def _set_plain_text_directive(self, count: int) -> None:
         """Set a terse planning directive so the LLM gets corrective feedback."""
         state = getattr(self, '_state', None)
-        if state is None or not hasattr(state, 'set_planning_directive'):
-            return
         text = (
-            f'Protocol error: your previous response was plain prose '
-            f'(attempt {count}). In Agent mode you must emit exactly one '
-            f'tool action every turn: finish to answer, communicate_with_user '
-            f'to ask, or a work tool to continue.'
+            f'Your previous response was plain prose while work remained '
+            f'(attempt {count}). {CONTINUATION_NUDGE}'
         )
-        try:
-            state.set_planning_directive(
-                text,
-                source='OrchestratorExecutor._gate_agent_mode_plain_text',
-            )
-        except Exception:
-            logger.debug('Failed to set plain-text planning directive', exc_info=True)
+        set_pending_directive(
+            state,
+            text,
+            source='OrchestratorExecutor._set_plain_text_directive',
+        )
 
     @staticmethod
     def _without_blank_agent_messages(actions: list[Action]) -> list[Action]:

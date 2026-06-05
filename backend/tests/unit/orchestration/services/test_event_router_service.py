@@ -165,6 +165,20 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         # Should create and add recall action
         self.mock_controller.event_stream.add_event.assert_called_once()
 
+    async def test_task_tracking_create_marks_tracker_created(self):
+        action = TaskTrackingAction(
+            command='create',
+            task_list=[{'id': '1', 'description': 'Do work', 'status': 'todo'}],
+        )
+
+        await self.service._handle_action(action)
+
+        self.assertTrue(
+            self.mock_controller.state.extra_data[
+                '__agent_protocol_tracker_created'
+            ]
+        )
+
     async def test_handle_action_message_from_agent_wait_response(self):
         """Test agent messages wait for user input when no task plan is active."""
         action = MessageAction(content='Question?')

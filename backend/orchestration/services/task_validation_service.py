@@ -4,6 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from backend.core.agent_protocol import (
+    increment_validator_failures,
+    reset_validator_failures,
+    skipped_or_blocked_steps,
+    task_description,
+    task_id,
+    tracker_created,
+)
 from backend.core.logger import app_logger as logger  # noqa: E402
 from backend.core.schemas import AgentState  # noqa: E402
 from backend.core.task_status import ACTIVE_TASK_STATUSES
@@ -55,13 +63,103 @@ class TaskValidationService:
         if not await self._ensure_active_plan_is_terminal(action):
             return False
 
+        if not await self._ensure_finish_payload_valid(action):
+            return False
+
         if not await self._ensure_completion_validator_available(action):
             return False
 
         if await self._should_validate(action):
             if not await self._validate_and_handle(action):
                 return False
+        reset_validator_failures(self._context.get_controller().state)
         return True
+
+    async def _ensure_finish_payload_valid(
+        self, action: PlaybookFinishAction
+    ) -> bool:
+        controller = self._context.get_controller()
+        state = getattr(controller, 'state', None)
+        if not tracker_created(state):
+            return True
+
+        summary = self._finish_summary_text(action)
+        if not summary:
+            return await self._emit_finish_validator_block(
+                'Finish rejected: summary is required once a task tracker exists.',
+                error_id='FINISH_SUMMARY_MISSING',
+                cause_action=action,
+            )
+
+        missing = self._unreported_skipped_or_blocked_items(action)
+        if missing:
+            sample = '\n'.join(f'- {item}' for item in missing[:5])
+            return await self._emit_finish_validator_block(
+                'Finish rejected: skipped or blocked tracker items must be '
+                f'mentioned in the summary.\n\nItems:\n{sample}',
+                error_id='FINISH_SKIPPED_BLOCKED_UNREPORTED',
+                cause_action=action,
+            )
+        return True
+
+    @staticmethod
+    def _finish_summary_text(action: PlaybookFinishAction) -> str:
+        outputs = getattr(action, 'outputs', {}) or {}
+        if not isinstance(outputs, dict):
+            outputs = {}
+        return (
+            str(outputs.get('summary') or '').strip()
+            or str(outputs.get('response') or '').strip()
+            or str(getattr(action, 'final_thought', '') or '').strip()
+            or str(getattr(action, 'thought', '') or '').strip()
+        )
+
+    def _finish_search_text(self, action: PlaybookFinishAction) -> str:
+        outputs = getattr(action, 'outputs', {}) or {}
+        parts = [self._finish_summary_text(action)]
+        if isinstance(outputs, dict):
+            for key in ('open_items', 'remaining_items', 'sections', 'actions_taken'):
+                parts.append(str(outputs.get(key) or ''))
+        return '\n'.join(parts).lower()
+
+    def _unreported_skipped_or_blocked_items(
+        self, action: PlaybookFinishAction
+    ) -> list[str]:
+        state = getattr(self._context.get_controller(), 'state', None)
+        search_text = self._finish_search_text(action)
+        missing: list[str] = []
+        for step in skipped_or_blocked_steps(state):
+            sid = task_id(step)
+            desc = task_description(step)
+            if sid and sid.lower() in search_text:
+                continue
+            if desc and desc.lower() in search_text:
+                continue
+            missing.append(desc or sid or 'Untitled skipped/blocked task')
+        return missing
+
+    async def _emit_finish_validator_block(
+        self,
+        message: str,
+        error_id: str,
+        *,
+        cause_action: Any | None = None,
+    ) -> bool:
+        controller = self._context.get_controller()
+        failure_count = increment_validator_failures(getattr(controller, 'state', None))
+        if failure_count > 2:
+            logger.warning(
+                'Finish validator failed repeatedly; allowing close after %d failures: %s',
+                failure_count,
+                error_id,
+            )
+            reset_validator_failures(getattr(controller, 'state', None))
+            return True
+        return await self._emit_finish_block(
+            message,
+            error_id=error_id,
+            cause_action=cause_action,
+        )
 
     async def _ensure_active_plan_is_terminal(
         self, action: PlaybookFinishAction

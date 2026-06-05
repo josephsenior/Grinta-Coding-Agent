@@ -13,6 +13,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from backend.core.agent_protocol import (
+    mark_tracker_created,
+    reset_terminal_cycle,
+    tracker_created,
+    tracker_terminal,
+)
 from backend.core.interaction_modes import (
     normalize_interaction_mode,
 )
@@ -106,6 +112,13 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                 action.task_list,
                 title=current_title,
             )
+            if action.command in {'create', 'update'} or action.task_list:
+                mark_tracker_created(
+                    self._ctrl.state,
+                    source='EventRouterService.task_tracking',
+                )
+            if not tracker_terminal(self._ctrl.state):
+                reset_terminal_cycle(self._ctrl.state)
             self._ctrl.log('info', f'Plan updated with {len(action.task_list)} steps.')
         except Exception as e:
             self._ctrl.log('error', f'Failed to update plan: {e}')
@@ -130,6 +143,9 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
         if action.source == EventSource.USER:
             await self._handle_user_message(action)
         elif action.source == EventSource.AGENT:
+            if bool(getattr(action, 'protocol_abandoned', False)):
+                await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+                return
             if action.wait_for_response:
                 if await self._intercept_text_tool_call_handoff(action):
                     return
@@ -158,15 +174,6 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
             normalize_autonomy_level,
         )
 
-        if isinstance(action, InformAction):
-            # Non-blocking; just log it and let the turn continue.
-            self._ctrl.log(
-                'debug',
-                'Meta-cognition inform action (non-blocking).',
-                extra={'action_type': type(action).__name__},
-            )
-            return
-
         autonomy_ctrl = getattr(self._ctrl, 'autonomy_controller', None)
         autonomy_level = (
             getattr(autonomy_ctrl, 'autonomy_level', AutonomyLevel.BALANCED.value)
@@ -189,6 +196,19 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
         agent = getattr(self._ctrl, 'agent', None)
         config = getattr(agent, 'config', None)
         mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+
+        if mode == 'agent' and tracker_created(self._ctrl.state):
+            await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+            return
+
+        if isinstance(action, InformAction):
+            # Non-blocking outside committed Agent-mode task runs.
+            self._ctrl.log(
+                'debug',
+                'Meta-cognition inform action (non-blocking).',
+                extra={'action_type': type(action).__name__},
+            )
+            return
 
         should_pause = mode == 'plan' or autonomy_level != AutonomyLevel.FULL.value
 

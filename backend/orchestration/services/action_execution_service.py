@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, cast
 from unittest.mock import Mock
 
+from backend.core.agent_protocol import ABANDONED_RETRY_PROMPT
 from backend.core.constants import (
     DEFAULT_AGENT_MAX_CONSECUTIVE_NULL_ACTIONS,
     DEFAULT_AGENT_MAX_IDENTICAL_RETRIES,
@@ -400,12 +401,7 @@ class ActionExecutionService:
                 'Please use an existing tool from the provided list.'
             )
         if isinstance(exc, LLMNoActionError):
-            return (
-                'No tool call detected - the response contains text but no tool call.\n\n'
-                'Use the available native tool calls shown in the prompt. '
-                'For file edits use the public file API tools; for commands use `terminal_manager`; '
-                'for user clarification use `communicate_with_user`.'
-            )
+            return 'No tool call detected — response contained text only.'
         return str(exc)
 
     def _publish_repair_error_observation(
@@ -455,12 +451,7 @@ class ActionExecutionService:
         if event_stream is not None:
             event_stream.add_event(
                 ErrorObservation(
-                    content=(
-                        'Protocol error: Agent mode requires a tool action, but the '
-                        f'model kept replying without one after {attempts} attempts. '
-                        'I paused the run instead of treating that prose as an answer. '
-                        'Retry the request, or switch to Chat mode for free-form replies.'
-                    ),
+                    content=ABANDONED_RETRY_PROMPT,
                     error_id='LLM_NO_ACTION_REPAIR_EXHAUSTED',
                     agent_only=False,
                 ),

@@ -179,11 +179,12 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RateLimitError):
             await self.service.get_next_action()
 
-    def test_format_repair_error_message_uses_current_tool_names(self):
+    def test_format_repair_error_message_is_brief_for_llm_no_action(self):
         msg = self.service._format_repair_error_message(LLMNoActionError('no action'))
 
-        self.assertIn('terminal_manager', msg)
-        self.assertIn('communicate_with_user', msg)
+        self.assertIn('No tool call detected', msg)
+        self.assertNotIn('terminal_manager', msg)
+        self.assertNotIn('communicate_with_user', msg)
 
     async def test_get_next_action_recovers_first_round_then_pauses(self):
         """Null-action loop uses two-round recovery before pausing.

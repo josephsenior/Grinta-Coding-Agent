@@ -1,6 +1,7 @@
 """Constants for tool names used in function calling."""
 
 from backend.core.constants import (
+    CREATE_TASK_TRACKER_TOOL_NAME,
     CREATE_TOOL_NAME,
     EDIT_SYMBOLS_TOOL_NAME,
     FIND_SYMBOLS_TOOL_NAME,
@@ -14,6 +15,7 @@ from backend.core.constants import (
 
 __all__ = [
     'CREATE_TOOL_NAME',
+    'CREATE_TASK_TRACKER_TOOL_NAME',
     'EDIT_SYMBOLS_TOOL_NAME',
     'FIND_SYMBOLS_TOOL_NAME',
     'FINISH_TOOL_NAME',

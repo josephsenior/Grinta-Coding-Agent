@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from backend.core.agent_protocol import prepare_next_agent_step
 from backend.core.constants import DEFAULT_STUCK_COOLDOWN_TURNS
+from backend.core.interaction_modes import normalize_interaction_mode
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
@@ -134,6 +136,7 @@ class StepGuardService:
     async def ensure_can_step(self) -> bool:
         """Return False if circuit breaker/stuck detection block execution."""
         controller = self._context.get_controller()
+        self._prepare_agent_protocol_directive(controller)
         # Circuit breaker is authoritative for pause/stop decisions.
         # Stuck detection runs only if stepping is still allowed, where it can
         # inject recovery guidance without overriding a hard stop/pause.
@@ -142,6 +145,13 @@ class StepGuardService:
         if await self._handle_stuck_detection(controller) is False:
             return False
         return True
+
+    @staticmethod
+    def _prepare_agent_protocol_directive(controller: 'SessionOrchestrator') -> None:
+        state = getattr(controller, 'state', None)
+        config = getattr(controller, 'config', None)
+        mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+        prepare_next_agent_step(state, mode)
 
     def _get_replan_flag(self, controller: 'SessionOrchestrator') -> bool:
         state: 'State | None' = getattr(controller, 'state', None)
