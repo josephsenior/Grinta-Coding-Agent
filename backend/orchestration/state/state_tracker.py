@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import ChangeAgentStateAction
 from backend.ledger.action.empty import NullAction
-from backend.ledger.event_filter import EventFilter
+from backend.ledger.event.event_filter import EventFilter
 from backend.ledger.observation.agent import AgentStateChangedObservation
 from backend.ledger.observation.empty import NullObservation
 from backend.ledger.serialization.event import event_to_trajectory

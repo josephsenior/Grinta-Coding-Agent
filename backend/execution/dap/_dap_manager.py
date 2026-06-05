@@ -14,13 +14,13 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.logger import app_logger as logger
-from backend.execution._dap_adapters import (
+from backend.execution.dap._dap_adapters import (
     _language_from_extension,
     _resolve_recipe,
 )
-from backend.execution._dap_errors import DAPError
-from backend.execution._dap_logging import _dap_log
-from backend.execution._dap_session import DAPDebugSession
+from backend.execution.dap._dap_errors import DAPError
+from backend.execution.dap._dap_logging import _dap_log
+from backend.execution.dap._dap_session import DAPDebugSession
 from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.debugger import DebuggerObservation

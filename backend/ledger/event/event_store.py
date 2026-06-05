@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
-from backend.ledger.event_store_abc import EventStoreABC
+from backend.ledger.event.event_store_abc import EventStoreABC
 from backend.ledger.serialization.event import event_from_dict
 from backend.persistence.locations import (
     get_conversation_dir,
@@ -19,7 +19,7 @@ from backend.persistence.locations import (
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event, EventSource
-    from backend.ledger.event_filter import EventFilter
+    from backend.ledger.event.event_filter import EventFilter
     from backend.persistence.files import FileStore
 
 

@@ -1,4 +1,4 @@
-"""Tests for backend.ledger.event_store_abc — EventStoreABC base class."""
+"""Tests for backend.ledger.event.event_store_abc — EventStoreABC base class."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.ledger.event_store_abc import EventStoreABC
+from backend.ledger.event.event_store_abc import EventStoreABC
 
 # ── Concrete stub ─────────────────────────────────────────────────────
 

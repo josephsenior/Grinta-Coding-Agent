@@ -30,7 +30,7 @@ from backend.ledger.backpressure import BackpressureManager
 from backend.ledger.coalescing import EventCoalescer
 from backend.ledger.config import get_event_runtime_defaults
 from backend.ledger.event import Event, EventSource
-from backend.ledger.event_store import EventStore
+from backend.ledger.event.event_store import EventStore
 from backend.ledger.persistence import EventPersistence
 from backend.ledger.secret_masker import SecretMasker
 from backend.ledger.serialization.event import event_from_dict, event_to_dict

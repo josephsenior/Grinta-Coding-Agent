@@ -30,7 +30,7 @@ from backend.ledger.observation import (
     ErrorObservation,
 )
 from backend.ledger.observation_cause import attach_observation_cause
-from backend.orchestration.services._event_router_delegate_helpers import (
+from backend.orchestration.services.event_router_mixins._event_router_delegate_helpers import (
     _looks_like_text_tool_call_handoff,
 )
 

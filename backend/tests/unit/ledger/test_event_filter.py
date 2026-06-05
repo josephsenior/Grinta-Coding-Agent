@@ -1,9 +1,9 @@
-"""Tests for backend.ledger.event_filter — event stream filtering utilities."""
+"""Tests for backend.ledger.event.event_filter — event stream filtering utilities."""
 
 from __future__ import annotations
 
 from backend.ledger.action.message import MessageAction
-from backend.ledger.event_filter import EventFilter
+from backend.ledger.event.event_filter import EventFilter
 from backend.ledger.observation import NullObservation
 
 # ── EventFilter dataclass ──────────────────────────────────────────────

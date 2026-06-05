@@ -155,7 +155,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         action.id = 123
 
         with patch(
-            'backend.orchestration.services._event_router_user_message_mixin.RecallAction'
+            'backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallAction'
         ) as mock_recall:
             mock_recall_instance = MagicMock()
             mock_recall.return_value = mock_recall_instance
@@ -327,7 +327,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         action.source = EventSource.USER
         action.id = 456
 
-        with patch('backend.orchestration.services._event_router_user_message_mixin.RecallAction'):
+        with patch('backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallAction'):
             await self.service._handle_message_action(action)
 
         # Should log at info level
@@ -344,10 +344,10 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.event_stream.search_events.return_value = [action]
 
         with patch(
-            'backend.orchestration.services._event_router_user_message_mixin.RecallAction'
+            'backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallAction'
         ) as mock_recall:
             with patch(
-                'backend.orchestration.services._event_router_user_message_mixin.RecallType'
+                'backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallType'
             ) as mock_recall_type:
                 mock_recall_type.WORKSPACE_CONTEXT = 'workspace'
                 mock_recall_type.KNOWLEDGE = 'knowledge'
@@ -375,10 +375,10 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         ]
 
         with patch(
-            'backend.orchestration.services._event_router_user_message_mixin.RecallAction'
+            'backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallAction'
         ) as mock_recall:
             with patch(
-                'backend.orchestration.services._event_router_user_message_mixin.RecallType'
+                'backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallType'
             ) as mock_recall_type:
                 mock_recall_type.WORKSPACE_CONTEXT = 'workspace'
                 mock_recall_type.KNOWLEDGE = 'knowledge'
@@ -397,7 +397,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
 
         self.mock_controller.get_agent_state.return_value = AgentState.PAUSED
 
-        with patch('backend.orchestration.services._event_router_user_message_mixin.RecallAction'):
+        with patch('backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallAction'):
             await self.service._handle_message_action(action)
 
         # Should set state to running
@@ -416,7 +416,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             AgentState.AWAITING_USER_INPUT
         )
 
-        with patch('backend.orchestration.services._event_router_user_message_mixin.RecallAction'):
+        with patch('backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallAction'):
             await self.service._handle_message_action(action)
 
         self.assertEqual(
@@ -436,7 +436,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         )
         self.mock_controller.state.extra_data['active_run_mode'] = 'plan'
 
-        with patch('backend.orchestration.services._event_router_user_message_mixin.RecallAction'):
+        with patch('backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallAction'):
             await self.service._handle_message_action(action)
 
         self.assertNotIn('active_run_mode', self.mock_controller.state.extra_data)
@@ -468,7 +468,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             AgentState.AWAITING_USER_INPUT
         )
 
-        with patch('backend.orchestration.services._event_router_user_message_mixin.RecallAction'):
+        with patch('backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallAction'):
             await self.service._handle_message_action(action)
 
         self.assertEqual(
@@ -497,7 +497,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         user_action = MessageAction(content='Plan this change')
         user_action.source = EventSource.USER
         user_action.id = 904
-        with patch('backend.orchestration.services._event_router_user_message_mixin.RecallAction'):
+        with patch('backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallAction'):
             await self.service._handle_message_action(user_action)
 
         self.assertEqual(
@@ -550,7 +550,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         answer_action = MessageAction(content='Use backend/engine')
         answer_action.source = EventSource.USER
         answer_action.id = 905
-        with patch('backend.orchestration.services._event_router_user_message_mixin.RecallAction'):
+        with patch('backend.orchestration.services.event_router_mixins._event_router_user_message_mixin.RecallAction'):
             await self.service._handle_message_action(answer_action)
 
         self.assertEqual(
@@ -751,7 +751,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
 
         with patch('backend.utils.async_utils.run_or_schedule', side_effect=_capture):
             with patch(
-                'backend.orchestration.services._event_router_delegate_mixin.EventStream'
+                'backend.orchestration.services.event_router_mixins._event_router_delegate_mixin.EventStream'
             ) as mock_event_stream:
                 worker_stream = MagicMock()
                 mock_event_stream.return_value = worker_stream

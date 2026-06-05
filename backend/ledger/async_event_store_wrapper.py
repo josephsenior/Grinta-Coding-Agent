@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from backend.ledger.event import Event
-from backend.ledger.event_store import EventStore
+from backend.ledger.event.event_store import EventStore
 
 
 class AsyncEventStoreWrapper:

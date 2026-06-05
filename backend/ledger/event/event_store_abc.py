@@ -6,12 +6,12 @@ from abc import abstractmethod
 from itertools import islice
 from typing import TYPE_CHECKING
 
-from backend.ledger.event_filter import EventFilter
+from backend.ledger.event.event_filter import EventFilter
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from backend.ledger.event import Event, EventSource
+    from backend.ledger.event._event import Event, EventSource
 
 
 class EventStoreABC:
