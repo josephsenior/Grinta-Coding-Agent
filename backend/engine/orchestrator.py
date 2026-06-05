@@ -13,13 +13,13 @@ Implementation layout
 --------------------
 The class is a thin coordinator. Each concern lives in its own module:
 
-* :mod:`backend.engine._orchestrator_helpers`    — top-level utility functions
-* :mod:`backend.engine._orchestrator_actions`    — pending/deferred queue
-* :mod:`backend.engine._orchestrator_prompts`    — prompt manager + MCP wiring
-* :mod:`backend.engine._orchestrator_condensation` — condensation events
-* :mod:`backend.engine._orchestrator_recovery`  — step / tool-error recovery
-* :mod:`backend.engine._orchestrator_protocol`  — protocol-mode fallbacks
-* :mod:`backend.engine._orchestrator_step`      — step(), astep(), LLM step
+* :mod:`backend.engine.orchestrator_helpers._orchestrator_helpers`    — top-level utility functions
+* :mod:`backend.engine.orchestrator_helpers._orchestrator_actions`    — pending/deferred queue
+* :mod:`backend.engine.orchestrator_helpers._orchestrator_prompts`    — prompt manager + MCP wiring
+* :mod:`backend.engine.orchestrator_helpers._orchestrator_condensation` — condensation events
+* :mod:`backend.engine.orchestrator_helpers._orchestrator_recovery`  — step / tool-error recovery
+* :mod:`backend.engine.orchestrator_helpers._orchestrator_protocol`  — protocol-mode fallbacks
+* :mod:`backend.engine.orchestrator_helpers._orchestrator_step`      — step(), astep(), LLM step
 """
 
 from __future__ import annotations
@@ -147,12 +147,12 @@ class Orchestrator(Agent):
         self._consecutive_context_errors = 0
 
     def step(self, state: State) -> Action:  # type: ignore[override]
-        from backend.engine._orchestrator_step import _step_sync
+        from backend.engine.orchestrator_helpers._orchestrator_step import _step_sync
 
         return _step_sync(self, state)
 
     async def astep(self, state: State) -> Action:  # type: ignore[override]
-        from backend.engine._orchestrator_step import astep as _astep
+        from backend.engine.orchestrator_helpers._orchestrator_step import astep as _astep
 
         return await _astep(self, state)
 
@@ -191,17 +191,17 @@ class Orchestrator(Agent):
     def set_mcp_tools(self, mcp_tools: list[dict]) -> None:
         """Set MCP tools and sync names to prompt manager for dynamic discovery."""
         super().set_mcp_tools(mcp_tools)
-        from backend.engine._orchestrator_prompts import _apply_mcp_tools
+        from backend.engine.orchestrator_helpers._orchestrator_prompts import _apply_mcp_tools
 
         _apply_mcp_tools(self, mcp_tools)
 
     def clear_queued_actions(self, reason: str = '') -> int:
-        from backend.engine._orchestrator_actions import _clear_queued_actions
+        from backend.engine.orchestrator_helpers._orchestrator_actions import _clear_queued_actions
 
         return _clear_queued_actions(self, reason)
 
     def iter_queued_actions(self) -> list[Action]:
-        from backend.engine._orchestrator_actions import _iter_queued_actions
+        from backend.engine.orchestrator_helpers._orchestrator_actions import _iter_queued_actions
 
         return list(_iter_queued_actions(self))
 
@@ -211,7 +211,7 @@ class Orchestrator(Agent):
     # for the implementation.
     # ------------------------------------------------------------------ #
     def _create_prompt_manager(self) -> PromptManager:
-        from backend.engine._orchestrator_prompts import _create_prompt_manager as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_prompts import _create_prompt_manager as _impl
 
         return _impl(self)
 
@@ -231,73 +231,73 @@ class Orchestrator(Agent):
             raise
 
     def _emit_compaction_status(self) -> None:
-        from backend.engine._orchestrator_condensation import (
+        from backend.engine.orchestrator_helpers._orchestrator_condensation import (
             _emit_compaction_status as _impl,
         )
 
         _impl(self)
 
     def _emit_compaction_status_if_needed(self, state: State) -> bool:  # type: ignore[override]
-        from backend.engine._orchestrator_condensation import (
+        from backend.engine.orchestrator_helpers._orchestrator_condensation import (
             _emit_compaction_status_if_needed as _impl,
         )
 
         return _impl(self, state)
 
     def _reset_step_recovery_counters(self) -> None:
-        from backend.engine._orchestrator_recovery import (
+        from backend.engine.orchestrator_helpers._orchestrator_recovery import (
             _reset_step_recovery_counters as _impl,
         )
 
         _impl(self)
 
     def _astep_handle_tool_execution_error(self, e) -> Action:
-        from backend.engine._orchestrator_recovery import (
+        from backend.engine.orchestrator_helpers._orchestrator_recovery import (
             _astep_handle_tool_execution_error as _impl,
         )
 
         return _impl(self, e)
 
     def _astep_handle_recoverable_tool_call_shape_error(self, e) -> Action:
-        from backend.engine._orchestrator_recovery import (
+        from backend.engine.orchestrator_helpers._orchestrator_recovery import (
             _astep_handle_recoverable_tool_call_shape_error as _impl,
         )
 
         return _impl(self, e)
 
     async def _astep_normal_path(self, state: State) -> Action:
-        from backend.engine._orchestrator_step import _astep_normal_path as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_step import _astep_normal_path as _impl
 
         return await _impl(self, state)
 
     def _consume_pending_action(self) -> Action | None:
-        from backend.engine._orchestrator_actions import (
+        from backend.engine.orchestrator_helpers._orchestrator_actions import (
             _consume_pending_action as _impl,
         )
 
         return _impl(self)
 
     def _queue_additional_actions(self, actions: list[Action]) -> None:
-        from backend.engine._orchestrator_actions import (
+        from backend.engine.orchestrator_helpers._orchestrator_actions import (
             _queue_additional_actions as _impl,
         )
 
         _impl(self, actions)
 
     def _promote_deferred_actions(self) -> None:
-        from backend.engine._orchestrator_actions import (
+        from backend.engine.orchestrator_helpers._orchestrator_actions import (
             _promote_deferred_actions as _impl,
         )
 
         _impl(self)
 
     def _sync_executor_llm(self) -> None:
-        from backend.engine._orchestrator_actions import _sync_executor_llm as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_actions import _sync_executor_llm as _impl
 
         _impl(self)
 
     def _active_run_mode_for_state(self, state: State) -> str:  # type: ignore[override]
-        from backend.engine._orchestrator_actions import (
+        from backend.engine.orchestrator_helpers._orchestrator_actions import (
             _active_run_mode_for_state as _impl,
         )
 
@@ -305,21 +305,21 @@ class Orchestrator(Agent):
 
     @staticmethod
     def _has_active_tasks_in_state(state: State) -> bool:
-        from backend.engine._orchestrator_actions import (
+        from backend.engine.orchestrator_helpers._orchestrator_actions import (
             _has_active_tasks_in_state as _impl,
         )
 
         return _impl(state)
 
     def _set_prompt_tier_from_recent_history(self, state: State) -> None:  # type: ignore[override]
-        from backend.engine._orchestrator_prompts import (
+        from backend.engine.orchestrator_helpers._orchestrator_prompts import (
             _set_prompt_tier_from_recent_history as _impl,
         )
 
         _impl(self, state)
 
     def _mcp_server_prompt_hints(self) -> list[dict[str, str]]:
-        from backend.engine._orchestrator_prompts import (
+        from backend.engine.orchestrator_helpers._orchestrator_prompts import (
             _mcp_server_prompt_hints as _impl,
         )
 
@@ -327,14 +327,14 @@ class Orchestrator(Agent):
 
     @staticmethod
     def _mcp_tool_descriptions_from_specs(mcp_tools: list[dict]) -> dict[str, str]:
-        from backend.engine._orchestrator_prompts import (
+        from backend.engine.orchestrator_helpers._orchestrator_prompts import (
             _mcp_tool_descriptions_from_specs as _impl,
         )
 
         return _impl(mcp_tools)
 
     def _queue_post_condensation_recovery(self, task_text: str = '') -> None:
-        from backend.engine._orchestrator_condensation import (
+        from backend.engine.orchestrator_helpers._orchestrator_condensation import (
             _queue_post_condensation_recovery as _impl,
         )
 
@@ -343,7 +343,7 @@ class Orchestrator(Agent):
     def _handle_pending_action_from_condensation(
         self, state: State, condensed: Any
     ) -> Action | None:
-        from backend.engine._orchestrator_condensation import (
+        from backend.engine.orchestrator_helpers._orchestrator_condensation import (
             _handle_pending_action_from_condensation as _impl,
         )
 
@@ -351,14 +351,14 @@ class Orchestrator(Agent):
 
     @staticmethod
     def _is_noop_condensation_action(action: object | None) -> bool:
-        from backend.engine._orchestrator_condensation import (
+        from backend.engine.orchestrator_helpers._orchestrator_condensation import (
             _is_noop_condensation_action as _impl,
         )
 
         return _impl(action)
 
     def _build_fallback_action(self, result) -> Action:
-        from backend.engine._orchestrator_protocol import (
+        from backend.engine.orchestrator_helpers._orchestrator_protocol import (
             _build_fallback_action as _impl,
         )
 
@@ -366,7 +366,7 @@ class Orchestrator(Agent):
 
     @staticmethod
     def _visible_fallback_message_text(message_text: str) -> str:
-        from backend.engine._orchestrator_protocol import (
+        from backend.engine.orchestrator_helpers._orchestrator_protocol import (
             _visible_fallback_message_text as _impl,
         )
 
@@ -380,7 +380,7 @@ class Orchestrator(Agent):
         *,
         mode: str,
     ) -> Action:
-        from backend.engine._orchestrator_protocol import (
+        from backend.engine.orchestrator_helpers._orchestrator_protocol import (
             _protocol_mode_fallback_message as _impl,
         )
 
@@ -390,36 +390,36 @@ class Orchestrator(Agent):
     def _synthesize_plain_text_finish(
         message_text: str, *, mode: str
     ) -> Any:
-        from backend.engine._orchestrator_protocol import (
+        from backend.engine.orchestrator_helpers._orchestrator_protocol import (
             _synthesize_plain_text_finish as _impl,
         )
 
         return _impl(message_text, mode=mode)
 
     def _generate_delimiter_token(self) -> str:
-        from backend.engine._orchestrator_step import _generate_delimiter_token as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_step import _generate_delimiter_token as _impl
 
         return _impl(self)
 
     def _check_exit_command(self, state: State) -> Action | None:
-        from backend.engine._orchestrator_step import _check_exit_command as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_step import _check_exit_command as _impl
 
         return _impl(self, state)
 
     def _execute_llm_step(self, state: State, condensed: Any) -> Action:  # type: ignore[override]
-        from backend.engine._orchestrator_step import _execute_llm_step as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_step import _execute_llm_step as _impl
 
         return _impl(self, state, condensed)
 
     async def _execute_llm_step_async(self, state: State, condensed: Any) -> Action:  # type: ignore[override]
-        from backend.engine._orchestrator_step import _execute_llm_step_async as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_step import _execute_llm_step_async as _impl
 
         return await _impl(self, state, condensed)
 
     async def _attempt_graceful_context_degradation(
         self, state: State
     ) -> Action | None:
-        from backend.engine._orchestrator_step import (
+        from backend.engine.orchestrator_helpers._orchestrator_step import (
             _attempt_graceful_context_degradation as _impl,
         )
 

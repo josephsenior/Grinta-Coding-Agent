@@ -26,26 +26,26 @@ from backend.core.errors import (
 from backend.core.logger import app_logger as logger
 from backend.engine import message_serializer
 from backend.engine import prompt_role_debug as _prompt_role_debug
-from backend.engine._orchestrator_actions import (
+from backend.engine.orchestrator_helpers._orchestrator_actions import (
     _active_run_mode_for_state,
     _has_active_tasks_in_state,
     _queue_additional_actions,
     _sync_executor_llm,
 )
-from backend.engine._orchestrator_condensation import (
+from backend.engine.orchestrator_helpers._orchestrator_condensation import (
     _emit_compaction_status,
     _emit_compaction_status_if_needed,
     _handle_pending_action_from_condensation,
 )
-from backend.engine._orchestrator_helpers import (
+from backend.engine.orchestrator_helpers._orchestrator_helpers import (
     _graceful_shrink_large_cmd_outputs,
     _graceful_trim_old_error_observations,
     _safe_plain_text_count,
     _should_reset_plain_text_count,
 )
-from backend.engine._orchestrator_prompts import _set_prompt_tier_from_recent_history
-from backend.engine._orchestrator_protocol import _build_fallback_action
-from backend.engine._orchestrator_recovery import (
+from backend.engine.orchestrator_helpers._orchestrator_prompts import _set_prompt_tier_from_recent_history
+from backend.engine.orchestrator_helpers._orchestrator_protocol import _build_fallback_action
+from backend.engine.orchestrator_helpers._orchestrator_recovery import (
     _astep_handle_recoverable_tool_call_shape_error,
     _astep_handle_tool_execution_error,
 )
@@ -103,7 +103,7 @@ async def _astep_normal_path(orch: Orchestrator, state: State) -> Action:
 
 
 def _consume_pending_action(orch: Orchestrator) -> Action | None:
-    from backend.engine._orchestrator_actions import _consume_pending_action as impl
+    from backend.engine.orchestrator_helpers._orchestrator_actions import _consume_pending_action as impl
 
     return impl(orch)
 

@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 from backend.core.constants import DEFAULT_AGENT_RECOVERABLE_TOOL_ERROR_THRESHOLD
 from backend.core.logger import app_logger as logger
-from backend.engine._orchestrator_actions import _clear_queued_actions
-from backend.engine._orchestrator_helpers import _normalize_recoverable_error_signature
+from backend.engine.orchestrator_helpers._orchestrator_actions import _clear_queued_actions
+from backend.engine.orchestrator_helpers._orchestrator_helpers import _normalize_recoverable_error_signature
 from backend.ledger.action import AgentThinkAction
 
 if TYPE_CHECKING:
