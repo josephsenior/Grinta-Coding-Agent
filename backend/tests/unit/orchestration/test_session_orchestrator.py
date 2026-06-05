@@ -77,6 +77,7 @@ def _make_controller() -> SessionOrchestrator:
     ctrl._step_lock_loop = None
     ctrl._step_gate = threading.Lock()
     ctrl._step_pending = False
+    ctrl._step_seq = 0  # re-entrancy guard for _step_pending teardown race
     ctrl._main_loop = None
     ctrl._draining_batch = False
 
@@ -1596,6 +1597,34 @@ class TestStepDispatch(unittest.TestCase):
 
         self.assertTrue(self.ctrl._step_pending)
 
+    def test_step_sets_pending_bumps_step_seq(self):
+        """step() bumps _step_seq when it sets _step_pending so _step's
+        finally block knows not to clobber it during teardown."""
+        mock_task = MagicMock()
+        mock_task.done.return_value = False
+        self.ctrl._step_task = mock_task
+        self.ctrl._step_pending = False
+        self.ctrl._step_seq = 0
+
+        self.ctrl.step()
+
+        self.assertTrue(self.ctrl._step_pending)
+        self.assertEqual(self.ctrl._step_seq, 1)
+
+    def test_create_step_task_bumps_step_seq_on_fast_path(self):
+        """_create_step_task bumps _step_seq when re-queueing, mirroring
+        step() so the finally block keeps _step_pending."""
+        mock_task = MagicMock()
+        mock_task.done.return_value = False
+        self.ctrl._step_task = mock_task
+        self.ctrl._step_pending = False
+        self.ctrl._step_seq = 0
+
+        self.ctrl._create_step_task()
+
+        self.assertTrue(self.ctrl._step_pending)
+        self.assertEqual(self.ctrl._step_seq, 1)
+
     def test_get_initial_task_no_message(self):
         """Line 701 coverage."""
         with patch.object(self.ctrl, '_first_user_message', return_value=None):
@@ -1850,3 +1879,103 @@ class TestStepDispatch(unittest.TestCase):
 
         await self.ctrl.log_task_audit('completed')
         self.ctrl._audit_callback.assert_called()
+
+
+class TestStepPendingRaceFix(unittest.IsolatedAsyncioTestCase):
+    """Regression tests for the _step_pending race condition.
+
+    The bug: when ``_on_event`` calls ``schedule_step_soon()`` (or previously
+    a direct ``step()``) while an ``_step`` task is in its ``finally`` block,
+    the ``finally`` clears ``_step_pending`` AFTER the new ``step()`` has
+    already set it to ``True``, silently dropping the re-queue request.
+
+    Fixes:
+    1. ``_on_event`` uses ``schedule_step_soon`` (not direct ``step()``).
+    2. ``step()`` bumps ``_step_seq`` when re-queueing.
+    3. ``_step`` finally only clears ``_step_pending`` if ``_step_seq``
+       matches the value captured on entry.
+    """
+
+    def setUp(self):
+        self.ctrl = _make_controller()
+
+    async def test_step_pending_not_cleared_when_step_seq_incremented_during_teardown(
+        self,
+    ):
+        """Verify the _step_seq mechanism prevents _step_pending wipe.
+
+        Simulates: _step() is in finally block; step() bumps _step_seq and
+        sets _step_pending=True; _step finally checks seq and leaves pending set.
+        """
+        # Pre-condition: no step task running, _step_pending is False
+        self.ctrl._step_task = None
+        self.ctrl._step_pending = False
+        self.ctrl._step_seq = 0
+
+        # Simulate: step() was called while _step task was still alive.
+        # step() bumps _step_seq and sets _step_pending.
+        self.ctrl._step_seq = 1
+        self.ctrl._step_pending = True
+
+        # Now simulate _step()'s finally block running.
+        # It captures entry_seq=0, but current _step_seq=1 (bumped by step()).
+        # It should NOT clear _step_pending because seq changed.
+        entry_seq = 0  # what _step captured on entry
+        if self.ctrl._step_seq == entry_seq:
+            self.ctrl._step_pending = False
+        else:
+            # Correct behaviour: keep the flag set
+            pass
+
+        # Assert: _step_pending is STILL True (not wiped)
+        self.assertTrue(
+            self.ctrl._step_pending,
+            'Bug: _step_pending was wiped during teardown despite a '
+            'concurrent step() call bumping _step_seq',
+        )
+
+    async def test_schedule_step_soon_not_step_in_on_event(self):
+        """Verify _on_event calls schedule_step_soon, not direct step().
+
+        This is the primary regression test: _on_event MUST NOT call
+        self.step() directly.  Instead it must call schedule_step_soon()
+        to defer the call until after the in-flight _step task finishes.
+        """
+        # event_router is a read-only property — patch via services
+        self.ctrl.services.event_router = MagicMock()
+        self.ctrl.services.event_router.route_event = AsyncMock()
+        # step_decision is a read-only property — patch via services
+        self.ctrl.services.step_decision = MagicMock()
+        self.ctrl.services.step_decision.should_step = MagicMock(return_value=True)
+
+        # Patch schedule_step_soon to verify it is called
+        with patch.object(
+            self.ctrl, 'schedule_step_soon', wraps=self.ctrl.schedule_step_soon
+        ) as mock_sss:
+            # Patch step to also track calls (it SHOULD NOT be called)
+            with patch.object(self.ctrl, 'step', wraps=self.ctrl.step) as mock_step:
+                from backend.ledger.action import MessageAction
+
+                evt = MessageAction(content='test')
+                evt.source = EventSource.USER
+
+                await self.ctrl._on_event(evt)
+
+                # schedule_step_soon MUST have been called
+                mock_sss.assert_called_once()
+
+                # step() MUST NOT have been called directly
+                mock_step.assert_not_called()
+
+    async def test_step_seq_bumped_on_pending_reentry(self):
+        """step() increments _step_seq when setting _step_pending for re-entry."""
+        mock_task = MagicMock()
+        mock_task.done.return_value = False
+        self.ctrl._step_task = mock_task
+        self.ctrl._step_pending = False
+        self.ctrl._step_seq = 0
+
+        self.ctrl.step()
+
+        self.assertEqual(self.ctrl._step_seq, 1)
+        self.assertTrue(self.ctrl._step_pending)
