@@ -152,7 +152,9 @@ class Orchestrator(Agent):
         return _step_sync(self, state)
 
     async def astep(self, state: State) -> Action:  # type: ignore[override]
-        from backend.engine.orchestrator_helpers._orchestrator_step import astep as _astep
+        from backend.engine.orchestrator_helpers._orchestrator_step import (
+            astep as _astep,
+        )
 
         return await _astep(self, state)
 
@@ -191,17 +193,23 @@ class Orchestrator(Agent):
     def set_mcp_tools(self, mcp_tools: list[dict]) -> None:
         """Set MCP tools and sync names to prompt manager for dynamic discovery."""
         super().set_mcp_tools(mcp_tools)
-        from backend.engine.orchestrator_helpers._orchestrator_prompts import _apply_mcp_tools
+        from backend.engine.orchestrator_helpers._orchestrator_prompts import (
+            _apply_mcp_tools,
+        )
 
         _apply_mcp_tools(self, mcp_tools)
 
     def clear_queued_actions(self, reason: str = '') -> int:
-        from backend.engine.orchestrator_helpers._orchestrator_actions import _clear_queued_actions
+        from backend.engine.orchestrator_helpers._orchestrator_actions import (
+            _clear_queued_actions,
+        )
 
         return _clear_queued_actions(self, reason)
 
     def iter_queued_actions(self) -> list[Action]:
-        from backend.engine.orchestrator_helpers._orchestrator_actions import _iter_queued_actions
+        from backend.engine.orchestrator_helpers._orchestrator_actions import (
+            _iter_queued_actions,
+        )
 
         return list(_iter_queued_actions(self))
 
@@ -211,7 +219,9 @@ class Orchestrator(Agent):
     # for the implementation.
     # ------------------------------------------------------------------ #
     def _create_prompt_manager(self) -> PromptManager:
-        from backend.engine.orchestrator_helpers._orchestrator_prompts import _create_prompt_manager as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_prompts import (
+            _create_prompt_manager as _impl,
+        )
 
         return _impl(self)
 
@@ -266,7 +276,9 @@ class Orchestrator(Agent):
         return _impl(self, e)
 
     async def _astep_normal_path(self, state: State) -> Action:
-        from backend.engine.orchestrator_helpers._orchestrator_step import _astep_normal_path as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_step import (
+            _astep_normal_path as _impl,
+        )
 
         return await _impl(self, state)
 
@@ -292,7 +304,9 @@ class Orchestrator(Agent):
         _impl(self)
 
     def _sync_executor_llm(self) -> None:
-        from backend.engine.orchestrator_helpers._orchestrator_actions import _sync_executor_llm as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_actions import (
+            _sync_executor_llm as _impl,
+        )
 
         _impl(self)
 
@@ -397,22 +411,30 @@ class Orchestrator(Agent):
         return _impl(message_text, mode=mode)
 
     def _generate_delimiter_token(self) -> str:
-        from backend.engine.orchestrator_helpers._orchestrator_step import _generate_delimiter_token as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_step import (
+            _generate_delimiter_token as _impl,
+        )
 
         return _impl(self)
 
     def _check_exit_command(self, state: State) -> Action | None:
-        from backend.engine.orchestrator_helpers._orchestrator_step import _check_exit_command as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_step import (
+            _check_exit_command as _impl,
+        )
 
         return _impl(self, state)
 
     def _execute_llm_step(self, state: State, condensed: Any) -> Action:  # type: ignore[override]
-        from backend.engine.orchestrator_helpers._orchestrator_step import _execute_llm_step as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_step import (
+            _execute_llm_step as _impl,
+        )
 
         return _impl(self, state, condensed)
 
     async def _execute_llm_step_async(self, state: State, condensed: Any) -> Action:  # type: ignore[override]
-        from backend.engine.orchestrator_helpers._orchestrator_step import _execute_llm_step_async as _impl
+        from backend.engine.orchestrator_helpers._orchestrator_step import (
+            _execute_llm_step_async as _impl,
+        )
 
         return await _impl(self, state, condensed)
 

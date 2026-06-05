@@ -26,6 +26,12 @@ from backend.core.errors import (
 from backend.core.logger import app_logger as logger
 from backend.engine import message_serializer
 from backend.engine import prompt_role_debug as _prompt_role_debug
+from backend.engine.common import (
+    FunctionCallNotExistsError as CommonFunctionCallNotExistsError,
+)
+from backend.engine.common import (
+    FunctionCallValidationError as CommonFunctionCallValidationError,
+)
 from backend.engine.orchestrator_helpers._orchestrator_actions import (
     _active_run_mode_for_state,
     _has_active_tasks_in_state,
@@ -43,17 +49,15 @@ from backend.engine.orchestrator_helpers._orchestrator_helpers import (
     _safe_plain_text_count,
     _should_reset_plain_text_count,
 )
-from backend.engine.orchestrator_helpers._orchestrator_prompts import _set_prompt_tier_from_recent_history
-from backend.engine.orchestrator_helpers._orchestrator_protocol import _build_fallback_action
+from backend.engine.orchestrator_helpers._orchestrator_prompts import (
+    _set_prompt_tier_from_recent_history,
+)
+from backend.engine.orchestrator_helpers._orchestrator_protocol import (
+    _build_fallback_action,
+)
 from backend.engine.orchestrator_helpers._orchestrator_recovery import (
     _astep_handle_recoverable_tool_call_shape_error,
     _astep_handle_tool_execution_error,
-)
-from backend.engine.common import (
-    FunctionCallNotExistsError as CommonFunctionCallNotExistsError,
-)
-from backend.engine.common import (
-    FunctionCallValidationError as CommonFunctionCallValidationError,
 )
 from backend.inference.exceptions import LLMError
 
@@ -103,7 +107,9 @@ async def _astep_normal_path(orch: Orchestrator, state: State) -> Action:
 
 
 def _consume_pending_action(orch: Orchestrator) -> Action | None:
-    from backend.engine.orchestrator_helpers._orchestrator_actions import _consume_pending_action as impl
+    from backend.engine.orchestrator_helpers._orchestrator_actions import (
+        _consume_pending_action as impl,
+    )
 
     return impl(orch)
 
