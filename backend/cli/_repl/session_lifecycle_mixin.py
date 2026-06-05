@@ -1,8 +1,14 @@
 """Session-lifecycle mixin for :class:`backend.cli.repl.Repl`.
 
 Holds the agent-idle wait loop, interrupt handler, session resume logic and
-confirmation prompt — extracted from :mod:`backend.cli.repl` to keep the main
-module close to the project's per-file LOC budget.
+confirmation prompt. Method bodies are extracted into focused helper
+modules:
+
+* :mod:`backend.cli._repl._session_lifecycle_wait` — wait loop, idle/timeout
+  helpers, notification dispatch.
+* :mod:`backend.cli._repl._session_lifecycle_resume` — session resume steps.
+* :mod:`backend.cli._repl._session_lifecycle_confirm` — interrupt and Y/N
+  confirmation.
 
 The mixin assumes the host class provides:
 
@@ -13,12 +19,32 @@ The mixin assumes the host class provides:
 
 from __future__ import annotations
 
-import asyncio
-import contextlib
 import logging
-import os
-import time
+import time  # noqa: F401  (test patch target: session_lifecycle_mixin.time.monotonic)
 from typing import TYPE_CHECKING, Any, cast
+
+from backend.cli._repl._session_lifecycle_confirm import (
+    _cancel_agent,
+    _handle_confirmation,
+)
+from backend.cli._repl._session_lifecycle_resume import (
+    _build_resume_controller,
+    _resolve_resume_target,
+    _resume_session,
+    _setup_resume_runtime,
+    _validate_resume_bootstrap_state,
+    _wire_resume_runtime_state,
+)
+from backend.cli._repl._session_lifecycle_wait import (
+    _active_timeout,
+    _coerce_env_int,
+    _drain_renderer_until_settled,
+    _fire_idle_notification,
+    _handle_agent_hard_timeout,
+    _handle_idle_or_confirmation,
+    _resolve_hard_timeouts,
+    _wait_for_agent_idle,
+)
 
 if TYPE_CHECKING:
     from backend.cli._typing import SessionLifecycleHost
@@ -27,16 +53,13 @@ if TYPE_CHECKING:
 else:
     _SessionLifecycleBase = object
 
-from backend.cli._typing import SessionLifecycleHost
-from backend.cli.confirmation import (
-    ConfirmationDecision,
-    build_confirmation_action,
-    render_confirmation,
-)
-from backend.core.config import AppConfig
-from backend.core.enums import AgentState, EventSource
+from backend.cli._typing import SessionLifecycleHost  # noqa: E402
+from backend.core.config import AppConfig  # noqa: E402
+from backend.core.enums import AgentState  # noqa: E402
 
 logger = logging.getLogger(__name__)
+
+__all__ = ['SessionLifecycleMixin']
 
 
 class SessionLifecycleMixin(_SessionLifecycleBase):
@@ -67,19 +90,11 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
 
     @staticmethod
     def _coerce_env_int(name: str, default: int = 0, *, floor: int = 0) -> int:
-        raw = os.getenv(name, str(default))
-        try:
-            return max(floor, int(raw))
-        except (ValueError, TypeError):
-            return default
+        return _coerce_env_int(name, default, floor=floor)
 
     @classmethod
     def _resolve_hard_timeouts(cls) -> tuple[int, int]:
-        hard = cls._coerce_env_int('APP_AGENT_HARD_TIMEOUT_SECONDS')
-        cmd = cls._coerce_env_int('APP_AGENT_HARD_TIMEOUT_CMD_SECONDS')
-        if hard > 0 and cmd > 0:
-            cmd = max(hard, cmd)
-        return hard, cmd
+        return _resolve_hard_timeouts()
 
     @staticmethod
     def _active_timeout(
@@ -87,89 +102,14 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         hard_timeout: int,
         cmd_timeout: int,
     ) -> int:
-        active = hard_timeout
-        pending_action = getattr(controller, '_pending_action', None)
-        if pending_action is None or cmd_timeout <= 0:
-            return active
-        with contextlib.suppress(Exception):
-            from backend.ledger.action import CmdRunAction
+        return _active_timeout(controller, hard_timeout, cmd_timeout)
 
-            if isinstance(pending_action, CmdRunAction):
-                active = cmd_timeout
-        return active
-
-    async def _wait_for_agent_idle(
-        self, controller: Any, agent_task: asyncio.Task[Any] | None
-    ) -> None:
-        """Wait until agent is idle, handling confirmation prompts inline.
-
-        Events are now processed directly in the EventStream delivery thread
-        (no 3rd hop to the main loop), so the renderer state stays nearly in
-        sync with the agent.  A brief yield after task completion is enough to
-        let any in-flight deliveries finish.
-        """
-        # Disabled by default to avoid aborting long-running sessions.
-        # Set APP_AGENT_HARD_TIMEOUT_SECONDS / APP_AGENT_HARD_TIMEOUT_CMD_SECONDS
-        # to a positive value to re-enable limits.
-        hard_timeout, cmd_timeout = self._resolve_hard_timeouts()
-        start = time.monotonic()
-        last_periodic_drain = start
-        host = cast(SessionLifecycleHost, self)
-
-        while True:
-            renderer = host._renderer
-
-            # Drain queued events and render — this is the ONLY place
-            # where Live.update() happens during agent execution.
-            if renderer is not None:
-                renderer.drain_events()
-            state = controller.get_agent_state()
-
-            if await self._handle_idle_or_confirmation(
-                controller,
-                renderer,
-                state,
-            ):
-                break
-
-            # Agent task finished — drain any remaining events, then break.
-            if agent_task and agent_task.done():
-                if renderer is not None:
-                    # Final settle after task completion to catch late events.
-                    await self._drain_renderer_until_settled(
-                        renderer, settle_delay=0.05
-                    )
-                break
-
-            # Yield to the event loop.  wait_for_state_change will return
-            # early when the delivery thread sets _state_event.
-            if renderer is None:
-                await asyncio.sleep(0.1)
-            else:
-                await renderer.wait_for_state_change(wait_timeout_sec=0.1)
-                # Keep transcript rendering moving even if no explicit state
-                # transition arrives (e.g. long-running tool with queued output).
-                renderer.drain_events()
-                now = time.monotonic()
-                if now - last_periodic_drain >= 0.5:
-                    renderer.refresh(force=True)
-                    last_periodic_drain = now
-
-            # Hard timeout — surface error and return to prompt instead of
-            # hanging forever (e.g. LLM API unresponsive). Allow a longer
-            # budget while a foreground command action is still pending.
-            active_timeout = self._active_timeout(
-                controller,
-                hard_timeout,
-                cmd_timeout,
-            )
-            if active_timeout > 0 and time.monotonic() - start > active_timeout:
-                await self._handle_agent_hard_timeout(
-                    renderer,
-                    agent_task,
-                    active_timeout,
-                )
-                break
+    async def _wait_for_agent_idle(self, controller: Any, agent_task: Any) -> None:
+        await _wait_for_agent_idle(
+            cast(SessionLifecycleHost, self),
+            controller,
+            agent_task,
+        )
 
     async def _handle_idle_or_confirmation(
         self,
@@ -177,69 +117,29 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         renderer: Any,
         state: AgentState,
     ) -> bool:
-        """Return True when the wait loop should break out (agent is idle)."""
-        if state in self._IDLE_AGENT_STATES:
-            # Reset confirmation counter when agent leaves confirmation state.
-            if hasattr(self, '_confirmation_prompt_count'):
-                self._confirmation_prompt_count = 0
-            if renderer is not None:
-                await self._drain_renderer_until_settled(renderer)
-                state = controller.get_agent_state()
-            if state == AgentState.AWAITING_USER_CONFIRMATION:
-                await self._handle_confirmation(controller)
-                return False
-            if state in self._IDLE_AGENT_STATES:
-                self._fire_idle_notification(state)
-                return True
-            return False
-        if state == AgentState.AWAITING_USER_CONFIRMATION:
-            await self._handle_confirmation(controller)
-        return False
+        return await _handle_idle_or_confirmation(
+            cast(SessionLifecycleHost, self),
+            controller,
+            renderer,
+            state,
+        )
 
     @staticmethod
     def _fire_idle_notification(state: AgentState) -> None:
-        """Fire a desktop notification when the agent reaches an idle state."""
-        from backend.cli.notifications import notify_agent_error, notify_agent_idle
-
-        if state == AgentState.ERROR:
-            notify_agent_error()
-        elif state == AgentState.AWAITING_USER_INPUT:
-            notify_agent_idle(needs_input=True)
-        elif state in (AgentState.FINISHED, AgentState.STOPPED):
-            notify_agent_idle(needs_input=False)
+        _fire_idle_notification(state)
 
     async def _handle_agent_hard_timeout(
         self,
         renderer: Any,
-        agent_task: asyncio.Task[Any] | None,
+        agent_task: Any,
         active_timeout: int,
     ) -> None:
-        logger.warning('Agent wait exceeded %ds hard timeout', active_timeout)
-        from backend.cli.notifications import notify
-        from backend.core.enums import AgentState
-
-        notify(
-            'Grinta — Timeout',
-            f'Agent timed out after {active_timeout} seconds.',
-            urgency='critical',
+        await _handle_agent_hard_timeout(
+            cast(SessionLifecycleHost, self),
+            renderer,
+            agent_task,
+            active_timeout,
         )
-        if renderer is not None:
-            renderer.add_system_message(
-                f'Agent timed out after {active_timeout} seconds. Returning to prompt.',
-                title='⏱ Timeout',
-            )
-            renderer.drain_events()
-        # Cancel the stale task so it does not linger into the next turn.
-        if agent_task and not agent_task.done():
-            agent_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await agent_task
-        # Transition controller out of RUNNING so the next user message
-        # starts from a clean, valid state machine position.
-        controller = getattr(self, '_controller', None)
-        if controller is not None:
-            with contextlib.suppress(Exception):
-                await controller.set_agent_state_to(AgentState.ERROR)
 
     async def _drain_renderer_until_settled(
         self,
@@ -248,53 +148,16 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         settle_delay: float = 0.05,
         max_passes: int = 4,
     ) -> None:
-        """Drain queued CLI events until the delivery queue stays quiet briefly."""
-        for _ in range(max_passes):
-            renderer.drain_events()
-            if getattr(renderer, 'pending_event_count', 0) == 0:
-                await asyncio.sleep(settle_delay)
-                renderer.drain_events()
-                if getattr(renderer, 'pending_event_count', 0) == 0:
-                    return
-            else:
-                await asyncio.sleep(settle_delay)
+        await _drain_renderer_until_settled(
+            renderer,
+            settle_delay=settle_delay,
+            max_passes=max_passes,
+        )
 
     # -- interrupt handler -------------------------------------------------
 
-    async def _cancel_agent(self, agent_task: asyncio.Task[Any] | None) -> None:
-        """Cancel a running agent task and return to the prompt."""
-        if agent_task and not agent_task.done():
-            agent_task.cancel()
-            try:
-                await asyncio.wait_for(agent_task, timeout=5.0)
-            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
-                pass
-
-        # Clear stale _next_action to prevent swallowing user messages after interrupt
-        self._next_action = None
-
-        # Hard kill underlying shells/processes
-        with contextlib.suppress(Exception):
-            from backend.execution.action_execution_server import (
-                client as runtime_client,
-            )
-
-            if runtime_client is not None:
-                await runtime_client.hard_kill()
-
-        # Stop orchestrator cleanly (no ErrorObservation for interrupted tools)
-        if self._controller is not None:
-            mark = getattr(self._controller, 'mark_user_interrupt_stop', None)
-            if callable(mark):
-                mark()
-            with contextlib.suppress(Exception):
-                await self._controller.stop()
-
-        self._reasoning.stop()
-        if self._renderer is not None:
-            self._renderer.add_system_message(
-                'Interrupted. Ready for input.', title='grinta'
-            )
+    async def _cancel_agent(self, agent_task: Any) -> None:
+        await _cancel_agent(cast(SessionLifecycleHost, self), agent_task)
 
     # -- session resume ----------------------------------------------------
 
@@ -302,98 +165,34 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         self,
         target: str,
         config: AppConfig,
-        create_controller,
-        create_status_callback,
-        run_agent_until_done,
+        create_controller: Any,
+        create_status_callback: Any,
+        run_agent_until_done: Any,
         end_states: list[AgentState],
-    ) -> tuple[Any, asyncio.Task[Any]] | None:
-        """Resume a previous session by index or ID.
-
-        Returns (controller, agent_task) on success, or None on failure.
-        """
-        bootstrap = self._validate_resume_bootstrap_state()
-        if bootstrap is None:
-            return None
-        llm_registry, agent, conversation_stats = bootstrap
-
-        resolved_id = self._resolve_resume_target(target, config)
-        if resolved_id is None:
-            return None
-
-        runtime_bundle = self._setup_resume_runtime(
+    ) -> tuple[Any, Any] | None:
+        return await _resume_session(
+            cast(SessionLifecycleHost, self),
+            target,
             config,
-            llm_registry,
-            agent,
-            resolved_id,
-        )
-        if runtime_bundle is None:
-            return None
-        runtime, repo_directory, acquire_result, event_stream = runtime_bundle
-
-        wire_ok = await self._wire_resume_runtime_state(
-            config,
-            runtime,
-            agent,
-            resolved_id,
-            repo_directory,
-            acquire_result,
-            event_stream,
-        )
-        if not wire_ok:
-            return None
-        controller = self._build_resume_controller(
-            agent,
-            runtime,
-            config,
-            conversation_stats,
             create_controller,
             create_status_callback,
+            run_agent_until_done,
+            end_states,
         )
-        agent_task = asyncio.create_task(
-            run_agent_until_done(controller, runtime, self._memory, end_states),
-            name='grinta-agent-loop',
-        )
-        if self._renderer is not None:
-            self._renderer.add_system_message(
-                f'Session {resolved_id} resumed. Send a message to continue.',
-                title='grinta',
-            )
-        return controller, agent_task
 
     def _validate_resume_bootstrap_state(
         self,
     ) -> tuple[Any, Any, Any] | None:
-        llm_registry = self._llm_registry
-        agent = self._agent
-        conversation_stats = self._conversation_stats
-        if llm_registry is None or agent is None or conversation_stats is None:
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    'Resume failed: session bootstrap state is incomplete.',
-                    title='error',
-                )
-            return None
-        return llm_registry, agent, conversation_stats
+        return _validate_resume_bootstrap_state(cast(SessionLifecycleHost, self))
 
     def _resolve_resume_target(
         self,
         target: str,
         config: AppConfig,
     ) -> str | None:
-        from backend.cli.session_manager import resolve_session_id
-
-        resolved_id, resolve_error = resolve_session_id(target, config)
-        if resolve_error or resolved_id is None:
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    resolve_error or f'No session matches: {target}', title='warning'
-                )
-            return None
-        if self._renderer is not None:
-            self._renderer.add_system_message(
-                f'Resuming session: {resolved_id}', title='grinta'
-            )
-        return resolved_id
+        return _resolve_resume_target(
+            cast(SessionLifecycleHost, self), target, config
+        )
 
     def _setup_resume_runtime(
         self,
@@ -402,46 +201,13 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         agent: Any,
         resolved_id: str,
     ) -> tuple[Any, Any, Any, Any] | None:
-        from backend.core.bootstrap.main import _setup_runtime_for_controller
-
-        try:
-            runtime_state = _setup_runtime_for_controller(
-                config,
-                llm_registry,
-                resolved_id,
-                True,
-                agent,
-                None,
-                inline_event_delivery=True,
-            )
-        except Exception as exc:
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    f'Resume failed: {exc}', title='error'
-                )
-            return None
-        runtime = runtime_state[0]
-        repo_directory = runtime_state[1]
-        acquire_result = runtime_state[2]
-        event_stream = runtime.event_stream
-        if event_stream is None:
-            # Clean up partially initialized runtime to prevent resource leaks.
-            if acquire_result is not None:
-                try:
-                    from backend.execution import runtime_orchestrator
-
-                    runtime_orchestrator.release(acquire_result)
-                except Exception:
-                    logger.debug(
-                        'Failed to release acquire_result during cleanup',
-                        exc_info=True,
-                    )
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    'Resume failed: no event stream.', title='error'
-                )
-            return None
-        return runtime, repo_directory, acquire_result, event_stream
+        return _setup_resume_runtime(
+            cast(SessionLifecycleHost, self),
+            config,
+            llm_registry,
+            agent,
+            resolved_id,
+        )
 
     async def _wire_resume_runtime_state(
         self,
@@ -453,52 +219,16 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         acquire_result: Any,
         event_stream: Any,
     ) -> bool:
-        """Wire up runtime state for resume. Returns True on success, False on failure."""
-        from backend.core.bootstrap.main import _setup_memory_and_mcp
-
-        if self._acquire_result is not None:
-            from backend.execution import runtime_orchestrator
-
-            runtime_orchestrator.release(self._acquire_result)
-
-        self._event_stream = event_stream
-        self._runtime = runtime
-        self._acquire_result = acquire_result
-
-        try:
-            memory = await _setup_memory_and_mcp(
-                config,
-                runtime,
-                resolved_id,
-                repo_directory,
-                None,
-                None,
-                agent,
-            )
-        except Exception as exc:
-            logger.error(
-                'Resume failed during memory/MCP setup: %s', exc, exc_info=True
-            )
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    f'Resume failed during memory/MCP setup: {exc}',
-                    title='error',
-                )
-            return False
-        self._memory = memory
-        mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
-        try:
-            mcp_n = int(mcp_status.get('connected_client_count') or 0)
-        except (TypeError, ValueError):
-            mcp_n = 0
-        self._hud.update_mcp_servers(mcp_n)
-
-        # Subscribe renderer to the new event stream.
-        if self._renderer is not None:
-            renderer = cast(Any, self._renderer)
-            renderer.reset_subscription()
-            renderer.subscribe(event_stream, event_stream.sid)
-        return True
+        return await _wire_resume_runtime_state(
+            cast(SessionLifecycleHost, self),
+            config,
+            runtime,
+            agent,
+            resolved_id,
+            repo_directory,
+            acquire_result,
+            event_stream,
+        )
 
     def _build_resume_controller(
         self,
@@ -509,115 +239,17 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         create_controller: Any,
         create_status_callback: Any,
     ) -> Any:
-        controller, _ = create_controller(
+        return _build_resume_controller(
+            cast(SessionLifecycleHost, self),
             agent,
             runtime,
             config,
             conversation_stats,
+            create_controller,
+            create_status_callback,
         )
-        runtime_for_controller = cast(Any, runtime)
-        runtime_for_controller.controller = controller
-        self._controller = controller
-
-        early_cb = create_status_callback(controller)
-        try:
-            self._memory.status_callback = early_cb  # type: ignore[union-attr]
-        except Exception:
-            logger.debug('Could not set memory status callback', exc_info=True)
-        return controller
 
     # -- confirmation handler ----------------------------------------------
 
-    async def _handle_confirmation(self, controller) -> None:
-        """Prompt user for Y/N on a pending action, then resume the engine."""
-        # Guard against infinite confirmation loops: if we've prompted
-        # too many times without the agent transitioning state, break out.
-        if not hasattr(self, '_confirmation_prompt_count'):
-            self._confirmation_prompt_count = 0
-        self._confirmation_prompt_count += 1
-        if self._confirmation_prompt_count > 5:
-            logger.warning(
-                'Confirmation loop detected (%d prompts), auto-rejecting',
-                self._confirmation_prompt_count,
-            )
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    'Confirmation loop detected — auto-rejecting to prevent hang.',
-                    title='warning',
-                )
-            action = build_confirmation_action(False)
-            if self._event_stream:
-                self._event_stream.add_event(action, EventSource.USER)
-            self._confirmation_prompt_count = 0
-            return
-
-        pending = None
-        try:
-            pending = controller.get_pending_action()
-        except Exception:
-            logger.debug('get_pending_action() failed, trying fallback', exc_info=True)
-            pending = getattr(controller, '_pending_action', None)
-
-        # Auto-approve LOW-risk when user chose "don't ask again" this session
-        if pending is not None and self._suppress_low_risk_confirmations:
-            from backend.core.enums import ActionSecurityRisk
-
-            risk = getattr(pending, 'security_risk', ActionSecurityRisk.UNKNOWN)
-            if risk == ActionSecurityRisk.LOW:
-                decision = ConfirmationDecision(approved=True, remember=False)
-                action = build_confirmation_action(True)
-                if self._event_stream:
-                    self._event_stream.add_event(action, EventSource.USER)
-                return
-
-        remember_always = False
-        suppress_low_risk = False
-        if pending is not None:
-            if self._renderer is not None:
-                with self._renderer.suspend_live():
-                    decision = render_confirmation(self._console, pending)
-            else:
-                decision = render_confirmation(self._console, pending)
-            approved = decision.approved
-            remember_always = decision.remember
-            suppress_low_risk = decision.suppress_low_risk
-        else:
-            # Fallback: generic prompt if we can't get the pending action.
-            from rich.prompt import Confirm
-
-            if self._renderer is not None:
-                with self._renderer.suspend_live():
-                    approved = Confirm.ask(
-                        '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]',
-                        console=self._console,
-                    )
-            else:
-                approved = Confirm.ask(
-                    '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]',
-                    console=self._console,
-                )
-
-        if remember_always and approved and pending is not None:
-            ac = getattr(controller, 'autonomy_controller', None)
-            if ac is not None and hasattr(ac, 'remember_always_allow'):
-                try:
-                    ac.remember_always_allow(pending)
-                    if self._renderer is not None:
-                        self._renderer.add_system_message(
-                            'Remembered for this session — will not ask again for this exact action.',
-                            title='autonomy',
-                        )
-                except Exception:
-                    logger.debug('remember_always_allow failed', exc_info=True)
-
-        if suppress_low_risk and approved:
-            self._suppress_low_risk_confirmations = True
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    'LOW-risk actions will be auto-approved for the rest of this session.',
-                    title='autonomy',
-                )
-
-        action = build_confirmation_action(approved)
-        if self._event_stream:
-            self._event_stream.add_event(action, EventSource.USER)
+    async def _handle_confirmation(self, controller: Any) -> None:
+        await _handle_confirmation(cast(SessionLifecycleHost, self), controller)
