@@ -32,9 +32,7 @@ def _reset_step_recovery_counters(orch: Orchestrator) -> None:
         executor._consecutive_plain_text_blocks = 0
 
 
-def _astep_handle_tool_execution_error(
-    orch: Orchestrator, e: Exception
-) -> Action:
+def _astep_handle_tool_execution_error(orch: Orchestrator, e: Exception) -> Action:
     orch._consecutive_context_errors = 0
     logger.warning('Auto-Healing: Tool Execution Error: %s', e)
 
@@ -90,8 +88,7 @@ def _astep_handle_recoverable_tool_call_shape_error(
 
     return AgentThinkAction(
         thought=(
-            f'{str(e)}\n'
-            'Please emit a corrected tool call with valid JSON arguments.'
+            f'{str(e)}\nPlease emit a corrected tool call with valid JSON arguments.'
         ),
         kind=AgentThinkAction.KIND_RECOVERABLE_ERROR,
     )

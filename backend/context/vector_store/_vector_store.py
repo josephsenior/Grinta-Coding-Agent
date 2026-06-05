@@ -20,7 +20,9 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-_LOCAL_VECTOR_STORE = importlib.import_module(__name__.rsplit('.', 1)[0] + '._local_vector_store')
+_LOCAL_VECTOR_STORE = importlib.import_module(
+    __name__.rsplit('.', 1)[0] + '._local_vector_store'
+)
 SQLiteBM25Backend = _LOCAL_VECTOR_STORE.SQLiteBM25Backend
 
 logger = logging.getLogger(__name__)

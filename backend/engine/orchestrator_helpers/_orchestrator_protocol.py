@@ -116,7 +116,9 @@ def _protocol_mode_fallback_message(
         return abandoned
 
     count = increment_prose_attempts(state)
-    if hasattr(executor := getattr(orch, 'executor', None), '_consecutive_plain_text_blocks'):
+    if hasattr(
+        executor := getattr(orch, 'executor', None), '_consecutive_plain_text_blocks'
+    ):
         executor._consecutive_plain_text_blocks = count
     set_pending_directive(
         state,

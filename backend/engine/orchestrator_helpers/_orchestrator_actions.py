@@ -47,9 +47,7 @@ def _clear_queued_actions(orch: Orchestrator, reason: str = '') -> int:
     orch.pending_actions.clear()
     orch.deferred_actions.clear()
     if removed > 0:
-        logger.warning(
-            'Cleared %d queued actions (%s)', removed, reason or 'no reason'
-        )
+        logger.warning('Cleared %d queued actions (%s)', removed, reason or 'no reason')
     return removed
 
 

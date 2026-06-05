@@ -186,7 +186,9 @@ def convert_tools_to_description(tools: list[dict]) -> str:
 
 def _process_system_message(content: Any, system_prompt_suffix: str) -> dict:
     """Process system message by appending the system prompt suffix."""
-    from backend.inference.fn_call._fn_call_to_messages import _raise_unexpected_content_type  # noqa: I001, PLC0415
+    from backend.inference.fn_call._fn_call_to_messages import (
+        _raise_unexpected_content_type,
+    )  # noqa: I001, PLC0415
 
     if isinstance(content, str):
         content += system_prompt_suffix
@@ -221,7 +223,9 @@ def _add_in_context_learning_example(
     mode: str = 'agent',
 ) -> Any:
     """Add in-context learning example to content."""
-    from backend.inference.fn_call._fn_call_to_messages import _raise_unexpected_content_type  # noqa: I001, PLC0415
+    from backend.inference.fn_call._fn_call_to_messages import (
+        _raise_unexpected_content_type,
+    )  # noqa: I001, PLC0415
 
     if not (example := IN_CONTEXT_LEARNING_EXAMPLE_PREFIX(tools, mode)):
         return content
