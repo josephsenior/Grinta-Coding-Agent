@@ -15,6 +15,7 @@ from backend.core.errors import (
 )
 from backend.engine.function_calling import (
     _handle_cmd_run_tool,
+    _handle_create_task_tracker_tool,
     _handle_finish_tool,
     _handle_mcp_tool,
     _handle_summarize_context_tool,
@@ -23,7 +24,10 @@ from backend.engine.function_calling import (
     combine_thought,
     set_security_risk,
 )
-from backend.engine.tools.task_tracker import create_task_tracker_tool
+from backend.engine.tools.task_tracker import (
+    create_create_task_tracker_tool,
+    create_task_tracker_tool,
+)
 from backend.ledger.action import (
     CmdRunAction,
     MessageAction,
@@ -232,6 +236,29 @@ class TestHandleMcpTool:
 
 
 class TestHandleTaskTrackerTool:
+    def test_create_task_tracker_command_with_task_list(self):
+        args = {
+            'task_list': [
+                {'id': 'task-1', 'description': 'Do X', 'status': 'todo'},
+            ],
+        }
+        action = _handle_create_task_tracker_tool(args)
+        assert isinstance(action, TaskTrackingAction)
+        assert action.command == 'create'
+        assert len(action.task_list) == 1
+
+    def test_create_task_tracker_requires_non_empty_task_list(self):
+        with pytest.raises(FunctionCallValidationError, match='at least one'):
+            _handle_create_task_tracker_tool({'task_list': []})
+
+    def test_create_task_tracker_schema_uses_same_statuses(self):
+        tool = create_create_task_tracker_tool()
+        parameters = tool['function']['parameters']
+        status = parameters['properties']['task_list']['items']['properties']['status']
+
+        assert tool['function']['name'] == 'create_task_tracker'
+        assert status['enum'] == ['todo', 'in_progress', 'done', 'skipped', 'blocked']
+
     def test_update_command_with_task_list(self):
         args = {
             'command': 'update',

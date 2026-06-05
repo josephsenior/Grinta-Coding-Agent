@@ -21,6 +21,18 @@ from collections import deque
 from typing import TYPE_CHECKING, Any
 
 import backend.engine.function_calling as orchestrator_function_calling
+from backend.core.agent_protocol import (
+    ABANDONED_RETRY_PROMPT,
+    CONTINUATION_NUDGE,
+    increment_prose_attempts,
+    mark_abandoned,
+    prose_attempts,
+    reset_prose_attempts,
+    set_pending_directive,
+    tracker_created,
+    tracker_terminal,
+    work_remains,
+)
 from backend.core.config import AgentConfig
 from backend.core.constants import (
     DEFAULT_AGENT_MAX_CONTEXT_LIMIT_ERRORS,
@@ -86,6 +98,15 @@ def _safe_plain_text_count(executor: Any) -> int:
     """
     raw = getattr(executor, '_consecutive_plain_text_blocks', 0)
     return raw if isinstance(raw, int) else 0
+
+
+def _should_reset_plain_text_count(actions: list[Any]) -> bool:
+    """Reset prose drift only after real work/finish, not status cards."""
+    if not actions:
+        return False
+    if all(bool(getattr(action, 'protocol_status', False)) for action in actions):
+        return False
+    return True
 
 
 def _normalize_recoverable_error_signature(e: Exception) -> str:
@@ -675,8 +696,10 @@ class Orchestrator(Agent):
             return self._build_fallback_action(result)
         # Real tool call: clear the plain-text streak.
         current_count = _safe_plain_text_count(self.executor)
-        if current_count > 0 and hasattr(
-            self.executor, '_consecutive_plain_text_blocks'
+        if (
+            current_count > 0
+            and _should_reset_plain_text_count(actions)
+            and hasattr(self.executor, '_consecutive_plain_text_blocks')
         ):
             self.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
         self._queue_additional_actions(actions[1:])
@@ -775,8 +798,10 @@ class Orchestrator(Agent):
         if not actions:
             return self._build_fallback_action(result)
         current_count = _safe_plain_text_count(self.executor)
-        if current_count > 0 and hasattr(
-            self.executor, '_consecutive_plain_text_blocks'
+        if (
+            current_count > 0
+            and _should_reset_plain_text_count(actions)
+            and hasattr(self.executor, '_consecutive_plain_text_blocks')
         ):
             self.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
         self._queue_additional_actions(actions[1:])
@@ -850,8 +875,9 @@ class Orchestrator(Agent):
 
         Empty text → raises :class:`LLMNoActionError` so the recovery machinery
         in :class:`ActionExecutionService` can issue corrective feedback and retry.
-        Agent-mode text-only output → also raises :class:`LLMNoActionError` so
-        prose never becomes an executable ``MessageAction``.
+        Agent-mode text-only output is allowed until a task tracker exists.
+        Once a tracker exists, prose is converted into a status card, an
+        implicit finish, or a neutral retry prompt depending on tracker state.
         """
         message_text = ''
         if result.response and getattr(result.response, 'choices', None):
@@ -870,6 +896,11 @@ class Orchestrator(Agent):
                 'instructions provided in that observation to continue.'
             )
 
+        # Extract reasoning content from response if available
+        reasoning = ''
+        if message is not None:
+            reasoning = getattr(message, 'reasoning_content', '') or ''
+
         executor = getattr(self, 'executor', None)
         config = getattr(self, 'config', None)
         active_mode = normalize_interaction_mode(
@@ -877,15 +908,8 @@ class Orchestrator(Agent):
             default=normalize_interaction_mode(getattr(config, 'mode', 'agent')),
         )
         if active_mode == AGENT_MODE:
-            raise LLMNoActionError(
-                'Agent mode requires a tool action, but the model returned plain text '
-                'with no tool call.'
-            )
-
-        # Extract reasoning content from response if available
-        reasoning = ''
-        if message is not None:
-            reasoning = getattr(message, 'reasoning_content', '') or ''
+            state = getattr(executor, '_state', None)
+            return self._agent_mode_fallback_message(message_text, reasoning, state)
 
         logger.warning(
             'LLM returned text-only response with no tool calls in %s mode; '
@@ -897,6 +921,94 @@ class Orchestrator(Agent):
         )
         fallback.source = EventSource.AGENT
         return fallback
+
+    def _agent_mode_fallback_message(
+        self,
+        message_text: str,
+        reasoning: str,
+        state: object | None,
+    ) -> Action:
+        """Handle Agent-mode prose when no parsed action was produced."""
+        if not tracker_created(state):
+            reset_prose_attempts(state)
+            fallback = MessageAction(
+                content=message_text, thought=reasoning, wait_for_response=True
+            )
+            fallback.source = EventSource.AGENT
+            return fallback
+
+        if tracker_terminal(state):
+            reset_prose_attempts(state)
+            return self._synthesize_plain_text_finish(message_text)
+
+        if not work_remains(state):
+            reset_prose_attempts(state)
+            fallback = MessageAction(
+                content=message_text, thought=reasoning, wait_for_response=True
+            )
+            fallback.source = EventSource.AGENT
+            return fallback
+
+        current_attempts = prose_attempts(state)
+        if current_attempts >= 3:
+            mark_abandoned(state)
+            logger.warning(
+                'Agent protocol abandoned fallback prose while work remained '
+                '(attempts=%d, text=%r).',
+                current_attempts,
+                message_text[:500],
+            )
+            abandoned = MessageAction(
+                content=ABANDONED_RETRY_PROMPT,
+                thought=reasoning,
+                wait_for_response=True,
+            )
+            abandoned.protocol_abandoned = True
+            abandoned.source = EventSource.AGENT
+            return abandoned
+
+        count = increment_prose_attempts(state)
+        if hasattr(executor := getattr(self, 'executor', None), '_consecutive_plain_text_blocks'):
+            executor._consecutive_plain_text_blocks = count
+        set_pending_directive(
+            state,
+            CONTINUATION_NUDGE,
+            source='Orchestrator._agent_mode_fallback_message',
+        )
+        status = MessageAction(
+            content=message_text,
+            thought=reasoning,
+            wait_for_response=False,
+        )
+        status.protocol_status = True
+        status.source = EventSource.AGENT
+        return status
+
+    @staticmethod
+    def _synthesize_plain_text_finish(message_text: str) -> PlaybookFinishAction:
+        clean = (message_text or '').strip() or 'All tracked tasks are complete.'
+        return PlaybookFinishAction(
+            final_thought=clean,
+            outputs={
+                'mode': 'agent',
+                'status': 'completed',
+                'response': clean,
+                'summary': clean,
+                'sections': [{'title': 'Summary', 'items': [clean]}],
+                'evidence': {
+                    'status': 'not_applicable',
+                    'details': 'Synthesized from plain text after tracker completion.',
+                },
+                'open_items': [],
+                'next_step': '',
+                'actions_taken': [],
+                'verification': {
+                    'status': 'not_run',
+                    'details': 'No separate verification was reported in the final text.',
+                },
+                'remaining_items': [],
+            },
+        )
 
     def _queue_additional_actions(self, actions: list[Action]) -> None:
         for pending in actions:

@@ -148,7 +148,7 @@ class TestGetNextAction:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_no_action_error_exhaustion_pauses_with_visible_protocol_error(self):
+    async def test_no_action_error_exhaustion_pauses_with_neutral_retry_prompt(self):
         from backend.core.errors import LLMNoActionError
         from backend.core.schemas import AgentState
 
@@ -173,6 +173,9 @@ class TestGetNextAction:
         assert isinstance(final_event, ErrorObservation)
         assert final_event.error_id == 'LLM_NO_ACTION_REPAIR_EXHAUSTED'
         assert final_event.agent_only is False
+        assert final_event.content == (
+            "Run didn't complete — want to continue from where it left off?"
+        )
 
     @pytest.mark.asyncio
     async def test_response_error_returns_none(self):

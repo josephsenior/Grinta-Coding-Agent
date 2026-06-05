@@ -475,7 +475,8 @@ def _build_context_discipline_section(
             [
                 '',
                 '**task_tracker** — your structural anchor:',
-                '- Use task_tracker for multi-step, multi-file, risky, long-running, or recovery-heavy tasks.',
+                '- In Agent mode, call create_task_tracker first when you decide a request requires structured work.',
+                '- Use task_tracker for viewing and status updates after the tracker exists.',
                 '- For small/local tasks, do not create tracker overhead; act, verify, and finish.',
                 '- If task_tracker was used for this run, keep it synced before finish.',
                 "- Update status \u2192 'in_progress' when starting, 'done' after proof, 'blocked' with reason.",
@@ -543,7 +544,7 @@ def _build_mandatory_discipline_checkpoints(
     idx = 2
     if tracker_on:
         items.append(
-            f'{idx}. For multi-step tasks \u2192 task_tracker(update) with full plan'
+            f'{idx}. For multi-step tasks \u2192 create_task_tracker with full plan'
         )
         idx += 1
         items.append(
@@ -658,7 +659,8 @@ def _render_autonomy(
     if tracker_on:
         task_tracker_discipline_block = (
             '<TASK_TRACKING>\n'
-            '**task_tracker**: For multi-step tasks, use `view` to inspect the plan and `update` to replace the full `task_list`.\n'
+            '**create_task_tracker**: In Agent mode, use this as your first action when you commit to structured work.\n'
+            '**task_tracker**: After creation, use `view` to inspect the plan, `update` to replace the full `task_list`, and `update_status` for single-task status changes.\n'
             'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task status by ID. Optional `result` field captures outcome.\n'
             'Allowed statuses: `todo`, `in_progress`, `done`, `skipped`, `blocked`.\n'
             'Each step object has: `id` (string, e.g. "1" or "1.1"), `description` (string), `status` (one of the allowed statuses), `result` (optional string), `tags` (optional LIST of strings — never a bare string), `subtasks` (optional recursive list of the same shape).\n'
@@ -817,7 +819,7 @@ def _render_critical(
     )
 
     planning_tool_list = (
-        '`task_tracker`, `{terminal_command_tool}`, and the public file API tools'
+        '`create_task_tracker`, `task_tracker`, `{terminal_command_tool}`, and the public file API tools'
         if tracker_on
         else '`{terminal_command_tool}` and the public file API tools'
     )

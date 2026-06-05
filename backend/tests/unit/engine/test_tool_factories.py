@@ -6,8 +6,15 @@ from backend.engine.tools.condensation_request import (
     create_summarize_context_tool,
 )
 from backend.engine.tools.finish import create_finish_tool
-from backend.engine.tools.task_tracker import create_task_tracker_tool
-from backend.inference.tool_names import FINISH_TOOL_NAME, TASK_TRACKER_TOOL_NAME
+from backend.engine.tools.task_tracker import (
+    create_create_task_tracker_tool,
+    create_task_tracker_tool,
+)
+from backend.inference.tool_names import (
+    CREATE_TASK_TRACKER_TOOL_NAME,
+    FINISH_TOOL_NAME,
+    TASK_TRACKER_TOOL_NAME,
+)
 
 
 class TestCreateFinishTool:
@@ -55,6 +62,20 @@ class TestCreateFinishTool:
 
 
 class TestCreateTaskTrackerTool:
+    def test_create_task_tracker_type(self):
+        tool = create_create_task_tracker_tool()
+        assert tool['type'] == 'function'
+
+    def test_create_task_tracker_name(self):
+        tool = create_create_task_tracker_tool()
+        assert tool['function']['name'] == CREATE_TASK_TRACKER_TOOL_NAME
+
+    def test_create_task_tracker_requires_task_list(self):
+        tool = create_create_task_tracker_tool()
+        params = tool['function']['parameters']
+        assert params['required'] == ['task_list']
+        assert params['properties']['task_list']['type'] == 'array'
+
     def test_type(self):
         tool = create_task_tracker_tool()
         assert tool['type'] == 'function'

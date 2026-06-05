@@ -33,6 +33,7 @@ from backend.engine.tools.browser_native import (
 from backend.engine.tools.search_code import build_search_code_action
 from backend.engine.tools.task_tracker import TaskTracker
 from backend.inference.tool_names import (
+    CREATE_TASK_TRACKER_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
 )
@@ -672,6 +673,30 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
         tracker.save_to_file(normalized_task_list)
 
     return TaskTrackingAction(command=command, task_list=normalized_task_list)
+
+
+def _handle_create_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
+    """Handle CREATE_TASK_TRACKER_TOOL tool call."""
+    raw_task_list_any = require_tool_argument(
+        arguments, 'task_list', CREATE_TASK_TRACKER_TOOL_NAME
+    )
+    if not isinstance(raw_task_list_any, Sequence) or isinstance(
+        raw_task_list_any, (str, bytes)
+    ):
+        raise FunctionCallValidationError(
+            'Invalid format for "task_list". Expected a non-empty list.'
+        )
+
+    raw_task_list = cast(Sequence[Mapping[str, Any]], raw_task_list_any)
+    if not raw_task_list:
+        raise FunctionCallValidationError(
+            'create_task_tracker requires at least one task item.'
+        )
+
+    normalized_task_list = _normalize_task_tracker_list(list(raw_task_list))
+    tracker = TaskTracker()
+    tracker.save_to_file(normalized_task_list)
+    return TaskTrackingAction(command='create', task_list=normalized_task_list)
 
 
 def _handle_mcp_tool(

@@ -188,11 +188,13 @@ class TestFeatureFlagToolPresence:
 
     def test_task_tracker_enabled(self):
         names = _build_toolset(enable_task_tracker_tool=True)
+        assert 'create_task_tracker' in names
         assert 'task_tracker' in names
         self._assert_dispatch_covered(names)
 
     def test_task_tracker_disabled(self):
         names = _build_toolset(enable_task_tracker_tool=False)
+        assert 'create_task_tracker' not in names
         assert 'task_tracker' not in names
 
     def test_condensation_request_enabled(self):
@@ -326,6 +328,7 @@ class TestModeToolVisibility:
             'call_mcp_tool',
             'browser_tool',
             'checkpoint',
+            'create_task_tracker',
             'task_tracker',
             'note',
             'memory_manager',

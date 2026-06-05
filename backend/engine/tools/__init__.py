@@ -23,7 +23,7 @@ from .native_file_tools import (
     create_undo_last_edit_tool,
 )
 from .search_code import create_search_code_tool
-from .task_tracker import create_task_tracker_tool
+from .task_tracker import create_create_task_tracker_tool, create_task_tracker_tool
 from .terminal_manager import create_terminal_manager_tool
 
 __all__ = [
@@ -45,6 +45,7 @@ __all__ = [
     'create_search_code_tool',
     'create_cmd_run_tool',
     'create_browser_tool',
+    'create_create_task_tracker_tool',
     'create_task_tracker_tool',
     'create_delegate_task_tool',
     'create_terminal_manager_tool',

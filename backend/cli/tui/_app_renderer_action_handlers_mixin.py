@@ -142,6 +142,11 @@ class _AppRendererActionHandlersMixin:
             self.clear_live_response()
             return
 
+        if bool(getattr(action, 'protocol_status', False)):
+            self._tui.add_protocol_status(content)
+            self.clear_live_response()
+            return
+
         self._commit_final_response(content)
 
     @staticmethod

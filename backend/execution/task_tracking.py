@@ -51,7 +51,7 @@ class TaskTrackingMixin:
         conversation_dir = get_conversation_dir(self.sid, self.event_stream.user_id)
         task_file_path = f'{conversation_dir}TASKS.md'
 
-        if action.command == 'update':
+        if action.command in {'create', 'update'}:
             return self._handle_task_update_action(action, task_file_path)
         if action.command == 'view':
             # Always read TASKS.md for view. The engine may hydrate task_list from

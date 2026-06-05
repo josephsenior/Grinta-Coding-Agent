@@ -78,6 +78,7 @@ from backend.ledger.observation.agent import (
 from backend.ledger.observation.browser_screenshot import BrowserScreenshotObservation
 from backend.ledger.observation.code_nav import LspQueryObservation
 from backend.ledger.observation.commands import CmdOutputObservation
+from backend.ledger.observation.error import ErrorObservation
 from backend.ledger.observation.files import (
     FileEditObservation,
     FileReadObservation,
@@ -3134,6 +3135,7 @@ async def test_tui_message_helpers(mock_config):
         s.add_system_message('test system message')
         s.add_success('test success')
         s.add_error('test error')
+        s.add_warning('test warning')
         s.add_tool_start('test_tool_name')
         s.add_tool_result('test tool result')
         s.add_divider()
@@ -3141,6 +3143,72 @@ async def test_tui_message_helpers(mock_config):
 
         log = s.query_one('#main-display')
         assert log is not None
+
+
+@pytest.mark.asyncio
+async def test_tui_recoverable_error_routes_to_add_warning(mock_config):
+    """Recoverable ErrorObservations must render via add_warning, not add_error."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        s.add_warning = MagicMock(wraps=s.add_warning)  # type: ignore[method-assign]
+        s.add_error = MagicMock(wraps=s.add_error)  # type: ignore[method-assign]
+
+        # Recoverable tool-validation outcome → warning path.
+        renderer._process_event(
+            ErrorObservation(content='Tool validation failed: bad args')
+        )
+        # User-facing auth failure → still red error path.
+        renderer._process_event(
+            ErrorObservation(
+                content='401 Unauthorized',
+                notify_ui_only=True,
+            )
+        )
+        await asyncio.sleep(0.1)
+
+        assert s.add_warning.call_count == 1
+        assert s.add_error.call_count == 1
+        warning_text = s.add_warning.call_args[0][0]
+        error_text = s.add_error.call_args[0][0]
+        assert 'Tool validation failed' in warning_text
+        assert '401 Unauthorized' in error_text
+
+
+@pytest.mark.asyncio
+async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
+    """add_error/add_warning must not pre-wrap text — let the container wrap."""
+    from backend.cli.tui._app_screen_messages_mixin import (
+        _AppScreenMessagesMixin,
+    )
+
+    long_text = 'recoverable ' + ('x' * 200)
+    # Use a stub class to exercise the helper without spinning up Textual.
+    stub = _AppScreenMessagesMixin.__new__(_AppScreenMessagesMixin)
+    captured: list[object] = []
+    stub._write_log = lambda renderable: captured.append(renderable)  # type: ignore[attr-defined]
+
+    stub.add_error('boom')
+    stub.add_warning(long_text)
+    plain = '\n'.join(
+        str(getattr(item, 'plain', item)) for item in captured
+    )
+    # The 200-char run must remain on a single line — no width=80 pre-wrap.
+    assert 'x' * 200 in plain
 
 
 @pytest.mark.asyncio

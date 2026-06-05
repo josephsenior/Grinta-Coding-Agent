@@ -31,6 +31,8 @@ ThinkingIntentKind = Literal[
     'error',
 ]
 
+ThinkingIntentSeverity = Literal['error', 'warning']
+
 
 @dataclass(frozen=True)
 class ThinkingRenderIntent:
@@ -41,6 +43,7 @@ class ThinkingRenderIntent:
     detail: str = ''
     tag: str = ''
     source_tool: str = ''
+    severity: ThinkingIntentSeverity = 'error'
 
 
 class _AppRendererThinkingMixin:
@@ -111,6 +114,7 @@ class _AppRendererThinkingMixin:
                 text=thought,
                 detail=detail_line,
                 tag='ERROR',
+                severity='warning',
             )
 
         if kind == 'truncated':
@@ -123,6 +127,7 @@ class _AppRendererThinkingMixin:
                 text=thought,
                 detail=detail_line,
                 tag='ERROR',
+                severity='warning',
             )
 
         if source_tool == 'search_code' or '[SEARCH_RESULTS]' in thought:
@@ -253,7 +258,11 @@ class _AppRendererThinkingMixin:
             return True
 
         if intent.kind == 'error':
-            self._tui.add_error(intent.detail or intent.text)
+            message = intent.detail or intent.text
+            if intent.severity == 'warning':
+                self._tui.add_warning(message)
+            else:
+                self._tui.add_error(message)
             return True
 
         card = self._thinking_artifact_card(intent)

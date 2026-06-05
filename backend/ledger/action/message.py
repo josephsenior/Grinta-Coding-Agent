@@ -30,6 +30,8 @@ class MessageAction(Action):
     image_urls: list[str] | None = None
     wait_for_response: bool = False
     suppress_cli: bool = False
+    protocol_status: bool = False
+    protocol_abandoned: bool = False
     action: ClassVar[str] = ActionType.MESSAGE
     security_risk: ActionSecurityRisk = ActionSecurityRisk.UNKNOWN
 

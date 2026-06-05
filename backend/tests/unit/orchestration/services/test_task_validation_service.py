@@ -248,7 +248,7 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Unfinished tasks:', observation.content)
 
     async def test_handle_finish_allows_terminal_plan_steps(self):
-        action = PlaybookFinishAction(outputs={})
+        action = PlaybookFinishAction(outputs={'summary': 'Implemented the work.'})
         self.mock_controller.task_validator = None
         self.mock_controller.state.plan = SimpleNamespace(
             steps=[
@@ -256,6 +256,48 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
                     id='1',
                     description='Implement CLI interface',
                     status='done',
+                    subtasks=[],
+                )
+            ]
+        )
+
+        result = await self.service.handle_finish(action)
+
+        self.assertTrue(result)
+
+    async def test_handle_finish_blocks_unreported_skipped_task(self):
+        action = PlaybookFinishAction(outputs={'summary': 'Completed the main work.'})
+        self.mock_controller.task_validator = None
+        self.mock_controller.state.extra_data['__agent_protocol_tracker_created'] = True
+        self.mock_controller.state.plan = SimpleNamespace(
+            steps=[
+                SimpleNamespace(
+                    id='1',
+                    description='Optional cleanup',
+                    status='skipped',
+                    subtasks=[],
+                )
+            ]
+        )
+
+        result = await self.service.handle_finish(action)
+
+        self.assertFalse(result)
+        observation = self.mock_controller.event_stream.add_event.call_args[0][0]
+        self.assertEqual(observation.error_id, 'FINISH_SKIPPED_BLOCKED_UNREPORTED')
+
+    async def test_handle_finish_allows_reported_skipped_task(self):
+        action = PlaybookFinishAction(
+            outputs={'summary': 'Optional cleanup was skipped because it is out of scope.'}
+        )
+        self.mock_controller.task_validator = None
+        self.mock_controller.state.extra_data['__agent_protocol_tracker_created'] = True
+        self.mock_controller.state.plan = SimpleNamespace(
+            steps=[
+                SimpleNamespace(
+                    id='1',
+                    description='Optional cleanup',
+                    status='skipped',
                     subtasks=[],
                 )
             ]

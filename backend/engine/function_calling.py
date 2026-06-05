@@ -63,6 +63,7 @@ from backend.engine.tools.note import build_note_action, build_recall_action
 from backend.engine.tools.search_code import SEARCH_CODE_TOOL_NAME
 from backend.engine.tools.terminal_manager import TERMINAL_MANAGER_TOOL_NAME
 from backend.inference.tool_names import (
+    CREATE_TASK_TRACKER_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
 )
@@ -126,6 +127,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         cast(
             str, create_summarize_context_tool().get('function', {}).get('name', '')
         ): _handle_summarize_context_tool,
+        CREATE_TASK_TRACKER_TOOL_NAME: _handle_create_task_tracker_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
         MEMORY_MANAGER_TOOL_NAME: _handle_memory_manager_tool,
         NOTE_TOOL_NAME: lambda args: build_note_action(
@@ -327,6 +329,7 @@ from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E
     _handle_checkpoint_tool,
     _handle_cmd_run_tool,
     _handle_communicate_tool,
+    _handle_create_task_tracker_tool,
     _handle_execute_mcp_tool_tool,
     _handle_finish_tool,
     _handle_mcp_tool,

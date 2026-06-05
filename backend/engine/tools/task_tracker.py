@@ -6,8 +6,8 @@ from typing import Any
 
 from backend.core.task_status import (
     TASK_STATUS_BLOCKED,
-    TASK_STATUS_IN_PROGRESS,
     TASK_STATUS_DONE,
+    TASK_STATUS_IN_PROGRESS,
     TASK_STATUS_SKIPPED,
     TASK_STATUS_TODO,
 )
@@ -16,7 +16,17 @@ from backend.engine.tools.common import (
     create_tool_definition,
     get_command_param,
 )
-from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
+from backend.inference.tool_names import (
+    CREATE_TASK_TRACKER_TOOL_NAME,
+    TASK_TRACKER_TOOL_NAME,
+)
+
+_CREATE_TASK_TRACKER_DESCRIPTION = (
+    'Create the structured task tracker and begin an Agent-mode task run. '
+    'Use this as the first action when you decide the request requires structured work. '
+    'After creation, use `task_tracker` to view the plan or update statuses. '
+    'Statuses must be exactly one of: `todo`, `in_progress`, `done`, `skipped`, `blocked`.'
+)
 
 _TASK_TRACKER_DESCRIPTION = (
     'Maintain a structured plan to track progress. '
@@ -223,4 +233,27 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
             },
         },
         required=['command'],
+    )
+
+
+def create_create_task_tracker_tool() -> ChatCompletionToolParam:
+    """Create the explicit task-run commitment tool."""
+    return create_tool_definition(
+        name=CREATE_TASK_TRACKER_TOOL_NAME,
+        description=_CREATE_TASK_TRACKER_DESCRIPTION,
+        properties={
+            'task_list': {
+                'type': 'array',
+                'description': (
+                    'The complete ordered list of plan steps for this task run. '
+                    'Must contain at least one step.'
+                ),
+                'items': _task_step_schema(),
+            },
+            'title': {
+                'type': 'string',
+                'description': 'Optional title for the current plan.',
+            },
+        },
+        required=['task_list'],
     )

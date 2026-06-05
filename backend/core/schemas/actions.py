@@ -138,6 +138,10 @@ class MessageActionSchema(ActionSchemaV1):
     action_type: Literal['message'] = Field(ActionType.MESSAGE.value, frozen=True)
     runnable: bool = Field(False, frozen=True)
     content: str = Field(..., min_length=1, description='Message content')
+    wait_for_response: bool = Field(False, description='Whether to wait for user input')
+    suppress_cli: bool = Field(False, description='Whether to suppress CLI rendering')
+    protocol_status: bool = Field(False, description='Render as a mid-task status')
+    protocol_abandoned: bool = Field(False, description='Render as a retry prompt')
 
     @field_validator('content')
     @classmethod

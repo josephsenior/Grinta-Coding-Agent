@@ -563,7 +563,14 @@ class _AppRendererEventProcessorMixin:
                 )
         elif isinstance(event, ErrorObservation):
             self._compaction_transcript_active = False
-            self._tui.add_error(event.content or 'An unknown error occurred')
+            content = event.content or 'An unknown error occurred'
+            # User-facing LLM/provider/config failures keep the red ✗ marker;
+            # everything else (tool validation, no-tool-call, capability
+            # outcomes, etc.) is a recoverable issue the agent retries on.
+            if getattr(event, 'notify_ui_only', False):
+                self._tui.add_error(content)
+            else:
+                self._tui.add_warning(content)
         elif isinstance(event, SuccessObservation):
             self._compaction_transcript_active = False
             self._clear_retry_strip('Recovered')
