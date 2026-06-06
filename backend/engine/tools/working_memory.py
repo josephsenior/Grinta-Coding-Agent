@@ -11,10 +11,14 @@ structured sections that map to how an LLM agent actually thinks:
 All sections persist to ``.app/working_memory.json`` and are automatically
 injected into post-condensation recovery context, ensuring the agent never
 loses its cognitive workspace even after history compression.
+
+Working memory is scoped per session: each conversation gets its own file
+to prevent context pollution across unrelated tasks on the same workspace.
 """
 
 from __future__ import annotations
 
+import contextvars
 import json
 import time
 from pathlib import Path
@@ -32,13 +36,34 @@ _VALID_SECTIONS = (
 )
 
 
+# Session-scoped context: set at session start to isolate working memory
+# across concurrent/sequential sessions on the same workspace.
+_current_session_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    'working_memory_session_id', default=None
+)
+
+
+def set_current_session_id(session_id: str | None) -> None:
+    """Set the session ID for working memory scoping. Call at session start."""
+    _current_session_id.set(session_id)
+
+
+def get_current_session_id() -> str | None:
+    """Get the current session ID for working memory scoping."""
+    return _current_session_id.get()
+
+
 # --- Persistence ---
 
 
 def _memory_path() -> Path:
     from backend.core.workspace_resolution import workspace_agent_state_dir
 
-    return workspace_agent_state_dir() / 'working_memory.json'
+    agent_dir = workspace_agent_state_dir()
+    session_id = get_current_session_id()
+    if session_id:
+        return agent_dir / f'working_memory_{session_id}.json'
+    return agent_dir / 'working_memory.json'
 
 
 def _load_memory() -> dict[str, str]:

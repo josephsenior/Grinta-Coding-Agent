@@ -409,6 +409,23 @@ def _handle_create_tool(arguments: Mapping[str, Any]) -> Action:
         path = require_tool_argument(arguments, 'path', CREATE_TOOL_NAME)
         content = require_tool_argument(arguments, 'content', CREATE_TOOL_NAME)
         normalized_args['file_text'] = str(content)
+        # Pre-flight existence check: if the file already exists, return a soft
+        # guidance message instead of silently overwriting. The LLM has already
+        # generated the content (tokens are spent), but this prevents accidental
+        # data loss and steers the agent toward the correct edit tool.
+        try:
+            safe_path = _safe_workspace_path(str(path), must_exist=False)
+            if safe_path.exists():
+                return AgentThinkAction(
+                    thought=(
+                        f'File already exists at {path}. '
+                        'Use replace_string to modify specific sections, '
+                        'or edit_symbols for targeted symbol-level changes. '
+                        'Only use create(type="file") for genuinely new files.'
+                    ),
+                )
+        except FunctionCallValidationError:
+            pass  # Path validation failed; let the action proceed and fail downstream
         normalized_args['overwrite_existing'] = True
         action = _build_create_file_action(str(path), normalized_args)
         set_security_risk(action, arguments)

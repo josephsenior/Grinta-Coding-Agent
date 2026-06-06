@@ -124,6 +124,16 @@ async def run_agent_until_done(
     """
     _validate_status_callbacks(runtime, controller)
 
+    # Set session ID for working memory scoping — isolates working memory
+    # across concurrent/sequential sessions on the same workspace.
+    try:
+        from backend.engine.tools.working_memory import set_current_session_id
+
+        session_id = getattr(controller, 'id', None)
+        set_current_session_id(session_id)
+    except Exception:
+        logger.debug('Failed to set working memory session ID', exc_info=True)
+
     # Auto-sync scratchpad to working_memory at session start
     try:
         from backend.engine.tools.note import _load_notes
