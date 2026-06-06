@@ -98,8 +98,23 @@ from backend.ledger.observation import (
     TerminalObservation,
     UserRejectObservation,
 )
+from backend.ledger.observation.error import (
+    ERROR_CATEGORY_NETWORK,
+    ERROR_CATEGORY_RATE_LIMIT,
+    ERROR_CATEGORY_TIMEOUT,
+)
 
 logger = logging.getLogger(__name__)
+
+# Error categories that are transient and already reflected in the HUD bar.
+# Rendering these in the history pollutes the transcript with redundant info.
+_SUPPRESS_FROM_HISTORY_CATEGORIES: frozenset[str] = frozenset(
+    {
+        ERROR_CATEGORY_TIMEOUT,
+        ERROR_CATEGORY_NETWORK,
+        ERROR_CATEGORY_RATE_LIMIT,
+    }
+)
 
 
 def _terminal_output_lexer(body: str) -> str:
@@ -390,13 +405,22 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
     def _render_error_observation(self, obs: ErrorObservation) -> None:
         if getattr(obs, 'agent_only', False):
             return
+        # Skip transient provider/network/timeout notices from history — the
+        # HUD bar already reflects the agent state (Backoff/Rate Limited/etc.)
+        # and these panels pollute the transcript with redundant information.
+        error_category = getattr(obs, 'error_category', None)
+        if error_category in _SUPPRESS_FROM_HISTORY_CATEGORIES:
+            return
+        # notify_ui_only errors are user-facing toasts only — they should not
+        # appear in the transcript history either.
+        if getattr(obs, 'notify_ui_only', False):
+            return
         self._stop_reasoning()
         self._flush_pending_tool_cards()
         self._clear_streaming_preview()
         error_content = getattr(obs, 'content', str(obs))
         # Use the structured category set by RecoveryService at the exception
         # site — no text matching needed for typed provider/runtime errors.
-        error_category = getattr(obs, 'error_category', None)
         use_notice = _use_recoverable_notice_style(
             error_content, error_category=error_category
         )
@@ -598,17 +622,6 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         host = cast(ObservationRenderersHost, self)
         content = getattr(obs, 'content', '')
         if not content:
-            return
-        lower_c = content.lower()
-        if 'stream timed out' in lower_c or 'retrying without streaming' in lower_c:
-            count = int(getattr(host, '_stream_fallback_count', 0)) + 1
-            setattr(host, '_stream_fallback_count', count)
-            logger.warning(
-                'stream_fallback_retry: count=%d content=%r',
-                count,
-                content[:120],
-            )
-            self._append_history(_build_llm_stream_fallback_panel())
             return
         if self._pending_activity_card is not None and not force_visible_status:
             return

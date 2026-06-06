@@ -930,13 +930,13 @@ async def test_tui_welcome_persists_until_real_transcript_content(mock_config):
         await pilot.pause(0.2)
         assert s._welcome_visible is True
 
-        s.on_renderer_drain_requested(RendererDrainRequested())
+        await s.on_renderer_drain_requested(RendererDrainRequested())
         await pilot.pause()
         assert s._welcome_visible is True
 
         s._get_display().mount(Static('boot complete'))
         await pilot.pause()
-        s.on_renderer_drain_requested(RendererDrainRequested())
+        await s.on_renderer_drain_requested(RendererDrainRequested())
         await pilot.pause()
         assert s._welcome_visible is False
 

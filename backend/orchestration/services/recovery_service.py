@@ -46,8 +46,9 @@ if TYPE_CHECKING:
 
 
 # Errors that require the user to intervene before the agent can continue.
-# Everything else is considered "agent-survivable": the error is injected as
-# an observation and the agent re-steps so the model can adapt its approach.
+# Includes transient infrastructure errors (Timeout, APIConnectionError, etc.)
+# because the LLM's internal Tenacity already retried 5 times. Re-executing
+# the same step won't help - just stop softly. The agent never sees these.
 _HARD_STOP_EXCEPTIONS = (
     AuthenticationError,
     ContentPolicyViolationError,
@@ -57,6 +58,12 @@ _HARD_STOP_EXCEPTIONS = (
     # Persistent runtime disconnects require a full session restart/re-init
     # and should not be treated as survivable tool errors.
     AgentRuntimeDisconnectedError,
+    # Transient provider/network failures: LLM already retried internally,
+    # re-executing the same call won't help. Stop softly.
+    Timeout,
+    APIConnectionError,
+    InternalServerError,
+    LLMNoResponseError,
 )
 
 # Errors that need a rate-limit back-off before retrying. These also use the
@@ -75,12 +82,10 @@ _TRANSIENT_LLM_INFRA_EXCEPTIONS = (
 )
 
 # Transient provider failures that should use the retry queue instead of
-# dropping straight back to the user. Timeouts and post-retry transport
-# failures belong here on purpose: they indicate provider/network stall, not
-# a task-level dead end the model can fix by changing strategy.
-_QUEUED_RETRY_EXCEPTIONS = (
-    _RATE_LIMITED_EXCEPTIONS + _TRANSIENT_LLM_INFRA_EXCEPTIONS + (Timeout,)
-)
+# dropping straight back to the user. Only rate limits use this path because
+# the provider explicitly asks us to wait. All other transient errors (Timeout,
+# APIConnectionError, etc.) are hard stops - the LLM already retried internally.
+_QUEUED_RETRY_EXCEPTIONS = _RATE_LIMITED_EXCEPTIONS
 
 
 def _is_limit_exceeded_error(exc: Exception) -> bool:
@@ -165,6 +170,16 @@ class RecoveryService:
     def _emit_exception_observation(self, exc: Exception) -> None:
         msg, err_id, notify_ui_only = self._format_exception(exc)
         error_category = self._error_category_for(exc)
+
+        # Suppress error observations for exceptions the agent should never see.
+        # Hard stops (Timeout, APIConnectionError, etc.) and retryable exceptions
+        # (rate limits) are handled at the runtime level. The agent just stops
+        # softly without knowing about runtime failures.
+        if isinstance(exc, _HARD_STOP_EXCEPTIONS) or isinstance(
+            exc, _QUEUED_RETRY_EXCEPTIONS
+        ):
+            return
+
         self._context.emit_event(
             ErrorObservation(
                 content=msg,

@@ -895,11 +895,16 @@ class EventStream(EventStore):
     ) -> None:
         """Execute subscriber callback inside thread pool with error handling.
 
-        If the subscriber returns an awaitable, it is awaited on the
+        If the subscriber returns an awaitable, it is scheduled on the
         application's main event loop (registered via ``set_main_event_loop``)
-        through ``run_coroutine_threadsafe``. Spinning up a fresh per-event
-        loop with ``asyncio.run`` would orphan any cross-loop primitives the
-        subscriber awaits (Locks/Events/Queues bound to the main loop).
+        through ``run_coroutine_threadsafe``. The worker does NOT block waiting
+        for the awaitable to complete — this prevents a single slow callback
+        from stalling the entire delivery pipeline and causing deadlocks when
+        the main loop is busy (e.g., during LLM streaming).
+
+        Spinning up a fresh per-event loop with ``asyncio.run`` would orphan
+        any cross-loop primitives the subscriber awaits (Locks/Events/Queues
+        bound to the main loop).
         """
         try:
             result = callback(event)
@@ -908,10 +913,12 @@ class EventStream(EventStore):
             main = get_main_event_loop()
             if main is not None and main.is_running():
                 future = asyncio.run_coroutine_threadsafe(
-                    self._await_result(result),  # type: ignore[arg-type]
+                    self._await_result_with_logging(result, callback_id, subscriber_id),  # type: ignore[arg-type]
                     main,
                 )
-                future.result(timeout=30)
+                future.add_done_callback(
+                    lambda f: self._handle_callback_future_done(f, callback_id, subscriber_id)
+                )
             else:
                 logger.warning(
                     'No main event loop available for callback %s; '
@@ -922,13 +929,15 @@ class EventStream(EventStore):
                     loop = asyncio.get_event_loop()
                     if not loop.is_closed():
                         future = asyncio.run_coroutine_threadsafe(
-                            self._await_result(result), loop
+                            self._await_result_with_logging(result, callback_id, subscriber_id), loop  # type: ignore[arg-type]
                         )
-                        future.result(timeout=30)
+                        future.add_done_callback(
+                            lambda f: self._handle_callback_future_done(f, callback_id, subscriber_id)
+                        )
                         return
                 except RuntimeError:
                     pass
-                asyncio.run(self._await_result(result))  # type: ignore[arg-type]
+                asyncio.run(self._await_result_with_logging(result, callback_id, subscriber_id))  # type: ignore[arg-type]
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error(
                 'Error in event callback %s for subscriber %s: %s',
@@ -937,9 +946,47 @@ class EventStream(EventStore):
                 exc,
             )
 
-    async def _await_result(self, awaitable: Any) -> None:
-        """Await a coroutine returned from a synchronous callback wrapper."""
-        await awaitable
+    async def _await_result_with_logging(
+        self, awaitable: Any, callback_id: str, subscriber_id: str
+    ) -> None:
+        """Await a coroutine with error logging."""
+        try:
+            await awaitable
+        except Exception as exc:
+            logger.error(
+                'Async callback %s for subscriber %s raised: %s',
+                callback_id,
+                subscriber_id,
+                exc,
+                exc_info=True,
+            )
+
+    def _handle_callback_future_done(
+        self, future: asyncio.Future, callback_id: str, subscriber_id: str
+    ) -> None:
+        """Handle completion of a callback future scheduled on the main loop."""
+        try:
+            exc = future.exception()
+            if exc is not None:
+                logger.error(
+                    'Async callback %s for subscriber %s failed: %s',
+                    callback_id,
+                    subscriber_id,
+                    exc,
+                )
+        except asyncio.CancelledError:
+            logger.warning(
+                'Async callback %s for subscriber %s was cancelled',
+                callback_id,
+                subscriber_id,
+            )
+        except Exception as exc:
+            logger.error(
+                'Error checking callback %s for subscriber %s: %s',
+                callback_id,
+                subscriber_id,
+                exc,
+            )
 
     def _snapshot_subscribers(self) -> list[tuple[str, str, Callable[[Event], None]]]:
         """Create a snapshot of current subscribers to avoid holding locks."""

@@ -64,13 +64,43 @@ class _AppRendererActionHandlersMixin:
                 # First line is already file:line:content — no separate query line
                 result_lines = [line for line in lines if line.strip()]
             else:
-                # First line is the query itself
-                query = first.strip().strip('"\'')
-                result_lines = [
-                    line
-                    for line in lines[1:]
-                    if line.strip() and ':' in line.split(None, 1)[0]
+                # Check if any lines contain file:line:content patterns (grep results)
+                potential_results = [
+                    line for line in lines
+                    if line.strip() and re.match(r'^.+:\d+:', line.strip())
                 ]
+                if potential_results:
+                    # Has actual grep search results - first line might be query or commentary
+                    # Check if first line looks like a query (short, no sentences)
+                    if len(first) < 100 and not re.search(r'[.!?]\s', first):
+                        query = first.strip().strip('"\'')
+                        result_lines = potential_results
+                    else:
+                        # First line is agent commentary, not a query
+                        result_lines = potential_results
+                else:
+                    # Check if lines look like file paths (glob results)
+                    # File paths typically contain / or \ and have extensions
+                    potential_files = [
+                        line for line in lines
+                        if line.strip() and (
+                            '/' in line or '\\' in line or '.' in line
+                        ) and not re.search(r'[.!?]\s', line)
+                    ]
+                    if potential_files:
+                        # This looks like glob results with file paths
+                        result_lines = potential_files
+                        # For glob, the first line might be the pattern or a file
+                        # Check if first line looks like a glob pattern
+                        if re.search(r'[*?\[\]]', first) or first.endswith('.py') or first.endswith('.txt'):
+                            query = first.strip().strip('"\'')
+                            result_lines = potential_files[1:] if len(potential_files) > 1 else []
+                        else:
+                            result_lines = potential_files
+                    else:
+                        # No actual search results found - this is likely agent commentary
+                        # Skip creating a search card for pure commentary
+                        return
 
         if not query:
             query = 'code search'

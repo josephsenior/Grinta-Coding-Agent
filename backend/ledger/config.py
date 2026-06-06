@@ -23,10 +23,10 @@ class EventRuntimeDefaults:
     hwm_ratio: float = 0.8
     block_timeout: float = 0.1
     rate_window_seconds: int = 60
-    # Single worker preserves FIFO delivery to WebSocket subscribers. With >1,
-    # parallel dispatch can reorder events (e.g. final MESSAGE before earlier
-    # STREAMING_CHUNK), and the UI drops "stale" ids — so streaming looks instant.
-    workers: int = 1
+    # Multiple workers prevent delivery stalls when one callback blocks (e.g., waiting
+    # for main loop). FIFO ordering to WebSocket subscribers is best-effort; minor
+    # reordering is acceptable since the UI handles out-of-order streaming chunks.
+    workers: int = 4
     async_write: bool = False
     coalesce: bool = False
     coalesce_window_ms: float = 100.0

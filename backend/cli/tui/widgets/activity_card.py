@@ -803,6 +803,7 @@ class ThinkingIndicator(Container):
         super().__init__(id=id)
         self._thoughts: list[str] = []
         self._current_action: str = 'Thinking'
+        self._code_block_container: Any = None
         self.add_class('-hidden')
 
     def compose(self) -> ComposeResult:
@@ -835,13 +836,13 @@ class ThinkingIndicator(Container):
         """Check if text contains fenced code blocks."""
         return bool(self._CODE_BLOCK_PATTERN.search(text))
 
-    def _render_with_code_blocks(self, text: str) -> Any:
+    def _render_with_code_blocks(self, text: str) -> tuple[Any, list[Any]]:
         """Render text with syntax-highlighted code blocks.
 
-        Returns a Text object or a Container with mixed content.
+        Returns a tuple of (container, children_widgets) to be mounted by caller.
         """
         prefix = f'{self._current_action}: '
-        prefix_color = '#5eead4'
+        prefix_color = '#42a394'  # ~0.7 opacity of #5eead4 against dark bg
         text_color = '#8c8c94'  # ~0.7 opacity of #c8c8d4 against dark bg
 
         # Split text into code blocks and plain text segments
@@ -871,25 +872,26 @@ class ThinkingIndicator(Container):
         # If no code blocks found, return simple Text
         if not segments:
             parts = [(prefix, f'bold {prefix_color}'), (text, text_color)]
-            return Text.assemble(*parts)
+            return Text.assemble(*parts), []
 
         # Build rich renderable with mixed content
         from textual.containers import Vertical
         from textual.widgets import Static as TextualStatic
 
         container = Vertical()
+        children = []
 
         for seg_type, seg_content in segments:
             if seg_type == 'plain':
                 # Render plain text with prefix on first segment
-                if not container.children:
+                if not children:
                     parts = [(prefix, f'bold {prefix_color}'), (seg_content, text_color)]
                     text_widget = TextualStatic(Text.assemble(*parts))
                 else:
                     text_widget = TextualStatic(
                         Text(seg_content, style=text_color)
                     )
-                container.mount(text_widget)
+                children.append(text_widget)
             else:
                 # Render code block with syntax highlighting
                 language, code = seg_content
@@ -903,31 +905,53 @@ class ThinkingIndicator(Container):
                 )
                 code_widget = TextualStatic(syntax)
                 code_widget.add_class('code-block')
-                container.mount(code_widget)
+                children.append(code_widget)
 
-        return container
+        return container, children
 
     def _update_display(self) -> None:
-        try:
-            content = self.query_one('#thinking-content', Static)
-        except Exception:
-            return
-
         if not self._thoughts:
             return
 
         full_text = '\n'.join(self._thoughts)
 
+        # Try to find the Static content widget
+        try:
+            content = self.query_one('#thinking-content', Static)
+        except Exception:
+            return
+
         # Check if we need syntax highlighting
         if self._has_code_blocks(full_text):
-            renderable = self._render_with_code_blocks(full_text)
-            # Replace the Static with a Container for mixed content
-            content.remove()
-            self.mount(renderable)
+            # Hide the plain text Static
+            content.add_class('-hidden')
+            
+            # Create or update the code block container
+            if self._code_block_container is None:
+                from textual.containers import Vertical
+                self._code_block_container = Vertical()
+                self.mount(self._code_block_container)
+            
+            # Clear existing children
+            for child in list(self._code_block_container.children):
+                child.remove()
+            
+            # Create new children
+            _, children = self._render_with_code_blocks(full_text)
+            for child in children:
+                self._code_block_container.mount(child)
         else:
+            # Show the plain text Static
+            content.remove_class('-hidden')
+            
+            # Remove code block container if it exists
+            if self._code_block_container is not None:
+                self._code_block_container.remove()
+                self._code_block_container = None
+            
             # Simple plain text rendering
             prefix = f'{self._current_action}: '
-            prefix_color = '#5eead4'
+            prefix_color = '#42a394'  # ~0.7 opacity of #5eead4 against dark bg
             text_color = '#8c8c94'  # ~0.7 opacity of #c8c8d4 against dark bg
 
             lines = self._thoughts

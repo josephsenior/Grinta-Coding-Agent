@@ -439,6 +439,28 @@ class SessionOrchestrator(
                 and not self._closed
             ):
                 self.schedule_step_soon()
+        else:
+            # Deadlock detection: if _pending_action has been set for too long,
+            # the observation may have been lost or delayed. Force-schedule a
+            # step to allow the PendingActionService watchdog to emit a timeout
+            # observation and recover.
+            pending_info = self.services.action.get_pending_action_info()
+            if pending_info is not None:
+                _pending_action, pending_ts = pending_info
+                import time as _time
+
+                elapsed = _time.time() - pending_ts
+                # Use a generous threshold (2x the default pending timeout) to
+                # avoid false positives. The PendingActionService watchdog will
+                # emit a timeout observation at the configured timeout.
+                if elapsed > 120.0:
+                    logger.warning(
+                        'Pending action has been set for %.1fs without observation; '
+                        'force-scheduling step to trigger recovery',
+                        elapsed,
+                        extra={'msg_type': 'PENDING_ACTION_STALL_DETECTED'},
+                    )
+                    self.schedule_step_soon()
 
     # ------------------------------------------------------------------ #
     # Independent watchdog timer for stall detection
