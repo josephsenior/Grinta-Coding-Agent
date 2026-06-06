@@ -165,6 +165,21 @@ try:
             return []
 
     anthropic_messages.build_events = _patched_build_events
+
+    # Also patch accumulate_event which can raise IndexError when the API
+    # sends malformed events with out-of-bounds content indices.
+    if hasattr(anthropic_messages, 'accumulate_event'):
+        _orig_accumulate_event = anthropic_messages.accumulate_event
+
+        def _patched_accumulate_event(*args, **kwargs):
+            try:
+                return _orig_accumulate_event(*args, **kwargs)
+            except IndexError:
+                # Return the first argument (snapshot) unchanged if we can't
+                # accumulate the event due to an index error.
+                return args[0] if args else None
+
+        anthropic_messages.accumulate_event = _patched_accumulate_event
 except Exception:
     pass
 
