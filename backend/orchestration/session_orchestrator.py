@@ -426,41 +426,22 @@ class SessionOrchestrator(
         # pending action is set and the runtime may never produce an observation
         # that would re-trigger the step loop.  Schedule the next step so the
         # agent can proceed to the LLM call instead of stalling indefinitely.
-        if not self._pending_action:
-            # Drain background _on_event tasks so state transitions from agent
-            # messages (e.g. wait_for_response handoffs) are fully processed
-            # before deciding whether to queue the next LLM call.
-            from backend.utils.async_utils import drain_background_tasks
+        #
+        # P2-C: Always schedule a step after post-execution, regardless of
+        # _pending_action state. This closes a race window where an event
+        # arrives during drain_background_tasks() that sets _pending_action
+        # but has should_step()==False (e.g. ErrorObservation), leaving the
+        # agent with no step task alive and no way to recover until the
+        # PendingActionService watchdog fires (up to 600s for CmdRunAction).
+        #
+        # If _pending_action is set, the step task checks can_step() and
+        # exits cleanly. The watchdog will eventually clear the pending
+        # action and trigger a new step, resuming normal operation.
+        from backend.utils.async_utils import drain_background_tasks
 
-            await drain_background_tasks(max_rounds=2, timeout=2.0)
-            if (
-                not self._pending_action
-                and self.get_agent_state() == AgentState.RUNNING
-                and not self._closed
-            ):
-                self.schedule_step_soon()
-        else:
-            # Deadlock detection: if _pending_action has been set for too long,
-            # the observation may have been lost or delayed. Force-schedule a
-            # step to allow the PendingActionService watchdog to emit a timeout
-            # observation and recover.
-            pending_info = self.services.action.get_pending_action_info()
-            if pending_info is not None:
-                _pending_action, pending_ts = pending_info
-                import time as _time
-
-                elapsed = _time.time() - pending_ts
-                # Use a generous threshold (2x the default pending timeout) to
-                # avoid false positives. The PendingActionService watchdog will
-                # emit a timeout observation at the configured timeout.
-                if elapsed > 120.0:
-                    logger.warning(
-                        'Pending action has been set for %.1fs without observation; '
-                        'force-scheduling step to trigger recovery',
-                        elapsed,
-                        extra={'msg_type': 'PENDING_ACTION_STALL_DETECTED'},
-                    )
-                    self.schedule_step_soon()
+        await drain_background_tasks(max_rounds=2, timeout=2.0)
+        if self.get_agent_state() == AgentState.RUNNING and not self._closed:
+            self.schedule_step_soon()
 
     # ------------------------------------------------------------------ #
     # Independent watchdog timer for stall detection
