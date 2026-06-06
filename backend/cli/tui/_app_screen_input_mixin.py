@@ -182,7 +182,7 @@ class _AppScreenInputMixin:
         async with self._input_lock:
             # Drain any stale events from previous turn before starting new one
             if self._renderer:
-                self._renderer.drain_events()
+                await self._renderer.drain_events_async()
 
             ta = self.query_one('#input', TextArea)
             ta.clear()
@@ -271,7 +271,7 @@ class _AppScreenInputMixin:
                 self._render_hud_bar()
                 self.query_one('#input-bar', InputBar).remove_class('processing')
                 if self._renderer:
-                    self._renderer.drain_events()
+                    await self._renderer.drain_events_async()
                 actual_state = (
                     str(self._controller.get_agent_state()) if self._controller else ''
                 )

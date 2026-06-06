@@ -107,9 +107,9 @@ class _AppScreenLifecycleMixin:
         self._start_background_bootstrap()
         self.set_timer(0.5, self._show_welcome)
 
-    def on_renderer_drain_requested(self, _message: RendererDrainRequested) -> None:
+    async def on_renderer_drain_requested(self, _message: RendererDrainRequested) -> None:
         if self._renderer is not None:
-            self._renderer.drain_events()
+            await self._renderer.drain_events_async()
         if not self._welcome_visible:
             return
         if self._transcript_has_real_content():
@@ -293,7 +293,7 @@ class _AppScreenLifecycleMixin:
             self._hud.update_agent_state('awaiting_user_input')
             self._render_hud_bar()
             self._render_hud_bar()
-            self._renderer.drain_events()
+            await self._renderer.drain_events_async()
             _tui_logger.debug('_bootstrap: done')
         except BaseException:
             if event_stream is not None:
@@ -663,4 +663,4 @@ class _AppScreenLifecycleMixin:
             break
         _tui_logger.debug('_dispatch_to_agent: poll loop exited')
         if self._renderer:
-            self._renderer.drain_events()
+            await self._renderer.drain_events_async()

@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 
 
 def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
+    """Synchronous drain for non-async contexts (backward compatibility)."""
     with orch._pending_lock:
         events = list(orch._pending_events)
         orch._pending_events.clear()
@@ -38,11 +39,9 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
         dropped = orch._pending_events_dropped
         orch._pending_events_dropped = 0
     if not events:
-        orch._refresh_display()  # Keep sidebar/HUD in sync
+        orch._refresh_display()
         return
     if dropped:
-        # Deferred import: the test suite patches this constant on the mixin
-        # module via ``monkeypatch.setattr(_ep_mod, '_TUI_HISTORY_RENDER_LIMIT', ...)``.
         from backend.cli.tui._app_renderer_event_processor_mixin import (
             _TUI_HISTORY_RENDER_LIMIT,
         )
@@ -62,6 +61,50 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
     orch._refresh_display()
 
 
+async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
+    """Async drain that yields control to the event loop periodically.
+    
+    This prevents blocking the Textual event loop when processing many events,
+    allowing keyboard and mouse input to be processed during active agent runs.
+    """
+    with orch._pending_lock:
+        events = list(orch._pending_events)
+        orch._pending_events.clear()
+        orch._drain_scheduled = False
+        dropped = orch._pending_events_dropped
+        orch._pending_events_dropped = 0
+    if not events:
+        orch._refresh_display()
+        return
+    if dropped:
+        from backend.cli.tui._app_renderer_event_processor_mixin import (
+            _TUI_HISTORY_RENDER_LIMIT,
+        )
+
+        orch._history.append(
+            Text(
+                f'... {dropped} TUI event(s) dropped while the renderer was backlogged ...',
+                style=NAVY_TEXT_DIM,
+            )
+        )
+        orch._history.append(Text(''))
+        overflow = len(orch._history) - _TUI_HISTORY_RENDER_LIMIT
+        if overflow > 0:
+            del orch._history[:overflow]
+    
+    # Process events in batches, yielding control between batches
+    # This allows Textual to process keyboard/mouse events
+    _BATCH_SIZE = 10
+    for i in range(0, len(events), _BATCH_SIZE):
+        batch = events[i:i + _BATCH_SIZE]
+        for event in batch:
+            orch._process_event(event)
+        # Yield control to the event loop between batches
+        await asyncio.sleep(0)
+    
+    orch._refresh_display()
+
+
 async def wait_for_activity(
     orch: '_AppRendererEventProcessorMixin',
     wait_timeout_sec: float = 0.5,
@@ -69,7 +112,7 @@ async def wait_for_activity(
     with orch._pending_lock:
         has_pending = bool(orch._pending_events)
     if has_pending:
-        drain_events(orch)
+        await drain_events_async(orch)
         orch._state_event.clear()
         return orch._current_state
     try:
@@ -78,7 +121,7 @@ async def wait_for_activity(
         return None
     finally:
         orch._state_event.clear()
-    drain_events(orch)
+    await drain_events_async(orch)
     return orch._current_state
 
 

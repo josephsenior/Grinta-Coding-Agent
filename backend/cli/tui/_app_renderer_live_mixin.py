@@ -142,7 +142,7 @@ class _AppRendererLiveMixin:
             if thoughts and self._live_thinking_dirty:
                 self._live_thinking_widget.finalize()
                 snapshot = Text.assemble(
-                    ('Thinking:', 'bold #5eead4'),
+                    ('Thinking:', 'bold #42a394'),
                     '  ',
                     Text('\n  '.join(thoughts), style='#c8c8d4'),
                 )
