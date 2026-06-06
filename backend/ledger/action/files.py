@@ -103,7 +103,6 @@ class FileEditAction(Action):
     impl_source: FileEditSource = FileEditSource.FILE_EDITOR
     edit_mode: str | None = None
     expected_hash: str | None = None
-    expected_file_hash: str | None = None
     start_line: int | None = None
     end_line: int | None = None
     overwrite_existing: bool = False

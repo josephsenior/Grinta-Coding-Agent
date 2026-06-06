@@ -254,7 +254,9 @@ class _AppRendererThinkingMixin:
             return True
 
         if intent.kind == 'search':
-            self._handle_search_action(intent.text)
+            self._handle_search_action(
+                intent.text, source_tool=intent.source_tool or 'search'
+            )
             return True
 
         if intent.kind == 'error':

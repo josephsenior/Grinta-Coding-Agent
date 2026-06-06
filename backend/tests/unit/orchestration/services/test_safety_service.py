@@ -255,8 +255,7 @@ class TestSafetyService(unittest.IsolatedAsyncioTestCase):
         action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
 
         mock_autonomy = MagicMock()
-        mock_autonomy.current_level = 'full'
-        mock_autonomy.autonomy_level = 'balanced'
+        mock_autonomy.autonomy_level = 'full'
         mock_autonomy.should_request_confirmation.return_value = True
         self.mock_context.autonomy_controller = mock_autonomy
 

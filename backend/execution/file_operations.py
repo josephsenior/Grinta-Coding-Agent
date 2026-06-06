@@ -47,12 +47,10 @@ def execute_file_editor(
     insert_line: int | str | None = None,
     start_line: int | None = None,
     end_line: int | None = None,
-    enable_linting: bool = False,
     dry_run: bool = False,
     *,
     edit_mode: str | None = None,
     expected_hash: str | None = None,
-    expected_file_hash: str | None = None,
     overwrite_existing: bool = False,
 ) -> tuple[str, tuple[str | None, str | None], dict[str, Any]]:
     """Execute file editor command and handle exceptions."""
@@ -81,11 +79,9 @@ def execute_file_editor(
         insert_line,
         start_line,
         end_line,
-        enable_linting,
         dry_run,
         edit_mode=edit_mode,
         expected_hash=expected_hash,
-        expected_file_hash=expected_file_hash,
         overwrite_existing=overwrite_existing,
     )
 
@@ -171,12 +167,10 @@ def _invoke_editor(
     insert_line: int | None,
     start_line: int | None,
     end_line: int | None,
-    enable_linting: bool,
     dry_run: bool,
     *,
     edit_mode: str | None = None,
     expected_hash: str | None = None,
-    expected_file_hash: str | None = None,
     overwrite_existing: bool = False,
 ) -> Any:
     """Safely invoke the editor with MISSING sentinels."""
@@ -195,11 +189,9 @@ def _invoke_editor(
             insert_line=insert_line,
             start_line=start_line,
             end_line=end_line,
-            enable_linting=enable_linting,
             dry_run=dry_run,
             edit_mode=edit_mode,
             expected_hash=expected_hash,
-            expected_file_hash=expected_file_hash,
             overwrite_existing=overwrite_existing,
         )
     except ToolError as e:

@@ -23,9 +23,6 @@ if TYPE_CHECKING:
 def _autonomy_level(autonomy: object | None) -> str:
     if autonomy is None:
         return ''
-    current = getattr(autonomy, 'current_level', None)
-    if isinstance(current, str):
-        return current
     from backend.orchestration.autonomy import normalize_autonomy_level
 
     return normalize_autonomy_level(getattr(autonomy, 'autonomy_level', ''))

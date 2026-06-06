@@ -95,7 +95,6 @@ class _FileEditorOpsMixin:
         *,
         edit_mode: str | None = None,
         expected_hash: str | None = None,
-        expected_file_hash: str | None = None,
         dry_run: bool = False,
     ) -> ToolResult:
         return _handle_edit_impl(
@@ -108,7 +107,6 @@ class _FileEditorOpsMixin:
             end_line,
             edit_mode=edit_mode,
             expected_hash=expected_hash,
-            expected_file_hash=expected_file_hash,
             dry_run=dry_run,
         )
 
@@ -120,7 +118,6 @@ class _FileEditorOpsMixin:
         *,
         replace_all: bool,
         dry_run: bool,
-        expected_file_hash: str | None = None,
     ) -> ToolResult:
         return _handle_replace_string_impl(
             self,
@@ -129,7 +126,6 @@ class _FileEditorOpsMixin:
             new_string,
             replace_all=replace_all,
             dry_run=dry_run,
-            expected_file_hash=expected_file_hash,
         )
 
     def _build_receipt(

@@ -92,11 +92,7 @@ class _AppScreenActionsMixin:
     def _is_full_autonomy(self) -> bool:
         controller = getattr(self, '_controller', None)
         ac = getattr(controller, 'autonomy_controller', None)
-        raw_level = ''
-        if ac is not None:
-            raw_level = getattr(ac, 'current_level', None) or getattr(
-                ac, 'autonomy_level', ''
-            )
+        raw_level = getattr(ac, 'autonomy_level', '') if ac is not None else ''
         return normalize_autonomy_level(raw_level) == 'full'
 
     async def _handle_confirmation_dialog(self) -> None:

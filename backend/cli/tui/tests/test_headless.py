@@ -2234,6 +2234,8 @@ async def test_tui_search_results_in_thinking_payload_render_as_card(mock_config
         )
         s._renderer = renderer
 
+        # Default source_tool='search' should fall back to the generic
+        # search card (no source_tool is set on the AgentThinkAction here).
         renderer._process_event(
             AgentThinkAction(
                 thought='[SEARCH_RESULTS]\nbackend/app.py:12:render thinking'
@@ -2250,6 +2252,89 @@ async def test_tui_search_results_in_thinking_payload_render_as_card(mock_config
         assert len(search_cards) == 1
         collapsed = search_cards[0].query_one('#collapsed-row')
         assert 'Search' in str(collapsed.renderable)
+
+
+@pytest.mark.asyncio
+async def test_tui_grep_results_in_thinking_payload_render_as_grep_card(
+    mock_config,
+):
+    """``AgentThinkAction.source_tool='grep'`` renders a Grep card.
+
+    Specifically, it does not fall back to the generic Search card.
+    """
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            AgentThinkAction(
+                thought='[SEARCH_RESULTS]\nbackend/app.py:12:render thinking',
+                source_tool='grep',
+            )
+        )
+        await pilot.pause()
+
+        grep_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-grep' in card.classes
+        ]
+        assert len(grep_cards) == 1
+        collapsed = grep_cards[0].query_one('#collapsed-row')
+        assert 'Grep' in str(collapsed.renderable)
+
+
+@pytest.mark.asyncio
+async def test_tui_glob_results_in_thinking_payload_render_as_glob_card(
+    mock_config,
+):
+    """``AgentThinkAction.source_tool='glob'`` renders a Glob card."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            AgentThinkAction(
+                thought='[SEARCH_RESULTS]\nbackend/app.py\nbackend/cli.py',
+                source_tool='glob',
+            )
+        )
+        await pilot.pause()
+
+        glob_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-glob' in card.classes
+        ]
+        assert len(glob_cards) == 1
+        collapsed = glob_cards[0].query_one('#collapsed-row')
+        assert 'Glob' in str(collapsed.renderable)
 
 
 @pytest.mark.asyncio

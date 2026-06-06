@@ -86,11 +86,6 @@ class AutonomyController:
             self.auto_retry,
         )
 
-    @property
-    def current_level(self) -> str:
-        """Normalized current autonomy level."""
-        return normalize_autonomy_level(self.autonomy_level)
-
     @staticmethod
     def action_signature(action: Action) -> str:
         """Stable per-session key used by the always-allow memory.
@@ -134,7 +129,7 @@ class AutonomyController:
         # already bypasses confirmation entirely).
         if self.is_always_allowed(action):
             return False
-        level = self.current_level
+        level = normalize_autonomy_level(self.autonomy_level)
         if level == AutonomyLevel.FULL.value:
             # Full autonomy: never ask
             return False

@@ -185,7 +185,7 @@ class TestApplyConfirmationState:
 
     def test_full_autonomy_never_marks_awaiting_confirmation(self):
         autonomy = MagicMock()
-        autonomy.current_level = AutonomyLevel.FULL.value
+        autonomy.autonomy_level = 'full'
         autonomy.should_request_confirmation.return_value = True
         ctx = _make_context(autonomy_controller=autonomy)
         svc = SafetyService(ctx)

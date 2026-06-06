@@ -244,6 +244,12 @@ class ActivityCard(Container):
         border: round #24385c;
         background: #050913;
     }
+    ActivityCard.-category-grep,
+    ActivityCard.-category-glob,
+    ActivityCard.-category-search {
+        border: round #2d4a6a;
+        background: #050c14;
+    }
     ActivityCard #collapsed-row-container {
         width: 100%;
         height: 1;
