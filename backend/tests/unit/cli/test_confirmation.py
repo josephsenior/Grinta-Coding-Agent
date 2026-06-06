@@ -13,7 +13,6 @@ from backend.cli.confirmation import (
     _confirmation_frame_style,
     _file_label,
     _risk_label,
-    build_confirmation_action,
     render_confirmation,
 )
 from backend.core.enums import ActionSecurityRisk, AgentState
@@ -281,18 +280,3 @@ class TestConfirmationDecision:
         d = ConfirmationDecision(approved=False)
         with pytest.raises(AttributeError):
             d.approved = True  # type: ignore[misc]
-
-
-# ---------------------------------------------------------------------------
-# build_confirmation_action
-# ---------------------------------------------------------------------------
-
-
-class TestBuildConfirmationAction:
-    def test_approved(self) -> None:
-        action = build_confirmation_action(approved=True)
-        assert action.agent_state == AgentState.USER_CONFIRMED
-
-    def test_rejected(self) -> None:
-        action = build_confirmation_action(approved=False)
-        assert action.agent_state == AgentState.USER_REJECTED

@@ -5,11 +5,7 @@ from typing import TYPE_CHECKING
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
-from backend.ledger.action import ActionConfirmationStatus
 from backend.ledger.observation import AgentStateChangedObservation
-from backend.orchestration.runtime_late_error_guard import (
-    TERMINALS_NO_LATE_RUNTIME_ERROR_PROMOTION,
-)
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
@@ -31,7 +27,6 @@ VALID_TRANSITIONS: dict[AgentState, frozenset[AgentState]] = {
     ),
     AgentState.RUNNING: frozenset(
         {
-            AgentState.PAUSED,
             AgentState.STOPPED,
             AgentState.FINISHED,
             AgentState.ERROR,
@@ -39,13 +34,6 @@ VALID_TRANSITIONS: dict[AgentState, frozenset[AgentState]] = {
             AgentState.AWAITING_USER_INPUT,
             AgentState.AWAITING_USER_CONFIRMATION,
             AgentState.REJECTED,
-        }
-    ),
-    AgentState.PAUSED: frozenset(
-        {
-            AgentState.RUNNING,
-            AgentState.STOPPED,
-            AgentState.ERROR,
         }
     ),
     AgentState.STOPPED: frozenset(
@@ -89,26 +77,10 @@ VALID_TRANSITIONS: dict[AgentState, frozenset[AgentState]] = {
     ),
     AgentState.AWAITING_USER_CONFIRMATION: frozenset(
         {
-            AgentState.USER_CONFIRMED,
-            AgentState.USER_REJECTED,
             AgentState.RUNNING,
+            AgentState.AWAITING_USER_INPUT,
             AgentState.STOPPED,
             AgentState.ERROR,
-        }
-    ),
-    AgentState.USER_CONFIRMED: frozenset(
-        {
-            AgentState.RUNNING,
-            AgentState.STOPPED,
-            AgentState.ERROR,
-        }
-    ),
-    AgentState.USER_REJECTED: frozenset(
-        {
-            AgentState.RUNNING,
-            AgentState.STOPPED,
-            AgentState.ERROR,
-            AgentState.REJECTED,
         }
     ),
     AgentState.RATE_LIMITED: frozenset(
@@ -151,18 +123,6 @@ class StateTransitionService:
         if new_state == old_state:
             return
 
-        # Late runtime callbacks may race after stop/finish; do not promote to ERROR.
-        if (
-            new_state == AgentState.ERROR
-            and old_state in TERMINALS_NO_LATE_RUNTIME_ERROR_PROMOTION
-        ):
-            logger.warning(
-                'Ignoring agent ERROR transition from %s (late runtime tail); '
-                'see last_error / logs for diagnostics.',
-                old_state,
-            )
-            return
-
         # ── Transition validation ──────────────────────────────────────
         allowed = VALID_TRANSITIONS.get(old_state)
         if allowed is not None and new_state not in allowed:
@@ -185,7 +145,6 @@ class StateTransitionService:
 
         await self._handle_state_reset(new_state)
         self._handle_error_recovery(old_state, new_state)
-        self._handle_pending_action_confirmation(new_state)
         self._handle_watchdog_lifecycle(old_state, new_state)
 
         reason = self._context.state.last_error if new_state == AgentState.ERROR else ''
@@ -216,13 +175,11 @@ class StateTransitionService:
                 start_watchdog()
             except Exception:
                 pass
-        elif new_state != old_state and new_state in (
-            AgentState.AWAITING_USER_INPUT,
-            AgentState.FINISHED,
-            AgentState.STOPPED,
-            AgentState.ERROR,
-            AgentState.REJECTED,
-        ) and callable(stop_watchdog):
+        elif (
+            old_state == AgentState.RUNNING
+            and new_state != AgentState.RUNNING
+            and callable(stop_watchdog)
+        ):
             try:
                 stop_watchdog()
             except Exception:
@@ -261,23 +218,3 @@ class StateTransitionService:
                 circuit_breaker, 'reset_task_counters'
             ):
                 circuit_breaker.reset_task_counters()
-
-    def _handle_pending_action_confirmation(self, new_state: AgentState) -> None:
-        pending_action = self._context.pending_action
-        if pending_action is None or new_state not in (
-            AgentState.USER_CONFIRMED,
-            AgentState.USER_REJECTED,
-        ):
-            return
-
-        if hasattr(pending_action, 'thought'):
-            pending_action.thought = ''
-
-        pending_action.confirmation_state = (
-            ActionConfirmationStatus.CONFIRMED
-            if new_state == AgentState.USER_CONFIRMED
-            else ActionConfirmationStatus.REJECTED
-        )
-        pending_action._id = None
-        self._context.clear_pending_action()
-        self._context.emit_event(pending_action, EventSource.AGENT)

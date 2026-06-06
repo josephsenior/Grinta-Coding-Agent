@@ -27,10 +27,9 @@ from backend.cli.theme import (
     STYLE_DIM,
     STYLE_EMPTY,
 )
-from backend.core.enums import ActionSecurityRisk, AgentState
+from backend.core.enums import ActionSecurityRisk
 from backend.ledger.action import (
     Action,
-    ChangeAgentStateAction,
     CmdRunAction,
     FileEditAction,
     FileWriteAction,
@@ -236,9 +235,3 @@ def render_confirmation(
             approved=True, remember=False, suppress_low_risk=True
         )
     return ConfirmationDecision(approved=answer == 'y', remember=False)
-
-
-def build_confirmation_action(approved: bool) -> ChangeAgentStateAction:
-    """Build the event to send back to the engine."""
-    state = AgentState.USER_CONFIRMED if approved else AgentState.USER_REJECTED
-    return ChangeAgentStateAction(agent_state=state)

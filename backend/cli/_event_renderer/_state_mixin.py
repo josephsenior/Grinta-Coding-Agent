@@ -62,10 +62,6 @@ class _EventRendererStateMixin(CLIEventRenderer if TYPE_CHECKING else object):
             self._loop.call_soon_threadsafe(self._state_event.set)
         except RuntimeError:
             pass
-        # PAUSED collapses to STOPPED in CLI — same UX.
-        if state == AgentState.PAUSED:
-            state = AgentState.STOPPED
-            self._current_state = state
         self._apply_state_hud_update(state)
         self._dispatch_state_followup(state, previous_state)
 

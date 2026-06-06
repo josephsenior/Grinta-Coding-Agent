@@ -4,7 +4,6 @@
 # pylint: disable=protected-access,too-many-lines
 
 import asyncio
-import threading
 import unittest
 from types import SimpleNamespace
 from typing import cast
@@ -75,9 +74,7 @@ def _make_controller() -> SessionOrchestrator:
     # attribute directly so tests can inject a pre-configured lock.
     ctrl._step_lock_instance = asyncio.Lock()
     ctrl._step_lock_loop = None
-    ctrl._step_gate = threading.Lock()
-    ctrl._step_pending = False
-    ctrl._step_seq = 0  # re-entrancy guard for _step_pending teardown race
+    ctrl._step_request = asyncio.Event()
     ctrl._main_loop = None
     ctrl._draining_batch = False
 
@@ -1473,23 +1470,23 @@ class TestStepDispatch(unittest.TestCase):
             self.ctrl.step()
 
         mock_loop.call_soon_threadsafe.assert_called_once_with(
-            self.ctrl._create_step_task
+            self.ctrl._request_step
         )
 
     def test_step_falls_back_to_direct_call_when_no_main_loop(self):
-        """step() should call _create_step_task directly when no main loop."""
+        """step() should call _request_step directly when no main loop."""
         self.ctrl._step_task = None
 
         with patch(
             'backend.orchestration.session_orchestrator.get_main_event_loop',
             return_value=None,
         ):
-            with patch.object(self.ctrl, '_create_step_task') as mock_create:
+            with patch.object(self.ctrl, '_request_step') as mock_request:
                 self.ctrl.step()
-                mock_create.assert_called_once()
+                mock_request.assert_called_once()
 
     def test_step_falls_back_when_main_loop_not_running(self):
-        """step() should call _create_step_task directly when main loop is stopped."""
+        """step() should call _request_step directly when main loop is stopped."""
         mock_loop = MagicMock()
         mock_loop.is_running.return_value = False
         self.ctrl._step_task = None
@@ -1498,23 +1495,23 @@ class TestStepDispatch(unittest.TestCase):
             'backend.orchestration.session_orchestrator.get_main_event_loop',
             return_value=mock_loop,
         ):
-            with patch.object(self.ctrl, '_create_step_task') as mock_create:
+            with patch.object(self.ctrl, '_request_step') as mock_request:
                 self.ctrl.step()
-                mock_create.assert_called_once()
+                mock_request.assert_called_once()
             mock_loop.call_soon_threadsafe.assert_not_called()
 
-    def test_step_sets_pending_when_task_already_running(self):
-        """step() should set _step_pending when a step task is in-flight."""
+    def test_step_sets_request_when_task_already_running(self):
+        """step() should set _step_request when a step task is in-flight."""
         mock_task = MagicMock()
         mock_task.done.return_value = False
         self.ctrl._step_task = mock_task
-        self.ctrl._step_pending = False
+        self.ctrl._step_request.clear()
 
         self.ctrl.step()
 
-        self.assertTrue(self.ctrl._step_pending)
+        self.assertTrue(self.ctrl._step_request.is_set())
 
-    def test_step_does_not_set_pending_when_task_done(self):
+    def test_step_does_not_set_request_when_task_done(self):
         """step() should proceed normally when the previous task is done."""
         mock_task = MagicMock()
         mock_task.done.return_value = True
@@ -1528,7 +1525,7 @@ class TestStepDispatch(unittest.TestCase):
         ):
             self.ctrl.step()
 
-        self.assertFalse(self.ctrl._step_pending)
+        self.assertFalse(self.ctrl._step_request.is_set())
         mock_loop.call_soon_threadsafe.assert_called_once()
 
     def test_step_from_threadpool_uses_main_loop(self):
@@ -1548,82 +1545,50 @@ class TestStepDispatch(unittest.TestCase):
                 future.result(timeout=5)
 
         mock_loop.call_soon_threadsafe.assert_called_once_with(
-            self.ctrl._create_step_task
+            self.ctrl._request_step
         )
 
-    def test_schedule_step_soon_uses_main_loop_to_reenter_step(self):
-        """Deferred retries should queue a fresh step on the main loop."""
-        mock_loop = MagicMock()
-        mock_loop.is_running.return_value = True
-
-        with (
-            patch(
-                'backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin.get_main_event_loop',
-                return_value=mock_loop,
-            ),
-            patch.object(self.ctrl, 'step') as mock_step,
-        ):
+    def test_schedule_step_soon_is_alias_for_step(self):
+        """``schedule_step_soon`` is an alias for ``step()`` (kept for
+        backward compatibility).  ``step()`` itself handles the
+        call_soon_threadsafe dispatch to the main loop."""
+        with patch.object(self.ctrl, 'step') as mock_step:
             self.ctrl.schedule_step_soon()
 
-        mock_loop.call_soon_threadsafe.assert_called_once_with(mock_step)
+        mock_step.assert_called_once()
 
-    def test_schedule_step_soon_falls_back_to_current_loop(self):
-        """When no captured main loop exists, defer via the current running loop."""
-        mock_loop = MagicMock()
+    def test_create_step_task_clears_request_and_creates_task(self):
+        """``_create_step_task`` always creates a task and clears the
+        request event.  Reentry is now guarded by ``_request_step``
+        (which sets the event instead of calling this method)."""
+        self.ctrl._step_task = None
+        self.ctrl._step_request.set()  # stale request from a previous turn
 
-        with (
-            patch(
-                'backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin.get_main_event_loop',
-                return_value=None,
-            ),
-            patch(
-                'backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin.asyncio.get_running_loop',
-                return_value=mock_loop,
-            ),
-            patch.object(self.ctrl, 'step') as mock_step,
-        ):
-            self.ctrl.schedule_step_soon()
+        async def _noop_inner() -> None:
+            return None
 
-        mock_loop.call_soon.assert_called_once_with(mock_step)
+        self.ctrl._step_with_exception_handling = _noop_inner  # type: ignore[method-assign]
 
-    def test_create_step_task_guards_reentry(self):
-        """_create_step_task should set _step_pending if a task appeared between scheduling."""
+        with patch(
+            'backend.utils.async_utils.create_tracked_task',
+            return_value=MagicMock(name='tracked_task'),
+        ) as mock_create:
+            self.ctrl._create_step_task()
+
+        mock_create.assert_called_once()
+        self.assertFalse(self.ctrl._step_request.is_set())
+        self.assertIsNotNone(self.ctrl._step_task)
+
+    def test_request_step_sets_request_when_task_alive(self):
+        """_request_step sets _step_request when a step task is in-flight."""
         mock_task = MagicMock()
         mock_task.done.return_value = False
         self.ctrl._step_task = mock_task
-        self.ctrl._step_pending = False
+        self.ctrl._step_request.clear()
 
-        self.ctrl._create_step_task()
+        self.ctrl._request_step()
 
-        self.assertTrue(self.ctrl._step_pending)
-
-    def test_step_sets_pending_bumps_step_seq(self):
-        """step() bumps _step_seq when it sets _step_pending so _step's
-        finally block knows not to clobber it during teardown."""
-        mock_task = MagicMock()
-        mock_task.done.return_value = False
-        self.ctrl._step_task = mock_task
-        self.ctrl._step_pending = False
-        self.ctrl._step_seq = 0
-
-        self.ctrl.step()
-
-        self.assertTrue(self.ctrl._step_pending)
-        self.assertEqual(self.ctrl._step_seq, 1)
-
-    def test_create_step_task_bumps_step_seq_on_fast_path(self):
-        """_create_step_task bumps _step_seq when re-queueing, mirroring
-        step() so the finally block keeps _step_pending."""
-        mock_task = MagicMock()
-        mock_task.done.return_value = False
-        self.ctrl._step_task = mock_task
-        self.ctrl._step_pending = False
-        self.ctrl._step_seq = 0
-
-        self.ctrl._create_step_task()
-
-        self.assertTrue(self.ctrl._step_pending)
-        self.assertEqual(self.ctrl._step_seq, 1)
+        self.assertTrue(self.ctrl._step_request.is_set())
 
     def test_get_initial_task_no_message(self):
         """Line 701 coverage."""
@@ -1814,11 +1779,11 @@ class TestStepDispatch(unittest.TestCase):
         self.ctrl.agent.get_system_message.assert_not_called()
 
     def test_step_task_creation(self):
-        """Line 338 coverage — step() with no main loop calls _create_step_task directly."""
+        """Line 338 coverage — step() with no main loop calls _request_step directly."""
         self.ctrl._main_loop = None
-        with patch.object(self.ctrl, '_create_step_task') as mock_create:
+        with patch.object(self.ctrl, '_request_step') as mock_request:
             self.ctrl.step()
-            mock_create.assert_called_once()
+            mock_request.assert_called_once()
 
     def test_can_drain_pending_getattr_branch(self):
         """Line 495-496 coverage."""
@@ -1881,101 +1846,253 @@ class TestStepDispatch(unittest.TestCase):
         self.ctrl._audit_callback.assert_called()
 
 
-class TestStepPendingRaceFix(unittest.IsolatedAsyncioTestCase):
-    """Regression tests for the _step_pending race condition.
+class TestStepRequestRaceFix(unittest.IsolatedAsyncioTestCase):
+    """Regression tests for the step-request race condition.
 
-    The bug: when ``_on_event`` calls ``schedule_step_soon()`` (or previously
-    a direct ``step()``) while an ``_step`` task is in its ``finally`` block,
-    the ``finally`` clears ``_step_pending`` AFTER the new ``step()`` has
-    already set it to ``True``, silently dropping the re-queue request.
+    The original bug: when a fresh ``step()`` call arrived while an
+    ``_step`` task was in its ``finally`` block, the boolean
+    ``_step_pending`` flag was cleared by the finally AFTER the new
+    ``step()`` had already set it, silently dropping the re-queue
+    request and leaving the agent visibly stuck in
+    ``AgentState.RUNNING``.
 
-    Fixes:
-    1. ``_on_event`` uses ``schedule_step_soon`` (not direct ``step()``).
-    2. ``step()`` bumps ``_step_seq`` when re-queueing.
-    3. ``_step`` finally only clears ``_step_pending`` if ``_step_seq``
-       matches the value captured on entry.
+    The fix replaces the ``_step_pending`` boolean + ``_step_seq``
+    counter pair with a single ``asyncio.Event`` (``_step_request``)
+    that is atomically set on ``_request_step`` and atomically
+    checked + cleared by ``_step``'s drain loop.  ``_step``'s
+    ``finally`` schedules a new step task if the event is still set
+    on exit, which is the asyncio.Event equivalent of the old
+    ``_step_seq`` mechanism.
     """
 
     def setUp(self):
         self.ctrl = _make_controller()
 
-    async def test_step_pending_not_cleared_when_step_seq_incremented_during_teardown(
-        self,
-    ):
-        """Verify the _step_seq mechanism prevents _step_pending wipe.
-
-        Simulates: _step() is in finally block; step() bumps _step_seq and
-        sets _step_pending=True; _step finally checks seq and leaves pending set.
+    async def test_request_event_survives_step_finally(self):
+        """A fresh request that arrives while ``_step`` is in finally
+        is detected: ``_step``'s finally schedules a new task because
+        the event is set, instead of silently dropping the request.
         """
-        # Pre-condition: no step task running, _step_pending is False
         self.ctrl._step_task = None
-        self.ctrl._step_pending = False
-        self.ctrl._step_seq = 0
+        self.ctrl._step_request.clear()
 
-        # Simulate: step() was called while _step task was still alive.
-        # step() bumps _step_seq and sets _step_pending.
-        self.ctrl._step_seq = 1
-        self.ctrl._step_pending = True
+        # Simulate: a fresh step() arrived while _step was still alive
+        # and the alive task's _request_step set the event.
+        self.ctrl._step_request.set()
 
-        # Now simulate _step()'s finally block running.
-        # It captures entry_seq=0, but current _step_seq=1 (bumped by step()).
-        # It should NOT clear _step_pending because seq changed.
-        entry_seq = 0  # what _step captured on entry
-        if self.ctrl._step_seq == entry_seq:
-            self.ctrl._step_pending = False
-        else:
-            # Correct behaviour: keep the flag set
-            pass
+        # Now simulate _step()'s finally block running.  It must detect
+        # the set event and schedule a new task (the asyncio.Event
+        # equivalent of the old _step_seq mechanism).
+        with patch.object(
+            self.ctrl, '_create_step_task'
+        ) as mock_create:
+            loop = MagicMock()
+            with patch(
+                'backend.orchestration.session_orchestrator.asyncio.get_event_loop',
+                return_value=loop,
+            ):
+                # Mimic the finally block from _step.
+                if not self.ctrl._closed and self.ctrl._step_request.is_set():
+                    self.ctrl._step_request.clear()
+                    loop.call_soon.assert_not_called()
+                    loop.call_soon(self.ctrl._create_step_task)
 
-        # Assert: _step_pending is STILL True (not wiped)
-        self.assertTrue(
-            self.ctrl._step_pending,
-            'Bug: _step_pending was wiped during teardown despite a '
-            'concurrent step() call bumping _step_seq',
-        )
+            loop.call_soon.assert_called_once_with(self.ctrl._create_step_task)
+            mock_create.assert_not_called()  # call_soon defers, doesn't run yet
+            self.assertFalse(self.ctrl._step_request.is_set())
 
-    async def test_schedule_step_soon_not_step_in_on_event(self):
-        """Verify _on_event calls schedule_step_soon, not direct step().
+    async def test_request_event_not_set_yields_no_new_task(self):
+        """If no fresh request arrived, ``_step``'s finally does NOT
+        schedule a new task (no spurious steps)."""
+        self.ctrl._step_task = None
+        self.ctrl._step_request.clear()
 
-        This is the primary regression test: _on_event MUST NOT call
-        self.step() directly.  Instead it must call schedule_step_soon()
-        to defer the call until after the in-flight _step task finishes.
+        with patch.object(
+            self.ctrl, '_create_step_task'
+        ) as mock_create:
+            loop = MagicMock()
+            with patch(
+                'backend.orchestration.session_orchestrator.asyncio.get_event_loop',
+                return_value=loop,
+            ):
+                if not self.ctrl._closed and self.ctrl._step_request.is_set():
+                    self.ctrl._step_request.clear()
+                    loop.call_soon(self.ctrl._create_step_task)
+
+            loop.call_soon.assert_not_called()
+            mock_create.assert_not_called()
+
+    async def test_drain_loop_uses_request_event(self):
+        """The drain loop in ``_step`` atomically checks + clears the
+        request event.  When the event is set, ``_step`` runs another
+        iteration; when it's clear, ``_step`` exits.
         """
-        # event_router is a read-only property — patch via services
+        self.ctrl._step_request.clear()
+
+        # Track how many times _step_inner is invoked.
+        call_count = 0
+
+        async def _counting_inner() -> None:
+            nonlocal call_count
+            call_count += 1
+            # On the first iteration, simulate a fresh request arriving
+            # between iterations.  On the second, do nothing (drain exits).
+            if call_count == 1:
+                self.ctrl._step_request.set()
+
+        self.ctrl._step_inner = _counting_inner  # type: ignore[method-assign]
+
+        # ``_step_lock`` is a property.  Swap it on the class to return
+        # a real lock we control.
+        lock = asyncio.Lock()
+        type(self.ctrl)._step_lock = PropertyMock(return_value=lock)  # type: ignore[assignment]
+        try:
+            await self.ctrl._step()
+        finally:
+            delattr(type(self.ctrl), '_step_lock')
+
+        # The drain loop ran twice: first iteration set the event; second
+        # iteration cleared it; loop exited.
+        self.assertEqual(call_count, 2)
+        self.assertFalse(self.ctrl._step_request.is_set())
+
+    async def test_step_called_from_on_event(self):
+        """``_on_event`` calls ``step()`` (which atomically dispatches
+        to the main loop).  No more ``schedule_step_soon`` indirection
+        is needed because ``step()`` is itself race-free.
+        """
         self.ctrl.services.event_router = MagicMock()
         self.ctrl.services.event_router.route_event = AsyncMock()
-        # step_decision is a read-only property — patch via services
         self.ctrl.services.step_decision = MagicMock()
         self.ctrl.services.step_decision.should_step = MagicMock(return_value=True)
 
-        # Patch schedule_step_soon to verify it is called
-        with patch.object(
-            self.ctrl, 'schedule_step_soon', wraps=self.ctrl.schedule_step_soon
-        ) as mock_sss:
-            # Patch step to also track calls (it SHOULD NOT be called)
-            with patch.object(self.ctrl, 'step', wraps=self.ctrl.step) as mock_step:
-                from backend.ledger.action import MessageAction
+        with patch.object(self.ctrl, 'step', wraps=self.ctrl.step) as mock_step:
+            from backend.ledger.action import MessageAction
 
-                evt = MessageAction(content='test')
-                evt.source = EventSource.USER
+            evt = MessageAction(content='test')
+            evt.source = EventSource.USER
 
-                await self.ctrl._on_event(evt)
+            await self.ctrl._on_event(evt)
 
-                # schedule_step_soon MUST have been called
-                mock_sss.assert_called_once()
+            mock_step.assert_called_once()
 
-                # step() MUST NOT have been called directly
-                mock_step.assert_not_called()
-
-    async def test_step_seq_bumped_on_pending_reentry(self):
-        """step() increments _step_seq when setting _step_pending for re-entry."""
+    async def test_request_step_sets_event_when_task_alive(self):
+        """``_request_step`` sets ``_step_request`` (instead of
+        creating a new task) when a step task is in-flight."""
         mock_task = MagicMock()
         mock_task.done.return_value = False
         self.ctrl._step_task = mock_task
-        self.ctrl._step_pending = False
-        self.ctrl._step_seq = 0
+        self.ctrl._step_request.clear()
 
-        self.ctrl.step()
+        with patch.object(self.ctrl, '_create_step_task') as mock_create:
+            self.ctrl._request_step()
 
-        self.assertEqual(self.ctrl._step_seq, 1)
-        self.assertTrue(self.ctrl._step_pending)
+        self.assertTrue(self.ctrl._step_request.is_set())
+        mock_create.assert_not_called()
+
+    async def test_request_step_creates_task_when_idle(self):
+        """``_request_step`` creates a new task when no step is in-flight."""
+        self.ctrl._step_task = None
+        self.ctrl._step_request.clear()
+
+        with patch.object(self.ctrl, '_create_step_task') as mock_create:
+            self.ctrl._request_step()
+
+        mock_create.assert_called_once()
+        self.assertFalse(self.ctrl._step_request.is_set())
+
+
+class TestApplyUserDecision(unittest.IsolatedAsyncioTestCase):
+    """Tests for :meth:`SessionOrchestrator.apply_user_decision`.
+
+    Replaces the previous ``ChangeAgentStateAction(USER_CONFIRMED/REJECTED)``
+    event flow that could race with the agent's state.
+    """
+
+    def setUp(self):
+        self.ctrl = _make_controller()
+        self.ctrl.services.pending_action = MagicMock()
+        self.ctrl.services.emit_event = MagicMock()
+        self.ctrl.set_agent_state_to = AsyncMock()
+        self.ctrl.step = MagicMock()
+
+    async def test_approve_confirms_and_starts_running(self):
+        """Approve: sets CONFIRMED, clears pending, emits action,
+        transitions to RUNNING, triggers a step."""
+        from backend.ledger.action import ActionConfirmationStatus
+
+        mock_pending = MagicMock()
+        mock_pending.thought = 'I should rm -rf /'
+        mock_pending._id = 'action-1'
+        self.ctrl.services.pending_action.get.return_value = mock_pending
+
+        await self.ctrl.apply_user_decision(approved=True)
+
+        # confirmation_state is set
+        self.assertEqual(
+            mock_pending.confirmation_state,
+            ActionConfirmationStatus.CONFIRMED,
+        )
+        # thought is cleared (so the agent doesn't re-display its plan)
+        self.assertEqual(mock_pending.thought, '')
+        # action id is cleared (so the action is re-executable)
+        self.assertIsNone(mock_pending._id)
+        # pending action is cleared
+        self.ctrl.services.pending_action.set.assert_called_once_with(None)
+        # action is re-emitted as AGENT
+        self.ctrl.services.emit_event.assert_called_once_with(
+            mock_pending, EventSource.AGENT
+        )
+        # state transitions to RUNNING
+        self.ctrl.set_agent_state_to.assert_awaited_once_with(AgentState.RUNNING)
+        # step is triggered
+        self.ctrl.step.assert_called_once()
+
+    async def test_reject_rejects_and_awaits_input(self):
+        """Reject: sets REJECTED, clears pending, emits action,
+        transitions to AWAITING_USER_INPUT, triggers a step."""
+        from backend.ledger.action import ActionConfirmationStatus
+
+        mock_pending = MagicMock()
+        mock_pending.thought = 'I should rm -rf /'
+        mock_pending._id = 'action-2'
+        self.ctrl.services.pending_action.get.return_value = mock_pending
+
+        await self.ctrl.apply_user_decision(approved=False)
+
+        self.assertEqual(
+            mock_pending.confirmation_state,
+            ActionConfirmationStatus.REJECTED,
+        )
+        self.ctrl.services.pending_action.set.assert_called_once_with(None)
+        self.ctrl.services.emit_event.assert_called_once_with(
+            mock_pending, EventSource.AGENT
+        )
+        self.ctrl.set_agent_state_to.assert_awaited_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+        self.ctrl.step.assert_called_once()
+
+    async def test_no_pending_action_is_a_noop(self):
+        """If there's no pending action, ``apply_user_decision`` is a no-op."""
+        self.ctrl.services.pending_action.get.return_value = None
+
+        await self.ctrl.apply_user_decision(approved=True)
+
+        self.ctrl.services.pending_action.set.assert_not_called()
+        self.ctrl.services.emit_event.assert_not_called()
+        self.ctrl.set_agent_state_to.assert_not_awaited()
+        self.ctrl.step.assert_not_called()
+
+    async def test_pending_action_without_thought_attribute(self):
+        """Pending actions that don't have a ``thought`` attribute are handled."""
+        mock_pending = MagicMock(spec=['_id', 'confirmation_state'])
+        mock_pending._id = 'action-3'
+        self.ctrl.services.pending_action.get.return_value = mock_pending
+
+        await self.ctrl.apply_user_decision(approved=True)
+
+        self.ctrl.services.pending_action.set.assert_called_once_with(None)
+        self.ctrl.services.emit_event.assert_called_once_with(
+            mock_pending, EventSource.AGENT
+        )

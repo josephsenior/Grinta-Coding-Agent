@@ -390,38 +390,6 @@ class TestObservationService(unittest.IsolatedAsyncioTestCase):
 class TestTransitionAgentStateLogic(unittest.IsolatedAsyncioTestCase):
     """Test transition_agent_state_logic helper function."""
 
-    async def test_transition_from_user_confirmed(self):
-        """Test transition from USER_CONFIRMED to RUNNING."""
-        mock_controller = MagicMock()
-        mock_controller.state = MagicMock()
-        mock_controller.state.agent_state = AgentState.USER_CONFIRMED
-        mock_controller.set_agent_state_to = AsyncMock()
-
-        mock_ctx = None
-        mock_observation = MagicMock()
-
-        await transition_agent_state_logic(mock_controller, mock_ctx, mock_observation)
-
-        # Should transition to RUNNING
-        mock_controller.set_agent_state_to.assert_called_once_with(AgentState.RUNNING)
-
-    async def test_transition_from_user_rejected(self):
-        """Test transition from USER_REJECTED to AWAITING_USER_INPUT."""
-        mock_controller = MagicMock()
-        mock_controller.state = MagicMock()
-        mock_controller.state.agent_state = AgentState.USER_REJECTED
-        mock_controller.set_agent_state_to = AsyncMock()
-
-        mock_ctx = None
-        mock_observation = MagicMock()
-
-        await transition_agent_state_logic(mock_controller, mock_ctx, mock_observation)
-
-        # Should transition to AWAITING_USER_INPUT
-        mock_controller.set_agent_state_to.assert_called_once_with(
-            AgentState.AWAITING_USER_INPUT
-        )
-
     async def test_transition_from_running(self):
         """Test no transition from RUNNING state."""
         mock_controller = MagicMock()

@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
-from backend.ledger.action import ActionConfirmationStatus
 from backend.orchestration.services.state_transition_service import (
     VALID_TRANSITIONS,
     InvalidStateTransitionError,
@@ -149,80 +148,6 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
 
         # Should not call error recovery
         self.mock_context.state_tracker.maybe_increase_control_flags_limits.assert_not_called()
-
-    async def test_set_agent_state_user_confirmed_emits_pending(self):
-        """Test set_agent_state to USER_CONFIRMED emits pending action."""
-        self.mock_context.state.agent_state = AgentState.AWAITING_USER_CONFIRMATION
-
-        mock_pending = MagicMock()
-        mock_pending.thought = 'Test thought'
-        mock_pending._id = 'action-123'
-        self.mock_context.pending_action = mock_pending
-
-        await self.service.set_agent_state(AgentState.USER_CONFIRMED)
-
-        # Should clear thought and set confirmation state
-        self.assertEqual(mock_pending.thought, '')
-        self.assertEqual(
-            mock_pending.confirmation_state, ActionConfirmationStatus.CONFIRMED
-        )
-        self.assertIsNone(mock_pending._id)
-
-        # Should emit action
-        self.mock_context.emit_event.assert_called_with(mock_pending, EventSource.AGENT)
-
-        # Should clear the approval pending row before re-emitting the confirmed
-        # action, so the fresh execution row is not immediately wiped out.
-        self.mock_context.clear_pending_action.assert_called_once()
-        self.assertLess(
-            self.mock_context.mock_calls.index(call.clear_pending_action()),
-            self.mock_context.mock_calls.index(
-                call.emit_event(mock_pending, EventSource.AGENT)
-            ),
-        )
-
-    async def test_set_agent_state_user_rejected_emits_pending(self):
-        """Test set_agent_state to USER_REJECTED emits pending action."""
-        self.mock_context.state.agent_state = AgentState.AWAITING_USER_CONFIRMATION
-
-        mock_pending = MagicMock()
-        mock_pending.thought = 'Thought'
-        mock_pending._id = 'action-456'
-        self.mock_context.pending_action = mock_pending
-
-        await self.service.set_agent_state(AgentState.USER_REJECTED)
-
-        # Should set rejected state
-        self.assertEqual(
-            mock_pending.confirmation_state, ActionConfirmationStatus.REJECTED
-        )
-
-        # Should emit and clear
-        self.mock_context.emit_event.assert_called()
-        self.mock_context.clear_pending_action.assert_called_once()
-
-    async def test_set_agent_state_no_pending_action(self):
-        """Test set_agent_state when no pending action."""
-        self.mock_context.state.agent_state = AgentState.AWAITING_USER_CONFIRMATION
-        self.mock_context.pending_action = None
-
-        await self.service.set_agent_state(AgentState.USER_CONFIRMED)
-
-        # Should not emit pending action
-        self.mock_context.clear_pending_action.assert_not_called()
-
-    async def test_set_agent_state_pending_action_no_thought(self):
-        """Test set_agent_state with pending action lacking thought attribute."""
-        self.mock_context.state.agent_state = AgentState.AWAITING_USER_CONFIRMATION
-
-        mock_pending = MagicMock(spec=['_id', 'confirmation_state'])
-        mock_pending._id = 'action-789'
-        self.mock_context.pending_action = mock_pending
-
-        await self.service.set_agent_state(AgentState.USER_CONFIRMED)
-
-        # Should still process without thought
-        self.mock_context.emit_event.assert_called()
 
     async def test_set_agent_state_from_loading_to_running(self):
         """Test valid transition from LOADING to RUNNING."""

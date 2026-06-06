@@ -517,7 +517,6 @@ class _EventRouterDelegateMixin(EventRouterService if TYPE_CHECKING else object)
                         if worker_controller.get_agent_state() not in (
                             AgentState.RUNNING,
                             AgentState.AWAITING_USER_INPUT,
-                            AgentState.PAUSED,
                         ):
                             break
 
@@ -579,7 +578,6 @@ class _EventRouterDelegateMixin(EventRouterService if TYPE_CHECKING else object)
                     in (
                         AgentState.RUNNING,
                         AgentState.AWAITING_USER_INPUT,
-                        AgentState.PAUSED,
                     )
                 ):
                     success = True

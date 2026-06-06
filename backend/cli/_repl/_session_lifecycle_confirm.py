@@ -5,8 +5,9 @@ Owns:
   hard-kill shells, stop the controller cleanly, and stop the reasoning
   stream.
 - ``_handle_confirmation`` — render the Y/N confirmation prompt and feed
-  the user's decision back into the event stream, with a guard against
-  infinite confirmation loops and a per-session "remember always allow"
+  the user's decision back to the controller via
+  ``controller.apply_user_decision()``, with a guard against infinite
+  confirmation loops and a per-session "remember always allow"
   affordance.
 """
 
@@ -19,10 +20,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 from backend.cli.confirmation import (
     ConfirmationDecision,
-    build_confirmation_action,
     render_confirmation,
 )
-from backend.core.enums import EventSource
 
 if TYPE_CHECKING:
     from backend.cli._typing import SessionLifecycleHost
@@ -89,9 +88,9 @@ async def _handle_confirmation(
                 'Confirmation loop detected — auto-rejecting to prevent hang.',
                 title='warning',
             )
-        action = build_confirmation_action(False)
-        if host._event_stream:
-            host._event_stream.add_event(action, EventSource.USER)
+        apply = getattr(controller, 'apply_user_decision', None)
+        if callable(apply):
+            await apply(approved=False)
         host._confirmation_prompt_count = 0
         return
 
@@ -108,10 +107,9 @@ async def _handle_confirmation(
 
         risk = getattr(pending, 'security_risk', ActionSecurityRisk.UNKNOWN)
         if risk == ActionSecurityRisk.LOW:
-            decision = ConfirmationDecision(approved=True, remember=False)
-            action = build_confirmation_action(True)
-            if host._event_stream:
-                host._event_stream.add_event(action, EventSource.USER)
+            apply = getattr(controller, 'apply_user_decision', None)
+            if callable(apply):
+                await apply(approved=True)
             return
 
     remember_always = False
@@ -162,6 +160,6 @@ async def _handle_confirmation(
                 title='autonomy',
             )
 
-    action = build_confirmation_action(approved)
-    if host._event_stream:
-        host._event_stream.add_event(action, EventSource.USER)
+    apply = getattr(controller, 'apply_user_decision', None)
+    if callable(apply):
+        await apply(approved=approved)

@@ -180,8 +180,8 @@ class StepGuardService:
         result = cb_service.check()
         if not result or not result.tripped:
             # Even when the primary check passes, run the no-step-progress
-            # watchdog.  This is a safety net for the
-            # _step_pending race that is not prevented by Edit 1 alone.
+            # watchdog.  This is a safety net for the rare case where
+            # ``_step_request`` is not delivered to a step task.
             watchdog_result = await self._check_no_step_progress_watchdog(
                 controller, cb_service, agent_state
             )
@@ -246,10 +246,7 @@ class StepGuardService:
         )
         controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
 
-        target_state = (
-            AgentState.STOPPED if result.action == 'stop' else AgentState.PAUSED
-        )
-        await controller.set_agent_state_to(target_state)
+        await controller.set_agent_state_to(AgentState.STOPPED)
         return False
 
     async def _check_no_step_progress_watchdog(
