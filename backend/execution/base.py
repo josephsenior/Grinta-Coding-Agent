@@ -93,7 +93,6 @@ AGENT_LEVEL_ACTIONS: frozenset[str] = frozenset(
         'message',
         'recall',
         'think',
-        'finish',
         'reject',
         'delegate',
         'delegate_task',

@@ -258,7 +258,7 @@ class ActivityRenderer:
             badge_category='files',
             title='Files',
             secondary=secondary,
-            secondary_kind='ok' if added else 'neutral',
+            secondary_kind='ok' if added or removed else 'neutral',
             extra_lines=extra_lines,
             is_collapsible=bool(diff_lines),
             start_collapsed=should_collapse,

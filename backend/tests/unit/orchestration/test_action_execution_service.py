@@ -154,8 +154,7 @@ class TestGetNextAction:
 
         ctx = _make_context()
         ctx.agent.step.side_effect = LLMNoActionError(
-            'Agent mode requires a tool action, but the model returned plain text '
-            'with no tool call.'
+            'LLM returned no tool calls and no content.'
         )
         controller = MagicMock()
         controller.get_agent_state.return_value = AgentState.RUNNING

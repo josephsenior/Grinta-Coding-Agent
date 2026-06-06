@@ -64,7 +64,8 @@ def test_read_only_batch_parallel() -> None:
 def test_read_only_mcp_tools_parallel() -> None:
     scheduler = ActionScheduler(enabled=True)
     actions = [
-        _FakeMCPAction(name='search_code'),
+        _FakeMCPAction(name='grep'),
+        _FakeMCPAction(name='glob'),
         _FakeMCPAction(name='get_entity'),
     ]
     decision = scheduler.decide_parallel_batch(actions)

@@ -220,7 +220,7 @@ class _EventRouterDelegateMixin(EventRouterService if TYPE_CHECKING else object)
                 # sub-agent has full context without needing to rediscover it.
                 worker_depth = depth + 1
                 parent_context_lines: list[str] = [
-                    f'You are a worker agent (depth {worker_depth}/{MAX_DELEGATION_DEPTH}) delegated the following task:\n\n{task_description}\n\nFocus ONLY on this task. Once completed, finish.\n\n'
+                    f'You are a worker agent (depth {worker_depth}/{MAX_DELEGATION_DEPTH}) delegated the following task:\n\n{task_description}\n\nFocus ONLY on this task. Once completed, write a final response.\n\n'
                     f'DELEGATION LIMIT: You can delegate sub-tasks up to depth {MAX_DELEGATION_DEPTH}. '
                     f'Your current depth is {worker_depth}. '
                     f'If you need to delegate further, you can go up to depth {MAX_DELEGATION_DEPTH}.'

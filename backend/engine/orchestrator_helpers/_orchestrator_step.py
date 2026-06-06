@@ -76,11 +76,12 @@ def _generate_delimiter_token(orch: Orchestrator) -> str:
 
 
 def _check_exit_command(orch: Orchestrator, state: State) -> Action | None:
-    from backend.ledger.action import PlaybookFinishAction
+    from backend.ledger.action import MessageAction
 
     latest_user_message = state.get_last_user_message()
     if latest_user_message and latest_user_message.content.strip() == '/exit':
-        return PlaybookFinishAction()
+        action = MessageAction(content='Exited.', final_response=True)
+        return action
     return None
 
 

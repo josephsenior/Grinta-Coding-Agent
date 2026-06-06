@@ -67,7 +67,7 @@ def _build_imports_action(path: str) -> AgentThinkAction:
                 next_steps=[
                     'Confirm the file path is correct and committed to the repo.',
                     'Try command=callers with a public symbol name from this file.',
-                    'Try command=search_code (separate tool) for non-import references.',
+                    'Try the `grep` tool (separate tool) for non-import references.',
                 ],
             )
         )

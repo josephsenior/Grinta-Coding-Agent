@@ -45,10 +45,6 @@ def _render_tool_reference(
             "Find: `Get-Process | Where-Object { $_.ProcessName -like '*name*' }`; "
             'kill: `Stop-Process -Id <PID>`.'
         )
-    checkpoints = getattr(config, 'enable_checkpoints', False)
-    checkpoint_rollback_hint = (
-        '; use **checkpoint** for coarse rollback' if checkpoints else ''
-    )
 
     if not can_edit:
         editor_ops = (
@@ -87,6 +83,6 @@ def _render_tool_reference(
         'system_partial_02_tools.md',
         confirm_paths=confirm_cmd,
         process_management=proc_find,
-        checkpoint_rollback_hint=checkpoint_rollback_hint,
+        checkpoint_rollback_hint='',
         editor_and_file_operations=editor_ops,
     )

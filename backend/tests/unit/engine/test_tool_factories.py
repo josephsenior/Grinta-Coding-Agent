@@ -1,63 +1,38 @@
-"""Tests for orchestrator tool factory functions — finish, task_tracker, condensation_request."""
+"""Tests for orchestrator tool factory functions."""
 
 from __future__ import annotations
 
 from backend.engine.tools.condensation_request import (
     create_summarize_context_tool,
 )
-from backend.engine.tools.finish import create_finish_tool
+from backend.engine.tools.meta_cognition import ASK_USER_TOOL_NAME, create_ask_user_tool
 from backend.engine.tools.task_tracker import (
     create_create_task_tracker_tool,
     create_task_tracker_tool,
 )
 from backend.inference.tool_names import (
     CREATE_TASK_TRACKER_TOOL_NAME,
-    FINISH_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
 )
 
 
-class TestCreateFinishTool:
+class TestCreateAskUserTool:
     def test_type(self):
-        tool = create_finish_tool()
+        tool = create_ask_user_tool()
         assert tool['type'] == 'function'
 
     def test_name(self):
-        tool = create_finish_tool()
-        assert tool['function']['name'] == FINISH_TOOL_NAME
+        tool = create_ask_user_tool()
+        assert tool['function']['name'] == ASK_USER_TOOL_NAME
 
-    def test_agent_finish_has_execution_params(self):
-        tool = create_finish_tool()
+    def test_requires_questions(self):
+        tool = create_ask_user_tool()
         params = tool['function']['parameters']
-        assert set(params['required']) == {
-            'status',
-            'response',
-            'summary',
-            'sections',
-            'evidence',
-            'open_items',
-            'next_step',
-        }
-        assert 'actions_taken' in params['properties']
-        assert 'plan' not in params['properties']
-
-    def test_plan_finish_has_plan_params(self):
-        tool = create_finish_tool('plan')
-        params = tool['function']['parameters']
-        assert set(params['required']) == {
-            'status',
-            'response',
-            'summary',
-            'sections',
-            'evidence',
-            'open_items',
-            'next_step',
-        }
-        assert 'plan' in params['properties']
-        assert 'actions_taken' not in params['properties']
+        assert params['required'] == ['questions']
+        assert params['properties']['questions']['type'] == 'array'
 
     def test_description_nonempty(self):
-        tool = create_finish_tool()
+        tool = create_ask_user_tool()
         assert len(tool['function']['description']) > 10
 
 

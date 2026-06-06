@@ -252,11 +252,6 @@ def _summary_think(args: dict[str, Any]) -> str:
     return _trunc(text, 160) if text else '…'
 
 
-def _summary_finish(args: dict[str, Any]) -> str:
-    msg = _arg_str(args, 'summary', 'message')
-    return _trunc(msg, 120) if msg else 'done'
-
-
 def _summary_memory(args: dict[str, Any]) -> str:
     op = args.get('operation') or args.get('action')
     q = args.get('query') or args.get('key')
@@ -275,7 +270,7 @@ def _summary_task_tracker(args: dict[str, Any]) -> str:
     return _trunc(' · '.join(parts), 160) if parts else 'tasks…'
 
 
-def _summary_search_code(args: dict[str, Any]) -> str:
+def _summary_grep(args: dict[str, Any]) -> str:
     q = _arg_str(args, 'query', 'pattern')
     path = _arg_str(args, 'path', 'root', 'directory')
     bits: list[str] = []
@@ -284,6 +279,17 @@ def _summary_search_code(args: dict[str, Any]) -> str:
     if path:
         bits.append(path)
     return ' in '.join(bits) if bits else 'search…'
+
+
+def _summary_glob(args: dict[str, Any]) -> str:
+    q = _arg_str(args, 'query', 'pattern')
+    path = _arg_str(args, 'path', 'root', 'directory')
+    bits: list[str] = []
+    if q:
+        bits.append(_trunc(q, 80))
+    if path:
+        bits.append(path)
+    return ' in '.join(bits) if bits else 'list…'
 
 
 def _summary_lsp(args: dict[str, Any]) -> str:
@@ -320,9 +326,13 @@ def _summary_delegate_task(args: dict[str, Any]) -> str:
     return _trunc(desc, 120) if desc else 'sub-task…'
 
 
-def _summary_communicate(args: dict[str, Any]) -> str:
-    msg = _arg_str(args, 'message', 'content', 'text')
-    return _trunc(msg, 120) if msg else '…'
+def _summary_ask_user(args: dict[str, Any]) -> str:
+    questions = args.get('questions')
+    if isinstance(questions, list):
+        text = '; '.join(str(item).strip() for item in questions if str(item).strip())
+        return _trunc(text, 120) if text else 'question…'
+    msg = _arg_str(args, 'question', 'message', 'content', 'text')
+    return _trunc(msg, 120) if msg else 'question…'
 
 
 def _summary_call_mcp(args: dict[str, Any]) -> str:
@@ -355,16 +365,16 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'find_symbols': _summary_find_symbol,
     'think': _summary_think,
     'agent_think': _summary_think,
-    'finish': _summary_finish,
     'memory_manager': _summary_memory,
     'task_tracker': _summary_task_tracker,
-    'search_code': _summary_search_code,
+    'grep': _summary_grep,
+    'glob': _summary_glob,
     'lsp': _summary_lsp,
     'analyze_project_structure': _summary_analyze_project,
     'read_symbol': _summary_read_symbol,
     'verify_file_lines': _summary_verify_file,
     'delegate_task': _summary_delegate_task,
-    'communicate_with_user': _summary_communicate,
+    'ask_user': _summary_ask_user,
     'call_mcp_tool': _summary_call_mcp,
     'checkpoint': _summary_checkpoint,
     'summarize_context': _summary_summarize_context,

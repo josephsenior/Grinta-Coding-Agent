@@ -32,6 +32,7 @@ class MessageAction(Action):
     wait_for_response: bool = False
     suppress_cli: bool = False
     transcript_only: bool = False
+    final_response: bool = False
     protocol_status: bool = False
     protocol_abandoned: bool = False
     action: ClassVar[str] = ActionType.MESSAGE

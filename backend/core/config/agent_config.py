@@ -33,7 +33,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_DYNAMIC_ITERATIONS_ENABLED,
     DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT,
     DEFAULT_AGENT_ERROR_RATE_WINDOW,
-    DEFAULT_AGENT_FINISH_ENABLED,
     DEFAULT_AGENT_HISTORY_TRUNCATION_ENABLED,
     DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED,
     DEFAULT_AGENT_MAX_AUTONOMOUS_ITERATIONS,
@@ -106,7 +105,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     mode: str = Field(
         default=DEFAULT_AGENT_MODE,
         description=(
-            "Run mode: 'chat'/'ask' (discussion), 'plan' (read-only planning), "
+            "Run mode: 'chat'/'ask' (discussion), 'plan' (planning), "
             "or 'agent' (execution/editing)."
         ),
     )
@@ -172,14 +171,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
 
     # Core tool toggles
-    enable_finish: bool = Field(
-        default=DEFAULT_AGENT_FINISH_ENABLED,
-        description=(
-            'Expose the finish tool. Keep enabled: the orchestrator uses it as the normal task-completion '
-            'signal (state transitions, validation). Disabling removes a core lifecycle hook unless you '
-            'replace it elsewhere.'
-        ),
-    )
     enable_condensation_request: bool = Field(
         default=DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
         description=(
@@ -447,12 +438,8 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             )
 
     @model_validator(mode='after')
-    def warn_on_finish_disable(self) -> AgentConfig:
-        """Surface dangerous lifecycle toggles loudly without breaking legacy configs."""
-        if not self.enable_finish:
-            logger.warning(
-                'Agent config has enable_finish=False; the finish tool is disabled, which removes the normal task-completion signal and may prevent clean termination.'
-            )
+    def _validate_iteration_bounds(self) -> AgentConfig:
+        """Validate iteration bounds and surface dangerous configuration choices."""
         if (
             self.max_iterations_override is not None
             and self.max_iterations_override < self.min_iterations

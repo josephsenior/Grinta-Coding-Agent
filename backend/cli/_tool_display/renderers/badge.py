@@ -108,8 +108,6 @@ def badge_for_tool_name(tool_name: str) -> ToolBadge:
         return _BADGES['think']
     if 'communicate' in name or 'message' in name:
         return _BADGES['message']
-    if 'finish' in name:
-        return _BADGES['done']
     if 'terminal' in name:
         return _BADGES['terminal']
     if 'checkpoint' in name:

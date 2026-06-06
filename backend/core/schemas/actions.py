@@ -141,6 +141,7 @@ class MessageActionSchema(ActionSchemaV1):
     wait_for_response: bool = Field(False, description='Whether to wait for user input')
     suppress_cli: bool = Field(False, description='Whether to suppress CLI rendering')
     transcript_only: bool = Field(False, description='Persist without LLM context')
+    final_response: bool = Field(False, description='Plain-text response that ends the run')
     protocol_status: bool = Field(False, description='Render as a mid-task status')
     protocol_abandoned: bool = Field(False, description='Render as a retry prompt')
 

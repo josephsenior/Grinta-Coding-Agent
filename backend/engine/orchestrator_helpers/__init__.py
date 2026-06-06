@@ -13,7 +13,7 @@ The orchestrator class delegates each concern to a dedicated private module:
 - :mod:`backend.engine.orchestrator_helpers._orchestrator_recovery` — step
   and tool-error recovery cascades.
 - :mod:`backend.engine.orchestrator_helpers._orchestrator_protocol` —
-  protocol-mode fallback synthesis.
+  plain-text final-response fallback handling.
 - :mod:`backend.engine.orchestrator_helpers._orchestrator_step` — ``step``,
   ``astep``, and the underlying LLM-step primitives.
 

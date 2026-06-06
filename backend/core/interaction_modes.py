@@ -11,28 +11,23 @@ CHAT_MODE_NAMES = frozenset({CHAT_MODE, ASK_MODE})
 VISIBLE_INTERACTION_MODES = (CHAT_MODE, PLAN_MODE, AGENT_MODE)
 VALID_INTERACTION_MODES = frozenset({*VISIBLE_INTERACTION_MODES, ASK_MODE})
 
-CHAT_MODE_ALLOWED_TOOLS = frozenset(
-    {
-        'analyze_project_structure',
-        'find_symbols',
-        'lsp',
-        'read',
-        'recall',
-        'search_code',
-    }
-)
+CHAT_MODE_ALLOWED_TOOLS = frozenset()
 
 PLAN_MODE_ALLOWED_TOOLS = frozenset(
     {
         'analyze_project_structure',
-        'communicate_with_user',
-        'create_task_tracker',
+        'ask_user',
+        'create',
+        'edit_symbols',
+        'execute_bash',
+        'execute_powershell',
         'find_symbols',
-        'finish',
+        'glob',
+        'grep',
         'lsp',
+        'multiedit',
         'read',
-        'recall',
-        'search_code',
+        'replace_string',
         'task_tracker',
     }
 )
@@ -52,5 +47,5 @@ def is_chat_mode(value: object) -> bool:
 
 
 def is_plan_mode(value: object) -> bool:
-    """Return True when the active run is a read-only planning run."""
+    """Return True when the active run is a planning run."""
     return normalize_interaction_mode(value) == PLAN_MODE

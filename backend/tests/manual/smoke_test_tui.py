@@ -1,8 +1,6 @@
 """Smoke test: mount both file_create and file_read cards in the TUI and dump their rendered text."""
-import asyncio
 from textual.app import App, ComposeResult
 
-from backend.cli.tui.widgets.activity_card import ActivityCard
 from backend.cli._event_renderer.unified_renderer import ActivityRenderer
 
 

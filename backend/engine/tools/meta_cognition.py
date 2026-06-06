@@ -1,128 +1,60 @@
-"""Meta-cognition tools enabling the LLM to express uncertainty and seek guidance.
+"""User-input tool for the simplified agent protocol."""
 
-These tools allow the LLM to interact with the user or system to express doubt,
-ask for clarification, propose options, request explicit confirmation, post a
-non-blocking status update, or escalate when stuck.
-"""
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
+from backend.ledger.action import MessageAction
 
-# Single unified tool name
-COMMUNICATE_TOOL_NAME = 'communicate_with_user'
-
-_VALID_INTENTS: frozenset[str] = frozenset(
-    {
-        'clarification',
-        'uncertainty',
-        'proposal',
-        'confirm',
-        'inform',
-        'escalate',
-    }
-)
-
-_COMMUNICATE_DESCRIPTION = (
-    'Interact with the user. Pick the intent that matches what you need:\n'
-    '  - clarification: ask a question, optionally with multiple-choice options.\n'
-    '  - uncertainty: flag that you are not confident; describe concerns and what would help.\n'
-    '  - proposal: offer 2+ alternative approaches with optional descriptions and a recommended pick.\n'
-    '  - confirm: require explicit user OK before a destructive or irreversible action; auto-denies on timeout.\n'
-    '  - inform: share a non-blocking status update; the user can read it but the turn continues.\n'
-    '  - escalate: hand off to the human after repeated failures; include what you tried and what help you need.'
-)
+ASK_USER_TOOL_NAME = 'ask_user'
 
 
-def create_communicate_tool() -> ChatCompletionToolParam:
-    """Create the unified communication tool."""
+def create_ask_user_tool() -> ChatCompletionToolParam:
+    """Create the only model-facing communication tool."""
     return create_tool_definition(
-        name=COMMUNICATE_TOOL_NAME,
-        description=_COMMUNICATE_DESCRIPTION,
+        name=ASK_USER_TOOL_NAME,
+        description=(
+            'Ask the user one or more questions when input is required to continue. '
+            'Calling this tool pauses the run until the user replies.'
+        ),
         properties={
-            'intent': {
-                'type': 'string',
-                'enum': sorted(_VALID_INTENTS),
-                'description': 'The specific reason for communication.',
-            },
-            'message': {
-                'type': 'string',
-                'description': 'The question, reason, or explanation you want to deliver.',
-            },
-            'options': {
+            'questions': {
                 'type': 'array',
-                'items': {
-                    'type': 'object',
-                    'properties': {
-                        'label': {
-                            'type': 'string',
-                            'description': 'Short label for this option (shown in the UI).',
-                        },
-                        'description': {
-                            'type': 'string',
-                            'description': 'Optional one-line explanation of tradeoffs.',
-                        },
-                    },
-                    'required': ['label'],
-                },
-                'description': (
-                    '(Optional) For clarification/proposal/confirm: a list of option objects. '
-                    'Each option needs a "label"; "description" is optional. '
-                    'For confirm, use exactly two options: the positive and the negative.'
-                ),
-            },
-            'recommended': {
-                'type': 'integer',
-                'minimum': 0,
-                'description': (
-                    '(Optional, proposal only) Zero-based index of the option you recommend. '
-                    'The UI pre-selects it so the user can accept with one Enter.'
-                ),
-            },
-            'uncertainty_level': {
-                'type': 'number',
-                'minimum': 0.0,
-                'maximum': 1.0,
-                'description': (
-                    '(Optional, uncertainty only) Your confidence in the current approach, '
-                    'where 1.0 = fully confident and 0.0 = no idea. Defaults to 0.5.'
-                ),
-            },
-            'specific_help_needed': {
-                'type': 'string',
-                'description': (
-                    '(Optional, escalate only) What concrete input or decision would unblock you. '
-                    'Shown verbatim to the user.'
-                ),
-            },
-            'attempts': {
-                'type': 'array',
-                'items': {
-                    'type': 'object',
-                    'properties': {
-                        'action': {
-                            'type': 'string',
-                            'description': 'Short label of the attempt (e.g. "rg --files").',
-                        },
-                        'result': {
-                            'type': 'string',
-                            'description': 'What happened (error, exit code, observation).',
-                        },
-                    },
-                    'required': ['action'],
-                },
-                'description': (
-                    '(Optional, escalate only) Structured list of approaches already tried. '
-                    'Each entry has an "action" and optional "result".'
-                ),
-            },
-            'context': {
-                'type': 'string',
-                'description': '(Optional) Background on what you tried or why you are asking.',
-            },
-            'thought': {
-                'type': 'string',
-                'description': 'Your internal reasoning. Optional for this tool.',
+                'description': 'Questions to show the user.',
+                'items': {'type': 'string'},
+                'minItems': 1,
             },
         },
-        required=['intent', 'message'],
+        required=['questions'],
     )
+
+
+def _clean_questions(raw_questions: object) -> list[str]:
+    if isinstance(raw_questions, str):
+        questions = [raw_questions]
+    elif isinstance(raw_questions, Sequence) and not isinstance(
+        raw_questions, (bytes, bytearray)
+    ):
+        questions = [str(item) for item in raw_questions]
+    else:
+        questions = []
+    return [question.strip() for question in questions if question.strip()]
+
+
+def build_ask_user_action(arguments: Mapping[str, Any]) -> MessageAction:
+    """Convert ask_user arguments into a pausing message action."""
+    from backend.core.errors import FunctionCallValidationError
+
+    questions = _clean_questions(arguments.get('questions'))
+    if not questions:
+        raise FunctionCallValidationError(
+            'ask_user requires a non-empty questions list.'
+        )
+
+    content = '\n'.join(
+        f'{idx}. {question}' for idx, question in enumerate(questions, start=1)
+    )
+    return MessageAction(content=content, wait_for_response=True)

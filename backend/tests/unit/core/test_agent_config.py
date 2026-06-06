@@ -174,18 +174,6 @@ class TestAgentConfigCustom:
         assert cfg.min_iterations == 25
         assert cfg.max_iterations_override == 25
 
-    def test_disable_finish_warning_is_not_silent(self):
-        from unittest.mock import patch
-
-        with patch('backend.core.config.agent_config.logger.warning') as mock_warning:
-            cfg = AgentConfig(enable_finish=False)
-
-        assert cfg.enable_finish is False
-        mock_warning.assert_called_once()
-        warning_message = mock_warning.call_args.args[0]
-        assert 'enable_finish=False' in warning_message
-        assert 'normal task-completion signal' in warning_message
-
     def test_non_full_autonomy_warns_on_full_autonomy_only_knobs(self):
         """As of 1.0.0-rc1 iteration limits are no longer coupled to autonomy mode.
 

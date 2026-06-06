@@ -2740,7 +2740,7 @@ async def test_renderer_handles_mcp_action() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    action = MCPAction(name='search_code', arguments={'query': 'test'})
+    action = MCPAction(name='grep', arguments={'pattern': 'test'})
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
     await renderer.handle_event(MCPObservation(content='{"text": "found 3 matches"}'))

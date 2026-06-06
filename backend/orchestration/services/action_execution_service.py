@@ -401,7 +401,7 @@ class ActionExecutionService:
                 'Please use an existing tool from the provided list.'
             )
         if isinstance(exc, LLMNoActionError):
-            return 'No tool call detected — response contained text only.'
+            return 'No tool call or final text was detected.'
         return str(exc)
 
     def _publish_repair_error_observation(
@@ -621,9 +621,10 @@ class ActionExecutionService:
             self._publish_agent_event(
                 ErrorObservation(
                     content=(
-                        'No tool call detected — retrying with explicit instruction.\n\n'
-                        'You MUST use a tool call from the available tool set shown in the prompt.\n'
-                        'Pick the single most important next step and execute it now.'
+                        'The model returned no tool call and no final text. '
+                        'Retrying with an explicit instruction.\n\n'
+                        'Use a tool call if work remains, call ask_user if input '
+                        'is required, or write the final response in plain text.'
                     ),
                     error_id='NULL_ACTION_LOOP_RECOVERY',
                     agent_only=True,
@@ -641,7 +642,7 @@ class ActionExecutionService:
         self._publish_agent_event(
             ErrorObservation(
                 content=(
-                    'Agent returned no tool calls for multiple steps.\n'
+                    'Agent returned no tool calls or final text for multiple steps.\n'
                     'Pausing to avoid wasted API calls.\n'
                     'Provide clearer instructions or ask the agent to retry.'
                 ),

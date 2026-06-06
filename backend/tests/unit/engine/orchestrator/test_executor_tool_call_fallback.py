@@ -11,7 +11,7 @@ import pytest
 from backend.core.errors import LLMNoActionError
 from backend.engine.executor import OrchestratorExecutor
 from backend.engine.orchestrator import Orchestrator
-from backend.ledger.action import Action, MessageAction, PlaybookFinishAction
+from backend.ledger.action import Action, MessageAction
 
 
 def _make_result(content: str) -> SimpleNamespace:
@@ -99,11 +99,11 @@ class TestBuildFallbackAction:
             'We need to build an expense sharing service.',
             # Model pretending it executed something
             'I have created the FastAPI application and configured SQLite.',
-            # Genuine question — must still be non-blocking; model must use communicate_with_user
+            # Genuine question in plain text is still a final response; use ask_user to pause.
             'Which Python version should I target?',
         ],
     )
-    def test_agent_mode_non_empty_text_yields_plain_text_before_tracker(
+    def test_agent_mode_non_empty_text_yields_final_response(
         self, text: str
     ) -> None:
         orch = _make_orchestrator()
@@ -111,9 +111,10 @@ class TestBuildFallbackAction:
 
         assert isinstance(action, MessageAction)
         assert action.content == text
-        assert action.wait_for_response is True
+        assert action.wait_for_response is False
+        assert action.final_response is True
 
-    def test_agent_mode_fallback_with_active_tracker_returns_status(self) -> None:
+    def test_agent_mode_fallback_with_active_tracker_is_final_response(self) -> None:
         orch = _make_orchestrator()
         orch.executor = SimpleNamespace(
             _active_run_mode='agent',
@@ -124,10 +125,10 @@ class TestBuildFallbackAction:
         action = _build_fallback_action(orch, _make_result('Still thinking aloud.'))
 
         assert isinstance(action, MessageAction)
-        assert action.protocol_status is True
         assert action.wait_for_response is False
+        assert action.final_response is True
 
-    def test_agent_mode_fallback_terminal_tracker_synthesizes_finish(self) -> None:
+    def test_agent_mode_fallback_terminal_tracker_is_final_response(self) -> None:
         orch = _make_orchestrator()
         orch.executor = SimpleNamespace(
             _active_run_mode='agent',
@@ -136,11 +137,12 @@ class TestBuildFallbackAction:
 
         action = _build_fallback_action(orch, _make_result('Everything is complete.'))
 
-        assert isinstance(action, PlaybookFinishAction)
-        assert action.outputs['summary'] == 'Everything is complete.'
+        assert isinstance(action, MessageAction)
+        assert action.content == 'Everything is complete.'
+        assert action.final_response is True
 
     @pytest.mark.parametrize('mode', ['chat', 'plan'])
-    def test_non_agent_modes_yield_plain_text(self, mode: str) -> None:
+    def test_non_agent_modes_yield_final_response(self, mode: str) -> None:
         orch = _make_orchestrator()
         orch.config = SimpleNamespace(mode=mode)
         orch.executor = SimpleNamespace(_active_run_mode=mode)
@@ -149,9 +151,10 @@ class TestBuildFallbackAction:
 
         assert isinstance(action, MessageAction)
         assert action.content == 'plain answer'
-        assert action.wait_for_response is True
+        assert action.wait_for_response is False
+        assert action.final_response is True
 
-    def test_plan_mode_fallback_with_active_tracker_returns_status(self) -> None:
+    def test_plan_mode_fallback_with_active_tracker_is_final_response(self) -> None:
         orch = _make_orchestrator()
         orch.config = SimpleNamespace(mode='plan')
         orch.executor = SimpleNamespace(
@@ -163,10 +166,10 @@ class TestBuildFallbackAction:
         action = _build_fallback_action(orch, _make_result('Drafting the plan.'))
 
         assert isinstance(action, MessageAction)
-        assert action.protocol_status is True
         assert action.wait_for_response is False
+        assert action.final_response is True
 
-    def test_plan_mode_fallback_terminal_tracker_synthesizes_plan_finish(self) -> None:
+    def test_plan_mode_fallback_terminal_tracker_is_final_response(self) -> None:
         orch = _make_orchestrator()
         orch.config = SimpleNamespace(mode='plan')
         orch.executor = SimpleNamespace(
@@ -176,9 +179,9 @@ class TestBuildFallbackAction:
 
         action = _build_fallback_action(orch, _make_result('Plan is complete.'))
 
-        assert isinstance(action, PlaybookFinishAction)
-        assert action.outputs['mode'] == 'plan'
-        assert action.outputs['summary'] == 'Plan is complete.'
+        assert isinstance(action, MessageAction)
+        assert action.content == 'Plan is complete.'
+        assert action.final_response is True
 
 
 class TestPlainTextProtocolGate:
@@ -214,7 +217,7 @@ class TestPlainTextProtocolGate:
         assert result == [action]
         assert executor._consecutive_plain_text_blocks == 0
 
-    def test_agent_mode_with_active_tracker_converts_plain_text_to_status(self):
+    def test_agent_mode_with_active_tracker_keeps_plain_text_unchanged(self):
         executor = self._make_executor('agent', active_tasks=True)
         executor._state = _state_with_tasks('in_progress')
         action = MessageAction(content='plain answer')
@@ -224,9 +227,8 @@ class TestPlainTextProtocolGate:
         )
 
         assert result == [action]
-        assert action.protocol_status is True
-        assert action.wait_for_response is False
-        assert executor._consecutive_plain_text_blocks == 1
+        assert action.protocol_status is False
+        assert executor._consecutive_plain_text_blocks == 0
 
     def test_agent_mode_mixed_actions_keep_message_visible(self):
         executor = self._make_executor('agent', active_tasks=True)
@@ -242,7 +244,7 @@ class TestPlainTextProtocolGate:
         assert text.wait_for_response is False
         assert text.suppress_cli is False
 
-    def test_agent_mode_terminal_tracker_plain_text_synthesizes_finish(self):
+    def test_agent_mode_terminal_tracker_keeps_plain_text_unchanged(self):
         executor = self._make_executor('agent', active_tasks=True)
         executor._state = _state_with_tasks('done')
         action = MessageAction(content='plain answer')
@@ -251,9 +253,7 @@ class TestPlainTextProtocolGate:
             [action], _make_result('plain').response
         )
 
-        assert len(result) == 1
-        assert isinstance(result[0], PlaybookFinishAction)
-        assert result[0].outputs['summary'] == 'plain answer'
+        assert result == [action]
 
     def test_plan_mode_allows_plain_text_without_task_tracker_state(self):
         executor = self._make_executor('plan', active_tasks=False)
@@ -265,7 +265,7 @@ class TestPlainTextProtocolGate:
 
         assert result == [action]
 
-    def test_plan_mode_with_active_tracker_converts_plain_text_to_status(self):
+    def test_plan_mode_with_active_tracker_keeps_plain_text_unchanged(self):
         executor = self._make_executor('plan', active_tasks=True)
         executor._state = _state_with_tasks('in_progress')
         action = MessageAction(content='plan status')
@@ -275,10 +275,9 @@ class TestPlainTextProtocolGate:
         )
 
         assert result == [action]
-        assert action.protocol_status is True
-        assert action.wait_for_response is False
+        assert action.protocol_status is False
 
-    def test_plan_mode_terminal_tracker_plain_text_synthesizes_plan_finish(self):
+    def test_plan_mode_terminal_tracker_keeps_plain_text_unchanged(self):
         executor = self._make_executor('plan', active_tasks=True)
         executor._state = _state_with_tasks('done')
         action = MessageAction(content='plan summary')
@@ -287,7 +286,4 @@ class TestPlainTextProtocolGate:
             [action], _make_result('plain').response
         )
 
-        assert len(result) == 1
-        assert isinstance(result[0], PlaybookFinishAction)
-        assert result[0].outputs['mode'] == 'plan'
-        assert result[0].outputs['summary'] == 'plan summary'
+        assert result == [action]

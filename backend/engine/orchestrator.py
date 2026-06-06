@@ -400,16 +400,6 @@ class Orchestrator(Agent):
 
         return _impl(self, message_text, reasoning, state, mode=mode)
 
-    @staticmethod
-    def _synthesize_plain_text_finish(
-        message_text: str, *, mode: str
-    ) -> Any:
-        from backend.engine.orchestrator_helpers._orchestrator_protocol import (
-            _synthesize_plain_text_finish as _impl,
-        )
-
-        return _impl(message_text, mode=mode)
-
     def _generate_delimiter_token(self) -> str:
         from backend.engine.orchestrator_helpers._orchestrator_step import (
             _generate_delimiter_token as _impl,

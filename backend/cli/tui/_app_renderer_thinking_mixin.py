@@ -130,7 +130,7 @@ class _AppRendererThinkingMixin:
                 severity='warning',
             )
 
-        if source_tool == 'search_code' or '[SEARCH_RESULTS]' in thought:
+        if source_tool in ('grep', 'glob') or '[SEARCH_RESULTS]' in thought:
             return ThinkingRenderIntent(
                 kind='search',
                 text=thought,
@@ -254,7 +254,7 @@ class _AppRendererThinkingMixin:
             return True
 
         if intent.kind == 'search':
-            self._handle_search_code_action(intent.text)
+            self._handle_search_action(intent.text)
             return True
 
         if intent.kind == 'error':

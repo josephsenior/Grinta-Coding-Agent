@@ -8,27 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from backend.core.agent_protocol import (
-    ABANDONED_RETRY_PROMPT,
-    CONTINUATION_NUDGE,
-    increment_prose_attempts,
-    increment_self_extension,
-    is_protocol_mode,
-    mark_abandoned,
-    prose_attempts,
-    reset_prose_attempts,
-    reset_terminal_cycle,
-    self_extension_count,
-    set_pending_directive,
-    terminal_nudge_sent,
-    tracker_created,
-    tracker_terminal,
-    work_remains,
-)
-from backend.core.interaction_modes import (
-    is_chat_mode,
-    normalize_interaction_mode,
-)
+from backend.core.interaction_modes import normalize_interaction_mode
 from backend.core.logger import app_logger as logger
 from backend.engine.executor_mixins._executor_types import (
     ModelResponse,
@@ -61,9 +41,9 @@ if TYPE_CHECKING:
 
 
 class _ExecutorResponseMixin:
-    """Mixin: response handling and agent-mode gating. All 11 methods defined below."""
+    """Mixin: response handling and action conversion."""
 
-    _PLAIN_TEXT_GATE_MAX_RETRIES: int = 2
+    _PLAIN_TEXT_GATE_MAX_RETRIES: int = 0
 
     @staticmethod
     def _build_recoverable_tool_call_error_action(exc: Exception) -> Action:
@@ -84,70 +64,13 @@ class _ExecutorResponseMixin:
     def _gate_agent_mode_plain_text(
         self, actions: list[Action], _response: ModelResponse
     ) -> list[Action]:
-        """Apply Agent/Plan prose rules based on tracker commitment state.
-
-        Agent/Plan mode is conversational until a task tracker exists. Once
-        the tracker exists, plain prose cannot silently complete unfinished
-        work.
-        """
-        from backend.ledger.action.agent import PlaybookFinishAction
-        from backend.ledger.action.message import MessageAction as _MessageAction
-
-        mode = self._get_agent_mode()
-        normalized_mode = normalize_interaction_mode(mode)
-        if is_chat_mode(normalized_mode) or not is_protocol_mode(normalized_mode):
-            return actions
-
-        if not actions:
-            return actions
-
-        state = getattr(self, '_state', None)
-        if any(isinstance(action, PlaybookFinishAction) for action in actions):
-            reset_prose_attempts(state)
-            return actions
-
-        message_actions = [
-            action for action in actions if isinstance(action, _MessageAction)
-        ]
-        if len(message_actions) != len(actions):
-            return self._handle_agent_mixed_actions(actions, state)
-
-        plain_text = '\n\n'.join(
-            str(getattr(action, 'content', '') or '').strip()
-            for action in message_actions
-            if str(getattr(action, 'content', '') or '').strip()
-        )
-        return self._handle_agent_plain_text_only(
-            actions,
-            state,
-            plain_text=plain_text,
-        )
+        """Plain text is a final response; no Agent/Plan prose enforcement."""
+        return actions
 
     def _handle_agent_mixed_actions(
         self, actions: list[Action], state: object | None
     ) -> list[Action]:
-        """Handle model responses that contain at least one real tool call."""
-        from backend.ledger.action.message import MessageAction as _MessageAction
-
-        if tracker_terminal(state) and terminal_nudge_sent(state):
-            if self_extension_count(state) >= 1:
-                logger.warning(
-                    'Agent/Plan protocol forcing finish after repeated self-extension '
-                    'from terminal tracker state.'
-                )
-                return [
-                    self._synthesize_finish(
-                        'All tracked tasks are terminal; finishing the run.',
-                        forced=True,
-                    )
-                ]
-            increment_self_extension(state)
-            reset_terminal_cycle(state)
-
-        reset_prose_attempts(state)
-        for action in actions:
-            if isinstance(action, _MessageAction):
-                action.wait_for_response = False
+        """Compatibility no-op for older tests/imports."""
         return actions
 
     def _handle_agent_plain_text_only(
@@ -157,85 +80,9 @@ class _ExecutorResponseMixin:
         *,
         plain_text: str,
     ) -> list[Action]:
-        from backend.ledger.action.message import MessageAction as _MessageAction
-
-        if not tracker_created(state):
-            reset_prose_attempts(state)
-            return actions
-
-        if tracker_terminal(state):
-            reset_prose_attempts(state)
-            return [self._synthesize_finish(plain_text)]
-
-        if not work_remains(state):
-            reset_prose_attempts(state)
-            return actions
-
-        current_attempts = prose_attempts(state)
-        if current_attempts >= 3:
-            mark_abandoned(state)
-            logger.warning(
-                'Agent/Plan protocol abandoned run after repeated prose while work remained '
-                '(attempts=%d, text=%r).',
-                current_attempts,
-                plain_text[:500],
-            )
-            abandoned = _MessageAction(
-                content=ABANDONED_RETRY_PROMPT,
-                wait_for_response=True,
-            )
-            abandoned.protocol_abandoned = True
-            return [abandoned]
-
-        count = increment_prose_attempts(state)
-        self._consecutive_plain_text_blocks = count
-        set_pending_directive(
-            state,
-            CONTINUATION_NUDGE,
-            source='OrchestratorExecutor._handle_agent_plain_text_only',
-        )
-        logger.info(
-            'Agent/Plan prose converted to mid-task status card (attempt=%d).',
-            count,
-        )
-        for action in actions:
-            if isinstance(action, _MessageAction):
-                action.wait_for_response = False
-                action.protocol_status = True
+        """Compatibility no-op for older tests/imports."""
+        _ = (state, plain_text)
         return actions
-
-    def _synthesize_finish(
-        self, summary: str, *, forced: bool = False, mode: str | None = None
-    ) -> Action:
-        """Build a finish action from terminal plain text."""
-        from backend.ledger.action.agent import PlaybookFinishAction
-
-        clean = (summary or '').strip() or 'All tracked tasks are complete.'
-        finish_mode = normalize_interaction_mode(mode or self._get_agent_mode())
-        outputs = {
-            'mode': finish_mode,
-            'status': 'completed',
-            'response': clean,
-            'summary': clean,
-            'sections': [{'title': 'Summary', 'items': [clean]}],
-            'evidence': {
-                'status': 'not_applicable',
-                'details': 'Synthesized from plain text after tracker completion.',
-            },
-            'open_items': [],
-            'next_step': '',
-            'actions_taken': [],
-            'verification': {
-                'status': 'not_run',
-                'details': 'No separate verification was reported in the final text.',
-            },
-            'remaining_items': [],
-        }
-        return PlaybookFinishAction(
-            final_thought=clean,
-            outputs=outputs,
-            force_finish=forced,
-        )
 
     def _get_agent_mode(self) -> str:
         """Return the active mode string from run state or planner config."""
@@ -282,17 +129,8 @@ class _ExecutorResponseMixin:
         return validated_actions
 
     def _set_plain_text_directive(self, count: int) -> None:
-        """Set a terse planning directive so the LLM gets corrective feedback."""
-        state = getattr(self, '_state', None)
-        text = (
-            f'Your previous response was plain prose while work remained '
-            f'(attempt {count}). {CONTINUATION_NUDGE}'
-        )
-        set_pending_directive(
-            state,
-            text,
-            source='OrchestratorExecutor._set_plain_text_directive',
-        )
+        """Compatibility no-op; plain text now ends the run."""
+        _ = count
 
     @staticmethod
     def _without_blank_agent_messages(actions: list[Action]) -> list[Action]:

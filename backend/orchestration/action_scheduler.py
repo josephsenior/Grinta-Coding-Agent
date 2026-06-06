@@ -28,7 +28,8 @@ _READ_ONLY_ACTION_TYPES: frozenset[str] = frozenset(
 # MCP tool names that are read-only.
 _READ_ONLY_MCP_TOOL_NAMES: frozenset[str] = frozenset(
     {
-        'search_code',
+        'grep',
+        'glob',
         'get_entity',
     }
 )

@@ -319,7 +319,7 @@ def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
                                 'Edited',
                                 fp,
                                 secondary=_format_diff_summary(f_added, f_removed),
-                                secondary_kind='ok' if f_added else 'neutral',
+                                secondary_kind='ok' if f_added or f_removed else 'neutral',
                                 extra_content=encoded,
                             )
                 else:
@@ -343,7 +343,7 @@ def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
                     'Edited',
                     path,
                     secondary=_format_diff_summary(added, removed),
-                    secondary_kind='ok' if added and not removed else 'neutral',
+                    secondary_kind='ok' if added or removed else 'neutral',
                     extra_content=encoded_diff,
                 )
             else:
@@ -363,7 +363,7 @@ def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
                 'Edited',
                 event.path,
                 secondary=_format_diff_summary(added, removed),
-                secondary_kind='ok' if added and not removed else 'neutral',
+                secondary_kind='ok' if added or removed else 'neutral',
                 extra_content=encoded_diff,
             )
     elif isinstance(event, MCPAction):

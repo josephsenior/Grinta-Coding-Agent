@@ -306,7 +306,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
         verb, title, detail = self._think_action_card_fields(source_tool, human_msg)
         self._emit_activity_turn_header()
 
-        if source_tool == 'search_code':
+        if source_tool in ('grep', 'glob'):
             from backend.cli._tool_display.renderers.search import (
                 extract_file_summary,
                 render_file_list,
@@ -317,7 +317,10 @@ class ActionRenderersMixin(_ActionRenderersBase):
                 for ln in human_msg.splitlines()
                 if ln.strip() and not ln.startswith('Error running')
             ]
-            if raw_lines and any(re.match(r'^.*:\d+:', ln) for ln in raw_lines[:5]):
+            is_grep = source_tool == 'grep'
+            if is_grep and raw_lines and any(
+                re.match(r'^.*:\d+:', ln) for ln in raw_lines[:5]
+            ):
                 match_count, file_count, file_list = extract_file_summary(human_msg)
                 extra_lines = render_file_list(file_list, file_count, match_count)
                 kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
@@ -363,14 +366,14 @@ class ActionRenderersMixin(_ActionRenderersBase):
     ) -> tuple[str, str, str]:
         if source_tool == 'checkpoint':
             return 'Saved', ACTIVITY_CARD_TITLE_CHECKPOINT, human_msg or 'checkpoint'
-        if source_tool == 'search_code':
-            detail = cls._search_code_detail(human_msg or '')
+        if source_tool in ('grep', 'glob'):
+            detail = cls._search_detail(human_msg or '')
             return 'Search Code', ACTIVITY_CARD_TITLE_SEARCH, detail
         verb = source_tool.replace('_', ' ').title()
         return verb, ACTIVITY_CARD_TITLE_TOOL, str(human_msg)[:150] or source_tool
 
     @classmethod
-    def _search_code_detail(cls, human_msg: str) -> str:
+    def _search_detail(cls, human_msg: str) -> str:
         from backend.cli._tool_display.renderers.search import extract_file_summary
 
         match_count, file_count, _ = extract_file_summary(human_msg)

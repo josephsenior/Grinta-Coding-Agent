@@ -391,9 +391,10 @@ def common_response_to_actions(
             MessageAction(
                 content=text_content,
                 thought=cot,
-                wait_for_response=not all_tool_calls,
+                wait_for_response=False,
                 suppress_cli=False,
                 transcript_only=bool(all_tool_calls),
+                final_response=not all_tool_calls,
             )
         )
 

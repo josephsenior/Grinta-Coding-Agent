@@ -168,7 +168,7 @@ class PromptManager:
             reminder_text = (
                 '\n\nENVIRONMENT REMINDER: You have '
                 f'{turns_left} turns left to complete the task. '
-                'When finished reply with <finish></finish>.'
+                'When finished, write the final response in plain text.'
             )
             latest_user_message.content.append(TextContent(text=reminder_text))
 

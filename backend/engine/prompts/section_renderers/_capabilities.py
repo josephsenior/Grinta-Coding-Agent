@@ -84,15 +84,13 @@ def _render_system_capabilities(
     automatically on the next prompt assembly.
     """
     parallel_enabled = bool(getattr(config, 'enable_parallel_tool_scheduling', False))
-    checkpoints_on = bool(getattr(config, 'enable_checkpoints', False))
-
     parallel_line = (
         (
             '- **Parallel tool scheduling**: ENABLED for read-only batches '
-            '(`read`, `search_code`, `lsp`).\n'
+            '(`read`, `grep`, `glob`, `find_symbols`, `lsp`).\n'
             '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
             'Emit independent reads in a single assistant turn to run them concurrently.\n'
-            '  - **Constraint**: Only read-only observation tools may run concurrently. Mutating tools, file edits, shell commands, terminal sessions, task/memory updates, and finish/communicate actions are executed sequentially in model order.'
+            '  - **Constraint**: Only read-only observation tools may run concurrently. Mutating tools, file edits, shell commands, task tracking, and ask_user actions are executed sequentially in model order.'
         )
         if parallel_enabled and parallel_tool_calls_provider_flag
         else ''
@@ -104,14 +102,6 @@ def _render_system_capabilities(
         'It uses a 3-tier memory model (working / episodic / semantic) and re-injects a pre-condensation '
         'snapshot after pruning, so verified facts and the immediate task surface survive. '
         'Do not describe condensation as "lossy" or as something you must invoke manually.'
-    )
-
-    checkpoint_line = (
-        '- **Checkpoints**: AVAILABLE for coarse-grained rollback of file/edit state. '
-        'Take one before risky multi-step edits when atomic batch tools are not a fit. '
-        '`checkpoint(command="view")` auto-detects modified files from workspace snapshots — no need to manually specify `files_modified`.'
-        if checkpoints_on
-        else ''
     )
 
     # Runtime-detected language servers / debug adapters — only when those tools
@@ -135,8 +125,6 @@ def _render_system_capabilities(
     ]
     if parallel_line:
         parts.append(f'{parallel_line}\n')
-    if checkpoint_line:
-        parts.append(f'{checkpoint_line}\n')
     if detection_block:
         parts.append(detection_block)
 

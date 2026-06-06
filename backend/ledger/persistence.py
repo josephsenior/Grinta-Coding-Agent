@@ -62,7 +62,6 @@ class EventPersistence:
 
     _CRITICAL_ACTIONS: ClassVar[set[str]] = {
         'change_agent_state',
-        'finish',
         'reject',
     }
     _CRITICAL_OBSERVATIONS: ClassVar[set[str]] = {

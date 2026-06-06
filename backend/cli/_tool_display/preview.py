@@ -188,8 +188,9 @@ def _mcp_count_summary(data: dict[str, Any]) -> str | None:
     return None
 
 
-def _mcp_search_code_summary(data: dict[str, Any], content: str) -> str | None:
-    if 'search_code' in content or data.get('tool_name') == 'search_code':
+def _mcp_search_summary(data: dict[str, Any], content: str) -> str | None:
+    tool_name = data.get('tool_name')
+    if tool_name in {'grep', 'glob'} or 'grep' in content or 'glob' in content:
         results = data.get('results')
         count = (
             len(results) if isinstance(results, list) else data.get('total_count', 0)
@@ -237,7 +238,7 @@ def _mcp_dict_preview(data: dict[str, Any], *, content: str, max_len: int) -> st
     for builder in (
         lambda d: _mcp_envelope_tool_summary(d, max_len=max_len),
         _mcp_count_summary,
-        lambda d: _mcp_search_code_summary(d, content),
+        lambda d: _mcp_search_summary(d, content),
         lambda d: _mcp_collection_summary(d, max_len=max_len),
         lambda d: _mcp_text_field_summary(d, max_len=max_len),
         lambda d: _mcp_error_summary(d, max_len=max_len),

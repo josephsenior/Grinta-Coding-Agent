@@ -26,64 +26,26 @@ def _build_context_discipline_section(
 ) -> str:
     parts = ['<CONTEXT_DISCIPLINE>']
     parts.append(
-        'You have persistent context tools. Use them — context condensation is free '
-        'and silent; relying only on attention-backed context guarantees information loss.'
+        'Use the visible conversation, current files, and fresh tool observations as context. '
+        'After condensation, resume from the summary without restarting broad exploration.'
     )
-
-    # note/recall are always available — unconditional include
-    parts.extend(
-        [
-            '',
-            '**note/recall** — facts that must survive across turns and new tasks:',
-            '- Decision made, architectural constraint discovered, stable command found, or project convention learned \u2192 note() when useful.',
-            '- Never store raw secrets, tokens, passwords, private keys, or credentials in note/memory. Store only non-sensitive facts such as "API key exists in env var X" when needed.',
-            '- Workspace architecture, DB URL, port mapping, test command \u2192 note().',
-            "- recall(key='all') at session start to re-ground; never recall 'lessons' twice this session.",
-        ]
-    )
-
-    if working_memory_on:
-        parts.extend(
-            [
-                '',
-                '**memory_manager** — your structured cognitive workspace for the current session:',
-                "- update section='hypothesis' when you form a theory; update 'findings' when you have evidence.",
-                "- update section='blockers' when something is stuck; update 'decisions' at each architectural pivot.",
-                '- Call memory_manager(get) before context re-reads you might skip.',
-            ]
-        )
+    _ = (working_memory_on, checkpoints_on)
 
     if tracker_on:
         parts.extend(
             [
                 '',
                 '**task_tracker** — your structural anchor:',
-                '- In Agent or Plan mode, call create_task_tracker first when you decide a request requires structured work.',
-                '- Use task_tracker for viewing and status updates after the tracker exists.',
-                '- For small/local tasks, do not create tracker overhead; act, verify, and finish.',
-                '- If task_tracker was used for this run, keep it synced before finish.',
+                '- In Agent or Plan mode, use task_tracker(update) with a task_list when you decide a request requires structured work.',
+                '- Use task_tracker for viewing and status updates.',
+                '- For small/local tasks, do not create tracker overhead; act, verify, and write the final summary.',
+                '- If task_tracker was used for this run, keep it synced before the final summary.',
                 "- Update status \u2192 'in_progress' when starting, 'done' after proof, 'blocked' with reason.",
                 '- For multi-step tasks: task_tracker(view) at turn start to re-anchor.',
             ]
         )
         if condensation_on:
-            if working_memory_on:
-                parts.append(
-                    '  Post-condensation: task_tracker(view) first, then memory_manager(get) + scratchpad.'
-                )
-            else:
-                parts.append(
-                    '  Post-condensation: task_tracker(view) first, then scratchpad.'
-                )
-
-    if checkpoints_on:
-        parts.extend(
-            [
-                '',
-                '**checkpoint** — Use checkpoint before destructive operations or risky non-atomic multi-step edits.',
-                '`multiedit` already provides atomic edit semantics; use checkpoint when rollback beyond a single atomic edit would be valuable.',
-            ]
-        )
+            parts.append('  Post-condensation: task_tracker(view) first.')
 
     parts.append('</CONTEXT_DISCIPLINE>')
     return '\n'.join(parts)
@@ -96,21 +58,13 @@ def _build_when_to_use_context(
     checkpoints_on: bool,
 ) -> str:
     parts = ['<WHEN_TO_USE_CONTEXT>']
-    parts.append(
-        '- **note/recall**: Cross-turn persistence for facts, decisions, and discoveries.'
-    )
-    if working_memory_on:
-        parts.append(
-            '- **memory_manager**: In-session structured workspace for hypotheses, blockers, findings, and decisions.'
-        )
+    _ = (working_memory_on, checkpoints_on)
     if tracker_on:
         parts.append(
             '- **task_tracker**: Engineering work planning and progress tracking — update before multi-step tasks, view at turn start.'
         )
-    if checkpoints_on:
-        parts.append(
-            '- **checkpoint**: Before destructive or multi-file batch operations — save state so you can rollback.'
-        )
+    if not tracker_on:
+        parts.append('- Use fresh reads/searches and recent observations to stay grounded.')
     parts.append('</WHEN_TO_USE_CONTEXT>')
     return '\n'.join(parts)
 
@@ -122,24 +76,20 @@ def _build_mandatory_discipline_checkpoints(
     checkpoints_on: bool,
 ) -> str:
     parts = ['<MANDATORY_DISCIPLINE_CHECKPOINTS>']
-    # Session start is always relevant
-    items = ["1. Session start \u2192 recall(key='all')"]
-    idx = 2
+    _ = (working_memory_on, checkpoints_on)
+    items: list[str] = []
+    idx = 1
     if tracker_on:
         items.append(
-            f'{idx}. For multi-step tasks \u2192 create_task_tracker with full plan'
+            f'{idx}. For multi-step tasks \u2192 task_tracker(update) with full plan'
         )
         idx += 1
         items.append(
             f'{idx}. At turn start during multi-step work \u2192 task_tracker(view)'
         )
         idx += 1
-    if checkpoints_on:
-        items.append(f'{idx}. Before destructive ops \u2192 checkpoint.save')
-        idx += 1
-    items.append(
-        f'{idx}. On decision/pivot/discovery \u2192 note() or{" memory_manager(update) or" if working_memory_on else ""} note()'
-    )
+    if not items:
+        items.append('1. For complex work, inspect first and verify before final summary')
     parts.extend(items)
     parts.append('</MANDATORY_DISCIPLINE_CHECKPOINTS>')
     return '\n'.join(parts)
@@ -153,7 +103,7 @@ def _build_risk_preview(
         return ''
     return (
         '<RISK_PREVIEW>\n'
-        'Use risk preview only for risky work: multi-file refactors, core runtime changes, concurrency/async changes, lifecycle/finish/tool-schema changes, destructive operations, public API changes, or large generated edits.\n\n'
+        'Use risk preview only for risky work: multi-file refactors, core runtime changes, concurrency/async changes, lifecycle/tool-schema changes, destructive operations, public API changes, or large generated edits.\n\n'
         'When triggered, write two concrete failure modes before continuing, then after the next major milestone note whether either occurred and pivot if needed.\n\n'
         'For small/local edits, skip formal risk preview.\n'
         '</RISK_PREVIEW>'
@@ -161,11 +111,7 @@ def _build_risk_preview(
 
 
 def _build_autonomy_block(_mode: str, *, checkpoints_on: bool) -> str:
-    cp_line = (
-        " Auto-save occurs before large writes; use 'checkpoint' tool to manually save logically safe states."
-        if checkpoints_on
-        else ''
-    )
+    _ = checkpoints_on
     return (
         '<AUTONOMY>\n'
         'For implementation work, drive the request through tools and verification; '
@@ -174,7 +120,7 @@ def _build_autonomy_block(_mode: str, *, checkpoints_on: bool) -> str:
         'authoritative and continue from where you stopped. On tool failure, make '
         'the next action a corrected retry or a different tool (e.g. `read` \u2192 `edit_symbols`, '
         'or `read` \u2192 `replace_string`) and auto-retry recoverable errors before reporting back.'
-        f'{cp_line}\n</AUTONOMY>'
+        '\n</AUTONOMY>'
     )
 
 
@@ -225,12 +171,12 @@ def _render_autonomy(
     if tracker_on:
         task_tracker_discipline_block = (
             '<TASK_TRACKING>\n'
-            '**create_task_tracker**: In Agent or Plan mode, use this as your first action when you commit to structured work.\n'
-            '**task_tracker**: After creation, use `view` to inspect the plan, `update` to replace the full `task_list`, and `update_status` for single-task status changes.\n'
+            '**task_tracker**: In Agent or Plan mode, use `task_tracker(update, task_list=[...])` as your first action when you commit to structured work.\n'
+            'Use `view` to inspect the plan, `update` to replace the full `task_list`, and `update_status` for single-task status changes.\n'
             'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task status by ID. Optional `result` field captures outcome.\n'
             'Allowed statuses: `todo`, `in_progress`, `done`, `skipped`, `blocked`.\n'
             'Each step object has: `id` (string, e.g. "1" or "1.1"), `description` (string), `status` (one of the allowed statuses), `result` (optional string), `tags` (optional LIST of strings — never a bare string), `subtasks` (optional recursive list of the same shape).\n'
-            '**Completion**: Before `finish`, no task should remain `todo` or `in_progress`. Mark truly completed work `done`, intentionally omitted work `skipped`, and only genuinely blocked work `blocked` with a reason.'
+            '**Completion**: Before the final summary, no task should remain `todo` or `in_progress`. Mark truly completed work `done`, intentionally omitted work `skipped`, and only genuinely blocked work `blocked` with a reason.'
             '</TASK_TRACKING>'
         )
     else:
@@ -245,15 +191,15 @@ def _render_autonomy(
             base_workflow
             + '\n\nWith **task_tracker** enabled, treat **sync** as part of the loop: after verify, update the plan when progress changed.'
         )
-        task_sync_instruction = '**Task synchronization:** Update `task_tracker` to `done`, `skipped`, or `blocked` before attempting to finish.'
+        task_sync_instruction = '**Task synchronization:** Update `task_tracker` to `done`, `skipped`, or `blocked` before writing the final summary.'
     else:
         problem_solving_workflow_body = base_workflow
-        task_sync_instruction = '**Plan synchronization:** Keep your working memory, finish response, and finish summary aligned with what was actually completed before attempting to finish.'
+        task_sync_instruction = '**Plan synchronization:** Keep your final response aligned with what was actually completed.'
 
     lsp_avail = _lsp_available(config)
     error_recovery_pivot_lines = (
-        '- `search_code` \u2192 `lsp` (check locally with the language server; no shell grep)\n'
-        '- `lsp` \u2192 `search_code` (wider text search)'
+        '- `grep` / `glob` \u2192 `lsp` (check locally with the language server; no shell grep)\n'
+        '- `lsp` \u2192 `grep` (wider text search)'
         if lsp_avail
         else ''
     )

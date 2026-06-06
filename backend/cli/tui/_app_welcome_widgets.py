@@ -154,7 +154,7 @@ class WelcomeWidget(Vertical):
 
 
 class CommunicatePromptWidget(WelcomeWidget):
-    """Interactive transcript prompt for communicate_with_user."""
+    """Interactive transcript prompt for ask_user."""
 
     def __init__(
         self,

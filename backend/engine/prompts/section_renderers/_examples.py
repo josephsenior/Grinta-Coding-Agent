@@ -20,24 +20,19 @@ def _render_examples(
         planning_hint = 'plan by thinking step-by-step in your head'
 
     destructive_confirmation_step = (
-        'Use `communicate_with_user` to confirm scope and target.'
-        if meta_cognition_on
-        else 'ask the user a short clarifying question in natural language to confirm scope and target.'
+        'Use `ask_user` to confirm scope and target.'
     )
+    _ = (meta_cognition_on, checkpoints_on)
     checkpoint_step = (
-        'If approved and supported, take a `checkpoint` first.'
-        if checkpoints_on
-        else 'If approved, keep the change surface small and verify immediately after the action.'
+        'If approved, keep the change surface small and verify immediately after the action.'
     )
     adjacent_tool_fallback = (
-        'symbol lookup → `search_code`; `lsp` → `search_code`'
+        'symbol lookup → `grep`; `lsp` → `grep`'
         if lsp_available
-        else 'symbol lookup → `search_code`; refine the `search_code` query and read nearby files'
+        else 'symbol lookup → `grep`; refine the `grep` query and read nearby files'
     )
     failure_escalation_step = (
-        'After 3 failed attempts on the same sub-task, escalate via `communicate_with_user` with a 1-line post-mortem and a specific question.'
-        if meta_cognition_on
-        else 'After 3 failed attempts on the same sub-task, ask the user with a 1-line post-mortem and a specific question.'
+        'After repeated failed attempts on the same sub-task, use `ask_user` with a 1-line post-mortem and a specific question.'
     )
     return render_partial(
         'system_partial_05_examples.md',

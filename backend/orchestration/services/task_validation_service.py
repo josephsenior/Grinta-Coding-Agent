@@ -1,4 +1,4 @@
-"""Service for validating task completion before allowing agent finish."""
+"""Service for validating task completion before allowing completion."""
 
 from __future__ import annotations
 
@@ -17,6 +17,9 @@ from backend.core.schemas import AgentState  # noqa: E402
 from backend.core.task_status import ACTIVE_TASK_STATUSES
 from backend.ledger import EventSource  # noqa: E402
 from backend.ledger.action.agent import PlaybookFinishAction  # noqa: E402
+from backend.ledger.action.message import MessageAction  # noqa: E402
+
+CompletionAction = PlaybookFinishAction | MessageAction
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
@@ -51,13 +54,19 @@ class TaskValidationService:
         self._context = context
 
     async def handle_finish(self, action: PlaybookFinishAction) -> bool:
-        """Handle a finish action, validating completion if configured.
+        """Handle a legacy finish action, validating completion if configured.
 
         Returns:
-            True if finish should proceed (validation passed or not configured),
+            True if completion should proceed (validation passed or not configured),
             False if validation failed and the agent should continue working.
         """
-        # Save any lessons learned before finishing
+        return await self._handle_completion(action)
+
+    async def handle_final_response(self, action: MessageAction) -> bool:
+        """Validate a plain-text final response before allowing completion."""
+        return await self._handle_completion(action)
+
+    async def _handle_completion(self, action: CompletionAction) -> bool:
         await self._save_lessons_learned(action)
 
         if not await self._ensure_active_plan_is_terminal(action):
@@ -76,7 +85,7 @@ class TaskValidationService:
         return True
 
     async def _ensure_finish_payload_valid(
-        self, action: PlaybookFinishAction
+        self, action: CompletionAction
     ) -> bool:
         controller = self._context.get_controller()
         state = getattr(controller, 'state', None)
@@ -86,7 +95,7 @@ class TaskValidationService:
         summary = self._finish_summary_text(action)
         if not summary:
             return await self._emit_finish_validator_block(
-                'Finish rejected: summary is required once a task tracker exists.',
+                'Completion rejected: summary is required once a task tracker exists.',
                 error_id='FINISH_SUMMARY_MISSING',
                 cause_action=action,
             )
@@ -95,7 +104,7 @@ class TaskValidationService:
         if missing:
             sample = '\n'.join(f'- {item}' for item in missing[:5])
             return await self._emit_finish_validator_block(
-                'Finish rejected: skipped or blocked tracker items must be '
+                'Completion rejected: skipped or blocked tracker items must be '
                 f'mentioned in the summary.\n\nItems:\n{sample}',
                 error_id='FINISH_SKIPPED_BLOCKED_UNREPORTED',
                 cause_action=action,
@@ -103,7 +112,9 @@ class TaskValidationService:
         return True
 
     @staticmethod
-    def _finish_summary_text(action: PlaybookFinishAction) -> str:
+    def _finish_summary_text(action: CompletionAction) -> str:
+        if isinstance(action, MessageAction):
+            return str(getattr(action, 'content', '') or '').strip()
         outputs = getattr(action, 'outputs', {}) or {}
         if not isinstance(outputs, dict):
             outputs = {}
@@ -114,7 +125,9 @@ class TaskValidationService:
             or str(getattr(action, 'thought', '') or '').strip()
         )
 
-    def _finish_search_text(self, action: PlaybookFinishAction) -> str:
+    def _finish_search_text(self, action: CompletionAction) -> str:
+        if isinstance(action, MessageAction):
+            return str(getattr(action, 'content', '') or '').lower()
         outputs = getattr(action, 'outputs', {}) or {}
         parts = [self._finish_summary_text(action)]
         if isinstance(outputs, dict):
@@ -123,7 +136,7 @@ class TaskValidationService:
         return '\n'.join(parts).lower()
 
     def _unreported_skipped_or_blocked_items(
-        self, action: PlaybookFinishAction
+        self, action: CompletionAction
     ) -> list[str]:
         state = getattr(self._context.get_controller(), 'state', None)
         search_text = self._finish_search_text(action)
@@ -162,9 +175,9 @@ class TaskValidationService:
         )
 
     async def _ensure_active_plan_is_terminal(
-        self, action: PlaybookFinishAction
+        self, action: CompletionAction
     ) -> bool:
-        """Block finish when the visible active plan still has tasks in progress."""
+        """Block completion when the visible active plan still has tasks in progress."""
         controller = self._context.get_controller()
         plan = getattr(controller.state, 'plan', None)
         used_task_tracker = self._session_used_task_tracker()
@@ -188,7 +201,7 @@ class TaskValidationService:
             more = f'\n- ... and {len(active_steps) - 5} more unfinished task(s)'
 
         return await self._emit_finish_block(
-            'Finish rejected: task tracker contains unfinished tasks.\n\n'
+            'Completion rejected: task tracker contains unfinished tasks.\n\n'
             f'Unfinished tasks:\n{bullets}{more}',
             error_id='TASK_TRACKER_INCOMPLETE',
             cause_action=action,
@@ -287,8 +300,10 @@ class TaskValidationService:
             active_steps.extend(self._collect_non_terminal_steps(subtasks))
         return active_steps
 
-    async def _save_lessons_learned(self, action: PlaybookFinishAction) -> None:
+    async def _save_lessons_learned(self, action: CompletionAction) -> None:
         """Persist lessons learned to a repository-level memory file."""
+        if isinstance(action, MessageAction):
+            return
         outputs = getattr(action, 'outputs', {})
         if not outputs or not isinstance(outputs, dict):
             return
@@ -346,7 +361,7 @@ class TaskValidationService:
         return False
 
     async def _ensure_completion_validator_available(
-        self, action: PlaybookFinishAction
+        self, action: CompletionAction
     ) -> bool:
         """Fail closed when completion validation is enabled but validator is missing."""
         if getattr(action, 'force_finish', False):
@@ -365,22 +380,22 @@ class TaskValidationService:
             return True
 
         logger.warning(
-            'Finish blocked: completion validation is enabled but no validator is configured'
+            'Completion blocked: validation is enabled but no validator is configured'
         )
         return await self._emit_finish_block(
-            '⚠️ FINISH BLOCKED: Completion validation is enabled but the validator is unavailable. '
+            'Completion blocked: validation is enabled but the validator is unavailable. '
             'Please continue working or retry once validation is restored.',
             error_id='TASK_VALIDATOR_UNAVAILABLE',
             cause_action=action,
         )
 
-    async def _should_validate(self, action: PlaybookFinishAction) -> bool:
+    async def _should_validate(self, action: CompletionAction) -> bool:
         """Check if task completion should be validated."""
         controller = self._context.get_controller()
         validator = getattr(controller, 'task_validator', None)
         return bool(validator) and not getattr(action, 'force_finish', False)
 
-    async def _validate_and_handle(self, action: PlaybookFinishAction) -> bool:
+    async def _validate_and_handle(self, action: CompletionAction) -> bool:
         """Run the validator and handle the result.
 
         Returns True if passed, False if failed.
@@ -405,7 +420,7 @@ class TaskValidationService:
         return True
 
     async def _handle_failure(
-        self, action: PlaybookFinishAction, validation: Any
+        self, action: CompletionAction, validation: Any
     ) -> None:
         """Emit an error observation and resume the agent on validation failure."""
         from backend.ledger.observation import ErrorObservation

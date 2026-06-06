@@ -14,14 +14,9 @@ import logging
 from typing import TYPE_CHECKING
 
 from backend.core.agent_protocol import (
-    is_protocol_mode,
     mark_tracker_created,
     reset_terminal_cycle,
-    tracker_created,
     tracker_terminal,
-)
-from backend.core.interaction_modes import (
-    normalize_interaction_mode,
 )
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
@@ -144,16 +139,28 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
         if action.source == EventSource.USER:
             await self._handle_user_message(action)
         elif action.source == EventSource.AGENT:
-            if bool(getattr(action, 'protocol_abandoned', False)):
-                await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
-                return
             if action.wait_for_response:
                 if await self._intercept_text_tool_call_handoff(action):
                     return
-                if self._task_tracker_has_unfinished_tasks():
-                    if await self._intercept_protocol_message_handoff(action):
-                        return
                 await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+                return
+            if bool(getattr(action, 'final_response', False)):
+                if not await self._ctrl.task_validation_service.handle_final_response(
+                    action
+                ):
+                    return
+                content = str(getattr(action, 'content', '') or '').strip()
+                self._ctrl.state.set_outputs(
+                    {
+                        'status': 'completed',
+                        'response': content,
+                        'summary': content,
+                    },
+                    source='EventRouterService.final_response',
+                )
+                self._ctrl.state.extra_data.pop('active_run_mode', None)
+                await self._ctrl.set_agent_state_to(AgentState.FINISHED)
+                await self._ctrl.log_task_audit(status='success')
 
     async def _handle_meta_cognition_action(self, action: Action) -> None:
         """Handle meta-cognition actions (clarification, proposal, uncertainty, escalation).
@@ -166,57 +173,8 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
           - In FULL autonomy, even explicit confirm requests do not pause; the
             safety validator remains the hard stop for forbidden operations.
         """
-        from backend.ledger.action.agent import (
-            ConfirmRequestAction,
-            InformAction,
+        self._ctrl.log(
+            'debug',
+            'Ignoring legacy meta-cognition action; ask_user is the model-facing communication tool.',
+            extra={'action_type': type(action).__name__},
         )
-        from backend.orchestration.autonomy import (
-            AutonomyLevel,
-            normalize_autonomy_level,
-        )
-
-        autonomy_ctrl = getattr(self._ctrl, 'autonomy_controller', None)
-        autonomy_level = (
-            getattr(autonomy_ctrl, 'autonomy_level', AutonomyLevel.BALANCED.value)
-            if autonomy_ctrl
-            else AutonomyLevel.BALANCED.value
-        )
-        autonomy_level = normalize_autonomy_level(autonomy_level)
-
-        if (
-            isinstance(action, ConfirmRequestAction)
-            and autonomy_level == AutonomyLevel.FULL.value
-        ):
-            self._ctrl.log(
-                'debug',
-                'Meta-cognition confirm action ignored in full autonomy.',
-                extra={'action_type': type(action).__name__},
-            )
-            return
-
-        agent = getattr(self._ctrl, 'agent', None)
-        config = getattr(agent, 'config', None)
-        mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
-
-        if is_protocol_mode(mode) and tracker_created(self._ctrl.state):
-            await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
-            return
-
-        if isinstance(action, InformAction):
-            # Non-blocking outside committed Agent/Plan task runs.
-            self._ctrl.log(
-                'debug',
-                'Meta-cognition inform action (non-blocking).',
-                extra={'action_type': type(action).__name__},
-            )
-            return
-
-        should_pause = mode == 'plan' or autonomy_level != AutonomyLevel.FULL.value
-
-        if should_pause:
-            self._ctrl.log(
-                'info',
-                'Meta-cognition action requires user input, pausing agent.',
-                extra={'action_type': type(action).__name__},
-            )
-            await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)

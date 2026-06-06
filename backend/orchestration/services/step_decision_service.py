@@ -67,7 +67,9 @@ class StepDecisionService:
     def _for_message_action(self, event: MessageAction) -> bool:
         if event.source == EventSource.USER:
             return True
-        return self._ctrl.get_agent_state() != AgentState.AWAITING_USER_INPUT
+        if bool(getattr(event, 'final_response', False)):
+            return False
+        return self._ctrl.get_agent_state() == AgentState.RUNNING
 
     def _for_observation(self, event: Observation) -> bool:
         if isinstance(event, NullObservation):

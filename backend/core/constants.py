@@ -249,7 +249,7 @@ DEFAULT_AGENT_AUTO_RETRY_ON_ERROR = True
 DEFAULT_AGENT_AUTONOMY_LEVEL = 'balanced'
 # DAP / interactive debugger: off by default; enable per agent when stable for your release.
 DEFAULT_AGENT_DEBUGGER_ENABLED = False
-DEFAULT_AGENT_FINISH_ENABLED = True
+
 # Optional LLM-initiated compaction; automatic condensation still runs when needed.
 DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED = False
 DEFAULT_AGENT_HISTORY_TRUNCATION_ENABLED = True
@@ -405,8 +405,6 @@ CREATE_TOOL_NAME = 'create'
 REPLACE_STRING_TOOL_NAME = 'replace_string'
 EDIT_SYMBOLS_TOOL_NAME = 'edit_symbols'
 MULTIEDIT_TOOL_NAME = 'multiedit'
-FINISH_TOOL_NAME = 'finish'
-CREATE_TASK_TRACKER_TOOL_NAME = 'create_task_tracker'
 TASK_TRACKER_TOOL_NAME = 'task_tracker'
 UNDO_LAST_EDIT_TOOL_NAME = 'undo_last_edit'
 NOTE_TOOL_NAME = 'note'

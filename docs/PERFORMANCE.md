@@ -8,8 +8,8 @@ These are the targets the project aims for; numbers vary substantially by model 
 
 | Step                                     | Target p50           | Target p95         | Notes                        |
 | ---------------------------------------- | -------------------- | ------------------ | ---------------------------- |
-| Tool dispatch (in-process)               | < 30 ms              | < 150 ms           | File read/write, search_code |
-| `search_code` over a 100k-LoC repo       | < 400 ms             | < 1.5 s            | Ripgrep fast path            |
+| Tool dispatch (in-process)               | < 30 ms              | < 150 ms           | File read/write, grep/glob   |
+| `grep` / `glob` over a 100k-LoC repo     | < 400 ms             | < 1.5 s            | Ripgrep fast path            |
 | AST edit (single symbol)                 | < 200 ms             | < 800 ms           | tree-sitter parse + replace  |
 | LLM round-trip (Sonnet/4o, ~10k ctx)     | 1–3 s                | 6–10 s             | Network-bound                |
 | Full agent step (think + tool + observe) | 2–5 s                | 10–20 s            | Dominated by LLM             |
@@ -39,7 +39,7 @@ If you observe latencies meaningfully worse than p95 targets, investigate before
 
 - File-store writes go through a dedicated durable-writer thread — producers are not blocked.
 - Multi-agent `delegate_task(parallel=True)` runs workers concurrently with an isolated event stream each.
-- `search_code` uses ripgrep when available; otherwise falls back to a Python implementation that is ~5–20× slower.
+- `grep` and `glob` use ripgrep when available; otherwise fall back to a Python implementation that is ~5–20× slower.
 
 ## Memory footprint
 

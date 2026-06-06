@@ -161,21 +161,11 @@ class OrchestratorPlanner:
         self,
         tools: list[ChatCompletionToolParam],
     ) -> list[ChatCompletionToolParam]:
-        filtered = [
+        return [
             tool
             for tool in tools
             if self._tool_name(tool) in PLAN_MODE_ALLOWED_TOOLS
-            and self._tool_name(tool) != 'finish'
         ]
-        present = {self._tool_name(tool) for tool in filtered}
-        from backend.engine.tools.finish import create_finish_tool
-
-        filtered.append(create_finish_tool(PLAN_MODE))
-        if 'communicate_with_user' not in present:
-            from backend.engine.tools.meta_cognition import create_communicate_tool
-
-            filtered.append(create_communicate_tool())
-        return filtered
 
     def partition_tools(
         self, tools: list[ChatCompletionToolParam]
@@ -202,53 +192,39 @@ class OrchestratorPlanner:
         self._add_terminal_and_special_tools(tools)
 
     def _add_basic_tools(self, tools: list) -> None:
-        """Add cmd, finish, summarize_context, memory, and read-only file tools."""
+        """Add shell, ask_user, and basic file tools."""
         from backend.engine.tools.bash import create_cmd_run_tool
-        from backend.engine.tools.condensation_request import (
-            create_summarize_context_tool,
-        )
-        from backend.engine.tools.finish import create_finish_tool
-        from backend.engine.tools.memory_manager import (
-            create_memory_manager_tool,
-        )
+        from backend.engine.tools.meta_cognition import create_ask_user_tool
         from backend.engine.tools.native_file_tools import (
             create_find_symbols_tool,
             create_read_tool,
         )
-        from backend.engine.tools.note import create_note_tool, create_recall_tool
 
         tools.append(create_cmd_run_tool())
-        if getattr(self._config, 'enable_finish', True):
-            tools.append(create_finish_tool(self._current_mode()))
-        if getattr(self._config, 'enable_condensation_request', False):
-            tools.append(create_summarize_context_tool())
-        if getattr(self._config, 'enable_working_memory', True):
-            tools.append(create_memory_manager_tool())
-        tools.append(create_note_tool())
-        tools.append(create_recall_tool())
+        if not is_chat_mode(self._current_mode()):
+            tools.append(create_ask_user_tool())
         tools.append(create_read_tool())
         tools.append(create_find_symbols_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
-        """Add task_tracker and search_code tools."""
-        from backend.engine.tools.search_code import (
-            create_search_code_tool,
-        )
+        """Add task_tracker, grep, and glob tools."""
+        from backend.engine.tools.glob import create_glob_tool
+        from backend.engine.tools.grep import create_grep_tool
         from backend.engine.tools.task_tracker import (
-            create_create_task_tracker_tool,
             create_task_tracker_tool,
         )
 
         if getattr(self._config, 'enable_task_tracker_tool', False):
-            tools.append(create_create_task_tracker_tool())
             tools.append(create_task_tracker_tool())
-        tools.append(create_search_code_tool())
+        tools.append(create_grep_tool())
+        tools.append(create_glob_tool())
 
     def _add_terminal_and_special_tools(self, tools: list) -> None:
-        """Add terminal, optional feature tools (web search, delegate, etc.), and meta-cognition tools."""
-        self._add_terminal_tools(tools)
+        """Add search/code-intelligence helpers."""
         self._add_optional_feature_tools(tools)
-        self._add_meta_cognition_tools(tools)
+        self._add_terminal_tools(tools)
+        self._add_memory_and_checkpoint_tools(tools)
+        self._add_scratchpad_tools(tools)
 
     def _add_terminal_tools(self, tools: list) -> None:
         """Add terminal manager tool when terminal support is enabled."""
@@ -266,12 +242,9 @@ class OrchestratorPlanner:
             tools.append(create_debugger_tool())
 
     def _add_optional_feature_tools(self, tools: list) -> None:
-        """Add delegate, analyze_project_structure, etc."""
+        """Add code-search helpers."""
         from backend.engine.tools.analyze_project_structure import (
             create_analyze_project_structure_tool,
-        )
-        from backend.engine.tools.delegate_task import (
-            create_delegate_task_tool,
         )
         from backend.engine.tools.lsp_query import create_lsp_query_tool
 
@@ -282,18 +255,6 @@ class OrchestratorPlanner:
 
             if has_any_lsp_server():
                 tools.append(create_lsp_query_tool())
-        if getattr(self._config, 'enable_swarming', False):
-            tools.append(create_delegate_task_tool())
-
-        from backend.engine.tools.blackboard import create_blackboard_tool
-
-        if getattr(self._config, 'enable_blackboard', False):
-            tools.append(create_blackboard_tool())
-
-        if getattr(self._config, 'enable_checkpoints', False):
-            from backend.engine.tools.checkpoint import create_checkpoint_tool
-
-            tools.append(create_checkpoint_tool())
 
     def _add_lazy_import_tools(
         self, tools: list, specs: list[tuple[str, bool, str, str]]
@@ -311,21 +272,11 @@ class OrchestratorPlanner:
                 tools.append(getattr(mod, factory_name)())
 
     def _add_meta_cognition_tools(self, tools: list) -> None:
-        """Add uncertainty, clarification, escalate, proposal tools when meta-cognition is enabled."""
-        if getattr(self._config, 'enable_meta_cognition', False):
-            from backend.engine.tools.meta_cognition import (
-                create_communicate_tool,
-            )
-
-            tools.append(create_communicate_tool())
+        """Compatibility no-op; ask_user is part of the core simplified toolset."""
+        return
 
     def _add_browsing_tool(self, tools: list) -> None:
-        if not getattr(self._config, 'enable_browsing', False):
-            return
-        if getattr(self._config, 'enable_native_browser', False):
-            from backend.engine.tools.browser_native import create_browser_tool
-
-            tools.append(create_browser_tool())
+        return
 
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):
@@ -334,25 +285,34 @@ class OrchestratorPlanner:
                 create_edit_symbols_tool,
                 create_multiedit_tool,
                 create_replace_string_tool,
+                create_undo_last_edit_tool,
             )
 
             tools.append(create_create_tool())
             tools.append(create_replace_string_tool())
             tools.append(create_edit_symbols_tool())
             tools.append(create_multiedit_tool())
+            tools.append(create_undo_last_edit_tool())
 
     def _add_execute_mcp_tool_tool(self, tools: list) -> None:
-        """Add the MCP gateway proxy tool when MCP is enabled.
+        from backend.engine.tools.execute_mcp_tool import (
+            create_execute_mcp_tool_tool,
+        )
 
-        The gateway replaces injecting 50+ individual MCP tool schemas.
-        Available MCP tool names are listed in the system prompt instead.
-        """
-        if getattr(self._config, 'enable_mcp', True):
-            from backend.engine.tools.execute_mcp_tool import (
-                create_execute_mcp_tool_tool,
-            )
+        tools.append(create_execute_mcp_tool_tool())
 
-            tools.append(create_execute_mcp_tool_tool())
+    def _add_memory_and_checkpoint_tools(self, tools: list) -> None:
+        from backend.engine.tools.checkpoint import create_checkpoint_tool
+        from backend.engine.tools.memory_manager import create_memory_manager_tool
+
+        tools.append(create_checkpoint_tool())
+        tools.append(create_memory_manager_tool())
+
+    def _add_scratchpad_tools(self, tools: list) -> None:
+        from backend.engine.tools.note import create_note_tool, create_recall_tool
+
+        tools.append(create_note_tool())
+        tools.append(create_recall_tool())
 
     def _refresh_checked_tools_cache(
         self, tools: list[ChatCompletionToolParam]
@@ -632,14 +592,9 @@ class OrchestratorPlanner:
             '\n\n=== CURRENT MODE: PLAN ===\n'
             'This is the authoritative current-mode instruction for this turn.\n'
             'Current mode: PLAN\n\n'
-            '- Read-only mode: inspect with read/search tools only.\n'
-            '- Do not mutate files, run mutating commands, or use write/MCP/shell tools.\n'
-            '- Use `communicate_with_user` for clarification or blockers.\n'
-            '- Use `finish` to deliver the structured plan or blocked outcome.\n\n'
-            '`finish` requires: status, response, summary, sections, evidence, '
-            'open_items, next_step. Use sections for Objective, Recommended Plan, '
-            'Scope / Targets, Risks / Tradeoffs, Verification Strategy, and '
-            'Assumptions / Open Questions as applicable.\n'
+            '- Use tools to inspect, search, or execute safe planning checks.\n'
+            '- Use `ask_user` only when user input is required to continue.\n'
+            '- Write the final plan in plain text when complete; that ends the run.\n'
             '==========================\n'
         )
         return self._apply_control_message(messages, instruction)
@@ -655,9 +610,8 @@ class OrchestratorPlanner:
             '\n\n=== CURRENT MODE: CHAT ===\n'
             'This is the authoritative current-mode instruction for this turn.\n'
             'Current mode: CHAT\n\n'
-            '- Respond naturally in prose by default.\n'
-            '- Use read-only tools only when investigation is needed.\n'
-            '- Do not use write tools, shell, MCP, or `finish`.\n'
+            '- Respond naturally in prose.\n'
+            '- Do not use tools; plain text ends the turn.\n'
             '==========================\n'
         )
         return self._apply_control_message(messages, instruction)

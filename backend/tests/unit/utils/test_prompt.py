@@ -60,7 +60,7 @@ class TestPromptManager:
         assert 'The current working directory is /tmp/grinta_project' in ctx
         assert 'relative' in ctx.lower()
         assert 'does not list project files' in ctx
-        assert 'search_code' in ctx
+        assert 'glob' in ctx
 
     def test_build_playbook_info(self, prompt_dir):
         pm = PromptManager(prompt_dir)

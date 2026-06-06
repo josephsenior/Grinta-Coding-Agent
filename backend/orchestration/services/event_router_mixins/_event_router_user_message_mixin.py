@@ -141,20 +141,6 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
         )
         return True
 
-    async def _intercept_protocol_message_handoff(self, action: MessageAction) -> bool:
-        guidance = (
-            'The previous response returned plain assistant text while active task '
-            'work remained. Continue with a valid tool call, finish, or '
-            'communicate_with_user.'
-        )
-        await self._reject_agent_message_handoff(
-            action,
-            guidance,
-            source='EventRouterService._intercept_protocol_message_handoff',
-            error_id='ASSISTANT_MESSAGE_PROTOCOL_ERROR',
-        )
-        return True
-
     async def _reject_agent_message_handoff(
         self,
         action: MessageAction,

@@ -32,8 +32,9 @@ _PROGRESS_OBSERVATION_TYPES: tuple[str, ...] = (
 # model can pivot in the same turn instead of stopping to explain.
 # Keys are the name that appears in the tool_call_metadata.function_name field.
 _TOOL_FALLBACK_MAP: dict[str, list[str]] = {
-    'search_code': ['lsp'],
-    'lsp': ['search_code'],
+    'grep': ['lsp'],
+    'glob': ['lsp'],
+    'lsp': ['grep', 'glob'],
 }
 
 

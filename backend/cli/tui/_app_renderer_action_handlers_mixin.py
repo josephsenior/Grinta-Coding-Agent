@@ -24,8 +24,8 @@ from backend.ledger.action import (
 class _AppRendererActionHandlersMixin:
     """action handlers (search/message/streaming/state)."""
 
-    def _handle_search_code_action(self, thought: str) -> None:
-        """Handle search_code action and render as a card."""
+    def _handle_search_action(self, thought: str) -> None:
+        """Handle grep/glob action and render as a card."""
         import re
 
         # Strip the [SEARCH_RESULTS] opener only (no close tag is emitted)

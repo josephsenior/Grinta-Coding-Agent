@@ -18,7 +18,6 @@ from backend.engine.planner import (
 
 def _make_config(**kwargs):
     cfg = MagicMock()
-    cfg.enable_finish = True
     cfg.enable_condensation_request = False
     cfg.enable_browsing = False
     cfg.enable_native_browser = False
@@ -266,13 +265,12 @@ class TestAddBrowsingTool:
         p._add_browsing_tool(tools)
         assert len(tools) == 0
 
-    def test_native_browser_adds_browser_tool(self):
+    def test_native_browser_adds_nothing(self):
         cfg = _make_config(enable_browsing=True, enable_native_browser=True)
         p = _make_planner(config=cfg)
         tools: list[Any] = []
         p._add_browsing_tool(tools)
-        names = [t.get('function', {}).get('name') for t in tools]
-        assert 'browser' in names
+        assert len(tools) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -523,7 +521,7 @@ class TestBuildLlmParams:
             )
             assert '<FIRST_TURN_ORIENTATION>' not in joined
 
-    def test_plan_mode_prompt_policy_is_read_only_and_structured(self):
+    def test_plan_mode_prompt_policy_uses_simplified_protocol(self):
         p = _make_planner(config=_make_config(mode='plan'))
         state = _make_state()
         messages = [{'role': 'user', 'content': 'Plan a refactor'}]
@@ -539,13 +537,15 @@ class TestBuildLlmParams:
         assert 'CURRENT MODE: PLAN' in joined
         assert 'Current mode: PLAN' in joined
         assert joined.count('Current mode:') == 1
-        assert 'Read-only mode' in joined
-        assert 'Use `communicate_with_user` for clarification or blockers.' in joined
-        assert 'Use `finish` to deliver the structured plan or blocked outcome.' in joined
-        assert 'status, response, summary, sections, evidence' in joined
-        assert 'open_items, next_step' in joined
-        assert 'Recommended Plan' in joined
-        assert 'Verification Strategy' in joined
+        assert 'Use `ask_user` only when user input is required to continue.' in joined
+        assert 'Write the final plan in plain text when complete' in joined
+        assert 'Read-only mode' not in joined
+        assert 'communicate_with_user' not in joined
+        assert '`finish`' not in joined
+        assert 'status, response, summary, sections, evidence' not in joined
+        assert 'open_items, next_step' not in joined
+        assert 'Recommended Plan' not in joined
+        assert 'Verification Strategy' not in joined
         assert 'open_questions_or_blockers' not in joined
         assert 'Current mode: AGENT' not in joined
 
