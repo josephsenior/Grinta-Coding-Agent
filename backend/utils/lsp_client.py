@@ -165,7 +165,7 @@ class LspResult:
         if not self.available:
             return (
                 'LSP is not available (pylsp not installed). '
-                'Use search_code or explore_code instead.'
+                'Use grep or glob instead.'
             )
         if self.error:
             return f'LSP error: {self.error}'

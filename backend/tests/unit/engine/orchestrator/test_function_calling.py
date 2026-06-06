@@ -16,7 +16,6 @@ from backend.core.errors import (
 from backend.engine.function_calling import (
     _handle_cmd_run_tool,
     _handle_create_task_tracker_tool,
-    _handle_finish_tool,
     _handle_mcp_tool,
     _handle_summarize_context_tool,
     _handle_task_tracker_tool,
@@ -32,8 +31,8 @@ from backend.engine.tools.task_tracker import (
 )
 from backend.ledger.action import (
     CmdRunAction,
+    FileEditAction,
     MessageAction,
-    PlaybookFinishAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import CondensationRequestAction
@@ -113,7 +112,8 @@ class TestResponseToActions:
         assert len(actions) == 1
         assert isinstance(actions[0], MessageAction)
         assert actions[0].content == 'Here is the status update.'
-        assert actions[0].wait_for_response is True
+        assert actions[0].wait_for_response is False
+        assert actions[0].final_response is True
         assert actions[0].suppress_cli is False
         assert actions[0].transcript_only is False
 
@@ -204,33 +204,6 @@ class TestHandleCmdRunTool:
     def test_missing_security_risk_raises(self):
         with pytest.raises(FunctionCallValidationError, match='security_risk'):
             _handle_cmd_run_tool({'command': 'ls'})
-
-
-# ---------------------------------------------------------------------------
-# _handle_finish_tool
-# ---------------------------------------------------------------------------
-
-
-class TestHandleFinishTool:
-    def test_creates_agent_playbook_finish_action(self):
-        action = _handle_finish_tool(
-            {
-                'status': 'completed',
-                'summary': 'Done!',
-                'actions_taken': ['Implemented the task'],
-                'verification': {'status': 'not_run', 'details': 'Not needed'},
-                'remaining_items': [],
-                'next_step': 'None',
-            },
-            mode='agent',
-        )
-        assert isinstance(action, PlaybookFinishAction)
-        assert action.final_thought == 'Done!'
-        assert action.outputs['verification']['status'] == 'not_run'
-
-    def test_missing_agent_field_raises(self):
-        with pytest.raises(FunctionCallValidationError, match='actions_taken'):
-            _handle_finish_tool({'status': 'completed', 'summary': 'Done!'})
 
 
 # ---------------------------------------------------------------------------
@@ -436,45 +409,10 @@ class TestProcessSingleToolCall:
         )
         assert isinstance(action, CmdRunAction)
 
-    def test_dispatches_finish(self):
-        from backend.engine.tools.finish import create_finish_tool
-
-        tool_name = create_finish_tool()['function']['name']
-        tc = self._make_tool_call(tool_name)
-        action = _process_single_tool_call(
-            tc,
-            {
-                'status': 'completed',
-                'summary': 'done',
-                'actions_taken': ['Finished'],
-                'verification': {'status': 'not_run', 'details': 'No tests run'},
-                'remaining_items': [],
-                'next_step': 'None',
-            },
-        )
-        assert isinstance(action, PlaybookFinishAction)
-
-    def test_dispatches_plan_finish_with_plan_payload(self):
-        from backend.engine.tools.finish import create_finish_tool
-
-        tool_name = create_finish_tool('plan')['function']['name']
-        tc = self._make_tool_call(tool_name)
-        action = _process_single_tool_call(
-            tc,
-            {
-                'status': 'completed',
-                'summary': 'Plan ready',
-                'plan': ['Inspect', 'Implement', 'Verify'],
-                'files_or_areas': ['backend/engine'],
-                'risks': [],
-                'verification': ['Run tests'],
-                'assumptions': [],
-                'next_step': 'Switch to Agent Mode',
-            },
-            mode='plan',
-        )
-        assert isinstance(action, PlaybookFinishAction)
-        assert action.outputs['plan'] == ['Inspect', 'Implement', 'Verify']
+    def test_finish_is_not_dispatchable(self):
+        tc = self._make_tool_call('finish')
+        with pytest.raises(FunctionCallNotExistsError):
+            _process_single_tool_call(tc, {'summary': 'done'})
 
     def test_plan_mode_allows_create_task_tracker_tool_call(self):
         tool_name = create_create_task_tracker_tool()['function']['name']
@@ -494,17 +432,23 @@ class TestProcessSingleToolCall:
         assert action.command == 'create'
         assert action.task_list[0]['description'] == 'Draft plan'
 
-    def test_plan_mode_rejects_mutation_tool_call(self):
+    def test_plan_mode_allows_file_tool_call(self):
         from backend.engine.tools.native_file_tools import create_create_tool
 
         tool_name = create_create_tool()['function']['name']
         tc = self._make_tool_call(tool_name)
-        with pytest.raises(FunctionCallValidationError, match='Plan Mode'):
-            _process_single_tool_call(
-                tc,
-                {'type': 'file', 'path': 'new.py', 'content': 'print(1)'},
-                mode='plan',
-            )
+        action = _process_single_tool_call(
+            tc,
+            {
+                'type': 'file',
+                'path': 'new.py',
+                'content': 'print(1)',
+                'security_risk': 'LOW',
+            },
+            mode='plan',
+        )
+
+        assert isinstance(action, FileEditAction)
 
     def test_dispatches_mcp_tool(self):
         tc = self._make_tool_call('some_mcp_tool', mcp_names=['some_mcp_tool'])

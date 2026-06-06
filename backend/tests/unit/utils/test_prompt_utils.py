@@ -185,7 +185,7 @@ class TestOrchestratorPromptManager:
         assert 'Update `task_tracker` to `done`, `skipped`, or `blocked`' not in result
         assert 'Trust your `task_tracker` plan as the source of truth' not in result
 
-    def test_get_system_message_omits_communicate_tool_when_meta_cognition_disabled(
+    def test_get_system_message_uses_ask_user_protocol_when_meta_disabled(
         self, tmp_path
     ):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -204,7 +204,7 @@ class TestOrchestratorPromptManager:
         result = opm.get_system_message()
 
         assert '`communicate_with_user`' not in result
-        assert 'ask the user a short clarifying question in natural language' in result
+        assert 'call ask_user with your questions as a list' in result
 
     def test_get_system_message_omits_summarize_context_when_disabled(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -495,11 +495,7 @@ class TestOrchestratorPromptManager:
         assert '`github_search`' not in result
         assert 'Configured MCP servers' not in result
 
-        assert 'call_mcp_tool(tool_name="...", arguments={...})' in addendum
-        assert '`github_search`' in addendum
-        assert 'Search GitHub code' in addendum
-        assert 'Configured MCP servers' in addendum
-        assert '**`github`:** Use for repository metadata and code search' in addendum
+        assert addendum == ''
 
 
 class TestPromptBuilderSectionTokens:
@@ -873,7 +869,8 @@ class TestBuildSystemPromptRenders:
             config=_base_config(enable_meta_cognition=True),
             function_calling_mode='native',
         )
-        assert 'communicate_with_user' in result
+        assert 'ask_user' in result
+        assert 'communicate_with_user' not in result
 
     def test_mcp_inline(self) -> None:
         result = self._assert_renders_cleanly(
@@ -886,7 +883,7 @@ class TestBuildSystemPromptRenders:
             function_calling_mode='native',
             render_mcp_inline=True,
         )
-        assert '`search_github`' in result
+        assert '`search_github`' not in result
 
     def test_mcp_addendum_not_inline(self) -> None:
         from backend.engine.prompts.prompt_builder import build_mcp_user_addendum
@@ -906,7 +903,7 @@ class TestBuildSystemPromptRenders:
             mcp_tool_names=['search_github'],
             mcp_tool_descriptions={'search_github': 'Search GitHub repositories'},
         )
-        assert '`search_github`' in addendum
+        assert addendum == ''
 
     @pytest.mark.parametrize('mode', ['chat', 'plan', 'agent'])
     def test_system_prompt_does_not_embed_current_mode_block(self, mode: str) -> None:

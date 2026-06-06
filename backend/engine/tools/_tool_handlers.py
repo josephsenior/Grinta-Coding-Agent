@@ -13,7 +13,6 @@ import backend.engine.tools.analyze_project_structure as analyze_project_structu
 import backend.engine.tools.checkpoint as checkpoint_tools
 from backend.core.enums import FileEditSource
 from backend.core.errors import FunctionCallValidationError
-from backend.core.interaction_modes import PLAN_MODE, normalize_interaction_mode
 from backend.core.logger import app_logger as logger
 from backend.engine.function_calling_helpers import (
     parse_bool_argument,
@@ -21,7 +20,7 @@ from backend.engine.function_calling_helpers import (
     set_security_risk,
     validate_security_risk,
 )
-from backend.engine.tools import create_cmd_run_tool, create_finish_tool
+from backend.engine.tools import create_cmd_run_tool
 from backend.engine.tools._file_ops import (
     _relative_display_path,
     _safe_workspace_path,
@@ -30,10 +29,10 @@ from backend.engine.tools.browser_native import (
     BROWSER_TOOL_NAME,
     build_browser_tool_action,
 )
-from backend.engine.tools.search_code import build_search_code_action
+from backend.engine.tools.grep import build_grep_action
+from backend.engine.tools.glob import build_glob_action
 from backend.engine.tools.task_tracker import TaskTracker
 from backend.inference.tool_names import (
-    CREATE_TASK_TRACKER_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
 )
@@ -43,7 +42,6 @@ from backend.ledger.action import (
     BrowserToolAction,
     CmdRunAction,
     FileEditAction,
-    PlaybookFinishAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import CondensationRequestAction
@@ -121,343 +119,6 @@ def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
     return action
 
 
-_FINISH_STATUSES = {'completed', 'blocked', 'failed'}
-_FINISH_EVIDENCE_STATUSES = {
-    'passed',
-    'failed',
-    'partial',
-    'not_run',
-    'not_applicable',
-    'planned',
-}
-
-
-def _finish_tool_name(mode: str = 'agent') -> str:
-    return cast(str, create_finish_tool(mode).get('function', {}).get('name', ''))
-
-
-def _require_finish_string(
-    arguments: Mapping[str, Any],
-    field: str,
-    tool_name: str,
-) -> str:
-    value = require_tool_argument(arguments, field, tool_name)
-    if not isinstance(value, str) or not value.strip():
-        raise FunctionCallValidationError(
-            f'Missing required non-empty string argument "{field}" for tool call {tool_name}'
-        )
-    return value.strip()
-
-
-def _require_finish_list(
-    arguments: Mapping[str, Any],
-    field: str,
-    tool_name: str,
-) -> list[Any]:
-    value = require_tool_argument(arguments, field, tool_name)
-    if not isinstance(value, list):
-        raise FunctionCallValidationError(
-            f'Argument "{field}" for tool call {tool_name} must be a list.'
-        )
-    return value
-
-
-def _require_finish_dict(
-    arguments: Mapping[str, Any],
-    field: str,
-    tool_name: str,
-) -> dict[str, Any]:
-    value = require_tool_argument(arguments, field, tool_name)
-    if not isinstance(value, Mapping):
-        raise FunctionCallValidationError(
-            f'Argument "{field}" for tool call {tool_name} must be an object.'
-        )
-    return dict(value)
-
-
-def _require_finish_status(arguments: Mapping[str, Any], tool_name: str) -> str:
-    status = _require_finish_string(arguments, 'status', tool_name).lower()
-    if status not in _FINISH_STATUSES:
-        allowed = ', '.join(sorted(_FINISH_STATUSES))
-        raise FunctionCallValidationError(
-            f'Invalid finish status {status!r}; expected one of: {allowed}.'
-        )
-    return status
-
-
-def _optional_finish_string(arguments: Mapping[str, Any], field: str) -> str:
-    value = arguments.get(field)
-    if value is None:
-        return ''
-    return str(value).strip()
-
-
-def _optional_finish_list(
-    arguments: Mapping[str, Any],
-    field: str,
-    tool_name: str,
-) -> list[Any]:
-    if field not in arguments:
-        return []
-    value = arguments.get(field)
-    if not isinstance(value, list):
-        raise FunctionCallValidationError(
-            f'Argument "{field}" for tool call {tool_name} must be a list.'
-        )
-    return value
-
-
-def _clean_finish_items(value: Any) -> list[str]:
-    if isinstance(value, str):
-        stripped = value.strip()
-        return [stripped] if stripped else []
-    if not isinstance(value, Sequence) or isinstance(value, (bytes, bytearray)):
-        return []
-    return [text for item in value if (text := str(item).strip())]
-
-
-def _normalize_finish_sections(
-    arguments: Mapping[str, Any],
-    field: str,
-    tool_name: str,
-) -> list[dict[str, Any]]:
-    if field not in arguments:
-        return []
-    raw_sections = arguments.get(field)
-    if not isinstance(raw_sections, list):
-        raise FunctionCallValidationError(
-            f'Argument "{field}" for tool call {tool_name} must be a list.'
-        )
-
-    sections: list[dict[str, Any]] = []
-    for index, raw in enumerate(raw_sections, 1):
-        if not isinstance(raw, Mapping):
-            raise FunctionCallValidationError(
-                f'Item {index} in "{field}" for tool call {tool_name} must be an object.'
-            )
-        title = str(raw.get('title') or '').strip()
-        items = _clean_finish_items(raw.get('items', []))
-        if not title:
-            raise FunctionCallValidationError(
-                f'Item {index} in "{field}" for tool call {tool_name} requires a title.'
-            )
-        if not items:
-            raise FunctionCallValidationError(
-                f'Item {index} in "{field}" for tool call {tool_name} requires at least one item.'
-            )
-        sections.append({'title': title, 'items': items})
-    return sections
-
-
-def _finish_section(title: str, items: Any) -> dict[str, Any] | None:
-    cleaned = _clean_finish_items(items)
-    if not cleaned:
-        return None
-    return {'title': title, 'items': cleaned}
-
-
-def _legacy_plan_sections(
-    *,
-    plan: list[Any],
-    files_or_areas: list[Any],
-    risks: list[Any],
-    verification: list[Any],
-    assumptions: list[Any],
-) -> list[dict[str, Any]]:
-    sections: list[dict[str, Any]] = []
-    for section in (
-        _finish_section('Recommended Plan', plan),
-        _finish_section('Scope / Targets', files_or_areas),
-        _finish_section('Risks / Tradeoffs', risks),
-        _finish_section('Verification Strategy', verification),
-        _finish_section('Assumptions / Open Questions', assumptions),
-    ):
-        if section is not None:
-            sections.append(section)
-    return sections
-
-
-def _legacy_agent_sections(*, actions_taken: list[Any]) -> list[dict[str, Any]]:
-    section = _finish_section('What I Did', actions_taken)
-    return [section] if section is not None else []
-
-
-def _normalize_finish_evidence(
-    arguments: Mapping[str, Any],
-    tool_name: str,
-    *,
-    fallback: Mapping[str, Any] | None = None,
-) -> dict[str, str]:
-    raw = arguments.get('evidence')
-    if raw is None:
-        raw = fallback or {}
-    if not isinstance(raw, Mapping):
-        raise FunctionCallValidationError(
-            f'Argument "evidence" for tool call {tool_name} must be an object.'
-        )
-
-    status = str(raw.get('status') or '').strip().lower()
-    details = str(raw.get('details') or '').strip()
-    if not status:
-        status = 'not_run'
-    if status not in _FINISH_EVIDENCE_STATUSES:
-        allowed = ', '.join(sorted(_FINISH_EVIDENCE_STATUSES))
-        raise FunctionCallValidationError(
-            f'Invalid finish evidence status {status!r}; expected one of: {allowed}.'
-        )
-    if not details:
-        raise FunctionCallValidationError(
-            f'Finish evidence for tool call {tool_name} requires non-empty details.'
-        )
-    return {'status': status, 'details': details}
-
-
-def _evidence_from_plan_verification(verification: list[Any]) -> dict[str, str] | None:
-    items = _clean_finish_items(verification)
-    if not items:
-        return None
-    return {
-        'status': 'planned',
-        'details': '; '.join(items),
-    }
-
-
-def _evidence_from_agent_verification(
-    verification: Mapping[str, Any] | None,
-) -> dict[str, str] | None:
-    if not verification:
-        return None
-    status = str(verification.get('status') or '').strip()
-    details = str(verification.get('details') or '').strip()
-    if not status and not details:
-        return None
-    return {'status': status or 'not_run', 'details': details}
-
-
-def _handle_plan_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAction:
-    tool_name = _finish_tool_name(PLAN_MODE)
-    status = _require_finish_status(arguments, tool_name)
-    summary = _require_finish_string(arguments, 'summary', tool_name)
-    response = _optional_finish_string(arguments, 'response') or summary
-    plan = _optional_finish_list(arguments, 'plan', tool_name)
-    files_or_areas = _optional_finish_list(arguments, 'files_or_areas', tool_name)
-    risks = _optional_finish_list(arguments, 'risks', tool_name)
-    verification = _optional_finish_list(arguments, 'verification', tool_name)
-    assumptions = _optional_finish_list(arguments, 'assumptions', tool_name)
-    next_step = _optional_finish_string(arguments, 'next_step')
-    sections = _normalize_finish_sections(arguments, 'sections', tool_name)
-    if not sections:
-        sections = _legacy_plan_sections(
-            plan=plan,
-            files_or_areas=files_or_areas,
-            risks=risks,
-            verification=verification,
-            assumptions=assumptions,
-        )
-    evidence = _normalize_finish_evidence(
-        arguments,
-        tool_name,
-        fallback=_evidence_from_plan_verification(verification)
-        or {'status': 'not_applicable', 'details': summary},
-    )
-    open_items = _optional_finish_list(arguments, 'open_items', tool_name)
-
-    if status == 'completed' and not sections:
-        raise FunctionCallValidationError(
-            'Plan Mode finish with status="completed" requires non-empty sections or a non-empty plan.'
-        )
-
-    outputs: dict[str, Any] = {
-        'mode': 'plan',
-        'status': status,
-        'response': response,
-        'summary': summary,
-        'sections': sections,
-        'evidence': evidence,
-        'open_items': open_items,
-        'next_step': next_step,
-        'plan': plan,
-        'files_or_areas': files_or_areas,
-        'risks': risks,
-        'verification': verification,
-        'assumptions': assumptions,
-    }
-    return PlaybookFinishAction(final_thought=response, outputs=outputs)
-
-
-def _handle_agent_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAction:
-    tool_name = _finish_tool_name('agent')
-    status = _require_finish_status(arguments, tool_name)
-    summary = _require_finish_string(arguments, 'summary', tool_name)
-    response = _optional_finish_string(arguments, 'response') or summary
-    actions_taken = _optional_finish_list(arguments, 'actions_taken', tool_name)
-    raw_verification = arguments.get('verification')
-    remaining_items = _optional_finish_list(arguments, 'remaining_items', tool_name)
-    next_step = _optional_finish_string(arguments, 'next_step')
-    sections = _normalize_finish_sections(arguments, 'sections', tool_name)
-    if not sections:
-        sections = _legacy_agent_sections(actions_taken=actions_taken)
-    if status == 'completed' and not sections:
-        raise FunctionCallValidationError(
-            'Agent Mode finish with status="completed" requires non-empty actions_taken or sections.'
-        )
-    if raw_verification is None:
-        verification: dict[str, Any] = {}
-    elif isinstance(raw_verification, Mapping):
-        verification = dict(raw_verification)
-    else:
-        raise FunctionCallValidationError(
-            f'Argument "verification" for tool call {tool_name} must be an object.'
-        )
-    evidence = _normalize_finish_evidence(
-        arguments,
-        tool_name,
-        fallback=_evidence_from_agent_verification(verification),
-    )
-    open_items = (
-        _optional_finish_list(arguments, 'open_items', tool_name) or remaining_items
-    )
-
-    outputs: dict[str, Any] = {
-        'mode': 'agent',
-        'status': status,
-        'response': response,
-        'summary': summary,
-        'sections': sections,
-        'evidence': evidence,
-        'open_items': open_items,
-        'next_step': next_step,
-        'actions_taken': actions_taken,
-        'verification': verification,
-        'remaining_items': remaining_items,
-    }
-
-    lessons = arguments.get('lessons_learned')
-    if lessons:
-        outputs['lessons_learned'] = lessons
-        # Persist lessons to the scratchpad so `recall(key="lessons")` in the
-        # next session actually returns something. Without this, the finish
-        # tool's `lessons_learned` field was write-only and died with the turn.
-        try:
-            from backend.engine.tools.note import append_to_note
-
-            append_to_note('lessons', str(lessons))
-        except Exception as exc:
-            # Persistence is best-effort; never block finish on scratchpad I/O.
-            logger.debug('Failed to persist finish lessons: %s', exc, exc_info=True)
-    return PlaybookFinishAction(final_thought=response, outputs=outputs)
-
-
-def _handle_finish_tool(
-    arguments: Mapping[str, Any],
-    mode: str = 'agent',
-) -> PlaybookFinishAction:
-    """Handle the mode-aware finish tool call."""
-    if normalize_interaction_mode(mode) == PLAN_MODE:
-        return _handle_plan_finish_tool(arguments)
-    return _handle_agent_finish_tool(arguments)
-
-
 def _handle_memory_manager_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     """Handle unified memory ops: note, recall, semantic_recall, working_memory."""
     action = arguments.get('action')
@@ -511,15 +172,24 @@ def _handle_memory_manager_tool(arguments: Mapping[str, Any]) -> AgentThinkActio
         raise FunctionCallValidationError(f'Unknown memory_manager action: {action}')
 
 
-def _handle_search_code_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
-    """Handle SEARCH_CODE_TOOL: fast code search via ripgrep/grep."""
-    return build_search_code_action(
+def _handle_grep_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
+    """Handle GREP tool: regex text search across files via ripgrep/Python."""
+    return build_grep_action(
         pattern=cast(str, arguments.get('pattern', '')),
         path=cast(str, arguments.get('path', '.')),
         file_pattern=cast(str, arguments.get('file_pattern', '')),
         context_lines=cast(int, arguments.get('context_lines', 2)),
         case_sensitive=cast(bool, arguments.get('case_sensitive', False)),
         max_results=cast(int, arguments.get('max_results', 50)),
+    )
+
+
+def _handle_glob_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
+    """Handle GLOB tool: list files matching a glob pattern."""
+    return build_glob_action(
+        pattern=cast(str, arguments.get('pattern', '')),
+        path=cast(str, arguments.get('path', '.')),
+        max_results=cast(int, arguments.get('max_results', 100)),
     )
 
 
@@ -675,30 +345,6 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
     return TaskTrackingAction(command=command, task_list=normalized_task_list)
 
 
-def _handle_create_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
-    """Handle CREATE_TASK_TRACKER_TOOL tool call."""
-    raw_task_list_any = require_tool_argument(
-        arguments, 'task_list', CREATE_TASK_TRACKER_TOOL_NAME
-    )
-    if not isinstance(raw_task_list_any, Sequence) or isinstance(
-        raw_task_list_any, (str, bytes)
-    ):
-        raise FunctionCallValidationError(
-            'Invalid format for "task_list". Expected a non-empty list.'
-        )
-
-    raw_task_list = cast(Sequence[Mapping[str, Any]], raw_task_list_any)
-    if not raw_task_list:
-        raise FunctionCallValidationError(
-            'create_task_tracker requires at least one task item.'
-        )
-
-    normalized_task_list = _normalize_task_tracker_list(list(raw_task_list))
-    tracker = TaskTracker()
-    tracker.save_to_file(normalized_task_list)
-    return TaskTrackingAction(command='create', task_list=normalized_task_list)
-
-
 def _handle_mcp_tool(
     tool_call_name: str, arguments: Mapping[str, Any] | None
 ) -> MCPAction:
@@ -763,178 +409,8 @@ def _handle_execute_mcp_tool_tool(arguments: dict[str, Any]) -> MCPAction:
     return MCPAction(name=tool_name, arguments=inner_args)
 
 
-def _normalize_communicate_options(
-    raw_options: Sequence[Any],
-) -> tuple[list[str], list[dict[str, str]]]:
-    """Normalize LLM-supplied options into (labels, structured) parallel lists.
+def _handle_ask_user_tool(arguments: Mapping[str, Any]) -> Action:
+    """Handle the simplified ask_user tool."""
+    from backend.engine.tools.meta_cognition import build_ask_user_action
 
-    Accepts either a plain string or a ``{"label": str, "description": str}`` dict.
-    Returns the flat labels (for the simple options field) and the structured
-    descriptors (for the renderer's rich display).
-    """
-    labels: list[str] = []
-    structured: list[dict[str, str]] = []
-    for opt in raw_options:
-        if isinstance(opt, str):
-            labels.append(opt)
-            structured.append({'label': opt, 'description': ''})
-        elif isinstance(opt, Mapping):
-            label = str(opt.get('label', '') or '').strip()
-            description = str(opt.get('description', '') or '').strip()
-            if not label:
-                continue
-            labels.append(label)
-            structured.append({'label': label, 'description': description})
-        else:
-            labels.append(str(opt))
-            structured.append({'label': str(opt), 'description': ''})
-    return labels, structured
-
-
-def _format_attempts(raw_attempts: Sequence[Any]) -> list[str]:
-    """Render structured attempts as compact strings for the escalation card."""
-    out: list[str] = []
-    for attempt in raw_attempts:
-        if isinstance(attempt, Mapping):
-            action = str(attempt.get('action', '') or '').strip()
-            result = str(attempt.get('result', '') or '').strip()
-            if action and result:
-                out.append(f'{action} \u2192 {result}')
-            elif action:
-                out.append(action)
-        elif attempt:
-            out.append(str(attempt))
-    return out
-
-
-def _handle_communicate_tool(arguments: Mapping[str, Any]) -> Action:
-    """Route the unified communicate tool to the specific Action class based on intent."""
-    intent = cast(str, arguments.get('intent', '')).strip().lower()
-    if not intent:
-        intent = 'clarification'
-
-    valid_intents = (
-        'clarification',
-        'uncertainty',
-        'proposal',
-        'confirm',
-        'inform',
-        'escalate',
-    )
-    if intent not in valid_intents:
-        from backend.core.errors import FunctionCallValidationError
-
-        raise FunctionCallValidationError(
-            f'communicate_with_user: unknown intent {intent!r}. '
-            f'Valid intents: {", ".join(valid_intents)}.'
-        )
-
-    message = cast(str, arguments.get('message', ''))
-    raw_options = cast(Sequence[Any], arguments.get('options') or [])
-    option_labels, option_structured = _normalize_communicate_options(raw_options)
-    context = cast(str, arguments.get('context', ''))
-    thought = cast(str, arguments.get('thought', ''))
-
-    if intent == 'uncertainty':
-        from backend.ledger.action.agent import UncertaintyAction
-
-        raw_level = arguments.get('uncertainty_level', 0.5)
-        try:
-            level = float(raw_level)
-        except (TypeError, ValueError):
-            level = 0.5
-        level = max(0.0, min(1.0, level))
-        return UncertaintyAction(
-            uncertainty_level=level,
-            specific_concerns=[message] if message else [],
-            requested_information=context,
-            thought=thought,
-        )
-
-    if intent == 'proposal':
-        from backend.ledger.action.agent import ProposalAction
-
-        formatted_options: list[dict[str, Any]] = (
-            [
-                {
-                    'approach': s['label'],
-                    'description': s.get('description', ''),
-                    'pros': [],
-                    'cons': [],
-                }
-                for s in option_structured
-            ]
-            if option_structured
-            else [{'approach': message, 'pros': [], 'cons': []}]
-        )
-        raw_recommended = arguments.get('recommended', 0)
-        try:
-            recommended = int(raw_recommended)
-        except (TypeError, ValueError):
-            recommended = 0
-        if formatted_options:
-            recommended = max(0, min(recommended, len(formatted_options) - 1))
-        return ProposalAction(
-            options=formatted_options,
-            rationale=context or message,
-            thought=thought,
-            recommended=recommended,
-        )
-
-    if intent == 'confirm':
-        from backend.ledger.action.agent import ConfirmRequestAction
-
-        if not option_labels:
-            option_labels = ['Yes, do it', 'No, abort']
-            option_structured = [
-                {'label': 'Yes, do it', 'description': ''},
-                {'label': 'No, abort', 'description': ''},
-            ]
-        raw_default = arguments.get('default_index', 1)
-        try:
-            default_index = int(raw_default)
-        except (TypeError, ValueError):
-            default_index = 1
-        default_index = 0 if default_index == 0 else 1
-        return ConfirmRequestAction(
-            question=message,
-            options=option_labels,
-            default_index=default_index,
-            context=context,
-            thought=thought,
-        )
-
-    if intent == 'inform':
-        from backend.ledger.action.agent import InformAction
-
-        return InformAction(
-            text=message,
-            context=context,
-            thought=thought,
-        )
-
-    if intent == 'escalate':
-        from backend.ledger.action.agent import EscalateToHumanAction
-
-        raw_attempts = cast(Sequence[Any], arguments.get('attempts') or [])
-        structured_attempts = _format_attempts(raw_attempts)
-        if not structured_attempts and context:
-            structured_attempts = [context]
-        return EscalateToHumanAction(
-            reason=message,
-            attempts_made=structured_attempts,
-            specific_help_needed=cast(
-                str, arguments.get('specific_help_needed', '')
-            ).strip(),
-            thought=thought,
-        )
-
-    # Default: clarification
-    from backend.ledger.action.agent import ClarificationRequestAction
-
-    return ClarificationRequestAction(
-        question=message,
-        options=option_labels,
-        context=context,
-        thought=thought,
-    )
+    return build_ask_user_action(arguments)

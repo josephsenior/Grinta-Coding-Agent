@@ -185,13 +185,12 @@ def build_recall_action(key: str) -> AgentThinkAction:
         return AgentThinkAction(thought=f'[SCRATCHPAD] [{key}] = {notes[key]!r}')
     if key == 'lessons':
         # No lessons persisted yet — return a clear empty-state message without
-        # writing an empty key (finish() will populate it at end-of-session via
-        # append_to_note). This avoids the previous bootstrap hack that masked
+        # writing an empty key. This avoids the previous bootstrap hack that masked
         # the genuine empty state and made `recall` look like a side-effect tool.
         return AgentThinkAction(
             thought=(
                 "[SCRATCHPAD] No lessons stored yet. Do not recall 'lessons' again this "
-                'session; it will be populated by `finish(lessons_learned=...)` for the next run.'
+                'session; it will be populated only if a future tool stores lessons.'
             )
         )
     return AgentThinkAction(

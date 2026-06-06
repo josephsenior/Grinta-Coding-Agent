@@ -418,10 +418,12 @@ class TestExampleStepBuilder:
         result = builder.build_all_steps()
         assert 'execute_bash' in result
 
-    def test_with_finish(self):
-        builder = ExampleStepBuilder({'finish'})
+    def test_with_tool_steps_ends_in_plain_text(self):
+        builder = ExampleStepBuilder({'execute_bash'})
         result = builder.build_all_steps()
-        assert 'finish' in result
+        assert '<function=finish>' not in result
+        assert 'ASSISTANT:' in result
+        assert 'Implemented the Flask page' in result
 
 
 # ── convert_fncall_messages_to_non_fncall_messages ─────────────────────

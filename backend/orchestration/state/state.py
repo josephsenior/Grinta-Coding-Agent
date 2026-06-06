@@ -904,8 +904,15 @@ class State:
         event: Event,
         last_user_message: str | None,
     ) -> tuple[str | None, list[str] | None] | None:
-        """Check if event is a finish action and return appropriate result."""
-        if isinstance(event, PlaybookFinishAction) and last_user_message is not None:
+        """Check if event is a completion boundary and return appropriate result."""
+        is_final_message = (
+            isinstance(event, MessageAction)
+            and event.source == EventSource.AGENT
+            and bool(getattr(event, 'final_response', False))
+        )
+        if (
+            isinstance(event, PlaybookFinishAction) or is_final_message
+        ) and last_user_message is not None:
             return (last_user_message, None)
         return None
 
@@ -919,7 +926,11 @@ class State:
                 last_user_message, last_user_message_image_urls = (
                     self._process_user_message_event(event)
                 )
-            elif isinstance(event, PlaybookFinishAction):
+            elif isinstance(event, PlaybookFinishAction) or (
+                isinstance(event, MessageAction)
+                and event.source == EventSource.AGENT
+                and bool(getattr(event, 'final_response', False))
+            ):
                 finish_result = self._check_for_finish_action(event, last_user_message)
                 if finish_result is not None:
                     return finish_result

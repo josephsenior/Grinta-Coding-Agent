@@ -144,7 +144,7 @@ class _AppRendererLiveMixin:
                 snapshot = Text.assemble(
                     ('Thinking:', 'bold #5eead4'),
                     '  ',
-                    Text('\n  '.join(thoughts), style='rgb(150,154,189)'),
+                    Text('\n  '.join(thoughts), style='#c8c8d4'),
                 )
                 self._history.append(snapshot)
                 self._history.append(Text(''))

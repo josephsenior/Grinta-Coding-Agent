@@ -7,10 +7,9 @@ from typing import Any, cast
 
 import pytest
 
-from backend.core.errors import FunctionCallValidationError
+from backend.core.errors import FunctionCallNotExistsError, FunctionCallValidationError
 from backend.engine.function_calling import (
     _handle_cmd_run_tool,
-    _handle_finish_tool,
     _process_single_tool_call,
     combine_thought,
     set_security_risk,
@@ -19,7 +18,6 @@ from backend.ledger.action import (
     ActionSecurityRisk,
     CmdRunAction,
     MessageAction,
-    PlaybookFinishAction,
 )
 
 # ---------------------------------------------------------------------------
@@ -153,203 +151,17 @@ class TestHandleCmdRunTool:
             _handle_cmd_run_tool({'command': 'ls', 'security_risk': 'CRITICAL'})
 
 
-# ---------------------------------------------------------------------------
-# _handle_finish_tool
-# ---------------------------------------------------------------------------
+class TestModeToolValidation:
+    def test_finish_tool_call_is_not_dispatchable(self):
+        tool_call = SimpleNamespace(function=SimpleNamespace(name='finish'))
 
-
-class TestHandleFinishTool:
-    """Tests for _handle_finish_tool."""
-
-    def test_agent_finish_accepts_execution_payload(self):
-        action = _handle_finish_tool(
-            {
-                'status': 'completed',
-                'summary': 'Task complete',
-                'actions_taken': ['Changed the implementation'],
-                'verification': {'status': 'passed', 'details': 'pytest passed'},
-                'remaining_items': [],
-                'next_step': 'Ship it',
-            },
-            mode='agent',
-        )
-        assert isinstance(action, PlaybookFinishAction)
-        assert action.final_thought == 'Task complete'
-        assert action.outputs['actions_taken'] == ['Changed the implementation']
-
-    def test_agent_finish_accepts_adaptive_payload(self):
-        action = _handle_finish_tool(
-            {
-                'status': 'completed',
-                'response': 'I finished the UX review and my recommendation is below.',
-                'summary': 'Completed a UX review with a recommendation.',
-                'sections': [
-                    {
-                        'title': 'Recommendation',
-                        'items': ['Keep the dense dashboard layout and simplify the hero copy.'],
-                    },
-                    {
-                        'title': 'Tradeoffs',
-                        'items': ['This favors repeat users over a marketing-style first impression.'],
-                    },
-                ],
-                'evidence': {
-                    'status': 'not_applicable',
-                    'details': 'This was a design critique, not an executable change.',
-                },
-                'open_items': [],
-                'next_step': '',
-            },
-            mode='agent',
-        )
-
-        assert isinstance(action, PlaybookFinishAction)
-        assert action.final_thought.startswith('I finished the UX review')
-        assert action.outputs['mode'] == 'agent'
-        assert action.outputs['sections'][0]['title'] == 'Recommendation'
-        assert action.outputs['evidence']['status'] == 'not_applicable'
-
-    def test_plan_finish_accepts_plan_payload(self):
-        action = _handle_finish_tool(
-            {
-                'status': 'completed',
-                'summary': 'Plan ready',
-                'plan': ['Inspect files', 'Make the change', 'Run tests'],
-                'files_or_areas': ['backend/engine'],
-                'risks': ['Tool schema drift'],
-                'verification': ['Run focused tests'],
-                'assumptions': ['Existing behavior stays stable'],
-                'next_step': 'Switch to Agent Mode',
-            },
-            mode='plan',
-        )
-        assert isinstance(action, PlaybookFinishAction)
-        assert action.final_thought == 'Plan ready'
-        assert action.outputs['plan'] == [
-            'Inspect files',
-            'Make the change',
-            'Run tests',
-        ]
-
-    def test_plan_finish_accepts_adaptive_payload(self):
-        action = _handle_finish_tool(
-            {
-                'status': 'completed',
-                'response': 'Here is the recommended migration plan.',
-                'summary': 'Produced a migration plan with risks and verification.',
-                'sections': [
-                    {
-                        'title': 'Objective',
-                        'items': ['Move the finish contract to a task-aware envelope.'],
-                    },
-                    {
-                        'title': 'Recommended Plan',
-                        'items': ['Update schema.', 'Normalize handler output.', 'Update rendering/tests.'],
-                    },
-                    {
-                        'title': 'Verification Strategy',
-                        'items': ['Run focused finish and renderer tests.'],
-                    },
-                ],
-                'evidence': {
-                    'status': 'planned',
-                    'details': 'Plan is based on the finish schema and renderer paths.',
-                },
-                'open_items': [],
-                'next_step': 'Switch to Agent Mode.',
-            },
-            mode='plan',
-        )
-
-        assert isinstance(action, PlaybookFinishAction)
-        assert action.final_thought == 'Here is the recommended migration plan.'
-        assert action.outputs['mode'] == 'plan'
-        assert action.outputs['sections'][1]['title'] == 'Recommended Plan'
-
-    def test_plan_finish_rejects_missing_required_fields(self):
-        with pytest.raises(FunctionCallValidationError, match='summary'):
-            _handle_finish_tool(
-                {
-                    'status': 'completed',
-                    'plan': ['Do it'],
-                    'files_or_areas': [],
-                    'risks': [],
-                    'verification': [],
-                    'assumptions': [],
-                    'next_step': 'Switch to Agent Mode',
-                },
-                mode='plan',
-            )
-
-    def test_plan_finish_blocked_allows_empty_plan(self):
-        action = _handle_finish_tool(
-            {
-                'status': 'blocked',
-                'summary': 'Target subsystem is unclear',
-                'plan': [],
-                'files_or_areas': [],
-                'risks': ['Wrong subsystem could be changed'],
-                'verification': [],
-                'assumptions': [],
-                'next_step': 'Clarify the target subsystem',
-            },
-            mode='plan',
-        )
-        assert action.outputs['status'] == 'blocked'
-        assert action.outputs['plan'] == []
-
-    def test_plan_finish_completed_requires_non_empty_plan(self):
-        with pytest.raises(FunctionCallValidationError, match='non-empty plan'):
-            _handle_finish_tool(
-                {
-                    'status': 'completed',
-                    'summary': 'Plan ready',
-                    'plan': [],
-                    'files_or_areas': [],
-                    'risks': [],
-                    'verification': [],
-                    'assumptions': [],
-                    'next_step': 'Switch to Agent Mode',
-                },
-                mode='plan',
-            )
-
-    def test_plan_finish_completed_does_not_require_code_specific_scope(self):
-        action = _handle_finish_tool(
-            {
-                'status': 'completed',
-                'summary': 'Plan ready',
-                'plan': ['Interview stakeholders', 'Compare workflow options'],
-                'files_or_areas': [],
-                'risks': [],
-                'verification': [],
-                'assumptions': [],
-                'next_step': 'Review the plan',
-            },
-            mode='plan',
-        )
-
-        assert action.outputs['sections'][0]['title'] == 'Recommended Plan'
-        assert action.outputs['evidence']['status'] == 'not_applicable'
-
-    def test_agent_finish_rejects_plan_payload(self):
-        with pytest.raises(FunctionCallValidationError, match='actions_taken'):
-            _handle_finish_tool(
-                {
-                    'status': 'completed',
-                    'summary': 'Plan ready',
-                    'plan': ['Do it'],
-                    'files_or_areas': [],
-                    'risks': [],
-                    'verification': [],
-                    'assumptions': [],
-                    'next_step': 'Switch to Agent Mode',
-                },
+        with pytest.raises(FunctionCallNotExistsError):
+            _process_single_tool_call(
+                tool_call,
+                {'summary': 'Done'},
                 mode='agent',
             )
 
-
-class TestModeToolValidation:
     def test_chat_mode_rejects_mutating_tool_call(self):
         tool_call = SimpleNamespace(function=SimpleNamespace(name='create'))
 

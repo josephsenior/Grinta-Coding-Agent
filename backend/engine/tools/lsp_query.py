@@ -45,7 +45,7 @@ def create_lsp_query_tool() -> dict[str, Any]:
                 'Tool boundaries (do not duplicate effort):\n'
                 '  • Edit by symbol name → use `edit_symbols`. `lsp` '
                 'is read-only and intentionally does not expose rename.\n'
-                '  • Workspace-wide text/symbol search → use `search_code` '
+                '  • Workspace-wide text/symbol search → use `grep` or `glob` '
                 '(ripgrep). `list_symbols` only enumerates symbols in a single file.\n'
                 '  • Code formatting / quick-fix application → run the project '
                 'formatter or linter via `execute_bash` / `execute_powershell`.\n'

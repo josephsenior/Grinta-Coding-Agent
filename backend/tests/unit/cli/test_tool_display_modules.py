@@ -106,9 +106,9 @@ class TestFriendlyVerbForTool(unittest.TestCase):
         self.assertEqual(friendly_verb_for_tool('edit_symbols', {}), 'Edited')
         self.assertEqual(friendly_verb_for_tool('multiedit', {}), 'Edited')
         self.assertEqual(friendly_verb_for_tool('find_symbols', {}), 'Found')
-        self.assertEqual(friendly_verb_for_tool('search_code', {}), 'Searched')
+        self.assertEqual(friendly_verb_for_tool('grep', {}), 'Searched')
+        self.assertEqual(friendly_verb_for_tool('glob', {}), 'Listed')
         self.assertEqual(friendly_verb_for_tool('think', {}), 'Thinking')
-        self.assertEqual(friendly_verb_for_tool('finish', {}), 'Finished')
         self.assertEqual(friendly_verb_for_tool('checkpoint', {}), 'Saved')
 
     def test_empty_tool_name(self) -> None:
@@ -121,12 +121,12 @@ class TestFriendlyVerbForTool(unittest.TestCase):
 
 
 class TestToolActivityStatsHint(unittest.TestCase):
-    def test_search_code_with_path(self) -> None:
-        hint = tool_activity_stats_hint('search_code', {'path': '/src'})
+    def test_grep_with_path(self) -> None:
+        hint = tool_activity_stats_hint('grep', {'path': '/src'})
         self.assertIn('/src', hint)  # type: ignore[arg-type]
 
-    def test_search_code_no_path(self) -> None:
-        hint = tool_activity_stats_hint('search_code', {})
+    def test_grep_no_path(self) -> None:
+        hint = tool_activity_stats_hint('grep', {})
         self.assertIsNone(hint)
 
     def test_analyze_project_with_depth(self) -> None:
@@ -309,10 +309,6 @@ class TestSummarizeToolArguments(unittest.TestCase):
         s = summarize_tool_arguments('think', {'thought': 'Plan A'})
         self.assertIn('Plan A', s)
 
-    def test_finish(self) -> None:
-        s = summarize_tool_arguments('finish', {'message': 'All done'})
-        self.assertIn('All done', s)
-
     def test_memory_manager(self) -> None:
         s = summarize_tool_arguments(
             'memory_manager', {'operation': 'store', 'key': 'my_key'}
@@ -329,11 +325,17 @@ class TestSummarizeToolArguments(unittest.TestCase):
         )
         self.assertIn('3', s)
 
-    def test_search_code(self) -> None:
+    def test_grep(self) -> None:
         s = summarize_tool_arguments(
-            'search_code', {'query': 'parse_args', 'path': '/src'}
+            'grep', {'pattern': 'parse_args', 'path': '/src'}
         )
         self.assertIn('parse_args', s)
+
+    def test_glob(self) -> None:
+        s = summarize_tool_arguments(
+            'glob', {'pattern': '*.py', 'path': '/src'}
+        )
+        self.assertIn('*.py', s)
 
     def test_lsp(self) -> None:
         s = summarize_tool_arguments('lsp', {'command': 'hover', 'symbol': 'Foo'})
@@ -347,8 +349,8 @@ class TestSummarizeToolArguments(unittest.TestCase):
         s = summarize_tool_arguments('delegate_task', {'task_description': 'do X'})
         self.assertIn('do X', s)
 
-    def test_communicate_with_user(self) -> None:
-        s = summarize_tool_arguments('communicate_with_user', {'message': 'hi'})
+    def test_ask_user(self) -> None:
+        s = summarize_tool_arguments('ask_user', {'questions': ['hi']})
         self.assertIn('hi', s)
 
     def test_call_mcp_tool(self) -> None:
@@ -677,7 +679,7 @@ from backend.cli._tool_display.preview import (
     _mcp_collection_summary,
     _mcp_count_summary,
     _mcp_error_summary,
-    _mcp_search_code_summary,
+    _mcp_search_summary,
     _mcp_text_field_summary,
     looks_like_streaming_tool_arguments,
 )
@@ -714,21 +716,21 @@ class TestMcpCountSummary(unittest.TestCase):
         self.assertIsNone(result)
 
 
-class TestMcpSearchCodeSummary(unittest.TestCase):
-    def test_search_code_in_content(self) -> None:
-        result = _mcp_search_code_summary({'results': ['a', 'b']}, 'search_code result')
+class TestMcpSearchSummary(unittest.TestCase):
+    def test_grep_in_content(self) -> None:
+        result = _mcp_search_summary({'results': ['a', 'b']}, 'grep result')
         self.assertIsNotNone(result)
         self.assertIn('2', result)  # type: ignore[arg-type]
 
-    def test_tool_name_is_search_code(self) -> None:
-        result = _mcp_search_code_summary(
-            {'tool_name': 'search_code', 'total_count': 7}, ''
+    def test_tool_name_is_glob(self) -> None:
+        result = _mcp_search_summary(
+            {'tool_name': 'glob', 'total_count': 7}, ''
         )
         self.assertIsNotNone(result)
         self.assertIn('7', result)  # type: ignore[arg-type]
 
     def test_no_match(self) -> None:
-        result = _mcp_search_code_summary({}, 'some other content')
+        result = _mcp_search_summary({}, 'some other content')
         self.assertIsNone(result)
 
 

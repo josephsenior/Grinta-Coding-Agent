@@ -137,7 +137,7 @@ I shipped over 40 built-in native Python tools. I had 10 different variants just
 
 It was a design mistake.
 
-If you give an LLM a toolbox with 40 highly specific, overlapping items, you do not make it smarter. You induce decision paralysis. The model ends up wasting precious reasoning cycles constantly debating whether to use `read_file`, `explore_code`, or `search_code`. Worse, when tools overlap, the model will often pick the slightly wrong one and hallucinate the parameters to force it to fit.
+If you give an LLM a toolbox with 40 highly specific, overlapping items, you do not make it smarter. You induce decision paralysis. The model ends up wasting precious reasoning cycles constantly debating whether to use `read_file`, `explore_code`, or `grep`. Worse, when tools overlap, the model will often pick the slightly wrong one and hallucinate the parameters to force it to fit.
 
 There is also a brutal economic reality: tool schemas cost tokens. Injecting 40 complex JSON schemas into the system prompt consumes thousands of tokens of overhead on every single turn. That is pure context pollution. It crowds out the actual conversational history and workspace context.
 
@@ -248,7 +248,7 @@ The result is a prompt builder that takes a context dictionary and returns a str
 
 The system prompt is composed from five static Markdown partials:
 
-1. **`routing`** — Tool routing strategy. This tells the model when to prefer `search_code` over `bash grep`, when to reach for the LSP query tool for precise symbol references, and when to batch commands instead of running them one at a time. It encodes the lessons I learned from watching early agents make terrible tool choices.
+1. **`routing`** — Tool routing strategy. This tells the model when to prefer `grep` / `glob` over `bash grep`, when to reach for the LSP query tool for precise symbol references, and when to batch commands instead of running them one at a time. It encodes the lessons I learned from watching early agents make terrible tool choices.
 
 2. **`autonomy`** — The runtime operating mode. Grinta supports three levels: `full` (execute all steps without asking), `balanced` (ask for risky actions), and `conservative` (confirm everything). The confirmation gate enforces those differences at runtime while the prompt keeps a single mode-agnostic autonomy block.
 
@@ -448,7 +448,7 @@ A detail that reveals a lot about how the system thinks at runtime is the tool a
 This is not a static list. It is a layered assembly:
 
 1. **Core tools** always present: `bash`, `think`, `finish`, the task tracker, the memory tools.
-2. **Edit and search tools**: `read`, `find_symbols`, `replace_string`, `edit_symbols`, `multiedit`, `search_code`, code structure exploration.
+2. **Edit and search tools**: `read`, `find_symbols`, `replace_string`, `edit_symbols`, `multiedit`, `grep`, `glob`, code structure exploration.
 3. **Terminal and special tools**: the terminal manager, checkpoint/rollback, delegation.
 4. **Optional feature tools**: LSP query (if the language server is available), signal progress (for external integrations), the blackboard (for state sharing).
 5. **Meta-cognition tools**: a communication tool for expressing uncertainty or asking the user for clarification. This is crucial because the model should always have a way to say "I am not sure" without being forced to guess.

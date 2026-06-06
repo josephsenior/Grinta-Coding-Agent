@@ -43,18 +43,18 @@ _SIMPLE_VERB_MAP = {
     'find_symbols': 'Found',
     'agent_think': 'Thinking',
     'think': 'Thinking',
-    'finish': 'Finished',
     'summarize_context': 'Compressed',
     'memory_manager': 'Managed',
     'task_tracker': 'Tracked',
-    'search_code': 'Searched',
+    'grep': 'Searched',
+    'glob': 'Listed',
     'lsp': 'Analyzed',
     'analyze_project_structure': 'Explored',
     'read_symbol': 'Read',
     'browser': 'Browser',
     'delegate_task': 'Delegated',
     'shared_task_board': 'Checked',
-    'communicate_with_user': 'Messaged',
+    'ask_user': 'Asked',
     'call_mcp_tool': 'Invoked',
     'checkpoint': 'Saved',
 }
@@ -85,10 +85,21 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
 # ---------------------------------------------------------------------------
 
 
-def _stats_search_code(args: dict[str, Any]) -> str | None:
+def _stats_search(args: dict[str, Any]) -> str | None:
     root = args.get('path') or args.get('root') or args.get('directory')
     if isinstance(root, str) and root.strip():
         return f'scope: {root}'
+    return None
+
+
+def _stats_grep(args: dict[str, Any]) -> str | None:
+    root = args.get('path') or args.get('root') or args.get('directory')
+    if isinstance(root, str) and root.strip():
+        return f'scope: {root}'
+    return None
+
+
+def _stats_glob(_args: dict[str, Any]) -> str | None:
     return None
 
 
@@ -140,7 +151,8 @@ def _stats_read_symbol(args: dict[str, Any]) -> str | None:
 
 
 _STATS_HANDLERS: dict[str, Callable[[dict[str, Any]], str | None]] = {
-    'search_code': _stats_search_code,
+    'grep': _stats_grep,
+    'glob': _stats_glob,
     'analyze_project_structure': _stats_analyze_project,
     'read_symbol': _stats_read_symbol,
     'task_tracker': _stats_task_tracker,

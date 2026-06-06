@@ -7,10 +7,10 @@ from unittest import TestCase
 from backend.inference import tool_names
 
 EXPECTED_EXPORTS = [
+    'CREATE_TASK_TRACKER_TOOL_NAME',
     'CREATE_TOOL_NAME',
     'EDIT_SYMBOLS_TOOL_NAME',
     'FIND_SYMBOLS_TOOL_NAME',
-    'FINISH_TOOL_NAME',
     'MULTIEDIT_TOOL_NAME',
     'READ_TOOL_NAME',
     'REPLACE_STRING_TOOL_NAME',
@@ -22,10 +22,9 @@ EXPECTED_EXPORTS = [
 class TestToolNames(TestCase):
     """Test tool_names module constants."""
 
-    def test_finish_tool_name_exported(self):
-        """Test that FINISH_TOOL_NAME is exported."""
-        self.assertTrue(hasattr(tool_names, 'FINISH_TOOL_NAME'))
-        self.assertIsInstance(tool_names.FINISH_TOOL_NAME, str)
+    def test_finish_tool_name_not_exported(self):
+        """The deleted finish tool must not remain in public tool constants."""
+        self.assertFalse(hasattr(tool_names, 'FINISH_TOOL_NAME'))
 
     def test_task_tracker_tool_name_exported(self):
         """Test that TASK_TRACKER_TOOL_NAME is exported."""
@@ -35,12 +34,6 @@ class TestToolNames(TestCase):
     def test_all_exports_in_all_list(self):
         """Test that __all__ contains all expected exports."""
         self.assertEqual(set(tool_names.__all__), set(EXPECTED_EXPORTS))
-
-    def test_finish_tool_name_value(self):
-        """Test FINISH_TOOL_NAME has expected value from constants."""
-        from backend.core.constants import FINISH_TOOL_NAME
-
-        self.assertEqual(tool_names.FINISH_TOOL_NAME, FINISH_TOOL_NAME)
 
     def test_task_tracker_tool_name_value(self):
         """Test TASK_TRACKER_TOOL_NAME has expected value from constants."""
@@ -54,7 +47,6 @@ class TestToolNames(TestCase):
             CREATE_TOOL_NAME,
             EDIT_SYMBOLS_TOOL_NAME,
             FIND_SYMBOLS_TOOL_NAME,
-            FINISH_TOOL_NAME,
             MULTIEDIT_TOOL_NAME,
             READ_TOOL_NAME,
             REPLACE_STRING_TOOL_NAME,
@@ -65,7 +57,6 @@ class TestToolNames(TestCase):
         self.assertIsNotNone(CREATE_TOOL_NAME)
         self.assertIsNotNone(EDIT_SYMBOLS_TOOL_NAME)
         self.assertIsNotNone(FIND_SYMBOLS_TOOL_NAME)
-        self.assertIsNotNone(FINISH_TOOL_NAME)
         self.assertIsNotNone(MULTIEDIT_TOOL_NAME)
         self.assertIsNotNone(READ_TOOL_NAME)
         self.assertIsNotNone(REPLACE_STRING_TOOL_NAME)

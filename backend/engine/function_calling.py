@@ -5,7 +5,7 @@ This is similar to the functionality of `OrchestratorResponseParser`.
 Split into sibling modules to keep this file under the 40 KB cap:
   - backend.engine.tools._file_ops       (read helpers + symbol search)
   - backend.engine.tools._file_edits     (file edit handlers)
-  - backend.engine.tools._tool_handlers  (browser/finish/memory/search/etc.)
+  - backend.engine.tools._tool_handlers  (ask_user/memory/search/etc.)
 Pure code motion: no logic changes. The flat re-export shim at the bottom
 preserves back-compat with callers using ``from backend.engine.function_calling
 import ...``.
@@ -41,7 +41,6 @@ from backend.engine.tools import (
     create_create_tool,
     create_edit_symbols_tool,
     create_find_symbols_tool,
-    create_finish_tool,
     create_multiedit_tool,
     create_read_tool,
     create_replace_string_tool,
@@ -58,12 +57,12 @@ from backend.engine.tools.delegate_task import DELEGATE_TASK_TOOL_NAME
 from backend.engine.tools.execute_mcp_tool import EXECUTE_MCP_TOOL_TOOL_NAME
 from backend.engine.tools.lsp_query import CODE_INTELLIGENCE_TOOL_NAME
 from backend.engine.tools.memory_manager import MEMORY_MANAGER_TOOL_NAME
-from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
+from backend.engine.tools.meta_cognition import ASK_USER_TOOL_NAME
 from backend.engine.tools.note import build_note_action, build_recall_action
-from backend.engine.tools.search_code import SEARCH_CODE_TOOL_NAME
+from backend.engine.tools.grep import GREP_TOOL_NAME
+from backend.engine.tools.glob import GLOB_TOOL_NAME
 from backend.engine.tools.terminal_manager import TERMINAL_MANAGER_TOOL_NAME
 from backend.inference.tool_names import (
-    CREATE_TASK_TRACKER_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
 )
@@ -104,9 +103,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             str, create_cmd_run_tool().get('function', {}).get('name', '')
         ): _handle_cmd_run_tool,
         cast(
-            str, create_finish_tool().get('function', {}).get('name', '')
-        ): _handle_finish_tool,
-        cast(
             str, create_read_tool().get('function', {}).get('name', '')
         ): _handle_read_tool,
         cast(
@@ -127,14 +123,14 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         cast(
             str, create_summarize_context_tool().get('function', {}).get('name', '')
         ): _handle_summarize_context_tool,
-        CREATE_TASK_TRACKER_TOOL_NAME: _handle_create_task_tracker_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
         MEMORY_MANAGER_TOOL_NAME: _handle_memory_manager_tool,
         NOTE_TOOL_NAME: lambda args: build_note_action(
             cast(str, args['key']), cast(str, args['value'])
         ),
         RECALL_TOOL_NAME: lambda args: build_recall_action(cast(str, args['key'])),
-        SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
+        GREP_TOOL_NAME: _handle_grep_tool,
+        GLOB_TOOL_NAME: _handle_glob_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
         DELEGATE_TASK_TOOL_NAME: lambda args: build_delegate_task_action(dict(args)),
         CODE_INTELLIGENCE_TOOL_NAME: lambda args: build_lsp_query_action(dict(args)),
@@ -143,7 +139,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         TERMINAL_MANAGER_TOOL_NAME: lambda args: handle_terminal_manager_tool(
             dict(args)
         ),
-        COMMUNICATE_TOOL_NAME: _handle_communicate_tool,
+        ASK_USER_TOOL_NAME: _handle_ask_user_tool,
         EXECUTE_MCP_TOOL_TOOL_NAME: _handle_execute_mcp_tool_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
         UNDO_LAST_EDIT_TOOL_NAME: _handle_undo_last_edit_tool,
@@ -206,13 +202,12 @@ def _process_single_tool_call(
         ):
             raise FunctionCallValidationError(
                 f'Tool `{tool_name}` is not available in Chat Mode. '
-                'Chat Mode is read-only; use plain text or inspection tools only.'
+                'Chat Mode is pure conversation; use plain text only.'
             )
     if normalized_mode == PLAN_MODE and tool_name not in PLAN_MODE_ALLOWED_TOOLS:
         raise FunctionCallValidationError(
             f'Tool `{tool_name}` is not available in Plan Mode. '
-            'Plan Mode is read-only; use inspection tools, task tracking, '
-            'communicate_with_user, or finish.'
+            'Use file, shell, search, task tracking, or ask_user tools.'
         )
     if tool_name == 'file_editor':
         raise FunctionCallValidationError(
@@ -241,8 +236,6 @@ def _process_single_tool_call(
             f'Malformed XML tool call for {tool_name}: '
             f'{arguments["__xml_syntax_error__"]}'
         )
-    if tool_name == _finish_tool_name(normalized_mode):
-        return _handle_finish_tool(arguments, mode=normalized_mode)
     if tool_name in tool_dispatch:
         return tool_dispatch[tool_name](arguments)
     if mcp_tool_names and tool_name in mcp_tool_names:
@@ -259,7 +252,7 @@ def _process_single_tool_call(
 # Symbols previously defined in this module have been moved to:
 #   - backend.engine.tools._file_ops       (read helpers + symbol search)
 #   - backend.engine.tools._file_edits     (read/create/replace/edit_symbols/multiedit)
-#   - backend.engine.tools._tool_handlers  (browser/finish/memory/search/task-tracker/mcp/...)
+#   - backend.engine.tools._tool_handlers  (ask_user/memory/search/task-tracker/mcp/...)
 # Kept as flat re-exports for in-repo callers. Will be removed once
 # downstream callers migrate to the new paths.
 from backend.engine.function_calling_helpers import (  # noqa: E402, F401
@@ -321,22 +314,17 @@ from backend.engine.tools._file_ops import (  # noqa: E402, F401
     _workspace_root,
 )
 from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E402, F401
-    _FINISH_STATUSES,
     _apply_context7_resolve_library_defaults,
-    _finish_tool_name,
-    _handle_agent_finish_tool,
     _handle_analyze_project_structure_tool,
     _handle_browser_tool,
     _handle_checkpoint_tool,
     _handle_cmd_run_tool,
-    _handle_communicate_tool,
-    _handle_create_task_tracker_tool,
+    _handle_ask_user_tool,
     _handle_execute_mcp_tool_tool,
-    _handle_finish_tool,
     _handle_mcp_tool,
     _handle_memory_manager_tool,
-    _handle_plan_finish_tool,
-    _handle_search_code_tool,
+    _handle_grep_tool,
+    _handle_glob_tool,
     _handle_summarize_context_tool,
     _handle_task_tracker_tool,
     _handle_undo_last_edit_tool,
@@ -344,10 +332,6 @@ from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E
     _merge_mcp_gateway_inner_arguments,
     _normalize_task_tracker_list,
     _normalize_task_tracker_step,
-    _require_finish_dict,
-    _require_finish_list,
-    _require_finish_status,
-    _require_finish_string,
     _semantic_recall_registry,
     _task_tracker_existing_normalized,
     get_semantic_recall_fn,

@@ -10,7 +10,7 @@ from backend.core.errors import AgentLimitExceededError
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
-from backend.ledger.action import MessageAction, PlaybookFinishAction
+from backend.ledger.action import MessageAction
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
@@ -98,7 +98,7 @@ class IterationGuardService:
                 '1. Save all important work and progress\n'
                 '2. Create a summary of what you accomplished\n'
                 '3. List any remaining work or next steps\n'
-                '4. Use the finish tool with your final summary\n\n'
+                '4. Write your final summary in plain text\n\n'
                 'Please be concise and focus on preserving critical information.'
             ),
         )
@@ -128,20 +128,12 @@ class IterationGuardService:
         controller = self._context.get_controller()
 
         logger.info('Forcing partial completion: %s', reason)
-        finish_action = PlaybookFinishAction(
-            outputs={
-                'status': 'partial',
-                'reason': reason,
-                'message': (
-                    'Task partially completed. Stopped due to: '
-                    f'{reason}\n\nProgress: '
-                    f'{controller.state.iteration_flag.current_value} iterations '
-                    'completed.\nPlease review the conversation history for '
-                    'completed work.'
-                ),
-            },
-            final_thought=f'Task stopped: {reason}',
-            force_finish=True,
+        content = (
+            'Task partially completed. Stopped due to: '
+            f'{reason}\n\nProgress: '
+            f'{controller.state.iteration_flag.current_value} iterations '
+            'completed.\nPlease review the conversation history for completed work.'
         )
-        finish_action.force_finish = True
-        await controller.event_router._handle_finish_action(finish_action)
+        final_message = MessageAction(content=content, final_response=True)
+        final_message.source = EventSource.AGENT
+        await controller.event_router._handle_message_action(final_message)

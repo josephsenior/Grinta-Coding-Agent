@@ -16,7 +16,7 @@ The first piece is a section in the system prompt called *“System Capabilities
 
 The block currently teaches the model these facts:
 
-1. Whether parallel tool scheduling is enabled in this run, and which read-only tools participate. The parallel-safe set is intentionally narrow: `read`, `find_symbols`, `search_code`, and `lsp` — read-only tools whose observation order does not matter.
+1. Whether parallel tool scheduling is enabled in this run, and which read-only tools participate. The parallel-safe set is intentionally narrow: `read`, `find_symbols`, `grep`, `glob`, and `lsp` — read-only tools whose observation order does not matter.
 2. Whether the provider supports emitting multiple `tool_calls` in a single assistant message (i.e. native parallel function calling at the API level).
 3. Whether atomic multi-file edits via `multiedit` are exposed in this build. `multiedit` accepts `edit_symbols` and `replace_string` operations across files; it does not include `create`, which has separate atomicity requirements.
 4. That conversation condensation is automatic, middleware-driven, costs zero turns, and uses a three-tier (working / episodic / semantic) memory model — *not* something the agent has to invoke or apologize for.
@@ -37,7 +37,7 @@ There is a small principle hiding here that I keep coming back to: **the prompt 
 
 Once the capability block was honest, the next problem was that one of the things it would honestly say was *“parallel scheduling is OFF in this run.”* Which the model would then dutifully obey — issuing reads sequentially even when the task obviously wanted them parallel.
 
-So the default flipped. `enable_parallel_tool_scheduling` is on by default, and the parallel set is intentionally narrow: `read`, `find_symbols`, `search_code`, and `lsp`. Every one of these is read-only. None of them touches disk in a way that another concurrent call could race against.
+So the default flipped. `enable_parallel_tool_scheduling` is on by default, and the parallel set is intentionally narrow: `read`, `find_symbols`, `grep`, `glob`, and `lsp`. Every one of these is read-only. None of them touches disk in a way that another concurrent call could race against.
 
 What is *not* in the parallel set is just as deliberate: shell commands, file edits, file writes, `create`, `edit_symbols`, `replace_string`, `multiedit`, terminal_manager I/O. Anything that mutates state runs sequentially, full stop. The chapter on parallelization went through *why* (chapter 25 — “The Parallelization Trap”). This chapter is about how the boundary survived being crossed under pressure, because the moment you turn parallel reads on by default, every PR that adds a new read-style tool comes with a thirty-second internal argument about whether to add it to the parallel allowlist. The answer has to be a structured one: only if the tool is genuinely read-only, only if its observation order does not matter, only if it cannot fail in a way that contaminates the others. That gate is small but real.
 

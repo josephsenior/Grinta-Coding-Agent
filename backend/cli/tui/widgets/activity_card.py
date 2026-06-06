@@ -765,16 +765,10 @@ class PlanMessage(Static):
 
 
 class ThinkingIndicator(Container):
-    """Live thinking/reasoning indicator.
+    """Thinking/reasoning indicator with inline prefix.
 
-    Collapses into a borderless, expandable ``Thought for Ns`` card once the
-    agent finishes its turn.
-
-    States:
-    - **streaming**: header shows ``Thinking: (Xs)...`` with body visible
-    - **collapsed** (after ``finalize()``): header shows ``Thought for Xs ▸``,
-      body hidden, click to expand
-    - **expanded**: header shows ``Thought for Xs ▾``, body visible
+    Shows the thinking content directly with a "Thinking:" prefix
+    inline on the first line. No collapse/expand, no duration display.
     """
 
     DEFAULT_CSS = """
@@ -783,163 +777,76 @@ class ThinkingIndicator(Container):
         height: auto;
         margin: 0 0 1 0;
         border: transparent;
-        background: transparent;
+        background: #090d18;
+        padding: 0 1;
     }
     ThinkingIndicator.-hidden {
         display: none;
     }
-    ThinkingIndicator > #thinking-header {
-        width: 100%;
-        height: 1;
-    }
-    ThinkingIndicator > #thinking-body {
+    ThinkingIndicator > #thinking-content {
         width: 100%;
         height: auto;
-        margin-left: 2;
-    }
-    ThinkingIndicator > #thinking-body.-hidden {
-        display: none;
-    }
-    ThinkingIndicator:hover > #thinking-header {
-        background: #0d162a;
     }
     """
-
-    BINDINGS = [
-        ('enter', 'toggle', 'Toggle Expansion'),
-        ('space', 'toggle', 'Toggle Expansion'),
-    ]
 
     def __init__(self, *, id: str | None = None) -> None:
         super().__init__(id=id)
         self._thoughts: list[str] = []
-        self._current_action: str = ''
-        self._step_count: int = 0
-        self._start_time: float = 0
-        self._elapsed_seconds: int = 0
-        self._collapsed: bool = False
-        self._finalized: bool = False
+        self._current_action: str = 'Thinking'
         self.add_class('-hidden')
 
     def compose(self) -> ComposeResult:
-        yield Static('', id='thinking-header')
-        yield Static('', id='thinking-body', classes='-hidden')
+        yield Static('', id='thinking-content')
 
     def start(self, action: str = 'Thinking') -> None:
         """Start the thinking indicator."""
-        import time
-
-        self._start_time = time.monotonic()
-        self._elapsed_seconds = 0
         self._current_action = action
         self._thoughts = []
-        self._step_count = 0
-        self._collapsed = False
-        self._finalized = False
         self.remove_class('-hidden')
-        try:
-            body = self.query_one('#thinking-body', Static)
-            body.remove_class('-hidden')
-        except Exception:
-            pass
         self._update_display()
 
     def add_thought(self, thought: str) -> None:
         """Add a reasoning step."""
         self._thoughts.append(thought)
-        self._step_count += 1
         self._update_display()
 
     def set_thoughts(self, text: str) -> None:
         self._thoughts = text.split('\n')
-        self._step_count = len(self._thoughts)
-        self._update_display()
-
-    def finalize(self) -> None:
-        """Freeze the current streamed thinking.
-
-        Collapse into a single line ``Thought for Ns`` card. The user can click
-        to expand it again.
-        """
-        import time
-
-        if self._start_time:
-            self._elapsed_seconds = int(time.monotonic() - self._start_time)
-        self._finalized = True
-        self._collapsed = True
         self._update_display()
 
     def stop(self) -> None:
         """Stop the thinking indicator."""
         self.add_class('-hidden')
 
-    def toggle(self) -> None:
-        """Toggle between collapsed and expanded states.
-
-        Only meaningful after ``finalize()``; while streaming the body is
-        always shown.
-        """
-        if not self._finalized:
-            return
-        self._collapsed = not self._collapsed
-        self._update_display()
-
-    def action_toggle(self) -> None:
-        self.toggle()
-
-    def on_click(self, event: events.Click) -> None:
-        """Click anywhere on the widget to toggle expansion."""
-        if not self._finalized:
-            return
-        self.toggle()
-        event.prevent_default()
-        event.stop()
+    def finalize(self) -> None:
+        """No-op for API compatibility."""
 
     def _update_display(self) -> None:
-        import time
-
-        if not self._finalized and self._start_time:
-            self._elapsed_seconds = int(time.monotonic() - self._start_time)
-
         try:
-            header = self.query_one('#thinking-header', Static)
-            body = self.query_one('#thinking-body', Static)
+            content = self.query_one('#thinking-content', Static)
         except Exception:
-            # Children not mounted yet; on_mount will call _update_display.
             return
 
-        thoughts_text = Text('\n  '.join(self._thoughts), style='rgb(150,154,189)')
+        if not self._thoughts:
+            return
 
-        if self._finalized:
-            # Collapsed / expanded post-think state
-            caret = '▸' if self._collapsed else '▾'
-            header_text = Text.assemble(
-                (f'{caret} ', '#54597b'),
-                ('Thought for ', '#5eead4'),
-                (f'{self._elapsed_seconds}s', 'dim'),
-            )
-            if self._collapsed:
-                body.add_class('-hidden')
-            else:
-                body.remove_class('-hidden')
+        prefix = f'{self._current_action}: '
+        prefix_color = '#5eead4'
+        text_color = '#c8c8d4'
+
+        lines = self._thoughts
+        parts: list[tuple[str, str]] = []
+
+        if len(lines) == 1:
+            parts = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
         else:
-            # Streaming state
-            elapsed = self._elapsed_seconds
-            dots = '.' * (elapsed % 4)
-            header_text = Text.assemble(
-                (f'{self._current_action or "Thinking"}:', 'bold #5eead4'),
-                ' ',
-                (f'({elapsed}s){dots}', 'dim'),
-            )
-            body.remove_class('-hidden')
+            parts = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
+            for line in lines[1:]:
+                parts.append(('\n  ', text_color))
+                parts.append((line, text_color))
 
-        header.update(header_text)
-        body.update(thoughts_text)
+        thoughts_text = Text.assemble(*parts)
+        content.update(thoughts_text)
 
     def on_mount(self) -> None:
-        """Re-render once children are available."""
-        self._update_display()
-
-    def on_compose(self) -> None:
-        """Re-render once children are available."""
         self._update_display()

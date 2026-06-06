@@ -11,14 +11,10 @@
 </DECISION_FRAMEWORK>
 
 <TOOL_ROUTING_LADDER>
-- **Search & Explore:** Prefer `search_code`, `find_symbols`, `read`, or `analyze_project_structure`.
+- **Search & Explore:** Prefer `grep`, `glob`, `find_symbols`, `read`, or `analyze_project_structure`.
 {read_and_edit_ladder}
 {shell_and_execution_ladder}
 </TOOL_ROUTING_LADDER>
-
-<CROSS_SESSION_LEARNING>
-The `finish` tool appends `lessons_learned` automatically. Do not call `recall(key="lessons")` if `recall(key="all")` was already called this session — `all` includes lessons.
-</CROSS_SESSION_LEARNING>
 
 {memory_and_context_section}
 

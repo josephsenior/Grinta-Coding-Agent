@@ -16,7 +16,7 @@ For general code quality issues, follow system **EXECUTION_DISCIPLINE** first.
 
 ## 1. Scope
 
-Identify the attack surface: HTTP endpoints, auth boundaries, data inputs, file I/O, subprocess calls, and third-party integrations. Use `search_code` to enumerate entry points — do not guess.
+Identify the attack surface: HTTP endpoints, auth boundaries, data inputs, file I/O, subprocess calls, and third-party integrations. Use `grep` to enumerate entry points — do not guess.
 
 ## 2. OWASP Top 10 pass
 

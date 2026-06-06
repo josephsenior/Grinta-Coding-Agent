@@ -380,7 +380,7 @@ class TestAnthropicClientHelpers:
         tools = [
             {
                 'type': 'function',
-                'function': {'name': 'finish', 'description': 'Finish'},
+                'function': {'name': 'noop_tool', 'description': 'No-op tool'},
             }
         ]
 
@@ -390,7 +390,7 @@ class TestAnthropicClientHelpers:
             default_model='minimax-m2.7',
         )
 
-        assert kwargs['tools'][0]['name'] == 'finish'
+        assert kwargs['tools'][0]['name'] == 'noop_tool'
         assert kwargs['tools'][0]['input_schema'] == {
             'type': 'object',
             'properties': {},

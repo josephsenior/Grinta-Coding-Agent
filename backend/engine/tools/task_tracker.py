@@ -17,15 +17,7 @@ from backend.engine.tools.common import (
     get_command_param,
 )
 from backend.inference.tool_names import (
-    CREATE_TASK_TRACKER_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
-)
-
-_CREATE_TASK_TRACKER_DESCRIPTION = (
-    'Create the structured task tracker and begin an Agent/Plan task run. '
-    'Use this as the first action when you decide the request requires structured work. '
-    'After creation, use `task_tracker` to view the plan or update statuses. '
-    'Statuses must be exactly one of: `todo`, `in_progress`, `done`, `skipped`, `blocked`.'
 )
 
 _TASK_TRACKER_DESCRIPTION = (
@@ -34,7 +26,7 @@ _TASK_TRACKER_DESCRIPTION = (
     'Use `view` (without a task_list) to read the current plan. '
     'Use `update_status` to change a single task status by ID (no need to re-emit full list). '
     'Statuses must be exactly one of: `todo`, `in_progress`, `done`, `skipped`, `blocked`. '
-    'Terminal states for finish are `done`, `skipped`, `blocked`.'
+    'Terminal states before completion are `done`, `skipped`, `blocked`.'
 )
 
 _TASK_STATUS_DESCRIPTION = (
@@ -233,27 +225,4 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
             },
         },
         required=['command'],
-    )
-
-
-def create_create_task_tracker_tool() -> ChatCompletionToolParam:
-    """Create the explicit task-run commitment tool."""
-    return create_tool_definition(
-        name=CREATE_TASK_TRACKER_TOOL_NAME,
-        description=_CREATE_TASK_TRACKER_DESCRIPTION,
-        properties={
-            'task_list': {
-                'type': 'array',
-                'description': (
-                    'The complete ordered list of plan steps for this task run. '
-                    'Must contain at least one step.'
-                ),
-                'items': _task_step_schema(),
-            },
-            'title': {
-                'type': 'string',
-                'description': 'Optional title for the current plan.',
-            },
-        },
-        required=['task_list'],
     )

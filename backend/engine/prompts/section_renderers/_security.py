@@ -16,7 +16,6 @@ def _render_security(cli_mode: bool = True) -> str:
     return (
         '# 🔐 Security Risk Policy\n'
         '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
-        '`browser`, `terminal_manager` (when `action=open`), '
         'and the file write tools `create`, `replace_string`, `edit_symbols`, and `multiedit`. '
         'Read-only tools (`read`, `find_symbols`) do **not** require it. '
         'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
@@ -27,6 +26,5 @@ def _render_security(cli_mode: bool = True) -> str:
         '- Always escalate to **HIGH** if sensitive data leaves the environment.\n'
         '- Long-running shell commands: pass an explicit `timeout` (seconds) instead of '
         'guessing.\n'
-        '- For servers and log tails, use `is_background=true` on shell executors.\n'
-        '- Interactive terminals (`terminal_manager`): wait for response before sending identical inputs.'
+        '- For servers and log tails, use `is_background=true` on shell executors.'
     )

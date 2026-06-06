@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.core.schemas import AgentState
 from backend.engine.tools.task_tracker import TaskTracker
+from backend.ledger.action import MessageAction
 from backend.ledger.action.agent import PlaybookFinishAction
 from backend.orchestration.services.task_validation_service import TaskValidationService
 
@@ -40,6 +41,31 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
 
         # Should return True to proceed with finish
         self.assertTrue(result)
+
+    async def test_handle_final_response_blocks_active_plan(self):
+        """Plain-text final responses still use completion validation."""
+        action = MessageAction(
+            content='Summary before the plan is done.',
+            final_response=True,
+        )
+        self.mock_controller.task_validator = None
+        self.mock_controller.state.plan = SimpleNamespace(
+            steps=[
+                SimpleNamespace(
+                    id='1',
+                    description='Implement CLI interface',
+                    status='in_progress',
+                    subtasks=[],
+                )
+            ]
+        )
+
+        result = await self.service.handle_final_response(action)
+
+        self.assertFalse(result)
+        self.mock_controller.event_stream.add_event.assert_called_once()
+        observation = self.mock_controller.event_stream.add_event.call_args[0][0]
+        self.assertEqual(observation.error_id, 'TASK_TRACKER_INCOMPLETE')
 
     async def test_handle_finish_force_finish(self):
         """Test handle_finish skips validation when force_finish is True."""
@@ -242,7 +268,7 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         observation = self.mock_controller.event_stream.add_event.call_args[0][0]
         self.assertEqual(observation.error_id, 'TASK_TRACKER_INCOMPLETE')
         self.assertIn(
-            'Finish rejected: task tracker contains unfinished tasks.',
+            'Completion rejected: task tracker contains unfinished tasks.',
             observation.content,
         )
         self.assertIn('Unfinished tasks:', observation.content)

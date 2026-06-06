@@ -12,7 +12,7 @@ Be thorough and direct; prefer completeness and verification details over brevit
 {response_style_body}
 
 - Show code or diffs only when you changed or proposed code.
-- Provide one concise final outcome summary; do not add a second post-`finish` recap unless requested.
+- Provide one concise final outcome summary; plain text commits it as the final response.
 - Backtick file paths, symbol names, and commands.
 </RESPONSE_STYLE>
 

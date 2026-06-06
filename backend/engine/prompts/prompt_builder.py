@@ -314,19 +314,8 @@ def _mcp_or_permissions_sections_for_collect(
     mcp_tool_descriptions: dict[str, str] | None,
     mcp_server_hints: list[dict[str, str]] | None,
 ) -> list[tuple[str, str]]:
-    """MCP catalogue inline, or permissions-only when MCP is delivered as user addendum."""
-    if render_mcp_inline:
-        return [
-            (
-                'mcp_permissions_partial_03_tail',
-                _render_mcp_and_permissions(
-                    mcp_tool_names or [],
-                    mcp_tool_descriptions or {},
-                    mcp_server_hints or [],
-                    config,
-                ),
-            ),
-        ]
+    """Return permissions guidance only; MCP is not model-facing."""
+    _ = (render_mcp_inline, mcp_tool_names, mcp_tool_descriptions, mcp_server_hints)
     if getattr(config, 'enable_permissions', False):
         perm = getattr(config, 'permissions', None)
         if perm is not None:
@@ -388,6 +377,23 @@ def _collect_system_prompt_sections(
             f'Configured model id: `{model_id}`',
         ),
     ]
+    from backend.core.interaction_modes import is_chat_mode, normalize_interaction_mode
+
+    mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+    if not is_chat_mode(mode):
+        sections.append(
+            (
+                'simplified_agent_protocol',
+                'You are an autonomous coding agent. Work through tasks using your tools.\n\n'
+                'When you need input from the user to continue, call ask_user with your questions as a list.\n\n'
+                'When your work is complete, write a comprehensive final summary covering:\n'
+                '- What you did\n'
+                '- What changed\n'
+                '- Any important notes or caveats for the user\n'
+                '- Any follow-up recommendations if relevant\n\n'
+                'Writing that summary ends the run. You do not need to call any special tool to signal completion. Your final response IS the completion.',
+            )
+        )
     sections.extend(
         _shell_identity_sections(
             is_windows=is_windows,
@@ -489,20 +495,9 @@ def build_mcp_user_addendum(
     mcp_server_hints: list[dict[str, str]] | None = None,
     config: Any = None,
 ) -> str:
-    """Render the MCP catalogue as a *per-turn* addendum.
-
-    Render the MCP catalogue as a per-turn addendum so the static system prompt remains cache-stable.
-
-    Returns an empty string when no MCP tools are connected.
-    """
-    if not mcp_tool_names:
-        return ''
-    return _render_mcp_and_permissions(
-        mcp_tool_names,
-        mcp_tool_descriptions or {},
-        mcp_server_hints or [],
-        config,
-    )
+    """MCP tools are not part of the simplified model-facing toolset."""
+    _ = (mcp_tool_names, mcp_tool_descriptions, mcp_server_hints, config)
+    return ''
 
 
 def measure_system_prompt_sections(
@@ -670,7 +665,7 @@ def _build_runtime_information_block(runtime_info: RuntimeInfo | None) -> str | 
         )
         ri_lines.append(
             'This message does not list project files—do not assume paths like '
-            '`tailwind.config.*` exist. Use `search_code` to discover layout, '
+            '`tailwind.config.*` exist. Use `glob` to discover layout, '
             'then read with editor/view tools.'
         )
 

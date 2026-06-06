@@ -1,11 +1,11 @@
 """Render cards and dump rendered text."""
 import asyncio
 import sys
-from textual.app import App
-from textual.containers import Container
 
-from backend.cli.tui.widgets.activity_card import ActivityCard
+from textual.app import App
+
 from backend.cli._event_renderer.unified_renderer import ActivityRenderer
+from backend.cli.tui.widgets.activity_card import ActivityCard
 
 # Force UTF-8 stdout
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')

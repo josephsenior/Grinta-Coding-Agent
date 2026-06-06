@@ -12,12 +12,12 @@ from backend.ledger.action import (
     AgentThinkAction,
     ChangeAgentStateAction,
     CmdRunAction,
+    FileEditAction,
     FileReadAction,
     MessageAction,
     PlaybookFinishAction,
     TaskTrackingAction,
 )
-from backend.ledger.action.agent import ClarificationRequestAction
 from backend.ledger.observation import Observation
 from backend.orchestration.services.event_router_service import (
     EventRouterService,
@@ -38,6 +38,9 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.log_task_audit = AsyncMock()
         self.mock_controller.task_validation_service = MagicMock()
         self.mock_controller.task_validation_service.handle_finish = AsyncMock(
+            return_value=True
+        )
+        self.mock_controller.task_validation_service.handle_final_response = AsyncMock(
             return_value=True
         )
         self.mock_controller.observation_service = MagicMock()
@@ -192,7 +195,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         )
         self.mock_controller.state.set_planning_directive.assert_not_called()
 
-    async def test_handle_action_message_from_agent_active_plan_rejects_handoff(self):
+    async def test_handle_action_message_from_agent_active_plan_pauses(self):
         action = MessageAction(content='I am done.')
         action.source = EventSource.AGENT
         action.wait_for_response = True
@@ -209,12 +212,14 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
 
         await self.service._handle_action(action)
 
-        self.mock_controller.set_agent_state_to.assert_not_called()
-        self.mock_controller.state.set_planning_directive.assert_called_once()
-        self.assertTrue(action.suppress_cli)
-        self.assertFalse(action.wait_for_response)
+        self.mock_controller.set_agent_state_to.assert_called_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+        self.mock_controller.state.set_planning_directive.assert_not_called()
+        self.assertFalse(action.suppress_cli)
+        self.assertTrue(action.wait_for_response)
 
-    async def test_rejected_agent_message_does_not_resume_paused_turn(self):
+    async def test_pausing_agent_message_keeps_paused_turn_waiting(self):
         action = MessageAction(content='I am done.')
         action.source = EventSource.AGENT
         action.wait_for_response = True
@@ -234,10 +239,12 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
 
         await self.service._handle_action(action)
 
-        self.mock_controller.set_agent_state_to.assert_not_called()
-        self.mock_controller.state.set_planning_directive.assert_called_once()
-        self.assertTrue(action.suppress_cli)
-        self.assertFalse(action.wait_for_response)
+        self.mock_controller.set_agent_state_to.assert_called_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+        self.mock_controller.state.set_planning_directive.assert_not_called()
+        self.assertFalse(action.suppress_cli)
+        self.assertTrue(action.wait_for_response)
 
     async def test_handle_action_message_from_agent_terminal_plan_allows_handoff(
         self,
@@ -441,16 +448,17 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
 
         self.assertNotIn('active_run_mode', self.mock_controller.state.extra_data)
 
-    async def test_plan_communicate_pauses_even_with_full_autonomy(self):
+    async def test_plan_ask_user_pauses_even_with_full_autonomy(self):
         self.mock_controller.agent = SimpleNamespace(
             config=SimpleNamespace(mode='plan')
         )
         self.mock_controller.autonomy_controller = SimpleNamespace(
             autonomy_level='full'
         )
-        action = ClarificationRequestAction(question='Which module?')
+        action = MessageAction(content='1. Which module?', wait_for_response=True)
+        action.source = EventSource.AGENT
 
-        await self.service._handle_meta_cognition_action(action)
+        await self.service._handle_message_action(action)
 
         self.mock_controller.set_agent_state_to.assert_called_once_with(
             AgentState.AWAITING_USER_INPUT
@@ -480,9 +488,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_plan_mode_integration_smoke_read_clarify_resume_finish(self):
-        from backend.core.errors import FunctionCallValidationError
         from backend.engine.function_calling import (
-            _handle_finish_tool,
             _process_single_tool_call,
         )
         from backend.inference.tool_names import CREATE_TOOL_NAME, READ_TOOL_NAME
@@ -518,7 +524,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsInstance(read_action, FileReadAction)
 
-        search_call = SimpleNamespace(function=SimpleNamespace(name='search_code'))
+        search_call = SimpleNamespace(function=SimpleNamespace(name='grep'))
         search_action = _process_single_tool_call(
             search_call,
             {
@@ -531,17 +537,22 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(search_action, AgentThinkAction)
 
         create_call = SimpleNamespace(function=SimpleNamespace(name=CREATE_TOOL_NAME))
-        with self.assertRaises(FunctionCallValidationError):
-            _process_single_tool_call(
-                create_call,
-                {'type': 'file', 'path': 'demo.txt', 'content': 'x'},
-                mode='plan',
-            )
+        create_action = _process_single_tool_call(
+            create_call,
+            {
+                'type': 'file',
+                'path': 'demo.txt',
+                'content': 'x',
+                'security_risk': 'LOW',
+            },
+            mode='plan',
+        )
+        self.assertIsInstance(create_action, FileEditAction)
 
         self.mock_controller.set_agent_state_to.reset_mock()
-        await self.service._handle_meta_cognition_action(
-            ClarificationRequestAction(question='Which module?')
-        )
+        ask_action = MessageAction(content='1. Which module?', wait_for_response=True)
+        ask_action.source = EventSource.AGENT
+        await self.service._handle_message_action(ask_action)
         self.mock_controller.set_agent_state_to.assert_called_once_with(
             AgentState.AWAITING_USER_INPUT
         )
@@ -561,21 +572,10 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             AgentState.RUNNING
         )
 
-        finish_action = _handle_finish_tool(
-            {
-                'status': 'completed',
-                'summary': 'Plan produced.',
-                'plan': ['Inspect the engine.', 'Apply a focused change.'],
-                'files_or_areas': ['backend/engine'],
-                'risks': [],
-                'verification': ['Run focused engine tests.'],
-                'assumptions': [],
-                'next_step': 'Switch to Agent Mode to execute.',
-            },
-            mode='plan',
-        )
+        finish_action = MessageAction(content='Plan produced.', final_response=True)
+        finish_action.source = EventSource.AGENT
         self.mock_controller.set_agent_state_to.reset_mock()
-        await self.service._handle_finish_action(finish_action)
+        await self.service._handle_message_action(finish_action)
 
         self.mock_controller.set_agent_state_to.assert_called_once_with(
             AgentState.FINISHED

@@ -20,14 +20,8 @@ def _append_mcp_connected_catalog_sections(
     mcp_server_hints: list[dict[str, str]],
     mode: str,
 ) -> None:
-    from backend.core.interaction_modes import is_plan_mode
-
     total = len(mcp_tool_names)
-    mode_rule = (
-        'Mode rules override MCP capability suggestions.'
-        if not is_plan_mode(mode)
-        else 'Mode rules override MCP capability suggestions. Plan mode remains codebase read-only; task tracking is allowed.'
-    )
+    mode_rule = 'Mode rules override MCP capability suggestions.'
     parts.extend(
         (
             '<CURATED_MCP_CAPABILITIES>\n'
@@ -37,7 +31,7 @@ def _append_mcp_connected_catalog_sections(
             '- GitHub: inspect repositories, issues, PRs, commits, releases, and upstream context. Remote write actions require explicit user intent.\n'
             '- Docs / Context7: use for reliable library/framework documentation when the library is known.\n'
             '- UI / shadcn: use only for React/Tailwind/shadcn component work.\n'
-            '- Quality Gates: use for tests, lint, typecheck, formatting checks, and finish-readiness validation.\n\n'
+            '- Quality Gates: use for tests, lint, typecheck, formatting checks, and completion-readiness validation.\n\n'
             f'{mode_rule}\n'
             '</CURATED_MCP_CAPABILITIES>',
             f'🔌 **External MCP tools** ({total}): use **`call_mcp_tool(tool_name="...", arguments={{...}})`** '

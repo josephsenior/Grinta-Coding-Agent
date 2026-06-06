@@ -39,7 +39,7 @@ Modern models like Claude 3.5 Sonnet and Gemini Pro are spatial thinkers. When y
 
 ### The Removal of Tool Hint Maps and First-Turn Injection
 
-I used to maintain a massive dictionary of "Tool Hint Maps." If an error contained the word `KeyError`, the system would inject a rigid, human-written message: *"Hint: Use the `search_code` tool to find where this key is defined."* I also used "First-Turn Injection," forcing arbitrary instructions into the system prompt right as the session began.
+I used to maintain a massive dictionary of "Tool Hint Maps." If an error contained the word `KeyError`, the system would inject a rigid, human-written message: *"Hint: Use the `grep` tool to find where this key is defined."* I also used "First-Turn Injection," forcing arbitrary instructions into the system prompt right as the session began.
 
 I ripped all of it out. Heavy error hints and rigid maps treated the LLM like an unintelligent state machine. A modern LLM mapping a stack trace does not need a hardcoded string telling it to search the codebase; it already knows how to code. Those hints often misread nuanced context and derailed the model's organic reasoning. Now, errors are fed back cleanly. The exception *is* the hint.
 

@@ -8,7 +8,7 @@ I fell for this premise. And it broke everything.
 
 ## The Illusion of Throughput
 
-When I first considered parallelization for Grinta, I envisioned a massive throughput boost. The model could issue an array of parallel tool calls—`read`, `search_code`, `cmd_run`—and process them all simultaneously.
+When I first considered parallelization for Grinta, I envisioned a massive throughput boost. The model could issue an array of parallel tool calls—`read`, `grep`, `cmd_run`—and process them all simultaneously.
 
 But autonomous coding agents are not just glorified task runners. They are state machines that rely on an unbroken, deterministic chain of events.
 
@@ -43,7 +43,8 @@ The `ActionScheduler` whitelists specific prefixes:
 
 - `read`
 - `think`
-- `search_code`
+- `grep`
+- `glob`
 - `explore_tree`
 - `get_entity`
 

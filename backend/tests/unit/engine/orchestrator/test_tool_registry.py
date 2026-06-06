@@ -11,8 +11,6 @@ from backend.engine.tool_registry import validate_internal_toolset
 
 def _make_config(**kwargs):
     cfg = MagicMock()
-    # Enable most tools by default so the toolset is representative.
-    cfg.enable_finish = True
     cfg.enable_editor = True
     cfg.enable_task_tracker_tool = True
     cfg.enable_checkpoints = True
@@ -97,18 +95,10 @@ class TestFeatureFlagToolPresence:
         missing = sorted(names - set(dispatch.keys()))
         assert missing == [], f'Tools with no dispatch handler: {missing}'
 
-    def test_finish_enabled(self):
-        names = _build_toolset(enable_finish=True)
-        assert 'finish' in names
-        self._assert_dispatch_covered(names)
-
-    def test_finish_disabled(self):
-        names = _build_toolset(enable_finish=False)
-        assert 'finish' not in names
-
     def test_terminal_enabled(self):
         names = _build_toolset(enable_terminal=True)
-        assert 'terminal_manager' in names
+        assert {'execute_bash', 'execute_powershell'} & names
+        assert 'terminal_manager' not in names
         self._assert_dispatch_covered(names)
 
     def test_terminal_disabled(self):
@@ -117,7 +107,7 @@ class TestFeatureFlagToolPresence:
 
     def test_debugger_enabled(self):
         names = _build_toolset(enable_debugger=True)
-        assert 'debugger' in names
+        assert 'debugger' not in names
         self._assert_dispatch_covered(names)
 
     def test_debugger_disabled(self):
@@ -161,7 +151,7 @@ class TestFeatureFlagToolPresence:
 
     def test_checkpoints_enabled(self):
         names = _build_toolset(enable_checkpoints=True)
-        assert 'checkpoint' in names
+        assert 'checkpoint' not in names
         self._assert_dispatch_covered(names)
 
     def test_checkpoints_disabled(self):
@@ -170,7 +160,7 @@ class TestFeatureFlagToolPresence:
 
     def test_mcp_enabled(self):
         names = _build_toolset(enable_mcp=True)
-        assert 'call_mcp_tool' in names
+        assert 'call_mcp_tool' not in names
         self._assert_dispatch_covered(names)
 
     def test_mcp_disabled(self):
@@ -179,12 +169,13 @@ class TestFeatureFlagToolPresence:
 
     def test_meta_cognition_enabled(self):
         names = _build_toolset(enable_meta_cognition=True)
-        assert 'communicate_with_user' in names
+        assert 'ask_user' in names
         self._assert_dispatch_covered(names)
 
     def test_meta_cognition_disabled(self):
         names = _build_toolset(enable_meta_cognition=False)
-        assert 'communicate_with_user' not in names
+        assert 'ask_user' in names
+        self._assert_dispatch_covered(names)
 
     def test_task_tracker_enabled(self):
         names = _build_toolset(enable_task_tracker_tool=True)
@@ -199,7 +190,7 @@ class TestFeatureFlagToolPresence:
 
     def test_condensation_request_enabled(self):
         names = _build_toolset(enable_condensation_request=True)
-        assert 'summarize_context' in names
+        assert 'summarize_context' not in names
         self._assert_dispatch_covered(names)
 
     def test_condensation_request_disabled(self):
@@ -208,7 +199,7 @@ class TestFeatureFlagToolPresence:
 
     def test_working_memory_enabled(self):
         names = _build_toolset(enable_working_memory=True)
-        assert 'memory_manager' in names
+        assert 'memory_manager' not in names
         self._assert_dispatch_covered(names)
 
     def test_working_memory_disabled(self):
@@ -217,7 +208,7 @@ class TestFeatureFlagToolPresence:
 
     def test_swarming_enabled(self):
         names = _build_toolset(enable_swarming=True)
-        assert 'delegate_task' in names
+        assert 'delegate_task' not in names
         self._assert_dispatch_covered(names)
 
     def test_swarming_disabled(self):
@@ -246,7 +237,6 @@ class TestFeatureFlagToolPresence:
     def test_all_flags_off_still_has_dispatch_coverage(self):
         """Minimal toolset (most features disabled) must still be dispatch-covered."""
         names = _build_toolset(
-            enable_finish=False,
             enable_terminal=False,
             enable_editor=False,
             enable_checkpoints=False,
@@ -270,7 +260,6 @@ class TestFeatureFlagToolPresence:
             'backend.utils.runtime_detect.has_any_lsp_server', return_value=True
         ):
             names = _build_toolset(
-                enable_finish=True,
                 enable_terminal=True,
                 enable_editor=True,
                 enable_checkpoints=True,
@@ -287,7 +276,7 @@ class TestFeatureFlagToolPresence:
 
 
 class TestModeToolVisibility:
-    def test_plan_mode_exposes_only_read_only_plus_terminal_lifecycle_tools(self):
+    def test_plan_mode_exposes_simplified_agent_tool_categories(self):
         from unittest.mock import patch
 
         with patch(
@@ -295,7 +284,6 @@ class TestModeToolVisibility:
         ):
             names = _build_toolset(
                 mode='plan',
-                enable_finish=False,
                 enable_meta_cognition=False,
                 enable_terminal=True,
                 enable_editor=True,
@@ -310,26 +298,28 @@ class TestModeToolVisibility:
         assert {
             'read',
             'find_symbols',
-            'search_code',
+            'grep',
+            'glob',
             'analyze_project_structure',
             'lsp',
-            'recall',
-            'communicate_with_user',
+            'ask_user',
             'create_task_tracker',
-            'finish',
             'task_tracker',
-        } <= names
-        assert {
             'create',
-            'edit_symbols',
             'replace_string',
+            'edit_symbols',
             'multiedit',
-            'run',
+        } <= names
+        assert {'execute_bash', 'execute_powershell'} & names
+        assert {
             'terminal_manager',
             'debugger',
             'call_mcp_tool',
             'browser_tool',
             'checkpoint',
+            'finish',
+            'communicate_with_user',
+            'recall',
             'note',
             'memory_manager',
             'delegate_task',
@@ -342,12 +332,23 @@ class TestModeToolVisibility:
             enable_terminal=True,
             enable_editor=True,
             enable_meta_cognition=True,
-            enable_finish=True,
         )
         assert {'create', 'edit_symbols', 'replace_string', 'multiedit'} <= names
-        assert {'terminal_manager', 'communicate_with_user', 'finish'} <= names
+        assert {'execute_bash', 'execute_powershell'} & names
+        assert 'ask_user' in names
+        assert {
+            'terminal_manager',
+            'communicate_with_user',
+            'finish',
+            'debugger',
+            'call_mcp_tool',
+            'checkpoint',
+            'memory_manager',
+            'delegate_task',
+            'blackboard',
+        }.isdisjoint(names)
 
-    def test_chat_mode_exposes_only_read_only_inspection_tools(self):
+    def test_chat_mode_exposes_no_tools(self):
         from unittest.mock import patch
 
         with patch(
@@ -355,7 +356,6 @@ class TestModeToolVisibility:
         ):
             names = _build_toolset(
                 mode='chat',
-                enable_finish=True,
                 enable_meta_cognition=True,
                 enable_terminal=True,
                 enable_editor=True,
@@ -367,11 +367,4 @@ class TestModeToolVisibility:
                 enable_working_memory=True,
             )
 
-        assert names == {
-            'read',
-            'find_symbols',
-            'search_code',
-            'analyze_project_structure',
-            'lsp',
-            'recall',
-        }
+        assert names == set()

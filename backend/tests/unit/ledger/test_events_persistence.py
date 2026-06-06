@@ -32,7 +32,7 @@ def _make_persistence(**overrides) -> tuple[EventPersistence, MagicMock]:
 
 class TestIsCriticalEventPersist:
     def test_critical_action(self):
-        event = MagicMock(action='finish', observation=None)
+        event = MagicMock(action='reject', observation=None)
         assert EventPersistence.is_critical_event(event) is True
 
     def test_critical_observation(self):
@@ -48,7 +48,7 @@ class TestIsCriticalEventPersist:
         assert EventPersistence.is_critical_event(event) is False
 
     def test_critical_payload(self):
-        assert EventPersistence.is_critical_payload({'action': 'finish'}) is True
+        assert EventPersistence.is_critical_payload({'action': 'reject'}) is True
         assert EventPersistence.is_critical_payload({'observation': 'error'}) is True
         assert EventPersistence.is_critical_payload({'action': 'run'}) is False
         assert EventPersistence.is_critical_payload({}) is False
@@ -70,7 +70,7 @@ class TestPersistSyncPath:
 
     def test_critical_event_always_sync(self):
         p, _ = _make_persistence()
-        payload = {'id': 2, 'action': 'finish'}
+        payload = {'id': 2, 'action': 'reject'}
         p.persist_event(payload, event_id=2, cache_payload=None)
         assert p.stats['critical_sync_persistence'] == 1
 
@@ -86,7 +86,7 @@ class TestPersistSyncPath:
     def test_health_snapshot_tracks_confirmed_critical_event(self):
         p, _ = _make_persistence()
 
-        p.persist_event({'id': 7, 'action': 'finish'}, event_id=7, cache_payload=None)
+        p.persist_event({'id': 7, 'action': 'reject'}, event_id=7, cache_payload=None)
 
         health = p.get_health_snapshot()
         assert health['persistence_health'] == 'healthy'

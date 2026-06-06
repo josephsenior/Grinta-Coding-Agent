@@ -26,12 +26,12 @@ def _explore_hint(_config: Any = None) -> str:
     """Return the canonical layout-discovery tool hint."""
     if _lsp_available(_config):
         return (
-            '`search_code` for text search, `find_symbols` for symbol candidates, '
+            '`grep` for text search, `glob` for file discovery, `find_symbols` for symbol candidates, '
             '`read` to fetch a specific symbol/file body, `lsp` for definitions/references '
             '(LSP), `analyze_project_structure` for tree layout'
         )
     return (
-        '`search_code` for text search, `find_symbols` for symbol candidates, `read` to fetch a '
+        '`grep` for text search, `glob` for file discovery, `find_symbols` for symbol candidates, `read` to fetch a '
         'specific symbol/file body, `analyze_project_structure` for tree layout'
     )
 
@@ -99,45 +99,31 @@ def _routing_memory_tool_placeholders(
     condensation_on: bool,
     meta_cognition_on: bool,
 ) -> dict[str, str]:
+    _ = meta_cognition_on
     ambiguous_intent_instruction = (
-        'Use `communicate_with_user` to offer options rather than guessing.'
-        if meta_cognition_on
-        else 'Ask the user a short clarifying question in natural language rather than guessing.'
+        'Use `ask_user` with a short question rather than guessing.'
     )
-    if working_memory_on:
-        memory_and_context_section = (
-            '<MEMORY_AND_CONTEXT_TOOLS>\n'
-            '- Disk facts: `note(key, value)` / `recall(key)`. Use for long-lived facts (e.g., user preferences, architectural rules, common commands).\n'
-            '- Session state: `memory_manager(action="working_memory", ...)` and `memory_manager(action="semantic_recall", key=...)`. Use for ephemeral task-local state (e.g., current bug hypotheses, "step 2 of 5").\n'
-            '- **Auto-sync**: Scratchpad notes are automatically synced to working_memory at session start and after condensation. No manual sync needed.\n'
-            'Rule: cross-session knowledge → `note`; within-session state → `memory_manager`.\n'
-            '</MEMORY_AND_CONTEXT_TOOLS>'
-        )
-        post_condensation_retrieval = 'Call `memory_manager(action="working_memory")` after condensation to restore plan/findings before acting.'
-        surviving_state_facts = 'Only `note` (disk) and `memory_manager` (session) facts reliably survive condensation.'
-    else:
-        memory_and_context_section = ''
-        post_condensation_retrieval = (
-            'Resume from the summary and your most recent verified observations.'
-        )
-        surviving_state_facts = (
-            'Only `note` (disk) facts are guaranteed to survive condensation.'
-        )
+    _ = working_memory_on
+    memory_and_context_section = ''
+    post_condensation_retrieval = (
+        'Resume from the summary and your most recent verified observations.'
+    )
+    surviving_state_facts = (
+        'Only the visible conversation, current files, and tool observations are available.'
+    )
     context_budget_sync_clause = ', sync `task_tracker`' if tracker_on else ''
     context_budget_next_step = (
-        'call `finish` or `summarize_context`'
+        'write the final summary or continue after automatic condensation'
         if condensation_on
-        else 'call `finish` or close the current sub-task before doing any broader exploration'
+        else 'write the final summary or close the current sub-task before doing any broader exploration'
     )
     repetition_recovery_options = (
-        'switch tools, escalate with `communicate_with_user`, or call `finish` with a partial result.'
-        if meta_cognition_on
-        else 'switch tools, ask the user a short clarifying question, or call `finish` with a partial result.'
+        'switch tools, use `ask_user` for required input, or write a partial final result.'
     )
     remaining_work_source_of_truth = (
         'Trust your `task_tracker` plan as the source of truth for what remains.'
         if tracker_on
-        else 'Use restored working memory and recent verified observations as the source of truth for what remains.'
+        else 'Use recent verified observations as the source of truth for what remains.'
     )
     return {
         'ambiguous_intent_instruction': ambiguous_intent_instruction,

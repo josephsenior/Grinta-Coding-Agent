@@ -163,7 +163,7 @@ before the final `1.0.0` cut.
 - **GraphRAG** subsystem (`backend/context/graph_rag.py`,
   `graph_store.py`) and its dependent tools (`explore_tree_structure`,
   `read_symbol_definition`). The four remaining retrieval primitives
-  (`search_code` via ripgrep, `find_symbols` / `read` via tree-sitter,
+  (`grep` / `glob` via ripgrep, `find_symbols` / `read` via tree-sitter,
   `lsp` via LSP) cover the same surface
   without the index-maintenance cost.
 - **`ReRanker`** class and the cross-encoder rerank step from

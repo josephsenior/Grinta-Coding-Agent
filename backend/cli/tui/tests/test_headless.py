@@ -2245,14 +2245,13 @@ async def test_tui_duplicate_thinking_payload_renders_once(mock_config):
 
         thinking_blocks = list(s.query(ThinkingIndicator).results())
         assert len(thinking_blocks) == 1
-        rendered = str(thinking_blocks[0].query_one('#thinking-body', Static).renderable)
+        rendered = str(thinking_blocks[0].query_one('#thinking-content', Static).renderable)
         assert rendered.count(thought) == 1
 
 
 @pytest.mark.asyncio
-async def test_tui_thinking_indicator_collapses_into_expandable_card(mock_config):
-    """After thinking ends, the block collapses to ``Thought for Ns ▸`` with
-    a hidden body. Clicking (or pressing enter) toggles expansion."""
+async def test_tui_thinking_indicator_shows_content_without_collapse(mock_config):
+    """Thinking indicator shows content directly with no collapse/expand or duration."""
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -2277,27 +2276,14 @@ async def test_tui_thinking_indicator_collapses_into_expandable_card(mock_config
         )
         await asyncio.sleep(0.2)
 
-        # Exactly one ThinkingIndicator, and it has collapsed.
         blocks = list(s.query(ThinkingIndicator).results())
         assert len(blocks) == 1
         block = blocks[0]
-        assert block._finalized is True
-        assert block._collapsed is True
 
-        body = block.query_one('#thinking-body', Static)
-        assert '-hidden' in body.classes
-        # The thought is still in the body — just hidden.
-        assert thought in str(body.renderable)
-
-        # Toggle via the public action (same as the enter/space binding).
-        block.action_toggle()
-        assert block._collapsed is False
-        assert '-hidden' not in body.classes
-
-        # Toggle back to collapsed.
-        block.action_toggle()
-        assert block._collapsed is True
-        assert '-hidden' in body.classes
+        content = block.query_one('#thinking-content', Static)
+        rendered = str(content.renderable)
+        assert thought in rendered
+        assert 'Thinking:' in rendered
 
 
 @pytest.mark.asyncio

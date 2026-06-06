@@ -23,7 +23,7 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.headless_mode = False
         self.mock_controller._step = AsyncMock()
         self.mock_controller.event_router = MagicMock()
-        self.mock_controller.event_router._handle_finish_action = AsyncMock()
+        self.mock_controller.event_router._handle_message_action = AsyncMock()
 
         self.mock_context = MagicMock()
         self.mock_context.get_controller.return_value = self.mock_controller
@@ -136,6 +136,7 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
         """Test _graceful_shutdown sends SYSTEM NOTICE message."""
         mock_msg = MagicMock()
         mock_message_action.return_value = mock_msg
+        self.mock_controller.state.agent_state = AgentState.FINISHED
 
         await self.service._graceful_shutdown('Iteration limit')
 
@@ -229,33 +230,19 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
 
             mock_force.assert_not_called()
 
-    @patch(
-        'backend.orchestration.services.iteration_guard_service.PlaybookFinishAction'
-    )
-    async def test_force_partial_completion(self, mock_finish_action):
-        """Test _force_partial_completion creates PlaybookFinishAction."""
-        mock_finish = MagicMock()
-        mock_finish_action.return_value = mock_finish
-
+    async def test_force_partial_completion(self):
+        """Test _force_partial_completion creates a final MessageAction."""
         self.mock_controller.event_router = MagicMock()
-        self.mock_controller.event_router._handle_finish_action = AsyncMock()
+        self.mock_controller.event_router._handle_message_action = AsyncMock()
 
         await self.service._force_partial_completion('Budget limit')
 
-        # Check PlaybookFinishAction was created
-        mock_finish_action.assert_called_once()
-        call_kwargs = mock_finish_action.call_args[1]
-        self.assertEqual(call_kwargs['outputs']['status'], 'partial')
-        self.assertIn('Budget limit', call_kwargs['outputs']['reason'])
-        self.assertTrue(call_kwargs['force_finish'])
-
-        # Check force_finish flag was set
-        self.assertTrue(mock_finish.force_finish)
-
-        # Check action was handled
-        self.mock_controller.event_router._handle_finish_action.assert_called_once_with(
-            mock_finish
+        self.mock_controller.event_router._handle_message_action.assert_called_once()
+        final_message = (
+            self.mock_controller.event_router._handle_message_action.call_args.args[0]
         )
+        self.assertTrue(final_message.final_response)
+        self.assertIn('Budget limit', final_message.content)
 
 
 if __name__ == '__main__':

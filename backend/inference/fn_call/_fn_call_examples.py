@@ -12,7 +12,6 @@ from threading import Lock
 
 from backend.inference.tool_names import (
     CREATE_TOOL_NAME,
-    FINISH_TOOL_NAME,
 )
 
 logger = logging.getLogger(__name__)
@@ -173,75 +172,6 @@ TOOL_EXAMPLES = {
     'browser': {
         'view_page': "\nASSISTANT:\nLet me check how the page looks in the browser:\n<function=browser>\n<parameter=code>\ngoto('http://127.0.0.1:5000')\nnoop(1000)  # Wait for page to load\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [browser]:\n[Browser shows the numbers in a table format]\n",
     },
-    'finish': {
-        'example': (
-            '\nASSISTANT:\n<function=finish>\n'
-            '<parameter=status>completed</parameter>\n'
-            '<parameter=summary>'
-            'Refactored the Flask server in src/app.py to render numbers 1-10 in an HTML table '
-            'instead of a plain text list. Added a route for /numbers that returns an '
-            'HTML page with styled table layout. The server runs on port 5000 and the '
-            'endpoint is fully functional.'
-            '</parameter>\n'
-            '<parameter=actions_taken>'
-            '["Updated src/app.py -- replaced the / route to return an HTML table '
-            'template instead of str(numbers)", '
-            '"Added src/templates/numbers.html -- created a new Jinja2 template with '
-            'table markup and CSS styling", '
-            '"Installed flask (version 3.0.3) via pip to resolve ModuleNotFoundError", '
-            '"Restarted the server on port 5000 with PID 126", '
-            '"Opened http://127.0.0.1:5000 in the browser and confirmed the table renders '
-            'correctly with all 10 rows"]'
-            '</parameter>\n'
-            '<parameter=verification>'
-            '{"status":"passed","details":"Ran `curl http://127.0.0.1:5000 | grep '
-            '<table>` -- confirmed HTML table in response body. Visited '
-            'http://127.0.0.1:5000 in browser -- table renders with rows 1-10. '
-            'No console errors."}'
-            '</parameter>\n'
-            '<parameter=remaining_items>'
-            '["Add pagination for large datasets -- deferred, not in scope", '
-            '"Internationalize table headers -- low priority"]'
-            '</parameter>\n'
-            '<parameter=next_step>'
-            'Consider adding sort-by-column functionality or pagination for larger datasets.'
-            '</parameter>\n'
-            '<parameter=lessons_learned>'
-            'Jinja2 templates must be in a templates/ subdirectory relative to the Flask '
-            'app for auto-discovery. Running pip install before importing avoids '
-            'ModuleNotFoundError even when requirements.txt exists.'
-            '</parameter>\n'
-            '</function>\n'
-        ),
-        'plan_example': (
-            '\nASSISTANT:\n<function=finish>\n'
-            '<parameter=status>completed</parameter>\n'
-            '<parameter=summary>'
-            'Inspected the project structure and analyzed the Flask server in src/app.py. '
-            'The current / route returns a plain text list of numbers. The plan is to '
-            'add an HTML table template, a new /numbers route, and install Flask if missing. '
-            'Server will run on port 5000.'
-            '</parameter>\n'
-            '<parameter=plan>'
-            '["Create src/templates/numbers.html -- add a Jinja2 template with HTML table '
-            'markup and CSS styling for the number rows", '
-            '"Update src/app.py -- add /numbers route that renders the new template '
-            'with numbers 1-10 passed as context", '
-            '"Install flask via pip if ModuleNotFoundError occurs on first run", '
-            '"Start the server on port 5000 and verify the page loads correctly"]'
-            '</parameter>\n'
-            '<parameter=assumptions>'
-            '["Flask app uses default Jinja2 template resolution (expects '
-            'templates/ subdirectory next to the app file)", '
-            '"Port 5000 is available and not blocked by firewall", '
-            '"Python 3.8+ is available with pip installed"]'
-            '</parameter>\n'
-            '<parameter=next_step>'
-            'Run the plan steps to implement the table display feature.'
-            '</parameter>\n'
-            '</function>\n'
-        ),
-    },
 }
 
 
@@ -325,7 +255,6 @@ def _get_tool_name_mapping() -> dict[str, str]:
         'execute_bash': TERMINAL_EXAMPLE_KEY,
         'execute_powershell': TERMINAL_EXAMPLE_KEY,
         CREATE_TOOL_NAME: 'create',
-        FINISH_TOOL_NAME: 'finish',
     }
 
 
@@ -381,7 +310,7 @@ class ExampleStepBuilder:
         self._add_page_view_step()
         self._add_server_kill_step()
         self._add_server_rerun_step()
-        self._add_finish_step()
+        self._add_final_response_step()
         return self.example
 
     def _has_terminal_tool(self) -> bool:
@@ -421,11 +350,26 @@ class ExampleStepBuilder:
         if self._has_terminal_tool():
             self.example += TOOL_EXAMPLES[TERMINAL_EXAMPLE_KEY]['run_server_again']
 
-    def _add_finish_step(self) -> None:
-        """Add finish step if finish tool is available."""
-        if 'finish' in self.available_tools:
-            key = 'plan_example' if self.mode == 'plan' else 'example'
-            self.example += TOOL_EXAMPLES['finish'][key]
+    def _add_final_response_step(self) -> None:
+        """Add a plain-text final response example."""
+        if not self.example:
+            return
+        if self.mode == 'plan':
+            self.example += (
+                '\nASSISTANT:\n'
+                'Recommended plan:\n'
+                '1. Create `src/templates/numbers.html` with table markup.\n'
+                '2. Update `src/app.py` to render the template with numbers 1-10.\n'
+                '3. Start the server on port 5000 and verify the page loads.\n'
+            )
+        else:
+            self.example += (
+                '\nASSISTANT:\n'
+                'Implemented the Flask page so numbers 1-10 render in an HTML '
+                'table, restarted the server on port 5000, and verified the page '
+                'loads correctly. No follow-up is required unless you want sorting '
+                'or pagination added next.\n'
+            )
 
 
 def _build_example_footer() -> str:
@@ -438,4 +382,4 @@ def _build_example_footer() -> str:
 
 
 IN_CONTEXT_LEARNING_EXAMPLE_PREFIX = get_example_for_tools
-IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX = '\n--------------------- END OF NEW TASK DESCRIPTION ---------------------\n\nPLEASE follow the format strictly! IN THIS FALLBACK FORMAT, EMIT ONE AND ONLY ONE FUNCTION CALL PER MESSAGE.\n'
+IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX = '\n--------------------- END OF NEW TASK DESCRIPTION ---------------------\n\nPLEASE follow the format strictly! IN THIS FALLBACK FORMAT, EMIT ONE TOOL CALL PER TOOL-CALL MESSAGE. WHEN COMPLETE, WRITE A PLAIN-TEXT FINAL RESPONSE.\n'
