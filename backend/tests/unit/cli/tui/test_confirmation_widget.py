@@ -39,12 +39,11 @@ def test_tui_confirmation_normalizes_enum_risk() -> None:
     assert GrintaScreen._normalize_risk_key('2') == 'HIGH'
 
 
-def test_tui_full_autonomy_uses_current_level() -> None:
+def test_tui_full_autonomy_uses_autonomy_level() -> None:
     screen = object.__new__(GrintaScreen)
     screen._controller = SimpleNamespace(
         autonomy_controller=SimpleNamespace(
-            current_level='full',
-            autonomy_level='balanced',
+            autonomy_level='full',
         )
     )
 

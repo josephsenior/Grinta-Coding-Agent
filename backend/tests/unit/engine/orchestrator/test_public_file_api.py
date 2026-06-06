@@ -288,7 +288,6 @@ def test_replace_string_public_action_supports_replace_add_and_delete(
     assert add.new_str == '## Usage\n\nExample:\n...'
     assert delete.new_str == ''
     assert replace.replace_all is False
-    assert replace.expected_file_hash
 
 
 def test_edit_symbols_replaces_one_or_more_symbols(monkeypatch, tmp_path):

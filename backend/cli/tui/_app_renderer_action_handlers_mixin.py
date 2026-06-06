@@ -24,8 +24,14 @@ from backend.ledger.action import (
 class _AppRendererActionHandlersMixin:
     """action handlers (search/message/streaming/state)."""
 
-    def _handle_search_action(self, thought: str) -> None:
-        """Handle grep/glob action and render as a card."""
+    def _handle_search_action(self, thought: str, source_tool: str = 'search') -> None:
+        """Handle grep/glob action and render as a card.
+
+        ``source_tool`` is forwarded by :meth:`_render_thinking_payload`
+        from the originating ``AgentThinkAction.source_tool`` (``'grep'``
+        or ``'glob'``) so the renderer can pick the dedicated Grep/Glob
+        card instead of the generic Search card.
+        """
         import re
 
         # Strip the [SEARCH_RESULTS] opener only (no close tag is emitted)
@@ -76,6 +82,7 @@ class _AppRendererActionHandlersMixin:
             file_list=file_list,
             result_lines=result_lines,
             scope=scope,
+            source_tool=source_tool,
         )
         self._write_card(card)
 

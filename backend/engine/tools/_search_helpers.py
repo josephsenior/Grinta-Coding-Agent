@@ -52,7 +52,6 @@ SEARCH_RG_EXCLUDED_DIRS: tuple[str, ...] = (
 )
 
 SEARCH_RESULTS_TAG = '[SEARCH_RESULTS]'
-SEARCH_RESULTS_SOURCE_TOOL = 'search'
 
 
 def search_results_action(content: str, *, source_tool: str) -> AgentThinkAction:

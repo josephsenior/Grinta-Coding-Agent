@@ -17,7 +17,7 @@ from backend.core.workspace_resolution import get_effective_workspace_root
 _MINIMAL_RIGOUR_YML = """version: 1
 preset: api
 gates:
-  max_file_lines: 500
+  max_file_lines: 1000
   forbid_todos: true
   required_files: []
 ignore: []

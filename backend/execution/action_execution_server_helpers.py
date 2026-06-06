@@ -758,7 +758,6 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
     )
 
     command = action.command or 'write'
-    enable_lint = executor._is_auto_lint_enabled()
     edit_mode = getattr(action, 'edit_mode', None) or ''
     is_range_edit = edit_mode.strip().lower() == 'range'
 
@@ -777,10 +776,8 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         insert_line=action.insert_line,
         start_line=getattr(action, 'start_line', None),
         end_line=getattr(action, 'end_line', None),
-        enable_linting=enable_lint,
         edit_mode=edit_mode,
         expected_hash=getattr(action, 'expected_hash', None),
-        expected_file_hash=getattr(action, 'expected_file_hash', None),
         overwrite_existing=getattr(action, 'overwrite_existing', False),
     )
     if result_str.startswith('ERROR:'):

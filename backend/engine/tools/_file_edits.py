@@ -392,7 +392,6 @@ def _handle_create_symbol_public(arguments: Mapping[str, Any]) -> Action:
         command='insert_text',
         insert_line=_insert_line_for_symbol(candidate, position),
         new_str=content_to_insert,
-        expected_file_hash=_sha256_text(content),
         impl_source=FileEditSource.FILE_EDITOR,
     )
     set_security_risk(action, arguments)
@@ -434,14 +433,12 @@ def _handle_replace_string_tool(arguments: Mapping[str, Any]) -> Action:
         )
     _guard_content_arguments(dict(arguments))
     safe_path = _safe_workspace_path(path, must_exist=True)
-    content = _read_text_for_tool(safe_path)
     action = FileEditAction(
         path=_relative_display_path(safe_path),
         command='replace_string',
         old_string=old_string,
         new_str=new_string,
         replace_all=parse_bool_argument(arguments.get('replace_all', False)),
-        expected_file_hash=_sha256_text(content),
         impl_source=FileEditSource.FILE_EDITOR,
     )
     set_security_risk(action, arguments)

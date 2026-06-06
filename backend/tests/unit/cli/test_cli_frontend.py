@@ -1146,7 +1146,7 @@ async def test_renderer_shows_recall_observation() -> None:
     assert 'recalled' in renderer._reasoning._current_action.lower()
 
 
-def test_autonomy_command_shows_current_level() -> None:
+def test_autonomy_command_shows_default_level() -> None:
     """_handle_autonomy_command with no arg shows current level."""
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
     mock_renderer = MagicMock()

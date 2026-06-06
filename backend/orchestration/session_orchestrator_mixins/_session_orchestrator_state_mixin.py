@@ -101,7 +101,7 @@ class _SessionOrchestratorStateMixin:
         )
 
         self.services.pending_action.set(None)
-        self.services.emit_event(pending, EventSource.AGENT)
+        self.services.context.emit_event(pending, EventSource.AGENT)
 
         new_state = (
             AgentState.RUNNING

@@ -45,10 +45,9 @@ def _is_live_thinking_event(
 def _is_full_autonomy(orch: '_AppRendererEventProcessorMixin') -> bool:
     controller = getattr(orch._tui, '_controller', None)
     ac = getattr(controller, 'autonomy_controller', None)
-    raw_level = getattr(ac, 'autonomy_level', '') if ac is not None else ''
-    level = normalize_autonomy_level(raw_level)
-    if level:
-        return level == 'full'
+    if ac is not None:
+        raw_level = getattr(ac, 'autonomy_level', '')
+        return normalize_autonomy_level(raw_level) == 'full'
     hud = getattr(orch._tui, '_hud', None)
     state = getattr(hud, 'state', None)
     return normalize_autonomy_level(getattr(state, 'autonomy_level', '')) == 'full'

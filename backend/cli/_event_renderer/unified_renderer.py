@@ -47,6 +47,17 @@ def _looks_error_heavy(text: str | None) -> bool:
     return bool(_ERROR_HEAVY_PATTERN.search(text))
 
 
+# Maps a search ``source_tool`` value to the (badge_category, title, verb)
+# used by the activity card.  Dedicated tools (``grep``, ``glob``) get their
+# own categories; anything else (including the legacy generic ``search``
+# source) falls back to the unified search card.
+_SEARCH_CARD_PRESETS: dict[str, tuple[str, str, str]] = {
+    'grep': ('grep', 'Grep', 'Grepped'),
+    'glob': ('glob', 'Glob', 'Globbed'),
+    'search': ('search', 'Search', 'Searched'),
+}
+
+
 def _extract_search_query(command: str) -> str:
     """Extract the search query/pattern from a grep/glob command."""
     # Try to extract quoted pattern: rg "pattern" or grep 'pattern'
@@ -172,9 +183,15 @@ class ActivityRenderer:
         duration: str = '',
     ) -> ActivityCard:
         """Create an activity card for a shell command."""
-        # Check if this is a grep/glob command and route to search card
-        if ActivityRenderer._is_grep_glob_command(command):
-            return ActivityRenderer._grep_glob_shell_command(
+        # Route shell-level grep/glob invocations to the dedicated tool
+        # cards so the UI doesn't lump them under the generic ``Shell``
+        # category.
+        if ActivityRenderer._is_grep_shell_command(command):
+            return ActivityRenderer._grep_shell_command(
+                command, output, exit_code
+            )
+        if ActivityRenderer._is_glob_shell_command(command):
+            return ActivityRenderer._glob_shell_command(
                 command, output, exit_code
             )
 
@@ -226,62 +243,99 @@ class ActivityRenderer:
         )
 
     @staticmethod
-    def _is_grep_glob_command(command: str) -> bool:
-        """Check if a shell command is a grep or glob operation."""
-        cmd_lower = command.lower()
-        # Check for rg (ripgrep), grep, or glob patterns
+    def _is_grep_shell_command(command: str) -> bool:
+        """Detect shell invocations of ripgrep / grep."""
+        cmd_lower = command.lower().lstrip()
         return (
             cmd_lower.startswith('rg ')
+            or cmd_lower.startswith('rg\t')
             or cmd_lower.startswith('grep ')
-            or cmd_lower.startswith('grep -')
+            or cmd_lower.startswith('grep-')
+            or cmd_lower.startswith('grep\t')
             or ' | rg ' in cmd_lower
+            or ' | rg\t' in cmd_lower
             or ' | grep ' in cmd_lower
-            or cmd_lower.startswith('get-childitem')  # PowerShell glob
-            or cmd_lower.startswith('gci ')  # PowerShell glob alias
+            or ' | grep\t' in cmd_lower
         )
 
     @staticmethod
-    def _grep_glob_shell_command(
+    def _is_glob_shell_command(command: str) -> bool:
+        """Detect shell invocations of filesystem globbing."""
+        cmd_lower = command.lower().lstrip()
+        return (
+            cmd_lower.startswith('get-childitem')  # PowerShell
+            or cmd_lower.startswith('gci ')  # PowerShell alias
+            or cmd_lower.startswith('gci\t')
+            or cmd_lower.startswith('find ')  # POSIX -name
+            or cmd_lower.startswith('find\t')
+        )
+
+    @staticmethod
+    def _grep_shell_command(
         command: str,
         output: str | None = None,
         exit_code: int | None = None,
     ) -> ActivityCard:
-        """Create a search card for grep/glob shell commands."""
-        # Extract query from command
-        query = _extract_search_query(command)
-        if not query:
-            query = command[:50]
+        """Create a Grep activity card for a shell-level grep invocation."""
+        return ActivityRenderer._build_search_shell_card(
+            command=command,
+            output=output,
+            exit_code=exit_code,
+            source_tool='grep',
+        )
 
-        # Parse output for match counts
+    @staticmethod
+    def _glob_shell_command(
+        command: str,
+        output: str | None = None,
+        exit_code: int | None = None,
+    ) -> ActivityCard:
+        """Create a Glob activity card for a shell-level glob invocation."""
+        return ActivityRenderer._build_search_shell_card(
+            command=command,
+            output=output,
+            exit_code=exit_code,
+            source_tool='glob',
+        )
+
+    @staticmethod
+    def _build_search_shell_card(
+        *,
+        command: str,
+        output: str | None,
+        exit_code: int | None,
+        source_tool: str,
+    ) -> ActivityCard:
+        """Shared rendering for shell-level grep/glob invocations."""
+        query = _extract_search_query(command) or command[:50]
+
         match_count = 0
         file_count = 0
-        result_lines = []
+        result_lines: list[str] = []
 
         if output:
             result_lines = output.splitlines()
-            # Try to count matches (ripgrep format: file:line:content)
             for line in result_lines:
                 if re.match(r'^[^:]+:\d+:', line):
                     match_count += 1
-            # Count unique files
-            files = set()
+            files: set[str] = set()
             for line in result_lines:
                 match = re.match(r'^([^:]+):\d+:', line)
                 if match:
                     files.add(match.group(1))
             file_count = len(files)
 
-        secondary = None
         if match_count and file_count:
             secondary = f'{match_count} matches · {file_count} files'
         elif match_count:
             secondary = f'{match_count} matches'
         elif exit_code == 1:  # grep returns 1 when no matches
             secondary = 'no matches'
+        else:
+            secondary = None
 
         extra_lines: list[ActivityLine] = []
         if result_lines:
-            # Show first 8 lines of results
             for line in result_lines[:8]:
                 truncated = line[:120] + ('...' if len(line) > 120 else '')
                 extra_lines.append(
@@ -302,11 +356,12 @@ class ActivityRenderer:
             else ('err' if exit_code is not None and exit_code > 1 else 'neutral')
         )
 
+        badge_category, title, verb = _SEARCH_CARD_PRESETS[source_tool]
         return ActivityCard(
-            verb='Search',
+            verb=verb,
             detail=f'"{query}"',
-            badge_category='search',
-            title='Search',
+            badge_category=badge_category,
+            title=title,
             secondary=secondary,
             secondary_kind=kind if match_count else 'neutral',
             extra_lines=extra_lines,
@@ -720,6 +775,8 @@ class ActivityRenderer:
         file_list: list[tuple[str, int]] | None = None,
         result_lines: list[str] | None = None,
         scope: str = '',
+        *,
+        source_tool: str = 'search',
     ) -> ActivityCard:
         """Create an activity card for search results.
 
@@ -730,7 +787,13 @@ class ActivityRenderer:
             file_list: List of (filepath, match_count) tuples for display
             result_lines: Raw ripgrep-style result lines (file:line:content)
             scope: Optional search path scope (e.g. 'src/runtime')
+            source_tool: ``'grep'`` or ``'glob'`` to render as the dedicated
+                tool card; anything else renders as the generic ``'search'``
+                card.
         """
+        badge_category, title, verb = _SEARCH_CARD_PRESETS.get(
+            source_tool, _SEARCH_CARD_PRESETS['search']
+        )
         # Detail: quoted query, optionally with scope
         quoted = f'"{query}"'
         detail = f'{quoted} in {scope}' if scope else quoted
@@ -781,10 +844,10 @@ class ActivityRenderer:
                 )
 
         return ActivityCard(
-            verb='Search',
+            verb=verb,
             detail=detail,
-            badge_category='search',
-            title='Search',
+            badge_category=badge_category,
+            title=title,
             secondary=secondary,
             secondary_kind='ok' if match_count else 'neutral',
             extra_lines=extra_lines,

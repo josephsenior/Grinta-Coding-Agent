@@ -133,11 +133,9 @@ class FileEditor(
         insert_line: int | None = None,
         start_line: int | None = None,
         end_line: int | None = None,
-        enable_linting: bool = False,
         dry_run: bool = False,
         edit_mode: str | None = None,
         expected_hash: str | None = None,
-        expected_file_hash: str | None = None,
         overwrite_existing: bool = False,
         **_: Any,
     ) -> ToolResult:
@@ -154,11 +152,9 @@ class FileEditor(
             insert_line: Optional line number to insert at (1-indexed)
             start_line: Optional start line number for range edit (1-indexed)
             end_line: Optional end line number for range edit (1-indexed)
-            enable_linting: Whether to enable linting (currently not implemented)
             dry_run: If True, compute preview result without writing changes
             edit_mode: Sub-command mode when ``command`` is ``edit`` (range only)
             expected_hash: Optional client-supplied content hash (legacy)
-            expected_file_hash: Optional per-file content hash for compare-and-swap
             overwrite_existing: Allow deliberate full-file rewrite guards to be bypassed
             **_: Additional keyword arguments (ignored)
 
@@ -191,7 +187,6 @@ class FileEditor(
                     dry_run=dry_run,
                     edit_mode=edit_mode,
                     expected_hash=expected_hash,
-                    expected_file_hash=expected_file_hash,
                     overwrite_existing=overwrite_existing,
                 )
 
@@ -217,13 +212,12 @@ class FileEditor(
         dry_run: bool,
         edit_mode: str | None,
         expected_hash: str | None,
-        expected_file_hash: str | None,
         overwrite_existing: bool,
     ) -> ToolResult:
         """Dispatch a validated editor command while the target file lock is held."""
         try:
             if command == 'read_file':
-                return self._handle_view(file_path, view_range, path)
+                return self._handle_view(file_path, view_range)
             if command == 'replace_string':
                 return self._handle_replace_string(
                     file_path,
@@ -231,12 +225,23 @@ class FileEditor(
                     self._extract_content(MISSING, new_str),
                     replace_all=replace_all,
                     dry_run=dry_run,
-                    expected_file_hash=expected_file_hash,
                 )
             if command in (
                 'edit',
                 'insert_text',
             ):
+                if command == 'insert_text':
+                    return self._handle_edit(
+                        file_path,
+                        file_text,
+                        new_str,
+                        insert_line,
+                        None,
+                        None,
+                        edit_mode=edit_mode,
+                        expected_hash=expected_hash,
+                        dry_run=dry_run,
+                    )
                 return self._handle_edit(
                     file_path,
                     file_text,
@@ -246,7 +251,6 @@ class FileEditor(
                     end_line,
                     edit_mode=edit_mode,
                     expected_hash=expected_hash,
-                    expected_file_hash=expected_file_hash,
                     dry_run=dry_run,
                 )
             if command == 'undo_last_edit':

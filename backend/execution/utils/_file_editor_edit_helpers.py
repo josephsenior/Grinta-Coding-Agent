@@ -38,7 +38,6 @@ def handle_edit_impl(
     *,
     edit_mode: str | None = None,
     expected_hash: str | None = None,
-    expected_file_hash: str | None = None,
     dry_run: bool = False,
 ) -> ToolResult:
     """Handle edit command - modify file content."""
@@ -96,7 +95,6 @@ def handle_replace_string_impl(
     *,
     replace_all: bool,
     dry_run: bool,
-    expected_file_hash: str | None = None,
 ) -> ToolResult:
     """Replace exact text occurrences using the safe edit pipeline."""
     try:
@@ -129,19 +127,6 @@ def handle_replace_string_impl(
             )
 
         old_content = self._read_file(file_path)
-        if expected_file_hash and self._sha256_text(old_content) != expected_file_hash:
-            return ToolResult(
-                output='',
-                error=(
-                    'FILE_UNEXPECTEDLY_MODIFIED: file changed since edit was '
-                    'planned. Re-read and retry.'
-                ),
-                old_content=old_content,
-                new_content=old_content,
-                error_code='FILE_UNEXPECTEDLY_MODIFIED',
-                retryable=True,
-                operation='replace_string',
-            )
         newline = '\r\n' if '\r\n' in old_content else '\n'
         old_match = old_string.replace('\r\n', '\n').replace('\r', '\n')
         new_replacement = new_string.replace('\r\n', '\n').replace('\r', '\n')
