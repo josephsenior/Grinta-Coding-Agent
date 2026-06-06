@@ -184,8 +184,6 @@ class TestAgentState:
         assert (
             AgentState.AWAITING_USER_CONFIRMATION.value == 'awaiting_user_confirmation'
         )
-        assert AgentState.USER_CONFIRMED.value == 'user_confirmed'
-        assert AgentState.USER_REJECTED.value == 'user_rejected'
 
     def test_enum_count(self):
         """Test AgentState has at least 10 values."""

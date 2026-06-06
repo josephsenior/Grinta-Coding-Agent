@@ -33,7 +33,6 @@ if TYPE_CHECKING:
 
 RESUMABLE_STATES = [
     AgentState.RUNNING,
-    AgentState.PAUSED,
     AgentState.AWAITING_USER_INPUT,
     AgentState.FINISHED,
 ]
@@ -425,7 +424,7 @@ class State:
       - almost stuck state
 
     - Running state of an agent:
-      - current agent state (e.g., LOADING, RUNNING, PAUSED)
+      - current agent state (e.g., LOADING, RUNNING, STOPPED)
       - traffic control state for rate limiting
       - confirmation mode
       - the last error encountered

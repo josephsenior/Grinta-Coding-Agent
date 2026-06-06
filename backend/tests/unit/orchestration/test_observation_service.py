@@ -66,26 +66,16 @@ def _make_observation(content: str = 'result', cause: int | None = None) -> Any:
 
 class TestTransitionLogic:
     @pytest.mark.asyncio
-    async def test_user_confirmed_transitions_to_running(self):
+    async def test_no_state_transition_runs_pipeline(self):
+        """The USER_CONFIRMED/USER_REJECTED special cases are gone; the
+        function now just runs the observation pipeline."""
         controller = MagicMock()
-        controller.state.agent_state = AgentState.USER_CONFIRMED
+        controller.state.agent_state = AgentState.RUNNING
         controller.set_agent_state_to = AsyncMock()
         controller.tool_pipeline = None
         obs = _make_observation()
         await transition_agent_state_logic(controller, None, obs)
-        controller.set_agent_state_to.assert_called_once_with(AgentState.RUNNING)
-
-    @pytest.mark.asyncio
-    async def test_user_rejected_transitions_to_awaiting_input(self):
-        controller = MagicMock()
-        controller.state.agent_state = AgentState.USER_REJECTED
-        controller.set_agent_state_to = AsyncMock()
-        controller.tool_pipeline = None
-        obs = _make_observation()
-        await transition_agent_state_logic(controller, None, obs)
-        controller.set_agent_state_to.assert_called_once_with(
-            AgentState.AWAITING_USER_INPUT
-        )
+        controller.set_agent_state_to.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_runs_pipeline_observe_when_ctx_present(self):

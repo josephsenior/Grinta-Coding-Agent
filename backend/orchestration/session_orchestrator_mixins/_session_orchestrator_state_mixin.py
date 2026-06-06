@@ -11,6 +11,7 @@ from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import (
     Action,
+    ActionConfirmationStatus,
     MessageAction,
 )
 from backend.ledger.observation import (
@@ -66,6 +67,51 @@ class _SessionOrchestratorStateMixin:
     async def set_agent_state_to(self, new_state: AgentState) -> None:
         """Delegate to the state transition service for consistency."""
         await self.services.state.set_agent_state(new_state)
+
+    async def apply_user_decision(self, approved: bool) -> None:
+        """Apply the user's decision to the currently-pending action.
+
+        This is a direct method call (not an event) so the decision is
+        applied atomically: the pending action's ``confirmation_state``
+        is set, the pending slot is cleared, the action is re-emitted
+        (so the agent loop picks it up), and the agent state transitions
+        out of ``AWAITING_USER_CONFIRMATION`` in one synchronous sequence.
+
+        Replacing the previous ``ChangeAgentStateAction(USER_CONFIRMED/REJECTED)``
+        event flow eliminates the race where the user decision arrived
+        while the agent was still in ``AWAITING_USER_CONFIRMATION`` (the
+        event's transition ``running → user_confirmed`` was rejected by
+        the state machine).
+        """
+        pending = self.services.pending_action.get()
+        if pending is None:
+            logger.warning(
+                'apply_user_decision: no pending action (state=%s); ignoring.',
+                self.get_agent_state(),
+            )
+            return
+
+        if hasattr(pending, 'thought'):
+            pending.thought = ''
+        pending._id = None
+        pending.confirmation_state = (
+            ActionConfirmationStatus.CONFIRMED
+            if approved
+            else ActionConfirmationStatus.REJECTED
+        )
+
+        self.services.pending_action.set(None)
+        self.services.emit_event(pending, EventSource.AGENT)
+
+        new_state = (
+            AgentState.RUNNING
+            if approved
+            else AgentState.AWAITING_USER_INPUT
+        )
+        await self.set_agent_state_to(new_state)
+
+        # Wake the agent loop so it picks up the just-emitted action.
+        self.step()
 
     def get_agent_state(self) -> AgentState:
         """Returns the current state of the agent.

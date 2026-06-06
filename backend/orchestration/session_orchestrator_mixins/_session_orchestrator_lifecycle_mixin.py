@@ -257,7 +257,7 @@ class _SessionOrchestratorLifecycleMixin:
         """Stop the agent, best-effort kill runtime processes, and clear pending actions."""
         logger.info('Stopping agent...')
 
-        self._step_pending = False
+        self._step_request.clear()
 
         # Signal the executor to stop streaming immediately.
 

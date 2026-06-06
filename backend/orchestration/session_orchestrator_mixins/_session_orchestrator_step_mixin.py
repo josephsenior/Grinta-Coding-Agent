@@ -11,7 +11,6 @@ from backend.ledger.action import (
     Action,
 )
 from backend.utils.async_utils import (
-    get_main_event_loop,
     run_or_schedule,
 )
 
@@ -44,7 +43,6 @@ if TYPE_CHECKING:
     from backend.core.enums import AgentState
     from backend.ledger.event import Event
     from backend.utils.async_utils import (
-        get_main_event_loop,
         run_or_schedule,
     )
 
@@ -61,78 +59,27 @@ class _SessionOrchestratorStepMixin:
     """Mixin: step scheduling, exception handling, event dispatch, reset."""
 
     def schedule_step_soon(self) -> None:
-        """Schedule a fresh ``step()`` on the main loop after the current turn unwinds.
+        """Schedule a step.
 
-        Unlike calling ``step()`` inline from within an active step task, this
-
-        defers re-entry until the event loop regains control. That avoids the
-
-        race where ``step()`` only flips ``_step_pending`` while the current
-
-        task is still running and the flag is then cleared during ``_step()``
-
-        shutdown.
-
+        Alias for :meth:`SessionOrchestrator.step`, which already funnels
+        through ``call_soon_threadsafe`` to the main loop and atomically
+        sets ``_step_request`` (or creates a task) inside
+        ``_request_step``.  Kept for backward compatibility with callers
+        that historically used this entry point.
         """
-        if self._closed:
-            return
-
-        # Record that a step is being scheduled.  The no-step-progress
-        # watchdog reads this to know that the agent is not genuinely stuck
-        # — a slow LLM streaming response is expected to take longer than
-        # the watchdog timeout, but as long as step() keeps getting called
-        # the watchdog stays quiet.
-        cb = getattr(self, 'circuit_breaker', None) or getattr(
-            self, '_circuit_breaker', None
-        )
-        if cb is not None and hasattr(cb, 'record_step_call'):
-            try:
-                cb.record_step_call()
-            except Exception:
-                pass
-
-        main_loop = get_main_event_loop()
-
-        if main_loop is not None and main_loop.is_running():
-            main_loop.call_soon_threadsafe(self.step)
-
-            return
-
-        with contextlib.suppress(RuntimeError):
-            asyncio.get_running_loop().call_soon(self.step)
-
-            return
-
         self.step()
 
     def _create_step_task(self) -> None:
-        """Create the step task on the current (main) running loop.
+        """Create the step task.  Must be called on the main event loop.
 
-        This method must only be called while holding _step_gate, either
-
-        directly from step() or via call_soon_threadsafe on the main loop.
-
-        The caller's gate acquisition prevents the race window.
-
+        The caller (``_request_step`` or ``_step``'s teardown callback) is
+        the only one that schedules us, and it has already verified that
+        ``_step_task`` is None or done before calling.  This method just
+        resets the request event and creates a fresh task.
         """
-        # Fast path: task still running — re-queue pending and exit.
-
-        # This check is safe because the gate was held at the call site;
-
-        # a second concurrent _create_step_task from another thread would
-
-        # have been blocked at step().
-
-        if self._step_task and not self._step_task.done():
-            # Mirror the counter bump in step() so the in-flight _step
-            # task's finally block knows NOT to clobber _step_pending.
-            self._step_seq += 1
-            self._step_pending = True
-
-            return
-
         from backend.utils.async_utils import create_tracked_task
 
+        self._step_request.clear()
         self._step_task = create_tracked_task(
             self._step_with_exception_handling(),
             name='agent-step',
@@ -226,16 +173,12 @@ class _SessionOrchestratorStepMixin:
 
             # cleared by observation_service.trigger_step), etc.
 
-            # IMPORTANT: must funnel through ``schedule_step_soon`` (not a direct
-            # ``self.step()``) to dodge the race documented in
-            # :meth:`schedule_step_soon`.  A direct call here races with the
-            # in-flight ``_step`` task's ``finally`` block: the call sees the
-            # previous ``_step_task`` as still alive, sets ``_step_pending = True``,
-            # returns — and the just-finishing ``_step`` task immediately clears
-            # ``_step_pending`` in its teardown, leaving the agent with no
-            # re-queued step and visibly stuck in ``AgentState.RUNNING`` forever.
+            # ``step()`` is now race-free: it dispatches ``_request_step`` onto
+            # the main loop, which atomically sets ``_step_request`` (if a task
+            # is alive) or creates a new task.  No deferral indirection is
+            # needed.
             if not self._closed and self.should_step(event):
-                self.schedule_step_soon()
+                self.step()
         except Exception as exc:
             event_type = type(event).__name__
             event_id = getattr(event, 'id', '?')
@@ -250,7 +193,7 @@ class _SessionOrchestratorStepMixin:
             )
             if not self._closed and self.should_step(event):
                 try:
-                    self.schedule_step_soon()
+                    self.step()
                 except Exception:
                     pass
 

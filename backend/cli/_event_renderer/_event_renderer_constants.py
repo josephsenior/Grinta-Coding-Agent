@@ -20,7 +20,6 @@ IDLE_STATES: frozenset[AgentState] = frozenset(
         AgentState.FINISHED,
         AgentState.ERROR,
         AgentState.STOPPED,
-        AgentState.PAUSED,
         AgentState.REJECTED,
     }
 )

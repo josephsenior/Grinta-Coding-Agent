@@ -62,9 +62,6 @@ from backend.ledger import EventSource, EventStreamSubscriber
 from backend.ledger.action import MessageAction, NullAction
 from backend.ledger.observation import AgentStateChangedObservation
 from backend.orchestration.replay import ReplayManager
-from backend.orchestration.runtime_late_error_guard import (
-    should_skip_agent_error_transition_for_runtime_callback,
-)
 from backend.utils.async_utils import call_async_from_sync
 from backend.utils.core_utils import create_registry_and_conversation_stats
 
@@ -256,9 +253,19 @@ def _create_early_status_callback(
                 logger.warning(
                     'Failed to record error state on controller', exc_info=True
                 )
-            # Schedule safely across threads without requiring a running loop
-            if should_skip_agent_error_transition_for_runtime_callback(controller):
-                pass
+            # Late runtime callbacks may fire after the user stopped/finished
+            # the agent; do not promote those diagnostics to ERROR.  The
+            # agent's state stays STOPPED/FINISHED — a transition to ERROR
+            # would raise InvalidStateTransitionError and blur the WAL
+            # semantics.
+            if controller.get_agent_state() in (
+                AgentState.STOPPED,
+                AgentState.FINISHED,
+            ):
+                logger.info(
+                    'Runtime error callback: skipping agent ERROR transition while state is %s',
+                    controller.get_agent_state().value,
+                )
             else:
                 try:
                     run_or_schedule(controller.set_agent_state_to(AgentState.ERROR))
@@ -577,7 +584,6 @@ async def _run_agent_loop(
         AgentState.FINISHED,
         AgentState.REJECTED,
         AgentState.ERROR,
-        AgentState.PAUSED,
         AgentState.STOPPED,
     ]
     try:

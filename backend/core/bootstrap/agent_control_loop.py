@@ -9,9 +9,6 @@ from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.execution.base import Runtime
 from backend.orchestration import SessionOrchestrator
-from backend.orchestration.runtime_late_error_guard import (
-    should_skip_agent_error_transition_for_runtime_callback,
-)
 from backend.utils.async_utils import run_or_schedule
 
 
@@ -34,9 +31,18 @@ def _handle_error_status(
                 )
         except Exception:
             logger.debug('Failed to record memory error boundary', exc_info=True)
-        # Schedule safely across threads without requiring a running loop
-        if should_skip_agent_error_transition_for_runtime_callback(controller):
-            pass
+        # Late runtime callbacks may fire after the user stopped/finished the
+        # agent; do not promote those diagnostics to ERROR.  The agent's
+        # state stays STOPPED/FINISHED — a transition to ERROR would raise
+        # InvalidStateTransitionError and blur the WAL semantics.
+        if controller.get_agent_state() in (
+            AgentState.STOPPED,
+            AgentState.FINISHED,
+        ):
+            logger.info(
+                'Runtime error callback: skipping agent ERROR transition while state is %s',
+                controller.get_agent_state().value,
+            )
         else:
             try:
                 run_or_schedule(controller.set_agent_state_to(AgentState.ERROR))

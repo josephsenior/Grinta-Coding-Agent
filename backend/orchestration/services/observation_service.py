@@ -94,12 +94,13 @@ async def transition_agent_state_logic(
     ctx: ToolInvocationContext | None,
     observation: Observation,
 ) -> None:
-    """Shared state transition logic for agent observations."""
-    if controller.state.agent_state == AgentState.USER_CONFIRMED:
-        await controller.set_agent_state_to(AgentState.RUNNING)
-    elif controller.state.agent_state == AgentState.USER_REJECTED:
-        await controller.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+    """Shared state transition logic for agent observations.
 
+    The previous handling of ``USER_CONFIRMED``/``USER_REJECTED`` was
+    removed: those are no longer agent states.  Confirmation outcomes
+    are now applied via :meth:`SessionOrchestrator.apply_user_decision`,
+    which transitions out of ``AWAITING_USER_CONFIRMATION`` in one shot.
+    """
     pipeline = getattr(controller, 'tool_pipeline', None)
     if ctx and pipeline:
         await pipeline.run_observe(ctx, observation)

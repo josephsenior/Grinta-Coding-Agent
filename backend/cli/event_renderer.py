@@ -63,7 +63,6 @@ _IDLE_STATES = {
     AgentState.FINISHED,
     AgentState.ERROR,
     AgentState.STOPPED,
-    AgentState.PAUSED,
     AgentState.REJECTED,
 }
 # Subscriber ID for the CLI renderer.

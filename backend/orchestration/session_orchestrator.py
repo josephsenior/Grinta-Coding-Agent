@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
@@ -103,6 +102,11 @@ class SessionOrchestrator(
     _replay_manager: ReplayManager
     PENDING_ACTION_TIMEOUT: float = DEFAULT_PENDING_ACTION_TIMEOUT
     _step_task: asyncio.Task[None] | None = None
+    # Set by ``_request_step`` (or ``_step``'s teardown) to request another
+    # step iteration.  ``_step``'s drain loop checks + clears this event
+    # atomically.  All mutations happen on the main event loop, so the
+    # event is implicitly thread-safe via the call_soon_threadsafe funnel.
+    _step_request: asyncio.Event = asyncio.Event()
     rate_governor: LLMRateGovernor
     memory_pressure: MemoryPressureMonitor
     action_scheduler: ActionScheduler
@@ -160,24 +164,14 @@ class SessionOrchestrator(
         self._step_lock_instance: asyncio.Lock | None = None
         self._step_lock_loop: asyncio.AbstractEventLoop | None = None
         self._step_owner_task: asyncio.Task[Any] | None = None
-        # Separate threading-safe gate for the sync step() entry point.
-        # EventStream callbacks arrive from a thread pool; without this lock
-        # two concurrent calls can both see _step_task as done and both create
-        # step tasks, violating the "only one step at a time" invariant.
-        self._step_gate = threading.Lock()
-        # When a step is requested while another is running, this flag ensures
-        # the dropped request is re-queued after the current step completes.
-        # Protected by _step_lock to avoid races with drain_loop's read/write.
-        self._step_pending = False
-        # Monotonic counter incremented every time ``step()`` is asked to
-        # re-queue a request (i.e. an in-flight step task is still alive).
-        # ``_step`` captures this counter on entry and only clears
-        # ``_step_pending`` in its ``finally`` if the counter is unchanged
-        # — this prevents the racy ``_step_pending`` wipe documented in
-        # :meth:`schedule_step_soon`.  Even if Edit 1 (use
-        # ``schedule_step_soon`` from ``_on_event``) is somehow bypassed,
-        # this counter is the second line of defence.
-        self._step_seq: int = 0
+        # Step request signal.  ``_request_step`` sets this when a step is
+        # requested while a step task is in-flight; ``_step``'s drain loop
+        # atomically checks + clears it.  See :attr:`_step_request` on the
+        # class body for the concurrency contract.  No additional gate or
+        # counter is needed — the asyncio.Event set/check/clear pattern
+        # replaces the previous ``_step_gate`` (threading.Lock),
+        # ``_step_pending`` (bool), and ``_step_seq`` (int) triple.
+        self._step_request = asyncio.Event()
         # Suppresses memory-pressure condensation signalling during batch drain
         # so that pending actions are not disrupted mid-batch.
         self._draining_batch = False
@@ -242,9 +236,11 @@ class SessionOrchestrator(
         __init__) because this method is often called from EventStream's
         thread-pool dispatcher which runs disposable event loops.
 
-        Thread-safe: the _step_gate is held for the entire task-creation
-        window so that call_soon_threadsafe + _create_step_task is atomic.
-        Only one step task can be created even across concurrent calls.
+        Thread-safe: dispatches ``_request_step`` onto the main loop via
+        ``call_soon_threadsafe`` (or runs it inline if the main loop is
+        unavailable).  The check-and-set of ``_step_request`` /
+        ``_step_task`` happens inside ``_request_step`` on the main loop,
+        so the operation is atomic without any additional threading lock.
         """
         if self._closed:
             return
@@ -263,23 +259,26 @@ class SessionOrchestrator(
                 pass
         self._record_watchdog_step()
 
-        # Atomic gate: prevents two threads from both seeing _step_task as done
-        # and both creating step tasks.  The gate is held for the entire
-        # call_soon_threadsafe window so no other thread can interleave.
-        with self._step_gate:
-            if self._step_task and not self._step_task.done():
-                # Bump _step_seq so the in-flight ``_step`` task's ``finally``
-                # block does NOT clear ``_step_pending`` (it's a fresh
-                # re-queue that arrived during the task's teardown window).
-                self._step_seq += 1
-                self._step_pending = True
-                return
+        main_loop = get_main_event_loop()
+        if main_loop is not None and main_loop.is_running():
+            main_loop.call_soon_threadsafe(self._request_step)
+        else:
+            self._request_step()
 
-            main_loop = get_main_event_loop()
-            if main_loop is not None and main_loop.is_running():
-                main_loop.call_soon_threadsafe(self._create_step_task)
-            else:
-                self._create_step_task()
+    def _request_step(self) -> None:
+        """Run on the main event loop.  Atomically routes a step request.
+
+        If a step task is already running, set ``_step_request`` so the
+        in-flight drain loop picks up another iteration.  Otherwise create
+        a fresh step task.  Replaces the previous ``_step_gate`` lock that
+        serialised the check-and-create across threads.
+        """
+        if self._closed:
+            return
+        if self._step_task is not None and not self._step_task.done():
+            self._step_request.set()
+            return
+        self._create_step_task()
 
     async def _step(self) -> None:
         """Execute one agent step.
@@ -289,43 +288,37 @@ class SessionOrchestrator(
         and has more queued actions from the same LLM response, those are
         drained immediately without re-entering the full polling cycle.
 
-        If another step is already running, marks _step_pending so the
-        current step will re-trigger after it completes — no events are
-        silently dropped.
+        The drain loop is driven by ``_step_request``: ``_request_step``
+        sets the event when a fresh ``step()`` call arrives while this
+        coroutine is alive.  Between iterations we atomically check + clear
+        the event — no separate counter or threading lock is needed.
         """
         async with self._step_lock:
             self._step_owner_task = asyncio.current_task()
-            # Capture the ``_step_seq`` counter on entry.  If a fresh
-            # ``step()`` call bumps the counter while we're still inside
-            # the drain loop, the ``finally`` block must NOT clobber the
-            # corresponding ``_step_pending = True`` — that fresh request
-            # belongs to a newer step and must survive our teardown.
-            entry_seq = self._step_seq
             try:
                 drained_count = 0
                 while drained_count < DEFAULT_AGENT_STEP_DRAIN_LIMIT:
                     drained_count += 1
                     await self._step_inner()
                     await asyncio.sleep(0)
-                    if not self._step_pending:
+                    if not self._step_request.is_set():
                         break
-                    self._step_pending = False
+                    self._step_request.clear()
                     if not self.step_prerequisites.can_step():
                         break
             finally:
                 self._step_owner_task = None
-                # Only clear _step_pending if no fresh request arrived
-                # during our teardown.  This closes the race that
-                # ``schedule_step_soon`` (and the previous direct
-                # ``self.step()`` in ``_on_event``) used to lose requests
-                # to the ``finally`` wipe.
-                if self._step_seq == entry_seq:
-                    self._step_pending = False
-                else:
-                    # Newer request arrived — keep _step_pending set so
-                    # the new _step task (already created via
-                    # call_soon_threadsafe) sees it on its first pass.
-                    self._step_pending = True
+                # If a fresh step request arrived during our teardown, the
+                # event is set but no in-flight task will pick it up.
+                # Schedule a new task on the next loop iteration.  This is
+                # the asyncio.Event equivalent of the old ``_step_seq``
+                # mechanism — by the time the call_soon callback fires,
+                # ``self._step_task`` will already be done, so
+                # ``_create_step_task`` will create a fresh task.
+                if not self._closed and self._step_request.is_set():
+                    self._step_request.clear()
+                    loop = asyncio.get_event_loop()
+                    loop.call_soon(self._create_step_task)
 
     async def _step_inner(self) -> None:
         """Inner step logic, guarded by _step_lock."""
@@ -566,7 +559,7 @@ class SessionOrchestrator(
             pass
         stream = self.event_stream
         try:
-            self._step_pending = False
+            self._step_request.clear()
             if self._step_task is not None and not self._step_task.done():
                 self._step_task.cancel()
                 try:

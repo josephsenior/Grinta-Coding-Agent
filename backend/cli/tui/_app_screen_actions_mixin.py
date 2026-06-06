@@ -6,8 +6,6 @@ from typing import Any
 
 from backend.cli.tui._app_dialogs import ConfirmWidget
 from backend.cli.tui._app_small_widgets import Transcript
-from backend.core.enums import AgentState, EventSource
-from backend.ledger.action import ChangeAgentStateAction
 from backend.orchestration.autonomy import normalize_autonomy_level
 
 
@@ -112,10 +110,7 @@ class _AppScreenActionsMixin:
             pass
 
         if self._is_full_autonomy():
-            self._event_stream.add_event(
-                ChangeAgentStateAction(agent_state=AgentState.USER_CONFIRMED),
-                EventSource.USER,
-            )
+            await self._controller.apply_user_decision(approved=True)
             return
 
         action_type_raw = type(pending).__name__ if pending else 'Unknown'
@@ -155,13 +150,12 @@ class _AppScreenActionsMixin:
             widget.hide()
 
         if result == 'approve':
-            decision = AgentState.USER_CONFIRMED
+            approved = True
         elif result == 'always':
-            decision = AgentState.USER_CONFIRMED
+            approved = True
             if ac is not None and pending is not None:
                 ac.remember_always_allow(pending)
         else:
-            decision = AgentState.USER_REJECTED
+            approved = False
 
-        action = ChangeAgentStateAction(agent_state=decision)
-        self._event_stream.add_event(action, EventSource.USER)
+        await self._controller.apply_user_decision(approved=approved)
