@@ -101,7 +101,6 @@ class TestActionType:
             'RUN',
             'BROWSE',
             'THINK',
-            'FINISH',
             'REJECT',
             'NULL',
             'PAUSE',
@@ -114,9 +113,6 @@ class TestActionType:
 
     def test_message_value(self):
         assert ActionType.MESSAGE.value == 'message'
-
-    def test_finish_value(self):
-        assert ActionType.FINISH.value == 'finish'
 
 
 class TestLifecyclePhase:

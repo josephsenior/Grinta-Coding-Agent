@@ -20,7 +20,6 @@ from backend.core.task_status import (
 )
 from backend.inference.metrics import Metrics
 from backend.ledger.action import MessageAction
-from backend.ledger.action.agent import PlaybookFinishAction
 from backend.ledger.event import Event, EventSource
 from backend.orchestration.state.control_flags import (
     BudgetControlFlag,
@@ -910,9 +909,7 @@ class State:
             and event.source == EventSource.AGENT
             and bool(getattr(event, 'final_response', False))
         )
-        if (
-            isinstance(event, PlaybookFinishAction) or is_final_message
-        ) and last_user_message is not None:
+        if is_final_message and last_user_message is not None:
             return (last_user_message, None)
         return None
 
@@ -926,7 +923,7 @@ class State:
                 last_user_message, last_user_message_image_urls = (
                     self._process_user_message_event(event)
                 )
-            elif isinstance(event, PlaybookFinishAction) or (
+            elif (
                 isinstance(event, MessageAction)
                 and event.source == EventSource.AGENT
                 and bool(getattr(event, 'final_response', False))

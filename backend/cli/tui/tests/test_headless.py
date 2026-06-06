@@ -35,7 +35,6 @@ from backend.cli.tui.widgets.activity_card import (
 from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
     DiffLine,
-    PlanMessage,
     SplitDiffLine,
     ThinkingIndicator,
     TurnCompletion,
@@ -125,76 +124,6 @@ async def _fill_scrollable_transcript(display, pilot, *, count: int = 80) -> Non
     display.force_scroll_end()
     await pilot.pause()
     assert display.max_scroll_y > 0
-
-
-def test_tui_plan_message_renders_structured_plan_card():
-    action = SimpleNamespace(
-        final_thought='Plan produced.',
-        outputs={
-            'status': 'completed',
-            'summary': 'Plan produced.',
-            'plan': ['Inspect `backend/cli/hud.py`.', 'Run tests.'],
-            'files_or_areas': ['backend/cli/hud.py'],
-            'risks': ['Estimated provider usage.'],
-            'verification': [
-                '`uv run pytest backend/tests/unit/cli/test_cli_frontend.py -q`'
-            ],
-            'assumptions': ['Metrics are present.'],
-            'next_step': 'Switch to Agent Mode.',
-        },
-    )
-
-    widget = PlanMessage(action)
-
-    console = RichConsole(record=True, width=100)
-    console.print(widget.renderable)
-    rendered = console.export_text()
-    assert 'Plan Ready' in rendered
-    assert 'Execution Plan' in rendered
-    assert 'backend/cli/hud.py' in rendered
-
-
-def test_tui_plan_message_renders_adaptive_finish_sections():
-    action = SimpleNamespace(
-        final_thought='Here is the recommended plan.',
-        outputs={
-            'mode': 'plan',
-            'status': 'completed',
-            'response': 'Here is the recommended plan.',
-            'summary': 'Produced an adaptive plan.',
-            'sections': [
-                {
-                    'title': 'Objective',
-                    'items': ['Improve finish output across task types.'],
-                },
-                {
-                    'title': 'Recommended Plan',
-                    'items': ['Update schema.', 'Normalize handlers.', 'Verify rendering.'],
-                },
-                {
-                    'title': 'Verification Strategy',
-                    'items': ['Run finish and TUI renderer tests.'],
-                },
-            ],
-            'evidence': {
-                'status': 'planned',
-                'details': 'Based on the finish schema and renderer paths.',
-            },
-            'open_items': ['Decide whether to add a generic Agent finish card.'],
-            'next_step': 'Switch to Agent Mode.',
-        },
-    )
-
-    widget = PlanMessage(action)
-
-    console = RichConsole(record=True, width=100)
-    console.print(widget.renderable)
-    rendered = console.export_text()
-    assert 'Plan Ready' in rendered
-    assert 'Objective' in rendered
-    assert 'Recommended Plan' in rendered
-    assert 'Evidence / Verification' in rendered
-    assert 'Open Items' in rendered
 
 
 @pytest.mark.asyncio

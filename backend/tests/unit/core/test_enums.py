@@ -129,7 +129,6 @@ class TestActionType:
         assert ActionType.READ.value == 'read'
         assert ActionType.WRITE.value == 'write'
         assert ActionType.EDIT.value == 'edit'
-        assert ActionType.FINISH.value == 'finish'
 
     def test_control_action_types(self):
         """Test ActionType has control action values."""

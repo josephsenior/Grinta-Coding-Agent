@@ -206,9 +206,10 @@ class TestDeserializeAction(unittest.TestCase):
         self.assertIsNotNone(a)
 
     def test_finish(self):
+        """Legacy 'finish' action_type is no longer recognised."""
         data = {'action_type': 'finish'}
-        a = _deserialize_action(data)
-        self.assertIsNotNone(a)
+        with self.assertRaises(ValueError):
+            _deserialize_action(data)
 
     def test_reject(self):
         data = {'action_type': 'reject'}

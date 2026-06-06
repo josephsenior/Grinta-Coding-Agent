@@ -18,7 +18,7 @@ from backend.ledger.action import (
     FileReadAction,
     FileWriteAction,
     MCPAction,
-    PlaybookFinishAction,
+    MessageAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import (
@@ -174,9 +174,13 @@ def _summarize_delegate_browser_action(
 def _summarize_delegate_finish_event(
     event: Action | Observation,
 ) -> tuple[str, str] | None:
-    if not isinstance(event, PlaybookFinishAction):
+    if not (
+        isinstance(event, MessageAction)
+        and bool(getattr(event, 'final_response', False))
+    ):
         return None
-    summary = _truncate_delegate_progress((event.message or '').splitlines()[0], 140)
+    content = str(getattr(event, 'content', '') or '').strip()
+    summary = _truncate_delegate_progress(content.splitlines()[0], 140)
     return 'done', summary or 'Completed'
 
 

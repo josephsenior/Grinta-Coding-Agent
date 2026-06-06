@@ -47,6 +47,32 @@ def _looks_error_heavy(text: str | None) -> bool:
     return bool(_ERROR_HEAVY_PATTERN.search(text))
 
 
+def _extract_search_query(command: str) -> str:
+    """Extract the search query/pattern from a grep/glob command."""
+    # Try to extract quoted pattern: rg "pattern" or grep 'pattern'
+    match = re.search(r'(?:rg|grep)\s+[\'"]([^\'"]+)[\'"]', command)
+    if match:
+        return match.group(1)
+
+    # Try to extract unquoted pattern: rg pattern or grep pattern
+    match = re.search(r'(?:rg|grep)\s+(\S+)', command)
+    if match:
+        return match.group(1)
+
+    # PowerShell Get-ChildItem with filter
+    match = re.search(r'-Filter\s+[\'"]([^\'"]+)[\'"]', command)
+    if match:
+        return match.group(1)
+
+    # Fallback: return first meaningful argument
+    parts = command.split()
+    for part in parts[1:]:
+        if not part.startswith('-') and part not in ('|', 'rg', 'grep'):
+            return part[:50]
+
+    return command[:50]
+
+
 def _lexer_for_path(path: str) -> str | None:
     """Return a Pygments lexer name for ``path`` based on its extension.
 
@@ -146,6 +172,12 @@ class ActivityRenderer:
         duration: str = '',
     ) -> ActivityCard:
         """Create an activity card for a shell command."""
+        # Check if this is a grep/glob command and route to search card
+        if ActivityRenderer._is_grep_glob_command(command):
+            return ActivityRenderer._grep_glob_shell_command(
+                command, output, exit_code
+            )
+
         cmd_preview = command[:80] + ('...' if len(command) > 80 else '')
 
         secondary_parts: list[str] = []
@@ -191,6 +223,95 @@ class ActivityRenderer:
             is_collapsible=bool(output),
             start_collapsed=should_collapse,
             syntax_language='console',
+        )
+
+    @staticmethod
+    def _is_grep_glob_command(command: str) -> bool:
+        """Check if a shell command is a grep or glob operation."""
+        cmd_lower = command.lower()
+        # Check for rg (ripgrep), grep, or glob patterns
+        return (
+            cmd_lower.startswith('rg ')
+            or cmd_lower.startswith('grep ')
+            or cmd_lower.startswith('grep -')
+            or ' | rg ' in cmd_lower
+            or ' | grep ' in cmd_lower
+            or cmd_lower.startswith('get-childitem')  # PowerShell glob
+            or cmd_lower.startswith('gci ')  # PowerShell glob alias
+        )
+
+    @staticmethod
+    def _grep_glob_shell_command(
+        command: str,
+        output: str | None = None,
+        exit_code: int | None = None,
+    ) -> ActivityCard:
+        """Create a search card for grep/glob shell commands."""
+        # Extract query from command
+        query = _extract_search_query(command)
+        if not query:
+            query = command[:50]
+
+        # Parse output for match counts
+        match_count = 0
+        file_count = 0
+        result_lines = []
+
+        if output:
+            result_lines = output.splitlines()
+            # Try to count matches (ripgrep format: file:line:content)
+            for line in result_lines:
+                if re.match(r'^[^:]+:\d+:', line):
+                    match_count += 1
+            # Count unique files
+            files = set()
+            for line in result_lines:
+                match = re.match(r'^([^:]+):\d+:', line)
+                if match:
+                    files.add(match.group(1))
+            file_count = len(files)
+
+        secondary = None
+        if match_count and file_count:
+            secondary = f'{match_count} matches · {file_count} files'
+        elif match_count:
+            secondary = f'{match_count} matches'
+        elif exit_code == 1:  # grep returns 1 when no matches
+            secondary = 'no matches'
+
+        extra_lines: list[ActivityLine] = []
+        if result_lines:
+            # Show first 8 lines of results
+            for line in result_lines[:8]:
+                truncated = line[:120] + ('...' if len(line) > 120 else '')
+                extra_lines.append(
+                    ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
+                )
+            if len(result_lines) > 8:
+                extra_lines.append(
+                    ActivityLine(
+                        f'... {len(result_lines) - 8} more lines',
+                        style=NAVY_TEXT_DIM,
+                        indent=1,
+                    )
+                )
+
+        kind = (
+            'ok'
+            if exit_code == 0 or (exit_code == 1 and not output)
+            else ('err' if exit_code is not None and exit_code > 1 else 'neutral')
+        )
+
+        return ActivityCard(
+            verb='Search',
+            detail=f'"{query}"',
+            badge_category='search',
+            title='Search',
+            secondary=secondary,
+            secondary_kind=kind if match_count else 'neutral',
+            extra_lines=extra_lines,
+            is_collapsible=bool(extra_lines),
+            start_collapsed=bool(output) and exit_code == 0,
         )
 
     @staticmethod

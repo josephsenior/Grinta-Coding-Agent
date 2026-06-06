@@ -15,7 +15,6 @@ from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
     MessageAction,
-    PlaybookFinishAction,
     TaskTrackingAction,
 )
 from backend.ledger.observation import Observation
@@ -37,12 +36,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.set_agent_state_to = AsyncMock()
         self.mock_controller.log_task_audit = AsyncMock()
         self.mock_controller.task_validation_service = MagicMock()
-        self.mock_controller.task_validation_service.handle_finish = AsyncMock(
-            return_value=True
-        )
-        self.mock_controller.task_validation_service.handle_final_response = AsyncMock(
-            return_value=True
-        )
+        self.mock_controller.task_validation_service.validate_completion_quality = AsyncMock()
         self.mock_controller.observation_service = MagicMock()
         self.mock_controller.observation_service.handle_observation = AsyncMock()
         self.mock_controller.state = MagicMock()
@@ -582,6 +576,34 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn('active_run_mode', self.mock_controller.state.extra_data)
 
+    async def test_plain_text_final_response_transitions_to_finished(self):
+        """A plain-text final response must transition to FINISHED.
+
+        Regression: the historical ``handle_final_response`` middleware
+        could return False on an incomplete plan, leaving the agent stuck
+        in ``RUNNING`` because an ``ErrorObservation`` from the validator
+        does not schedule another step.  The service is now an opt-in
+        quality check that emits a warning but never blocks.
+        """
+        self.mock_controller.task_validation_service.validate_completion_quality = AsyncMock()
+        self.mock_controller.state.extra_data['active_run_mode'] = 'plan'
+
+        finish_action = MessageAction(
+            content='Here is the summary.', final_response=True
+        )
+        finish_action.source = EventSource.AGENT
+
+        self.mock_controller.set_agent_state_to.reset_mock()
+        await self.service._handle_message_action(finish_action)
+
+        self.mock_controller.set_agent_state_to.assert_called_once_with(
+            AgentState.FINISHED
+        )
+        self.mock_controller.task_validation_service.validate_completion_quality.assert_awaited_once_with(
+            finish_action
+        )
+        self.assertNotIn('active_run_mode', self.mock_controller.state.extra_data)
+
     async def test_handle_task_tracking_action_uses_canonical_plan_payloads(self):
         """Live plan updates should keep the canonical task payload shape intact."""
         action = TaskTrackingAction(
@@ -607,41 +629,6 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plan.steps[0].subtasks[0].id, 'step-1')
         self.assertEqual(plan.steps[0].subtasks[0].description, 'Nested child')
         self.assertEqual(plan.steps[0].subtasks[0].status, 'done')
-
-    async def test_handle_finish_action_success(self):
-        """Test _handle_finish_action marks task as finished."""
-        action = PlaybookFinishAction(outputs={'result': 'success'})
-        self.mock_controller.state.extra_data['active_run_mode'] = 'plan'
-
-        await self.service._handle_finish_action(action)
-
-        # Should set outputs
-        self.mock_controller.state.set_outputs.assert_called_once_with(
-            {'result': 'success'}, source='EventRouterService.finish'
-        )
-
-        # Should set state to finished
-        self.mock_controller.set_agent_state_to.assert_called_once_with(
-            AgentState.FINISHED
-        )
-
-        # Should log audit
-        self.mock_controller.log_task_audit.assert_called_once_with(status='success')
-        self.assertNotIn('active_run_mode', self.mock_controller.state.extra_data)
-
-    async def test_handle_finish_action_validation_fails(self):
-        """Test _handle_finish_action skips finish when validation fails."""
-        action = PlaybookFinishAction(outputs={})
-
-        self.mock_controller.task_validation_service.handle_finish = AsyncMock(
-            return_value=False
-        )
-
-        await self.service._handle_finish_action(action)
-
-        # Should not set state or outputs
-        self.mock_controller.state.set_outputs.assert_not_called()
-        self.mock_controller.set_agent_state_to.assert_not_called()
 
     async def test_handle_reject_action(self):
         """Test _handle_reject_action marks task as rejected."""
@@ -776,13 +763,6 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(mock_event_stream.call_args.kwargs['worker_count'], 0)
                 # Worker loop must call _step_inner directly
                 self.assertTrue(step_inner_called)
-
-    async def test_handle_finish_action_calls_run_critics(self):
-        """_handle_finish_action must invoke critics after audit log."""
-        action = PlaybookFinishAction(outputs={})
-        with patch.object(self.service, '_run_critics', new_callable=AsyncMock) as m:
-            await self.service._handle_finish_action(action)
-        m.assert_called_once()
 
     def test_summarize_delegate_worker_event_for_tool_actions(self):
         read_action = FileReadAction(path='src/main.py')

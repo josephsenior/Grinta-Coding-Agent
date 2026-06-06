@@ -12,7 +12,6 @@ from backend.ledger.action import (
     FileReadAction,
     FileWriteAction,
     MessageAction,
-    PlaybookFinishAction,
 )
 from backend.ledger.observation import (
     AgentStateChangedObservation,
@@ -91,8 +90,10 @@ class Echo(Agent):
                 'observations': [AgentStateChangedObservation('', AgentState.REJECTED)],
             },
             {
-                'action': PlaybookFinishAction(
-                    outputs={}, thought='Task completed', final_thought='Task completed'
+                'action': MessageAction(
+                    content='Task completed',
+                    thought='Task completed',
+                    final_response=True,
                 ),
                 'observations': [AgentStateChangedObservation('', AgentState.FINISHED)],
             },
@@ -196,7 +197,7 @@ class Echo(Agent):
     def step(self, state: State) -> Action:
         """Execute the next step in the dummy agent's predefined sequence."""
         if state.iteration_flag.current_value >= len(self.steps):
-            return PlaybookFinishAction()
+            return MessageAction(content='Done.', final_response=True)
 
         current_step = self.steps[state.iteration_flag.current_value]
 

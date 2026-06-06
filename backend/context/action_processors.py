@@ -18,7 +18,6 @@ from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
     MessageAction,
-    PlaybookFinishAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import (
@@ -70,8 +69,6 @@ def convert_action_to_messages(
     """
     if _is_tool_based_action(action):
         return _handle_tool_based_action(action, pending_tool_call_action_messages)
-    if isinstance(action, PlaybookFinishAction):
-        return _handle_agent_finish_action(action)
     if isinstance(action, MessageAction):
         return _handle_message_action(action, vision_is_active)
     if isinstance(action, CmdRunAction):
@@ -348,57 +345,6 @@ def _ensure_tool_call_function(
         }
 
     call_dict['function'] = function_payload
-
-
-def _handle_agent_finish_action(action: PlaybookFinishAction) -> list[Message]:
-    """Handle PlaybookFinishAction by converting thought/conclusion to message."""
-    role = _role_from_source(getattr(action, 'source', None))
-    _merge_tool_metadata_thought(action)
-    content_items: list[TextContent | ImageContent] = [TextContent(text=action.message)]
-    return [Message(role=role, content=content_items)]
-
-
-def _role_from_source(
-    source: EventSource | str | None,
-) -> Literal['user', 'system', 'assistant', 'tool']:
-    src_value = source.value if isinstance(source, EventSource) else source
-    role_value = 'user' if src_value == 'user' else 'assistant'
-    return cast(Literal['user', 'system', 'assistant', 'tool'], role_value)
-
-
-def _assistant_message_content_from_tool_metadata(tool_metadata: Any) -> str | None:
-    response = _to_model_response_lite(tool_metadata.model_response)
-    if response is None or not response.choices:
-        return None
-    choice = response.choices[0]
-    if not hasattr(choice, 'message'):
-        return None
-    assistant_msg = cast(Any, choice).message
-    return getattr(assistant_msg, 'content', '') or ''
-
-
-def _thought_target_attr(action: PlaybookFinishAction) -> str:
-    return 'final_thought' if getattr(action, 'final_thought', '') else 'thought'
-
-
-def _merge_thought_content(current: str, content: str) -> str:
-    if not current:
-        return content
-    if current == content or not content:
-        return current
-    return current + '\n' + content
-
-
-def _merge_tool_metadata_thought(action: PlaybookFinishAction) -> None:
-    tool_metadata = action.tool_call_metadata
-    if tool_metadata is None:
-        return
-    content = _assistant_message_content_from_tool_metadata(tool_metadata)
-    if content is not None:
-        target_attr = _thought_target_attr(action)
-        current = getattr(action, target_attr, '') or ''
-        setattr(action, target_attr, _merge_thought_content(current, content))
-    action.tool_call_metadata = None
 
 
 def _message_role_from_source(

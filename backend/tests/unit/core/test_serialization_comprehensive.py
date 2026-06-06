@@ -100,11 +100,6 @@ class TestDeserializeAction:
         ev = deserialize_event(d)
         assert ev.__class__.__name__ == 'FileEditActionSchema'
 
-    def test_finish_action(self):
-        d = _action_dict('finish')
-        ev = deserialize_event(d)
-        assert ev.__class__.__name__ == 'PlaybookFinishActionSchema'
-
     def test_reject_action(self):
         d = _action_dict('reject')
         ev = deserialize_event(d)

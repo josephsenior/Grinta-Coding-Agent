@@ -15,7 +15,7 @@ import pytest
 from backend.core.enums import LifecyclePhase
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
-from backend.ledger.action import MessageAction, PlaybookFinishAction
+from backend.ledger.action import MessageAction
 from backend.orchestration.action_scheduler import ActionScheduler
 from backend.orchestration.orchestration_config import OrchestrationConfig
 from backend.orchestration.session_orchestrator import (
@@ -1768,12 +1768,12 @@ class TestStepDispatch(unittest.TestCase):
             self.ctrl.services.action_execution.execute_action.call_count, 1
         )
 
-    async def test_finish_action_clears_stale_queued_followups(self):
-        """A finish action must stop the same-response drain loop immediately."""
+    async def test_final_response_clears_stale_queued_followups(self):
+        """A final-response action must stop the same-response drain loop immediately."""
         self.ctrl.services.step_prerequisites.can_step.return_value = True
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
         self.ctrl.services.retry.retry_count = 0
-        finish = PlaybookFinishAction(final_thought='done')
+        finish = MessageAction(content='done', final_response=True)
         finish.source = EventSource.AGENT
         stale = MessageAction(content='Anything else?', wait_for_response=True)
         stale.source = EventSource.AGENT
