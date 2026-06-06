@@ -64,6 +64,12 @@ _HARD_STOP_EXCEPTIONS = (
     APIConnectionError,
     InternalServerError,
     LLMNoResponseError,
+    # Python built-in exceptions that indicate SDK bugs or malformed responses.
+    # The agent cannot adapt to these - they're not actionable errors.
+    IndexError,
+    KeyError,
+    TypeError,
+    AttributeError,
 )
 
 # Errors that need a rate-limit back-off before retrying. These also use the
