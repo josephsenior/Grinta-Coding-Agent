@@ -53,7 +53,6 @@ from backend.ledger.action import (
     MCPAction,
     MessageAction,
     NullAction,
-    PlaybookFinishAction,
     ProposalAction,
     RecallAction,
     StreamingChunkAction,
@@ -712,20 +711,6 @@ def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
             orch._pending_delegate_card = None
         else:
             orch._write_card(card)
-    elif isinstance(event, PlaybookFinishAction):
-        from backend.cli.plan_display import is_structured_plan_finish
-        from backend.cli.tui.widgets.activity_card import PlanMessage
-
-        if is_structured_plan_finish(event):
-            orch._tui._write_log(PlanMessage(event))
-        else:
-            message = getattr(event, 'message', '') or ''
-            if message:
-                from backend.cli.theme import get_grinta_pygments_style
-
-                orch._tui._write_log(
-                    Markdown(message, code_theme=get_grinta_pygments_style())
-                )
     elif isinstance(event, UserRejectObservation):
         card = ActivityRenderer.user_reject()
         orch._write_card(card)

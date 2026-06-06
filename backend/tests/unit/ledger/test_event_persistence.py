@@ -13,9 +13,10 @@ from backend.ledger.persistence import EventPersistence
 
 
 class TestIsCriticalEvent:
-    def test_critical_action_finish(self):
+    def test_legacy_finish_action_not_critical(self):
+        """The 'finish' action type was removed; no longer a critical event."""
         event = SimpleNamespace(action='finish', observation=None)
-        assert EventPersistence.is_critical_event(event) is True
+        assert EventPersistence.is_critical_event(event) is False
 
     def test_critical_action_reject(self):
         event = SimpleNamespace(action='reject', observation=None)

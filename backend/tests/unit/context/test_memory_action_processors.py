@@ -15,7 +15,6 @@ from backend.context.action_processors import (
     _handle_user_cmd_action,
     _is_tool_based_action,
     _role_from_assistant_message,
-    _role_from_source,
     _should_emit_user_tool_request,
     convert_action_to_messages,
 )
@@ -153,26 +152,6 @@ class TestContentFromAssistantMessageProc:
         assert len(result) == 1
         part = result[0]
         assert isinstance(part, TextContent) and '42' in part.text
-
-
-# ── _role_from_source ─────────────────────────────────────────────────
-
-
-class TestRoleFromSourceProc:
-    def test_user_source(self):
-        assert _role_from_source(EventSource.USER) == 'user'
-
-    def test_agent_source(self):
-        assert _role_from_source(EventSource.AGENT) == 'assistant'
-
-    def test_string_user(self):
-        assert _role_from_source('user') == 'user'
-
-    def test_string_agent(self):
-        assert _role_from_source('agent') == 'assistant'
-
-    def test_none_source(self):
-        assert _role_from_source(None) == 'assistant'
 
 
 # ── _convert_tool_calls ──────────────────────────────────────────────

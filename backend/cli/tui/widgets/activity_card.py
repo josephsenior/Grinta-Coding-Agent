@@ -13,6 +13,7 @@ Expanded cards show:
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from rich.syntax import Syntax
@@ -755,20 +756,12 @@ class AgentMessage(Static):
         self.update(Markdown(text, code_theme=get_grinta_pygments_style()))
 
 
-class PlanMessage(Static):
-    """Structured Plan-mode finish card."""
-
-    def __init__(self, action: object, *, id: str | None = None) -> None:
-        from backend.cli.plan_display import render_plan_finish_panel
-
-        super().__init__(render_plan_finish_panel(action), id=id)
-
-
 class ThinkingIndicator(Container):
     """Thinking/reasoning indicator with inline prefix.
 
     Shows the thinking content directly with a "Thinking:" prefix
     inline on the first line. No collapse/expand, no duration display.
+    Supports syntax highlighting for code blocks within thinking content.
     """
 
     DEFAULT_CSS = """
@@ -787,7 +780,18 @@ class ThinkingIndicator(Container):
         width: 100%;
         height: auto;
     }
+    ThinkingIndicator .code-block {
+        margin: 1 0;
+        padding: 0 1;
+        background: #0d1525;
+    }
     """
+
+    # Pattern to match fenced code blocks: ```language\n...\n```
+    _CODE_BLOCK_PATTERN = re.compile(
+        r'```(\w*)\n(.*?)```',
+        re.DOTALL
+    )
 
     def __init__(self, *, id: str | None = None) -> None:
         super().__init__(id=id)
@@ -821,6 +825,82 @@ class ThinkingIndicator(Container):
     def finalize(self) -> None:
         """No-op for API compatibility."""
 
+    def _has_code_blocks(self, text: str) -> bool:
+        """Check if text contains fenced code blocks."""
+        return bool(self._CODE_BLOCK_PATTERN.search(text))
+
+    def _render_with_code_blocks(self, text: str) -> Any:
+        """Render text with syntax-highlighted code blocks.
+
+        Returns a Text object or a Container with mixed content.
+        """
+        prefix = f'{self._current_action}: '
+        prefix_color = '#5eead4'
+        text_color = '#8c8c94'  # ~0.7 opacity of #c8c8d4 against dark bg
+
+        # Split text into code blocks and plain text segments
+        segments = []
+        last_end = 0
+
+        for match in self._CODE_BLOCK_PATTERN.finditer(text):
+            # Add plain text before this code block
+            if match.start() > last_end:
+                plain_text = text[last_end:match.start()]
+                if plain_text.strip():
+                    segments.append(('plain', plain_text))
+
+            # Add the code block
+            language = match.group(1) or 'text'
+            code_content = match.group(2)
+            segments.append(('code', (language, code_content)))
+
+            last_end = match.end()
+
+        # Add any remaining plain text
+        if last_end < len(text):
+            remaining = text[last_end:]
+            if remaining.strip():
+                segments.append(('plain', remaining))
+
+        # If no code blocks found, return simple Text
+        if not segments:
+            parts = [(prefix, f'bold {prefix_color}'), (text, text_color)]
+            return Text.assemble(*parts)
+
+        # Build rich renderable with mixed content
+        from textual.containers import Vertical
+        from textual.widgets import Static as TextualStatic
+
+        container = Vertical()
+
+        for seg_type, seg_content in segments:
+            if seg_type == 'plain':
+                # Render plain text with prefix on first segment
+                if not container.children:
+                    parts = [(prefix, f'bold {prefix_color}'), (seg_content, text_color)]
+                    text_widget = TextualStatic(Text.assemble(*parts))
+                else:
+                    text_widget = TextualStatic(
+                        Text(seg_content, style=text_color)
+                    )
+                container.mount(text_widget)
+            else:
+                # Render code block with syntax highlighting
+                language, code = seg_content
+                syntax = Syntax(
+                    code,
+                    language,
+                    theme=get_grinta_pygments_style(),
+                    background_color='#0d1525',
+                    padding=(0, 1),
+                    word_wrap=True,
+                )
+                code_widget = TextualStatic(syntax)
+                code_widget.add_class('code-block')
+                container.mount(code_widget)
+
+        return container
+
     def _update_display(self) -> None:
         try:
             content = self.query_one('#thinking-content', Static)
@@ -830,23 +910,33 @@ class ThinkingIndicator(Container):
         if not self._thoughts:
             return
 
-        prefix = f'{self._current_action}: '
-        prefix_color = '#5eead4'
-        text_color = '#c8c8d4'
+        full_text = '\n'.join(self._thoughts)
 
-        lines = self._thoughts
-        parts: list[tuple[str, str]] = []
-
-        if len(lines) == 1:
-            parts = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
+        # Check if we need syntax highlighting
+        if self._has_code_blocks(full_text):
+            renderable = self._render_with_code_blocks(full_text)
+            # Replace the Static with a Container for mixed content
+            content.remove()
+            self.mount(renderable)
         else:
-            parts = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
-            for line in lines[1:]:
-                parts.append(('\n  ', text_color))
-                parts.append((line, text_color))
+            # Simple plain text rendering
+            prefix = f'{self._current_action}: '
+            prefix_color = '#5eead4'
+            text_color = '#8c8c94'  # ~0.7 opacity of #c8c8d4 against dark bg
 
-        thoughts_text = Text.assemble(*parts)
-        content.update(thoughts_text)
+            lines = self._thoughts
+            parts: list[tuple[str, str]] = []
+
+            if len(lines) == 1:
+                parts = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
+            else:
+                parts = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
+                for line in lines[1:]:
+                    parts.append(('\n  ', text_color))
+                    parts.append((line, text_color))
+
+            thoughts_text = Text.assemble(*parts)
+            content.update(thoughts_text)
 
     def on_mount(self) -> None:
         self._update_display()

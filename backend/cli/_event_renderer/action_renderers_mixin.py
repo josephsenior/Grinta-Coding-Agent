@@ -57,10 +57,6 @@ from backend.cli.layout_tokens import (
     DECISION_PANEL_ACCENT_STYLE,
 )
 from backend.cli.path_links import linkify_plain
-from backend.cli.plan_display import (
-    is_structured_plan_finish,
-    render_plan_finish_panel,
-)
 from backend.cli.theme import (
     CLR_OPTION_RECOMMENDED,
     CLR_OPTION_TEXT,
@@ -93,7 +89,6 @@ from backend.ledger.action import (
     LspQueryAction,
     MCPAction,
     MessageAction,
-    PlaybookFinishAction,
     ProposalAction,
     RecallAction,
     StreamingChunkAction,
@@ -112,8 +107,6 @@ class ActionRenderersMixin(_ActionRenderersBase):
     _pending_shell_action: tuple[str, str] | None
     _pending_shell_title: str | None
     _pending_shell_is_internal: bool
-    _pending_finish_text: str | None
-    _pending_finish_renderable: Any | None
     _last_terminal_input_sent: str
 
     # Dispatch table for :meth:`_handle_agent_action` — maps action class to
@@ -138,7 +131,6 @@ class ActionRenderersMixin(_ActionRenderersBase):
         (TerminalInputAction, '_render_terminal_input_action'),
         (TerminalReadAction, '_render_terminal_read_action'),
         (DelegateTaskAction, '_render_delegate_task_action'),
-        (PlaybookFinishAction, '_render_playbook_finish_action'),
         (EscalateToHumanAction, '_render_escalate_to_human_action'),
         (ClarificationRequestAction, '_render_clarification_request_action'),
         (UncertaintyAction, '_render_uncertainty_action'),
@@ -715,21 +707,6 @@ class ActionRenderersMixin(_ActionRenderersBase):
             kind='delegate',
             badge_label='workers',
         )
-        self.refresh()
-
-    def _render_playbook_finish_action(self, action: PlaybookFinishAction) -> None:
-        self._flush_pending_tool_cards()
-        self._stop_reasoning()
-        # Buffer the finish text — do NOT render it yet.  The validation
-        # service may still block this finish call; ``_handle_state_change``
-        # renders it once the agent actually reaches AgentState.FINISHED.
-        if is_structured_plan_finish(action):
-            self._pending_finish_renderable = render_plan_finish_panel(action)
-            self._pending_finish_text = None
-        else:
-            finish_text = _sanitize_visible_transcript_text(action.message or '')
-            self._pending_finish_text = finish_text or None
-            self._pending_finish_renderable = None
         self.refresh()
 
     def _render_escalate_to_human_action(self, action: EscalateToHumanAction) -> None:

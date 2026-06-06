@@ -213,28 +213,46 @@ class _SessionOrchestratorStepMixin:
         if self._closed:
             return
 
-        await self.event_router.route_event(event)
+        try:
+            await self.event_router.route_event(event)
 
-        # Drive the agent loop forward for events that should trigger a step.
+            # Drive the agent loop forward for events that should trigger a step.
 
-        # This is necessary in the server (event-driven) path because there is
+            # This is necessary in the server (event-driven) path because there is
 
-        # no external polling loop like run_agent_until_done in CLI/headless mode.
+            # no external polling loop like run_agent_until_done in CLI/headless mode.
 
-        # Examples: ThinkObservation, most tool observations (after pending is
+            # Examples: ThinkObservation, most tool observations (after pending is
 
-        # cleared by observation_service.trigger_step), etc.
+            # cleared by observation_service.trigger_step), etc.
 
-        # IMPORTANT: must funnel through ``schedule_step_soon`` (not a direct
-        # ``self.step()``) to dodge the race documented in
-        # :meth:`schedule_step_soon`.  A direct call here races with the
-        # in-flight ``_step`` task's ``finally`` block: the call sees the
-        # previous ``_step_task`` as still alive, sets ``_step_pending = True``,
-        # returns — and the just-finishing ``_step`` task immediately clears
-        # ``_step_pending`` in its teardown, leaving the agent with no
-        # re-queued step and visibly stuck in ``AgentState.RUNNING`` forever.
-        if not self._closed and self.should_step(event):
-            self.schedule_step_soon()
+            # IMPORTANT: must funnel through ``schedule_step_soon`` (not a direct
+            # ``self.step()``) to dodge the race documented in
+            # :meth:`schedule_step_soon`.  A direct call here races with the
+            # in-flight ``_step`` task's ``finally`` block: the call sees the
+            # previous ``_step_task`` as still alive, sets ``_step_pending = True``,
+            # returns — and the just-finishing ``_step`` task immediately clears
+            # ``_step_pending`` in its teardown, leaving the agent with no
+            # re-queued step and visibly stuck in ``AgentState.RUNNING`` forever.
+            if not self._closed and self.should_step(event):
+                self.schedule_step_soon()
+        except Exception as exc:
+            event_type = type(event).__name__
+            event_id = getattr(event, 'id', '?')
+            logger.error(
+                '_on_event: unhandled exception processing %s (id=%s): %s: %s',
+                event_type,
+                event_id,
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+                extra={'msg_type': 'ON_EVENT_EXCEPTION'},
+            )
+            if not self._closed and self.should_step(event):
+                try:
+                    self.schedule_step_soon()
+                except Exception:
+                    pass
 
     def _schedule_coroutine(self, coro: Coroutine[Any, Any, Any]) -> None:
         """Schedule a coroutine using the current or new event loop."""

@@ -25,7 +25,6 @@ from backend.ledger.action import (
     AgentRejectAction,
     ChangeAgentStateAction,
     MessageAction,
-    PlaybookFinishAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import (
@@ -85,7 +84,6 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
 
         for action_type, handler in (
             (MessageAction, self._handle_message_action),
-            (PlaybookFinishAction, self._handle_finish_action),
             (AgentRejectAction, self._handle_reject_action),
             (TaskTrackingAction, self._handle_task_tracking_action),
             (DelegateTaskAction, self._handle_delegate_task_action),
@@ -119,16 +117,6 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
         except Exception as e:
             self._ctrl.log('error', f'Failed to update plan: {e}')
 
-    async def _handle_finish_action(self, action: PlaybookFinishAction) -> None:
-        """Handle agent finish action with completion validation."""
-        if not await self._ctrl.task_validation_service.handle_finish(action):
-            return
-        self._ctrl.state.set_outputs(action.outputs, source='EventRouterService.finish')
-        self._ctrl.state.extra_data.pop('active_run_mode', None)
-        await self._ctrl.set_agent_state_to(AgentState.FINISHED)
-        await self._ctrl.log_task_audit(status='success')
-        await self._run_critics()
-
     async def _handle_reject_action(self, action: AgentRejectAction) -> None:
         """Handle agent reject action."""
         self._ctrl.state.set_outputs(action.outputs, source='EventRouterService.reject')
@@ -145,10 +133,11 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                 await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
                 return
             if bool(getattr(action, 'final_response', False)):
-                if not await self._ctrl.task_validation_service.handle_final_response(
+                # Optional LLM-judge quality check; emits a warning on
+                # failure but never blocks the transition.
+                await self._ctrl.task_validation_service.validate_completion_quality(
                     action
-                ):
-                    return
+                )
                 content = str(getattr(action, 'content', '') or '').strip()
                 self._ctrl.state.set_outputs(
                     {

@@ -20,7 +20,6 @@ from backend.ledger.action.agent import (
     ChangeAgentStateAction,
     CondensationAction,
     CondensationRequestAction,
-    PlaybookFinishAction,
     RecallAction,
     TaskTrackingAction,
 )
@@ -345,76 +344,6 @@ class TestChangeAgentStateAction(unittest.TestCase):
 
     def test_default_agent_state(self):
         self.assertEqual(ChangeAgentStateAction().agent_state, '')
-
-
-# ---------------------------------------------------------------------------
-# PlaybookFinishAction
-# ---------------------------------------------------------------------------
-class TestPlaybookFinishAction(unittest.TestCase):
-    def test_action_type(self):
-        self.assertEqual(PlaybookFinishAction.action, ActionType.FINISH)
-
-    def test_message_with_thought(self):
-        f = PlaybookFinishAction(thought='done')
-        self.assertEqual(f.message, 'done')
-
-    def test_message_prefers_final_thought(self):
-        f = PlaybookFinishAction(final_thought='final summary', thought='internal note')
-        self.assertEqual(f.message, 'final summary')
-
-    def test_message_includes_completed_and_next_steps(self):
-        f = PlaybookFinishAction(
-            final_thought='Finished the task.',
-            outputs={
-                'completed': ['Created md_to_html.py'],
-                'next_steps': ['Open sample.html', 'Try a different input file'],
-            },
-        )
-        self.assertIn('Finished the task.', f.message)
-        self.assertIn('Completed:', f.message)
-        self.assertIn('Next steps:', f.message)
-        self.assertIn('Open sample.html', f.message)
-
-    def test_message_uses_adaptive_finish_sections(self):
-        f = PlaybookFinishAction(
-            final_thought='I finished the review.',
-            outputs={
-                'response': 'I finished the review.',
-                'sections': [
-                    {
-                        'title': 'Recommendation',
-                        'items': ['Keep the workflow focused on repeat use.'],
-                    },
-                    {
-                        'title': 'Tradeoffs',
-                        'items': ['This reduces marketing flair but improves scanning.'],
-                    },
-                ],
-                'evidence': {
-                    'status': 'not_applicable',
-                    'details': 'Design critique; no executable verification applies.',
-                },
-                'open_items': ['Confirm the intended audience.'],
-                'next_step': 'Apply the content hierarchy.',
-            },
-        )
-
-        self.assertIn('I finished the review.', f.message)
-        self.assertIn('Recommendation:', f.message)
-        self.assertIn('Keep the workflow focused', f.message)
-        self.assertIn('Evidence / Verification:', f.message)
-        self.assertIn('Open items:', f.message)
-        self.assertIn('Next step:', f.message)
-
-    def test_message_without_thought(self):
-        f = PlaybookFinishAction()
-        self.assertIn("What's next", f.message)
-
-    def test_outputs_default(self):
-        self.assertEqual(PlaybookFinishAction().outputs, {})
-
-    def test_force_finish_default(self):
-        self.assertFalse(PlaybookFinishAction().force_finish)
 
 
 # ---------------------------------------------------------------------------

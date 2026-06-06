@@ -170,14 +170,6 @@ class SystemMessageActionSchema(ActionSchemaV1):
         return validate_non_empty_string(v, name='content')
 
 
-class PlaybookFinishActionSchema(ActionSchemaV1):
-    """Schema for PlaybookFinishAction."""
-
-    action_type: Literal['finish'] = Field(ActionType.FINISH.value, frozen=True)
-    runnable: bool = Field(False, frozen=True)
-    message: str | None = Field(None, description='Finish message')
-
-
 class AgentRejectActionSchema(ActionSchemaV1):
     """Schema for AgentRejectAction."""
 
@@ -659,7 +651,6 @@ ActionSchemaUnion = (
     | SystemMessageActionSchema
     | BrowseInteractiveActionSchema
     | BrowserToolActionSchema
-    | PlaybookFinishActionSchema
     | AgentRejectActionSchema
     | ChangeAgentStateActionSchema
     | NullActionSchema

@@ -186,6 +186,7 @@ class StateTransitionService:
         await self._handle_state_reset(new_state)
         self._handle_error_recovery(old_state, new_state)
         self._handle_pending_action_confirmation(new_state)
+        self._handle_watchdog_lifecycle(old_state, new_state)
 
         reason = self._context.state.last_error if new_state == AgentState.ERROR else ''
         self._context.event_stream.add_event(
@@ -193,6 +194,39 @@ class StateTransitionService:
             EventSource.ENVIRONMENT,
         )
         self._context.save_state()
+
+    def _handle_watchdog_lifecycle(
+        self, old_state: AgentState, new_state: AgentState
+    ) -> None:
+        """Start/stop the independent watchdog based on state transitions.
+
+        The watchdog is only meaningful while the agent is in RUNNING state.
+        Starting it on entry and stopping it on exit avoids spurious stall
+        detections during user input or terminal states.
+        """
+        try:
+            controller = self._context.get_controller()
+        except (AttributeError, TypeError):
+            return
+        start_watchdog = getattr(controller, '_start_watchdog', None)
+        stop_watchdog = getattr(controller, '_stop_watchdog', None)
+
+        if new_state == AgentState.RUNNING and callable(start_watchdog):
+            try:
+                start_watchdog()
+            except Exception:
+                pass
+        elif new_state != old_state and new_state in (
+            AgentState.AWAITING_USER_INPUT,
+            AgentState.FINISHED,
+            AgentState.STOPPED,
+            AgentState.ERROR,
+            AgentState.REJECTED,
+        ) and callable(stop_watchdog):
+            try:
+                stop_watchdog()
+            except Exception:
+                pass
 
     async def _handle_state_reset(self, new_state: AgentState) -> None:
         if new_state in (AgentState.STOPPED, AgentState.ERROR):

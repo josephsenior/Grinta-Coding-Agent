@@ -32,7 +32,7 @@ def mock_config():
 
 
 def _plain_text(widget: ThinkingIndicator) -> str:
-    body = widget.query_one('#thinking-body', Static)
+    body = widget.query_one('#thinking-content', Static)
     return str(body.renderable)
 
 

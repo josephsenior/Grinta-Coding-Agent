@@ -538,6 +538,11 @@ class _AppScreenLifecycleMixin:
             raise
         loop_count = 0
         _started_at = _time.monotonic()
+        _last_progress_at = _started_at
+        _last_event_count = 0
+        _last_state = None
+        _stale_poll_count = 0
+        _STALE_POLL_THRESHOLD = 20
         while True:
             _tui_logger.debug('_dispatch_to_agent: entering poll loop')
             while True:
@@ -549,25 +554,66 @@ class _AppScreenLifecycleMixin:
                     loop_count += 1
                     state = self._controller.get_agent_state()
 
-                    # Hard timeout: if the agent has been in RUNNING state for too
-                    # long without transitioning, surface the stall clearly
-                    # rather than polling forever (which was the previous
-                    # behaviour and masked the _step_pending race).
-                    _elapsed = _time.monotonic() - _started_at
-                    if _elapsed > DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS:
+                    current_event_count = 0
+                    try:
+                        current_event_count = self._event_stream.get_latest_event_id()
+                    except Exception:
+                        pass
+
+                    # Track progress: new events or state changes reset the stall timer
+                    _progress_made = False
+                    if current_event_count != _last_event_count:
+                        _progress_made = True
+                        _stale_poll_count = 0
+                        _last_event_count = current_event_count
+                    else:
+                        _stale_poll_count += 1
+
+                    if state != _last_state:
+                        _progress_made = True
+                        _last_state = state
+
+                    if _progress_made:
+                        _last_progress_at = _time.monotonic()
+
+                    if (
+                        _stale_poll_count > 0
+                        and _stale_poll_count % _STALE_POLL_THRESHOLD == 0
+                        and state == AgentState.RUNNING
+                    ):
+                        logger.warning(
+                            '[TUI] _dispatch_to_agent: %d consecutive polls with no new events '
+                            'in RUNNING state; issuing schedule_step_soon() to recover',
+                            _stale_poll_count,
+                            extra={'msg_type': 'TUI_STALE_POLL_RECOVERY'},
+                        )
+                        try:
+                            self._controller.schedule_step_soon()
+                        except Exception:
+                            pass
+
+                    # Hard timeout: measures time since last PROGRESS, not total
+                    # elapsed time. This prevents false stalls when the agent is
+                    # actively working (streaming LLM, executing commands) for
+                    # extended periods.
+                    _elapsed_since_progress = _time.monotonic() - _last_progress_at
+                    if _elapsed_since_progress > DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS:
+                        _total_elapsed = _time.monotonic() - _started_at
                         _tui_logger.error(
-                            '_dispatch_to_agent: TIMEOUT after %.0fs '
-                            '(poll #%d, state=%s) — forcing ERROR to break stall',
-                            _elapsed,
+                            '_dispatch_to_agent: TIMEOUT after %.0fs since last progress '
+                            '(%.0fs total, poll #%d, state=%s) — forcing ERROR to break stall',
+                            _elapsed_since_progress,
+                            _total_elapsed,
                             loop_count,
                             state,
                         )
                         logger.error(
-                            '[TUI] _dispatch_to_agent: STALL TIMEOUT after %.0fs '
-                            '(poll #%d, state=%s). '
+                            '[TUI] _dispatch_to_agent: STALL TIMEOUT after %.0fs since last progress '
+                            '(%.0fs total, poll #%d, state=%s). '
                             'This usually indicates the _step_pending race condition. '
                             'Forcing ERROR state.',
-                            _elapsed,
+                            _elapsed_since_progress,
+                            _total_elapsed,
                             loop_count,
                             state,
                             extra={'msg_type': 'TUI_DISPATCH_STALL_TIMEOUT'},

@@ -104,7 +104,6 @@ def _deserialize_action(data: dict[str, Any]) -> ActionSchemaUnion:
         FileWriteActionSchema,
         MessageActionSchema,
         NullActionSchema,
-        PlaybookFinishActionSchema,
         SystemMessageActionSchema,
     )
 
@@ -121,7 +120,6 @@ def _deserialize_action(data: dict[str, Any]) -> ActionSchemaUnion:
         'system': SystemMessageActionSchema,
         'browse_interactive': BrowseInteractiveActionSchema,
         'browser_tool': BrowserToolActionSchema,
-        'finish': PlaybookFinishActionSchema,
         'reject': AgentRejectActionSchema,
         'change_agent_state': ChangeAgentStateActionSchema,
         'null': NullActionSchema,

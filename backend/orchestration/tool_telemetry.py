@@ -308,7 +308,6 @@ class ToolTelemetry:
             FileWriteActionSchema,
             MessageActionSchema,
             NullActionSchema,
-            PlaybookFinishActionSchema,
             SystemMessageActionSchema,
         )
 
@@ -319,7 +318,6 @@ class ToolTelemetry:
             'run': CmdRunActionSchema,
             'message': MessageActionSchema,
             'system': SystemMessageActionSchema,
-            'finish': PlaybookFinishActionSchema,
             'reject': AgentRejectActionSchema,
             'change_agent_state': ChangeAgentStateActionSchema,
             'null': NullActionSchema,

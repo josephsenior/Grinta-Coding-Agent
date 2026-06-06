@@ -31,7 +31,6 @@ from backend.ledger import EventSource, EventStreamSubscriber
 from backend.ledger.action import (
     Action,
     MessageAction,
-    PlaybookFinishAction,
 )
 from backend.orchestration.action_scheduler import ActionScheduler
 from backend.orchestration.memory_pressure import MemoryPressureMonitor
@@ -185,6 +184,13 @@ class SessionOrchestrator(
         # CLI Ctrl+C: skip pending-unmatched ErrorObservation on next _reset().
         self._suppress_pending_unmatched_error_on_reset: bool = False
 
+        # Independent watchdog timer for stall detection.
+        # This runs as a standalone background task, not inside _step_inner(),
+        # so it can detect stalls even when the step loop stops running entirely.
+        self._watchdog_task: asyncio.Task[None] | None = None
+        self._watchdog_last_step_ts: float = 0.0
+        self._watchdog_auto_recover_ts: float = 0.0
+
         # Initialize core state via lifecycle service
         self._initialize_operation_pipeline()
         self.services.lifecycle.initialize_core_attributes(
@@ -255,6 +261,7 @@ class SessionOrchestrator(
                 cb.record_step_call()
             except Exception:
                 pass
+        self._record_watchdog_step()
 
         # Atomic gate: prevents two threads from both seeing _step_task as done
         # and both creating step tasks.  The gate is held for the entire
@@ -374,7 +381,10 @@ class SessionOrchestrator(
         # Finish must terminate the current response immediately. Any queued
         # follow-up actions from the same LLM response are stale once finish was
         # chosen, so drop them and do not schedule another step from this turn.
-        if isinstance(action, PlaybookFinishAction):
+        if (
+            isinstance(action, MessageAction)
+            and bool(getattr(action, 'final_response', False))
+        ):
             with contextlib.suppress(Exception):
                 clear_queued_actions = getattr(self.agent, 'clear_queued_actions', None)
                 if callable(clear_queued_actions):
@@ -437,12 +447,118 @@ class SessionOrchestrator(
             ):
                 self.schedule_step_soon()
 
+    # ------------------------------------------------------------------ #
+    # Independent watchdog timer for stall detection
+    # ------------------------------------------------------------------ #
+
+    def _start_watchdog(self) -> None:
+        """Start the independent watchdog background task.
+
+        The watchdog runs on the main event loop and periodically checks
+        whether ``step()`` has been called recently.  If the agent is in
+        RUNNING state but no step has occurred within the configured timeout,
+        the watchdog issues ``schedule_step_soon()`` to recover.
+
+        This is a safety net for the case where the step loop stops running
+        entirely (e.g. due to an unhandled exception in ``_on_event``).
+        The existing watchdog inside ``_step_inner`` cannot detect this case
+        because it only runs when ``_step_inner`` runs.
+        """
+        if self._watchdog_task is not None and not self._watchdog_task.done():
+            return
+        import time as _time
+
+        self._watchdog_last_step_ts = _time.monotonic()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = get_main_event_loop()
+        if loop is None or not loop.is_running():
+            return
+        from backend.utils.async_utils import create_tracked_task
+
+        self._watchdog_task = create_tracked_task(
+            self._watchdog_loop(),
+            name='agent-watchdog',
+        )
+
+    def _stop_watchdog(self) -> None:
+        """Cancel the watchdog background task."""
+        task = getattr(self, '_watchdog_task', None)
+        if task is not None and not task.done():
+            task.cancel()
+        self._watchdog_task = None
+
+    async def _watchdog_loop(self) -> None:
+        """Background loop that checks for step() progress at regular intervals."""
+        import time as _time
+
+        check_interval = 10.0
+        timeout = getattr(
+            self, '_watchdog_timeout', None
+        ) or self.config.circuit_breaker.no_step_progress_timeout_seconds
+        if timeout <= 0:
+            return
+        cooldown = self.config.circuit_breaker.auto_recover_cooldown_seconds
+        auto_recover_attempted = False
+        auto_recover_ts = 0.0
+
+        try:
+            while not self._closed:
+                await asyncio.sleep(check_interval)
+                state = self.get_agent_state()
+                if state != AgentState.RUNNING:
+                    self._watchdog_last_step_ts = _time.monotonic()
+                    auto_recover_attempted = False
+                    continue
+
+                elapsed = _time.monotonic() - self._watchdog_last_step_ts
+                if elapsed < timeout:
+                    continue
+
+                now = _time.monotonic()
+                if not auto_recover_attempted or (now - auto_recover_ts) > cooldown:
+                    logger.warning(
+                        'INDEPENDENT WATCHDOG: no step() call for %.1fs in RUNNING; '
+                        'issuing schedule_step_soon() to recover',
+                        elapsed,
+                    )
+                    self._watchdog_last_step_ts = now
+                    auto_recover_attempted = True
+                    auto_recover_ts = now
+                    try:
+                        self.schedule_step_soon()
+                    except Exception:
+                        pass
+                else:
+                    logger.error(
+                        'INDEPENDENT WATCHDOG: auto-recover did not help after %.1fs; '
+                        'forcing ERROR state to break the stall',
+                        elapsed,
+                    )
+                    try:
+                        await self.set_agent_state_to(AgentState.ERROR)
+                    except Exception:
+                        pass
+                    return
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:
+            logger.debug('Watchdog loop exited: %s', exc)
+
+    def _record_watchdog_step(self) -> None:
+        """Record that step() was called, resetting the watchdog timer."""
+        import time as _time
+
+        self._watchdog_last_step_ts = _time.monotonic()
+
     async def close(self, set_stop_state: bool = True) -> None:
         """Closes the agent controller, canceling any ongoing tasks and unsubscribing from the event stream.
 
         Note that it's fairly important that this closes properly, otherwise the state is incomplete.
         """
         self._lifecycle = LifecyclePhase.CLOSING
+        self._stop_watchdog()
         # C-P1-1: snapshot final state for post-mortem rollback.
         try:
             self._create_phase_boundary_checkpoint('active_to_closing')

@@ -13,7 +13,6 @@ from backend.ledger.action import (
     AgentRejectAction,
     ChangeAgentStateAction,
     MessageAction,
-    PlaybookFinishAction,
 )
 from backend.ledger.action.agent import ConfirmRequestAction
 from backend.ledger.observation import Observation
@@ -141,28 +140,6 @@ class TestHandleAction:
         action.source = EventSource.AGENT
         action.wait_for_response = False
         await svc._handle_action(action)
-        ctrl.set_agent_state_to.assert_not_called()
-
-
-class TestHandleFinishAction:
-    @pytest.mark.asyncio
-    async def test_successful_finish(self):
-        ctrl = _make_controller()
-        svc = EventRouterService(ctrl)
-        action = PlaybookFinishAction(outputs={'result': 'done'})
-        await svc._handle_finish_action(action)
-        ctrl.state.set_outputs.assert_called_once()
-        ctrl.set_agent_state_to.assert_called_with(AgentState.FINISHED)
-        ctrl.log_task_audit.assert_called_once_with(status='success')
-
-    @pytest.mark.asyncio
-    async def test_validation_failure_aborts(self):
-        ctrl = _make_controller()
-        ctrl.task_validation_service.handle_finish = AsyncMock(return_value=False)
-        svc = EventRouterService(ctrl)
-        action = PlaybookFinishAction(outputs={})
-        await svc._handle_finish_action(action)
-        ctrl.state.set_outputs.assert_not_called()
         ctrl.set_agent_state_to.assert_not_called()
 
 

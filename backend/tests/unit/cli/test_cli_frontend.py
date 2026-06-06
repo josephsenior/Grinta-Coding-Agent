@@ -3003,8 +3003,7 @@ async def test_renderer_dedupes_identical_retry_status_lines() -> None:
 
 
 @pytest.mark.asyncio
-async def test_renderer_renders_finish_action_message_and_next_steps() -> None:
-    from backend.ledger.action import PlaybookFinishAction
+async def test_renderer_renders_final_message_action() -> None:
     from backend.ledger.observation.agent import AgentStateChangedObservation
 
     console = _make_console()
@@ -3012,77 +3011,13 @@ async def test_renderer_renders_finish_action_message_and_next_steps() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    action = PlaybookFinishAction(
-        final_thought='Completed the Markdown to HTML converter.',
-        outputs={
-            'completed': ['Created md_to_html.py', 'Generated sample.html'],
-            'next_steps': [
-                'Open sample.html in a browser',
-                'Replace sample.md with your real input',
-            ],
-        },
-    )
+    action = MessageAction(content='Task done.', final_response=True)
     action.source = EventSource.AGENT
 
     await renderer.handle_event(action)
 
-    # Finish text is buffered until AgentState.FINISHED — not shown yet
-    assert 'Completed the Markdown to HTML converter.' not in _console_output(console)
-
-    # Simulate the orchestrator confirming the finish
-    finished_obs = AgentStateChangedObservation(
-        content='', agent_state=AgentState.FINISHED
-    )
-    finished_obs.source = EventSource.ENVIRONMENT
-    await renderer.handle_event(finished_obs)
-
     output = _console_output(console)
-    assert 'Completed the Markdown to HTML converter.' in output
-    assert 'Next steps' in output
-    assert 'Open sample.html in a browser' in output
-
-
-@pytest.mark.asyncio
-async def test_renderer_renders_structured_plan_finish_card() -> None:
-    from backend.ledger.action import PlaybookFinishAction
-    from backend.ledger.observation.agent import AgentStateChangedObservation
-
-    console = _make_console()
-    renderer = CLIEventRenderer(
-        console, HUDBar(), ReasoningDisplay(), loop=asyncio.get_running_loop()
-    )
-    action = PlaybookFinishAction(
-        final_thought='Plan produced.',
-        outputs={
-            'status': 'completed',
-            'summary': 'Plan produced.',
-            'plan': ['Inspect `backend/cli/hud.py`.', 'Run the focused tests.'],
-            'files_or_areas': ['backend/cli/hud.py'],
-            'risks': ['Token usage may be estimated for streaming providers.'],
-            'verification': [
-                '`uv run pytest backend/tests/unit/cli/test_cli_frontend.py -q`'
-            ],
-            'assumptions': ['Existing HUD metrics are available.'],
-            'next_step': 'Switch to Agent Mode and execute.',
-        },
-    )
-    action.source = EventSource.AGENT
-
-    await renderer.handle_event(action)
-    assert 'Plan Ready' not in _console_output(console)
-
-    finished_obs = AgentStateChangedObservation(
-        content='', agent_state=AgentState.FINISHED
-    )
-    finished_obs.source = EventSource.ENVIRONMENT
-    await renderer.handle_event(finished_obs)
-
-    output = _console_output(console)
-    assert 'Plan Ready' in output
-    assert 'Execution Plan' in output
-    assert 'Files / Areas' in output
-    assert 'Verification' in output
-    assert 'backend/cli/hud.py' in output
+    assert 'Task done.' in output
 
 
 @pytest.mark.asyncio

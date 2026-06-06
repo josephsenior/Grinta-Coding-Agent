@@ -185,11 +185,6 @@ class CLIEventRenderer(
         self._pending_activity_card: PendingActivityCard | None = None
         #: First tool/shell row each turn prints a small section marker for scanability.
         self._activity_turn_header_emitted: bool = False
-        #: Finish summary text buffered from PlaybookFinishAction; rendered only
-        #: once the agent actually reaches AgentState.FINISHED (validation may
-        #: block the finish call and keep the agent running).
-        self._pending_finish_text: str | None = None
-        self._pending_finish_renderable: Any | None = None
         #: Monotonic timestamp of the last Live refresh (for throttling).
         self._last_refresh_time: float = 0.0
         #: Last reasoning lines committed to transcript (for prefix de-dup per turn).

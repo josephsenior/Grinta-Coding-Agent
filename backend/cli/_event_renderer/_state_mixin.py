@@ -149,17 +149,6 @@ class _EventRendererStateMixin(CLIEventRenderer if TYPE_CHECKING else object):
         del previous_state
         self._flush_pending_tool_cards()
         self._clear_streaming_preview()
-        # Render the finish summary that was buffered when PlaybookFinishAction
-        # arrived — we deferred it to here so it only appears when the finish
-        # actually went through (not when validation blocks it).
-        if self._pending_finish_renderable is not None:
-            self._append_history(Text(''))
-            self._append_history(self._pending_finish_renderable)
-            self._pending_finish_renderable = None
-            self._pending_finish_text = None
-        elif self._pending_finish_text:
-            self._append_assistant_message(self._pending_finish_text)
-            self._pending_finish_text = None
 
     def _after_state_error(self, *, previous_state: Any) -> None:
         del previous_state
