@@ -736,5 +736,81 @@ class _EventRouterDelegateMixin(EventRouterService if TYPE_CHECKING else object)
             run_or_schedule(_run_subagent())
 
     async def _handle_observation(self, observation: Observation) -> None:
-        """Delegate observation handling to the observation service."""
-        await self._ctrl.observation_service.handle_observation(observation)
+        """Delegate observation handling to the observation service.
+
+        Bounded with ``asyncio.wait_for(..., timeout=10s)`` so a hung
+        observation handler cannot wedge the agent.  If the handler
+        times out, we log at WARNING and force-emit the post-resolution
+        step so the next ``astep`` can run.  This is the recovery path
+        that complements the LLM step timeout (Layer 1) and the
+        runtime action timeout.
+        """
+        import asyncio as _asyncio
+        from backend.core.constants import (
+            DEFAULT_OBSERVATION_HANDLER_TIMEOUT_SECONDS,
+        )
+
+        observation_id = getattr(observation, 'id', '?')
+        observation_type = type(observation).__name__
+        logger.debug(
+            '[_handle_observation] ENTER %s (id=%s)',
+            observation_type,
+            observation_id,
+            extra={'msg_type': 'OBSERVATION_HANDLER_ENTER'},
+        )
+        try:
+            await _asyncio.wait_for(
+                self._ctrl.observation_service.handle_observation(observation),
+                timeout=DEFAULT_OBSERVATION_HANDLER_TIMEOUT_SECONDS,
+            )
+        except _asyncio.TimeoutError:
+            logger.warning(
+                'Observation handler timed out after %.1fs for %s (id=%s); '
+                'forcing post-resolution step to avoid wedging the agent',
+                DEFAULT_OBSERVATION_HANDLER_TIMEOUT_SECONDS,
+                observation_type,
+                observation_id,
+                extra={'msg_type': 'OBSERVATION_HANDLER_TIMEOUT'},
+            )
+            # Force-clear any stuck pending state so the next step can run.
+            try:
+                pending_service = getattr(
+                    getattr(self._ctrl, 'services', None),
+                    'pending_action',
+                    None,
+                )
+                if pending_service is not None:
+                    pending_service.set(None)
+            except Exception:
+                logger.debug(
+                    'Failed to force-clear pending state after handler timeout',
+                    exc_info=True,
+                )
+            # Schedule the next step directly.
+            try:
+                trigger = getattr(self._ctrl, 'step', None)
+                if callable(trigger):
+                    trigger()
+            except Exception:
+                logger.debug(
+                    'Failed to trigger step after handler timeout',
+                    exc_info=True,
+                )
+        except Exception as exc:
+            logger.error(
+                '[_handle_observation] exception in %s (id=%s): %s: %s',
+                observation_type,
+                observation_id,
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+                extra={'msg_type': 'OBSERVATION_HANDLER_EXCEPTION'},
+            )
+            raise
+        finally:
+            logger.debug(
+                '[_handle_observation] EXIT %s (id=%s)',
+                observation_type,
+                observation_id,
+                extra={'msg_type': 'OBSERVATION_HANDLER_EXIT'},
+            )
