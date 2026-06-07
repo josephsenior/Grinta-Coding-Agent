@@ -7,6 +7,7 @@ method bodies are byte-identical to the pre-split version.
 
 from __future__ import annotations
 
+import asyncio
 import os
 from typing import TYPE_CHECKING
 
@@ -64,7 +65,9 @@ class _AesIoFileMixin:
         return _handle_aci_file_read_impl(self, action)
 
     async def read(self, action: FileReadAction) -> Observation:
-        bash_session, shell_err = self._get_or_recreate_default_shell_session()
+        bash_session, shell_err = await asyncio.to_thread(
+            self._get_or_recreate_default_shell_session
+        )
         if shell_err is not None:
             return shell_err
         assert bash_session is not None
@@ -99,7 +102,9 @@ class _AesIoFileMixin:
             return handle_file_read_errors(filepath, working_dir)
 
     async def write(self, action: FileWriteAction) -> Observation:
-        bash_session, shell_err = self._get_or_recreate_default_shell_session()
+        bash_session, shell_err = await asyncio.to_thread(
+            self._get_or_recreate_default_shell_session
+        )
         if shell_err is not None:
             return shell_err
         assert bash_session is not None
@@ -136,7 +141,9 @@ class _AesIoFileMixin:
         return _is_auto_lint_enabled_impl(self)
 
     async def edit(self, action: FileEditAction) -> Observation:
-        bash_session, shell_err = self._get_or_recreate_default_shell_session()
+        bash_session, shell_err = await asyncio.to_thread(
+            self._get_or_recreate_default_shell_session
+        )
         if shell_err is not None:
             return shell_err
         assert bash_session is not None

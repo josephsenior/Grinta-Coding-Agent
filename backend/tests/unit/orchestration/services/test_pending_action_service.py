@@ -474,7 +474,14 @@ class TestPendingActionWatchdog(unittest.IsolatedAsyncioTestCase):
         self.service = PendingActionService(self.mock_context, timeout=5.0)
 
     @patch('time.time')
-    async def test_watchdog_fire_calls_trigger_step_after_timeout(self, mock_time):
+    async def test_watchdog_fire_purges_timed_out_action(self, mock_time):
+        """Watchdog fire must actually purge stuck pending actions.
+
+        The old behaviour just called ``trigger_step`` which was a no-op
+        when ``can_step()`` returned False because of a stuck pending.
+        The new behaviour calls ``_purge_timeouts`` first so the agent
+        is unblocked.  This test verifies the purge happens.
+        """
         mock_action = MagicMock()
         mock_action.__class__.__name__ = 'TestAction'
         mock_action.id = 'action-123'
@@ -482,9 +489,57 @@ class TestPendingActionWatchdog(unittest.IsolatedAsyncioTestCase):
         mock_time.return_value = 100.0
         self.service._legacy_pending = (mock_action, 100.0)
 
+        # 6s elapsed with a 5s timeout → action is timed out.
         mock_time.return_value = 106.0
         self.service._watchdog_fire()
 
+        # Pending must be cleared (this was the original bug).
+        assert self.service._legacy_pending is None
+
+        # A PENDING_ACTION_TIMEOUT observation must be emitted on the
+        # event stream so the LLM/controller see the recovery.
+        self.mock_controller.event_stream.add_event.assert_called_once()
+        emitted = self.mock_controller.event_stream.add_event.call_args.args[0]
+        assert getattr(emitted, 'error_id', None) == 'PENDING_ACTION_TIMEOUT'
+
+        # Nothing remains pending → no need to trigger a step.
+        self.mock_context.trigger_step.assert_not_called()
+
+    @patch('time.time')
+    async def test_watchdog_fire_triggers_step_only_when_pending_remains(
+        self, mock_time
+    ):
+        """Watchdog triggers step only if purge leaves outstanding pending.
+
+        If multiple actions are outstanding and only some are timed out,
+        the remaining ones still need a step trigger.  This test ensures
+        the watchdog only skips ``trigger_step`` when the purge actually
+        cleared everything.
+        """
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-stuck'
+
+        # The legacy entry is timed out (6s elapsed, 5s timeout).
+        mock_time.return_value = 100.0
+        self.service._legacy_pending = (mock_action, 100.0)
+
+        # _outstanding contains a fresh action that is NOT yet timed out.
+        live_action = MagicMock()
+        live_action.__class__.__name__ = 'LiveAction'
+        live_action.id = 'action-live'
+        mock_time.return_value = 101.0
+        self.service._outstanding[live_action.id] = (live_action, 101.0)
+
+        # Advance time so the legacy is timed out but the live is not.
+        mock_time.return_value = 106.0
+        self.service._watchdog_fire()
+
+        # Legacy (stuck) was purged.
+        assert self.service._legacy_pending is None
+        # Live (not stuck) is still there.
+        assert live_action.id in self.service._outstanding
+        # And a step trigger is fired so the live action is processed.
         self.mock_context.trigger_step.assert_called_once_with()
 
     @patch(

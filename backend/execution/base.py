@@ -637,7 +637,10 @@ class Runtime(
         )
 
         try:
-            observation = await self._execute_action(event)
+            observation = await asyncio.wait_for(
+                self._execute_action(event),
+                timeout=event.timeout,
+            )
             logger.debug(
                 '[runtime %s] _handle_action GOT observation %s for %s (id=%s)',
                 self.sid,
@@ -645,6 +648,35 @@ class Runtime(
                 action_type,
                 action_id,
             )
+        except asyncio.TimeoutError:
+            logger.warning(
+                '[runtime %s] _handle_action TIMEOUT for %s (id=%s) after %.1fs; '
+                'emitting ACTION_EXECUTION_TIMEOUT observation',
+                self.sid,
+                action_type,
+                action_id,
+                event.timeout,
+            )
+            self.set_runtime_status(
+                RuntimeStatus.ERROR,
+                f'Action {action_type} (id={action_id}) exceeded {event.timeout}s hard timeout',
+                level='error',
+            )
+            observation = ErrorObservation(
+                content=(
+                    f'Action {action_type} exceeded the hard wall-clock timeout of '
+                    f'{event.timeout:.0f}s. The operation may still complete in the '
+                    f'background. Verify the state of any files or resources this '
+                    f'action was modifying before proceeding.'
+                ),
+                error_id='ACTION_EXECUTION_TIMEOUT',
+                timeout_kind='action_execution_timeout',
+            )
+            if not self._process_observation(observation, event):
+                return
+            if self.event_stream:
+                self.event_stream.add_event(observation, event.source or EventSource.AGENT)
+            return
         except PermissionError as e:
             observation = ErrorObservation(content=str(e))
         except ValueError as e:
