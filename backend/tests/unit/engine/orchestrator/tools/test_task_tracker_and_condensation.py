@@ -9,9 +9,7 @@ from backend.engine.tools.condensation_request import (
     create_summarize_context_tool,
 )
 from backend.engine.tools.task_tracker import (
-    _CREATE_TASK_TRACKER_DESCRIPTION,
     _TASK_TRACKER_DESCRIPTION,
-    create_create_task_tracker_tool,
     create_task_tracker_tool,
 )
 
@@ -39,27 +37,6 @@ def _required(tool: Any) -> list[str]:
 # ---------------------------------------------------------------------------
 # create_task_tracker_tool
 # ---------------------------------------------------------------------------
-
-
-class TestCreateCreateTaskTrackerTool:
-    def setup_method(self):
-        self.tool = create_create_task_tracker_tool()
-
-    def test_name_matches_constant(self):
-        from backend.inference.tool_names import CREATE_TASK_TRACKER_TOOL_NAME
-
-        assert _func(self.tool)['name'] == CREATE_TASK_TRACKER_TOOL_NAME
-
-    def test_description_matches_constant(self):
-        assert _func(self.tool)['description'] == _CREATE_TASK_TRACKER_DESCRIPTION
-
-    def test_requires_task_list(self):
-        assert _required(self.tool) == ['task_list']
-
-    def test_task_status_enum(self):
-        task_list = _props(self.tool)['task_list']
-        status = task_list['items']['properties']['status']
-        assert status['enum'] == ['todo', 'in_progress', 'done', 'skipped', 'blocked']
 
 
 class TestCreateTaskTrackerTool:

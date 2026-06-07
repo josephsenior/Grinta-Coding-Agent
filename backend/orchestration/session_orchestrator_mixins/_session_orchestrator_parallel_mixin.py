@@ -325,13 +325,16 @@ class _SessionOrchestratorParallelMixin:
 
                 if mm is not None and getattr(mm, 'compactor', None) is not None:
                     import asyncio
-                    from copy import copy
+                    import copy as _copy_mod
 
                     compactor = mm.compactor
 
-                    state_copy = copy(self.state)
+                    state_copy = _copy_mod.copy(self.state)
 
                     state_copy.history = list(history) if history else []
+                    state_copy.turn_signals = _copy_mod.deepcopy(
+                        self.state.turn_signals
+                    )
 
                     async def _run_bg():
                         import inspect

@@ -156,6 +156,34 @@ class TaskCancellationService:
                 continue
             self._kill_pid_best_effort(pid)
 
+    def cancel_last_registered(self) -> None:
+        """Kill the most recently registered process (and its process tree).
+
+        Used when a pending action times out — the most recently registered
+        process is the one belonging to the timed-out action.  This avoids
+        killing all processes (``cancel_all``) which would disrupt unrelated
+        background work.
+        """
+        with self._lock:
+            if not self._active_processes:
+                if self._active_pids:
+                    pid = next(iter(self._active_pids))
+                    self._active_pids.discard(pid)
+                else:
+                    return
+            else:
+                pid = next(iter(self._active_processes))
+                self._active_processes.pop(pid, None)
+                self._active_pids.discard(pid)
+
+        logger.warning(
+            '[TaskCancellationService:%s] Cancelling last-registered pid=%s '
+            '(pending action timeout)',
+            self._label,
+            pid,
+        )
+        self._kill_pid_best_effort(pid)
+
     def cancel_all(self) -> None:
         """Hard kill all registered processes."""
         pids, processes, callbacks = self._drain_tracked_targets()

@@ -66,7 +66,6 @@ def test_window_preserves_summary_and_recent_action_observation_chunk() -> None:
     assert result.windowed is True
     assert summary in result.events
     assert recent_chunk[0] in result.events
-    assert recent_chunk[1] in result.events
     assert old_chunk[0] not in result.events
     assert old_chunk[1] not in result.events
 

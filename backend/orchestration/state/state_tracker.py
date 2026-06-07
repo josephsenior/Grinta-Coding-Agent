@@ -22,8 +22,6 @@ MAX_HISTORY_EVENTS: int = 10_000
 
 MAX_HISTORY_BYTES: int = 200 * 1024 * 1024  # 200 MB
 
-_BYTE_ESTIMATE_INTERVAL: int = 10
-
 if TYPE_CHECKING:
     from backend.ledger.event import Event
     from backend.ledger.stream import EventStream
@@ -65,7 +63,7 @@ class StateTracker:
             ),
             exclude_hidden=True,
         )
-        self._events_since_last_byte_estimate: int = 0
+        self._history_bytes_estimate: int = 0
 
     # pylint: disable=R0917
     def set_initial_state(
@@ -181,7 +179,9 @@ class StateTracker:
                 'Loaded last %d filtered events for state.history; older events remain durable in the ledger.',
                 len(events),
             )
-            return self._trim_history_list(events, force_byte_check=True)
+            result = self._trim_history_list(events, force_byte_check=True)
+            self._recompute_history_bytes_estimate_for(result)
+            return result
 
         events = list(
             event_stream.search_events(
@@ -191,7 +191,9 @@ class StateTracker:
                 filter=self.agent_history_filter,
             ),
         )
-        return self._trim_history_list(events, force_byte_check=True)
+        result = self._trim_history_list(events, force_byte_check=True)
+        self._recompute_history_bytes_estimate_for(result)
+        return result
 
     def set_conversation_stats(self, conversation_stats: ConversationStats) -> None:
         self.state.conversation_stats = conversation_stats
@@ -238,6 +240,7 @@ class StateTracker:
         """
         if self.agent_history_filter.include(event):
             self.state.history.append(event)
+            self._history_bytes_estimate += self._estimate_single_event_bytes(event)
             self._maybe_trim_history()
 
     def _maybe_trim_history(self) -> None:
@@ -245,6 +248,7 @@ class StateTracker:
         trimmed = self._trim_history_list(self.state.history)
         if trimmed is not self.state.history:
             self.state.history = trimmed
+            self._recompute_history_bytes_estimate()
 
     def _trim_history_list(
         self, history: list[Event], *, force_byte_check: bool = False
@@ -259,7 +263,6 @@ class StateTracker:
                 return trimmed
             trim_count = max(len(trimmed) // 4, 1)
             trimmed = list(trimmed[trim_count:])
-            self._events_since_last_byte_estimate = 0
             logger.debug(
                 'Trimmed %d oldest events from state.history (%s, now %d)',
                 trim_count,
@@ -273,15 +276,10 @@ class StateTracker:
         if len(history) > MAX_HISTORY_EVENTS:
             return f'count {len(history)} > {MAX_HISTORY_EVENTS}'
 
-        self._events_since_last_byte_estimate += 1
-        if not force_byte_check and (
-            len(history) <= 100
-            or self._events_since_last_byte_estimate < _BYTE_ESTIMATE_INTERVAL
-        ):
+        if not force_byte_check:
             return None
 
-        self._events_since_last_byte_estimate = 0
-        estimated_bytes = self._estimate_history_bytes(history)
+        estimated_bytes = self._history_bytes_estimate
         if estimated_bytes <= MAX_HISTORY_BYTES:
             return None
         return (
@@ -297,33 +295,32 @@ class StateTracker:
         return event_id if isinstance(event_id, int) and event_id >= 0 else fallback
 
     @staticmethod
-    def _estimate_history_bytes(history: list) -> int:
-        """Rough byte-size estimate for the history list.
+    def _estimate_single_event_bytes(event: object) -> int:
+        """Estimate the in-memory byte size of a single event.
 
-        Uses ``sys.getsizeof`` on string-heavy fields (message, content)
-        as a cheap proxy — avoids deep traversal which would be too slow
-        to run on every event insertion.
+        Uses ``sys.getsizeof`` on the event itself plus the lengths of
+        any large string fields (content, message, output, text) that
+        dominate the memory footprint of tool observations.
         """
         import sys
 
+        size = sys.getsizeof(event)
+        for attr in ('content', 'message', 'output', 'text'):
+            val = getattr(event, attr, None)
+            if isinstance(val, str):
+                size += len(val)
+        return size
+
+    def _recompute_history_bytes_estimate(self) -> None:
+        """Recompute the running byte estimate from the current history."""
+        self._recompute_history_bytes_estimate_for(self.state.history)
+
+    def _recompute_history_bytes_estimate_for(self, history: list[Event]) -> None:
+        """Recompute the running byte estimate for a specific history list."""
         total = 0
-        # Sample every 10th event for speed, multiply by count
-        sample_step = max(1, len(history) // 100)
-        sample_total = 0
-        sample_count = 0
-        for i in range(0, len(history), sample_step):
-            evt = history[i]
-            size = sys.getsizeof(evt)
-            # Also count large string fields if present
-            for attr in ('content', 'message', 'output', 'text'):
-                val = getattr(evt, attr, None)
-                if isinstance(val, str):
-                    size += len(val)
-            sample_total += size
-            sample_count += 1
-        if sample_count > 0:
-            total = (sample_total // sample_count) * len(history)
-        return total
+        for evt in history:
+            total += self._estimate_single_event_bytes(evt)
+        self._history_bytes_estimate = total
 
     def get_transcript(self, include_screenshots: bool = False) -> list[dict[str, Any]]:
         """Convert state history to transcript format for export.
