@@ -208,9 +208,6 @@ def apply_autonomy_level(host: Any, new_level: str) -> None:
         ac = getattr(controller, 'autonomy_controller', None)
         if ac is not None:
             ac.autonomy_level = new_level
-            runtime = getattr(controller, 'runtime', None)
-            if runtime is not None:
-                setattr(runtime, '_autonomy_level', new_level)
             if host._renderer is not None:
                 host._renderer.add_system_message(
                     f'Autonomy set to: {new_level}', title='autonomy'

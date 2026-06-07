@@ -128,6 +128,7 @@ def _acquire_event_stream(
     sid: str | None,
     event_stream: EventStream | None,
     inline_event_delivery: bool,
+    user_id: str | None = None,
 ) -> tuple[EventStream, bool, str]:
     if event_stream is not None:
         return event_stream, False, sid or event_stream.sid
@@ -137,6 +138,7 @@ def _acquire_event_stream(
     created_event_stream = EventStream(
         session_id,
         file_store,
+        user_id=user_id,
         worker_count=0 if inline_event_delivery else None,
     )
     return created_event_stream, True, session_id
@@ -234,6 +236,7 @@ def create_runtime(
         sid,
         event_stream,
         inline_event_delivery,
+        user_id=user_id,
     )
     agent_cls = type(agent) if agent else Agent.get_cls(config.default_agent)
 

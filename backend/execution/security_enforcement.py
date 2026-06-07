@@ -74,7 +74,6 @@ class SecurityPolicyDecision:
 
     risk: Any | None = None
     block_message: str | None = None
-    require_confirmation: bool = False
 
 
 def normalize_allowlist(values: Any) -> set[str]:
@@ -270,13 +269,6 @@ class SecurityEnforcementMixin:
     security_analyzer: Any
     config: Any
 
-    def _is_full_autonomy(self) -> bool:
-        """Return True when the runtime is in full autonomy mode."""
-        level = getattr(self, '_autonomy_level', '')
-        if not level:
-            return False
-        return str(level).strip().lower() == 'full'
-
     def _check_action_confirmation(self, action: Action) -> Observation | None:
         """Check action confirmation state and return appropriate observation."""
         from backend.ledger.action import (
@@ -312,11 +304,13 @@ class SecurityEnforcementMixin:
         Returns:
             * ``None`` — action may proceed.
             * ``ErrorObservation`` — action is blocked (HIGH risk + ``block_high_risk``).
-            * ``NullObservation`` — action needs user confirmation (HIGH risk, not blocking).
+
+        Note: Confirmation policy (AWAITING_CONFIRMATION) is decided by the
+        orchestration layer (SafetyService), not here. This layer only blocks
+        actions that violate hardcoded safety rules or configurable policies.
         """
         from backend.core.enums import ActionSecurityRisk
-        from backend.ledger.action import ActionConfirmationStatus
-        from backend.ledger.observation import ErrorObservation, NullObservation
+        from backend.ledger.observation import ErrorObservation
 
         decision = self._evaluate_security_policy(action)
 
@@ -329,25 +323,10 @@ class SecurityEnforcementMixin:
 
         if risk >= ActionSecurityRisk.HIGH:
             action_desc = f'{action.action}: {str(action)[:120]}'
-            if self._is_full_autonomy():
-                logger.info(
-                    'Security: full autonomy — skipping confirmation for high-risk action: %s',
-                    action_desc,
-                )
-                return None
-            if decision.require_confirmation and (
-                hasattr(action, 'confirmation_state')
-                and action.confirmation_state != ActionConfirmationStatus.CONFIRMED
-            ):
-                logger.info(
-                    'Security: requiring confirmation for high-risk action: %s',
-                    action_desc,
-                )
-                action.confirmation_state = (
-                    ActionConfirmationStatus.AWAITING_CONFIRMATION
-                )  # type: ignore[union-attr]
-                return NullObservation('')
-
+            logger.info(
+                'Security: high-risk action allowed (not blocked by policy): %s',
+                action_desc,
+            )
         elif risk >= ActionSecurityRisk.MEDIUM:
             logger.info(
                 'Security: medium-risk action allowed: %s (risk=%s)',
@@ -359,7 +338,7 @@ class SecurityEnforcementMixin:
 
     def _evaluate_security_policy(self, action: Action) -> SecurityPolicyDecision:
         from backend.core.enums import ActionSecurityRisk
-        from backend.ledger.action import ActionConfirmationStatus, CmdRunAction
+        from backend.ledger.action import CmdRunAction
 
         sec_cfg = self.config.security  # type: ignore[attr-defined]
         decision = SecurityPolicyDecision()
@@ -393,12 +372,6 @@ class SecurityEnforcementMixin:
                 )
                 decision.block_message = f'Action blocked by security policy (risk={risk.name}). Action: {action_desc}'
                 return decision
-            if (
-                hasattr(action, 'confirmation_state')
-                and getattr(action, 'confirmation_state', None)
-                != ActionConfirmationStatus.CONFIRMED
-            ):
-                decision.require_confirmation = True
 
         return decision
 
