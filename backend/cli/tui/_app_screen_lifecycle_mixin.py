@@ -49,6 +49,7 @@ from backend.ledger.observation import (
     StatusObservation,
 )
 from backend.persistence import get_file_store
+from backend.persistence.locations import get_local_data_root
 
 
 class _AppScreenLifecycleMixin:
@@ -172,9 +173,12 @@ class _AppScreenLifecycleMixin:
 
         event_stream = None
         try:
-            file_store = get_file_store(config)
+            file_store = get_file_store(
+                file_store_type=config.file_store,
+                local_data_root=get_local_data_root(config),
+            )
             sid = session_id.strip() if session_id else generate_sid(config)
-            event_stream = EventStream(sid=sid, file_store=file_store)
+            event_stream = EventStream(sid=sid, file_store=file_store, user_id='tui')
             self._event_stream = event_stream
             try:
                 agent, runtime, conversation_stats = await asyncio.to_thread(
@@ -542,7 +546,13 @@ class _AppScreenLifecycleMixin:
         _last_event_count = 0
         _last_state = None
         _stale_poll_count = 0
-        _STALE_POLL_THRESHOLD = 20
+        # True stalls are detected by the no-step-progress watchdog in
+        # SessionOrchestrator's circuit breaker (record_step_call), which
+        # fires after 120s of no step() calls.  The TUI's poll loop emits a
+        # less aggressive debug heartbeat every 60s so operators can see the
+        # agent is still being polled even when the LLM is thinking silently
+        # (10–60s of quiet is normal for big LLM responses).
+        _STALE_POLL_THRESHOLD = 120
         while True:
             _tui_logger.debug('_dispatch_to_agent: entering poll loop')
             while True:
@@ -581,16 +591,19 @@ class _AppScreenLifecycleMixin:
                         and _stale_poll_count % _STALE_POLL_THRESHOLD == 0
                         and state == AgentState.RUNNING
                     ):
-                        logger.warning(
-                            '[TUI] _dispatch_to_agent: %d consecutive polls with no new events '
-                            'in RUNNING state; issuing schedule_step_soon() to recover',
+                        # Demoted from WARNING to DEBUG: the no-step-progress
+                        # watchdog in the circuit breaker is the authoritative
+                        # stall detector.  Calling schedule_step_soon() here is
+                        # a no-op when the agent's _step_task is already alive
+                        # (which it is during a normal LLM call), so emitting a
+                        # WARNING every 10s was pure log spam during routine
+                        # long LLM thinking (10–60s of silent streaming).
+                        _tui_logger.debug(
+                            '_dispatch_to_agent: %d consecutive polls with no new events '
+                            'in RUNNING state (LLM may be thinking silently; '
+                            'no-step-progress watchdog will recover true stalls)',
                             _stale_poll_count,
-                            extra={'msg_type': 'TUI_STALE_POLL_RECOVERY'},
                         )
-                        try:
-                            self._controller.schedule_step_soon()
-                        except Exception:
-                            pass
 
                     # Hard timeout: measures time since last PROGRESS, not total
                     # elapsed time. This prevents false stalls when the agent is

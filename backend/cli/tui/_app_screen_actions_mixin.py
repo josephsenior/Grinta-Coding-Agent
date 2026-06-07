@@ -18,15 +18,15 @@ class _AppScreenActionsMixin:
 
     def action_scroll_up(self) -> None:
         """Scroll transcript up by one page."""
-        self._get_display().user_scroll_page_up(animate=True)
+        self._get_display().user_scroll_page_up(animate=False)
 
     def action_scroll_down(self) -> None:
         """Scroll transcript down by one page."""
-        self._get_display().user_scroll_page_down(animate=True)
+        self._get_display().user_scroll_page_down(animate=False)
 
     def action_scroll_home(self) -> None:
         """Scroll transcript to top."""
-        self._get_display().user_scroll_home(animate=True)
+        self._get_display().user_scroll_home(animate=False)
 
     def action_scroll_end(self) -> None:
         """Scroll transcript to bottom."""
@@ -92,8 +92,15 @@ class _AppScreenActionsMixin:
     def _is_full_autonomy(self) -> bool:
         controller = getattr(self, '_controller', None)
         ac = getattr(controller, 'autonomy_controller', None)
-        raw_level = getattr(ac, 'autonomy_level', '') if ac is not None else ''
-        return normalize_autonomy_level(raw_level) == 'full'
+        if ac is not None:
+            raw_level = getattr(ac, 'autonomy_level', '')
+            if normalize_autonomy_level(raw_level) == 'full':
+                return True
+        hud = getattr(self, '_hud', None)
+        state = getattr(hud, 'state', None)
+        if state is not None:
+            return normalize_autonomy_level(getattr(state, 'autonomy_level', '')) == 'full'
+        return False
 
     async def _handle_confirmation_dialog(self) -> None:
         """Show inline confirmation widget and wait for user decision."""

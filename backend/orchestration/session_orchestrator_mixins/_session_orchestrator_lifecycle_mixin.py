@@ -315,10 +315,6 @@ class _SessionOrchestratorLifecycleMixin:
         if runtime is None:
             return
 
-        ac = getattr(self, 'autonomy_controller', None)
-        if ac is not None:
-            setattr(runtime, '_autonomy_level', getattr(ac, 'autonomy_level', 'balanced'))
-
         # Check if already initialized to avoid redundant connect calls.
 
         if hasattr(runtime, 'runtime_initialized'):

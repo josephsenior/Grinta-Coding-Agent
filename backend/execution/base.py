@@ -260,7 +260,6 @@ class Runtime(
         self.process_manager = ProcessManager()
         self.runtime_status = None
         self.security_analyzer = None
-        self._autonomy_level: str = 'balanced'
         if self.config.security.security_analyzer:
             # SecurityAnalyzers is a dict-like object in options module
             analyzer_cls = getattr(options, 'SecurityAnalyzers', {}).get(  # type: ignore[attr-defined]

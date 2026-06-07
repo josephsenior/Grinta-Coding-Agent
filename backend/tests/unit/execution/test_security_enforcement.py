@@ -132,7 +132,12 @@ class TestEnforceSecurity:
         assert result is not None
         assert result.__class__.__name__ == 'ErrorObservation'
 
-    def test_high_risk_requires_confirmation(self):
+    def test_high_risk_not_blocked_when_block_high_disabled(self):
+        """When block_high_risk is disabled, high-risk actions are allowed to proceed.
+
+        Confirmation policy (AWAITING_CONFIRMATION) is now handled by the
+        orchestration layer (SafetyService), not by _enforce_security.
+        """
         from backend.core.enums import ActionSecurityRisk
         from backend.ledger.action import ActionConfirmationStatus
 
@@ -141,14 +146,10 @@ class TestEnforceSecurity:
         rt = _FakeRuntime(analyzer=analyzer, enforce=True, block_high=False)
         action = MagicMock()
         action.action = 'test_action'
-        action.confirmation_state = ActionConfirmationStatus.REJECTED  # Not CONFIRMED
+        action.confirmation_state = ActionConfirmationStatus.CONFIRMED
         with patch('asyncio.get_running_loop', side_effect=RuntimeError):
             result = rt._enforce_security(action)
-        assert result is not None
-        assert result.__class__.__name__ == 'NullObservation'
-        assert (
-            action.confirmation_state == ActionConfirmationStatus.AWAITING_CONFIRMATION
-        )
+        assert result is None
 
     def test_medium_risk_allowed(self):
         from backend.core.enums import ActionSecurityRisk

@@ -288,7 +288,7 @@ class ReasoningDisplay:
         rows: list[Any] = []
 
         # "Thinking:" header with distinct teal color
-        rows.append(Text('Thinking:', style='bold #5eead4'))
+        rows.append(Text('Thinking:', style='#5eead4'))
 
         if self.live_panel_shows_thought_rows():
             self._append_thought_rows(rows, max_width, max_lines)
