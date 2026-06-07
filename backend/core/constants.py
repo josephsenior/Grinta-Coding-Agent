@@ -58,6 +58,18 @@ RECALL_PIPELINE_TIMEOUT_SECONDS = 90.0
 # Max seconds waiting for an observation matching a tool call before timing out.
 # 0 or negative = disabled (no timeout error, no watchdog).
 DEFAULT_PENDING_ACTION_TIMEOUT = 120.0
+# Hard cap on observation handler (``observation_service.handle_observation``)
+# wall-clock time.  If the handler hangs (e.g. tool pipeline deadlock, plugin
+# hook deadlock), we force-clear pending state and trigger the next step
+# instead of letting the agent wedge in RUNNING.  10s is generous for normal
+# observation processing but short enough to recover within a single TUI poll.
+DEFAULT_OBSERVATION_HANDLER_TIMEOUT_SECONDS = 10.0
+# Wall-clock cap on a single step drain iteration.  If a single
+# ``_step_inner`` call exceeds this, we force-complete the step task so
+# the next iteration can start.  Mirrors the LLM step timeout (default
+# 300s) but applied at the controller layer, catching hangs in action
+# execution, tool pipelines, plugin hooks, etc.
+DEFAULT_STEP_TASK_LIVENESS_SECONDS = 600.0
 # Hard cap on how long run_agent_until_done polls before forcing termination.
 # 0 or negative = disabled (no hard cap).  Env override allows long sessions.
 # Default raised from 0 → 1800s (30 min) so a silent stall in the agent loop

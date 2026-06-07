@@ -321,6 +321,7 @@ class ActionExecutionService:
                 raise Timeout(
                     f'LLM step timed out after {step_timeout} seconds',
                     model=model_name,  # type: ignore[arg-type]
+                    step_timeout=step_timeout,
                 ) from exc
 
         if result is None:
@@ -578,8 +579,10 @@ class ActionExecutionService:
             except (ContextWindowExceededError, BadRequestError, OpenAIError) as exc:
                 self._reset_consecutive_null_actions()
                 return await self._handle_context_window_error(exc)
+            except Timeout as exc:
+                return await self._handle_llm_step_timeout(exc)
             # APIConnectionError, AuthenticationError, RateLimitError, ServiceUnavailableError,
-            # APIError, InternalServerError, Timeout: let propagate to caller
+            # APIError, InternalServerError: let propagate to caller
 
         return None
 
@@ -736,6 +739,53 @@ class ActionExecutionService:
             if ctx is not None:
                 self._context.cleanup_action_context(ctx, action=action)
             raise
+
+    async def _handle_llm_step_timeout(self, exc: Exception) -> Action | None:
+        """Recover from a hung LLM step (``astep``).
+
+        Emits an ``LLM_STEP_TIMEOUT`` ``ErrorObservation`` so the agent
+        sees the failure in its next turn and can decide whether to
+        retry, switch tools, or surface the issue to the user.  Returns
+        ``None`` so the outer step loop re-enters cleanly.
+
+        The default 300s ceiling in :mod:`backend.core.llm_step_timeout`
+        catches:
+
+        - Hung HTTP connections to the LLM provider
+        - Provider-side stalls that keep the stream open
+        - Network black-holes where TCP keepalives are not re-established
+        - DNS or TLS hangs that never resolve
+
+        These all manifest as the underlying ``asyncio.wait_for`` raising
+        ``TimeoutError`` which :meth:`_run_async_step_with_timeout`
+        re-raises as :class:`backend.inference.exceptions.Timeout`.
+        """
+        self._reset_consecutive_null_actions()
+        model_name = self._agent_model_name(self._context.agent)
+        timeout_seconds = getattr(exc, 'kwargs', {}).get('step_timeout') or 'unknown'
+        logger.error(
+            'ActionExecutionService.get_next_action: LLM step timed out after '
+            '%s seconds for model=%s; emitting LLM_STEP_TIMEOUT observation '
+            'so the agent can recover',
+            timeout_seconds,
+            model_name,
+        )
+        content = (
+            f'The LLM step timed out after {timeout_seconds} seconds '
+            f'(model={model_name}). The provider may be unreachable, hung, '
+            f'or returning a response too slowly. Verify network connectivity '
+            f'and provider status, then ask the agent to retry. You can also '
+            f'override the cap with the APP_LLM_STEP_TIMEOUT_SECONDS env var.'
+        )
+        self._publish_agent_event(
+            ErrorObservation(
+                content=content,
+                error_id='LLM_STEP_TIMEOUT',
+                error_category='llm_timeout',
+                notify_ui_only=True,
+            )
+        )
+        return None
 
     async def _handle_context_window_error(self, exc: Exception) -> Action | None:
         error_str = str(exc).lower()

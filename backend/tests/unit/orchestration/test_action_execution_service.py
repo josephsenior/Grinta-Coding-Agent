@@ -103,11 +103,19 @@ class TestGetNextAction:
         ctx.agent.step.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_astep_timeout_raises(self):
-        """Astep timeout raises Timeout from llm.exceptions."""
+    async def test_astep_timeout_recovers_with_observation(self):
+        """Astep timeout is converted to LLM_STEP_TIMEOUT observation.
+
+        Previously this raised ``Timeout`` from ``llm.exceptions`` which
+        crashed the controller.  The bounded-pipeline plan (Layer 1)
+        converts the timeout into a recoverable ``ErrorObservation``
+        (error_id='LLM_STEP_TIMEOUT') and returns ``None`` so the outer
+        step loop re-enters cleanly with the LLM seeing the failure
+        in its next turn.
+        """
         import asyncio
 
-        from backend.inference.exceptions import Timeout
+        from backend.ledger.observation import ErrorObservation
 
         ctx = _make_context()
 
@@ -119,8 +127,13 @@ class TestGetNextAction:
         ctx.agent.config = MagicMock()
         ctx.agent.config.llm_step_timeout_seconds = 0.01  # 10ms
         svc = ActionExecutionService(ctx)
-        with pytest.raises(Timeout, match='timed out'):
-            await svc.get_next_action()
+        result = await svc.get_next_action()
+        assert result is None
+        # LLM_STEP_TIMEOUT observation was published so the LLM sees it.
+        ctx.event_stream.add_event.assert_called_once()
+        emitted = ctx.event_stream.add_event.call_args.args[0]
+        assert isinstance(emitted, ErrorObservation)
+        assert emitted.error_id == 'LLM_STEP_TIMEOUT'
 
     @pytest.mark.asyncio
     async def test_malformed_action_returns_none(self):

@@ -292,14 +292,92 @@ class SessionOrchestrator(
         sets the event when a fresh ``step()`` call arrives while this
         coroutine is alive.  Between iterations we atomically check + clear
         the event — no separate counter or threading lock is needed.
+
+        **Liveness watchdog (Layer 5 of the bounded-pipeline plan):**
+        Each ``_step_inner`` call is wrapped in ``asyncio.wait_for`` with
+        a hard ceiling (``DEFAULT_STEP_TASK_LIVENESS_SECONDS``).  If a
+        single drain iteration hangs past that bound, the inner coroutine
+        is cancelled, the pending state is force-cleared, and the drain
+        loop exits.  The next ``step()`` request will then create a
+        fresh task.  This is the last-line-of-defense safety net that
+        catches hangs in any code path inside ``_step_inner`` (LLM
+        call, observation processing, tool pipeline, plugin hooks, etc.)
+        where the more specific timeouts (Layers 1, 2, 3) do not apply.
         """
+        from backend.core.constants import DEFAULT_STEP_TASK_LIVENESS_SECONDS
+
         async with self._step_lock:
             self._step_owner_task = asyncio.current_task()
             try:
                 drained_count = 0
                 while drained_count < DEFAULT_AGENT_STEP_DRAIN_LIMIT:
                     drained_count += 1
-                    await self._step_inner()
+                    try:
+                        await asyncio.wait_for(
+                            self._step_inner(),
+                            timeout=DEFAULT_STEP_TASK_LIVENESS_SECONDS,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.error(
+                            'STEP_TASK_LIVENESS_TIMEOUT: _step_inner did not '
+                            'complete within %.0fs; force-cancelling and '
+                            'clearing pending state. The agent loop will '
+                            'recover on the next step() request.',
+                            DEFAULT_STEP_TASK_LIVENESS_SECONDS,
+                            extra={'msg_type': 'STEP_TASK_LIVENESS_TIMEOUT'},
+                        )
+                        # Force-clear pending state so can_step() returns True
+                        # on the next attempt.  Use the same recovery the
+                        # observation-handler timeout uses (Layer 2).
+                        try:
+                            pending_service = getattr(
+                                getattr(self, 'services', None),
+                                'pending_action',
+                                None,
+                            )
+                            if pending_service is not None:
+                                pending_service.set(None)
+                        except Exception:
+                            logger.debug(
+                                'Failed to clear pending state after '
+                                'step-task liveness timeout',
+                                exc_info=True,
+                            )
+                        # Emit a visible error so the LLM sees what happened
+                        # in its next turn.
+                        try:
+                            from backend.ledger import EventSource
+                            from backend.ledger.observation import ErrorObservation
+                            self.event_stream.add_event(
+                                ErrorObservation(
+                                    content=(
+                                        f'Step task exceeded the liveness '
+                                        f'ceiling of '
+                                        f'{DEFAULT_STEP_TASK_LIVENESS_SECONDS:.0f}s '
+                                        f'and was force-cancelled. Pending '
+                                        f'state was cleared; the next step '
+                                        f'will retry. The underlying cause is '
+                                        f'a hang in the agent loop — check the '
+                                        f'log for the last completed step.'
+                                    ),
+                                    error_id='STEP_TASK_LIVENESS_TIMEOUT',
+                                    notify_ui_only=True,
+                                ),
+                                EventSource.ENVIRONMENT,
+                            )
+                        except Exception:
+                            logger.debug(
+                                'Failed to emit STEP_TASK_LIVENESS_TIMEOUT '
+                                'observation',
+                                exc_info=True,
+                            )
+                        # Break the drain loop.  The next step() request
+                        # will create a fresh task with cleared state.
+                        break
+                    except asyncio.CancelledError:
+                        # Cooperative cancellation — propagate without
+                        # treating as a hang.
+                        raise
                     await asyncio.sleep(0)
                     if not self._step_request.is_set():
                         break
@@ -322,9 +400,27 @@ class SessionOrchestrator(
 
     async def _step_inner(self) -> None:
         """Inner step logic, guarded by _step_lock."""
+        import time as _t
+
+        _step_inner_start = _t.monotonic()
+        logger.debug(
+            '_step_inner ENTER (sid=%s)',
+            getattr(self, 'sid', '?'),
+            extra={'msg_type': 'STEP_INNER_ENTER'},
+        )
         await self._ensure_runtime_connected()
+        logger.debug(
+            '_step_inner: _ensure_runtime_connected done in %.3fs',
+            _t.monotonic() - _step_inner_start,
+            extra={'msg_type': 'STEP_INNER_RUNTIME_CONNECTED'},
+        )
 
         if not self.step_prerequisites.can_step():
+            logger.debug(
+                '_step_inner EXIT (prereq not met) after %.3fs',
+                _t.monotonic() - _step_inner_start,
+                extra={'msg_type': 'STEP_INNER_EXIT_PREREQ'},
+            )
             return
 
         self._log_step_info()
@@ -335,12 +431,28 @@ class SessionOrchestrator(
             pass
 
         if not await self._run_control_flags_safely():
+            logger.debug(
+                '_step_inner EXIT (control flags) after %.3fs',
+                _t.monotonic() - _step_inner_start,
+                extra={'msg_type': 'STEP_INNER_EXIT_CONTROL'},
+            )
             return
 
         action = await self.action_execution.get_next_action()
+        logger.debug(
+            '_step_inner: get_next_action returned %s after %.3fs',
+            type(action).__name__ if action is not None else 'None',
+            _t.monotonic() - _step_inner_start,
+            extra={'msg_type': 'STEP_INNER_GOT_ACTION'},
+        )
         if action is None:
             if not self.action_execution.consume_expected_no_action_recovery():
                 await self.action_execution.handle_unexpected_no_action_while_running()
+            logger.debug(
+                '_step_inner EXIT (no action) after %.3fs',
+                _t.monotonic() - _step_inner_start,
+                extra={'msg_type': 'STEP_INNER_EXIT_NO_ACTION'},
+            )
             return
 
         # Reset retry count on successful action execution
@@ -357,6 +469,12 @@ class SessionOrchestrator(
             return
 
         await self.action_execution.execute_action(action)
+        logger.debug(
+            '_step_inner: execute_action returned after %.3fs for %s',
+            _t.monotonic() - _step_inner_start,
+            type(action).__name__,
+            extra={'msg_type': 'STEP_INNER_EXECUTED_ACTION'},
+        )
         extra_data = getattr(self.state, 'extra_data', None)
         if isinstance(extra_data, dict):
             extra_data.pop('__survivable_error_consecutive', None)
@@ -386,6 +504,11 @@ class SessionOrchestrator(
 
             await drain_background_tasks(max_rounds=2, timeout=2.0)
             await self._handle_post_execution()
+            logger.debug(
+                '_step_inner EXIT (finish branch) after %.3fs',
+                _t.monotonic() - _step_inner_start,
+                extra={'msg_type': 'STEP_INNER_EXIT_FINISH'},
+            )
             return
         await self._handle_post_execution()
 
@@ -421,6 +544,11 @@ class SessionOrchestrator(
             self._draining_batch = False
         # Deferred condensation check after batch drain completes.
         await self._handle_post_execution()
+        logger.debug(
+            '_step_inner EXIT (normal) after %.3fs',
+            _t.monotonic() - _step_inner_start,
+            extra={'msg_type': 'STEP_INNER_EXIT'},
+        )
 
         # After processing non-runnable actions (e.g. AgentThinkAction), no
         # pending action is set and the runtime may never produce an observation
