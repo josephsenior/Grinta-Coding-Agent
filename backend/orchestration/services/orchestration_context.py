@@ -214,3 +214,31 @@ class OrchestrationContext:
     def get_controller(self) -> SessionOrchestrator:
         """Expose the underlying controller instance."""
         return self._controller
+
+    def kill_running_command(self) -> None:
+        """Kill the currently running subprocess (best-effort).
+
+        Traverses the controller → runtime → session_manager → cancellation_service
+        chain to find the ``TaskCancellationService`` and kill the most recently
+        registered process.  This is used when a pending action times out — the
+        timed-out subprocess must be terminated to prevent zombie accumulation
+        over long sessions.
+        """
+        try:
+            runtime = getattr(self._controller, 'runtime', None)
+            if runtime is None:
+                return
+            executor = getattr(runtime, '_executor', None)
+            if executor is None:
+                executor = runtime
+            session_manager = getattr(executor, 'session_manager', None)
+            if session_manager is None:
+                return
+            cancellation_service = getattr(
+                session_manager, 'cancellation_service', None
+            )
+            if cancellation_service is None:
+                return
+            cancellation_service.cancel_last_registered()
+        except Exception:
+            pass

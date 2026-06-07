@@ -7,7 +7,6 @@ from unittest import TestCase
 from backend.inference import tool_names
 
 EXPECTED_EXPORTS = [
-    'CREATE_TASK_TRACKER_TOOL_NAME',
     'CREATE_TOOL_NAME',
     'EDIT_SYMBOLS_TOOL_NAME',
     'FIND_SYMBOLS_TOOL_NAME',

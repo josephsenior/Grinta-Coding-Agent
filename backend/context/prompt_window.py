@@ -94,6 +94,11 @@ def select_prompt_events(
         must_keep_latest = not has_tail
         if not must_keep_latest and (not count_allows or not budget_allows):
             continue
+        if must_keep_latest and not budget_allows and budget is not None:
+            remaining = max(1, budget - selected_tokens)
+            chunk = _truncate_chunk_to_budget(chunk, remaining)
+            chunk_tokens = estimate_events_tokens(chunk)
+            chunk_count = len(chunk)
         selected_chunks.append(chunk)
         selected_tokens += chunk_tokens
         selected_count += chunk_count
@@ -172,6 +177,61 @@ def _causal_chunks(events: Iterable[Event]) -> list[list[Event]]:
     if current:
         chunks.append(current)
     return chunks
+
+
+def _truncate_chunk_to_budget(chunk: list[Event], token_budget: int) -> list[Event]:
+    """Truncate events in *chunk* so their estimated tokens fit within *token_budget*.
+
+    The largest observation events are truncated first (by replacing their
+    ``content`` field with a head/tail excerpt).  Action events are never
+    truncated — they carry the tool-call structure the LLM needs.  If
+    truncation of observations is insufficient, the oldest non-action events
+    are dropped entirely.
+    """
+    if not chunk or token_budget <= 0:
+        return chunk
+
+    _TRUNCATION_MARKER = '\n\n[... truncated to fit context window ...]\n\n'
+    _HEAD_CHARS = 500
+    _TAIL_CHARS = 500
+
+    current_tokens = estimate_events_tokens(chunk)
+    if current_tokens <= token_budget:
+        return chunk
+
+    sized = []
+    for i, event in enumerate(chunk):
+        if isinstance(event, Action):
+            continue
+        content = getattr(event, 'content', None)
+        if not isinstance(content, str) or len(content) < _HEAD_CHARS + _TAIL_CHARS:
+            continue
+        sized.append((len(content), i, event))
+
+    sized.sort(reverse=True)
+
+    for _size, idx, event in sized:
+        if estimate_events_tokens(chunk) <= token_budget:
+            break
+        content = getattr(event, 'content', '')
+        truncated = content[:_HEAD_CHARS] + _TRUNCATION_MARKER + content[-_TAIL_CHARS:]
+        try:
+            event.content = truncated
+        except Exception:
+            pass
+
+    if estimate_events_tokens(chunk) <= token_budget:
+        return chunk
+
+    while len(chunk) > 1 and estimate_events_tokens(chunk) > token_budget:
+        for i, event in enumerate(chunk):
+            if not isinstance(event, Action):
+                chunk.pop(i)
+                break
+        else:
+            break
+
+    return chunk
 
 
 def _event_payload_text(event: Event) -> str:

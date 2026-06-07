@@ -867,7 +867,13 @@ class EventStream(EventStore):
                 self._bp.queue_size = queue.qsize()
 
     async def _dispatch_event(self, event: Event) -> None:
-        """Dispatch a single event to all registered subscribers."""
+        """Dispatch a single event to all registered subscribers.
+
+        Ensures ordering: all async callbacks scheduled by this event
+        complete before the next event is dispatched.  Without this,
+        concurrent delivery of events N and N+1 can cause subscriber
+        callbacks to execute out of order on the main loop.
+        """
         callbacks = self._snapshot_subscribers()
         if not callbacks:
             return
@@ -884,7 +890,15 @@ class EventStream(EventStore):
             for subscriber_id, callback_id, callback in callbacks
         ]
         if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            cross_loop_futures = [
+                r for r in results
+                if isinstance(r, asyncio.Future) and not r.done()
+            ]
+            if cross_loop_futures:
+                await asyncio.gather(
+                    *cross_loop_futures, return_exceptions=True
+                )
 
     def _execute_callback(
         self,
@@ -892,15 +906,14 @@ class EventStream(EventStore):
         event: Event,
         subscriber_id: str,
         callback_id: str,
-    ) -> None:
+    ) -> asyncio.Future | None:
         """Execute subscriber callback inside thread pool with error handling.
 
         If the subscriber returns an awaitable, it is scheduled on the
-        application's main event loop (registered via ``set_main_event_loop``)
-        through ``run_coroutine_threadsafe``. The worker does NOT block waiting
-        for the awaitable to complete — this prevents a single slow callback
-        from stalling the entire delivery pipeline and causing deadlocks when
-        the main loop is busy (e.g., during LLM streaming).
+        application's main event loop via ``run_coroutine_threadsafe``.
+        The returned ``asyncio.Future`` is passed back to ``_dispatch_event``
+        so it can await completion before dispatching the next event,
+        preserving per-subscriber event ordering.
 
         Spinning up a fresh per-event loop with ``asyncio.run`` would orphan
         any cross-loop primitives the subscriber awaits (Locks/Events/Queues
@@ -909,7 +922,7 @@ class EventStream(EventStore):
         try:
             result = callback(event)
             if not inspect.isawaitable(result):
-                return
+                return None
             main = get_main_event_loop()
             if main is not None and main.is_running():
                 future = asyncio.run_coroutine_threadsafe(
@@ -919,6 +932,7 @@ class EventStream(EventStore):
                 future.add_done_callback(
                     lambda f: self._handle_callback_future_done(f, callback_id, subscriber_id)
                 )
+                return future
             else:
                 logger.warning(
                     'No main event loop available for callback %s; '
@@ -934,10 +948,11 @@ class EventStream(EventStore):
                         future.add_done_callback(
                             lambda f: self._handle_callback_future_done(f, callback_id, subscriber_id)
                         )
-                        return
+                        return future
                 except RuntimeError:
                     pass
                 asyncio.run(self._await_result_with_logging(result, callback_id, subscriber_id))  # type: ignore[arg-type]
+                return None
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error(
                 'Error in event callback %s for subscriber %s: %s',
@@ -945,6 +960,7 @@ class EventStream(EventStore):
                 subscriber_id,
                 exc,
             )
+            return None
 
     async def _await_result_with_logging(
         self, awaitable: Any, callback_id: str, subscriber_id: str

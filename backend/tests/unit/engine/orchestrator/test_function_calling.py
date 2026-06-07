@@ -15,7 +15,6 @@ from backend.core.errors import (
 )
 from backend.engine.function_calling import (
     _handle_cmd_run_tool,
-    _handle_create_task_tracker_tool,
     _handle_mcp_tool,
     _handle_summarize_context_tool,
     _handle_task_tracker_tool,
@@ -26,7 +25,6 @@ from backend.engine.function_calling import (
 )
 from backend.engine.tools import create_cmd_run_tool
 from backend.engine.tools.task_tracker import (
-    create_create_task_tracker_tool,
     create_task_tracker_tool,
 )
 from backend.ledger.action import (
@@ -246,29 +244,6 @@ class TestHandleMcpTool:
 
 
 class TestHandleTaskTrackerTool:
-    def test_create_task_tracker_command_with_task_list(self):
-        args = {
-            'task_list': [
-                {'id': 'task-1', 'description': 'Do X', 'status': 'todo'},
-            ],
-        }
-        action = _handle_create_task_tracker_tool(args)
-        assert isinstance(action, TaskTrackingAction)
-        assert action.command == 'create'
-        assert len(action.task_list) == 1
-
-    def test_create_task_tracker_requires_non_empty_task_list(self):
-        with pytest.raises(FunctionCallValidationError, match='at least one'):
-            _handle_create_task_tracker_tool({'task_list': []})
-
-    def test_create_task_tracker_schema_uses_same_statuses(self):
-        tool = create_create_task_tracker_tool()
-        parameters = tool['function']['parameters']
-        status = parameters['properties']['task_list']['items']['properties']['status']
-
-        assert tool['function']['name'] == 'create_task_tracker'
-        assert status['enum'] == ['todo', 'in_progress', 'done', 'skipped', 'blocked']
-
     def test_update_command_with_task_list(self):
         args = {
             'command': 'update',
@@ -413,24 +388,6 @@ class TestProcessSingleToolCall:
         tc = self._make_tool_call('finish')
         with pytest.raises(FunctionCallNotExistsError):
             _process_single_tool_call(tc, {'summary': 'done'})
-
-    def test_plan_mode_allows_create_task_tracker_tool_call(self):
-        tool_name = create_create_task_tracker_tool()['function']['name']
-        tc = self._make_tool_call(tool_name)
-
-        action = _process_single_tool_call(
-            tc,
-            {
-                'task_list': [
-                    {'id': '1', 'description': 'Draft plan', 'status': 'todo'}
-                ]
-            },
-            mode='plan',
-        )
-
-        assert isinstance(action, TaskTrackingAction)
-        assert action.command == 'create'
-        assert action.task_list[0]['description'] == 'Draft plan'
 
     def test_plan_mode_allows_file_tool_call(self):
         from backend.engine.tools.native_file_tools import create_create_tool

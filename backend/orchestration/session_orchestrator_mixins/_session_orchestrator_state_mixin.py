@@ -101,7 +101,6 @@ class _SessionOrchestratorStateMixin:
         )
 
         self.services.pending_action.set(None)
-        self.services.context.emit_event(pending, EventSource.AGENT)
 
         new_state = (
             AgentState.RUNNING
@@ -110,7 +109,8 @@ class _SessionOrchestratorStateMixin:
         )
         await self.set_agent_state_to(new_state)
 
-        # Wake the agent loop so it picks up the just-emitted action.
+        self.services.context.emit_event(pending, EventSource.AGENT)
+
         self.step()
 
     def get_agent_state(self) -> AgentState:

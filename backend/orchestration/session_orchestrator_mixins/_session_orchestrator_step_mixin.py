@@ -79,7 +79,7 @@ class _SessionOrchestratorStepMixin:
         """
         from backend.utils.async_utils import create_tracked_task
 
-        self._step_request.clear()
+        self._step_request_count = 0
         self._step_task = create_tracked_task(
             self._step_with_exception_handling(),
             name='agent-step',

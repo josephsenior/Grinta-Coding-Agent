@@ -102,11 +102,14 @@ class SessionOrchestrator(
     _replay_manager: ReplayManager
     PENDING_ACTION_TIMEOUT: float = DEFAULT_PENDING_ACTION_TIMEOUT
     _step_task: asyncio.Task[None] | None = None
-    # Set by ``_request_step`` (or ``_step``'s teardown) to request another
-    # step iteration.  ``_step``'s drain loop checks + clears this event
-    # atomically.  All mutations happen on the main event loop, so the
-    # event is implicitly thread-safe via the call_soon_threadsafe funnel.
-    _step_request: asyncio.Event = asyncio.Event()
+    # Counter incremented by ``_request_step`` to request another step iteration.
+    # ``_step``'s drain loop decrements it.  All mutations happen on the main
+    # event loop, so the counter is implicitly thread-safe via the
+    # call_soon_threadsafe funnel.  Using an integer counter instead of an
+    # asyncio.Event eliminates the lost-wakeup race where the finally block
+    # clears the event between an external set() and the scheduled
+    # _create_step_task.
+    _step_request_count: int = 0
     rate_governor: LLMRateGovernor
     memory_pressure: MemoryPressureMonitor
     action_scheduler: ActionScheduler
@@ -164,14 +167,14 @@ class SessionOrchestrator(
         self._step_lock_instance: asyncio.Lock | None = None
         self._step_lock_loop: asyncio.AbstractEventLoop | None = None
         self._step_owner_task: asyncio.Task[Any] | None = None
-        # Step request signal.  ``_request_step`` sets this when a step is
+        # Step request counter.  ``_request_step`` increments when a step is
         # requested while a step task is in-flight; ``_step``'s drain loop
-        # atomically checks + clears it.  See :attr:`_step_request` on the
-        # class body for the concurrency contract.  No additional gate or
-        # counter is needed — the asyncio.Event set/check/clear pattern
-        # replaces the previous ``_step_gate`` (threading.Lock),
-        # ``_step_pending`` (bool), and ``_step_seq`` (int) triple.
-        self._step_request = asyncio.Event()
+        # decrements.  All mutations happen on the main event loop, so the
+        # counter is implicitly thread-safe via the call_soon_threadsafe funnel.
+        # Using an integer counter instead of an asyncio.Event eliminates the
+        # lost-wakeup race where the finally block clears the event between
+        # an external set() and the scheduled _create_step_task.
+        self._step_request_count = 0
         # Suppresses memory-pressure condensation signalling during batch drain
         # so that pending actions are not disrupted mid-batch.
         self._draining_batch = False
@@ -276,7 +279,7 @@ class SessionOrchestrator(
         if self._closed:
             return
         if self._step_task is not None and not self._step_task.done():
-            self._step_request.set()
+            self._step_request_count += 1
             return
         self._create_step_task()
 
@@ -379,22 +382,14 @@ class SessionOrchestrator(
                         # treating as a hang.
                         raise
                     await asyncio.sleep(0)
-                    if not self._step_request.is_set():
+                    if self._step_request_count <= 0:
                         break
-                    self._step_request.clear()
+                    self._step_request_count -= 1
                     if not self.step_prerequisites.can_step():
                         break
             finally:
                 self._step_owner_task = None
-                # If a fresh step request arrived during our teardown, the
-                # event is set but no in-flight task will pick it up.
-                # Schedule a new task on the next loop iteration.  This is
-                # the asyncio.Event equivalent of the old ``_step_seq``
-                # mechanism — by the time the call_soon callback fires,
-                # ``self._step_task`` will already be done, so
-                # ``_create_step_task`` will create a fresh task.
-                if not self._closed and self._step_request.is_set():
-                    self._step_request.clear()
+                if not self._closed and self._step_request_count > 0:
                     loop = asyncio.get_event_loop()
                     loop.call_soon(self._create_step_task)
 
@@ -690,7 +685,7 @@ class SessionOrchestrator(
             pass
         stream = self.event_stream
         try:
-            self._step_request.clear()
+            self._step_request_count = 0
             if self._step_task is not None and not self._step_task.done():
                 self._step_task.cancel()
                 try:
