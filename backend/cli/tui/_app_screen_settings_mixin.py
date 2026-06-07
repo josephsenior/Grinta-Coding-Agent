@@ -53,6 +53,9 @@ class _AppScreenSettingsMixin:
             ac = getattr(controller, 'autonomy_controller', None)
             if ac is not None:
                 ac.autonomy_level = level
+            runtime = getattr(controller, 'runtime', None)
+            if runtime is not None:
+                setattr(runtime, '_autonomy_level', level)
         try:
             setattr(self._config, 'autonomy_level', level)
         except Exception:

@@ -213,9 +213,10 @@ def test_create_file_public_action_overwrites_by_default_and_rejects_serialized(
             'security_risk': 'LOW',
         }
     )
-    assert isinstance(existing_action, FileEditAction)
-    assert existing_action.command == 'create_file'
-    assert existing_action.overwrite_existing is True
+    # File existence pre-check: returns soft guidance instead of overwriting
+    assert isinstance(existing_action, AgentThinkAction)
+    assert 'already exists' in existing_action.thought
+    assert 'replace_string' in existing_action.thought
 
     with pytest.raises(FunctionCallValidationError, match='CONTENT_APPEARS_SERIALIZED'):
         _handle_create_tool(
