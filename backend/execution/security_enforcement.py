@@ -270,6 +270,13 @@ class SecurityEnforcementMixin:
     security_analyzer: Any
     config: Any
 
+    def _is_full_autonomy(self) -> bool:
+        """Return True when the runtime is in full autonomy mode."""
+        level = getattr(self, '_autonomy_level', '')
+        if not level:
+            return False
+        return str(level).strip().lower() == 'full'
+
     def _check_action_confirmation(self, action: Action) -> Observation | None:
         """Check action confirmation state and return appropriate observation."""
         from backend.ledger.action import (
@@ -322,6 +329,12 @@ class SecurityEnforcementMixin:
 
         if risk >= ActionSecurityRisk.HIGH:
             action_desc = f'{action.action}: {str(action)[:120]}'
+            if self._is_full_autonomy():
+                logger.info(
+                    'Security: full autonomy — skipping confirmation for high-risk action: %s',
+                    action_desc,
+                )
+                return None
             if decision.require_confirmation and (
                 hasattr(action, 'confirmation_state')
                 and action.confirmation_state != ActionConfirmationStatus.CONFIRMED
