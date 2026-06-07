@@ -577,8 +577,22 @@ class EventStream(EventStore):
         # written to its own file keyed by ID, so concurrent writes to
         # different IDs are safe.  On WAL replay events are re-sorted by ID,
         # so transient out-of-order flushes do not cause ordering bugs.
+        #
+        # Persistence failure is intentionally non-fatal: a transient I/O
+        # error (disk full, SQLite lock, AV scan) must not prevent the event
+        # from being delivered to subscribers.  Durability is degraded for
+        # that event, but the session continues.  A dead session caused by a
+        # recoverable disk blip violates the runtime stability contract.
         if sanitized_event.id is not None:
-            self._persist.persist_event(payload, sanitized_event.id, cache_payload)
+            try:
+                self._persist.persist_event(payload, sanitized_event.id, cache_payload)
+            except Exception:
+                logger.error(
+                    'EventStream: persist_event failed for event id=%s; '
+                    'continuing with in-memory delivery (durability degraded)',
+                    sanitized_event.id,
+                    exc_info=True,
+                )
 
         # Arm pending with *sanitized_event*, the same object the stream delivers
         # to subscribers (runtime, controller). A round-trip can diverge from the

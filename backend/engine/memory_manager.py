@@ -10,6 +10,7 @@ from backend.context.compactor import Compactor
 from backend.context.pre_condensation_snapshot import (
     commit_snapshot,
     delete_snapshot,
+    delete_staging_snapshot,
     extract_snapshot,
     format_snapshot_for_injection,
     load_snapshot,
@@ -249,9 +250,16 @@ class ContextMemoryManager:
         memory_pressure = self._memory_pressure_signal(state)
 
         if isinstance(condensation_result, View):
-            # Compaction did not fire — clean up the staged snapshot
-            # so it cannot be injected stale on a future turn or session.
-            delete_snapshot()
+            # Compaction did not fire — discard only the *staging* file so a
+            # half-written snapshot from this turn cannot leak on the next.
+            # The *canonical* snapshot (committed by a prior compaction turn)
+            # must NOT be deleted here: the AgentCondensationObservation from
+            # that prior turn is rendered in build_messages on THIS turn, and
+            # _load_restored_context_snapshot() needs the canonical file to
+            # still exist when it runs.  delete_snapshot() is called by the
+            # consumer (_load_restored_context_snapshot) after it reads the
+            # file, ensuring exactly-once delivery.
+            delete_staging_snapshot()
             logger.info(
                 'ContextMemoryManager.condense_history finished with View '
                 '(events=%d postprocess=%.3fs elapsed=%.3fs)',
