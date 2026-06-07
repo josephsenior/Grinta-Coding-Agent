@@ -411,9 +411,23 @@ class PendingActionService:
         )
 
     def _watchdog_fire(self) -> None:
-        """Trigger a step if any pending action is still active."""
+        """Trigger a step if any pending action is still active.
+
+        First purges timed-out actions (emits ErrorObservation and clears
+        internal state) so the agent is no longer blocked on a stuck pending
+        action. Only triggers a step if anything is still pending after the
+        purge — otherwise the purge itself is the recovery and a step is
+        unnecessary.
+        """
         self._watchdog_handle = None
         if not self._outstanding and self._legacy_pending is None:
+            return
+        self._purge_timeouts()
+        if not self._outstanding and self._legacy_pending is None:
+            logger.warning(
+                'Pending action watchdog fired; purged timed-out actions. '
+                'No further step trigger needed.'
+            )
             return
         logger.warning(
             'Pending action watchdog fired; triggering step (outstanding ids=%s)',
