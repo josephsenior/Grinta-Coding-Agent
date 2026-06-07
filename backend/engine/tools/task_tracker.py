@@ -117,15 +117,27 @@ class TaskTracker:
             return []
 
     def save_to_file(self, task_list: list[dict[str, Any]]) -> None:
-        """Save the task list to disk."""
+        """Save the task list to disk atomically.
+
+        Writes to a sibling ``.tmp`` file first, fsyncs it, then uses
+        ``os.replace`` for an atomic rename.  This prevents a crash or
+        disk-full event mid-write from silently corrupting or truncating
+        ``active_plan.json``.
+        """
+        import os
+
         from backend.core.contracts.state import normalize_plan_step_payload
 
         normalized = [
             normalize_plan_step_payload(task, i + 1) for i, task in enumerate(task_list)
         ]
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.path, 'w', encoding='utf-8') as f:
+        tmp = self.path.with_suffix('.json.tmp')
+        with open(tmp, 'w', encoding='utf-8') as f:
             json.dump(normalized, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, self.path)
 
     def update_task_status(
         self, task_id: str, status: str, result: str | None = None

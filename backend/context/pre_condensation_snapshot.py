@@ -594,9 +594,9 @@ def load_snapshot() -> dict[str, Any] | None:
 def delete_snapshot() -> None:
     """Delete the on-disk snapshot and staging file if they exist.
 
-    Called when compaction did NOT fire so the eagerly-written staging
-    snapshot is removed.  Also called after the canonical snapshot has
-    been consumed via ``load_snapshot()``.
+    Called **after** the canonical snapshot has been consumed via
+    ``load_snapshot()``, so it cannot be injected a second time.
+    Deletes both the canonical and staging paths.
     """
     for getter in (_snapshot_path, _snapshot_staging_path):
         try:
@@ -605,6 +605,24 @@ def delete_snapshot() -> None:
                 p.unlink()
         except OSError:
             pass
+
+
+def delete_staging_snapshot() -> None:
+    """Delete only the staging snapshot file.
+
+    Called when compaction did NOT fire (the ``View`` branch of
+    ``condense_history``), so the eagerly-written staging file is cleaned up
+    without touching the canonical snapshot.  The canonical file must remain
+    intact so that the ``AgentCondensationObservation`` from the *previous*
+    compaction turn can still inject its ``<RESTORED_CONTEXT>`` block on
+    the current turn.
+    """
+    try:
+        p = _snapshot_staging_path()
+        if p.exists():
+            p.unlink()
+    except OSError:
+        pass
 
 
 def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:

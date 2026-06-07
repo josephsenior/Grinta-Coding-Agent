@@ -64,8 +64,16 @@ _HARD_STOP_EXCEPTIONS = (
     APIConnectionError,
     InternalServerError,
     LLMNoResponseError,
-    # Python built-in exceptions that indicate SDK bugs or malformed responses.
-    # The agent cannot adapt to these - they're not actionable errors.
+)
+
+# Generic Python exceptions previously classified as hard stops.
+# These are NOT hard stops: a single incidental AttributeError/KeyError in a
+# rarely-hit branch must not halt an otherwise-healthy multi-hour session.
+# They are routed through _continue_after_survivable_error so the circuit
+# breaker (5 consecutive) and the survivable-error backstop (10 consecutive)
+# bound any genuine deterministic loop without requiring user intervention for
+# a one-off hiccup.
+_SURVIVABLE_PYTHON_EXCEPTIONS = (
     IndexError,
     KeyError,
     TypeError,
