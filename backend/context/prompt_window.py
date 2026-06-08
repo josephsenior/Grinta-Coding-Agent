@@ -10,6 +10,9 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
+_EVENT_TOKEN_CACHE: dict[str, int] = {}
+_EVENT_TOKEN_CACHE_MAX = 4096
+
 from backend.inference.provider_capabilities import model_token_correction
 from backend.ledger.action import Action
 from backend.ledger.event import Event
@@ -106,6 +109,8 @@ def select_prompt_events(
 
     selected_chunks.reverse()
     selected = protected + [event for chunk in selected_chunks for event in chunk]
+    if budget is not None:
+        selected = _enforce_token_ceiling(selected, budget, protected)
     return _result(
         events=selected,
         original_events=len(event_list),
@@ -118,8 +123,37 @@ def select_prompt_events(
     )
 
 
+def estimate_event_tokens(event: Event) -> int:
+    """Best-effort token estimate for a single event (cached by fingerprint)."""
+    fp = event_fingerprint(event)
+    cached = _EVENT_TOKEN_CACHE.get(fp)
+    if cached is not None:
+        return cached
+    text = _event_payload_text(event)
+    if not text:
+        tokens = 0
+    else:
+        tokenizer = _tokenizer()
+        if tokenizer is not None:
+            try:
+                tokens = max(1, len(tokenizer.encode(text)))
+            except Exception:
+                tokens = max(1, len(text) // 4)
+        else:
+            tokens = max(1, len(text) // 4)
+    if len(_EVENT_TOKEN_CACHE) >= _EVENT_TOKEN_CACHE_MAX:
+        _EVENT_TOKEN_CACHE.clear()
+    _EVENT_TOKEN_CACHE[fp] = tokens
+    return tokens
+
+
 def estimate_events_tokens(events: Iterable[Event]) -> int:
     """Best-effort token estimate for event payloads."""
+    total = 0
+    for event in events:
+        total += estimate_event_tokens(event)
+    if total > 0:
+        return total
     text = '\n'.join(_event_payload_text(event) for event in events)
     if not text:
         return 0
@@ -164,6 +198,52 @@ def _protected_summary_events(events: list[Event]) -> list[Event]:
             continue
         protected.append(event)
     return protected
+
+
+def _enforce_token_ceiling(
+    selected: list[Event],
+    budget: int,
+    protected: list[Event],
+) -> list[Event]:
+    """Drop oldest removable causal units until the selection fits the token budget."""
+    if estimate_events_tokens(selected) <= budget:
+        return selected
+    protected_ids = {id(event) for event in protected}
+    removable = [event for event in selected if id(event) not in protected_ids]
+    protected_events = [event for event in selected if id(event) in protected_ids]
+    protected_tokens = estimate_events_tokens(protected_events)
+    chunks = _causal_chunks(removable)
+    kept_chunks: list[list[Event]] = []
+    kept_tokens = protected_tokens
+    for chunk in reversed(chunks):
+        chunk_tokens = estimate_events_tokens(chunk)
+        if not kept_chunks:
+            if kept_tokens + chunk_tokens > budget:
+                chunk = _truncate_chunk_to_budget(
+                    chunk, max(1, budget - kept_tokens)
+                )
+                chunk_tokens = estimate_events_tokens(chunk)
+            kept_chunks.append(chunk)
+            kept_tokens += chunk_tokens
+            continue
+        if kept_tokens + chunk_tokens <= budget:
+            kept_chunks.append(chunk)
+            kept_tokens += chunk_tokens
+    kept_chunks.reverse()
+    result = protected_events + [event for chunk in kept_chunks for event in chunk]
+    while estimate_events_tokens(result) > budget:
+        tail = [event for event in result if id(event) not in protected_ids]
+        if not tail:
+            break
+        remaining = max(1, budget - protected_tokens)
+        truncated_tail = _truncate_chunk_to_budget(tail, remaining)
+        result = protected_events + truncated_tail
+        if estimate_events_tokens(result) <= budget:
+            break
+        if not _drop_oldest_removable_unit(tail):
+            break
+        result = protected_events + tail
+    return result
 
 
 def _causal_chunks(events: Iterable[Event]) -> list[list[Event]]:
@@ -354,6 +434,7 @@ def _tokenizer() -> Any | None:
 
 __all__ = [
     'PromptWindowResult',
+    'estimate_event_tokens',
     'estimate_events_tokens',
     'event_fingerprint',
     'select_prompt_events',

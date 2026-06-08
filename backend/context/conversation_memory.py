@@ -286,6 +286,50 @@ class ContextMemory:
         messages = remove_duplicate_system_prompt_user(messages)
         return apply_user_message_formatting(messages)
 
+    def process_events_appending(
+        self,
+        condensed_history: list[Event],
+        initial_user_action: MessageAction,
+        prefix_messages: list[Message],
+        prefix_event_count: int,
+        max_message_chars: int | None = None,
+        vision_is_active: bool = False,
+    ) -> list[Message]:
+        """Extend a prior message build when only new tail events were appended."""
+        if prefix_event_count <= 0 or prefix_event_count >= len(condensed_history):
+            return self.process_events(
+                condensed_history,
+                initial_user_action,
+                max_message_chars=max_message_chars,
+                vision_is_active=vision_is_active,
+            )
+
+        events = self._prepare_event_history(condensed_history, initial_user_action)
+        tool_state = _ToolCallTracking()
+        messages: list[Message] = list(prefix_messages)
+        for i in range(prefix_event_count, len(events)):
+            messages_to_add = self._messages_from_event(
+                event=events[i],
+                index=i,
+                events=events,
+                tool_state=tool_state,
+                max_message_chars=max_message_chars,
+                vision_is_active=vision_is_active,
+            )
+            messages_to_add.extend(self._flush_resolved_tool_calls(tool_state))
+            messages += messages_to_add
+        messages = list(filter_unmatched_tool_calls(messages))
+        messages = self._normalize_system_messages(messages)
+        messages = remove_duplicate_system_prompt_user(messages)
+        return apply_user_message_formatting(messages)
+
+    def release_post_compaction_render_cache(self) -> int:
+        """Drop cached event renders superseded by compaction."""
+        evicted = len(self._render_cache)
+        self._render_cache.clear()
+        self._indexed_event_ids.clear()
+        return evicted
+
     def _prepare_event_history(
         self,
         condensed_history: list[Event],

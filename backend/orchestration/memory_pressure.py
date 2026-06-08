@@ -73,20 +73,28 @@ class MemoryPressureMonitor:
     ) -> None:
         self._warn_delta_mb = warn_mb or int(os.getenv('APP_MEM_WARN_MB', '768'))
         self._crit_delta_mb = crit_mb or int(os.getenv('APP_MEM_CRIT_MB', '1536'))
-        self._check_interval = check_interval_s or float(
-            os.getenv('APP_MEM_CHECK_INTERVAL', '10')
+        self._check_interval = (
+            check_interval_s
+            if check_interval_s is not None
+            else float(os.getenv('APP_MEM_CHECK_INTERVAL', '10'))
         )
-        self._cooldown_s = cooldown_s or float(
-            os.getenv('APP_MEM_CONDENSE_COOLDOWN_S', '30')
+        self._cooldown_s = (
+            cooldown_s
+            if cooldown_s is not None
+            else float(os.getenv('APP_MEM_CONDENSE_COOLDOWN_S', '30'))
         )
-        self._prewarm_cooldown_s = prewarm_cooldown_s or float(
-            os.getenv('APP_MEM_PREWARM_COOLDOWN_S', '5')
+        self._prewarm_cooldown_s = (
+            prewarm_cooldown_s
+            if prewarm_cooldown_s is not None
+            else float(os.getenv('APP_MEM_PREWARM_COOLDOWN_S', '5'))
         )
         self._min_history_events = (
             min_history_events
             if min_history_events is not None
             else int(os.getenv('APP_MEM_MIN_HISTORY_EVENTS', '30'))
         )
+        self._prewarm_ratio = float(os.getenv('APP_MEM_PREWARM_RATIO', '0.5'))
+        self._signal_ratio = float(os.getenv('APP_MEM_SIGNAL_RATIO', '0.75'))
         self._last_check: float = 0.0
         self._last_rss_mb: float = 0.0
         self._condensation_count: int = 0
@@ -123,6 +131,20 @@ class MemoryPressureMonitor:
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
+
+    def should_prewarm(self, history_events: int | None = None) -> bool:
+        """Return True when background compaction pre-warm should start."""
+        if history_events is not None and history_events < self._min_history_events:
+            return False
+        if self.pressure_ratio() >= self._prewarm_ratio:
+            return True
+        return self.should_condense(history_events=history_events)
+
+    def should_signal_pressure(self) -> bool:
+        """Return True when the orchestrator should schedule foreground compaction."""
+        if self.is_critical():
+            return True
+        return self.pressure_ratio() >= self._signal_ratio
 
     def should_condense(self, history_events: int | None = None) -> bool:
         """Return True if memory pressure warrants proactive condensation.
@@ -294,6 +316,8 @@ class MemoryPressureMonitor:
             'has_prewarmed': self.has_prewarmed,
             'eta_seconds_p50': self.eta_seconds(),
             'condense_samples': len(self._condense_durations),
+            'prewarm_ratio': self._prewarm_ratio,
+            'signal_ratio': self._signal_ratio,
         }
 
     # ------------------------------------------------------------------ #

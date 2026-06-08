@@ -360,13 +360,19 @@ class _SessionOrchestratorParallelMixin:
 
         history_events = len(history) if history is not None else None
 
-        if not self._draining_batch and self.memory_pressure.should_condense(
-            history_events=history_events
-        ):
+        should_signal = (
+            not self._draining_batch
+            and self.memory_pressure.should_signal_pressure()
+            and (
+                history_events is None
+                or history_events >= self.memory_pressure._min_history_events
+            )
+        )
+        if should_signal:
             level = 'CRITICAL' if self.memory_pressure.is_critical() else 'WARNING'
 
             if (
-                level == 'WARNING'
+                self.memory_pressure.should_prewarm(history_events=history_events)
                 and not self.memory_pressure.is_prewarming
                 and not self.memory_pressure.has_prewarmed
             ):
