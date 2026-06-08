@@ -3171,26 +3171,36 @@ async def test_tui_recoverable_error_routes_to_add_warning(mock_config):
 
         s.add_warning = MagicMock(wraps=s.add_warning)  # type: ignore[method-assign]
         s.add_error = MagicMock(wraps=s.add_error)  # type: ignore[method-assign]
+        s.set_runtime_status = MagicMock()  # type: ignore[method-assign]
 
         # Recoverable tool-validation outcome → warning path.
         renderer._process_event(
             ErrorObservation(content='Tool validation failed: bad args')
         )
-        # User-facing auth failure → still red error path.
+        # HUD-only auth failure → runtime strip, not transcript.
         renderer._process_event(
             ErrorObservation(
                 content='401 Unauthorized',
                 notify_ui_only=True,
+                error_category='auth',
+            )
+        )
+        # Transient timeout → HUD strip only (retry StatusObservation handles strip).
+        renderer._process_event(
+            ErrorObservation(
+                content='Timeout: provider timed out',
+                notify_ui_only=True,
+                error_category='timeout',
             )
         )
         await asyncio.sleep(0.1)
 
         assert s.add_warning.call_count == 1
-        assert s.add_error.call_count == 1
+        assert s.add_error.call_count == 0
         warning_text = s.add_warning.call_args[0][0]
-        error_text = s.add_error.call_args[0][0]
         assert 'Tool validation failed' in warning_text
-        assert '401 Unauthorized' in error_text
+        s.set_runtime_status.assert_called_once()
+        assert '401 Unauthorized' in s.set_runtime_status.call_args.kwargs['meta']
 
 
 @pytest.mark.asyncio

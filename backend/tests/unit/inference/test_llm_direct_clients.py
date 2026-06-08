@@ -891,6 +891,13 @@ class TestBoundedLlmHttpTimeout:
         assert timeout.read == LLM_HTTP_READ_TIMEOUT_SECONDS
         assert timeout.connect <= 10.0
 
+    def test_streaming_read_timeout_aligns_with_chunk_budget(self):
+        from backend.core.constants import LLM_STREAM_CHUNK_TIMEOUT_SECONDS
+        from backend.inference.direct_clients import bounded_llm_http_timeout
+
+        timeout = bounded_llm_http_timeout(600.0, streaming=True)
+        assert timeout.read == LLM_STREAM_CHUNK_TIMEOUT_SECONDS
+
     def test_with_default_timeout_wraps_explicit_override(self):
         from backend.inference.direct_clients import _with_default_timeout
 

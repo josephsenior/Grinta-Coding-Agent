@@ -138,6 +138,13 @@ async def run_tui(
             except (asyncio.TimeoutError, asyncio.CancelledError):
                 pass
 
+        try:
+            from backend.core.logger import finalize_session_logging_audit
+
+            finalize_session_logging_audit()
+        except Exception:
+            pass
+
         # Drain remaining tracked background tasks so asyncio.run() cleanup
         # doesn't hit RecursionError from Python 3.12's recursive Task.cancel().
         from backend.utils.async_utils import drain_background_tasks

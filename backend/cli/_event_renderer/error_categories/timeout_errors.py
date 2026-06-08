@@ -55,7 +55,7 @@ TIMEOUT_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
                 'Confirm your network and the provider status page, then retry.',
                 'Shorter prompts or a faster model in /settings usually help.',
                 'If chunks pause too long mid-stream, raise APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS '
-                '(default 90s) or APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS.',
+                '(default 120s) or APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS.',
                 'If streaming often stalls, Grinta may retry non-streaming automatically—'
                 'watch for the cyan "Still working" note in the transcript.',
             ),

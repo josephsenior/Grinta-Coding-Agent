@@ -13,6 +13,7 @@ import os
 import time
 from typing import TYPE_CHECKING, Any
 
+from backend.core.constants import LLM_STREAM_CHUNK_TIMEOUT_SECONDS
 from backend.core.logger import app_logger as logger
 from backend.engine.executor_mixins._executor_types import (
     _INLINE_CLOSE_THINK_RE,
@@ -209,9 +210,9 @@ class _ExecutorStreamingMixin:
         stream_chunk_timeout = (
             self._timeout_from_env(
                 'APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS',
-                90.0,
+                LLM_STREAM_CHUNK_TIMEOUT_SECONDS,
             )
-            or 90.0
+            or LLM_STREAM_CHUNK_TIMEOUT_SECONDS
         )
         await self._consume_remaining_stream_chunks(
             stream_aiter,

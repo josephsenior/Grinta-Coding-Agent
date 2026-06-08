@@ -146,6 +146,7 @@ class StateTransitionService:
         await self._handle_state_reset(new_state)
         self._handle_error_recovery(old_state, new_state)
         self._handle_watchdog_lifecycle(old_state, new_state)
+        self._refresh_session_log_audit(old_state, new_state)
 
         reason = self._context.state.last_error if new_state == AgentState.ERROR else ''
         self._context.event_stream.add_event(
@@ -153,6 +154,28 @@ class StateTransitionService:
             EventSource.ENVIRONMENT,
         )
         self._context.save_state()
+
+    @staticmethod
+    def _refresh_session_log_audit(
+        old_state: AgentState, new_state: AgentState
+    ) -> None:
+        """Refresh ``app.stripped.log`` / ``app.audit.txt`` when a run ends."""
+        if old_state != AgentState.RUNNING:
+            return
+        if new_state not in (
+            AgentState.STOPPED,
+            AgentState.ERROR,
+            AgentState.FINISHED,
+            AgentState.AWAITING_USER_INPUT,
+            AgentState.RATE_LIMITED,
+        ):
+            return
+        try:
+            from backend.core.logger import finalize_session_logging_audit
+
+            finalize_session_logging_audit()
+        except Exception:
+            logger.debug('Session log audit refresh failed', exc_info=True)
 
     def _handle_watchdog_lifecycle(
         self, old_state: AgentState, new_state: AgentState
