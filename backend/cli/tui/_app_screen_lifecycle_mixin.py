@@ -154,6 +154,12 @@ class _AppScreenLifecycleMixin:
                 _tui_logger.debug(f'on_unmount: event_stream close failed: {exc}')
             finally:
                 self._event_stream = None
+        try:
+            from backend.core.logger import finalize_session_logging_audit
+
+            finalize_session_logging_audit()
+        except Exception as exc:
+            _tui_logger.debug('on_unmount: session audit generation failed: %s', exc)
         _tui_logger.debug('on_unmount: done')
 
     def show_help(self) -> None:

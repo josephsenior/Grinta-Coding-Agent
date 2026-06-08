@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 import collections.abc as mapping
 import contextlib
 import hashlib
@@ -46,6 +47,7 @@ from backend.core.log_formatters import _fix_record as fix_record  # type: ignor
 __all__ = [
     'configure_file_logging',
     'bind_session_logging',
+    'finalize_session_logging_audit',
     'mcp_log_stream',
     'get_log_dir',
     'TRACE_LOCAL',
@@ -528,6 +530,58 @@ def _safe_session_segment(session_id: str) -> str:
     return safe[:64] or 'session'
 
 
+def _flush_shared_file_handler() -> None:
+    """Ensure the active session ``app.log`` is flushed before audit generation."""
+    handler = _SHARED_FILE_HANDLER
+    if handler is None:
+        return
+    with contextlib.suppress(Exception):
+        handler.flush()
+        stream = getattr(handler, 'stream', None)
+        if stream is not None:
+            stream.flush()
+
+
+def finalize_session_logging_audit(log_dir: str | None = None) -> None:
+    """Write ``app.stripped.log`` and ``app.audit.txt`` for a session log directory."""
+    if not LOG_TO_FILE:
+        return
+    from backend.core.session_log_audit import generate_session_audit_artifacts
+
+    _flush_shared_file_handler()
+    target_dir = log_dir or get_log_dir()
+    try:
+        result = generate_session_audit_artifacts(target_dir)
+    except Exception:
+        app_logger.debug('Session log audit generation failed', exc_info=True)
+        return
+    if result is None:
+        return
+    app_logger.info(
+        'Session audit artifacts written (%s): kept=%d stripped=%d verdict=%s',
+        result.report_path.parent,
+        result.kept_lines,
+        result.stripped_lines,
+        result.verdict,
+    )
+
+
+def _audit_previous_session_log(previous_segment: str | None) -> None:
+    if not previous_segment:
+        return
+    previous_dir = os.path.join(_workspace_logs_dir(), 'sessions', previous_segment)
+    finalize_session_logging_audit(previous_dir)
+
+
+def _audit_session_log_on_exit() -> None:
+    if not LOG_TO_FILE or not _LOG_SESSION_ID:
+        return
+    finalize_session_logging_audit()
+
+
+atexit.register(_audit_session_log_on_exit)
+
+
 def bind_session_logging(session_id: str | None) -> None:
     """Re-point all file logging into ``sessions/<session_id>/app.log``.
 
@@ -542,6 +596,9 @@ def bind_session_logging(session_id: str | None) -> None:
     segment = _safe_session_segment(str(session_id))
     if _LOG_SESSION_ID == segment:
         return
+    previous_segment = _LOG_SESSION_ID
+    _flush_shared_file_handler()
+    _audit_previous_session_log(previous_segment)
     _LOG_SESSION_ID = segment
     log_dir = get_log_dir()
     os.makedirs(log_dir, exist_ok=True)
