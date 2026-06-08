@@ -188,6 +188,7 @@ class GrintaScreen(
         self._memory_stub: Any = None
         self._agent_running = True
         self._input_lock = asyncio.Lock()
+        self._turn_in_flight = False
         self._bootstrapping: asyncio.Event | None = None
         self._bootstrap_task: asyncio.Task[Any] | None = None
         self._is_unmounted = False

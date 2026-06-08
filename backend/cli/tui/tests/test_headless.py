@@ -3371,6 +3371,92 @@ async def test_tui_drain_events_noop_when_empty(mock_config, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_flush_live_ui_applies_deferred_stream_chunk(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._deferred_stream_chunk = StreamingChunkAction(
+            accumulated='Deferred stream preview.',
+            is_final=False,
+        )
+        renderer._stream_paint_timer_armed = True
+
+        renderer.flush_live_ui()
+
+        assert renderer._live_response == 'Deferred stream preview.'
+        assert renderer._deferred_stream_chunk is None
+        assert renderer._stream_paint_timer_armed is False
+
+
+@pytest.mark.asyncio
+async def test_transcript_skips_mount_animation_during_streaming(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s._get_display()
+        display._suppress_mount_animation = True
+        widget = Static('quiet mount')
+        display.append_widget(widget)
+        assert widget.styles.offset == (0, 0)
+
+
+@pytest.mark.asyncio
+async def test_handle_input_releases_lock_during_dispatch(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    dispatch_started = asyncio.Event()
+    dispatch_continue = asyncio.Event()
+
+    class FakeController:
+        def get_agent_state(self):
+            return AgentState.RUNNING
+
+    async def fake_bootstrap(self, session_id=None):
+        self._controller = FakeController()
+
+    async def slow_dispatch(self, text: str) -> None:
+        dispatch_started.set()
+        await dispatch_continue.wait()
+
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', fake_bootstrap)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._dispatch_to_agent = slow_dispatch  # type: ignore[method-assign]
+
+        task = asyncio.create_task(s._handle_input('hello'))
+        await dispatch_started.wait()
+        assert s._turn_in_flight is True
+        assert not s._input_lock.locked()
+
+        dispatch_continue.set()
+        await task
+        assert s._turn_in_flight is False
+
+
+@pytest.mark.asyncio
 async def test_tui_stats_panel_exists(mock_config):
     """Verify stats panel in input bar is present."""
     console = RichConsole()

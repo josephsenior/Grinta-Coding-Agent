@@ -35,6 +35,7 @@ class Transcript(VerticalScroll):
         super().__init__(*args, **kwargs)
         self._user_scrolled_away = False
         self._scroll_badge: Static | None = None
+        self._suppress_mount_animation = False
 
     def compose(self) -> ComposeResult:
         yield Static(id='scroll-badge', classes='-hidden')
@@ -113,15 +114,22 @@ class Transcript(VerticalScroll):
     def user_scroll_end(self, *, animate: bool = False) -> None:
         self.force_scroll_end(animate=animate)
 
-    def append_widget(self, widget: Widget) -> None:
+    def append_widget(self, widget: Widget, *, animate: bool | None = None) -> None:
         """Mount a widget and auto-scroll unless user scrolled up."""
         should_follow = self.should_follow_tail()
-        widget.styles.offset = (0, -1)
+        use_animation = (
+            animate
+            if animate is not None
+            else not getattr(self, '_suppress_mount_animation', False)
+        )
+        if use_animation:
+            widget.styles.offset = (0, -1)
         self.mount(widget)
-        try:
-            widget.animate('offset', (0, 0), duration=0.2)
-        except Exception:
-            widget.styles.offset = (0, 0)
+        if use_animation:
+            try:
+                widget.animate('offset', (0, 0), duration=0.2)
+            except Exception:
+                widget.styles.offset = (0, 0)
         if should_follow:
             self.scroll_end(animate=False)
 
