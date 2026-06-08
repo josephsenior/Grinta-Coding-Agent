@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
@@ -146,14 +148,19 @@ class ActionService:
         es = controller.event_stream
         previous_hook: object | None = None
         if action.runnable and isinstance(es, EventStream):
-            previous_hook = _install_one_shot_pending_hook(es, self)
-        try:
+            lock = es.pre_dispatch_lock()
+            async with lock:
+                previous_hook = _install_one_shot_pending_hook(es, self)
+                try:
+                    controller.event_stream.add_event(
+                        action, action.source or EventSource.AGENT
+                    )
+                finally:
+                    _restore_pre_dispatch_hook(es, previous_hook)
+        else:
             controller.event_stream.add_event(
                 action, action.source or EventSource.AGENT
             )
-        finally:
-            if previous_hook is not None and isinstance(es, EventStream):
-                _restore_pre_dispatch_hook(es, previous_hook)
 
         # MagicMock event streams do not run EventStream's pre-dispatch hook, so
         # keep tests and lightweight fakes on the old post-add path.

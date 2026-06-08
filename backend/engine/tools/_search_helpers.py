@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -126,10 +127,16 @@ def matches_search_file_pattern(
     )
 
 
-def collect_python_target_files(path: str, file_pattern: str) -> list[str]:
+def collect_python_target_files(
+    path: str,
+    file_pattern: str,
+    *,
+    walk_timeout_seconds: float = 30.0,
+) -> list[str]:
     spec_root = path if os.path.isdir(path) else os.path.dirname(path) or '.'
     spec = get_ignore_spec(spec_root)
     target_files: list[str] = []
+    deadline = time.monotonic() + max(1.0, walk_timeout_seconds)
 
     if os.path.isfile(path):
         current_root = os.path.dirname(path) or '.'
@@ -138,8 +145,12 @@ def collect_python_target_files(path: str, file_pattern: str) -> list[str]:
         return target_files
 
     for root, dirs, files in os.walk(path):
+        if time.monotonic() >= deadline:
+            break
         prune_ignored_dirs(spec_root, root, dirs, spec)
         for file_name in files:
+            if time.monotonic() >= deadline:
+                break
             if is_ignored_file(spec_root, root, file_name, spec):
                 continue
             file_path = os.path.join(root, file_name)
@@ -202,6 +213,11 @@ def run_ripgrep_with_handler(
         result = run_ripgrep_command(args_builder())
     except Exception as exc:
         return search_error_action(f'Error running ripgrep: {exc}', source_tool=source_tool)
+    if getattr(result, 'timed_out', False):
+        return search_error_action(
+            'Search timed out after 30s',
+            source_tool=source_tool,
+        )
     return search_results_action(
         format_ripgrep_output(
             result.stdout,

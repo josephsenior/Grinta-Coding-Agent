@@ -296,6 +296,8 @@ class TurnSignals:
     planning_directive: str | None = None
     memory_pressure: str | None = None
     prewarmed_compaction: Any | None = None
+    prewarm_history_len: int | None = None
+    prewarm_latest_event_id: int | None = None
     repetition_score: float = 0.0
 
 

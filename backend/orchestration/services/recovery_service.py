@@ -187,7 +187,7 @@ class RecoveryService:
         if pending is None:
             return
         self._context.discard_invocation_context_for_action(pending)
-        pending_svc.set(None)
+        pending_svc.pop_for_cause(getattr(pending, 'id', None))
 
     def _emit_exception_observation(self, exc: Exception) -> None:
         msg, err_id, notify_ui_only = self._format_exception(exc)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from collections.abc import Iterable
@@ -179,6 +180,33 @@ def _causal_chunks(events: Iterable[Event]) -> list[list[Event]]:
     return chunks
 
 
+def _copy_event_for_prompt(event: Event) -> Event:
+    """Return a prompt-only copy so windowing never mutates state.history."""
+    try:
+        return event_from_dict(event_to_dict(event))
+    except Exception:
+        return copy.deepcopy(event)
+
+
+def _drop_oldest_removable_unit(chunk: list[Event]) -> bool:
+    """Drop the oldest causal unit without splitting an action from its results."""
+    if len(chunk) <= 1:
+        return False
+    first_action_idx = next(
+        (i for i, event in enumerate(chunk) if isinstance(event, Action)),
+        len(chunk),
+    )
+    if first_action_idx > 0:
+        chunk.pop(0)
+        return True
+    if isinstance(chunk[0], Action):
+        chunk.pop(0)
+        while chunk and not isinstance(chunk[0], Action):
+            chunk.pop(0)
+        return True
+    return False
+
+
 def _truncate_chunk_to_budget(chunk: list[Event], token_budget: int) -> list[Event]:
     """Truncate events in *chunk* so their estimated tokens fit within *token_budget*.
 
@@ -190,6 +218,9 @@ def _truncate_chunk_to_budget(chunk: list[Event], token_budget: int) -> list[Eve
     """
     if not chunk or token_budget <= 0:
         return chunk
+
+    original = list(chunk)
+    chunk = [_copy_event_for_prompt(event) for event in chunk]
 
     _TRUNCATION_MARKER = '\n\n[... truncated to fit context window ...]\n\n'
     _HEAD_CHARS = 500
@@ -224,12 +255,14 @@ def _truncate_chunk_to_budget(chunk: list[Event], token_budget: int) -> list[Eve
         return chunk
 
     while len(chunk) > 1 and estimate_events_tokens(chunk) > token_budget:
-        for i, event in enumerate(chunk):
-            if not isinstance(event, Action):
-                chunk.pop(i)
-                break
-        else:
+        if not _drop_oldest_removable_unit(chunk):
             break
+
+    if not chunk and original:
+        for event in reversed(original):
+            if isinstance(event, Action):
+                return [_copy_event_for_prompt(event)]
+        return [_copy_event_for_prompt(original[-1])]
 
     return chunk
 

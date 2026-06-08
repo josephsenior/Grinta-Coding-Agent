@@ -73,6 +73,10 @@ class EventPersistence:
     @classmethod
     def is_critical_event(cls, event: Any) -> bool:
         """Check whether an Event instance represents a critical control/error event."""
+        if getattr(event, 'runnable', False):
+            return True
+        if getattr(event, 'cause', None) is not None:
+            return True
         action_name = getattr(event, 'action', None)
         if isinstance(action_name, str):
             return action_name in cls._CRITICAL_ACTIONS

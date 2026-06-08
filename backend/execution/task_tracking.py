@@ -96,6 +96,19 @@ class TaskTrackingMixin:
                 f'Failed to write task list to session directory {task_file_path}: {e!s}'
             )
 
+        try:
+            from backend.engine.tools.task_tracker import TaskTracker
+
+            TaskTracker().save_to_file(list(action.task_list))
+        except Exception as e:
+            try:
+                self.event_stream.file_store.delete(task_file_path)
+            except Exception:
+                pass
+            return ErrorObservation(
+                f'Failed to persist active_plan.json after TASKS.md write: {e!s}'
+            )
+
         self._consecutive_task_view_count = 0
 
         msg = f'✅ Plan updated with {n} tasks. Now begin implementing the first todo task.'
@@ -156,10 +169,18 @@ class TaskTrackingMixin:
     def _handle_task_update_status_action(
         self, action: TaskTrackingAction, task_file_path: str
     ) -> Observation:
-        """Handle task update_status command — status is applied to active_plan.json by the tool handler."""
+        """Handle task update_status — sync TASKS.md with active_plan.json."""
         thought = (getattr(action, 'thought', '') or '').strip()
         self._consecutive_task_view_count = 0
         msg = thought if thought else '✅ Task status updated.'
+        try:
+            content = self._generate_task_list_content(action.task_list)
+            assert self.event_stream is not None
+            self.event_stream.file_store.write(task_file_path, content)
+        except Exception as e:
+            return ErrorObservation(
+                f'Failed to write task list to session directory {task_file_path}: {e!s}'
+            )
         return TaskTrackingObservation(
             content=msg,
             command=action.command,

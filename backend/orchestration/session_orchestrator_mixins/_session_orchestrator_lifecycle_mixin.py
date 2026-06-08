@@ -251,7 +251,7 @@ class _SessionOrchestratorLifecycleMixin:
 
             self.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
 
-        self.services.pending_action.set(None)
+        self.services.pending_action.clear_for_action(action)
 
     async def stop(self) -> None:
         """Stop the agent, best-effort kill runtime processes, and clear pending actions."""
