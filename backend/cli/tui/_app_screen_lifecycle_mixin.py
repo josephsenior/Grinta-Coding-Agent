@@ -610,7 +610,11 @@ class _AppScreenLifecycleMixin:
                     # actively working (streaming LLM, executing commands) for
                     # extended periods.
                     _elapsed_since_progress = _time.monotonic() - _last_progress_at
-                    if _elapsed_since_progress > DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS:
+                    if (
+                        DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS > 0
+                        and _elapsed_since_progress
+                        > DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS
+                    ):
                         _total_elapsed = _time.monotonic() - _started_at
                         _tui_logger.error(
                             '_dispatch_to_agent: TIMEOUT after %.0fs since last progress '
