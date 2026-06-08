@@ -309,6 +309,12 @@ class SessionOrchestrator(
         where the more specific timeouts (Layers 1, 2, 3) do not apply.
         """
         from backend.core.constants import DEFAULT_STEP_TASK_LIVENESS_SECONDS
+        from backend.core.llm_step_timeout import resolve_step_task_liveness_seconds
+
+        step_liveness_seconds = resolve_step_task_liveness_seconds(
+            getattr(self, 'agent', None),
+            default_liveness_seconds=DEFAULT_STEP_TASK_LIVENESS_SECONDS,
+        )
 
         async with self._step_lock:
             self._step_owner_task = asyncio.current_task()
@@ -319,7 +325,7 @@ class SessionOrchestrator(
                     try:
                         await asyncio.wait_for(
                             self._step_inner(),
-                            timeout=DEFAULT_STEP_TASK_LIVENESS_SECONDS,
+                            timeout=step_liveness_seconds,
                         )
                     except asyncio.TimeoutError:
                         logger.error(
@@ -327,7 +333,7 @@ class SessionOrchestrator(
                             'complete within %.0fs; force-cancelling and '
                             'clearing pending state. The agent loop will '
                             'recover on the next step() request.',
-                            DEFAULT_STEP_TASK_LIVENESS_SECONDS,
+                            step_liveness_seconds,
                             extra={'msg_type': 'STEP_TASK_LIVENESS_TIMEOUT'},
                         )
                         # Force-clear pending state so can_step() returns True
@@ -374,7 +380,7 @@ class SessionOrchestrator(
                                     content=(
                                         f'Step task exceeded the liveness '
                                         f'ceiling of '
-                                        f'{DEFAULT_STEP_TASK_LIVENESS_SECONDS:.0f}s '
+                                        f'{step_liveness_seconds:.0f}s '
                                         f'and was force-cancelled. Pending '
                                         f'state was cleared; the next step '
                                         f'will retry. The underlying cause is '

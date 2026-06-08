@@ -19,6 +19,7 @@ in ``EventStream._persist_event()``.
 from __future__ import annotations
 
 import contextlib
+import copy
 import logging
 import os
 import sqlite3
@@ -27,7 +28,11 @@ from pathlib import Path
 from typing import Any
 
 from backend.core import json_compat as json
-from backend.ledger.integrity import embed_checksum, verify_event_integrity
+from backend.ledger.integrity import (
+    embed_checksum,
+    repair_payload_checksum,
+    verify_event_integrity,
+)
 
 _SCHEMA_VERSION = 1
 
@@ -258,7 +263,7 @@ class SQLiteEventStore:
 
     def _prepare_payload(self, event_id: int, event_dict: dict[str, Any]) -> str:
         """Return canonical JSON payload with event ID and checksum embedded."""
-        payload_dict = dict(event_dict)
+        payload_dict = copy.deepcopy(event_dict)
         payload_id = payload_dict.get('id')
         if payload_id is not None and payload_id != event_id:
             raise ValueError(
@@ -266,6 +271,46 @@ class SQLiteEventStore:
             )
         payload_dict['id'] = event_id
         return json.dumps(embed_checksum(payload_dict), ensure_ascii=False, default=str)
+
+    def repair_event_checksums(self) -> int:
+        """Re-embed checksums for rows whose stored digest no longer matches."""
+        fixed = 0
+        with self._write_lock:
+            conn = self._get_conn()
+            rows = conn.execute('SELECT id, payload FROM events ORDER BY id').fetchall()
+            updates: list[tuple[str, int]] = []
+            for row in rows:
+                event_id = int(row['id'])
+                data = json.loads(row['payload'])
+                if verify_event_integrity(data, event_id):
+                    continue
+                repaired = repair_payload_checksum(data, event_id=event_id)
+                updates.append(
+                    (
+                        json.dumps(repaired, ensure_ascii=False, default=str),
+                        event_id,
+                    )
+                )
+            if not updates:
+                return 0
+            conn.execute('BEGIN IMMEDIATE')
+            try:
+                conn.executemany(
+                    'UPDATE events SET payload = ? WHERE id = ?',
+                    updates,
+                )
+                conn.commit()
+                fixed = len(updates)
+            except Exception:
+                conn.rollback()
+                raise
+        if fixed:
+            logger.info(
+                'Repaired %d SQLite event checksum(s) in %s',
+                fixed,
+                self._db_path,
+            )
+        return fixed
 
     def write_event(self, event_id: int, event_dict: dict[str, Any]) -> None:
         """Persist a single event.

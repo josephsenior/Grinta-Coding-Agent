@@ -287,6 +287,23 @@ class ActionExecutionService:
             return await async_step(self._context.state)
         return await self._run_async_step_with_timeout(agent, async_step, timeout)
 
+    @staticmethod
+    def _cancel_agent_step(agent: object) -> None:
+        try:
+            executor = getattr(agent, 'executor', None)
+            cancel_fn = (
+                getattr(executor, 'cancel_step', None)
+                if executor is not None
+                else None
+            )
+            if callable(cancel_fn):
+                cancel_fn()
+        except Exception:
+            logger.debug(
+                'ActionExecutionService: cancel_step after astep timeout failed',
+                exc_info=True,
+            )
+
     async def _run_async_step_with_timeout(
         self,
         agent: object,
@@ -310,6 +327,7 @@ class ActionExecutionService:
                         'astep timed out after %s seconds, retrying once',
                         step_timeout,
                     )
+                    self._cancel_agent_step(agent)
                     continue
                 model_name = self._agent_model_name(agent)
                 logger.error(

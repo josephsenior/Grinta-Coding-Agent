@@ -156,6 +156,7 @@ class EventPersistence:
 
         if self._sqlite_store is not None:
             self._migrate_legacy_event_files_to_sqlite()
+            self._repair_sqlite_event_checksums()
 
         # Async durable writer
         self._durable_writer: DurableEventWriter | None = None
@@ -356,6 +357,19 @@ class EventPersistence:
                 exc,
             )
             raise
+
+    def _repair_sqlite_event_checksums(self) -> None:
+        """Fix stale checksum rows left by pre-deepcopy persistence."""
+        if self._sqlite_store is None:
+            return
+        try:
+            self._sqlite_store.repair_event_checksums()
+        except Exception as exc:
+            logger.warning(
+                'SQLite checksum repair failed for session %s: %s',
+                self.sid,
+                exc,
+            )
 
     def _migrate_legacy_event_files_to_sqlite(self) -> None:
         """Import legacy per-event JSON files into the authoritative SQLite ledger."""
@@ -591,6 +605,8 @@ class EventPersistence:
                 },
             )
             _truncate_payload(payload, max_event_bytes)
+            payload.pop('_grinta_checksum', None)
+            payload = embed_checksum(payload)
             event_json = json.dumps(payload)
         elif json_len > 1_000_000:
             logger.warning(

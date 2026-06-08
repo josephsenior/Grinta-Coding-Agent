@@ -100,6 +100,33 @@ class TestLlmStepTimeoutPropagation:
             await service._run_async_step_with_timeout(MagicMock(), slow_astep, 0.01)
         assert excinfo.value.kwargs.get('step_timeout') == 0.01
 
+    @pytest.mark.asyncio
+    async def test_first_astep_timeout_cancels_before_retry(self):
+        import asyncio
+
+        from backend.orchestration.services.action_execution_service import (
+            ActionExecutionService,
+        )
+
+        service = ActionExecutionService.__new__(ActionExecutionService)
+        service._context = MagicMock()
+        service._agent_model_name = MagicMock(return_value='test-model')
+
+        agent = MagicMock()
+        agent.executor.cancel_step = MagicMock()
+        calls = {'count': 0}
+
+        async def flaky_astep(_state):
+            calls['count'] += 1
+            if calls['count'] == 1:
+                await asyncio.sleep(10)
+            return MagicMock()
+
+        await service._run_async_step_with_timeout(agent, flaky_astep, 0.05)
+
+        agent.executor.cancel_step.assert_called_once()
+        assert calls['count'] == 2
+
     def test_local_swallow_handler_is_removed(self):
         """Regression guard: the handler that converted a step timeout into a
         ``None`` action must not be reintroduced."""
