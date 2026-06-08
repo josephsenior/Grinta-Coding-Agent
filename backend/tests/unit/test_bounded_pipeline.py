@@ -68,15 +68,22 @@ class TestLlmStepTimeoutDefault:
         assert result == DEFAULT_LLM_STEP_TIMEOUT_SECONDS
 
 
-# ── Layer 1: _handle_llm_step_timeout behavior ───────────────────────
+# ── Layer 1: LLM step timeout propagates for retry-queue recovery ────
 
 
-class TestHandleLlmStepTimeout:
-    """The LLM step timeout handler must emit a recoverable observation."""
+class TestLlmStepTimeoutPropagation:
+    """A hung LLM step must raise ``Timeout`` (after one in-place retry) so
+    the orchestrator's RecoveryService can route it through the retry queue
+    (exponential backoff + automatic RUNNING resume).  It must NOT be
+    swallowed into a ``None`` action — doing so made the agent halt silently
+    (the liveness guard saw a no-action and went AWAITING_USER_INPUT)."""
 
     @pytest.mark.asyncio
-    async def test_emits_llm_step_timeout_observation(self):
-        """A Timeout exception is converted to a visible ErrorObservation."""
+    async def test_hung_step_raises_timeout(self):
+        """``_run_async_step_with_timeout`` raises ``Timeout`` once the cap is
+        exceeded, preserving the cap value for diagnostics."""
+        import asyncio
+
         from backend.inference.exceptions import Timeout
         from backend.orchestration.services.action_execution_service import (
             ActionExecutionService,
@@ -84,47 +91,23 @@ class TestHandleLlmStepTimeout:
 
         service = ActionExecutionService.__new__(ActionExecutionService)
         service._context = MagicMock()
-        service._reset_consecutive_null_actions = MagicMock()
         service._agent_model_name = MagicMock(return_value='test-model')
-        service._publish_agent_event = MagicMock()
 
-        exc = Timeout(
-            'LLM step timed out after 300 seconds',
-            model='test-model',
-            step_timeout=300.0,
-        )
-        result = await service._handle_llm_step_timeout(exc)
+        async def slow_astep(_state):
+            await asyncio.sleep(10)
 
-        # Must return None so the outer step loop re-enters cleanly.
-        assert result is None
+        with pytest.raises(Timeout) as excinfo:
+            await service._run_async_step_with_timeout(MagicMock(), slow_astep, 0.01)
+        assert excinfo.value.kwargs.get('step_timeout') == 0.01
 
-        # Must emit an ErrorObservation with the LLM_STEP_TIMEOUT id so the
-        # LLM sees the recovery in its next turn.
-        service._publish_agent_event.assert_called_once()
-        emitted = service._publish_agent_event.call_args.args[0]
-        assert emitted.error_id == 'LLM_STEP_TIMEOUT'
-        assert '300' in emitted.content
-        assert 'test-model' in emitted.content
-        assert emitted.notify_ui_only is True
-
-    @pytest.mark.asyncio
-    async def test_resets_consecutive_null_actions(self):
-        """A timeout is not a null-action — counters must reset."""
-        from backend.inference.exceptions import Timeout
+    def test_local_swallow_handler_is_removed(self):
+        """Regression guard: the handler that converted a step timeout into a
+        ``None`` action must not be reintroduced."""
         from backend.orchestration.services.action_execution_service import (
             ActionExecutionService,
         )
 
-        service = ActionExecutionService.__new__(ActionExecutionService)
-        service._context = MagicMock()
-        service._reset_consecutive_null_actions = MagicMock()
-        service._agent_model_name = MagicMock(return_value='m')
-        service._publish_agent_event = MagicMock()
-
-        await service._handle_llm_step_timeout(
-            Timeout('test', step_timeout=300.0)
-        )
-        service._reset_consecutive_null_actions.assert_called_once()
+        assert not hasattr(ActionExecutionService, '_handle_llm_step_timeout')
 
 
 # ── Layer 2: observation handler timeout ─────────────────────────────

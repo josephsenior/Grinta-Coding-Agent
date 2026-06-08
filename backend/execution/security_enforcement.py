@@ -258,6 +258,42 @@ def evaluate_hardened_local_file_policy(
     return None
 
 
+def _invoke_security_analyzer(analyzer: Any, action: Action) -> Any:
+    """Run the configured security analyzer without blocking the event loop.
+
+    Production :class:`~backend.security.analyzer.SecurityAnalyzer` uses
+    ``security_risk_sync`` (pure structural checks, no I/O).  Custom/test
+    analyzers that only expose the async ``security_risk`` coroutine fall
+    back to ``call_async_from_sync`` when invoked off the event loop.
+    """
+    from backend.core.enums import ActionSecurityRisk
+    from backend.security.analyzer import SecurityAnalyzer
+
+    if isinstance(analyzer, SecurityAnalyzer):
+        return analyzer.security_risk_sync(action)
+
+    import asyncio
+
+    from backend.utils.async_utils import call_async_from_sync
+
+    corofn = getattr(analyzer, 'security_risk', None)
+    if not callable(corofn):
+        return ActionSecurityRisk.LOW
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return call_async_from_sync(corofn, 30.0, action)
+
+    logger.error(
+        'BRIDGE_ON_LOOP: async-only security analyzer invoked on the event '
+        'loop; cannot escalate without blocking. Implement '
+        'security_risk_sync on the analyzer.',
+        extra={'msg_type': 'BRIDGE_ON_LOOP'},
+    )
+    return ActionSecurityRisk.LOW
+
+
 class SecurityEnforcementMixin:
     """Mixin that gates action execution based on security risk assessment.
 
@@ -414,13 +450,9 @@ class SecurityEnforcementMixin:
 
         analyzer_risk: ActionSecurityRisk | None = None
         if self.security_analyzer is not None:  # type: ignore[attr-defined]
-            from backend.utils.async_utils import call_async_from_sync
-
             try:
-                # ``call_async_from_sync`` routes through the bounded EXECUTOR
-                # with task-cancellation timeouts.
-                analyzer_risk = call_async_from_sync(
-                    self.security_analyzer.security_risk, 30.0, action
+                analyzer_risk = _invoke_security_analyzer(
+                    self.security_analyzer, action
                 )
             except Exception:
                 logger.warning(

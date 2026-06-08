@@ -23,6 +23,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_STEP_DRAIN_LIMIT,
     DEFAULT_PENDING_ACTION_TIMEOUT,
 )
+from backend.core.step_phase import clear_step_phase, set_step_phase
 from backend.core.enums import LifecyclePhase
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
@@ -398,173 +399,197 @@ class SessionOrchestrator(
         import time as _t
 
         _step_inner_start = _t.monotonic()
-        logger.debug(
-            '_step_inner ENTER (sid=%s)',
-            getattr(self, 'sid', '?'),
-            extra={'msg_type': 'STEP_INNER_ENTER'},
-        )
-        await self._ensure_runtime_connected()
-        logger.debug(
-            '_step_inner: _ensure_runtime_connected done in %.3fs',
-            _t.monotonic() - _step_inner_start,
-            extra={'msg_type': 'STEP_INNER_RUNTIME_CONNECTED'},
-        )
-
-        if not self.step_prerequisites.can_step():
+        set_step_phase('step_inner:enter')
+        try:
             logger.debug(
-                '_step_inner EXIT (prereq not met) after %.3fs',
+                '_step_inner ENTER (sid=%s)',
+                getattr(self, 'sid', '?'),
+                extra={'msg_type': 'STEP_INNER_ENTER'},
+            )
+            set_step_phase('step_inner:ensure_runtime_connected')
+            await self._ensure_runtime_connected()
+            logger.debug(
+                '_step_inner: _ensure_runtime_connected done in %.3fs',
                 _t.monotonic() - _step_inner_start,
-                extra={'msg_type': 'STEP_INNER_EXIT_PREREQ'},
+                extra={'msg_type': 'STEP_INNER_RUNTIME_CONNECTED'},
             )
-            return
 
-        self._log_step_info()
-        self._sync_budget_flag_with_metrics()
+            set_step_phase('step_inner:check_prerequisites')
+            if not self.step_prerequisites.can_step():
+                logger.debug(
+                    '_step_inner EXIT (prereq not met) after %.3fs',
+                    _t.monotonic() - _step_inner_start,
+                    extra={'msg_type': 'STEP_INNER_EXIT_PREREQ'},
+                )
+                return
 
-        if not await self.step_guard.ensure_can_step():
-            # Disabled step guard for now
-            pass
+            self._log_step_info()
+            self._sync_budget_flag_with_metrics()
 
-        if not await self._run_control_flags_safely():
+            set_step_phase('step_inner:step_guard')
+            if not await self.step_guard.ensure_can_step():
+                # Disabled step guard for now
+                pass
+
+            set_step_phase('step_inner:control_flags')
+            if not await self._run_control_flags_safely():
+                logger.debug(
+                    '_step_inner EXIT (control flags) after %.3fs',
+                    _t.monotonic() - _step_inner_start,
+                    extra={'msg_type': 'STEP_INNER_EXIT_CONTROL'},
+                )
+                return
+
+            set_step_phase('step_inner:get_next_action')
+            action = await self.action_execution.get_next_action()
             logger.debug(
-                '_step_inner EXIT (control flags) after %.3fs',
+                '_step_inner: get_next_action returned %s after %.3fs',
+                type(action).__name__ if action is not None else 'None',
                 _t.monotonic() - _step_inner_start,
-                extra={'msg_type': 'STEP_INNER_EXIT_CONTROL'},
+                extra={'msg_type': 'STEP_INNER_GOT_ACTION'},
             )
-            return
+            if action is None:
+                set_step_phase('step_inner:no_action_recovery')
+                if not self.action_execution.consume_expected_no_action_recovery():
+                    await self.action_execution.handle_unexpected_no_action_while_running()
+                logger.debug(
+                    '_step_inner EXIT (no action) after %.3fs',
+                    _t.monotonic() - _step_inner_start,
+                    extra={'msg_type': 'STEP_INNER_EXIT_NO_ACTION'},
+                )
+                return
 
-        action = await self.action_execution.get_next_action()
-        logger.debug(
-            '_step_inner: get_next_action returned %s after %.3fs',
-            type(action).__name__ if action is not None else 'None',
-            _t.monotonic() - _step_inner_start,
-            extra={'msg_type': 'STEP_INNER_GOT_ACTION'},
-        )
-        if action is None:
-            if not self.action_execution.consume_expected_no_action_recovery():
-                await self.action_execution.handle_unexpected_no_action_while_running()
+            # Reset retry count on successful action execution
+            # This prevents getting stuck if a previous error has been resolved
+            if self.services.retry.retry_count > 0:
+                logger.debug(
+                    'Resetting retry count from %d to 0 after successful execution',
+                    self.services.retry.retry_count,
+                )
+                self.services.retry.reset_retry_metrics()
+
+            if self.get_agent_state() != AgentState.RUNNING:
+                logger.info('Agent is no longer running, skipping action execution.')
+                return
+
+            action_label = getattr(action, 'action', None) or type(action).__name__
+            set_step_phase(f'step_inner:execute_action:{action_label}')
+            await self.action_execution.execute_action(action)
             logger.debug(
-                '_step_inner EXIT (no action) after %.3fs',
+                '_step_inner: execute_action returned after %.3fs for %s',
                 _t.monotonic() - _step_inner_start,
-                extra={'msg_type': 'STEP_INNER_EXIT_NO_ACTION'},
+                type(action).__name__,
+                extra={'msg_type': 'STEP_INNER_EXECUTED_ACTION'},
             )
-            return
+            extra_data = getattr(self.state, 'extra_data', None)
+            if isinstance(extra_data, dict):
+                extra_data.pop('__survivable_error_consecutive', None)
 
-        # Reset retry count on successful action execution
-        # This prevents getting stuck if a previous error has been resolved
-        if self.services.retry.retry_count > 0:
+            # P1-B: When the agent returns a MessageAction with wait_for_response,
+            # the state must be transitioned to AWAITING_USER_INPUT synchronously
+            # here (after the action is dispatched) rather than relying on the
+            # async on_event handler. If we don't, the subsequent "schedule next
+            # step" check below will see state still RUNNING and queue another LLM
+            # call, creating a spurious step task that blocks the next user message.
+            if isinstance(action, MessageAction) and action.source == EventSource.AGENT:
+                if action.wait_for_response:
+                    if self.get_agent_state() == AgentState.RUNNING:
+                        set_step_phase('step_inner:await_user_input')
+                        await self.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+            # Finish must terminate the current response immediately. Any queued
+            # follow-up actions from the same LLM response are stale once finish was
+            # chosen, so drop them and do not schedule another step from this turn.
+            if (
+                isinstance(action, MessageAction)
+                and bool(getattr(action, 'final_response', False))
+            ):
+                set_step_phase('step_inner:finish')
+                with contextlib.suppress(Exception):
+                    clear_queued_actions = getattr(self.agent, 'clear_queued_actions', None)
+                    if callable(clear_queued_actions):
+                        clear_queued_actions(reason='finish_action_dispatched')
+                from backend.utils.async_utils import drain_background_tasks
+
+                await drain_background_tasks(max_rounds=2, timeout=2.0)
+                set_step_phase('step_inner:post_execution')
+                await self._handle_post_execution()
+                logger.debug(
+                    '_step_inner EXIT (finish branch) after %.3fs',
+                    _t.monotonic() - _step_inner_start,
+                    extra={'msg_type': 'STEP_INNER_EXIT_FINISH'},
+                )
+                return
+            set_step_phase('step_inner:post_execution')
+            await self._handle_post_execution()
+
+            # Batch-drain queued non-blocking actions from the same LLM response.
+            # After a non-runnable action (e.g. AgentThinkAction), no pending_action
+            # is set, so we can immediately process the next queued action without
+            # waiting for the full polling cycle.
+            #
+            # P2-B: If all remaining queued actions are parallel-safe (reads, thinks,
+            # searches), execute them concurrently via asyncio.gather. The pending
+            # action service already tracks multiple outstanding actions by stream ID,
+            # so concurrent execute_action calls are safe as long as each action gets
+            # a unique ID (guaranteed by EventStream.add_event).
+            set_step_phase('step_inner:drain_batch')
+            self._draining_batch = True
+            try:
+                if not self._pending_action and not await self._try_parallel_read_batch():
+                    # Fall through to serial drain for mixed workloads.
+                    while self._can_drain_pending():
+                        drain_action = await self.action_execution.get_next_action()
+                        if drain_action is None:
+                            break
+                        if self.get_agent_state() != AgentState.RUNNING:
+                            logger.info('Agent is no longer running, stopping drain.')
+                            break
+                        drain_label = (
+                            getattr(drain_action, 'action', None)
+                            or type(drain_action).__name__
+                        )
+                        set_step_phase(f'step_inner:drain_execute:{drain_label}')
+                        await self.action_execution.execute_action(drain_action)
+                        # Drain background _on_event tasks so state.history is
+                        # updated before the next get_next_action() → astep()
+                        # → condense_history() check.
+                        from backend.utils.async_utils import drain_background_tasks
+
+                        await drain_background_tasks(max_rounds=2, timeout=2.0)
+            finally:
+                self._draining_batch = False
+            # Deferred condensation check after batch drain completes.
+            set_step_phase('step_inner:post_execution_after_drain')
+            await self._handle_post_execution()
             logger.debug(
-                'Resetting retry count from %d to 0 after successful execution',
-                self.services.retry.retry_count,
+                '_step_inner EXIT (normal) after %.3fs',
+                _t.monotonic() - _step_inner_start,
+                extra={'msg_type': 'STEP_INNER_EXIT'},
             )
-            self.services.retry.reset_retry_metrics()
 
-        if self.get_agent_state() != AgentState.RUNNING:
-            logger.info('Agent is no longer running, skipping action execution.')
-            return
-
-        await self.action_execution.execute_action(action)
-        logger.debug(
-            '_step_inner: execute_action returned after %.3fs for %s',
-            _t.monotonic() - _step_inner_start,
-            type(action).__name__,
-            extra={'msg_type': 'STEP_INNER_EXECUTED_ACTION'},
-        )
-        extra_data = getattr(self.state, 'extra_data', None)
-        if isinstance(extra_data, dict):
-            extra_data.pop('__survivable_error_consecutive', None)
-
-        # P1-B: When the agent returns a MessageAction with wait_for_response,
-        # the state must be transitioned to AWAITING_USER_INPUT synchronously
-        # here (after the action is dispatched) rather than relying on the
-        # async on_event handler. If we don't, the subsequent "schedule next
-        # step" check below will see state still RUNNING and queue another LLM
-        # call, creating a spurious step task that blocks the next user message.
-        if isinstance(action, MessageAction) and action.source == EventSource.AGENT:
-            if action.wait_for_response:
-                if self.get_agent_state() == AgentState.RUNNING:
-                    await self.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
-        # Finish must terminate the current response immediately. Any queued
-        # follow-up actions from the same LLM response are stale once finish was
-        # chosen, so drop them and do not schedule another step from this turn.
-        if (
-            isinstance(action, MessageAction)
-            and bool(getattr(action, 'final_response', False))
-        ):
-            with contextlib.suppress(Exception):
-                clear_queued_actions = getattr(self.agent, 'clear_queued_actions', None)
-                if callable(clear_queued_actions):
-                    clear_queued_actions(reason='finish_action_dispatched')
+            # After processing non-runnable actions (e.g. AgentThinkAction), no
+            # pending action is set and the runtime may never produce an observation
+            # that would re-trigger the step loop.  Schedule the next step so the
+            # agent can proceed to the LLM call instead of stalling indefinitely.
+            #
+            # P2-C: Always schedule a step after post-execution, regardless of
+            # _pending_action state. This closes a race window where an event
+            # arrives during drain_background_tasks() that sets _pending_action
+            # but has should_step()==False (e.g. ErrorObservation), leaving the
+            # agent with no step task alive and no way to recover until the
+            # PendingActionService watchdog fires (up to 600s for CmdRunAction).
+            #
+            # If _pending_action is set, the step task checks can_step() and
+            # exits cleanly. The watchdog will eventually clear the pending
+            # action and trigger a new step, resuming normal operation.
+            set_step_phase('step_inner:schedule_next')
             from backend.utils.async_utils import drain_background_tasks
 
             await drain_background_tasks(max_rounds=2, timeout=2.0)
-            await self._handle_post_execution()
-            logger.debug(
-                '_step_inner EXIT (finish branch) after %.3fs',
-                _t.monotonic() - _step_inner_start,
-                extra={'msg_type': 'STEP_INNER_EXIT_FINISH'},
-            )
-            return
-        await self._handle_post_execution()
-
-        # Batch-drain queued non-blocking actions from the same LLM response.
-        # After a non-runnable action (e.g. AgentThinkAction), no pending_action
-        # is set, so we can immediately process the next queued action without
-        # waiting for the full polling cycle.
-        #
-        # P2-B: If all remaining queued actions are parallel-safe (reads, thinks,
-        # searches), execute them concurrently via asyncio.gather. The pending
-        # action service already tracks multiple outstanding actions by stream ID,
-        # so concurrent execute_action calls are safe as long as each action gets
-        # a unique ID (guaranteed by EventStream.add_event).
-        self._draining_batch = True
-        try:
-            if not self._pending_action and not await self._try_parallel_read_batch():
-                # Fall through to serial drain for mixed workloads.
-                while self._can_drain_pending():
-                    action = await self.action_execution.get_next_action()
-                    if action is None:
-                        break
-                    if self.get_agent_state() != AgentState.RUNNING:
-                        logger.info('Agent is no longer running, stopping drain.')
-                        break
-                    await self.action_execution.execute_action(action)
-                    # Drain background _on_event tasks so state.history is
-                    # updated before the next get_next_action() → astep()
-                    # → condense_history() check.
-                    from backend.utils.async_utils import drain_background_tasks
-
-                    await drain_background_tasks(max_rounds=2, timeout=2.0)
+            if self.get_agent_state() == AgentState.RUNNING and not self._closed:
+                self.schedule_step_soon()
         finally:
-            self._draining_batch = False
-        # Deferred condensation check after batch drain completes.
-        await self._handle_post_execution()
-        logger.debug(
-            '_step_inner EXIT (normal) after %.3fs',
-            _t.monotonic() - _step_inner_start,
-            extra={'msg_type': 'STEP_INNER_EXIT'},
-        )
-
-        # After processing non-runnable actions (e.g. AgentThinkAction), no
-        # pending action is set and the runtime may never produce an observation
-        # that would re-trigger the step loop.  Schedule the next step so the
-        # agent can proceed to the LLM call instead of stalling indefinitely.
-        #
-        # P2-C: Always schedule a step after post-execution, regardless of
-        # _pending_action state. This closes a race window where an event
-        # arrives during drain_background_tasks() that sets _pending_action
-        # but has should_step()==False (e.g. ErrorObservation), leaving the
-        # agent with no step task alive and no way to recover until the
-        # PendingActionService watchdog fires (up to 600s for CmdRunAction).
-        #
-        # If _pending_action is set, the step task checks can_step() and
-        # exits cleanly. The watchdog will eventually clear the pending
-        # action and trigger a new step, resuming normal operation.
-        from backend.utils.async_utils import drain_background_tasks
-
-        await drain_background_tasks(max_rounds=2, timeout=2.0)
-        if self.get_agent_state() == AgentState.RUNNING and not self._closed:
-            self.schedule_step_soon()
+            clear_step_phase()
 
     # ------------------------------------------------------------------ #
     # Independent watchdog timer for stall detection

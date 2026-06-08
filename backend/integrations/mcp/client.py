@@ -203,10 +203,10 @@ class MCPClient(BaseModel):
             except OSError:
                 cwd = None
 
-        from backend.core.logger import get_log_dir
-        log_dir = get_log_dir()
-        os.makedirs(log_dir, exist_ok=True)
-        log_file = Path(log_dir) / f"mcp_{cfg.name}_stderr.log"
+        # Merge MCP server stderr into the unified (session-scoped) app.log
+        # instead of a scattered mcp_<name>_stderr.log file.
+        from backend.core.logger import mcp_log_stream
+        log_file = mcp_log_stream(cfg.name)
 
         transport = StdioTransport(
             command=cfg.command,
@@ -366,10 +366,10 @@ class MCPClient(BaseModel):
                 except OSError:
                     cwd = None
 
-            from backend.core.logger import get_log_dir
-            log_dir = get_log_dir()
-            os.makedirs(log_dir, exist_ok=True)
-            log_file = Path(log_dir) / f"mcp_{server.name}_stderr.log"
+            # Merge MCP server stderr into the unified (session-scoped) app.log
+            # instead of a scattered mcp_<name>_stderr.log file.
+            from backend.core.logger import mcp_log_stream
+            log_file = mcp_log_stream(server.name)
 
             transport = StdioTransport(
                 command=server.command,

@@ -21,11 +21,8 @@ from backend.engine.tools.ignore_filter import (
     is_ignored_file,
     prune_ignored_dirs,
 )
-from backend.execution.utils.bounded_io import (
-    BoundedResult,
-    async_bounded_subprocess_exec,
-)
-from backend.utils.async_utils import call_async_from_sync
+from backend.execution.utils.bounded_io import BoundedResult
+from backend.utils.subprocess_bridge import run_bounded_subprocess_sync
 
 
 def _run_command(
@@ -35,9 +32,7 @@ def _run_command(
     process_timeout: float = 30.0,
     max_bytes_per_stream: int = 2 * 1024 * 1024,
 ) -> BoundedResult:
-    return call_async_from_sync(
-        async_bounded_subprocess_exec,
-        process_timeout + 5.0,
+    return run_bounded_subprocess_sync(
         args,
         cwd=cwd,
         process_timeout=process_timeout,

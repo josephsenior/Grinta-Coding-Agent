@@ -7,6 +7,7 @@ from backend.context.agent_memory import Memory
 from backend.core.enums import RuntimeStatus
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
+from backend.core.suspend_aware_deadline import SuspendAwareDeadline
 from backend.execution.base import Runtime
 from backend.orchestration import SessionOrchestrator
 from backend.utils.async_utils import run_or_schedule
@@ -110,6 +111,16 @@ def _set_status_callbacks(
     memory.status_callback = status_callback
 
 
+def _apply_freeze_credit(
+    started: float, slept: float, poll_interval: float, grace: float
+) -> tuple[float, float]:
+    """Credit a detected freeze back to the run deadline (test/helper shim)."""
+    overrun = slept - poll_interval
+    if overrun > grace:
+        return started + overrun, overrun
+    return started, 0.0
+
+
 async def run_agent_until_done(
     controller: SessionOrchestrator,
     runtime: Runtime,
@@ -167,19 +178,41 @@ async def run_agent_until_done(
     # machine stalls (e.g. due to a provider outage or infinite loop).
     import time as _time
 
-    from backend.core.constants import DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS
+    from backend.core.constants import (
+        DEFAULT_AGENT_RUN_FREEZE_GRACE_SECONDS,
+        DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS,
+    )
 
-    _started = _time.monotonic()
+    _POLL_INTERVAL = 0.5
     _max_poll_seconds = DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS
+    _freeze_grace = DEFAULT_AGENT_RUN_FREEZE_GRACE_SECONDS
+    deadline = SuspendAwareDeadline(
+        _max_poll_seconds,
+        poll_interval=_POLL_INTERVAL,
+        freeze_grace_seconds=_freeze_grace,
+    )
     _ran_loop = False
     try:
         while controller.state.agent_state not in end_states:  # noqa: ASYNC110
             _ran_loop = True
-            await asyncio.sleep(0.5)
-            if (
-                _max_poll_seconds > 0
-                and _time.monotonic() - _started > _max_poll_seconds
-            ):
+            _before_sleep = _time.monotonic()
+            await asyncio.sleep(_POLL_INTERVAL)
+            _slept = _time.monotonic() - _before_sleep
+            _credited = deadline.credit_poll_sleep(_slept)
+            if _credited > 0:
+                logger.warning(
+                    'run_agent_until_done: detected ~%.0fs freeze (poll sleep '
+                    'overran by %.0fs) — likely OS suspend or a blocked loop. '
+                    'Frozen time credited back to the run budget; not counted '
+                    'as an agent hang.',
+                    _slept,
+                    _credited,
+                    extra={
+                        'msg_type': 'AGENT_RUN_FREEZE_CREDIT',
+                        'frozen_seconds': round(_credited, 1),
+                    },
+                )
+            if deadline.expired():
                 logger.error(
                     'run_agent_until_done: HARD TIMEOUT after %.0fs in state=%s',
                     _max_poll_seconds,
@@ -192,6 +225,7 @@ async def run_agent_until_done(
                     pass
                 break
     finally:
+        deadline.close()
         if _ran_loop:
             # Drain is intentionally omitted here — the TUI gates new messages on
             # _agent_task.done(), and this cleanup delays completion. Background

@@ -877,3 +877,24 @@ class TestDirectLLMClientModelName:
 
             c = OpenAIClient('gpt-4', 'key')
             assert c.model_name == 'gpt-4'
+
+
+# ---------------------------------------------------------------------------
+# bounded_llm_http_timeout
+# ---------------------------------------------------------------------------
+class TestBoundedLlmHttpTimeout:
+    def test_large_request_budget_caps_read_timeout(self):
+        from backend.core.constants import LLM_HTTP_READ_TIMEOUT_SECONDS
+        from backend.inference.direct_clients import bounded_llm_http_timeout
+
+        timeout = bounded_llm_http_timeout(600.0)
+        assert timeout.read == LLM_HTTP_READ_TIMEOUT_SECONDS
+        assert timeout.connect <= 10.0
+
+    def test_with_default_timeout_wraps_explicit_override(self):
+        from backend.inference.direct_clients import _with_default_timeout
+
+        kwargs = _with_default_timeout({'timeout': 900.0}, None)
+        assert isinstance(kwargs['timeout'], httpx.Timeout)
+        assert kwargs['timeout'].read <= 30.0
+        assert kwargs['timeout'].connect <= 10.0

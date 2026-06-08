@@ -80,13 +80,56 @@ def _normalize_timeout_seconds(timeout: float | int | None) -> float | None:
     return value if value > 0 else None
 
 
+def bounded_llm_http_timeout(
+    request_timeout: float | int | None = None,
+) -> httpx.Timeout:
+    """Build ``httpx.Timeout`` with bounded socket-level connect/read ceilings.
+
+    The overall *timeout* follows the logical request budget (model thinking
+    time) but connect, read, write, and pool waits are capped so dead sockets
+    and stalled streams fail within seconds and route to retry logic.
+    """
+    from backend.core.constants import (
+        LLM_HTTP_CONNECT_TIMEOUT_SECONDS,
+        LLM_HTTP_POOL_TIMEOUT_SECONDS,
+        LLM_HTTP_READ_TIMEOUT_SECONDS,
+        LLM_HTTP_WRITE_TIMEOUT_SECONDS,
+    )
+
+    total = _normalize_timeout_seconds(request_timeout) or 60.0
+    read_cap = min(LLM_HTTP_READ_TIMEOUT_SECONDS, total)
+    return httpx.Timeout(
+        timeout=total,
+        connect=LLM_HTTP_CONNECT_TIMEOUT_SECONDS,
+        read=read_cap,
+        write=min(LLM_HTTP_WRITE_TIMEOUT_SECONDS, total),
+        pool=LLM_HTTP_POOL_TIMEOUT_SECONDS,
+    )
+
+
+def _coerce_bounded_request_timeout(value: Any, default_total: float | None) -> httpx.Timeout:
+    """Normalize SDK timeout kwargs to a bounded ``httpx.Timeout``."""
+    if isinstance(value, httpx.Timeout):
+        return bounded_llm_http_timeout(value.timeout if value.timeout else default_total)
+    if isinstance(value, (int, float)):
+        return bounded_llm_http_timeout(float(value))
+    if default_total is not None:
+        return bounded_llm_http_timeout(default_total)
+    return bounded_llm_http_timeout(None)
+
+
 def _with_default_timeout(
     kwargs: dict[str, Any], timeout: float | int | None
 ) -> dict[str, Any]:
     normalized = _normalize_timeout_seconds(timeout)
-    if normalized is None or 'timeout' in kwargs:
+    if 'timeout' in kwargs:
+        return {
+            **kwargs,
+            'timeout': _coerce_bounded_request_timeout(kwargs['timeout'], normalized),
+        }
+    if normalized is None:
         return kwargs
-    return {**kwargs, 'timeout': normalized}
+    return {**kwargs, 'timeout': bounded_llm_http_timeout(normalized)}
 
 
 def _gemini_timeout_ms(timeout: float | int | None) -> int:
@@ -109,7 +152,7 @@ def get_shared_http_client(provider: str, base_url: str | None = None) -> httpx.
             if key not in _shared_sync_clients:
                 _shared_sync_clients[key] = httpx.Client(
                     limits=_POOL_LIMITS,
-                    timeout=httpx.Timeout(timeout=60.0, connect=10.0),
+                    timeout=bounded_llm_http_timeout(60.0),
                     follow_redirects=True,
                 )
                 logger.debug('Created shared sync httpx pool for %s', key)
@@ -126,7 +169,7 @@ def get_shared_async_http_client(
             if key not in _shared_async_clients:
                 _shared_async_clients[key] = httpx.AsyncClient(
                     limits=_POOL_LIMITS,
-                    timeout=httpx.Timeout(timeout=60.0, connect=10.0),
+                    timeout=bounded_llm_http_timeout(60.0),
                     follow_redirects=True,
                 )
                 logger.debug('Created shared async httpx pool for %s', key)

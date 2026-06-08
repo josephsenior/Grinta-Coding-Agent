@@ -113,6 +113,7 @@ class RetryService:
 
     def _is_retryable_exception(self, exc: Exception) -> bool:
         """Return True if the exception is retryable."""
+        from backend.core.errors import LLMNoResponseError
         from backend.inference.exceptions import (
             APIConnectionError,
             APIError,
@@ -131,6 +132,11 @@ class RetryService:
                 ServiceUnavailableError,
                 Timeout,
                 InternalServerError,
+                # Empty/no-response blips (common with some Gemini configs).
+                # The inner Tenacity loop retries immediately + bumps temperature;
+                # a backed-off outer retry is a genuinely different attempt and is
+                # bounded by the retry queue's max_retries before giving up.
+                LLMNoResponseError,
             ),
         )
 

@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import sys
+import threading
 import traceback
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
@@ -44,6 +45,8 @@ from backend.core.log_formatters import _fix_record as fix_record  # type: ignor
 
 __all__ = [
     'configure_file_logging',
+    'bind_session_logging',
+    'mcp_log_stream',
     'get_log_dir',
     'TRACE_LOCAL',
     'ColoredFormatter',
@@ -360,17 +363,33 @@ def _workspace_logs_segment() -> str:
     return f'{safe}__{digest}'
 
 
-def get_log_dir() -> str:
-    """Return the log directory for this process (``app.log``, ``llm/``, …)."""
-    override = globals().get('LOG_DIR')
-    if isinstance(override, (str, os.PathLike)):
-        return os.fspath(override)
+def _workspace_logs_dir() -> str:
+    """Workspace-level log directory (shared by all sessions of a workspace)."""
     return os.path.join(
         _grinta_install_tree_root(),
         'logs',
         'workspaces',
         _workspace_logs_segment(),
     )
+
+
+def get_log_dir() -> str:
+    """Return the active log directory for this process.
+
+    Once a session is bound via :func:`bind_session_logging`, this resolves to
+    ``logs/workspaces/<workspace>/sessions/<session_id>/`` so every artifact
+    (``app.log``, MCP server output, ``llm/`` dumps) is isolated per session.
+    Before a session is bound (early startup) it falls back to the
+    workspace-level directory so nothing is lost.
+    """
+    override = globals().get('LOG_DIR')
+    if isinstance(override, (str, os.PathLike)):
+        return os.fspath(override)
+    base = _workspace_logs_dir()
+    sid = globals().get('_LOG_SESSION_ID')
+    if isinstance(sid, str) and sid:
+        return os.path.join(base, 'sessions', sid)
+    return base
 
 
 def __getattr__(name: str) -> Any:
@@ -459,36 +478,151 @@ def _setup_llm_logger(name: str, log_level: int) -> logging.Logger:
 
 _file_logging_configured = False
 
+# The single file handler shared by every Grinta logger, plus the loggers it
+# is attached to. ``bind_session_logging`` swaps this handler so all output
+# follows the active session into ``sessions/<id>/app.log``.
+_LOG_SESSION_ID: str | None = None
+_SHARED_FILE_HANDLER: logging.Handler | None = None
+_FILE_LOGGER_NAMES: tuple[str, ...] = (
+    'app',
+    'app.access',
+    'prompt',
+    'response',
+    'grinta.tui',
+)
+
+
+def _attach_shared_handler(handler: logging.Handler) -> None:
+    """Attach *handler* to every Grinta logger, dropping stale LLM handlers."""
+    for name in _FILE_LOGGER_NAMES:
+        lg = logging.getLogger(name)
+        for h in list(lg.handlers):
+            if isinstance(h, LlmFileHandler):
+                lg.removeHandler(h)
+        if handler not in lg.handlers:
+            lg.addHandler(handler)
+
 
 def configure_file_logging() -> None:
-    """Attach file handlers after ``PROJECT_ROOT`` is known (CLI / workers).
+    """Attach the shared file handler after ``PROJECT_ROOT`` is known.
 
-    Idempotent. Uses :func:`get_log_dir` so each workspace maps to its own
-    directory under ``<Grinta>/logs/workspaces/``.
+    Idempotent. Writes to the workspace-level directory until a session is
+    bound (see :func:`bind_session_logging`), at which point all output is
+    re-pointed into that session's own ``app.log``.
     """
-    global _file_logging_configured
+    global _file_logging_configured, _SHARED_FILE_HANDLER
     if _file_logging_configured or not LOG_TO_FILE:
         return
     log_dir = get_log_dir()
     os.makedirs(log_dir, exist_ok=True)
-    # Create a single shared file handler for unified logging
     shared_handler = get_file_handler(log_dir, current_log_level)
-    app_logger.addHandler(shared_handler)
-    access_logger.addHandler(shared_handler)
-    # Attach the same handler to LLM loggers (prompt, response) and TUI logger
-    for name in ('prompt', 'response'):
-        lg = logging.getLogger(name)
-        # Remove any existing LlmFileHandler
-        for h in list(lg.handlers):
-            if isinstance(h, LlmFileHandler):
-                lg.removeHandler(h)
-        if shared_handler not in lg.handlers:
-            lg.addHandler(shared_handler)
-    tui_logger = logging.getLogger('grinta.tui')
-    if shared_handler not in tui_logger.handlers:
-        tui_logger.addHandler(shared_handler)
+    _SHARED_FILE_HANDLER = shared_handler
+    _attach_shared_handler(shared_handler)
     app_logger.debug('Logging to file in: %s', log_dir)
     _file_logging_configured = True
+
+
+def _safe_session_segment(session_id: str) -> str:
+    """Filesystem-safe, bounded directory name for a session id."""
+    safe = re.sub(r'[^A-Za-z0-9._-]+', '_', session_id).strip('_')
+    return safe[:64] or 'session'
+
+
+def bind_session_logging(session_id: str | None) -> None:
+    """Re-point all file logging into ``sessions/<session_id>/app.log``.
+
+    Called once the session id is known (see ``bootstrap/setup.py``). This is
+    what makes ``app.log`` session-scoped instead of one ever-growing
+    workspace file shared by every run. Idempotent per session id; safe to
+    call before or after :func:`configure_file_logging`.
+    """
+    global _LOG_SESSION_ID, _SHARED_FILE_HANDLER
+    if not LOG_TO_FILE or not session_id:
+        return
+    segment = _safe_session_segment(str(session_id))
+    if _LOG_SESSION_ID == segment:
+        return
+    _LOG_SESSION_ID = segment
+    log_dir = get_log_dir()
+    os.makedirs(log_dir, exist_ok=True)
+    new_handler = get_file_handler(log_dir, current_log_level)
+    old_handler = _SHARED_FILE_HANDLER
+    for name in _FILE_LOGGER_NAMES:
+        lg = logging.getLogger(name)
+        if old_handler is not None and old_handler in lg.handlers:
+            lg.removeHandler(old_handler)
+    _attach_shared_handler(new_handler)
+    _SHARED_FILE_HANDLER = new_handler
+    _file_logging_configured = True
+    if old_handler is not None and old_handler is not new_handler:
+        with contextlib.suppress(Exception):
+            old_handler.close()
+    app_logger.info('Session logging bound to %s', log_dir)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# MCP server stderr → unified app.log
+#
+# stdio MCP servers write diagnostics to stderr. Historically each server got
+# its own ``mcp_<name>_stderr.log`` scattered in the log dir. Instead we hand
+# the transport one end of an OS pipe and forward every line into the
+# ``app.mcp.<server>`` logger, so it lands in the *same* (session-scoped)
+# app.log as everything else. One pipe + one daemon reader thread per server
+# for the life of the process (reused across reconnects); because the records
+# propagate to the ``app`` logger's handler, the destination follows session
+# rebinds automatically.
+# ──────────────────────────────────────────────────────────────────────────
+_MCP_LOG_STREAMS: dict[str, Any] = {}
+_MCP_LOG_LOCK = threading.Lock()
+
+
+def _mcp_stderr_forwarder(read_stream: Any, target: logging.Logger) -> None:
+    try:
+        for raw in iter(read_stream.readline, ''):
+            line = raw.rstrip('\r\n')
+            if line:
+                target.info(line)
+    except Exception:  # pragma: no cover - defensive; pipe teardown races
+        pass
+    finally:
+        with contextlib.suppress(Exception):
+            read_stream.close()
+
+
+def mcp_log_stream(server_name: str) -> Any:
+    """Return a writable stream whose lines are forwarded into ``app.log``.
+
+    Hand the returned object to ``StdioTransport(log_file=...)`` instead of a
+    file path. The MCP subprocess's stderr is then merged into the unified
+    ``app.log`` under the ``app.mcp.<server>`` logger rather than a separate
+    per-server file. Cached and reused per server name.
+    """
+    safe = re.sub(r'[^A-Za-z0-9._-]+', '_', server_name or 'mcp').strip('_') or 'mcp'
+    with _MCP_LOG_LOCK:
+        existing = _MCP_LOG_STREAMS.get(safe)
+        if existing is not None and not getattr(existing, 'closed', False):
+            return existing
+        read_fd, write_fd = os.pipe()
+        read_stream = os.fdopen(read_fd, 'r', encoding='utf-8', errors='replace')
+        write_stream = os.fdopen(
+            write_fd, 'w', encoding='utf-8', errors='replace'
+        )
+        mcp_logger = logging.getLogger(f'app.mcp.{safe}')
+        if not getattr(mcp_logger, '_grinta_mcp_configured', False):
+            mcp_logger.setLevel(logging.INFO)
+            mcp_logger.addFilter(SensitiveDataFilter(mcp_logger.name))
+            # Propagates to the 'app' logger, which owns the app.log handler.
+            mcp_logger.propagate = True
+            mcp_logger._grinta_mcp_configured = True  # type: ignore[attr-defined]
+        thread = threading.Thread(
+            target=_mcp_stderr_forwarder,
+            args=(read_stream, mcp_logger),
+            name=f'mcp-stderr-{safe}',
+            daemon=True,
+        )
+        thread.start()
+        _MCP_LOG_STREAMS[safe] = write_stream
+        return write_stream
 
 
 llm_prompt_logger = _setup_llm_logger('prompt', current_log_level)

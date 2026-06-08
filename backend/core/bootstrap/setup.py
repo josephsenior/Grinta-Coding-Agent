@@ -10,6 +10,7 @@ Functions:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib
 import uuid
@@ -238,6 +239,13 @@ def create_runtime(
         inline_event_delivery,
         user_id=user_id,
     )
+    # Re-point file logging into this session's own directory so app.log (and
+    # MCP server output) is session-scoped rather than a single ever-growing
+    # workspace file shared across runs.
+    with contextlib.suppress(Exception):
+        from backend.core.logger import bind_session_logging
+
+        bind_session_logging(session_id)
     agent_cls = type(agent) if agent else Agent.get_cls(config.default_agent)
 
     from backend.execution.runtime_factory import get_runtime_cls
