@@ -222,6 +222,53 @@ class TestCondenseHistory:
         assert result.events == view.events
         assert result.pending_action is None
 
+    async def test_stale_prewarm_is_discarded_and_recomputed(self):
+        m = _make_manager()
+        from backend.context.view import View
+
+        prewarmed_view = MagicMock(spec=View)
+        prewarmed_view.events = [MagicMock(name='prewarmed')]
+        fresh_view = MagicMock(spec=View)
+        fresh_view.events = [MagicMock(name='fresh')]
+        mock_compactor = MagicMock()
+        mock_compactor.compacted_history = AsyncMock(return_value=fresh_view)
+        m.compactor = mock_compactor
+
+        latest = MagicMock()
+        latest.id = 99
+        state = self._make_state_with_history([MagicMock(), latest])
+        state.turn_signals.prewarmed_compaction = prewarmed_view
+        state.turn_signals.prewarm_history_len = 1
+        state.turn_signals.prewarm_latest_event_id = 50
+
+        result = await m.condense_history(state)
+
+        mock_compactor.compacted_history.assert_awaited_once_with(state)
+        assert result.events == fresh_view.events
+        assert state.turn_signals.prewarmed_compaction is None
+
+    async def test_fresh_prewarm_is_used_without_recompute(self):
+        m = _make_manager()
+        from backend.context.view import View
+
+        prewarmed_view = MagicMock(spec=View)
+        prewarmed_view.events = [MagicMock(name='prewarmed')]
+        mock_compactor = MagicMock()
+        mock_compactor.compacted_history = AsyncMock()
+        m.compactor = mock_compactor
+
+        latest = MagicMock()
+        latest.id = 42
+        state = self._make_state_with_history([MagicMock(), latest])
+        state.turn_signals.prewarmed_compaction = prewarmed_view
+        state.turn_signals.prewarm_history_len = 2
+        state.turn_signals.prewarm_latest_event_id = 42
+
+        result = await m.condense_history(state)
+
+        mock_compactor.compacted_history.assert_not_awaited()
+        assert result.events == prewarmed_view.events
+
     async def test_compactor_non_view_result_returns_action(self):
         m = _make_manager()
 

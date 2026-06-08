@@ -28,7 +28,7 @@ reliability-gate: pretest
 
 .PHONY: reliability-gate-integration
 reliability-gate-integration: pretest
-	@uv run python backend/scripts/verify/reliability_gate.py --phase full --include-integration
+	@uv run python backend/scripts/verify/reliability_gate.py --phase full --include-integration --include-stress
 
 .PHONY: docker-up
 docker-up:

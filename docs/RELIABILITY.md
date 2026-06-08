@@ -119,6 +119,72 @@ before further writes or `finish`. Default is strict for safety; relaxing it
 product trade-off—see `backend/orchestration/services/action_execution_service.py`
 and `step_guard_service.py`.
 
+## Pending action lifecycle
+
+`PendingActionService` tracks **every** in-flight runnable action by stream id,
+not a single global slot. Parallel read batches can therefore clear one action
+without colliding with siblings still awaiting observations.
+
+* **`clear_for_action(action)`** — remove one outstanding row (observation
+  arrival, parallel batch completion).
+* **`clear_primary()`** — remove only the latest row (step-liveness timeout,
+  single-action recovery).
+* **`clear_all()`** — hard reset (agent stop, user message preemption).
+* **`has_outstanding()`** — serial batch drain and step barriers consult this
+  before dequeuing the next action from the same LLM response.
+
+Structured logs include `pending_action_id`, `clear_reason`, and
+`outstanding_count` on every `PENDING_ACTION_CLEARED` line.
+
+## Prompt window immutability
+
+`select_prompt_events` deep-copies events before truncation. Windowing never
+mutates `state.history` in place. Action/observation pairs are dropped as
+causal units so the model never sees an orphaned tool call without its result.
+
+## Background drain barrier
+
+After parallel batches and before compaction, the controller calls
+`drain_step_barrier`, which:
+
+1. Drains `_background_tasks` spawned via `run_or_schedule`.
+2. Waits until `PendingActionService.has_outstanding()` is false.
+
+A suspend-aware deadline (default 2 s) prevents indefinite hangs. On timeout
+the step continues with a `DRAIN_STEP_BARRIER_TIMEOUT` warning in logs; the
+session is not killed.
+
+## Persistence degraded mode
+
+`EventStream.persistence_health` is one of `ok`, `degraded`, or `failed`:
+
+* First `persist_event` failure → `degraded`.
+* Three consecutive failures → `failed`.
+* Next successful write → `ok`.
+
+Delivery to subscribers continues in-memory when disk writes fail. The next
+agent step emits a one-line `StatusObservation` so the model knows durability
+may be incomplete. `/health` and `collect_orchestration_health` surface
+`persistence_health` and add `persistence_degraded` / `persistence_failed`
+warnings.
+
+Quarantined WAL segments are moved to `lost_events/` rather than deleted when
+flush permanently fails.
+
+## What to do when something goes wrong (log triage)
+
+Search `logs/workspaces/<ws>/app.log` for:
+
+* **`outstanding_count`** — pending rows not cleared; may indicate a parallel
+  batch race or late observation.
+* **`persistence_health=degraded`** or **`PERSISTENCE_DEGRADED`** — disk or
+  SQLite writes failing; verify free space and AV locks.
+* **`DRAIN_STEP_BARRIER_TIMEOUT`** — background work or pending actions did
+  not finish before the step barrier; compaction may run on slightly stale
+  history (soft degradation, not session death).
+* **`lost_events/`** under the workspace events directory — quarantined WAL
+  payloads that could not be flushed.
+
 ## What this document does not promise
 
 * No guarantee against a malicious model intentionally destroying files in

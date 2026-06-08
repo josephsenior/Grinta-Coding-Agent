@@ -93,14 +93,17 @@ class _SessionOrchestratorStateMixin:
 
         if hasattr(pending, 'thought'):
             pending.thought = ''
+        # Clear the pre-confirmation stream row while ``_id`` is still valid.
+        # Wiping ``_id`` first made ``clear_for_action`` a no-op and left stale
+        # outstanding rows that timed out ~120s later as false FileEditAction
+        # pending timeouts during auto-confirm soak runs.
+        self.services.pending_action.clear_for_action(pending)
         pending._id = None
         pending.confirmation_state = (
             ActionConfirmationStatus.CONFIRMED
             if approved
             else ActionConfirmationStatus.REJECTED
         )
-
-        self.services.pending_action.set(None)
 
         new_state = (
             AgentState.RUNNING

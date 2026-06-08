@@ -185,7 +185,7 @@ class TestGetNextAction:
         assert final_event.error_id == 'LLM_NO_ACTION_REPAIR_EXHAUSTED'
         assert final_event.agent_only is False
         assert final_event.content == (
-            "Run didn't complete — want to continue from where it left off?"
+            'Run paused because the model returned no usable output.'
         )
 
     @pytest.mark.asyncio

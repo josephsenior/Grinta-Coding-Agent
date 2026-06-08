@@ -780,7 +780,7 @@ class _EventRouterDelegateMixin(EventRouterService if TYPE_CHECKING else object)
                     None,
                 )
                 if pending_service is not None:
-                    pending_service.set(None)
+                    pending_service.clear_all()
             except Exception:
                 logger.debug(
                     'Failed to force-clear pending state after handler timeout',

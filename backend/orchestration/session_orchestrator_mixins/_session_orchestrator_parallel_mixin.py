@@ -258,6 +258,55 @@ class _SessionOrchestratorParallelMixin:
 
         return True
 
+    async def _drain_step_barrier(self, *, timeout: float = 2.0) -> bool:
+        """Drain background tasks and wait for outstanding pending actions."""
+        from backend.utils.async_utils import drain_step_barrier
+
+        pending_service = getattr(
+            getattr(self, 'services', None), 'pending_action', None
+        )
+        has_outstanding = (
+            pending_service.has_outstanding if pending_service is not None else None
+        )
+        return await drain_step_barrier(
+            has_outstanding=has_outstanding,
+            timeout=timeout,
+        )
+
+    def _maybe_emit_persistence_degraded_warning(self) -> None:
+        """Surface one model-visible warning when event persistence is degraded."""
+        stream = getattr(self, 'event_stream', None)
+        if stream is None:
+            return
+        health = getattr(stream, 'persistence_health', 'ok')
+        if health == 'ok':
+            return
+        extra = getattr(self.state, 'extra_data', None)
+        if not isinstance(extra, dict):
+            return
+        warned_key = '__persistence_degraded_warned'
+        if extra.get(warned_key) == health:
+            return
+        extra[warned_key] = health
+        from backend.ledger import EventSource
+        from backend.ledger.observation import StatusObservation
+
+        message = (
+            'Event persistence is degraded; recent events may not be durable on disk. '
+            'Verify workspace state before relying on prior tool results.'
+            if health == 'degraded'
+            else 'Event persistence has failed repeatedly; session history may be '
+            'incomplete after restart. Save important work outside the agent.'
+        )
+        self.event_stream.add_event(
+            StatusObservation(
+                content=message,
+                status_type='persistence_degraded',
+                extras={'persistence_health': health},
+            ),
+            EventSource.ENVIRONMENT,
+        )
+
     def _can_drain_pending(self) -> bool:
         """Check if we can immediately execute the next queued action.
 
@@ -547,4 +596,7 @@ class _SessionOrchestratorParallelMixin:
         pending_service = self.services.pending_action
 
         if pending_service:
-            pending_service.set(action)
+            if action is None:
+                pending_service.clear_primary()
+            else:
+                pending_service.set(action)

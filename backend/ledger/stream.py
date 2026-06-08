@@ -22,7 +22,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from backend.core.logger import app_logger as logger
 from backend.core.workspace_resolution import workspace_agent_state_dir
@@ -264,6 +264,9 @@ class EventStream(EventStore):
             recent_persist_failures=deque(),
             existing_sqlite_store=getattr(self, '_sqlite_store', None),
         )
+        self._persistence_health: Literal['ok', 'degraded', 'failed'] = 'ok'
+        self._persist_failure_streak: int = 0
+        self._persist_failure_threshold: int = 3
 
         # ---- Queue / threading setup --------------------------------------
         # inline_delivery=True: all events are delivered synchronously in the
@@ -599,11 +602,15 @@ class EventStream(EventStore):
         if sanitized_event.id is not None:
             try:
                 self._persist.persist_event(payload, sanitized_event.id, cache_payload)
+                self._record_persist_success()
             except Exception:
+                self._record_persist_failure(sanitized_event.id)
                 logger.error(
                     'EventStream: persist_event failed for event id=%s; '
-                    'continuing with in-memory delivery (durability degraded)',
+                    'continuing with in-memory delivery (durability degraded, '
+                    'persistence_health=%s)',
                     sanitized_event.id,
+                    self._persistence_health,
                     exc_info=True,
                 )
 
@@ -618,6 +625,39 @@ class EventStream(EventStore):
         else:
             self._enqueue_serialized_event(sanitized_event)
         self._notify_activity_listeners()
+
+    @property
+    def persistence_health(self) -> Literal['ok', 'degraded', 'failed']:
+        """Durability health based on recent persist_event outcomes."""
+        return self._persistence_health
+
+    def _record_persist_success(self) -> None:
+        if self._persist_failure_streak > 0:
+            logger.info(
+                'EventStream persistence recovered after %d failure(s)',
+                self._persist_failure_streak,
+                extra={'msg_type': 'PERSISTENCE_RECOVERED'},
+            )
+        self._persist_failure_streak = 0
+        self._persistence_health = 'ok'
+
+    def _record_persist_failure(self, event_id: object) -> None:
+        self._persist_failure_streak += 1
+        if self._persist_failure_streak >= self._persist_failure_threshold:
+            self._persistence_health = 'failed'
+        elif self._persistence_health == 'ok':
+            self._persistence_health = 'degraded'
+        logger.warning(
+            'EventStream persistence failure streak=%d health=%s event_id=%s',
+            self._persist_failure_streak,
+            self._persistence_health,
+            event_id,
+            extra={
+                'msg_type': 'PERSISTENCE_DEGRADED',
+                'persistence_health': self._persistence_health,
+                'persist_failure_streak': self._persist_failure_streak,
+            },
+        )
 
     def _dispatch_event_inline(self, event: Event) -> None:
         """Deliver a critical event immediately to current subscribers.

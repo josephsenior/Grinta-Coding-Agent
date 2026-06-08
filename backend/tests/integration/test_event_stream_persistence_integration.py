@@ -58,6 +58,28 @@ def test_event_stream_cleans_stale_pending_marker() -> None:
             stream.close()
 
 
+def test_persistence_health_transitions_on_failures() -> None:
+    sid = 'persist-health-session'
+    with tempfile.TemporaryDirectory() as tmpdir:
+        file_store = LocalFileStore(tmpdir)
+        stream = EventStream(sid, file_store)
+        try:
+            assert stream.persistence_health == 'ok'
+
+            def _boom(*_args, **_kwargs):
+                raise OSError('disk full')
+
+            stream._persist.persist_event = _boom  # type: ignore[method-assign]
+            stream.add_event(NullObservation(content='one'), EventSource.AGENT)
+            assert stream.persistence_health == 'degraded'
+
+            stream.add_event(NullObservation(content='two'), EventSource.AGENT)
+            stream.add_event(NullObservation(content='three'), EventSource.AGENT)
+            assert stream.persistence_health == 'failed'
+        finally:
+            stream.close()
+
+
 def test_event_stream_persists_and_loads_events_across_restart() -> None:
     sid = 'persist-restart-session'
     with tempfile.TemporaryDirectory() as tmpdir:

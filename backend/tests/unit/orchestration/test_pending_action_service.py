@@ -182,6 +182,56 @@ class TestTimeout:
         assert obs.cause is None
 
 
+# ── targeted clear API (parallel-safe lifecycle) ─────────────────────
+
+
+class TestTargetedClearAPI:
+    def test_clear_for_action_removes_only_matching_row(self):
+        svc = PendingActionService(_make_context(), timeout=300.0)
+        a1 = _make_action(10)
+        a2 = _make_action(20)
+        svc.set(cast(Any, a1))
+        svc.set(cast(Any, a2))
+        assert svc.has_outstanding() is True
+        svc.clear_for_action(cast(Any, a1))
+        assert svc.peek_for_cause(10) is None
+        assert svc.peek_for_cause(20) is a2
+        assert svc.has_outstanding() is True
+
+    def test_clear_primary_removes_latest_only(self):
+        svc = PendingActionService(_make_context(), timeout=300.0)
+        a1 = _make_action(10)
+        a2 = _make_action(20)
+        svc.set(cast(Any, a1))
+        svc.set(cast(Any, a2))
+        svc.clear_primary()
+        assert svc.peek_for_cause(20) is None
+        assert svc.peek_for_cause(10) is a1
+        assert svc.has_outstanding() is True
+
+    def test_has_outstanding_false_when_empty(self):
+        svc = PendingActionService(_make_context(), timeout=300.0)
+        assert svc.has_outstanding() is False
+        svc.set(cast(Any, _make_action(1)))
+        assert svc.has_outstanding() is True
+        svc.clear_all()
+        assert svc.has_outstanding() is False
+
+    def test_get_primary_returns_latest_without_side_effects(self):
+        ctx = _make_context()
+        controller = ctx.get_controller()
+        svc = PendingActionService(ctx, timeout=600.0)
+        a1 = _make_action(10)
+        a2 = _make_action(20)
+        svc.set(cast(Any, a1))
+        old_ts = time.time() - 120.0
+        svc._outstanding[10] = cast(Any, (a1, old_ts))
+        svc.set(cast(Any, a2))
+        controller.log.reset_mock()
+        assert svc.get_primary() is a2
+        controller.log.assert_not_called()
+
+
 # ── slow pending logging ─────────────────────────────────────────────
 
 

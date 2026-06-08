@@ -143,6 +143,21 @@ class TestBackpressureCriticalEvents:
     """Critical events must never be dropped."""
 
     @pytest.mark.asyncio
+    async def test_runnable_and_cause_linked_events_are_critical(self):
+        from backend.ledger.action import CmdRunAction
+        from backend.ledger.observation import CmdOutputObservation
+        from backend.ledger.persistence import EventPersistence
+
+        runnable = CmdRunAction(command='echo hi')
+        runnable.id = 1
+        observation = CmdOutputObservation(content='ok', command='echo hi')
+        observation.id = 2
+        observation.cause = 1
+
+        assert EventPersistence.is_critical_event(runnable) is True
+        assert EventPersistence.is_critical_event(observation) is True
+
+    @pytest.mark.asyncio
     async def test_critical_events_survive_full_queue(self):
         bp = BackpressureManager(
             max_queue_size=5,

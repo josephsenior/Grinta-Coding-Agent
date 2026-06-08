@@ -127,3 +127,26 @@ class TestHungActionRecovery:
         assert isinstance(emitted.tool_result, dict)
         assert emitted.tool_result.get('ok') is False
         assert emitted.tool_result.get('retryable') is True
+
+    @pytest.mark.asyncio
+    async def test_timeout_does_not_promote_runtime_error_status(self):
+        """ACTION_EXECUTION_TIMEOUT must not flip runtime to ERROR (session survival)."""
+        from backend.core.schemas import RuntimeStatus
+
+        runtime = _make_runtime(timeout=0.1)
+
+        async def _hang_forever(_event):
+            await asyncio.sleep(60)
+
+        runtime._execute_action = AsyncMock(side_effect=_hang_forever)  # type: ignore[method-assign]
+        runtime.event_stream = MagicMock()
+        runtime.set_runtime_status = MagicMock()  # type: ignore[method-assign]
+
+        action = FileReadAction(path='/workspace/hung.py')
+        action.set_hard_timeout(0.1, blocking=False)
+
+        await runtime._handle_action(action)
+
+        for call in runtime.set_runtime_status.call_args_list:
+            status = call.args[0] if call.args else None
+            assert status != RuntimeStatus.ERROR

@@ -75,7 +75,7 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
             return
 
         if pending_service is not None:
-            pending_service.set(None)
+            pending_service.clear_all()
 
         cb_svc = getattr(self._ctrl, 'circuit_breaker_service', None)
         if cb_svc is not None:

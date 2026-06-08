@@ -441,6 +441,7 @@ class SessionOrchestrator(
                 return
 
             self._log_step_info()
+            self._maybe_emit_persistence_degraded_warning()
             self._sync_budget_flag_with_metrics()
 
             set_step_phase('step_inner:step_guard')
@@ -525,9 +526,7 @@ class SessionOrchestrator(
                     clear_queued_actions = getattr(self.agent, 'clear_queued_actions', None)
                     if callable(clear_queued_actions):
                         clear_queued_actions(reason='finish_action_dispatched')
-                from backend.utils.async_utils import drain_background_tasks
-
-                await drain_background_tasks(max_rounds=2, timeout=2.0)
+                await self._drain_step_barrier()
                 set_step_phase('step_inner:post_execution')
                 await self._handle_post_execution()
                 logger.debug(
@@ -570,9 +569,7 @@ class SessionOrchestrator(
                         # Drain background _on_event tasks so state.history is
                         # updated before the next get_next_action() → astep()
                         # → condense_history() check.
-                        from backend.utils.async_utils import drain_background_tasks
-
-                        await drain_background_tasks(max_rounds=2, timeout=2.0)
+                        await self._drain_step_barrier()
             finally:
                 self._draining_batch = False
             # Deferred condensation check after batch drain completes.
@@ -600,9 +597,7 @@ class SessionOrchestrator(
             # exits cleanly. The watchdog will eventually clear the pending
             # action and trigger a new step, resuming normal operation.
             set_step_phase('step_inner:schedule_next')
-            from backend.utils.async_utils import drain_background_tasks
-
-            await drain_background_tasks(max_rounds=2, timeout=2.0)
+            await self._drain_step_barrier()
             if self.get_agent_state() == AgentState.RUNNING and not self._closed:
                 self.schedule_step_soon()
         finally:

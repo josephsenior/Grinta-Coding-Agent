@@ -5,6 +5,9 @@ Use this list before declaring a **1.0.0** (or any major) release and before pub
 ## Pre-release verification
 
 - [ ] **Unit tests (full corpus):** `PYTHONPATH=. uv run pytest backend/tests/unit` passes on your machine (same scope as [py-tests workflow](../.github/workflows/py-tests.yml) `gates-on-linux` / `gates-on-windows`).
+- [ ] **Reliability gate (RC / GA):** `make reliability-gate` passes; for release candidates and GA promotion also run `make reliability-gate-integration` (adds integration + stress suites via [`reliability_gate.py`](../backend/scripts/verify/reliability_gate.py)).
+- [ ] **Stress suite (RC / GA):** `make test-stress` or `PYTHONPATH=. uv run pytest backend/tests/stress -m stress -q` passes (parallel pending lifecycle, event-stream backpressure, durable-writer load).
+- [ ] **Integration suite (RC / GA):** `make test-integration` or `PYTHONPATH=. uv run pytest backend/tests/integration -m integration -q` passes (includes hung-action recovery, persistence health, trajectory regression).
 - [ ] **Optional — full Python test tree:** `PYTHONPATH=. uv run pytest` from the repo root (discovers `backend/tests` per [`pytest.ini`](../pytest.ini); long run; may need services). Run before a major release if you want confidence beyond the unit gates.
 - [ ] **Lint:** pre-commit and mypy pass (see [lint workflow](../.github/workflows/lint.yml)); run `pre-commit run --all-files` locally if you change Python.
 - [ ] **CLI smoke:** from a clean venv or `uv run`, start `grinta` or `uv run python -m backend.cli.entry` and confirm the REPL loads; run [e2e-tests workflow](../.github/workflows/e2e-tests.yml) steps locally if you changed CLI/launch/packaging:

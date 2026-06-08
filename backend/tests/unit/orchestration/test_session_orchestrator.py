@@ -1789,12 +1789,22 @@ class TestStepDispatch(unittest.TestCase):
         """Line 495-496 coverage."""
         # Ensure property returns None
         self.ctrl.services.pending_action.get = MagicMock(return_value=None)
+        self.ctrl.services.pending_action.has_outstanding = MagicMock(
+            return_value=False
+        )
         self.ctrl.services.action.get_pending_action = MagicMock(return_value=None)
 
         self.ctrl.agent.pending_actions = [MagicMock()]
         self.assertTrue(self.ctrl._can_drain_pending())
 
         self.ctrl.agent.pending_actions = []
+        self.assertFalse(self.ctrl._can_drain_pending())
+
+    def test_can_drain_pending_false_when_outstanding_pending(self):
+        self.ctrl.services.pending_action.has_outstanding = MagicMock(
+            return_value=True
+        )
+        self.ctrl.agent.pending_actions = [MagicMock()]
         self.assertFalse(self.ctrl._can_drain_pending())
 
     def test_pending_action_no_service(self):
@@ -2012,7 +2022,8 @@ class TestApplyUserDecision(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.ctrl = _make_controller()
         self.ctrl.services.pending_action = MagicMock()
-        self.ctrl.services.emit_event = MagicMock()
+        self.ctrl.services.context = MagicMock()
+        self.ctrl.services.context.emit_event = MagicMock()
         self.ctrl.set_agent_state_to = AsyncMock()
         self.ctrl.step = MagicMock()
 
@@ -2037,10 +2048,12 @@ class TestApplyUserDecision(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_pending.thought, '')
         # action id is cleared (so the action is re-executable)
         self.assertIsNone(mock_pending._id)
-        # pending action is cleared
-        self.ctrl.services.pending_action.set.assert_called_once_with(None)
+        # outstanding row cleared while stream id was still valid
+        self.ctrl.services.pending_action.clear_for_action.assert_called_once_with(
+            mock_pending
+        )
         # action is re-emitted as AGENT
-        self.ctrl.services.emit_event.assert_called_once_with(
+        self.ctrl.services.context.emit_event.assert_called_once_with(
             mock_pending, EventSource.AGENT
         )
         # state transitions to RUNNING
@@ -2064,8 +2077,10 @@ class TestApplyUserDecision(unittest.IsolatedAsyncioTestCase):
             mock_pending.confirmation_state,
             ActionConfirmationStatus.REJECTED,
         )
-        self.ctrl.services.pending_action.set.assert_called_once_with(None)
-        self.ctrl.services.emit_event.assert_called_once_with(
+        self.ctrl.services.pending_action.clear_for_action.assert_called_once_with(
+            mock_pending
+        )
+        self.ctrl.services.context.emit_event.assert_called_once_with(
             mock_pending, EventSource.AGENT
         )
         self.ctrl.set_agent_state_to.assert_awaited_once_with(
@@ -2079,10 +2094,28 @@ class TestApplyUserDecision(unittest.IsolatedAsyncioTestCase):
 
         await self.ctrl.apply_user_decision(approved=True)
 
-        self.ctrl.services.pending_action.set.assert_not_called()
-        self.ctrl.services.emit_event.assert_not_called()
+        self.ctrl.services.pending_action.clear_for_action.assert_not_called()
+        self.ctrl.services.context.emit_event.assert_not_called()
         self.ctrl.set_agent_state_to.assert_not_awaited()
         self.ctrl.step.assert_not_called()
+
+    async def test_clear_for_action_runs_before_id_is_wiped(self):
+        """Pre-confirmation stream id must be cleared before ``_id`` is reset."""
+        mock_pending = MagicMock()
+        mock_pending.thought = ''
+        mock_pending._id = 248
+        captured_id_at_clear: list[object] = []
+
+        def _capture_clear(action):
+            captured_id_at_clear.append(getattr(action, '_id', None))
+
+        self.ctrl.services.pending_action.get.return_value = mock_pending
+        self.ctrl.services.pending_action.clear_for_action.side_effect = _capture_clear
+
+        await self.ctrl.apply_user_decision(approved=True)
+
+        self.assertEqual(captured_id_at_clear, [248])
+        self.assertIsNone(mock_pending._id)
 
     async def test_pending_action_without_thought_attribute(self):
         """Pending actions that don't have a ``thought`` attribute are handled."""
@@ -2092,7 +2125,9 @@ class TestApplyUserDecision(unittest.IsolatedAsyncioTestCase):
 
         await self.ctrl.apply_user_decision(approved=True)
 
-        self.ctrl.services.pending_action.set.assert_called_once_with(None)
-        self.ctrl.services.emit_event.assert_called_once_with(
+        self.ctrl.services.pending_action.clear_for_action.assert_called_once_with(
+            mock_pending
+        )
+        self.ctrl.services.context.emit_event.assert_called_once_with(
             mock_pending, EventSource.AGENT
         )

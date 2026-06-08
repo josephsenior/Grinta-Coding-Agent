@@ -346,7 +346,7 @@ class ObservationService:
         even though the mismatched observation is already in history.
         """
         self._context.discard_invocation_context_for_action(pending_action)
-        self._pending_service.set(None)
+        self._pending_service.clear_for_action(pending_action)
         pid = getattr(pending_action, 'id', None)
         oc = getattr(observation, 'cause', None)
         msg = (
