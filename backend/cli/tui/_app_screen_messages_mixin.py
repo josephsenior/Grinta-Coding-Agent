@@ -75,15 +75,18 @@ class _AppScreenMessagesMixin:
 
     def add_thinking(self, text: str) -> None:
         """Real-time thinking/reasoning — update live display."""
-        spinner = self.query_one('#spinner', Static)
-        spinner.remove_class('-hidden')
-        spinner.update('⟳')
+        if not getattr(self, '_thinking_spinner_active', False):
+            spinner = self.query_one('#spinner', Static)
+            spinner.remove_class('-hidden')
+            spinner.update('⟳')
+            self._thinking_spinner_active = True
 
         if self._renderer:
             self._renderer.update_live_thinking(text)
 
     def finalize_thinking(self) -> None:
         """Agent turn done — hide spinner."""
+        self._thinking_spinner_active = False
         self.query_one('#spinner', Static).add_class('-hidden')
         if self._renderer:
             self._renderer.commit_live_thinking()

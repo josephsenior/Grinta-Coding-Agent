@@ -24,7 +24,7 @@ from backend.ledger.action import (
 class _AppRendererActionHandlersMixin:
     """action handlers (search/message/streaming/state)."""
 
-    _LIVE_STREAM_PAINT_INTERVAL = 0.05
+    _LIVE_STREAM_PAINT_INTERVAL = 0.033
 
     def _handle_search_action(self, thought: str, source_tool: str = 'search') -> None:
         """Handle grep/glob action and render as a card.

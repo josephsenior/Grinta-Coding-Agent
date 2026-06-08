@@ -250,6 +250,8 @@ class TUIRenderer(
         self._pending_events: deque[Any] = deque()
         self._pending_lock = threading.Lock()
         self._drain_scheduled = False
+        self._drain_debounce_handle: Any | None = None
+        self._last_scroll_paint_at: float = 0.0
         self._pending_events_dropped = 0
 
         # History & Live state

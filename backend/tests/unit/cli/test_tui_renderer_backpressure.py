@@ -200,7 +200,7 @@ async def test_tui_renderer_schedules_single_drain_message_per_backlog():
     renderer._on_event('first')
     renderer._on_event('second')
     renderer._on_event('third')
-    await asyncio.sleep(0)
+    await asyncio.sleep(0.03)
 
     assert fake_tui.post_message.call_count == 1
 

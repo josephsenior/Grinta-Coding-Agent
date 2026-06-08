@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
+
+_LIVE_SCROLL_PAINT_INTERVAL = 0.1
 
 from rich.text import (
     Text,
@@ -21,6 +24,16 @@ from backend.ledger import (
 
 class _AppRendererLiveMixin:
     """subscribe + live thinking/response streaming."""
+
+    def _maybe_scroll_to_tail(self, display: Any) -> None:
+        if not display.should_follow_tail():
+            return
+        now = time.monotonic()
+        last_scroll = getattr(self, '_last_scroll_paint_at', 0.0)
+        if (now - last_scroll) < _LIVE_SCROLL_PAINT_INTERVAL:
+            return
+        self._last_scroll_paint_at = now
+        display.scroll_end(animate=False)
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
@@ -75,9 +88,9 @@ class _AppRendererLiveMixin:
             display.append_widget(self._live_thinking_widget)
             self._live_thinking_widget.start()
 
-        self._live_thinking_widget.set_thoughts(text)
+        self._live_thinking_widget.set_thoughts(text, streaming=True)
         if should_follow:
-            display.scroll_end(animate=False)
+            self._maybe_scroll_to_tail(display)
 
     def update_live_response(self, text: str) -> None:
         """Update the in-flight assistant response in-place."""
@@ -104,10 +117,8 @@ class _AppRendererLiveMixin:
             self._live_response_widget = Static(Text(text))
             display.append_widget(self._live_response_widget)
         else:
-            should_follow = display.should_follow_tail()
             self._live_response_widget.update(Text(text))
-            if should_follow:
-                display.scroll_end(animate=False)
+            self._maybe_scroll_to_tail(display)
 
     def clear_live_response(self) -> None:
         """Clear the in-flight response preview widget."""
