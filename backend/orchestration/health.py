@@ -342,6 +342,13 @@ def _collect_health_warnings(controller: Any) -> tuple[list[str], str]:
     if retry_pending is True:
         warnings.append('retry_pending')
 
+    stream = getattr(controller, 'event_stream', None)
+    persistence_health = getattr(stream, 'persistence_health', 'ok')
+    if persistence_health == 'degraded':
+        warnings.append('persistence_degraded')
+    elif persistence_health == 'failed':
+        warnings.append('persistence_failed')
+
     severity = 'red' if cb_state_name == 'OPEN' else ('yellow' if warnings else 'green')
     return (warnings, severity)
 
@@ -354,10 +361,13 @@ def collect_orchestration_health(controller: Any) -> dict[str, Any]:
     state_obj = getattr(controller, 'state', None)
     warnings, severity = _collect_health_warnings(controller)
     state_snapshot = _collect_state_snapshot(state_obj)
+    stream = getattr(controller, 'event_stream', None)
+    persistence_health = getattr(stream, 'persistence_health', 'ok')
     return {
         'timestamp': datetime.now(UTC).isoformat(),
         'controller_id': getattr(controller, 'sid', 'unknown'),
         'severity': severity,
         'warnings': warnings,
+        'persistence_health': persistence_health,
         'state': state_snapshot,
     }

@@ -143,7 +143,9 @@ class TestObservationService(unittest.IsolatedAsyncioTestCase):
         self.mock_context.discard_invocation_context_for_action.assert_called_once_with(
             mock_pending_action
         )
-        self.mock_pending_service.set.assert_called_once_with(None)
+        self.mock_pending_service.clear_for_action.assert_called_once_with(
+            mock_pending_action
+        )
         emit_args = self.mock_context.emit_event.call_args[0]
         self.assertIsInstance(emit_args[0], ErrorObservation)
         self.assertEqual(emit_args[0].error_id, 'OBSERVATION_PENDING_MISMATCH')

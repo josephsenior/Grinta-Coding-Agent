@@ -245,10 +245,14 @@ class RetryService:
             'error': str(exc),
             'retry_reason': type(exc).__name__,
         }
-        if controller._pending_action is not None:
-            metadata['pending_action'] = ToolTelemetry.action_to_dict(
-                controller._pending_action
-            )
+        pending_svc = getattr(
+            getattr(controller, 'services', None), 'pending_action', None
+        )
+        pending = pending_svc.get_primary() if pending_svc is not None else None
+        if pending is None:
+            pending = getattr(controller, '_pending_action', None)
+        if pending is not None:
+            metadata['pending_action'] = ToolTelemetry.action_to_dict(pending)
         initial_delay = self._compute_initial_delay(
             exc, queue, attempt=next_attempt - 1
         )

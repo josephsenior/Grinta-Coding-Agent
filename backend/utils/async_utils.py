@@ -609,6 +609,42 @@ def run_or_schedule(coro: Coroutine[Any, Any, Any]) -> None:
         _fallback_loop.run_until_complete(coro)
 
 
+async def drain_step_barrier(
+    *,
+    has_outstanding: Callable[[], bool] | None = None,
+    max_rounds: int = 20,
+    timeout: float = 2.0,
+    poll_interval: float = 0.05,
+) -> bool:
+    """Drain background tasks and wait for outstanding pending actions to clear.
+
+    Returns True when both the background task set and optional pending predicate
+    report idle; False when *timeout* expires with pending work still outstanding.
+    """
+    from backend.core.logger import app_logger as logger
+    from backend.core.suspend_aware_deadline import SuspendAwareDeadline
+
+    deadline = SuspendAwareDeadline(timeout, poll_interval=poll_interval)
+    try:
+        while not deadline.expired():
+            await drain_background_tasks(
+                max_rounds=max_rounds,
+                timeout=poll_interval,
+            )
+            if has_outstanding is None or not has_outstanding():
+                return True
+            await asyncio.sleep(poll_interval)
+            deadline.credit_poll_sleep(poll_interval)
+        logger.warning(
+            'drain_step_barrier timed out after %.1fs with outstanding pending work',
+            timeout,
+            extra={'msg_type': 'DRAIN_STEP_BARRIER_TIMEOUT'},
+        )
+        return False
+    finally:
+        deadline.close()
+
+
 async def drain_background_tasks(
     *,
     max_rounds: int = 20,

@@ -36,6 +36,7 @@ These are the concrete gates already present in the repository.
 | Package release | `.github/workflows/pypi-release.yml` | Manual publish flow with pre-release tests |
 | Evaluation runs | `.github/workflows/run-eval.yml` | Label-driven, release-driven, or manual evaluation passes |
 | Local reliability gate | `backend/scripts/verify/reliability_gate.py` | Phase-based release gate runnable from the Makefile |
+| Stress suite | `make test-stress` | Parallel pending, backpressure, and event-stream load tests (`pytest -m stress`) |
 
 Two local commands matter most before promotion:
 
@@ -44,7 +45,7 @@ make reliability-gate
 make reliability-gate-integration
 ```
 
-The first runs the full reliability gate. The second adds integration coverage and is the stronger pre-release check.
+The first runs the full reliability gate. The second adds integration coverage, the reliability integration bundle, and the stress suite — the stronger pre-release check for RC and GA.
 
 ---
 
@@ -55,7 +56,8 @@ Before cutting a release from `main`, verify all of the following:
 - PR review is complete and the final branch has already merged cleanly into `main`
 - CI is green on `main`
 - `make reliability-gate` passes locally
-- `make reliability-gate-integration` passes for releases that touch runtime, orchestration, or evaluation-critical code
+- `make reliability-gate-integration` passes for releases that touch runtime, orchestration, or evaluation-critical code (includes integration + stress)
+- `make test-stress` passes for RC and GA promotion
 - `CHANGELOG.md` is updated
 - `pyproject.toml` version is updated
 - release notes are clear enough that a user can understand what changed and what risk exists

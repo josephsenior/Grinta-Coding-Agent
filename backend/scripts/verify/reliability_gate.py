@@ -40,7 +40,10 @@ def _basetemp_root(cwd: Path) -> Path:
 
 
 def _phase_commands(
-    phase: str, include_integration: bool
+    phase: str,
+    *,
+    include_integration: bool,
+    include_stress: bool,
 ) -> list[tuple[str, list[str]]]:
     py = [sys.executable, '-m', 'pytest', '-q']
 
@@ -68,17 +71,45 @@ def _phase_commands(
         (
             'release2_runtime_integration_filter',
             py + ['backend/tests/integration', '-k', 'runtime or prompt or truncation'],
-        )
+        ),
+        (
+            'release3_reliability_integration',
+            py
+            + [
+                'backend/tests/integration/test_hung_action_does_not_wedge_agent.py',
+                'backend/tests/integration/test_event_stream_persistence_integration.py',
+                'backend/tests/integration/test_trajectory_regression_harness.py',
+                'backend/tests/integration/test_reliability_lifecycle_integration.py',
+            ],
+        ),
+        (
+            'release3_integration_suite',
+            py + ['backend/tests/integration', '-m', 'integration'],
+        ),
+    ]
+
+    stress = [
+        (
+            'release3_stress_suite',
+            py + ['backend/tests/stress', '-m', 'stress'],
+        ),
     ]
 
     if phase == 'release1':
         return release1
     if phase == 'release2':
-        return release2 + (integration if include_integration else [])
+        cmds = list(release2)
+        if include_integration:
+            cmds += integration
+        if include_stress:
+            cmds += stress
+        return cmds
     if phase == 'full':
         cmds = release1 + release2
         if include_integration:
             cmds += integration
+        if include_stress:
+            cmds += stress
         return cmds
     raise ValueError(f'Unsupported phase: {phase}')
 
@@ -144,7 +175,15 @@ def main() -> int:
     parser.add_argument(
         '--include-integration',
         action='store_true',
-        help='Also run integration filter gate for runtime prompts/truncation.',
+        help=(
+            'Also run integration gates: runtime/prompt/truncation filter, '
+            'reliability integration bundle, and full integration marker suite.'
+        ),
+    )
+    parser.add_argument(
+        '--include-stress',
+        action='store_true',
+        help='Also run the stress marker suite under backend/tests/stress.',
     )
     parser.add_argument(
         '--continue-on-fail',
@@ -165,7 +204,12 @@ def main() -> int:
     args = parser.parse_args()
 
     cwd = _repo_root()
-    commands = _phase_commands(args.phase, args.include_integration)
+    include_stress = args.include_stress or args.include_integration
+    commands = _phase_commands(
+        args.phase,
+        include_integration=args.include_integration,
+        include_stress=include_stress,
+    )
     results: list[GateCommandResult] = []
 
     if args.dry_run:

@@ -86,6 +86,78 @@ def pytest_generate_tests(metafunc):
 
 
 @pytest.mark.integration
+def test_long_history_baseline_checks() -> None:
+    """Programmatic long-history harness without a committed 500-event fixture."""
+    from types import SimpleNamespace
+
+    from backend.context.prompt_window import select_prompt_events
+    from backend.ledger.action import CmdRunAction, MessageAction
+    from backend.ledger.event import EventSource
+    from backend.ledger.observation import CmdOutputObservation
+    from backend.ledger.observation.agent import AgentCondensationObservation
+
+    events: list[Any] = []
+    events.append(MessageAction(content='start the long session task'))
+    events[-1].source = EventSource.USER
+    events[-1].id = 0
+
+    next_id = 1
+    while len(events) < 500:
+        action = CmdRunAction(command=f'echo cmd-{next_id}')
+        action.id = next_id
+        events.append(action)
+        next_id += 1
+        obs = CmdOutputObservation(
+            content=f'output cmd-{next_id - 1}',
+            command=f'echo cmd-{next_id - 1}',
+        )
+        obs.id = next_id
+        obs.cause = next_id - 1
+        events.append(obs)
+        next_id += 1
+        if next_id % 40 == 0:
+            msg = MessageAction(content=f'checkpoint user message {next_id}')
+            msg.source = EventSource.USER
+            msg.id = next_id
+            events.append(msg)
+            next_id += 1
+
+    summary = AgentCondensationObservation(content='summary of older work')
+    summary.id = 999
+    events.insert(1, summary)
+
+    start_msg = events[0]
+    checkpoint_msgs = [
+        event
+        for event in events
+        if isinstance(event, MessageAction)
+        and event.source == EventSource.USER
+        and event is not start_msg
+    ]
+    original_checkpoint_contents = [msg.content for msg in checkpoint_msgs]
+
+    cfg = SimpleNamespace(
+        prompt_history_token_budget=10_000,
+        prompt_history_min_events=1,
+        prompt_history_max_events=80,
+        model='gpt-4o',
+    )
+    result = select_prompt_events(events, cfg)
+
+    assert result.windowed is True
+    assert result.selected_events <= 80
+    assert summary in result.events
+    assert start_msg.content == 'start the long session task'
+    for original in original_checkpoint_contents:
+        assert any(
+            isinstance(event, MessageAction)
+            and event.source == EventSource.USER
+            and event.content == original
+            for event in events
+        ), 'Windowing must not mutate user message content in history'
+
+
+@pytest.mark.integration
 def test_trajectory_regression(trajectory_file: Path) -> None:
     """Validate a recorded trajectory against baseline reliability checks."""
     with trajectory_file.open('r', encoding='utf-8') as fh:

@@ -370,6 +370,43 @@ class TestGetActiveLoop:
         assert loop is None
 
 
+# ── drain_step_barrier ─────────────────────────────────────────────────
+
+
+class TestDrainStepBarrier:
+    @pytest.mark.asyncio
+    async def test_returns_true_when_pending_clears(self):
+        from backend.utils.async_utils import drain_step_barrier
+
+        outstanding = {'value': True}
+
+        def has_outstanding() -> bool:
+            return outstanding['value']
+
+        async def clear_later():
+            await asyncio.sleep(0.05)
+            outstanding['value'] = False
+
+        asyncio.create_task(clear_later())
+        drained = await drain_step_barrier(
+            has_outstanding=has_outstanding,
+            timeout=1.0,
+            poll_interval=0.02,
+        )
+        assert drained is True
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_timeout(self):
+        from backend.utils.async_utils import drain_step_barrier
+
+        drained = await drain_step_barrier(
+            has_outstanding=lambda: True,
+            timeout=0.1,
+            poll_interval=0.02,
+        )
+        assert drained is False
+
+
 # ── run_or_schedule ────────────────────────────────────────────────────
 
 

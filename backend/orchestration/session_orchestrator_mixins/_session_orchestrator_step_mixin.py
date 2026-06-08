@@ -215,7 +215,11 @@ class _SessionOrchestratorStepMixin:
 
         self._emit_dropped_agent_actions()
 
-        self._pending_action = None
+        pending_service = getattr(
+            getattr(self, 'services', None), 'pending_action', None
+        )
+        if pending_service is not None:
+            pending_service.clear_all()
 
         agent = getattr(self, 'agent', None)
 

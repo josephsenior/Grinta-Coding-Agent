@@ -141,6 +141,29 @@ class TestCollectControllerHealth:
         assert result['severity'] == 'yellow'
         assert 'retry_pending' in result['warnings']
 
+    def test_persistence_degraded_warning(self):
+        from backend.orchestration.health import collect_orchestration_health
+
+        controller = MagicMock()
+        controller.sid = 'session-persist'
+        state = MagicMock()
+        state.agent_state.value = 'running'
+        state.iteration_flag.current_value = 1
+        state.iteration_flag.max_value = 100
+        state.budget_flag.current_value = 0
+        state.budget_flag.max_value = 10.0
+        state.metrics.accumulated_cost = 0
+        controller.state = state
+        controller.circuit_breaker_service.state.name = 'CLOSED'
+        controller.circuit_breaker_service.failure_count = 0
+        controller.retry_service.pending_retry = False
+        controller.event_stream = MagicMock()
+        controller.event_stream.persistence_health = 'degraded'
+
+        result = collect_orchestration_health(controller)
+        assert result['persistence_health'] == 'degraded'
+        assert 'persistence_degraded' in result['warnings']
+
     def test_missing_attributes_handled(self):
         """Controller with missing attributes should not crash."""
         from backend.orchestration.health import collect_orchestration_health

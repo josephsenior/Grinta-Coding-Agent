@@ -60,4 +60,8 @@ class SafetyValidatorMiddleware(ToolInvocationMiddleware):
             error_obs, ctx.action, context='safety_validator.blocked'
         )
         self.controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
-        self.controller._pending_action = None
+        pending_service = getattr(
+            getattr(self.controller, 'services', None), 'pending_action', None
+        )
+        if pending_service is not None:
+            pending_service.clear_for_action(ctx.action)

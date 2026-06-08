@@ -88,3 +88,37 @@ def test_event_count_guard_windows_many_tiny_events_without_token_budget() -> No
     assert result.selected_events <= 6
     assert events[-2] in result.events
     assert events[-1] in result.events
+
+
+def test_windowing_does_not_mutate_input_event_content() -> None:
+    long_payload = 'x' * 5000
+    events = [_user_message('start', 1), *_run_chunk(2, 'big', payload=long_payload)]
+    original_content = events[-1].content
+    cfg = SimpleNamespace(
+        prompt_history_token_budget=40,
+        prompt_history_min_events=1,
+        prompt_history_max_events=4,
+        model='gpt-4o',
+    )
+
+    result = select_prompt_events(events, cfg)
+
+    assert result.windowed is True
+    assert events[-1].content == original_content
+
+
+def test_orphan_action_without_observation_is_dropped_as_causal_unit() -> None:
+    orphan_action = _with_id(CmdRunAction(command='echo orphan'), 10)
+    recent_chunk = _run_chunk(12, 'recent', payload='recent payload')
+    events = [_user_message('start', 1), orphan_action, *recent_chunk]
+    cfg = SimpleNamespace(
+        prompt_history_token_budget=60,
+        prompt_history_min_events=1,
+        prompt_history_max_events=4,
+        model='gpt-4o',
+    )
+
+    result = select_prompt_events(events, cfg)
+
+    assert orphan_action not in result.events
+    assert recent_chunk[0] in result.events

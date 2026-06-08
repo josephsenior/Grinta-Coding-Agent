@@ -306,7 +306,11 @@ class _SessionOrchestratorLifecycleMixin:
 
         # 3. Ensure any pending actions are cleared or marked as cancelled?
 
-        self._pending_action = None
+        pending_service = getattr(
+            getattr(self, 'services', None), 'pending_action', None
+        )
+        if pending_service is not None:
+            pending_service.clear_all()
 
     async def _ensure_runtime_connected(self) -> None:
         """Restore execution backend if disconnected (e.g. after hard_kill/interrupt)."""

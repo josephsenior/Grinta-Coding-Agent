@@ -153,11 +153,11 @@ class PendingActionService:
         self._cancel_watchdog()
         if action is None:
             for act, ts in list(self._outstanding.values()):
-                self._log_clear(controller, act, ts)
+                self._log_clear(controller, act, ts, clear_reason='clear_all')
             self._outstanding.clear()
             if self._legacy_pending is not None:
                 act, ts = self._legacy_pending
-                self._log_clear(controller, act, ts)
+                self._log_clear(controller, act, ts, clear_reason='clear_all')
                 self._legacy_pending = None
             self._progress_log_buckets.clear()
             self._timing_out_ids.clear()
@@ -218,7 +218,9 @@ class PendingActionService:
             return None
         action, ts = entry
         self._progress_log_buckets.pop(cid, None)
-        self._log_clear(self._context.get_controller(), action, ts)
+        self._log_clear(
+            self._context.get_controller(), action, ts, clear_reason='pop_for_cause'
+        )
         self._schedule_watchdog_if_needed()
         return action
 
@@ -230,7 +232,7 @@ class PendingActionService:
             act, ts = self._outstanding.pop(aid)
             self._progress_log_buckets.pop(aid, None)
             self._timing_out_ids.discard(aid)
-            self._log_clear(controller, act, ts)
+            self._log_clear(controller, act, ts, clear_reason='clear_for_action')
             self._schedule_watchdog_if_needed()
             return
         if self._legacy_pending is not None:
@@ -238,8 +240,20 @@ class PendingActionService:
             if legacy_action is action:
                 self._legacy_pending = None
                 self._progress_log_buckets.pop('legacy', None)
-                self._log_clear(controller, legacy_action, ts)
+                self._log_clear(
+                    controller, legacy_action, ts, clear_reason='clear_for_action'
+                )
                 self._schedule_watchdog_if_needed()
+
+    def get_primary(self) -> Action | None:
+        """Return the latest outstanding action without progress side effects."""
+        self._purge_timeouts()
+        primary = self._primary_entry()
+        return primary[0] if primary else None
+
+    def clear_all(self) -> None:
+        """Clear every outstanding pending row (shutdown / hard reset)."""
+        self.set(None)
 
     def clear_primary(self) -> None:
         """Clear only the latest outstanding row (step-liveness / single-action recovery)."""
@@ -254,14 +268,14 @@ class PendingActionService:
                     act, ts = self._outstanding.pop(best_id)
                     self._progress_log_buckets.pop(best_id, None)
                     self._timing_out_ids.discard(best_id)
-                    self._log_clear(controller, act, ts)
+                    self._log_clear(controller, act, ts, clear_reason='clear_primary')
                     self._schedule_watchdog_if_needed()
                     return
             if self._legacy_pending is not None:
                 act, ts = self._legacy_pending
                 self._legacy_pending = None
                 self._progress_log_buckets.pop('legacy', None)
-                self._log_clear(controller, act, ts)
+                self._log_clear(controller, act, ts, clear_reason='clear_primary')
                 self._schedule_watchdog_if_needed()
 
     def has_outstanding(self) -> bool:
@@ -439,14 +453,32 @@ class PendingActionService:
             extra={'msg_type': 'PENDING_ACTION_STILL_RUNNING'},
         )
 
-    def _log_clear(self, controller, prev_action: Action, timestamp: float) -> None:
+    def _outstanding_count(self) -> int:
+        count = len(self._outstanding)
+        if self._legacy_pending is not None:
+            count += 1
+        return count
+
+    def _log_clear(
+        self,
+        controller,
+        prev_action: Action,
+        timestamp: float,
+        *,
+        clear_reason: str = 'unknown',
+    ) -> None:
         action_id = getattr(prev_action, 'id', 'unknown')
         action_type = type(prev_action).__name__
         elapsed = time.time() - timestamp
         controller.log(
             'debug',
             f'Cleared pending action after {elapsed:.2f}s: {action_type} (id={action_id})',
-            extra={'msg_type': 'PENDING_ACTION_CLEARED'},
+            extra={
+                'msg_type': 'PENDING_ACTION_CLEARED',
+                'pending_action_id': action_id,
+                'clear_reason': clear_reason,
+                'outstanding_count': self._outstanding_count(),
+            },
         )
 
     def _handle_timeout(self, controller, action: Action, elapsed: float) -> None:
