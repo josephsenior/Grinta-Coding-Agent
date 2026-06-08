@@ -165,7 +165,7 @@ class SQLiteEventStore:
         except Exception:
             pass
 
-    def check_integrity(self) -> bool:
+    def check_integrity(self, *, verify_checksums: bool = True) -> bool:
         """Run SQLite and application-level integrity checks.
 
         SQLite's ``integrity_check`` validates database pages and indexes. It
@@ -190,9 +190,9 @@ class SQLiteEventStore:
                 exc,
             )
             return False
-        return self.check_application_integrity()
+        return self.check_application_integrity(verify_checksums=verify_checksums)
 
-    def check_application_integrity(self) -> bool:
+    def check_application_integrity(self, *, verify_checksums: bool = True) -> bool:
         """Validate persisted event payload IDs and checksums."""
         try:
             conn = self._get_read_conn()
@@ -219,7 +219,7 @@ class SQLiteEventStore:
                         payload_id,
                     )
                     return False
-                if not verify_event_integrity(data, event_id):
+                if verify_checksums and not verify_event_integrity(data, event_id):
                     logger.error(
                         'SQLite event checksum mismatch for %s event id=%s',
                         self._db_path,

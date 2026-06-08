@@ -60,6 +60,27 @@ class TestMemoryPressureMonitorInit:
         assert m._crit_mb == baseline + 1536
 
 
+# ── proactive scheduling ─────────────────────────────────────────────
+
+
+class TestProactiveScheduling:
+    def test_should_prewarm_at_half_pressure(self):
+        m = _make_monitor(warn_mb=100, crit_mb=200, check_interval_s=0)
+        m._process = MagicMock()
+        m._process.memory_info.return_value = MagicMock(rss=150 * 1024 * 1024)
+        assert m.should_prewarm(history_events=50) is True
+
+    def test_should_signal_before_sync_cooldown(self):
+        m = _make_monitor(warn_mb=100, crit_mb=200, check_interval_s=0)
+        m._process = MagicMock()
+        m._process.memory_info.return_value = MagicMock(rss=180 * 1024 * 1024)
+        m._last_condensation_at = 1.0
+        with patch('backend.orchestration.memory_pressure.time.monotonic', return_value=2.0):
+            assert m.should_condense() is False
+            assert m.pressure_ratio() >= m._signal_ratio
+            assert m.should_signal_pressure() is True
+
+
 # ── should_condense ───────────────────────────────────────────────────
 
 

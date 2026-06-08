@@ -107,6 +107,23 @@ def test_windowing_does_not_mutate_input_event_content() -> None:
     assert events[-1].content == original_content
 
 
+def test_token_ceiling_trims_oversized_latest_chunk() -> None:
+    huge = 'payload ' * 800
+    events = [_user_message('start', 1), *_run_chunk(2, 'huge', payload=huge)]
+    cfg = SimpleNamespace(
+        prompt_history_token_budget=200,
+        prompt_history_min_events=1,
+        prompt_history_max_events=100,
+        model='gpt-4o',
+    )
+
+    result = select_prompt_events(events, cfg)
+
+    assert result.windowed is True
+    assert result.selected_estimated_tokens < result.estimated_tokens
+    assert result.selected_estimated_tokens <= result.token_budget
+
+
 def test_orphan_action_without_observation_is_dropped_as_causal_unit() -> None:
     orphan_action = _with_id(CmdRunAction(command='echo orphan'), 10)
     recent_chunk = _run_chunk(12, 'recent', payload='recent payload')

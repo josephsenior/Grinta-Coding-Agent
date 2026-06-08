@@ -105,7 +105,10 @@ class EventStore(EventStoreABC):
                         'events.db',
                     )
                     store = SQLiteEventStore(db_path=db_path)
-                    if store.check_integrity():
+                    verify_checksums = str(
+                        os.getenv('GRINTA_SYNC_CHECKSUM_REPAIR', '')
+                    ).lower() in ('1', 'true', 'yes')
+                    if store.check_integrity(verify_checksums=verify_checksums):
                         self._sqlite_store = store
                     else:
                         store.close()
@@ -238,6 +241,40 @@ class EventStore(EventStoreABC):
         event_filter = filter
         start_id, end_id = self._normalize_search_range(start_id, end_id)
         start_id, end_id, step = self._setup_reverse_search(start_id, end_id, reverse)
+
+        if (
+            getattr(self, '_sqlite_store', None) is not None
+            and not reverse
+            and event_filter is None
+            and step == 1
+        ):
+            yielded = 0
+            try:
+                batch = self._sqlite_store.list_events(
+                    start_id=start_id,
+                    end_id=end_id,
+                    limit=limit,
+                )
+            except (json.JSONDecodeError, ValueError) as exc:
+                logger.debug(
+                    'SQLite batch read failed for %s; falling back to per-event scan: %s',
+                    self.sid,
+                    exc,
+                )
+            else:
+                for data in batch:
+                    try:
+                        event = event_from_dict(data)
+                    except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                        logger.warning(
+                            'Skipping corrupt SQLite event in batch for %s: %s',
+                            self.sid,
+                            exc,
+                        )
+                        continue
+                    yield event
+                    yielded += 1
+                return
 
         cache_page = _DUMMY_PAGE
         num_results = 0

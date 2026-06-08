@@ -8,6 +8,7 @@ helper by :class:`~backend.ledger.stream.EventStream`.
 from __future__ import annotations
 
 import os
+import threading
 import time
 from collections import deque
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -154,6 +155,8 @@ class EventPersistence:
                     f'Failed to initialise authoritative SQLite event store for session {sid}'
                 ) from exc
 
+        self._checksum_repair_thread: threading.Thread | None = None
+        self._checksum_repair_done = threading.Event()
         if self._sqlite_store is not None:
             self._migrate_legacy_event_files_to_sqlite()
             self._repair_sqlite_event_checksums()
@@ -358,18 +361,84 @@ class EventPersistence:
             )
             raise
 
+    @staticmethod
+    def _sync_checksum_repair_enabled() -> bool:
+        return str(os.getenv('GRINTA_SYNC_CHECKSUM_REPAIR', '')).lower() in (
+            '1',
+            'true',
+            'yes',
+        )
+
     def _repair_sqlite_event_checksums(self) -> None:
         """Fix stale checksum rows left by pre-deepcopy persistence."""
         if self._sqlite_store is None:
             return
+        if self._sync_checksum_repair_enabled():
+            self._run_checksum_repair()
+            return
+        if (
+            self._checksum_repair_thread is not None
+            and self._checksum_repair_thread.is_alive()
+        ):
+            return
+        store = self._sqlite_store
+        sid = self.sid
+
+        def _background_repair() -> None:
+            try:
+                fixed = store.repair_event_checksums()
+                if fixed:
+                    logger.info(
+                        'Background checksum repair fixed %d row(s) for session %s',
+                        fixed,
+                        sid,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    'Background SQLite checksum repair failed for session %s: %s',
+                    sid,
+                    exc,
+                )
+            finally:
+                self._checksum_repair_done.set()
+
+        thread = threading.Thread(
+            target=_background_repair,
+            name=f'checksum-repair-{sid[:8]}',
+            daemon=True,
+        )
+        self._checksum_repair_thread = thread
+        thread.start()
+        logger.debug(
+            'Started background SQLite checksum repair for session %s',
+            sid,
+        )
+
+    def _run_checksum_repair(self) -> None:
+        if self._sqlite_store is None:
+            return
         try:
-            self._sqlite_store.repair_event_checksums()
+            fixed = self._sqlite_store.repair_event_checksums()
+            if fixed:
+                logger.info(
+                    'Repaired %d SQLite event checksum(s) for session %s',
+                    fixed,
+                    self.sid,
+                )
         except Exception as exc:
             logger.warning(
                 'SQLite checksum repair failed for session %s: %s',
                 self.sid,
                 exc,
             )
+        finally:
+            self._checksum_repair_done.set()
+
+    def checksum_repair_complete(self, timeout: float | None = None) -> bool:
+        """Return True when checksum repair has finished (for tests/diagnostics)."""
+        if self._checksum_repair_thread is None:
+            return True
+        return self._checksum_repair_done.wait(timeout=timeout)
 
     def _migrate_legacy_event_files_to_sqlite(self) -> None:
         """Import legacy per-event JSON files into the authoritative SQLite ledger."""

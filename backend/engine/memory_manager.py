@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -16,7 +17,7 @@ from backend.context.pre_condensation_snapshot import (
     load_snapshot,
     save_snapshot,
 )
-from backend.context.prompt_window import select_prompt_events
+from backend.context.prompt_window import event_fingerprint, select_prompt_events
 from backend.context.view import View
 from backend.core.logger import app_logger as logger
 from backend.core.message import Message, TextContent
@@ -42,6 +43,13 @@ class CondensedHistory:
 _MIN_HISTORY_EVENTS_FOR_FORCED_COMPACTION = 30
 
 
+@dataclass
+class _BuildMessagesCache:
+    event_fingerprints: tuple[str, ...]
+    messages: list[Message]
+    llm_config_key: str
+
+
 class ContextMemoryManager:
     """Owns context memory and condensation."""
 
@@ -54,6 +62,7 @@ class ContextMemoryManager:
         self._llm_registry = llm_registry
         self.conversation_memory: ContextMemory | None = None
         self.compactor: Compactor | None = None
+        self._build_messages_cache: _BuildMessagesCache | None = None
 
     def initialize(self, prompt_manager: PromptManager) -> None:
         """Initialize context memory with prompt manager."""
@@ -317,6 +326,8 @@ class ContextMemoryManager:
         if memory_pressure:
             state.ack_memory_pressure(source='ContextMemoryManager')
 
+        self._release_post_compaction_resources(state, action)
+
         # Compaction occurred — attach the snapshot for post-recovery injection
         logger.info(
             'ContextMemoryManager.condense_history finished with pending action %s '
@@ -414,6 +425,60 @@ class ContextMemoryManager:
                 continue
         raise ValueError('Initial user message not found')
 
+    @staticmethod
+    def _llm_build_config_key(llm_config: object) -> str:
+        return '|'.join(
+            str(value)
+            for value in (
+                getattr(llm_config, 'model', ''),
+                getattr(llm_config, 'max_message_chars', None),
+                getattr(llm_config, 'vision_is_active', False),
+                getattr(llm_config, 'prompt_history_windowing_enabled', True),
+                getattr(llm_config, 'prompt_history_token_budget', None),
+                getattr(llm_config, 'prompt_history_max_events', None),
+            )
+        )
+
+    def invalidate_build_messages_cache(self) -> None:
+        """Clear incremental build cache after history-shaping events."""
+        self._build_messages_cache = None
+
+    def _release_post_compaction_resources(self, state: State, action: object) -> None:
+        """Release caches superseded by a compaction pass."""
+        self.invalidate_build_messages_cache()
+        if self.conversation_memory is not None:
+            evicted = self.conversation_memory.release_post_compaction_render_cache()
+            if evicted:
+                logger.debug(
+                    'Released %d post-compaction render-cache entries',
+                    evicted,
+                )
+
+        event_stream = getattr(state, 'event_stream', None)
+        event_store = (
+            event_stream
+            if event_stream is not None
+            and hasattr(event_stream, 'prune_old_events')
+            else None
+        )
+        if event_store is not None:
+            try:
+                pruned = event_store.prune_old_events(keep_recent=1000)
+                if pruned:
+                    logger.info(
+                        'Post-compaction event-store prune removed %d stale files',
+                        pruned,
+                    )
+            except Exception:
+                logger.debug('Post-compaction event-store prune failed', exc_info=True)
+
+        pruned_ids = getattr(action, 'pruned', None)
+        if isinstance(pruned_ids, (list, tuple, set)) and pruned_ids:
+            logger.debug(
+                'Compaction pruned %d event id(s) from active history',
+                len(pruned_ids),
+            )
+
     def build_messages(
         self,
         condensed_history: Iterable[Event],
@@ -428,6 +493,16 @@ class ContextMemoryManager:
         prompt_window = select_prompt_events(events, llm_config)
         events_for_prompt = prompt_window.events
         window_elapsed = time.perf_counter() - window_started
+        config_key = self._llm_build_config_key(llm_config)
+        fingerprints = tuple(event_fingerprint(event) for event in events_for_prompt)
+        cache = self._build_messages_cache
+        incremental = (
+            cache is not None
+            and cache.llm_config_key == config_key
+            and not prompt_window.windowed
+            and len(fingerprints) > len(cache.event_fingerprints)
+            and fingerprints[: len(cache.event_fingerprints)] == cache.event_fingerprints
+        )
         if prompt_window.windowed:
             logger.info(
                 'ContextMemoryManager.prompt_window selected %d/%d events '
@@ -445,12 +520,29 @@ class ContextMemoryManager:
                 window_elapsed,
             )
         started = time.perf_counter()
-        messages = self.conversation_memory.process_events(
-            condensed_history=events_for_prompt,
-            initial_user_action=initial_user_message,
-            max_message_chars=getattr(llm_config, 'max_message_chars', None),
-            vision_is_active=getattr(llm_config, 'vision_is_active', False),
-        )
+        max_message_chars = getattr(llm_config, 'max_message_chars', None)
+        vision_is_active = getattr(llm_config, 'vision_is_active', False)
+        if incremental and cache is not None:
+            messages = self.conversation_memory.process_events_appending(
+                condensed_history=events_for_prompt,
+                initial_user_action=initial_user_message,
+                prefix_messages=cache.messages,
+                prefix_event_count=len(cache.event_fingerprints),
+                max_message_chars=max_message_chars,
+                vision_is_active=vision_is_active,
+            )
+            logger.debug(
+                'ContextMemoryManager.build_messages incremental tail=%d/%d events',
+                len(fingerprints) - len(cache.event_fingerprints),
+                len(fingerprints),
+            )
+        else:
+            messages = self.conversation_memory.process_events(
+                condensed_history=events_for_prompt,
+                initial_user_action=initial_user_message,
+                max_message_chars=max_message_chars,
+                vision_is_active=vision_is_active,
+            )
         elapsed = time.perf_counter() - started
         if elapsed >= 0.25 or len(events_for_prompt) >= 100 or prompt_window.windowed:
             logger.info(
@@ -464,8 +556,14 @@ class ContextMemoryManager:
             )
 
         if not messages:
+            self._build_messages_cache = None
             return messages
 
+        self._build_messages_cache = _BuildMessagesCache(
+            event_fingerprints=fingerprints,
+            messages=copy.deepcopy(messages),
+            llm_config_key=config_key,
+        )
         self._apply_prompt_cache_hints(messages, llm_config)
         return messages
 
