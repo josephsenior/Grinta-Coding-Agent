@@ -613,3 +613,40 @@ class TestErrorHandling:
         store.write_event(0, {'action': 'real'})
         result = store.list_events(event_type='fake')
         assert result == []
+
+    def test_prepare_payload_survives_shallow_nested_mutation(
+        self, store: SQLiteEventStore
+    ) -> None:
+        payload = {'action': 'message', 'args': {'token': 'alpha'}}
+        store.write_event(0, payload)
+        payload['args']['token'] = 'beta'
+        result = store.read_event(0)
+        assert result is not None
+        assert result['args']['token'] == 'alpha'
+
+    def test_repair_event_checksums_fixes_stale_rows(
+        self, store: SQLiteEventStore
+    ) -> None:
+        store.write_event(0, {'action': 'message', 'args': {'n': 1}})
+        row = store._get_read_conn().execute(
+            'SELECT payload FROM events WHERE id = 0'
+        ).fetchone()
+        assert row is not None
+        import json
+
+        data = json.loads(row['payload'])
+        data['_grinta_checksum'] = 'deadbeef'
+        store._get_conn().execute(
+            'UPDATE events SET payload = ? WHERE id = 0',
+            (json.dumps(data),),
+        )
+        store._get_conn().commit()
+
+        with pytest.raises(ValueError):
+            store.read_event(0)
+
+        fixed = store.repair_event_checksums()
+        assert fixed == 1
+        repaired = store.read_event(0)
+        assert repaired is not None
+        assert repaired['args']['n'] == 1

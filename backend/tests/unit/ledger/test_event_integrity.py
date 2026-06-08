@@ -6,7 +6,12 @@ import json
 from collections.abc import Mapping
 from unittest.mock import MagicMock, PropertyMock
 
-from backend.ledger.integrity import iter_events_until_corrupt
+from backend.core import json_compat as json
+from backend.ledger.integrity import (
+    embed_checksum,
+    iter_events_until_corrupt,
+    verify_event_integrity,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -135,6 +140,17 @@ class TestEventFilter:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
+
+class TestChecksumEmbedding:
+    def test_embed_checksum_survives_post_embed_nested_mutation(self) -> None:
+        payload = {'action': 'message', 'args': {'value': 'keep-me'}}
+        embedded = embed_checksum(payload)
+        payload['args']['value'] = 'mutated'
+        stored = json.loads(
+            json.dumps(embedded, ensure_ascii=False, default=str)
+        )
+        assert verify_event_integrity(stored, 0)
 
 
 class TestEdgeCases:

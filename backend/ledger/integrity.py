@@ -7,11 +7,12 @@ cleanly at the last valid event.
 
 from __future__ import annotations
 
+import copy
 import hashlib
-import json
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
+from backend.core import json_compat as json
 from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -31,10 +32,19 @@ def compute_event_checksum(payload: dict) -> str:
 
 
 def embed_checksum(payload: dict) -> dict:
-    """Return a new payload with an integrity checksum embedded."""
-    result = dict(payload)
+    """Return a deep-copied payload with an integrity checksum embedded."""
+    result = copy.deepcopy(payload)
+    result.pop(_CHECKSUM_KEY, None)
     result[_CHECKSUM_KEY] = compute_event_checksum(result)
     return result
+
+
+def repair_payload_checksum(payload: dict, *, event_id: int | None = None) -> dict:
+    """Recompute and embed a checksum for an already-loaded event payload."""
+    repaired = copy.deepcopy(payload)
+    if event_id is not None:
+        repaired['id'] = event_id
+    return embed_checksum(repaired)
 
 
 def _event_file_has_checksum(payload: dict) -> bool:
