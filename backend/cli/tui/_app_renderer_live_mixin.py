@@ -101,13 +101,11 @@ class _AppRendererLiveMixin:
             return
 
         if not self._live_response_widget:
-            from backend.cli.tui.widgets.activity_card import AgentMessage
-
-            self._live_response_widget = AgentMessage(text)
+            self._live_response_widget = Static(Text(text))
             display.append_widget(self._live_response_widget)
         else:
             should_follow = display.should_follow_tail()
-            self._live_response_widget.update_message(text)
+            self._live_response_widget.update(Text(text))
             if should_follow:
                 display.scroll_end(animate=False)
 

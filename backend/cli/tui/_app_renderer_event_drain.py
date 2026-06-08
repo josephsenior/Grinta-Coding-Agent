@@ -30,6 +30,44 @@ if TYPE_CHECKING:
     )
 
 
+def _collapse_streaming_chunks(events: list[Any]) -> list[Any]:
+    """Keep only the latest snapshot from each run of streaming chunk events."""
+    from backend.ledger.action.message import StreamingChunkAction
+
+    if not events:
+        return events
+
+    collapsed: list[Any] = []
+    idx = 0
+    while idx < len(events):
+        event = events[idx]
+        if isinstance(event, StreamingChunkAction):
+            end = idx + 1
+            while end < len(events) and isinstance(events[end], StreamingChunkAction):
+                end += 1
+            collapsed.append(events[end - 1])
+            idx = end
+        else:
+            collapsed.append(event)
+            idx += 1
+    return collapsed
+
+
+def _try_coalesce_streaming_enqueue(pending: Any, event: Any) -> bool:
+    """Replace the tail interim streaming chunk instead of enqueueing another."""
+    from backend.ledger.action.message import StreamingChunkAction
+
+    if not isinstance(event, StreamingChunkAction) or not pending:
+        return False
+    last = pending[-1]
+    if not isinstance(last, StreamingChunkAction):
+        return False
+    if last.is_final:
+        return False
+    pending[-1] = event
+    return True
+
+
 def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
     """Synchronous drain for non-async contexts (backward compatibility)."""
     with orch._pending_lock:
@@ -56,6 +94,7 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
         overflow = len(orch._history) - _TUI_HISTORY_RENDER_LIMIT
         if overflow > 0:
             del orch._history[:overflow]
+    events = _collapse_streaming_chunks(events)
     for event in events:
         orch._process_event(event)
     orch._refresh_display()
@@ -92,6 +131,8 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
         if overflow > 0:
             del orch._history[:overflow]
     
+    events = _collapse_streaming_chunks(events)
+
     # Process events in batches, yielding control between batches
     # This allows Textual to process keyboard/mouse events
     _BATCH_SIZE = 10
@@ -134,10 +175,12 @@ def _on_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
 
     should_schedule_drain = False
     with orch._pending_lock:
-        if len(orch._pending_events) >= _TUI_PENDING_EVENT_LIMIT:
-            orch._pending_events.popleft()
-            orch._pending_events_dropped += 1
-        orch._pending_events.append(event)
+        coalesced = _try_coalesce_streaming_enqueue(orch._pending_events, event)
+        if not coalesced:
+            if len(orch._pending_events) >= _TUI_PENDING_EVENT_LIMIT:
+                orch._pending_events.popleft()
+                orch._pending_events_dropped += 1
+            orch._pending_events.append(event)
         if not orch._drain_scheduled:
             orch._drain_scheduled = True
             should_schedule_drain = True
