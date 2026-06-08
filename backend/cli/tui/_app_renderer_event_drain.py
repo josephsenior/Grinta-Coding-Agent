@@ -87,6 +87,9 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
         dropped = orch._pending_events_dropped
         orch._pending_events_dropped = 0
     if not events:
+        flush = getattr(orch, 'flush_live_ui', None)
+        if callable(flush):
+            flush()
         orch._refresh_display()
         return
     if dropped:
@@ -108,6 +111,9 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
     streaming_only = _is_streaming_only_batch(events)
     for event in events:
         orch._process_event(event)
+    flush = getattr(orch, 'flush_live_ui', None)
+    if callable(flush):
+        flush()
     if not streaming_only or any(
         getattr(event, 'is_final', False) for event in events
     ):
@@ -135,6 +141,9 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
         dropped = orch._pending_events_dropped
         orch._pending_events_dropped = 0
     if not events:
+        flush = getattr(orch, 'flush_live_ui', None)
+        if callable(flush):
+            flush()
         orch._refresh_display()
         return
     if dropped:
@@ -165,6 +174,10 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
             orch._process_event(event)
         # Yield control to the event loop between batches
         await asyncio.sleep(0)
+
+    flush = getattr(orch, 'flush_live_ui', None)
+    if callable(flush):
+        flush()
 
     if not streaming_only or any(
         getattr(event, 'is_final', False) for event in events

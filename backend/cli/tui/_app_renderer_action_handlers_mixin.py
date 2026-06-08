@@ -26,6 +26,38 @@ class _AppRendererActionHandlersMixin:
 
     _LIVE_STREAM_PAINT_INTERVAL = 0.033
 
+    def _sync_streaming_mount_mode(self) -> None:
+        """Skip transcript mount animations while the LLM stream is active."""
+        try:
+            display = self._tui._get_display()
+        except Exception:
+            return
+        if type(display).__name__ == 'MagicMock':
+            return
+        display._suppress_mount_animation = bool(self._streaming_active)
+
+    def flush_live_ui(self, *, terminal: bool = False) -> None:
+        """Apply deferred stream paint and optionally finalize live tail widgets."""
+        self._stream_paint_timer_armed = False
+        deferred = getattr(self, '_deferred_stream_chunk', None)
+        self._deferred_stream_chunk = None
+        if deferred is not None and not getattr(deferred, 'is_final', False):
+            self._last_stream_paint_at = time.monotonic()
+            self._apply_streaming_chunk(deferred)
+
+        if not terminal:
+            return
+
+        self._streaming_active = False
+        self._sync_streaming_mount_mode()
+        self._finalize_live_thinking()
+        if self._live_response_dirty:
+            text = self._normalize_final_response_text(self._live_response)
+            if text and text != self._last_final_response_text:
+                self._commit_final_response(text)
+            else:
+                self.clear_live_response()
+
     def _handle_search_action(self, thought: str, source_tool: str = 'search') -> None:
         """Handle grep/glob action and render as a card.
 
@@ -205,6 +237,7 @@ class _AppRendererActionHandlersMixin:
 
     def _apply_streaming_chunk(self, action: StreamingChunkAction) -> None:
         self._streaming_active = not action.is_final
+        self._sync_streaming_mount_mode()
 
         thinking = (action.thinking_accumulated or '').strip()
         content = self._normalize_final_response_text(action.accumulated or '')
@@ -270,6 +303,7 @@ class _AppRendererActionHandlersMixin:
             AgentState.STOPPED,
         ):
             self._streaming_active = False
+            self.flush_live_ui(terminal=True)
 
         current_label = (self._hud.state.agent_state_label or '').strip()
         if state == AgentState.RATE_LIMITED:
@@ -308,15 +342,6 @@ class _AppRendererActionHandlersMixin:
                 from backend.cli.tui.widgets.activity_card import TurnCompletion
 
                 self._tui._write_log(TurnCompletion(duration_str))
-
-        # Ensure thinking UI is cleared on any idle/terminal state
-        if state in (
-            AgentState.AWAITING_USER_INPUT,
-            AgentState.FINISHED,
-            AgentState.ERROR,
-            AgentState.STOPPED,
-        ):
-            self._tui.finalize_thinking()
 
         self._state_event.set()
         self._tui._render_hud_bar()

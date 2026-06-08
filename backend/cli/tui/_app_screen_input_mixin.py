@@ -118,6 +118,9 @@ class _AppScreenInputMixin:
         _tui_logger.debug(
             f'action_submit_input: lock_locked={self._input_lock.locked()}'
         )
+        if getattr(self, '_turn_in_flight', False):
+            _tui_logger.debug('action_submit_input: turn in flight, ignoring')
+            return
         if self._input_lock.locked():
             _tui_logger.debug('action_submit_input: lock held, ignoring')
             return
@@ -179,6 +182,8 @@ class _AppScreenInputMixin:
             _tui_logger.debug(
                 f'_handle_input: _trace FAILED: {type(exc).__name__}: {exc}'
             )
+
+        agent_text: str | None = None
         async with self._input_lock:
             # Drain any stale events from previous turn before starting new one
             if self._renderer:
@@ -194,6 +199,10 @@ class _AppScreenInputMixin:
 
             if text.startswith('/'):
                 await self._handle_slash_command(text)
+                return
+
+            if self._turn_in_flight:
+                _tui_logger.debug('_handle_input: turn already in flight, ignoring')
                 return
 
             self.add_user_message(text)
@@ -221,7 +230,6 @@ class _AppScreenInputMixin:
                         logger.info(
                             '[TUI] _handle_input: bootstrapping (no controller)'
                         )
-                        # Internal bootstrap - no user-facing message
                         await self._bootstrap()
                     if self._controller is None:
                         raise RuntimeError('Bootstrap failed to initialize controller')
@@ -232,7 +240,6 @@ class _AppScreenInputMixin:
                         '[TUI] _handle_input: bootstrap complete, state=%s',
                         self._controller.get_agent_state(),
                     )
-                    # Internal ready - no user-facing message
                 else:
                     _tui_logger.debug(
                         '_handle_input: controller exists, dispatch will ensure task'
@@ -241,43 +248,63 @@ class _AppScreenInputMixin:
                 assert self._controller is not None, (
                     'Controller must be initialized after agent task setup'
                 )
-                _tui_logger.debug('_handle_input: calling _dispatch_to_agent()')
-                logger.info('[TUI] _handle_input: dispatching to agent')
-                await self._dispatch_to_agent(text)
-                _tui_logger.debug(
-                    f'_handle_input: _dispatch_to_agent done, state={self._controller.get_agent_state()}'
-                )
-                logger.info(
-                    '[TUI] _handle_input: dispatch complete, state=%s',
-                    self._controller.get_agent_state() if self._controller else 'N/A',
-                )
+                agent_text = text
+                self._turn_in_flight = True
             except Exception as exc:
-                _tui_logger.debug(f'_handle_input: EXCEPTION in try block: {exc}')
-                logger.exception('[TUI] _handle_input FAILED')
+                _tui_logger.debug(f'_handle_input: EXCEPTION in setup: {exc}')
+                logger.exception('[TUI] _handle_input setup FAILED')
                 self.add_error(f'Agent error: {type(exc).__name__}: {exc}')
                 self._render_hud_bar()
                 if self._controller:
                     try:
                         actual = str(self._controller.get_agent_state())
                         self._hud.update_agent_state(actual or 'Error')
-                        self._render_hud_bar()
-                        self._render_hud_bar()
                     except Exception:
                         self._hud.update_agent_state('Error')
-                        self._render_hud_bar()
-                        self._render_hud_bar()
-            finally:
-                self.finalize_thinking()
-                self._render_hud_bar()
                 self.query_one('#input-bar', InputBar).remove_class('processing')
-                if self._renderer:
-                    await self._renderer.drain_events_async()
-                actual_state = (
-                    str(self._controller.get_agent_state()) if self._controller else ''
-                )
-                self._hud.update_agent_state(actual_state or 'Ready')
                 self._render_hud_bar()
-                self._render_hud_bar()
+                return
+
+        if agent_text is None:
+            return
+
+        try:
+            _tui_logger.debug('_handle_input: calling _dispatch_to_agent()')
+            logger.info('[TUI] _handle_input: dispatching to agent')
+            await self._dispatch_to_agent(agent_text)
+            _tui_logger.debug(
+                f'_handle_input: _dispatch_to_agent done, state={self._controller.get_agent_state()}'
+            )
+            logger.info(
+                '[TUI] _handle_input: dispatch complete, state=%s',
+                self._controller.get_agent_state() if self._controller else 'N/A',
+            )
+        except Exception as exc:
+            _tui_logger.debug(f'_handle_input: EXCEPTION in dispatch: {exc}')
+            logger.exception('[TUI] _handle_input FAILED')
+            self.add_error(f'Agent error: {type(exc).__name__}: {exc}')
+            self._render_hud_bar()
+            if self._controller:
+                try:
+                    actual = str(self._controller.get_agent_state())
+                    self._hud.update_agent_state(actual or 'Error')
+                    self._render_hud_bar()
+                except Exception:
+                    self._hud.update_agent_state('Error')
+                    self._render_hud_bar()
+        finally:
+            self.finalize_thinking()
+            self._render_hud_bar()
+            self.query_one('#input-bar', InputBar).remove_class('processing')
+            if self._renderer:
+                self._renderer.flush_live_ui(terminal=True)
+                await self._renderer.drain_events_async()
+            actual_state = (
+                str(self._controller.get_agent_state()) if self._controller else ''
+            )
+            self._hud.update_agent_state(actual_state or 'Ready')
+            self._render_hud_bar()
+            self._turn_in_flight = False
 
     async def _handle_slash_command(self, text: str) -> None:
         raw = text.strip()
