@@ -158,6 +158,14 @@ class TestSharedHttpClients:
         client2 = get_shared_async_http_client('test_provider_async', 'http://test')
         assert client is client2
 
+    def test_shared_pool_uses_streaming_read_ceiling(self):
+        from backend.core.constants import LLM_STREAM_CHUNK_TIMEOUT_SECONDS
+
+        client = get_shared_async_http_client(
+            'test_pool_stream_read_ceiling', 'http://test'
+        )
+        assert client.timeout.read == LLM_STREAM_CHUNK_TIMEOUT_SECONDS
+
     @pytest.mark.asyncio
     async def test_aclose_shared_clients_clears_pools(self):
         sync_client = get_shared_http_client('test_provider_close', 'http://test')
