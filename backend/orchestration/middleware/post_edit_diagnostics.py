@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Literal
 
 from backend.core.logger import app_logger as logger
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
+from backend.utils.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
     from backend.ledger.observation import Observation
@@ -67,7 +68,10 @@ class PostEditDiagnosticsMiddleware(ToolInvocationMiddleware):
             receipts: list[LspDiagnosticReceipt] = []
             for raw_path in paths[: self.max_files]:
                 resolved = _resolve_for_diagnostics(raw_path, ctx)
-                receipt = _run_lsp_diagnostics(
+                # LSP queries spawn a subprocess and block on I/O; run them on
+                # the sync-from-async pool so the event loop stays responsive.
+                receipt = await call_sync_from_async(
+                    _run_lsp_diagnostics,
                     resolved,
                     timeout_seconds=self.timeout_seconds,
                     max_diagnostics=self.max_diagnostics,

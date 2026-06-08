@@ -79,6 +79,57 @@ DEFAULT_STEP_TASK_LIVENESS_SECONDS = 600.0
 DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS = float(
     os.getenv('GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS', '1800')
 )
+# ── Event-loop stall watchdog (backend.core.loop_watchdog) ──────────
+# A dedicated OS thread monitors the main asyncio loop for freezes that the
+# in-loop timers (liveness ceiling, chunk timeout, observation-handler
+# timeout) physically *cannot* catch — a blocked loop cannot fire its own
+# timers, so such a freeze leaves no log line and no recovery until it ends.
+# When the loop stops ticking for LOOP_WATCHDOG_STALL_SECONDS the watchdog
+# dumps every thread's stack so the blocking call names itself.  When the
+# watchdog thread *itself* was frozen well past its poll interval, the whole
+# process was suspended (OS sleep/hibernate or a long GIL-holding native
+# call); that is reported distinctly so frozen time is not mistaken for an
+# agent hang.  Set GRINTA_LOOP_WATCHDOG=0 to disable.
+LOOP_WATCHDOG_ENABLED = os.getenv('GRINTA_LOOP_WATCHDOG', '1').strip().lower() not in {
+    '0',
+    'false',
+    'no',
+    'off',
+}
+LOOP_WATCHDOG_INTERVAL_SECONDS = float(
+    os.getenv('GRINTA_LOOP_WATCHDOG_INTERVAL_SECONDS', '5')
+)
+LOOP_WATCHDOG_STALL_SECONDS = float(
+    os.getenv('GRINTA_LOOP_WATCHDOG_STALL_SECONDS', '60')
+)
+LOOP_WATCHDOG_SUSPEND_SECONDS = float(
+    os.getenv('GRINTA_LOOP_WATCHDOG_SUSPEND_SECONDS', '30')
+)
+# A single ``run_agent_until_done`` poll sleeps ~0.5s.  If one sleep overruns
+# by more than this, the process/loop was frozen (OS sleep/hibernate, or a
+# blocking call on the loop thread that the liveness ceiling force-cancels).
+# Frozen wall-clock time is *not* the agent failing to make progress, so it is
+# credited back to the hard-timeout budget instead of tripping a spurious
+# ERROR — the agent resumes as if nothing happened.
+DEFAULT_AGENT_RUN_FREEZE_GRACE_SECONDS = float(
+    os.getenv('GRINTA_AGENT_RUN_FREEZE_GRACE_SECONDS', '30')
+)
+# ── LLM HTTP socket timeouts (backend.inference.direct_clients) ─────
+# Per-request thinking budgets may be large, but connect/read on the wire are
+# capped so a dead socket fails fast and hits retry logic instead of wedging
+# the agent loop for minutes (Windows TCP give-up ~16m40s).
+LLM_HTTP_CONNECT_TIMEOUT_SECONDS = float(
+    os.getenv('GRINTA_HTTP_CONNECT_TIMEOUT_SECONDS', '10')
+)
+LLM_HTTP_READ_TIMEOUT_SECONDS = float(
+    os.getenv('GRINTA_HTTP_READ_TIMEOUT_SECONDS', '30')
+)
+LLM_HTTP_WRITE_TIMEOUT_SECONDS = float(
+    os.getenv('GRINTA_HTTP_WRITE_TIMEOUT_SECONDS', '30')
+)
+LLM_HTTP_POOL_TIMEOUT_SECONDS = float(
+    os.getenv('GRINTA_HTTP_POOL_TIMEOUT_SECONDS', '10')
+)
 # Hard cap on how long the TUI ``_dispatch_to_agent`` poll loop will wait
 # for the agent to leave ``AgentState.RUNNING`` before forcing ERROR.
 # Catches the symptom of the agent-stuck-in-RUNNING race: a 30-min default

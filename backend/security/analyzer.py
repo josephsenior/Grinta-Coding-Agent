@@ -70,11 +70,11 @@ class SecurityAnalyzer:
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self._cmd_analyzer = CommandAnalyzer(config or {})
 
-    async def security_risk(self, action: Action) -> ActionSecurityRisk:
-        """Evaluate the security risk of *action*.
+    def security_risk_sync(self, action: Action) -> ActionSecurityRisk:
+        """Evaluate the security risk of *action* (synchronous, no I/O).
 
-        Returns:
-            ``HIGH`` only on a true-unsafe match; ``LOW`` otherwise.
+        Safe to call from any thread, including the event-loop thread.
+        The async :meth:`security_risk` delegates here.
         """
         if isinstance(action, FileWriteAction):
             return self._assess_file_write(action)
@@ -83,6 +83,14 @@ class SecurityAnalyzer:
             return self._assess_command(action)
 
         return ActionSecurityRisk.LOW
+
+    async def security_risk(self, action: Action) -> ActionSecurityRisk:
+        """Evaluate the security risk of *action*.
+
+        Returns:
+            ``HIGH`` only on a true-unsafe match; ``LOW`` otherwise.
+        """
+        return self.security_risk_sync(action)
 
     # ------------------------------------------------------------------
     # File-write assessment

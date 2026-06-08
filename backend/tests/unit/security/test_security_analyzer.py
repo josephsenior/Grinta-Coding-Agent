@@ -27,6 +27,11 @@ class TestSecurityAnalyzerInit:
         sa = SecurityAnalyzer(config={'some_key': 'val'})
         assert sa._cmd_analyzer is not None
 
+    def test_security_risk_sync_matches_async(self):
+        sa = SecurityAnalyzer()
+        action = CmdRunAction(command='echo hello')
+        assert sa.security_risk_sync(action) == ActionSecurityRisk.LOW
+
 
 # ---------------------------------------------------------------------------
 # CmdRunAction risk assessment

@@ -6,7 +6,9 @@ import asyncio
 import atexit
 import logging
 import os
+import sys
 import threading
+import traceback
 from collections.abc import Awaitable, Callable, Coroutine, Iterable
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
@@ -15,6 +17,77 @@ from typing import Any, ParamSpec, TypeVar
 from backend.core.constants import GENERAL_TIMEOUT
 
 _logger = logging.getLogger(__name__)
+
+# ── On-loop bridge tripwire ─────────────────────────────────────────────
+# ``call_async_from_sync`` blocks its calling thread (``futures.wait``).  When
+# that thread is an event-loop thread, the loop freezes and *no* in-loop timer
+# can fire — the silent multi-minute-hang failure mode.  The proper offload
+# pattern (``call_sync_from_async`` / ``call_coro_in_bg_thread``) runs the
+# bridge on a worker thread where there is no running loop, so it never trips
+# this wire.  Direct on-loop calls are surfaced loudly (once per call site),
+# and fatally when ``GRINTA_STRICT_LOOP_BRIDGE`` is set.
+_STRICT_LOOP_BRIDGE = os.getenv('GRINTA_STRICT_LOOP_BRIDGE', '0').strip().lower() in {
+    '1',
+    'true',
+    'yes',
+    'on',
+}
+_seen_on_loop_bridges: set[str] = set()
+_on_loop_bridge_lock = threading.Lock()
+
+
+def _warn_if_on_loop_thread(corofn: Any) -> None:
+    """Flag ``call_async_from_sync`` calls made on an event-loop thread.
+
+    A no-op (one cheap ``get_running_loop``) on the safe, intended off-loop
+    path.  On a loop thread it emits a de-duplicated ``BRIDGE_ON_LOOP`` warning
+    naming the call site (so the path can be made async or offloaded), or
+    raises in strict mode so tests catch the regression.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return  # Off-loop (worker thread / plain sync): this is correct usage.
+
+    name = getattr(corofn, '__name__', repr(corofn))
+    try:
+        caller = sys._getframe(2)  # 0=here, 1=call_async_from_sync, 2=caller
+        site = f'{caller.f_code.co_filename}:{caller.f_lineno}'
+    except Exception:
+        site = '<unknown>'
+
+    if _STRICT_LOOP_BRIDGE:
+        raise RuntimeError(
+            f'call_async_from_sync({name}) was invoked on a running event loop '
+            f'(thread={threading.current_thread().name!r}) at {site}: this '
+            f'blocks the loop thread. Await the coroutine directly, or offload '
+            f'via call_sync_from_async()/call_coro_in_bg_thread().'
+        )
+
+    key = f'{name}@{site}'
+    with _on_loop_bridge_lock:
+        first_seen = key not in _seen_on_loop_bridges
+        if first_seen:
+            _seen_on_loop_bridges.add(key)
+    if first_seen:
+        stack = ''.join(traceback.format_stack(limit=12))
+        _logger.warning(
+            'BRIDGE_ON_LOOP: call_async_from_sync(%s) called on event-loop '
+            'thread %r at %s — this blocks the loop (no in-loop timer can fire '
+            'until it returns). Await the coroutine directly, or offload via '
+            'call_sync_from_async()/call_coro_in_bg_thread(). Stack:\n%s',
+            name,
+            threading.current_thread().name,
+            site,
+            stack,
+            extra={'msg_type': 'BRIDGE_ON_LOOP', 'bridge': name, 'site': site},
+        )
+    else:
+        _logger.debug(
+            'BRIDGE_ON_LOOP (repeat): call_async_from_sync(%s) on loop at %s',
+            name,
+            site,
+        )
 
 # Module-level set to hold strong references to background tasks.
 # Without this, tasks created via ``asyncio.create_task()`` may be
@@ -213,6 +286,9 @@ def call_async_from_sync(
         msg = 'corofn is not a coroutine function'
         raise ValueError(msg)
 
+    # Tripwire: blocking the loop thread here is the silent-hang failure mode.
+    _warn_if_on_loop_thread(corofn)
+
     async def arun() -> _R:
         """Execute target coroutine function with provided args/kwargs."""
         coro = corofn(*args, **kwargs)
@@ -288,17 +364,20 @@ async def call_coro_in_bg_thread(
     timeout_sec: float = GENERAL_TIMEOUT,
     *args: object,
     **kwargs: object,
-) -> None:
-    """Function for running a coroutine in a background thread.
+) -> Any:
+    """Run an async coroutine from async code without blocking the event loop.
 
-    Resolve the delegate at call-time from the canonical module to ensure
-    test monkeypatches apply deterministically even under import edge-cases.
+    Preferred replacement for ``call_async_from_sync`` when the caller is
+    already on the event loop (middleware, services, orchestration).
     """
     import importlib
 
     mod = importlib.import_module('backend.utils.async_utils')
     delegate = mod.call_sync_from_async
-    await delegate(call_async_from_sync, corofn, timeout_sec, *args, **kwargs)
+    return await delegate(call_async_from_sync, corofn, timeout_sec, *args, **kwargs)
+
+
+run_async_bridge = call_coro_in_bg_thread
 
 
 async def wait_all(
@@ -431,6 +510,16 @@ def set_main_event_loop(loop: asyncio.AbstractEventLoop | None = None) -> None:
         if loop is None:
             loop = asyncio.get_running_loop()
         _main_event_loop = loop
+
+    # Point the out-of-loop stall/suspend watchdog at the (possibly new) main
+    # loop.  Deferred import keeps this low-level module free of heavier deps
+    # and avoids import cycles.  Idempotent and never raises into callers.
+    try:
+        from backend.core.loop_watchdog import start_loop_watchdog
+
+        start_loop_watchdog(loop)
+    except Exception:
+        _logger.debug('failed to start loop watchdog', exc_info=True)
 
 
 def get_main_event_loop() -> asyncio.AbstractEventLoop | None:

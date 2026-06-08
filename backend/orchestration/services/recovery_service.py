@@ -46,9 +46,18 @@ if TYPE_CHECKING:
 
 
 # Errors that require the user to intervene before the agent can continue.
-# Includes transient infrastructure errors (Timeout, APIConnectionError, etc.)
-# because the LLM's internal Tenacity already retried 5 times. Re-executing
-# the same step won't help - just stop softly. The agent never sees these.
+# These are genuinely unrecoverable without a config/credential/runtime change,
+# so auto-retrying would just loop on the same failure. The agent never sees
+# these (they are surfaced to the user, not the model).
+#
+# NOTE: Transient provider/network failures (Timeout, APIConnectionError,
+# InternalServerError, LLMNoResponseError) are intentionally NOT here. The
+# LLM's inner Tenacity retry only covers errors raised *before* the first
+# streamed chunk — a mid-stream disconnect, a per-chunk stall, or a flaky
+# proxy drop bypasses it entirely. Treating those as hard stops made the
+# agent halt mid-session on a single transient blip. They now route through
+# the retry queue (``_TRANSIENT_LLM_INFRA_EXCEPTIONS`` below) so the session
+# backs off and resumes automatically.
 _HARD_STOP_EXCEPTIONS = (
     AuthenticationError,
     ContentPolicyViolationError,
@@ -58,12 +67,6 @@ _HARD_STOP_EXCEPTIONS = (
     # Persistent runtime disconnects require a full session restart/re-init
     # and should not be treated as survivable tool errors.
     AgentRuntimeDisconnectedError,
-    # Transient provider/network failures: LLM already retried internally,
-    # re-executing the same call won't help. Stop softly.
-    Timeout,
-    APIConnectionError,
-    InternalServerError,
-    LLMNoResponseError,
 )
 
 # Generic Python exceptions previously classified as hard stops.
@@ -87,19 +90,24 @@ _RATE_LIMITED_EXCEPTIONS = (
     ServiceUnavailableError,
 )
 
-# After inner LLM retries (see ``LLM_RETRY_EXCEPTIONS`` in ``llm.py``), these
-# are still transport/provider issues—not actionable by the model.
+# Transport/provider issues that are not actionable by the model but ARE
+# worth retrying automatically: the inner LLM Tenacity loop only retries
+# errors raised before the first streamed chunk, so mid-stream/transport
+# failures and step-level timeouts reach here un-retried. The retry queue
+# applies exponential backoff and resumes the run, bounded by
+# ``RetryQueue.max_retries`` (falls back to AWAITING_USER_INPUT when the
+# queue is unavailable or retries are exhausted).
 _TRANSIENT_LLM_INFRA_EXCEPTIONS = (
     APIConnectionError,
     InternalServerError,
     LLMNoResponseError,
+    Timeout,
 )
 
-# Transient provider failures that should use the retry queue instead of
-# dropping straight back to the user. Only rate limits use this path because
-# the provider explicitly asks us to wait. All other transient errors (Timeout,
-# APIConnectionError, etc.) are hard stops - the LLM already retried internally.
-_QUEUED_RETRY_EXCEPTIONS = _RATE_LIMITED_EXCEPTIONS
+# Transient failures that should use the retry queue (exponential backoff +
+# automatic RUNNING resume) instead of dropping straight back to the user.
+# Rate limits additionally honour any provider-supplied ``Retry-After``.
+_QUEUED_RETRY_EXCEPTIONS = _RATE_LIMITED_EXCEPTIONS + _TRANSIENT_LLM_INFRA_EXCEPTIONS
 
 
 def _is_limit_exceeded_error(exc: Exception) -> bool:
@@ -185,15 +193,13 @@ class RecoveryService:
         msg, err_id, notify_ui_only = self._format_exception(exc)
         error_category = self._error_category_for(exc)
 
-        # Suppress error observations for exceptions the agent should never see.
-        # Hard stops (Timeout, APIConnectionError, etc.) and retryable exceptions
-        # (rate limits) are handled at the runtime level. The agent just stops
-        # softly without knowing about runtime failures.
-        if isinstance(exc, _HARD_STOP_EXCEPTIONS) or isinstance(
-            exc, _QUEUED_RETRY_EXCEPTIONS
-        ):
-            return
-
+        # Always emit an ErrorObservation so the failure is visible *somewhere*.
+        # ``notify_ui_only`` (set by ``_format_exception``) decides whether the
+        # model also sees it: transient infra errors, rate limits, timeouts and
+        # auth failures are HUD-only (the orchestrator/retry-queue handles them,
+        # so the model must not be told a hard failure occurred and re-plan
+        # around it); genuinely model-actionable errors are surfaced to the LLM
+        # transcript so it can adapt on the next turn.
         self._context.emit_event(
             ErrorObservation(
                 content=msg,

@@ -103,19 +103,20 @@ class TestGetNextAction:
         ctx.agent.step.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_astep_timeout_recovers_with_observation(self):
-        """Astep timeout is converted to LLM_STEP_TIMEOUT observation.
+    async def test_astep_timeout_propagates_for_recovery(self):
+        """Astep timeout propagates ``Timeout`` to the caller for recovery.
 
-        Previously this raised ``Timeout`` from ``llm.exceptions`` which
-        crashed the controller.  The bounded-pipeline plan (Layer 1)
-        converts the timeout into a recoverable ``ErrorObservation``
-        (error_id='LLM_STEP_TIMEOUT') and returns ``None`` so the outer
-        step loop re-enters cleanly with the LLM seeing the failure
-        in its next turn.
+        A hung LLM step must NOT be swallowed into ``None`` here: doing so
+        made the orchestrator's liveness guard treat it as an unexpected
+        no-action and halt the session (AWAITING_USER_INPUT) on a single
+        transient blip.  Instead ``get_next_action`` lets
+        ``backend.inference.exceptions.Timeout`` propagate so the
+        RecoveryService can route it through the retry queue (exponential
+        backoff + automatic RUNNING resume).
         """
         import asyncio
 
-        from backend.ledger.observation import ErrorObservation
+        from backend.inference.exceptions import Timeout
 
         ctx = _make_context()
 
@@ -127,13 +128,11 @@ class TestGetNextAction:
         ctx.agent.config = MagicMock()
         ctx.agent.config.llm_step_timeout_seconds = 0.01  # 10ms
         svc = ActionExecutionService(ctx)
-        result = await svc.get_next_action()
-        assert result is None
-        # LLM_STEP_TIMEOUT observation was published so the LLM sees it.
-        ctx.event_stream.add_event.assert_called_once()
-        emitted = ctx.event_stream.add_event.call_args.args[0]
-        assert isinstance(emitted, ErrorObservation)
-        assert emitted.error_id == 'LLM_STEP_TIMEOUT'
+        with pytest.raises(Timeout):
+            await svc.get_next_action()
+        # The service must not emit/recover locally; recovery is the
+        # orchestrator's job once the exception propagates.
+        ctx.event_stream.add_event.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_malformed_action_returns_none(self):

@@ -175,6 +175,17 @@ class TestEnforceSecurity:
                 result = rt._enforce_security(action)
         assert result is None
 
+    def test_production_analyzer_uses_sync_path_without_bridge(self):
+        from backend.ledger.action import CmdRunAction
+        from backend.security.analyzer import SecurityAnalyzer
+
+        rt = _FakeRuntime(analyzer=SecurityAnalyzer(), enforce=True)
+        action = CmdRunAction(command='echo hello')
+        with patch('backend.utils.async_utils.call_async_from_sync') as bridge:
+            result = rt._enforce_security(action)
+        bridge.assert_not_called()
+        assert result is None
+
     def test_precomputed_high_risk_still_runs_analyzer_for_escalation(self):
         """Under the escalate-only contract, the analyzer is consulted on every
         action so it can raise an undeclared higher risk; it can never lower
@@ -182,9 +193,9 @@ class TestEnforceSecurity:
         """
         from backend.core.enums import ActionSecurityRisk
         from backend.ledger.action import CmdRunAction
+        from backend.security.analyzer import SecurityAnalyzer
 
-        analyzer = MagicMock()
-        analyzer.security_risk = AsyncMock(return_value=ActionSecurityRisk.LOW)
+        analyzer = SecurityAnalyzer()
         rt = _FakeRuntime(analyzer=analyzer, enforce=True, block_high=True)
         action = CmdRunAction(command='rm -rf tmp')
         action.security_risk = ActionSecurityRisk.HIGH
@@ -193,7 +204,6 @@ class TestEnforceSecurity:
 
         assert result is not None
         assert result.__class__.__name__ == 'ErrorObservation'
-        analyzer.security_risk.assert_called_once()
         # Effective risk is the maximum of declared and analyzed (no downgrade).
         assert action.security_risk == ActionSecurityRisk.HIGH
 

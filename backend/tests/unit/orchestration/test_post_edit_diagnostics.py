@@ -132,6 +132,35 @@ async def test_post_edit_diagnostics_uses_structured_edit_file_receipts(
 
 
 @pytest.mark.asyncio
+async def test_post_edit_diagnostics_offloads_lsp_from_loop(tmp_path) -> None:
+    path = tmp_path / 'app.py'
+    path.write_text('def ok():\n    return 1\n', encoding='utf-8')
+    action = FileEditAction(path=str(path), command='edit')
+    obs = FileEditObservation(content='Edited', path=str(path))
+    lsp = MagicMock(query=MagicMock(return_value=LspResult(available=True)))
+
+    with (
+        patch(
+            'backend.utils.runtime_detect.lsp_command_for_extension',
+            return_value=('pylsp',),
+        ),
+        patch('backend.utils.lsp_client.get_lsp_client', return_value=lsp),
+        patch(
+            'backend.orchestration.middleware.post_edit_diagnostics.call_sync_from_async',
+            wraps=__import__(
+                'backend.utils.async_utils', fromlist=['call_sync_from_async']
+            ).call_sync_from_async,
+        ) as offload,
+    ):
+        await PostEditDiagnosticsMiddleware(timeout_seconds=0.25).observe(
+            _ctx(action), obs
+        )
+
+    offload.assert_awaited_once()
+    assert '<LSP_DIAGNOSTICS status="passed">' in obs.content
+
+
+@pytest.mark.asyncio
 async def test_post_edit_diagnostics_ignores_unknown_extensions(tmp_path) -> None:
     path = tmp_path / 'notes.xyz'
     path.write_text('plain text', encoding='utf-8')
