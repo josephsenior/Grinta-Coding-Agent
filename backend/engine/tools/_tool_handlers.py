@@ -308,7 +308,14 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
         status = require_tool_argument(arguments, 'status', TASK_TRACKER_TOOL_NAME)
         result = arguments.get('result')
         tracker = TaskTracker()
-        _, message = tracker.update_task_status(task_id, status, result)
+        success, message = tracker.update_task_status(task_id, status, result)
+        if not success:
+            from backend.ledger.action.agent import AgentThinkAction
+
+            return AgentThinkAction(
+                thought=f'[TASK_TRACKER] {message}',
+                source_tool=TASK_TRACKER_TOOL_NAME,
+            )
         full_plan = tracker.load_from_file()
         return TaskTrackingAction(
             command='update_status',
@@ -338,9 +345,6 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
     )
     if noop is not None:
         return noop
-
-    if command == 'update':
-        tracker.save_to_file(normalized_task_list)
 
     return TaskTrackingAction(command=command, task_list=normalized_task_list)
 

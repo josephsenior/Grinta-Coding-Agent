@@ -219,13 +219,40 @@ class ContextMemoryManager:
         prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
         if prewarmed is not None:
             turn_signals.prewarmed_compaction = None  # type: ignore[union-attr]
-            logger.info('Utilizing background pre-warmed condensation result.')
-            condensation_result = prewarmed
-
-            # Tag the CondensationAction to identify it as prewarmed
-            action = getattr(condensation_result, 'action', None)
-            if action:
-                action.is_prewarmed = True
+            prewarm_len = getattr(turn_signals, 'prewarm_history_len', None)
+            prewarm_latest_id = getattr(
+                turn_signals, 'prewarm_latest_event_id', None
+            )
+            turn_signals.prewarm_history_len = None  # type: ignore[union-attr]
+            turn_signals.prewarm_latest_event_id = None  # type: ignore[union-attr]
+            current_len = len(history)
+            current_latest_id = (
+                getattr(history[-1], 'id', None) if history else None
+            )
+            prewarm_stale = (
+                prewarm_len is not None
+                and (
+                    prewarm_len != current_len
+                    or prewarm_latest_id != current_latest_id
+                )
+            )
+            if prewarm_stale:
+                logger.warning(
+                    'Discarding stale pre-warmed condensation '
+                    '(prewarm_len=%s current_len=%s prewarm_latest_id=%s '
+                    'current_latest_id=%s); recomputing compaction.',
+                    prewarm_len,
+                    current_len,
+                    prewarm_latest_id,
+                    current_latest_id,
+                )
+                condensation_result = await self.compactor.compacted_history(state)
+            else:
+                logger.info('Utilizing background pre-warmed condensation result.')
+                condensation_result = prewarmed
+                action = getattr(condensation_result, 'action', None)
+                if action:
+                    action.is_prewarmed = True
         else:
             compaction_started = time.perf_counter()
             condensation_result = await self.compactor.compacted_history(state)

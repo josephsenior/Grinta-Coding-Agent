@@ -117,6 +117,7 @@ class PendingActionService:
         self._outstanding: dict[int, tuple[Action, float]] = {}
         self._legacy_pending: tuple[Action, float] | None = None
         self._progress_log_buckets: dict[int | str, int] = {}
+        self._timing_out_ids: set[int] = set()
         self._watchdog_handle: asyncio.TimerHandle | threading.Timer | None = None
         self._watchdog_delay_s: float = timeout + 2
         self._lock = threading.Lock()
@@ -159,6 +160,7 @@ class PendingActionService:
                 self._log_clear(controller, act, ts)
                 self._legacy_pending = None
             self._progress_log_buckets.clear()
+            self._timing_out_ids.clear()
             return
 
         action_id = getattr(action, 'id', 'unknown')
@@ -220,13 +222,66 @@ class PendingActionService:
         self._schedule_watchdog_if_needed()
         return action
 
+    def clear_for_action(self, action: Action) -> None:
+        """Remove only the outstanding row for *action* (parallel-safe clear)."""
+        controller = self._context.get_controller()
+        aid = self._int_action_id(action)
+        if aid is not None and aid in self._outstanding:
+            act, ts = self._outstanding.pop(aid)
+            self._progress_log_buckets.pop(aid, None)
+            self._timing_out_ids.discard(aid)
+            self._log_clear(controller, act, ts)
+            self._schedule_watchdog_if_needed()
+            return
+        if self._legacy_pending is not None:
+            legacy_action, ts = self._legacy_pending
+            if legacy_action is action:
+                self._legacy_pending = None
+                self._progress_log_buckets.pop('legacy', None)
+                self._log_clear(controller, legacy_action, ts)
+                self._schedule_watchdog_if_needed()
+
+    def clear_primary(self) -> None:
+        """Clear only the latest outstanding row (step-liveness / single-action recovery)."""
+        controller = self._context.get_controller()
+        with self._lock:
+            if self._outstanding:
+                try:
+                    best_id = max(self._outstanding.keys())
+                except ValueError:
+                    best_id = None
+                if best_id is not None:
+                    act, ts = self._outstanding.pop(best_id)
+                    self._progress_log_buckets.pop(best_id, None)
+                    self._timing_out_ids.discard(best_id)
+                    self._log_clear(controller, act, ts)
+                    self._schedule_watchdog_if_needed()
+                    return
+            if self._legacy_pending is not None:
+                act, ts = self._legacy_pending
+                self._legacy_pending = None
+                self._progress_log_buckets.pop('legacy', None)
+                self._log_clear(controller, act, ts)
+                self._schedule_watchdog_if_needed()
+
+    def has_outstanding(self) -> bool:
+        """Return True when any action is still awaiting its observation."""
+        self._purge_timeouts()
+        with self._lock:
+            return bool(self._outstanding) or self._legacy_pending is not None
+
     def _primary_entry(self) -> tuple[Action, float] | None:
         """Latest / highest-id outstanding row (for step guards and logging)."""
         with self._lock:
             if not self._outstanding:
                 return self._legacy_pending
             try:
-                best_id = max(self._outstanding.keys())
+                active_ids = [
+                    aid for aid in self._outstanding if aid not in self._timing_out_ids
+                ]
+                if not active_ids:
+                    return self._legacy_pending
+                best_id = max(active_ids)
                 return self._outstanding[best_id]
             except (ValueError, KeyError):
                 return self._legacy_pending
@@ -240,18 +295,21 @@ class PendingActionService:
                 elapsed = now - ts
                 limit = self._effective_timeout_seconds(self._timeout, action)
                 if math.isfinite(limit) and elapsed > limit:
+                    if aid in self._timing_out_ids:
+                        continue
+                    self._timing_out_ids.add(aid)
                     dead.append((action, elapsed))
-                    self._outstanding.pop(aid, None)
-                    self._progress_log_buckets.pop(aid, None)
 
             if self._legacy_pending is not None:
                 action, ts = self._legacy_pending
                 elapsed = now - ts
                 limit = self._effective_timeout_seconds(self._timeout, action)
                 if math.isfinite(limit) and elapsed > limit:
-                    dead.append((action, elapsed))
-                    self._legacy_pending = None
-                    self._progress_log_buckets.pop('legacy', None)
+                    legacy_id = self._int_action_id(action)
+                    if legacy_id is None or legacy_id not in self._timing_out_ids:
+                        if legacy_id is not None:
+                            self._timing_out_ids.add(legacy_id)
+                        dead.append((action, elapsed))
 
         # Defer observation emission to async path to avoid recursive
         # event delivery when called from the sync step loop.
@@ -310,7 +368,27 @@ class PendingActionService:
         attach_observation_cause(
             timeout_obs, action, context='pending_action_service.timeout'
         )
-        controller.event_stream.add_event(timeout_obs, EventSource.ENVIRONMENT)
+        try:
+            from backend.orchestration.file_edit_transaction import (
+                get_file_edit_transaction_coordinator,
+            )
+
+            timeout_obs = get_file_edit_transaction_coordinator(
+                controller
+            ).after_observation(action, timeout_obs)
+        except Exception:
+            controller.log(
+                'warning',
+                'File edit transaction timeout handling failed; continuing.',
+                extra={'msg_type': 'FILE_EDIT_TRANSACTION_TIMEOUT_FAILED'},
+            )
+        try:
+            self.clear_for_action(action)
+            controller.event_stream.add_event(timeout_obs, EventSource.ENVIRONMENT)
+        finally:
+            aid = self._int_action_id(action)
+            if aid is not None:
+                self._timing_out_ids.discard(aid)
 
     def get(self) -> Action | None:
         self._purge_timeouts()

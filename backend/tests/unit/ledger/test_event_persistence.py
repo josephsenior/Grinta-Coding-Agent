@@ -38,12 +38,20 @@ class TestIsCriticalEvent:
         event = SimpleNamespace(action=None, observation='user_rejected')
         assert EventPersistence.is_critical_event(event) is True
 
+    def test_runnable_action_is_critical(self):
+        event = SimpleNamespace(action='run', observation=None, runnable=True)
+        assert EventPersistence.is_critical_event(event) is True
+
     def test_non_critical_action(self):
-        event = SimpleNamespace(action='run', observation=None)
+        event = SimpleNamespace(action='run', observation=None, runnable=False)
         assert EventPersistence.is_critical_event(event) is False
 
+    def test_observation_with_cause_is_critical(self):
+        event = SimpleNamespace(action=None, observation='run', cause=42)
+        assert EventPersistence.is_critical_event(event) is True
+
     def test_non_critical_observation(self):
-        event = SimpleNamespace(action=None, observation='run')
+        event = SimpleNamespace(action=None, observation='run', cause=None)
         assert EventPersistence.is_critical_event(event) is False
 
     def test_no_action_no_observation(self):

@@ -334,13 +334,30 @@ class SessionOrchestrator(
                         # on the next attempt.  Use the same recovery the
                         # observation-handler timeout uses (Layer 2).
                         try:
+                            agent = getattr(self, 'agent', None)
+                            if agent is not None:
+                                executor = getattr(agent, 'executor', None)
+                                cancel_fn = (
+                                    getattr(executor, 'cancel_step', None)
+                                    if executor is not None
+                                    else None
+                                )
+                                if callable(cancel_fn):
+                                    cancel_fn()
+                        except Exception:
+                            logger.debug(
+                                'Failed to cancel executor after '
+                                'step-task liveness timeout',
+                                exc_info=True,
+                            )
+                        try:
                             pending_service = getattr(
                                 getattr(self, 'services', None),
                                 'pending_action',
                                 None,
                             )
                             if pending_service is not None:
-                                pending_service.set(None)
+                                pending_service.clear_primary()
                         except Exception:
                             logger.debug(
                                 'Failed to clear pending state after '

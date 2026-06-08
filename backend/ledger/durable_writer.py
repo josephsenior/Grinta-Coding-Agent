@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import queue
 import threading
 import time
@@ -261,16 +262,8 @@ class DurableEventWriter:
                     _MAX_FLUSH_RETRIES,
                     exc,
                 )
-                # Clean up WAL marker — will be re-created if retried on restart
                 pending_path = self._pending_path(item.filename)
-                try:
-                    self._file_store.delete(pending_path)
-                except Exception as purge_exc:
-                    logger.debug(
-                        'WAL: could not clean up .pending after permanent failure %s: %s',
-                        pending_path,
-                        purge_exc,
-                    )
+                self._quarantine_pending_file(pending_path, item)
             finally:
                 # Decrement _in_flight BEFORE task_done() so that if task_done()
                 # raises (e.g. from a double-call bug elsewhere), the counter is
@@ -278,6 +271,38 @@ class DurableEventWriter:
                 if self._in_flight > 0:
                     self._in_flight -= 1
                 self._queue.task_done()
+
+    def _quarantine_pending_file(
+        self, pending_path: str, item: PersistedEvent
+    ) -> None:
+        """Preserve a failed WAL marker under lost_events/ for manual recovery."""
+        normalized = item.filename.replace('\\', '/')
+        events_dir = os.path.dirname(normalized)
+        if events_dir:
+            events_dir = f'{events_dir}/'
+        else:
+            events_dir = ''
+        dest_path = f'{events_dir}lost_events/{os.path.basename(pending_path)}'
+        try:
+            try:
+                serialized = self._file_store.read(pending_path)
+            except Exception:
+                serialized = json.dumps(item.payload)
+            self._file_store.write(dest_path, serialized)
+            self._file_store.delete(pending_path)
+            logger.error(
+                'WAL: quarantined permanently failed pending file to %s '
+                '(event id=%s)',
+                dest_path,
+                item.event_id,
+            )
+        except Exception as quarantine_exc:
+            logger.error(
+                'WAL: could not quarantine %s after permanent failure: %s '
+                '— file left in place',
+                pending_path,
+                quarantine_exc,
+            )
 
     def _flush_with_retry(self, persisted_event: PersistedEvent) -> None:
         """Attempt to flush an event with exponential-backoff retry on transient errors."""

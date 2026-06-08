@@ -6,7 +6,11 @@ from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import ChangeAgentStateAction
 from backend.ledger.action.empty import NullAction
 from backend.ledger.event.event_filter import EventFilter
-from backend.ledger.observation.agent import AgentStateChangedObservation
+from backend.ledger.action.message import MessageAction
+from backend.ledger.observation.agent import (
+    AgentCondensationObservation,
+    AgentStateChangedObservation,
+)
 from backend.ledger.observation.empty import NullObservation
 from backend.ledger.serialization.event import event_to_trajectory
 from backend.orchestration.state.control_flags import (
@@ -250,11 +254,24 @@ class StateTracker:
             self.state.history = trimmed
             self._recompute_history_bytes_estimate()
 
+    @staticmethod
+    def _is_protected_history_event(event: Event, index: int) -> bool:
+        if index == 0:
+            return True
+        if isinstance(event, AgentCondensationObservation):
+            return True
+        if isinstance(event, MessageAction) and getattr(event, 'source', None):
+            from backend.ledger.event import EventSource
+
+            if event.source == EventSource.USER:
+                return True
+        return False
+
     def _trim_history_list(
         self, history: list[Event], *, force_byte_check: bool = False
     ) -> list[Event]:
         """Return a sliding-window history bounded by count and estimated bytes."""
-        trimmed = history
+        trimmed = list(history)
         while True:
             reason = self._history_trim_reason(
                 trimmed, force_byte_check=force_byte_check
@@ -262,10 +279,22 @@ class StateTracker:
             if reason is None:
                 return trimmed
             trim_count = max(len(trimmed) // 4, 1)
-            trimmed = list(trimmed[trim_count:])
+            removed = 0
+            new_trimmed: list[Event] = []
+            for index, event in enumerate(trimmed):
+                if removed >= trim_count:
+                    new_trimmed.append(event)
+                    continue
+                if self._is_protected_history_event(event, index):
+                    new_trimmed.append(event)
+                    continue
+                removed += 1
+            if removed == 0:
+                return trimmed
+            trimmed = new_trimmed
             logger.debug(
-                'Trimmed %d oldest events from state.history (%s, now %d)',
-                trim_count,
+                'Trimmed %d oldest non-protected events from state.history (%s, now %d)',
+                removed,
                 reason,
                 len(trimmed),
             )

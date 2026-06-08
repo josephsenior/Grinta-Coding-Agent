@@ -268,6 +268,12 @@ class _SessionOrchestratorParallelMixin:
         same LLM response.
 
         """
+        pending_service = getattr(
+            getattr(self, 'services', None), 'pending_action', None
+        )
+        if pending_service is not None and pending_service.has_outstanding():
+            return False
+
         if self._pending_action:
             return False
 
@@ -334,6 +340,17 @@ class _SessionOrchestratorParallelMixin:
                     state_copy.history = list(history) if history else []
                     state_copy.turn_signals = _copy_mod.deepcopy(
                         self.state.turn_signals
+                    )
+                    state_copy.turn_signals.prewarm_history_len = len(
+                        state_copy.history
+                    )
+                    latest = (
+                        state_copy.history[-1]
+                        if state_copy.history
+                        else None
+                    )
+                    state_copy.turn_signals.prewarm_latest_event_id = getattr(
+                        latest, 'id', None
                     )
 
                     async def _run_bg():
@@ -413,6 +430,16 @@ class _SessionOrchestratorParallelMixin:
                         prewarmed = self.memory_pressure.consume_prewarmed()
 
                         self.state.turn_signals.prewarmed_compaction = prewarmed
+                        current_history = getattr(self.state, 'history', None) or []
+                        self.state.turn_signals.prewarm_history_len = len(
+                            current_history
+                        )
+                        latest_event = (
+                            current_history[-1] if current_history else None
+                        )
+                        self.state.turn_signals.prewarm_latest_event_id = getattr(
+                            latest_event, 'id', None
+                        )
 
                         logger.info('Injected prewarmed compaction into turn signals.')
 

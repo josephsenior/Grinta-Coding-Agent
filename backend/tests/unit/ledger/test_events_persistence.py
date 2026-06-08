@@ -40,7 +40,7 @@ class TestIsCriticalEventPersist:
         assert EventPersistence.is_critical_event(event) is True
 
     def test_non_critical(self):
-        event = MagicMock(action='run', observation=None)
+        event = MagicMock(action='run', observation=None, runnable=False, cause=None)
         assert EventPersistence.is_critical_event(event) is False
 
     def test_no_action_or_observation(self):

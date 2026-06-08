@@ -27,6 +27,7 @@ class TaskCancellationService:
         self._lock = threading.Lock()
         self._active_pids: set[int] = set()
         self._active_processes: dict[int, subprocess.Popen] = {}
+        self._registration_order: list[int] = []
         self._kill_callbacks: dict[str, Callable[[], None]] = {}
 
     def register_kill_callback(self, key: str, callback: Callable[[], None]) -> None:
@@ -53,6 +54,7 @@ class TaskCancellationService:
         with self._lock:
             self._active_pids.add(pid)
             self._active_processes[pid] = process
+            self._registration_order.append(pid)
             logger.debug('[TaskCancellationService] Registered process pid=%s', pid)
 
     def register_pid(self, pid: int) -> None:
@@ -60,18 +62,22 @@ class TaskCancellationService:
         if not pid:
             return
         with self._lock:
-            self._active_pids.add(int(pid))
+            pid_int = int(pid)
+            self._active_pids.add(pid_int)
+            self._registration_order.append(pid_int)
             logger.debug('[TaskCancellationService] Registered pid=%s', pid)
 
     def unregister_process(self, pid: int) -> None:
         with self._lock:
             self._active_pids.discard(pid)
             self._active_processes.pop(pid, None)
+            self._registration_order = [p for p in self._registration_order if p != pid]
             logger.debug('[TaskCancellationService] Unregistered pid=%s', pid)
 
     def unregister_pid(self, pid: int) -> None:
         with self._lock:
             self._active_pids.discard(pid)
+            self._registration_order = [p for p in self._registration_order if p != pid]
             logger.debug('[TaskCancellationService] Unregistered pid=%s', pid)
 
     def snapshot(self) -> Mapping[str, int]:
@@ -91,6 +97,7 @@ class TaskCancellationService:
             callbacks = dict(self._kill_callbacks)
             self._active_pids.clear()
             self._active_processes.clear()
+            self._registration_order.clear()
             self._kill_callbacks.clear()
         return pids, processes, callbacks
 
@@ -165,16 +172,20 @@ class TaskCancellationService:
         background work.
         """
         with self._lock:
-            if not self._active_processes:
-                if self._active_pids:
-                    pid = next(iter(self._active_pids))
-                    self._active_pids.discard(pid)
-                else:
-                    return
-            else:
-                pid = next(iter(self._active_processes))
-                self._active_processes.pop(pid, None)
-                self._active_pids.discard(pid)
+            pid: int | None = None
+            while self._registration_order:
+                candidate = self._registration_order.pop()
+                if candidate in self._active_processes:
+                    pid = candidate
+                    self._active_processes.pop(candidate, None)
+                    self._active_pids.discard(candidate)
+                    break
+                if candidate in self._active_pids:
+                    pid = candidate
+                    self._active_pids.discard(candidate)
+                    break
+            if pid is None:
+                return
 
         logger.warning(
             '[TaskCancellationService:%s] Cancelling last-registered pid=%s '

@@ -657,11 +657,6 @@ class Runtime(
                 action_id,
                 event.timeout,
             )
-            self.set_runtime_status(
-                RuntimeStatus.ERROR,
-                f'Action {action_type} (id={action_id}) exceeded {event.timeout}s hard timeout',
-                level='error',
-            )
             observation = ErrorObservation(
                 content=(
                     f'Action {action_type} exceeded the hard wall-clock timeout of '

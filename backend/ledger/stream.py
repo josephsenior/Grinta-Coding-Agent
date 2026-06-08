@@ -304,6 +304,8 @@ class EventStream(EventStore):
         # registered before synchronous (inline) runtime handlers can emit
         # observations (otherwise cause-based routing sees no outstanding row).
         self.pre_runnable_action_dispatch: Callable[[Any], None] | None = None
+        self._pre_dispatch_lock: asyncio.Lock | None = None
+        self._pre_dispatch_lock_loop: asyncio.AbstractEventLoop | None = None
 
         # Register for global metrics aggregation
         try:  # pragma: no cover - defensive
@@ -363,6 +365,17 @@ class EventStream(EventStore):
                     "EventStream '%s' queue thread did not stop within timeout; continuing",
                     self.sid,
                 )
+
+    def pre_dispatch_lock(self) -> asyncio.Lock:
+        """Return a loop-bound lock serializing one-shot pre-dispatch hook swaps."""
+        loop = asyncio.get_running_loop()
+        if (
+            self._pre_dispatch_lock is None
+            or self._pre_dispatch_lock_loop is not loop
+        ):
+            self._pre_dispatch_lock = asyncio.Lock()
+            self._pre_dispatch_lock_loop = loop
+        return self._pre_dispatch_lock
 
     def _close_persist_and_super(self) -> None:
         try:
@@ -745,14 +758,18 @@ class EventStream(EventStore):
     def _enqueue_serialized_event(self, event: Event) -> None:
         if not self._queue_ready.wait(timeout=2):
             logger.warning(
-                'EventStream queue not ready; dropping event id=%s', event.id
+                'EventStream queue not ready; inline-fallback delivery for event id=%s',
+                event.id,
             )
+            self._dispatch_event_inline(event)
             return
 
         if not self._queue_loop or not self._async_queue:
             logger.warning(
-                'EventStream queue loop missing; dropping event id=%s', event.id
+                'EventStream queue loop missing; inline-fallback delivery for event id=%s',
+                event.id,
             )
+            self._dispatch_event_inline(event)
             return
 
         try:
@@ -761,7 +778,12 @@ class EventStream(EventStore):
             )
             future.result(timeout=5.0)
         except Exception as exc:  # pragma: no cover - defensive
-            logger.warning('Failed to enqueue event id=%s: %s', event.id, exc)
+            logger.warning(
+                'Failed to enqueue event id=%s: %s; inline-fallback delivery',
+                event.id,
+                exc,
+            )
+            self._dispatch_event_inline(event)
 
     def add_activity_listener(self, callback: Callable[[str], None]) -> str:
         """Register a callback invoked whenever a new event is added."""

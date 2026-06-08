@@ -6,7 +6,7 @@ import json
 import time
 from types import MethodType
 from typing import Any, cast
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 
@@ -349,15 +349,27 @@ class TestWALMarkers:
             drain_blocker.set()
             writer.stop(timeout=2.0)
 
-    def test_pending_cleaned_on_permanent_error(self):
-        """The .pending file is cleaned up after all retries fail."""
+    def test_pending_quarantined_on_permanent_error(self):
+        """The .pending file is quarantined after all retries fail."""
         store = _make_file_store()
-        store.write.side_effect = OSError('permanent failure')
+
+        def _write_side_effect(filename: str, content: str) -> None:
+            if 'lost_events' in filename.replace('\\', '/'):
+                return None
+            raise OSError('permanent failure')
+
+        store.write.side_effect = _write_side_effect
         writer = DurableEventWriter(store, max_queue_size=10)
         writer.start()
         try:
             writer.enqueue(_make_event(9))
             time.sleep(2.0)
+            quarantine_writes = [
+                call
+                for call in store.write.call_args_list
+                if 'lost_events' in str(call)
+            ]
+            assert quarantine_writes
             store.delete.assert_any_call('event_9.json.pending')
         finally:
             writer.stop(timeout=2.0)
