@@ -9,6 +9,7 @@ binds them via simple names without indirection.
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -27,6 +28,82 @@ if TYPE_CHECKING:
 
 class _ExecutorStreamingMixin:
     """Mixin: streaming delta parsing, chunk consumption, fallback, and event emission."""
+
+    @staticmethod
+    def _stream_emit_limits() -> tuple[float, int]:
+        raw_interval = os.getenv('APP_STREAM_EMIT_INTERVAL_MS', '40').strip()
+        raw_min_chars = os.getenv('APP_STREAM_EMIT_MIN_CHARS', '32').strip()
+        try:
+            interval_ms = float(raw_interval)
+        except ValueError:
+            interval_ms = 40.0
+        try:
+            min_chars = int(raw_min_chars)
+        except ValueError:
+            min_chars = 32
+        return max(0.016, interval_ms / 1000.0), max(1, min_chars)
+
+    def _should_emit_stream_snapshot(
+        self,
+        state: _AsyncStreamingState,
+        *,
+        channel: str,
+        force: bool = False,
+    ) -> bool:
+        if force:
+            return True
+        interval, min_chars = self._stream_emit_limits()
+        now = time.monotonic()
+        if channel == 'text':
+            last_at = state.last_text_emit_at
+            last_len = state.last_text_emit_len
+            current_len = len(state.content_accumulate)
+        else:
+            last_at = state.last_thinking_emit_at
+            last_len = state.last_thinking_emit_len
+            current_len = len(state.thinking_accumulate)
+        if last_at <= 0.0:
+            return True
+        if (now - last_at) >= interval:
+            return True
+        return (current_len - last_len) >= min_chars
+
+    @staticmethod
+    def _mark_stream_snapshot_emitted(
+        state: _AsyncStreamingState,
+        *,
+        channel: str,
+    ) -> None:
+        now = time.monotonic()
+        if channel == 'text':
+            state.last_text_emit_at = now
+            state.last_text_emit_len = len(state.content_accumulate)
+            return
+        state.last_thinking_emit_at = now
+        state.last_thinking_emit_len = len(state.thinking_accumulate)
+
+    async def _flush_stream_paint_events(
+        self,
+        state: _AsyncStreamingState,
+        event_stream: EventStream | None,
+    ) -> None:
+        """Emit the latest accumulated stream snapshot before the final chunk."""
+        if event_stream is None:
+            return
+        if state.thinking_accumulate:
+            await self._emit_stream_thinking_piece(
+                state,
+                '',
+                event_stream,
+                force=True,
+            )
+        if state.content_accumulate:
+            await self._emit_stream_text_piece(
+                state,
+                '',
+                event_stream,
+                force=True,
+            )
 
     async def _apply_fallback_completion(
         self,
@@ -270,58 +347,70 @@ class _ExecutorStreamingMixin:
         state: _AsyncStreamingState,
         text_piece: str,
         event_stream: EventStream | None,
+        *,
+        force: bool = False,
     ) -> None:
-        if not text_piece:
+        if text_piece:
+            state.content_accumulate = self._merge_stream_fragment(
+                state.content_accumulate,
+                text_piece,
+            )
+        if not event_stream or not state.content_accumulate:
+            return
+        if not self._should_emit_stream_snapshot(state, channel='text', force=force):
             return
 
         from backend.cli.tool_call_display import redact_streamed_tool_call_markers
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
-        state.content_accumulate = self._merge_stream_fragment(
-            state.content_accumulate,
-            text_piece,
+        display_acc = redact_streamed_tool_call_markers(state.content_accumulate)
+        ev = StreamingChunkAction(
+            chunk=text_piece,
+            accumulated=display_acc,
+            is_final=False,
+            thinking_accumulated=state.thinking_accumulate,
         )
-        if event_stream:
-            display_acc = redact_streamed_tool_call_markers(state.content_accumulate)
-            ev = StreamingChunkAction(
-                chunk=text_piece,
-                accumulated=display_acc,
-                is_final=False,
-                thinking_accumulated=state.thinking_accumulate,
-            )
-            ev.source = EventSource.AGENT
-            event_stream.add_event(ev, EventSource.AGENT)
-            await asyncio.sleep(0)
+        ev.source = EventSource.AGENT
+        event_stream.add_event(ev, EventSource.AGENT)
+        self._mark_stream_snapshot_emitted(state, channel='text')
+        await asyncio.sleep(0)
 
     async def _emit_stream_thinking_piece(
         self,
         state: _AsyncStreamingState,
         text_piece: str,
         event_stream: EventStream | None,
+        *,
+        force: bool = False,
     ) -> None:
-        if not text_piece:
+        if text_piece:
+            state.thinking_accumulate = self._merge_stream_fragment(
+                state.thinking_accumulate,
+                text_piece,
+            )
+        if not event_stream or not state.thinking_accumulate:
+            return
+        if not self._should_emit_stream_snapshot(
+            state, channel='thinking', force=force
+        ):
             return
 
         from backend.cli.tool_call_display import redact_streamed_tool_call_markers
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
-        state.thinking_accumulate = self._merge_stream_fragment(
-            state.thinking_accumulate,
-            text_piece,
+        ev = StreamingChunkAction(
+            chunk='',
+            accumulated=redact_streamed_tool_call_markers(state.content_accumulate),
+            is_final=False,
+            thinking_chunk=text_piece,
+            thinking_accumulated=state.thinking_accumulate,
         )
-        if event_stream:
-            ev = StreamingChunkAction(
-                chunk='',
-                accumulated=redact_streamed_tool_call_markers(state.content_accumulate),
-                is_final=False,
-                thinking_chunk=text_piece,
-                thinking_accumulated=state.thinking_accumulate,
-            )
-            ev.source = EventSource.AGENT
-            event_stream.add_event(ev, EventSource.AGENT)
-            await asyncio.sleep(0)
+        ev.source = EventSource.AGENT
+        event_stream.add_event(ev, EventSource.AGENT)
+        self._mark_stream_snapshot_emitted(state, channel='thinking')
+        await asyncio.sleep(0)
 
     def _emit_streaming_actions(
         self,

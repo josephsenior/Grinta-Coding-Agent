@@ -228,6 +228,7 @@ class OrchestratorExecutor(
             await consume_task
             if self._step_cancelled:
                 raise asyncio.CancelledError()
+            await self._flush_stream_paint_events(state, event_stream)
             tool_calls_list = self._finalize_stream_tool_calls(state)
             visible_accum = self._visible_stream_content(state.content_accumulate)
             self._emit_final_stream_event(

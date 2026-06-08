@@ -29,6 +29,16 @@ if TYPE_CHECKING:
         _AppRendererEventProcessorMixin,
     )
 
+_TUI_DRAIN_DEBOUNCE_SECONDS = 0.016
+
+
+def _is_streaming_only_batch(events: list[Any]) -> bool:
+    from backend.ledger.action.message import StreamingChunkAction
+
+    return bool(events) and all(
+        isinstance(event, StreamingChunkAction) for event in events
+    )
+
 
 def _collapse_streaming_chunks(events: list[Any]) -> list[Any]:
     """Keep only the latest snapshot from each run of streaming chunk events."""
@@ -95,9 +105,13 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
         if overflow > 0:
             del orch._history[:overflow]
     events = _collapse_streaming_chunks(events)
+    streaming_only = _is_streaming_only_batch(events)
     for event in events:
         orch._process_event(event)
-    orch._refresh_display()
+    if not streaming_only or any(
+        getattr(event, 'is_final', False) for event in events
+    ):
+        orch._refresh_display()
 
 
 async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
@@ -106,6 +120,14 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
     This prevents blocking the Textual event loop when processing many events,
     allowing keyboard and mouse input to be processed during active agent runs.
     """
+    debounce_handle = getattr(orch, '_drain_debounce_handle', None)
+    if debounce_handle is not None:
+        try:
+            debounce_handle.cancel()
+        except Exception:
+            pass
+        orch._drain_debounce_handle = None
+
     with orch._pending_lock:
         events = list(orch._pending_events)
         orch._pending_events.clear()
@@ -132,6 +154,7 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
             del orch._history[:overflow]
     
     events = _collapse_streaming_chunks(events)
+    streaming_only = _is_streaming_only_batch(events)
 
     # Process events in batches, yielding control between batches
     # This allows Textual to process keyboard/mouse events
@@ -142,8 +165,11 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
             orch._process_event(event)
         # Yield control to the event loop between batches
         await asyncio.sleep(0)
-    
-    orch._refresh_display()
+
+    if not streaming_only or any(
+        getattr(event, 'is_final', False) for event in events
+    ):
+        orch._refresh_display()
 
 
 async def wait_for_activity(
@@ -193,6 +219,15 @@ def _on_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
         pass
 
 
+def _post_drain_message(orch: '_AppRendererEventProcessorMixin') -> None:
+    orch._drain_debounce_handle = None
+    try:
+        orch._tui.post_message(RendererDrainRequested())
+    except Exception:
+        with orch._pending_lock:
+            orch._drain_scheduled = False
+
+
 def _signal_activity(
     orch: '_AppRendererEventProcessorMixin',
     should_schedule_drain: bool,
@@ -200,8 +235,13 @@ def _signal_activity(
     orch._state_event.set()
     if not should_schedule_drain:
         return
+    if getattr(orch, '_drain_debounce_handle', None) is not None:
+        return
     try:
-        orch._tui.post_message(RendererDrainRequested())
+        orch._drain_debounce_handle = orch._loop.call_later(
+            _TUI_DRAIN_DEBOUNCE_SECONDS,
+            lambda: _post_drain_message(orch),
+        )
     except Exception:
         with orch._pending_lock:
             orch._drain_scheduled = False

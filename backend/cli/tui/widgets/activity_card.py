@@ -821,9 +821,15 @@ class ThinkingIndicator(Container):
         self._thoughts.append(thought)
         self._update_display()
 
-    def set_thoughts(self, text: str) -> None:
+    def set_thoughts(self, text: str, *, streaming: bool = False) -> None:
+        if streaming and text == getattr(self, '_last_stream_text', ''):
+            return
+        if streaming:
+            self._last_stream_text = text
+        else:
+            self._last_stream_text = ''
         self._thoughts = text.split('\n')
-        self._update_display()
+        self._update_display(streaming=streaming)
 
     def stop(self) -> None:
         """Stop the thinking indicator."""
@@ -909,7 +915,7 @@ class ThinkingIndicator(Container):
 
         return container, children
 
-    def _update_display(self) -> None:
+    def _update_display(self, *, streaming: bool = False) -> None:
         if not self._thoughts:
             return
 
@@ -919,6 +925,29 @@ class ThinkingIndicator(Container):
         try:
             content = self.query_one('#thinking-content', Static)
         except Exception:
+            return
+
+        # During live streaming, defer expensive fenced-code remounts until finalize.
+        if streaming:
+            content.remove_class('-hidden')
+            if self._code_block_container is not None:
+                self._code_block_container.remove()
+                self._code_block_container = None
+            prefix = f'{self._current_action}: '
+            prefix_color = '#42a394'
+            text_color = '#8c8c94'
+            lines = self._thoughts
+            if len(lines) == 1:
+                parts: list[tuple[str, str]] = [
+                    (prefix, f'bold {prefix_color}'),
+                    (lines[0], text_color),
+                ]
+            else:
+                parts = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
+                for line in lines[1:]:
+                    parts.append(('\n  ', text_color))
+                    parts.append((line, text_color))
+            content.update(Text.assemble(*parts))
             return
 
         # Check if we need syntax highlighting
