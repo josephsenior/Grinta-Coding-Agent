@@ -44,7 +44,7 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         ),
     )
     execution_profile: Literal['standard', 'hardened_local', 'sandboxed_local'] = Field(
-        default='hardened_local',
+        default='standard',
         description=(
             "Runtime execution profile. 'standard' preserves permissive local behavior. "
             "'hardened_local' adds stricter local policy gates for commands and file access. "

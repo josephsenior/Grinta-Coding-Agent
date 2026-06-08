@@ -120,15 +120,37 @@ def bounded_llm_http_timeout(
     )
 
 
-def _coerce_bounded_request_timeout(value: Any, default_total: float | None) -> httpx.Timeout:
+def _shared_llm_pool_timeout() -> httpx.Timeout:
+    """Default socket timeouts for pooled LLM httpx clients.
+
+    These transports serve streaming completions; use the streaming read
+    ceiling so inter-chunk pauses are not capped at 30s by the pool default.
+    """
+    from backend.core.llm_step_timeout import DEFAULT_LLM_STEP_TIMEOUT_SECONDS
+
+    return bounded_llm_http_timeout(
+        DEFAULT_LLM_STEP_TIMEOUT_SECONDS,
+        streaming=True,
+    )
+
+
+def _coerce_bounded_request_timeout(
+    value: Any,
+    default_total: float | None,
+    *,
+    streaming: bool = False,
+) -> httpx.Timeout:
     """Normalize SDK timeout kwargs to a bounded ``httpx.Timeout``."""
     if isinstance(value, httpx.Timeout):
-        return bounded_llm_http_timeout(value.timeout if value.timeout else default_total)
+        return bounded_llm_http_timeout(
+            value.timeout if value.timeout else default_total,
+            streaming=streaming,
+        )
     if isinstance(value, (int, float)):
-        return bounded_llm_http_timeout(float(value))
+        return bounded_llm_http_timeout(float(value), streaming=streaming)
     if default_total is not None:
-        return bounded_llm_http_timeout(default_total)
-    return bounded_llm_http_timeout(None)
+        return bounded_llm_http_timeout(default_total, streaming=streaming)
+    return bounded_llm_http_timeout(None, streaming=streaming)
 
 
 def _with_default_timeout(
@@ -141,7 +163,9 @@ def _with_default_timeout(
     if 'timeout' in kwargs:
         return {
             **kwargs,
-            'timeout': _coerce_bounded_request_timeout(kwargs['timeout'], normalized),
+            'timeout': _coerce_bounded_request_timeout(
+                kwargs['timeout'], normalized, streaming=streaming
+            ),
         }
     if normalized is None:
         return kwargs
@@ -171,7 +195,7 @@ def get_shared_http_client(provider: str, base_url: str | None = None) -> httpx.
             if key not in _shared_sync_clients:
                 _shared_sync_clients[key] = httpx.Client(
                     limits=_POOL_LIMITS,
-                    timeout=bounded_llm_http_timeout(60.0),
+                    timeout=_shared_llm_pool_timeout(),
                     follow_redirects=True,
                 )
                 logger.debug('Created shared sync httpx pool for %s', key)
@@ -188,7 +212,7 @@ def get_shared_async_http_client(
             if key not in _shared_async_clients:
                 _shared_async_clients[key] = httpx.AsyncClient(
                     limits=_POOL_LIMITS,
-                    timeout=bounded_llm_http_timeout(60.0),
+                    timeout=_shared_llm_pool_timeout(),
                     follow_redirects=True,
                 )
                 logger.debug('Created shared async httpx pool for %s', key)
