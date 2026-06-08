@@ -71,13 +71,11 @@ DEFAULT_OBSERVATION_HANDLER_TIMEOUT_SECONDS = 10.0
 # execution, tool pipelines, plugin hooks, etc.
 DEFAULT_STEP_TASK_LIVENESS_SECONDS = 600.0
 # Hard cap on how long run_agent_until_done polls before forcing termination.
-# 0 or negative = disabled (no hard cap).  Env override allows long sessions.
-# Default raised from 0 → 1800s (30 min) so a silent stall in the agent loop
-# surfaces as ERROR state within a bounded time window instead of looping
-# forever.  Set GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS=0 to restore the
-# pre-fix behavior.
+# 0 or negative = disabled (no hard cap).  Set
+# GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS=1800 (or any positive value) to cap
+# long sessions when debugging silent stalls.
 DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS = float(
-    os.getenv('GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS', '1800')
+    os.getenv('GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS', '0')
 )
 # ── Event-loop stall watchdog (backend.core.loop_watchdog) ──────────
 # A dedicated OS thread monitors the main asyncio loop for freezes that the
@@ -131,13 +129,10 @@ LLM_HTTP_POOL_TIMEOUT_SECONDS = float(
     os.getenv('GRINTA_HTTP_POOL_TIMEOUT_SECONDS', '10')
 )
 # Hard cap on how long the TUI ``_dispatch_to_agent`` poll loop will wait
-# for the agent to leave ``AgentState.RUNNING`` before forcing ERROR.
-# Catches the symptom of the agent-stuck-in-RUNNING race: a 30-min default
-# keeps legitimate long-running tasks working but prevents the previous
-# 4-hour silent poll loops.  Set GRINTA_TUI_DISPATCH_TIMEOUT_SECONDS=0 to
-# disable the cap entirely.
+# without progress before forcing ERROR.  0 = disabled.  Set
+# GRINTA_TUI_DISPATCH_TIMEOUT_SECONDS=1800 to re-enable a 30-min stall guard.
 DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS = float(
-    os.getenv('GRINTA_TUI_DISPATCH_TIMEOUT_SECONDS', '1800')
+    os.getenv('GRINTA_TUI_DISPATCH_TIMEOUT_SECONDS', '0')
 )
 # How long the controller may go with state==RUNNING and no recorded
 # ``step()`` call before the no-step-progress watchdog fires.  120s is
