@@ -291,16 +291,16 @@ _INBAND_DISCONNECT_PHRASES: tuple[str, ...] = (
 # in-band error messages fit comfortably within this window.
 _INBAND_PREFIX_LIMIT = 256
 
-# Per-chunk streaming timeout: if no chunk arrives within this period,
-# the provider is considered to be silently hanging.
-_CHUNK_TIMEOUT_SEC = 120.0
-
-
 async def _stream_with_chunk_timeout(
-    stream_iter: Any, *, timeout_sec: float = _CHUNK_TIMEOUT_SEC
+    stream_iter: Any, *, timeout_sec: float | None = None
 ) -> Any:
     """Yield chunks from *stream_iter*, raising TimeoutError if a chunk takes too long."""
     import asyncio as _asyncio
+
+    from backend.core.constants import LLM_STREAM_CHUNK_TIMEOUT_SECONDS
+
+    if timeout_sec is None:
+        timeout_sec = LLM_STREAM_CHUNK_TIMEOUT_SECONDS
 
     while True:
         try:
@@ -816,9 +816,7 @@ class LLM(RetryMixin, DebugMixin):
                     )
                 self.log_prompt(messages)
                 stream_iter = self.client.astream(messages=messages, **call_kwargs)
-                async for chunk in _stream_with_chunk_timeout(
-                    stream_iter, timeout_sec=_CHUNK_TIMEOUT_SEC
-                ):
+                async for chunk in _stream_with_chunk_timeout(stream_iter):
                     if await self._check_cancelled():
                         logger.debug('LLM stream cancelled by user.')
                         return

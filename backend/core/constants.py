@@ -128,6 +128,11 @@ LLM_HTTP_WRITE_TIMEOUT_SECONDS = float(
 LLM_HTTP_POOL_TIMEOUT_SECONDS = float(
     os.getenv('GRINTA_HTTP_POOL_TIMEOUT_SECONDS', '10')
 )
+# Inter-chunk streaming budget: shared by the executor chunk watchdog,
+# ``llm.py`` stream iterator, and httpx read timeout for ``astream``.
+LLM_STREAM_CHUNK_TIMEOUT_SECONDS = float(
+    os.getenv('APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS', '120')
+)
 # Hard cap on how long the TUI ``_dispatch_to_agent`` poll loop will wait
 # without progress before forcing ERROR.  0 = disabled.  Set
 # GRINTA_TUI_DISPATCH_TIMEOUT_SECONDS=1800 to re-enable a 30-min stall guard.
@@ -626,6 +631,11 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
         '0',
         'Hard cap (seconds) for run_agent_until_done polling; 0 disables the cap entirely '
         'so long sessions are never forcibly terminated.',
+    ),
+    'APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS': (
+        '120',
+        'Max seconds between streamed LLM chunks before timeout; also sets httpx read '
+        'timeout for streaming and the executor chunk watchdog',
     ),
     # API versioning
     'APP_PERMISSIVE_API': (

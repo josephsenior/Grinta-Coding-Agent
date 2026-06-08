@@ -20,7 +20,21 @@ from typing import TYPE_CHECKING, Any
 from rich.markdown import Markdown
 from rich.text import Text
 
+from backend.cli._event_renderer.error_panel import notice_panel_title
 from backend.cli._event_renderer.unified_renderer import ActivityRenderer
+from backend.ledger.observation.error import (
+    ERROR_CATEGORY_NETWORK,
+    ERROR_CATEGORY_RATE_LIMIT,
+    ERROR_CATEGORY_TIMEOUT,
+)
+
+_TRANSIENT_HUD_ONLY_CATEGORIES = frozenset(
+    {
+        ERROR_CATEGORY_TIMEOUT,
+        ERROR_CATEGORY_NETWORK,
+        ERROR_CATEGORY_RATE_LIMIT,
+    }
+)
 from backend.cli.theme import NAVY_TEXT_MUTED, NAVY_TEXT_PRIMARY
 from backend.cli.transcript import strip_tool_result_validation_annotations
 from backend.cli.tui._app_helpers import (
@@ -421,13 +435,22 @@ def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
     elif isinstance(event, ErrorObservation):
         orch._compaction_transcript_active = False
         content = event.content or 'An unknown error occurred'
-        # User-facing LLM/provider/config failures keep the red ✗ marker;
-        # everything else (tool validation, no-tool-call, capability
-        # outcomes, etc.) is a recoverable issue the agent retries on.
         if getattr(event, 'notify_ui_only', False):
-            orch._tui.add_error(content)
-        else:
-            orch._tui.add_warning(content)
+            # HUD-only infra/config errors: retry StatusObservation drives the
+            # strip for transient failures; hard-stop auth/config issues use
+            # the runtime strip. Never pollute the transcript (matches REPL
+            # renderer behaviour in observation_renderers_mixin).
+            error_category = getattr(event, 'error_category', None)
+            if (
+                error_category
+                and error_category not in _TRANSIENT_HUD_ONLY_CATEGORIES
+            ):
+                summary = notice_panel_title(content, error_category=error_category)
+                first_line = content.split('\n', 1)[0].strip()
+                orch._update_runtime_strip(summary, first_line, active=True)
+            return
+        # Recoverable model-actionable issues (tool validation, etc.).
+        orch._tui.add_warning(content)
     elif isinstance(event, SuccessObservation):
         orch._compaction_transcript_active = False
         orch._clear_retry_strip('Recovered')

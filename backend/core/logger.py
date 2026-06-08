@@ -484,6 +484,7 @@ _file_logging_configured = False
 # is attached to. ``bind_session_logging`` swaps this handler so all output
 # follows the active session into ``sessions/<id>/app.log``.
 _LOG_SESSION_ID: str | None = None
+_ACTIVE_SESSION_LOG_DIR: str | None = None
 _SHARED_FILE_HANDLER: logging.Handler | None = None
 _FILE_LOGGER_NAMES: tuple[str, ...] = (
     'app',
@@ -574,9 +575,14 @@ def _audit_previous_session_log(previous_segment: str | None) -> None:
 
 
 def _audit_session_log_on_exit() -> None:
-    if not LOG_TO_FILE or not _LOG_SESSION_ID:
+    if not LOG_TO_FILE:
         return
-    finalize_session_logging_audit()
+    target_dir = _ACTIVE_SESSION_LOG_DIR
+    if not target_dir and _LOG_SESSION_ID:
+        target_dir = get_log_dir()
+    if not target_dir:
+        return
+    finalize_session_logging_audit(target_dir)
 
 
 atexit.register(_audit_session_log_on_exit)
@@ -590,7 +596,7 @@ def bind_session_logging(session_id: str | None) -> None:
     workspace file shared by every run. Idempotent per session id; safe to
     call before or after :func:`configure_file_logging`.
     """
-    global _LOG_SESSION_ID, _SHARED_FILE_HANDLER
+    global _LOG_SESSION_ID, _ACTIVE_SESSION_LOG_DIR, _SHARED_FILE_HANDLER
     if not LOG_TO_FILE or not session_id:
         return
     segment = _safe_session_segment(str(session_id))
@@ -600,7 +606,8 @@ def bind_session_logging(session_id: str | None) -> None:
     _flush_shared_file_handler()
     _audit_previous_session_log(previous_segment)
     _LOG_SESSION_ID = segment
-    log_dir = get_log_dir()
+    log_dir = os.path.join(_workspace_logs_dir(), 'sessions', segment)
+    _ACTIVE_SESSION_LOG_DIR = log_dir
     os.makedirs(log_dir, exist_ok=True)
     new_handler = get_file_handler(log_dir, current_log_level)
     old_handler = _SHARED_FILE_HANDLER

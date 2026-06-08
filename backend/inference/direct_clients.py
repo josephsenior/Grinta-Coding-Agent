@@ -82,22 +82,35 @@ def _normalize_timeout_seconds(timeout: float | int | None) -> float | None:
 
 def bounded_llm_http_timeout(
     request_timeout: float | int | None = None,
+    *,
+    streaming: bool = False,
 ) -> httpx.Timeout:
     """Build ``httpx.Timeout`` with bounded socket-level connect/read ceilings.
 
     The overall *timeout* follows the logical request budget (model thinking
     time) but connect, read, write, and pool waits are capped so dead sockets
     and stalled streams fail within seconds and route to retry logic.
+
+    Streaming calls use a higher per-read ceiling aligned with
+    ``APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS`` so slow token delivery does not
+    trip the non-streaming 30s read cap before the chunk watchdog fires.
     """
     from backend.core.constants import (
         LLM_HTTP_CONNECT_TIMEOUT_SECONDS,
         LLM_HTTP_POOL_TIMEOUT_SECONDS,
         LLM_HTTP_READ_TIMEOUT_SECONDS,
         LLM_HTTP_WRITE_TIMEOUT_SECONDS,
+        LLM_STREAM_CHUNK_TIMEOUT_SECONDS,
     )
 
     total = _normalize_timeout_seconds(request_timeout) or 60.0
-    read_cap = min(LLM_HTTP_READ_TIMEOUT_SECONDS, total)
+    if streaming:
+        read_floor = max(
+            LLM_HTTP_READ_TIMEOUT_SECONDS, LLM_STREAM_CHUNK_TIMEOUT_SECONDS
+        )
+        read_cap = min(read_floor, total)
+    else:
+        read_cap = min(LLM_HTTP_READ_TIMEOUT_SECONDS, total)
     return httpx.Timeout(
         timeout=total,
         connect=LLM_HTTP_CONNECT_TIMEOUT_SECONDS,
@@ -119,7 +132,10 @@ def _coerce_bounded_request_timeout(value: Any, default_total: float | None) -> 
 
 
 def _with_default_timeout(
-    kwargs: dict[str, Any], timeout: float | int | None
+    kwargs: dict[str, Any],
+    timeout: float | int | None,
+    *,
+    streaming: bool = False,
 ) -> dict[str, Any]:
     normalized = _normalize_timeout_seconds(timeout)
     if 'timeout' in kwargs:
@@ -129,7 +145,10 @@ def _with_default_timeout(
         }
     if normalized is None:
         return kwargs
-    return {**kwargs, 'timeout': bounded_llm_http_timeout(normalized)}
+    return {
+        **kwargs,
+        'timeout': bounded_llm_http_timeout(normalized, streaming=streaming),
+    }
 
 
 def _gemini_timeout_ms(timeout: float | int | None) -> int:
@@ -693,7 +712,9 @@ class OpenAIClient(DirectLLMClient):
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
-        kwargs = _with_default_timeout(kwargs, self._request_timeout)
+        kwargs = _with_default_timeout(
+            kwargs, self._request_timeout, streaming=True
+        )
         async for chunk in _openai_astream(self, messages, **kwargs):
             yield chunk
 
@@ -750,7 +771,9 @@ class AnthropicClient(DirectLLMClient):
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
-        kwargs = _with_default_timeout(kwargs, self._request_timeout)
+        kwargs = _with_default_timeout(
+            kwargs, self._request_timeout, streaming=True
+        )
         async for chunk in _anthropic_astream(self, messages, **kwargs):
             yield chunk
 

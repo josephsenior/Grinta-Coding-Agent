@@ -251,6 +251,11 @@ class _AppScreenMessagesMixin:
             if self._renderer is not None:
                 self._renderer._tui.add_system_message('Interrupted. Ready for input.')
 
+            with contextlib.suppress(Exception):
+                from backend.core.logger import finalize_session_logging_audit
+
+                finalize_session_logging_audit()
+
             self.finalize_thinking()
             spinner = self.query_one('#spinner', Static)
             spinner.add_class('-hidden')
