@@ -24,6 +24,8 @@ from backend.ledger.action import (
 class _AppRendererActionHandlersMixin:
     """action handlers (search/message/streaming/state)."""
 
+    _LIVE_STREAM_PAINT_INTERVAL = 0.05
+
     def _handle_search_action(self, thought: str, source_tool: str = 'search') -> None:
         """Handle grep/glob action and render as a card.
 
@@ -165,13 +167,48 @@ class _AppRendererActionHandlersMixin:
         if action.is_tool_call:
             return
 
+        if action.is_final:
+            self._stream_paint_timer_armed = False
+            self._deferred_stream_chunk = None
+            self._apply_streaming_chunk(action)
+            return
+
+        now = time.monotonic()
+        last_paint = getattr(self, '_last_stream_paint_at', 0.0)
+        if now - last_paint < self._LIVE_STREAM_PAINT_INTERVAL:
+            self._deferred_stream_chunk = action
+            if not getattr(self, '_stream_paint_timer_armed', False):
+                self._stream_paint_timer_armed = True
+                delay = max(
+                    self._LIVE_STREAM_PAINT_INTERVAL - (now - last_paint),
+                    0.01,
+                )
+                try:
+                    self._loop.call_later(delay, self._flush_deferred_stream_chunk)
+                except RuntimeError:
+                    self._stream_paint_timer_armed = False
+                    self._last_stream_paint_at = now
+                    self._apply_streaming_chunk(action)
+            return
+
+        self._last_stream_paint_at = now
+        self._apply_streaming_chunk(action)
+
+    def _flush_deferred_stream_chunk(self) -> None:
+        self._stream_paint_timer_armed = False
+        action = getattr(self, '_deferred_stream_chunk', None)
+        if action is None or action.is_final:
+            return
+        self._deferred_stream_chunk = None
+        self._last_stream_paint_at = time.monotonic()
+        self._apply_streaming_chunk(action)
+
+    def _apply_streaming_chunk(self, action: StreamingChunkAction) -> None:
         self._streaming_active = not action.is_final
 
         thinking = (action.thinking_accumulated or '').strip()
         content = self._normalize_final_response_text(action.accumulated or '')
 
-        # Debug: log raw thinking_accumulated so we can see if duplication is
-        # in the data or in the rendering layer.
         if thinking:
             _chunk_n = getattr(self, '_dbg_chunk_n', 0) + 1
             self._dbg_chunk_n = _chunk_n
@@ -181,18 +218,14 @@ class _AppRendererActionHandlersMixin:
                 _log.info(
                     '[streaming-dbg] chunk=%d thinking_accumulated len=%d '
                     'head=%r tail=%r',
-                    _chunk_n, len(thinking),
-                    thinking[:80], thinking[-80:],
+                    _chunk_n,
+                    len(thinking),
+                    thinking[:80],
+                    thinking[-80:],
                 )
 
         if self._is_visible_thinking_text(thinking):
             self._render_thinking_payload(thinking)
-            # Only finalize the thinking block when the stream ends.
-            # Finalizing on every intermediate chunk that has content destroys
-            # the ThinkingIndicator widget mid-stream; the next chunk then
-            # re-creates it and populates it with the full thinking_accumulated
-            # (which re-includes all previously finalized text), causing the
-            # thinking content to appear duplicated in the transcript.
             if action.is_final:
                 self._finalize_live_thinking()
         elif action.is_final:

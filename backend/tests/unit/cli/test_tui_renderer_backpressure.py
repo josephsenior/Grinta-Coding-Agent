@@ -13,7 +13,9 @@ from backend.cli.tui._app_constants import (
     _TUI_PENDING_EVENT_LIMIT as _ORIG_PENDING_LIMIT,
 )
 from backend.cli.tui import _app_renderer_event_processor_mixin as _ep_mod
+from backend.cli.tui import _app_renderer_event_drain as _drain_mod
 from backend.cli.tui import _app_renderer_live_mixin as _live_mod
+from backend.ledger.action import StreamingChunkAction
 
 
 @pytest.mark.asyncio
@@ -133,6 +135,53 @@ async def test_tui_renderer_live_response_renders_in_main_panel_until_clear():
     assert renderer._live_response == ''
     assert renderer._live_response_dirty is False
     assert display.clear.call_count >= 2
+
+
+@pytest.mark.asyncio
+async def test_tui_renderer_coalesces_interim_streaming_chunks():
+    loop = MagicMock()
+    renderer = tui_app.TUIRenderer(
+        console=SimpleNamespace(width=100),
+        hud=SimpleNamespace(
+            state=SimpleNamespace(mcp_servers=0), bundled_skill_count=0
+        ),
+        reasoning=SimpleNamespace(),
+        tui=SimpleNamespace(),
+        loop=loop,
+    )
+
+    renderer._on_event(
+        StreamingChunkAction(chunk='a', accumulated='a', is_final=False)
+    )
+    renderer._on_event(
+        StreamingChunkAction(chunk='b', accumulated='ab', is_final=False)
+    )
+    renderer._on_event(
+        StreamingChunkAction(chunk='c', accumulated='abc', is_final=False)
+    )
+
+    assert len(renderer._pending_events) == 1
+    assert renderer._pending_events[0].accumulated == 'abc'
+    assert renderer._pending_events_dropped == 0
+
+
+def test_collapse_streaming_chunks_keeps_latest_snapshot_per_run():
+    other = object()
+    chunks = [
+        StreamingChunkAction(chunk='a', accumulated='a', is_final=False),
+        StreamingChunkAction(chunk='b', accumulated='ab', is_final=False),
+        other,
+        StreamingChunkAction(chunk='x', accumulated='x', is_final=False),
+        StreamingChunkAction(chunk='y', accumulated='xy', is_final=True),
+    ]
+
+    collapsed = _drain_mod._collapse_streaming_chunks(chunks)
+
+    assert len(collapsed) == 3
+    assert collapsed[0].accumulated == 'ab'
+    assert collapsed[1] is other
+    assert collapsed[2].accumulated == 'xy'
+    assert collapsed[2].is_final is True
 
 
 @pytest.mark.asyncio
