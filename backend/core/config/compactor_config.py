@@ -14,6 +14,7 @@ from backend.core.constants import (
     DEFAULT_COMPACTOR_MAX_EVENT_LENGTH,
     DEFAULT_COMPACTOR_MAX_EVENTS,
     DEFAULT_COMPACTOR_MAX_SIZE,
+    DEFAULT_LLM_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
     DEFAULT_SMART_COMPACTOR_IMPORTANCE_THRESHOLD,
     DEFAULT_SMART_COMPACTOR_KEEP_FIRST,
@@ -145,6 +146,31 @@ class CompactorPipelineConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     model_config = ConfigDict(extra='forbid')
 
 
+class ContextPipelineConfig(BaseModel, metaclass=CanonicalModelMetaclass):
+    """Configuration for the unified ContextPipeline compaction architecture."""
+
+    type: Literal['context_pipeline'] = Field(default='context_pipeline')
+    llm_config: LLMConfig | str | None = Field(
+        default=None,
+        description='LLM config for Layer 5b structured compaction.',
+    )
+    allow_llm_hot_path: bool = Field(
+        default=True,
+        description='Allow LLM structured compaction on the hot path (with cooldown).',
+    )
+    preserve_recent: int = Field(
+        default=DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
+        description='Microcompact preservation window (Layer 3).',
+        ge=1,
+    )
+    llm_compact_cooldown_seconds: int = Field(
+        default=DEFAULT_LLM_COMPACT_COOLDOWN_SECONDS,
+        description='Minimum seconds between hot-path LLM compaction attempts.',
+        ge=0,
+    )
+    model_config = ConfigDict(extra='forbid')
+
+
 class AutoCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for task-aware automatic compactor selection.
 
@@ -219,6 +245,7 @@ CompactorConfig = (
     | CompactorPipelineConfig
     | SmartCompactorConfig
     | AutoCompactorConfig
+    | ContextPipelineConfig
 )
 
 
@@ -246,7 +273,7 @@ def compactor_config_from_toml_section(
     """
     compactor_mapping: dict[str, CompactorConfig] = {}
     try:
-        compactor_type = data.get('type', 'smart')
+        compactor_type = data.get('type', 'context_pipeline')
         if (
             compactor_type in ('smart', 'structured')
             and 'llm_config' in data
@@ -301,6 +328,7 @@ def create_compactor_config(compactor_type: str, data: dict) -> CompactorConfig:
         'pipeline': CompactorPipelineConfig,
         'smart': SmartCompactorConfig,
         'auto': AutoCompactorConfig,
+        'context_pipeline': ContextPipelineConfig,
     }
     if compactor_type not in compactor_classes:
         msg = f'Unknown compactor type: {compactor_type}'
@@ -318,3 +346,4 @@ StructuredSummaryCompactorConfig.model_rebuild()
 CompactorPipelineConfig.model_rebuild()
 SmartCompactorConfig.model_rebuild()
 AutoCompactorConfig.model_rebuild()
+ContextPipelineConfig.model_rebuild()

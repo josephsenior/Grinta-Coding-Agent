@@ -79,36 +79,13 @@ class DAPDebugManager:
                 payload = self._start(action, timeout=start_timeout)
             else:
                 session = self._get_session(action.session_id)
-                try:
-                    payload = self._dispatch_existing(
-                        session, action, debug_action, timeout
-                    )
-                except Exception:
-                    # Drop sessions whose adapter is in an unrecoverable state
-                    # so the model can ``start`` a fresh one instead of looping
-                    # against a wedged subprocess.
-                    self._drop_session(session)
-                    raise
+                payload = self._dispatch_existing(
+                    session, action, debug_action, timeout
+                )
             return self._observation(debug_action, payload)
         except Exception as exc:
-            stderr_tail = self._stderr_tail_for(action)
-            phase = getattr(exc, 'phase', None)
-            exc_timeout: Any | None = getattr(exc, 'timeout', None)
-            phase_suffix = f'\nstartup_phase: {phase}' if phase else ''
-            timeout_suffix = (
-                f'\nstartup_timeout_seconds: {float(exc_timeout):.1f}'
-                if isinstance(exc_timeout, (int, float)) and exc_timeout > 0
-                else ''
-            )
-            suffix = f'\nadapter_stderr:\n{stderr_tail}' if stderr_tail else ''
-            logger.warning(
-                'DAP: %s failed for session=%s: %s',
-                debug_action or '<unknown>',
-                action.session_id or '<new>',
-                exc,
-            )
-            return ErrorObservation(
-                f'Debugger error: {type(exc).__name__}: {exc}{phase_suffix}{timeout_suffix}{suffix}'
+            return self._handle_dispatch_exception(
+                exc, action, debug_action
             )
 
     def _drop_session(self, session: DAPDebugSession) -> None:
@@ -117,6 +94,29 @@ class DAPDebugManager:
             session.close()
         except Exception:
             logger.debug('DAP session close after dispatch error failed', exc_info=True)
+
+    def _handle_dispatch_exception(
+        self, exc: Exception, action: DebuggerAction, debug_action: str
+    ) -> ErrorObservation:
+        stderr_tail = self._stderr_tail_for(action)
+        phase = getattr(exc, 'phase', None)
+        exc_timeout: Any | None = getattr(exc, 'timeout', None)
+        phase_suffix = f'\nstartup_phase: {phase}' if phase else ''
+        timeout_suffix = (
+            f'\nstartup_timeout_seconds: {float(exc_timeout):.1f}'
+            if isinstance(exc_timeout, (int, float)) and exc_timeout > 0
+            else ''
+        )
+        suffix = f'\nadapter_stderr:\n{stderr_tail}' if stderr_tail else ''
+        logger.warning(
+            'DAP: %s failed for session=%s: %s',
+            debug_action or '<unknown>',
+            action.session_id or '<new>',
+            exc,
+        )
+        return ErrorObservation(
+            f'Debugger error: {type(exc).__name__}: {exc}{phase_suffix}{timeout_suffix}{suffix}'
+        )
 
     def _stderr_tail_for(self, action: DebuggerAction) -> str:
         session = self.sessions.get(action.session_id) if action.session_id else None
@@ -160,7 +160,28 @@ class DAPDebugManager:
         adapter_id = action.adapter_id or adapter or 'generic'
         language = action.language or adapter
 
-        session = DAPDebugSession(
+        session = self._build_session(
+            session_id, action, adapter_id, language, request,
+            adapter_command,
+        )
+        self.sessions[session_id] = session
+        try:
+            return session.start(timeout=timeout)
+        except Exception:
+            self.sessions.pop(session_id, None)
+            session.close()
+            raise
+
+    def _build_session(
+        self,
+        session_id: str,
+        action: DebuggerAction,
+        adapter_id: str,
+        language: str,
+        request: str,
+        adapter_command: list[str],
+    ) -> DAPDebugSession:
+        return DAPDebugSession(
             session_id,
             workspace_root=self.workspace_root,
             adapter_command=adapter_command,
@@ -177,13 +198,6 @@ class DAPDebugManager:
             initialize_options=action.initialize_options,
             python=action.python,
         )
-        self.sessions[session_id] = session
-        try:
-            return session.start(timeout=timeout)
-        except Exception:
-            self.sessions.pop(session_id, None)
-            session.close()
-            raise
 
     def _dispatch_existing(
         self,
@@ -192,45 +206,72 @@ class DAPDebugManager:
         debug_action: str,
         timeout: float,
     ) -> dict[str, Any]:
-        if debug_action == 'set_breakpoints':
-            if not action.file:
-                raise DAPError('set_breakpoints requires file')
-            return session.set_breakpoints(
-                action.file, action.lines, action.breakpoints or None, timeout=timeout
-            )
-        if debug_action == 'continue':
-            return session.continue_execution(action.thread_id, timeout=timeout)
-        if debug_action == 'next':
-            return session.step('next', action.thread_id, timeout=timeout)
-        if debug_action == 'step_in':
-            return session.step('stepIn', action.thread_id, timeout=timeout)
-        if debug_action == 'step_out':
-            return session.step('stepOut', action.thread_id, timeout=timeout)
-        if debug_action == 'pause':
-            return session.pause(action.thread_id, timeout=timeout)
-        if debug_action == 'stack':
-            return session.stack_trace(action.thread_id, timeout=timeout)
-        if debug_action == 'scopes':
-            if action.frame_id is None:
-                raise DAPError('scopes requires frame_id')
-            return session.scopes(action.frame_id, timeout=timeout)
-        if debug_action == 'variables':
-            if action.variables_reference is None:
-                raise DAPError('variables requires variables_reference')
-            return session.variables(
-                action.variables_reference, action.count, timeout=timeout
-            )
-        if debug_action == 'evaluate':
-            if not action.expression:
-                raise DAPError('evaluate requires expression')
-            return session.evaluate(action.expression, action.frame_id, timeout=timeout)
-        if debug_action == 'status':
-            return session.status(timeout=timeout)
-        if debug_action == 'stop':
-            payload = session.stop(timeout=timeout)
-            self.sessions.pop(session.session_id, None)
-            return payload
-        raise DAPError(f'Unknown debugger action: {debug_action}')
+        try:
+            handler = self._DISPATCH_TABLE[debug_action]
+        except KeyError:
+            raise DAPError(f'Unknown debugger action: {debug_action}')
+        try:
+            return handler(self, session, action, timeout)
+        except Exception:
+            self._drop_session(session)
+            raise
+
+    def _action_set_breakpoints(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
+        if not action.file:
+            raise DAPError('set_breakpoints requires file')
+        return session.set_breakpoints(action.file, action.lines, action.breakpoints or None, timeout=timeout)
+
+    def _action_continue(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
+        return session.continue_execution(action.thread_id, timeout=timeout)
+
+    def _action_step(self, step_kind: str):
+        def handler(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
+            return session.step(step_kind, action.thread_id, timeout=timeout)
+        return handler
+
+    def _action_pause(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
+        return session.pause(action.thread_id, timeout=timeout)
+
+    def _action_stack(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
+        return session.stack_trace(action.thread_id, timeout=timeout)
+
+    def _action_scopes(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
+        if action.frame_id is None:
+            raise DAPError('scopes requires frame_id')
+        return session.scopes(action.frame_id, timeout=timeout)
+
+    def _action_variables(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
+        if action.variables_reference is None:
+            raise DAPError('variables requires variables_reference')
+        return session.variables(action.variables_reference, action.count, timeout=timeout)
+
+    def _action_evaluate(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
+        if not action.expression:
+            raise DAPError('evaluate requires expression')
+        return session.evaluate(action.expression, action.frame_id, timeout=timeout)
+
+    def _action_status(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
+        return session.status(timeout=timeout)
+
+    def _action_stop(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
+        payload = session.stop(timeout=timeout)
+        self.sessions.pop(session.session_id, None)
+        return payload
+
+    _DISPATCH_TABLE: dict[str, Any] = {
+        'set_breakpoints': _action_set_breakpoints,
+        'continue': _action_continue,
+        'next': _action_step('next'),
+        'step_in': _action_step('stepIn'),
+        'step_out': _action_step('stepOut'),
+        'pause': _action_pause,
+        'stack': _action_stack,
+        'scopes': _action_scopes,
+        'variables': _action_variables,
+        'evaluate': _action_evaluate,
+        'status': _action_status,
+        'stop': _action_stop,
+    }
 
     def _adapter_name(self, action: DebuggerAction) -> str | None:
         adapter = action.adapter or action.language

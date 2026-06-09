@@ -175,6 +175,27 @@ def _bare_model_id(model_id: str | None) -> str:
     return mid.split('/', 1)[-1]
 
 
+_MODEL_PREFIX_TO_PROVIDER: tuple[tuple[str, str], ...] = (
+    ('claude-', 'anthropic'),
+    ('gemini-', 'google'),
+    ('deepseek-', 'deepseek'),
+    ('grok-', 'xai'),
+    ('gpt-', 'openai'),
+    ('o1', 'openai'),
+    ('o3', 'openai'),
+    ('o4', 'openai'),
+)
+
+_OLLAMA_PREFIXES = ('llama', 'phi', 'qwen')
+
+
+def _match_model_prefix(mid: str) -> str | None:
+    for prefix, provider in _MODEL_PREFIX_TO_PROVIDER:
+        if mid.startswith(prefix):
+            return provider
+    return None
+
+
 def _extract_provider_from_model(model_id: str | None) -> str | None:
     """Best-effort provider extraction from a model id.
 
@@ -186,18 +207,11 @@ def _extract_provider_from_model(model_id: str | None) -> str | None:
         return None
     if '/' in mid:
         return mid.split('/', 1)[0] or None
-    if mid.startswith('claude-'):
-        return 'anthropic'
-    if mid.startswith('gemini-'):
-        return 'google'
-    if mid.startswith('deepseek-'):
-        return 'deepseek'
-    if mid.startswith('grok-'):
-        return 'xai'
-    if mid.startswith('llama') or mid.startswith('phi') or mid.startswith('qwen'):
+    matched = _match_model_prefix(mid)
+    if matched:
+        return matched
+    if any(mid.startswith(p) for p in _OLLAMA_PREFIXES):
         return 'ollama'
-    if mid.startswith(('gpt-', 'o1', 'o3', 'o4')):
-        return 'openai'
     return None
 
 

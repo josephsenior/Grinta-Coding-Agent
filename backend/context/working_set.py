@@ -18,25 +18,17 @@ from backend.ledger.observation.agent import AgentCondensationObservation
 _WORKING_SET_MARKER = '<DURABLE_WORKING_SET>'
 
 
-def sync_snapshot_to_working_memory(snapshot: dict[str, Any] | None) -> list[str]:
-    """Persist condensation snapshot facts into structured working memory."""
-    if not snapshot:
-        return []
-    try:
-        from backend.context.pre_condensation_snapshot import format_snapshot_for_injection
-        from backend.engine.tools.working_memory import _load_memory, _save_memory
-    except Exception:
-        logger.debug('Working memory sync unavailable', exc_info=True)
-        return []
-
-    memory = _load_memory()
-    updated: list[str] = []
+def _sync_findings_block(memory: dict[str, Any], snapshot: dict[str, Any]) -> str | None:
+    from backend.context.pre_condensation_snapshot import format_snapshot_for_injection
 
     block = format_snapshot_for_injection(snapshot)
     if block and block.strip():
         memory['findings'] = block[: DEFAULT_DURABLE_CONTEXT_CHAR_BUDGET * 2]
-        updated.append('findings')
+        return 'findings'
+    return None
 
+
+def _sync_test_results(memory: dict[str, Any], snapshot: dict[str, Any]) -> str | None:
     test_lines: list[str] = []
     for result in snapshot.get('test_results', [])[-5:]:
         if not isinstance(result, dict):
@@ -51,27 +43,60 @@ def sync_snapshot_to_working_memory(snapshot: dict[str, Any] | None) -> list[str
         test_lines.append(line)
     if test_lines:
         memory['blockers'] = 'Recent test results:\n' + '\n'.join(test_lines)
-        updated.append('blockers')
+        return 'blockers'
+    return None
 
+
+def _sync_decisions(memory: dict[str, Any], snapshot: dict[str, Any]) -> str | None:
     decisions = snapshot.get('decisions', [])
     if isinstance(decisions, list) and decisions:
         memory['decisions'] = '\n'.join(str(d)[:300] for d in decisions[-8:])
-        updated.append('decisions')
+        return 'decisions'
+    return None
 
+
+def _sync_failed_approaches(memory: dict[str, Any], snapshot: dict[str, Any]) -> str | None:
     approaches = snapshot.get('attempted_approaches', [])
-    if isinstance(approaches, list) and approaches:
-        failed = [
-            a for a in approaches if isinstance(a, dict) and 'FAILED' in str(a.get('outcome', ''))
-        ]
-        if failed:
-            lines = [
-                f"✗ {a.get('type', '?')}: {str(a.get('detail', ''))[:120]}"
-                for a in failed[-6:]
-            ]
-            existing = memory.get('hypothesis', '')
-            hint = 'Do not retry these failed approaches:\n' + '\n'.join(lines)
-            memory['hypothesis'] = f'{existing}\n\n{hint}'.strip() if existing else hint
-            updated.append('hypothesis')
+    if not (isinstance(approaches, list) and approaches):
+        return None
+    failed = [
+        a for a in approaches if isinstance(a, dict) and 'FAILED' in str(a.get('outcome', ''))
+    ]
+    if not failed:
+        return None
+    lines = [
+        f"✗ {a.get('type', '?')}: {str(a.get('detail', ''))[:120]}"
+        for a in failed[-6:]
+    ]
+    existing = memory.get('hypothesis', '')
+    hint = 'Do not retry these failed approaches:\n' + '\n'.join(lines)
+    memory['hypothesis'] = f'{existing}\n\n{hint}'.strip() if existing else hint
+    return 'hypothesis'
+
+
+def sync_snapshot_to_working_memory(snapshot: dict[str, Any] | None) -> list[str]:
+    """Persist condensation snapshot facts into structured working memory."""
+    if not snapshot:
+        return []
+    try:
+        from backend.context.pre_condensation_snapshot import format_snapshot_for_injection  # noqa: F401
+        from backend.engine.tools.working_memory import _load_memory, _save_memory
+    except Exception:
+        logger.debug('Working memory sync unavailable', exc_info=True)
+        return []
+
+    memory = _load_memory()
+    updated: list[str] = []
+
+    for sync_fn in (
+        _sync_findings_block,
+        _sync_test_results,
+        _sync_decisions,
+        _sync_failed_approaches,
+    ):
+        result = sync_fn(memory, snapshot)
+        if result:
+            updated.append(result)
 
     if updated:
         memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')

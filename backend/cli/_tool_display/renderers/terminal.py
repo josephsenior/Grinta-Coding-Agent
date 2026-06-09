@@ -34,6 +34,30 @@ def render_terminal_read(session_id: str = '') -> Panel:
     )
 
 
+def _build_terminal_content(content: str) -> list[Text]:
+    lines: list[Text] = []
+    all_lines = content.splitlines()
+    preview = all_lines[:15]
+    for line in preview:
+        if len(line) > 120:
+            line = line[:117] + '\u2026'
+        lines.append(Text(line, style=NAVY_TEXT_MUTED))
+    if len(all_lines) > 15:
+        lines.append(
+            Text(f'... {len(all_lines) - 15} more lines', style=NAVY_TEXT_DIM)
+        )
+    return lines
+
+
+def _build_terminal_meta(exit_code: int | None) -> Text | None:
+    if exit_code is None:
+        return None
+    style = CLR_STATUS_OK if exit_code == 0 else '#fd8383'
+    meta_line = Text()
+    meta_line.append(f'exit {exit_code}', style=style)
+    return meta_line
+
+
 def render_terminal_output(
     content: str, session_id: str = '', exit_code: int | None = None
 ) -> Panel:
@@ -44,35 +68,12 @@ def render_terminal_output(
         content_parts.append(Text(f'Session: {session_id}', style=NAVY_TEXT_DIM))
 
     if content:
-        lines = content.splitlines()[:15]
-        for line in lines:
-            if len(line) > 120:
-                line = line[:117] + '…'
-            content_parts.append(Text(line, style=NAVY_TEXT_MUTED))
+        content_parts.extend(_build_terminal_content(content))
 
-        if len(content.splitlines()) > 15:
-            content_parts.append(
-                Text(
-                    f'... {len(content.splitlines()) - 15} more lines',
-                    style=NAVY_TEXT_DIM,
-                )
-            )
-
-    meta_parts = []
-    if exit_code is not None:
-        if exit_code == 0:
-            meta_parts.append(Text(f'exit {exit_code}', style=CLR_STATUS_OK))
-        else:
-            meta_parts.append(Text(f'exit {exit_code}', style='#fd8383'))
-
-    if meta_parts:
+    meta = _build_terminal_meta(exit_code)
+    if meta:
         content_parts.append(Text(''))
-        meta_line = Text()
-        for i, part in enumerate(meta_parts):
-            if i > 0:
-                meta_line.append('  ')
-            meta_line.append(part)
-        content_parts.append(meta_line)
+        content_parts.append(meta)
 
     panel_title = Text('Terminal', style='bold #f6ff8f')
     return Panel(

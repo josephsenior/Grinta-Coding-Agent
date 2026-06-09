@@ -90,6 +90,9 @@ class _AesIoFileMixin:
                 f"You're not allowed to access this path: {action.path}. You can only access paths inside the workspace."
             )
 
+        return self._read_file_by_type(filepath, action, working_dir)
+
+    def _read_file_by_type(self, filepath: str, action: FileReadAction, working_dir: str) -> Observation:
         try:
             if filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
                 return read_image_file(filepath)

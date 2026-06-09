@@ -330,40 +330,58 @@ SERIALIZED_PAYLOAD_ERROR = (
 )
 
 
+def _get_stripped_content(content: object) -> str:
+    if not isinstance(content, str) or not content:
+        return ''
+    return content.strip()
+
+
+def _is_fenced_code_block(stripped: str) -> bool:
+    return stripped.startswith('```') and stripped.endswith('```') and len(stripped) > 6
+
+
+def _is_surrounded_by_quotes(stripped: str) -> bool:
+    return (stripped.startswith('"') and stripped.endswith('"')) or (
+        stripped.startswith("'") and stripped.endswith("'")
+    )
+
+
+def _is_quoted_with_escapes(stripped: str, content: str) -> bool:
+    if not _is_surrounded_by_quotes(stripped):
+        return False
+    return content.count('\\n') > 0 or content.count('\\"') > 0
+
+
+def _has_excessive_literal_newlines(content: str) -> bool:
+    literal_newlines = content.count('\\n')
+    real_newlines = content.count('\n')
+    if literal_newlines >= 3 and real_newlines <= 1:
+        return True
+    if literal_newlines >= 6 and literal_newlines >= (real_newlines + 1) * 3:
+        return True
+    return False
+
+
+def _has_excessive_escaped_quotes(content: str) -> bool:
+    return content.count('\\"') >= 4 and content.count('\n') <= 1
+
+
 def looks_serialized_payload(content: str) -> bool:
     r"""Conservatively detect obvious JSON-serialized file payloads.
 
     This intentionally catches only high-confidence cases. A few legitimate
     source string literals containing ``"\n"`` must not block an edit.
     """
-    if not isinstance(content, str) or not content:
-        return False
-
-    stripped = content.strip()
+    stripped = _get_stripped_content(content)
     if not stripped:
         return False
-
-    if stripped.startswith('```') and stripped.endswith('```') and len(stripped) > 6:
+    if _is_fenced_code_block(stripped):
         return True
-
-    quoted = (stripped.startswith('"') and stripped.endswith('"')) or (
-        stripped.startswith("'") and stripped.endswith("'")
-    )
-    literal_newlines = content.count('\\n')
-    real_newlines = content.count('\n')
-    escaped_quotes = content.count('\\"')
-
-    if quoted and (literal_newlines > 0 or escaped_quotes > 0):
+    if _is_quoted_with_escapes(stripped, content):
         return True
-
-    if literal_newlines >= 3 and real_newlines <= 1:
+    if _has_excessive_literal_newlines(content):
         return True
-    if literal_newlines >= 6 and literal_newlines >= (real_newlines + 1) * 3:
-        return True
-    if escaped_quotes >= 4 and real_newlines <= 1:
-        return True
-
-    return False
+    return _has_excessive_escaped_quotes(content)
 
 
 def serialized_payload_error(field_name: str | None = None) -> str:

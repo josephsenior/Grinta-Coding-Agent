@@ -433,6 +433,60 @@ class ActivityCard(Container):
     def _caret_char(self) -> str:
         return chr(9660) if not self._collapsed else chr(9654)
 
+    def _build_syntax_renderable(
+        self,
+        content: str,
+        language: str,
+        *,
+        line_numbers: bool = False,
+    ) -> Syntax:
+        return Syntax(
+            content,
+            language,
+            theme=get_grinta_pygments_style(),
+            background_color=NAVY_BG,
+            line_numbers=line_numbers,
+            padding=(0, 1),
+            word_wrap=True,
+        )
+
+    def _is_diff_like_content(self, content: str) -> bool:
+        if content.startswith('--- ') or content.startswith('diff --git'):
+            return True
+        return any(
+            line.startswith(('+', '-', '@@'))
+            for line in content.splitlines()
+            if line and not line.startswith(('+++', '---'))
+        )
+
+    def _try_json_syntax(self, content: str) -> Any | None:
+        is_json_shape = (
+            (content.startswith('{') and content.endswith('}'))
+            or (content.startswith('[') and content.endswith(']'))
+        )
+        if not is_json_shape:
+            return None
+        try:
+            json.loads(content)
+        except Exception:
+            return None
+        return self._build_syntax_renderable(content, 'json')
+
+    def _format_plain_content(self, content: str) -> str:
+        lines = content.splitlines() or ['']
+        styled_lines = [f'[{NAVY_TEXT_MUTED}]{line}[/]' for line in lines]
+        return '\n'.join(styled_lines)
+
+    def _auto_detect_format(self, content: str) -> Any:
+        if self._is_diff_like_content(content):
+            return self._build_syntax_renderable(
+                content, 'diff', line_numbers=True
+            )
+        json_result = self._try_json_syntax(content)
+        if json_result is not None:
+            return json_result
+        return self._format_plain_content(content)
+
     def _get_formatted_extra_content(self) -> Any:
         content = self._extra_content or ''
 
@@ -440,55 +494,13 @@ class ActivityCard(Container):
             return content
 
         if self._syntax_language:
-            return Syntax(
+            return self._build_syntax_renderable(
                 content,
                 self._syntax_language,
-                theme=get_grinta_pygments_style(),
-                background_color=NAVY_BG,
                 line_numbers=self._syntax_language == 'diff',
-                padding=(0, 1),
-                word_wrap=True,
             )
 
-        diff_like = (
-            content.startswith('--- ')
-            or content.startswith('diff --git')
-            or any(
-                line.startswith(('+', '-', '@@'))
-                for line in content.splitlines()
-                if line and not line.startswith(('+++', '---'))
-            )
-        )
-        if diff_like:
-            return Syntax(
-                content,
-                'diff',
-                theme=get_grinta_pygments_style(),
-                background_color=NAVY_BG,
-                line_numbers=True,
-                padding=(0, 1),
-                word_wrap=True,
-            )
-
-        if (content.startswith('{') and content.endswith('}')) or (
-            content.startswith('[') and content.endswith(']')
-        ):
-            try:
-                json.loads(content)
-                return Syntax(
-                    content,
-                    'json',
-                    theme=get_grinta_pygments_style(),
-                    background_color=NAVY_BG,
-                    padding=(0, 1),
-                    word_wrap=True,
-                )
-            except Exception:
-                pass
-
-        lines = content.splitlines() or ['']
-        styled_lines = [f'[{NAVY_TEXT_MUTED}]{line}[/]' for line in lines]
-        return '\n'.join(styled_lines)
+        return self._auto_detect_format(content)
 
     def _extra_renderables(self) -> list[Any]:
         content = self._extra_content or ''
@@ -842,54 +854,34 @@ class ThinkingIndicator(Container):
         """Check if text contains fenced code blocks."""
         return bool(self._CODE_BLOCK_PATTERN.search(text))
 
-    def _render_with_code_blocks(self, text: str) -> tuple[Any, list[Any]]:
-        """Render text with syntax-highlighted code blocks.
-
-        Returns a tuple of (container, children_widgets) to be mounted by caller.
-        """
-        prefix = f'{self._current_action}: '
-        prefix_color = '#42a394'  # ~0.7 opacity of #5eead4 against dark bg
-        text_color = '#8c8c94'  # ~0.7 opacity of #c8c8d4 against dark bg
-
-        # Split text into code blocks and plain text segments
+    def _parse_text_segments(self, text: str) -> list[tuple[str, Any]]:
         segments = []
         last_end = 0
-
         for match in self._CODE_BLOCK_PATTERN.finditer(text):
-            # Add plain text before this code block
             if match.start() > last_end:
                 plain_text = text[last_end:match.start()]
                 if plain_text.strip():
                     segments.append(('plain', plain_text))
-
-            # Add the code block
             language = match.group(1) or 'text'
             code_content = match.group(2)
             segments.append(('code', (language, code_content)))
-
             last_end = match.end()
-
-        # Add any remaining plain text
         if last_end < len(text):
             remaining = text[last_end:]
             if remaining.strip():
                 segments.append(('plain', remaining))
+        return segments
 
-        # If no code blocks found, return simple Text
-        if not segments:
-            parts = [(prefix, f'bold {prefix_color}'), (text, text_color)]
-            return Text.assemble(*parts), []
-
-        # Build rich renderable with mixed content
-        from textual.containers import Vertical
+    def _build_segment_widgets(self, segments: list[tuple[str, Any]]) -> list[Any]:
         from textual.widgets import Static as TextualStatic
 
-        container = Vertical()
-        children = []
+        prefix = f'{self._current_action}: '
+        prefix_color = '#42a394'
+        text_color = '#8c8c94'
+        children: list[Any] = []
 
         for seg_type, seg_content in segments:
             if seg_type == 'plain':
-                # Render plain text with prefix on first segment
                 if not children:
                     parts = [(prefix, f'bold {prefix_color}'), (seg_content, text_color)]
                     text_widget = TextualStatic(Text.assemble(*parts))
@@ -899,7 +891,6 @@ class ThinkingIndicator(Container):
                     )
                 children.append(text_widget)
             else:
-                # Render code block with syntax highlighting
                 language, code = seg_content
                 syntax = Syntax(
                     code,
@@ -912,8 +903,68 @@ class ThinkingIndicator(Container):
                 code_widget = TextualStatic(syntax)
                 code_widget.add_class('code-block')
                 children.append(code_widget)
+        return children
 
+    def _render_with_code_blocks(self, text: str) -> tuple[Any, list[Any]]:
+        """Render text with syntax-highlighted code blocks.
+
+        Returns a tuple of (container, children_widgets) to be mounted by caller.
+        """
+        prefix = f'{self._current_action}: '
+        prefix_color = '#42a394'
+        text_color = '#8c8c94'
+
+        segments = self._parse_text_segments(text)
+
+        if not segments:
+            parts = [(prefix, f'bold {prefix_color}'), (text, text_color)]
+            return Text.assemble(*parts), []
+
+        from textual.containers import Vertical
+
+        container = Vertical()
+        children = self._build_segment_widgets(segments)
         return container, children
+
+    def _build_thoughts_text_parts(self) -> list[tuple[str, str]]:
+        prefix = f'{self._current_action}: '
+        prefix_color = '#42a394'
+        text_color = '#8c8c94'
+        lines = self._thoughts
+        parts: list[tuple[str, str]] = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
+        for line in lines[1:]:
+            parts.append(('\n  ', text_color))
+            parts.append((line, text_color))
+        return parts
+
+    def _update_display_streaming(self, content: Static) -> None:
+        content.remove_class('-hidden')
+        if self._code_block_container is not None:
+            self._code_block_container.remove()
+            self._code_block_container = None
+        parts = self._build_thoughts_text_parts()
+        content.update(Text.assemble(*parts))
+
+    def _update_display_with_code_blocks(self, content: Static, full_text: str) -> None:
+        from textual.containers import Vertical
+
+        content.add_class('-hidden')
+        if self._code_block_container is None:
+            self._code_block_container = Vertical()
+            self.mount(self._code_block_container)
+        for child in list(self._code_block_container.children):
+            child.remove()
+        _, children = self._render_with_code_blocks(full_text)
+        for child in children:
+            self._code_block_container.mount(child)
+
+    def _update_display_plain(self, content: Static) -> None:
+        content.remove_class('-hidden')
+        if self._code_block_container is not None:
+            self._code_block_container.remove()
+            self._code_block_container = None
+        parts = self._build_thoughts_text_parts()
+        content.update(Text.assemble(*parts))
 
     def _update_display(self, *, streaming: bool = False) -> None:
         if not self._thoughts:
@@ -921,81 +972,19 @@ class ThinkingIndicator(Container):
 
         full_text = '\n'.join(self._thoughts)
 
-        # Try to find the Static content widget
         try:
             content = self.query_one('#thinking-content', Static)
         except Exception:
             return
 
-        # During live streaming, defer expensive fenced-code remounts until finalize.
         if streaming:
-            content.remove_class('-hidden')
-            if self._code_block_container is not None:
-                self._code_block_container.remove()
-                self._code_block_container = None
-            prefix = f'{self._current_action}: '
-            prefix_color = '#42a394'
-            text_color = '#8c8c94'
-            lines = self._thoughts
-            if len(lines) == 1:
-                parts: list[tuple[str, str]] = [
-                    (prefix, f'bold {prefix_color}'),
-                    (lines[0], text_color),
-                ]
-            else:
-                parts = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
-                for line in lines[1:]:
-                    parts.append(('\n  ', text_color))
-                    parts.append((line, text_color))
-            content.update(Text.assemble(*parts))
+            self._update_display_streaming(content)
             return
 
-        # Check if we need syntax highlighting
         if self._has_code_blocks(full_text):
-            # Hide the plain text Static
-            content.add_class('-hidden')
-            
-            # Create or update the code block container
-            if self._code_block_container is None:
-                from textual.containers import Vertical
-                self._code_block_container = Vertical()
-                self.mount(self._code_block_container)
-            
-            # Clear existing children
-            for child in list(self._code_block_container.children):
-                child.remove()
-            
-            # Create new children
-            _, children = self._render_with_code_blocks(full_text)
-            for child in children:
-                self._code_block_container.mount(child)
+            self._update_display_with_code_blocks(content, full_text)
         else:
-            # Show the plain text Static
-            content.remove_class('-hidden')
-            
-            # Remove code block container if it exists
-            if self._code_block_container is not None:
-                self._code_block_container.remove()
-                self._code_block_container = None
-            
-            # Simple plain text rendering
-            prefix = f'{self._current_action}: '
-            prefix_color = '#42a394'  # ~0.7 opacity of #5eead4 against dark bg
-            text_color = '#8c8c94'  # ~0.7 opacity of #c8c8d4 against dark bg
-
-            lines = self._thoughts
-            parts: list[tuple[str, str]] = []
-
-            if len(lines) == 1:
-                parts = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
-            else:
-                parts = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
-                for line in lines[1:]:
-                    parts.append(('\n  ', text_color))
-                    parts.append((line, text_color))
-
-            thoughts_text = Text.assemble(*parts)
-            content.update(thoughts_text)
+            self._update_display_plain(content)
 
     def on_mount(self) -> None:
         self._update_display()

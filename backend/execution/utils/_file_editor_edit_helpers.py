@@ -87,6 +87,71 @@ def handle_edit_impl(
         )
 
 
+def _validate_replace_string_old_string(old_string: str | None) -> ToolResult | None:
+    if old_string is None or old_string == '':
+        return ToolResult(
+            output='',
+            error='replace_string old_string must not be empty.',
+            error_code='EMPTY_OLD_STRING',
+            retryable=False,
+            operation='replace_string',
+        )
+    return None
+
+
+def _check_replace_string_preflight(self, file_path: Path, new_string: str) -> ToolResult | None:
+    preflight = self._preflight_content_guard(file_path, new_string)
+    if preflight is not None:
+        return ToolResult(
+            output='',
+            error=preflight,
+            error_code='CONTENT_APPEARS_SERIALIZED'
+            if 'CONTENT_APPEARS_SERIALIZED' in preflight
+            else 'CONTENT_PREFLIGHT_FAILED',
+            retryable=False,
+            operation='replace_string',
+        )
+    return None
+
+
+def _normalize_replace_strings(
+    old_content: str, old_string: str, new_string: str
+) -> tuple[str, str]:
+    newline = '\r\n' if '\r\n' in old_content else '\n'
+    old_match = old_string.replace('\r\n', '\n').replace('\r', '\n')
+    new_replacement = new_string.replace('\r\n', '\n').replace('\r', '\n')
+    if newline == '\r\n':
+        old_match = old_match.replace('\n', '\r\n')
+        new_replacement = new_replacement.replace('\n', '\r\n')
+    return old_match, new_replacement
+
+
+def _build_old_string_not_found_result(
+    self, file_path: Path, old_content: str
+) -> ToolResult:
+    base_error = (
+        'replace_string old_string was not found exactly. '
+        'Re-read the file and retry the edit with a verified '
+        'old_string.'
+    )
+    if self._was_recently_written(file_path):
+        base_error += (
+            " (The file was modified by a previous edit in this "
+            "turn — re-read it before retrying, the model's "
+            'working copy is now stale.)'
+        )
+    return ToolResult(
+        output='',
+        error=base_error,
+        old_content=old_content,
+        new_content=old_content,
+        error_code='OLD_STRING_NOT_FOUND',
+        retryable=True,
+        operation='replace_string',
+        metadata={'match_count': 0},
+    )
+
+
 def handle_replace_string_impl(
     self,
     file_path: Path,
@@ -98,25 +163,14 @@ def handle_replace_string_impl(
 ) -> ToolResult:
     """Replace exact text occurrences using the safe edit pipeline."""
     try:
-        if old_string is None or old_string == '':
-            return ToolResult(
-                output='',
-                error='replace_string old_string must not be empty.',
-                error_code='EMPTY_OLD_STRING',
-                retryable=False,
-                operation='replace_string',
-            )
-        preflight = self._preflight_content_guard(file_path, new_string)
+        validation = _validate_replace_string_old_string(old_string)
+        if validation is not None:
+            return validation
+
+        preflight = _check_replace_string_preflight(self, file_path, new_string)
         if preflight is not None:
-            return ToolResult(
-                output='',
-                error=preflight,
-                error_code='CONTENT_APPEARS_SERIALIZED'
-                if 'CONTENT_APPEARS_SERIALIZED' in preflight
-                else 'CONTENT_PREFLIGHT_FAILED',
-                retryable=False,
-                operation='replace_string',
-            )
+            return preflight
+
         if not file_path.exists():
             return ToolResult(
                 output='',
@@ -127,36 +181,13 @@ def handle_replace_string_impl(
             )
 
         old_content = self._read_file(file_path)
-        newline = '\r\n' if '\r\n' in old_content else '\n'
-        old_match = old_string.replace('\r\n', '\n').replace('\r', '\n')
-        new_replacement = new_string.replace('\r\n', '\n').replace('\r', '\n')
-        if newline == '\r\n':
-            old_match = old_match.replace('\n', '\r\n')
-            new_replacement = new_replacement.replace('\n', '\r\n')
+        old_match, new_replacement = _normalize_replace_strings(
+            old_content, old_string, new_string
+        )
 
         match_count = old_content.count(old_match)
         if match_count == 0:
-            base_error = (
-                'replace_string old_string was not found exactly. '
-                'Re-read the file and retry the edit with a verified '
-                'old_string.'
-            )
-            if self._was_recently_written(file_path):
-                base_error += (
-                    " (The file was modified by a previous edit in this "
-                    "turn — re-read it before retrying, the model's "
-                    'working copy is now stale.)'
-                )
-            return ToolResult(
-                output='',
-                error=base_error,
-                old_content=old_content,
-                new_content=old_content,
-                error_code='OLD_STRING_NOT_FOUND',
-                retryable=True,
-                operation='replace_string',
-                metadata={'match_count': 0},
-            )
+            return _build_old_string_not_found_result(self, file_path, old_content)
         if match_count > 1 and not replace_all:
             return ToolResult(
                 output='',
@@ -348,17 +379,9 @@ def build_dry_run_result_impl(
     )
 
 
-def write_edit_result_impl(
-    self,
-    file_path: Path,
-    old_content: str | None,
-    new_content: str,
-    *,
-    target_kind: str,
-    requested_start_line: int | None = None,
-    requested_end_line: int | None = None,
-) -> ToolResult:
-    """Write the result of an edit operation to disk."""
+def _validate_edit_before_write(
+    self, file_path: Path, old_content: str | None, new_content: str
+) -> tuple[ToolResult | None, str]:
     if old_content is not None and file_path.exists():
         disk_now = self._read_file(file_path)
         if disk_now != old_content:
@@ -370,7 +393,7 @@ def write_edit_result_impl(
                 ),
                 old_content=old_content,
                 new_content=new_content,
-            )
+            ), ''
 
     regression_error = self._detect_introduced_syntax_error(
         file_path, old_content, new_content
@@ -384,7 +407,7 @@ def write_edit_result_impl(
             error_code='INTRODUCED_SYNTAX_ERROR',
             retryable=True,
             operation='edit_validate',
-        )
+        ), ''
 
     is_valid, msg = self._maybe_validate_syntax_for_file(file_path, new_content)
     if not is_valid:
@@ -396,7 +419,48 @@ def write_edit_result_impl(
             error_code='SYNTAX_VALIDATION_FAILED',
             retryable=True,
             operation='edit_validate',
+        ), ''
+    return None, msg if msg else ''
+
+
+def _format_edit_success_output(
+    self,
+    old_content: str | None,
+    new_content: str,
+    written_content: str,
+    msg: str,
+) -> str:
+    output = 'File updated successfully'
+
+    if old_content is not None:
+        context_window = _format_context_window(old_content, new_content)
+        if context_window:
+            output += '\n\n' + context_window
+
+    if self._last_indent_warnings:
+        output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(
+            self._last_indent_warnings
         )
+
+    if msg and msg.startswith('WARNING:'):
+        output = f'{output}\n{msg}'
+    return output
+
+
+def write_edit_result_impl(
+    self,
+    file_path: Path,
+    old_content: str | None,
+    new_content: str,
+    *,
+    target_kind: str,
+    requested_start_line: int | None = None,
+    requested_end_line: int | None = None,
+) -> ToolResult:
+    """Write the result of an edit operation to disk."""
+    validation_err, msg = _validate_edit_before_write(self, file_path, old_content, new_content)
+    if validation_err is not None:
+        return validation_err
 
     if self._transaction_stack:
         self._backup_file(file_path, old_content)
@@ -418,20 +482,9 @@ def write_edit_result_impl(
 
     self._record_recent_write(file_path)
 
-    output = 'File updated successfully'
-
-    if old_content is not None:
-        context_window = _format_context_window(old_content, new_content)
-        if context_window:
-            output += '\n\n' + context_window
-
-    if self._last_indent_warnings:
-        output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(
-            self._last_indent_warnings
-        )
-
-    if msg and msg.startswith('WARNING:'):
-        output = f'{output}\n{msg}'
+    output = _format_edit_success_output(
+        self, old_content, new_content, written_content, msg
+    )
     return ToolResult(
         output=output,
         old_content=old_content,
@@ -450,18 +503,10 @@ def write_edit_result_impl(
     )
 
 
-def handle_write_maybe_short_circuit_impl(
-    self,
-    *,
-    file_path: Path,
-    content: str,
-    old_content: str | None,
-    file_existed: bool,
-    is_create: bool,
-    dry_run: bool,
-    overwrite_existing: bool,
+def _check_write_create_exists(
+    is_create: bool, file_existed: bool, overwrite_existing: bool,
+    old_content: str | None, content: str,
 ) -> ToolResult | None:
-    """Early exits before validation / disk write."""
     if is_create and file_existed and not overwrite_existing:
         return ToolResult(
             output='',
@@ -475,22 +520,39 @@ def handle_write_maybe_short_circuit_impl(
             retryable=False,
             operation='create_file',
         )
+    return None
 
-    if dry_run:
-        return ToolResult(
-            output='Preview generated (no changes applied)',
+
+def _check_write_dry_run(
+    self,
+    dry_run: bool,
+    file_path: Path,
+    content: str,
+    old_content: str | None,
+    is_create: bool,
+) -> ToolResult | None:
+    if not dry_run:
+        return None
+    op = 'create_file_preview' if is_create else 'write_preview'
+    return ToolResult(
+        output='Preview generated (no changes applied)',
+        old_content=old_content,
+        new_content=content,
+        operation=op,
+        metadata=self._build_receipt(
+            file_path=file_path,
             old_content=old_content,
             new_content=content,
-            operation='create_file_preview' if is_create else 'write_preview',
-            metadata=self._build_receipt(
-                file_path=file_path,
-                old_content=old_content,
-                new_content=content,
-                operation='create_file_preview' if is_create else 'write_preview',
-                target_kind='full_file',
-                verification_passed=False,
-            ),
-        )
+            operation=op,
+            target_kind='full_file',
+            verification_passed=False,
+        ),
+    )
+
+
+def _check_write_noop(
+    file_existed: bool, old_content: str | None, content: str,
+) -> ToolResult | None:
     if file_existed and old_content == content:
         return ToolResult(
             output='No changes applied (content unchanged).',
@@ -498,6 +560,18 @@ def handle_write_maybe_short_circuit_impl(
             new_content=content,
             operation='write_noop',
         )
+    return None
+
+
+def _check_large_existing_file_guard(
+    self,
+    file_path: Path,
+    file_existed: bool,
+    is_create: bool,
+    overwrite_existing: bool,
+    old_content: str | None,
+    content: str,
+) -> ToolResult | None:
     if (
         file_existed
         and not is_create
@@ -521,7 +595,7 @@ def handle_write_maybe_short_circuit_impl(
     return None
 
 
-def handle_write_commit_impl(
+def handle_write_maybe_short_circuit_impl(
     self,
     *,
     file_path: Path,
@@ -529,8 +603,32 @@ def handle_write_commit_impl(
     old_content: str | None,
     file_existed: bool,
     is_create: bool,
-) -> ToolResult:
-    """Validate, detect stale disk, backup, undo snapshot, atomic write."""
+    dry_run: bool,
+    overwrite_existing: bool,
+) -> ToolResult | None:
+    """Early exits before validation / disk write."""
+    result = _check_write_create_exists(
+        is_create, file_existed, overwrite_existing, old_content, content
+    )
+    if result is not None:
+        return result
+
+    result = _check_write_dry_run(self, dry_run, file_path, content, old_content, is_create)
+    if result is not None:
+        return result
+
+    result = _check_write_noop(file_existed, old_content, content)
+    if result is not None:
+        return result
+
+    return _check_large_existing_file_guard(
+        self, file_path, file_existed, is_create, overwrite_existing, old_content, content
+    )
+
+
+def _validate_write_commit(
+    self, file_path: Path, old_content: str | None, content: str
+) -> tuple[ToolResult | None, str]:
     regression_error = self._detect_introduced_syntax_error(
         file_path, old_content, content
     )
@@ -543,7 +641,7 @@ def handle_write_commit_impl(
             error_code='INTRODUCED_SYNTAX_ERROR',
             retryable=True,
             operation='write_validate',
-        )
+        ), ''
 
     is_valid, msg = self._maybe_validate_syntax_for_file(file_path, content)
     if not is_valid:
@@ -555,8 +653,45 @@ def handle_write_commit_impl(
             error_code='SYNTAX_VALIDATION_FAILED',
             retryable=True,
             operation='write_validate',
-        )
+        ), ''
     soft_warning = msg if msg and msg.startswith('WARNING:') else ''
+    return None, soft_warning
+
+
+def _compose_write_commit_output(
+    self,
+    is_create: bool,
+    content: str,
+    old_content: str | None,
+    soft_warning: str,
+) -> str:
+    output_msg = _compose_write_success_message(
+        is_create=is_create,
+        content=content,
+        soft_warning=soft_warning,
+    )
+
+    if not is_create and old_content is not None:
+        context_window = _format_context_window(old_content, content)
+        if context_window:
+            output_msg += '\n\n' + context_window
+
+    return output_msg
+
+
+def handle_write_commit_impl(
+    self,
+    *,
+    file_path: Path,
+    content: str,
+    old_content: str | None,
+    file_existed: bool,
+    is_create: bool,
+) -> ToolResult:
+    """Validate, detect stale disk, backup, undo snapshot, atomic write."""
+    validation_err, soft_warning = _validate_write_commit(self, file_path, old_content, content)
+    if validation_err is not None:
+        return validation_err
 
     stale = self._detect_stale_disk_on_write(
         file_path=file_path,
@@ -583,27 +718,21 @@ def handle_write_commit_impl(
     if verification_error is not None:
         return verification_error
 
-    output_msg = _compose_write_success_message(
-        is_create=is_create,
-        content=content,
-        soft_warning=soft_warning,
+    operation = 'create_file' if is_create else 'write'
+    output_msg = _compose_write_commit_output(
+        self, is_create, content, old_content, soft_warning
     )
-
-    if not is_create and old_content is not None:
-        context_window = _format_context_window(old_content, content)
-        if context_window:
-            output_msg += '\n\n' + context_window
 
     return ToolResult(
         output=output_msg,
         old_content=old_content,
         new_content=written_content,
-        operation='create_file' if is_create else 'write',
+        operation=operation,
         metadata=self._build_receipt(
             file_path=file_path,
             old_content=old_content,
             new_content=written_content,
-            operation='create_file' if is_create else 'write',
+            operation=operation,
             target_kind='full_file',
             verification_passed=True,
         ),

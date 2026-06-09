@@ -182,47 +182,46 @@ def _normalize_plan_step_status(raw_status: Any) -> str:
         raise TypeError(str(exc)) from exc
 
 
-def normalize_plan_step_payload(step: Any, idx: int | None = None) -> dict[str, Any]:
-    """Normalize plan/task-tracker step payloads to the canonical schema."""
-    if not isinstance(step, dict):
-        msg = f'Plan step must be a dictionary, got {type(step)}'
-        raise TypeError(msg)
-
-    fallback_id = f'step-{idx}' if idx is not None else 'step'
+def _normalize_plan_step_subtasks(step: dict) -> list:
     subtasks = step.get('subtasks', [])
     if subtasks is None:
         subtasks = []
     if not isinstance(subtasks, list):
         msg = "Plan step 'subtasks' must be a list"
         raise TypeError(msg)
+    return subtasks
 
-    tags = step.get('tags', [])
-    if tags is None:
-        tags = []
-    elif isinstance(tags, str):
-        # Be forgiving: the LLM sometimes sends a bare comma-separated string
-        # instead of a list. Split on commas (and trim whitespace) so the
-        # agent doesn't have to re-issue the whole plan.
-        tags = [t.strip() for t in tags.split(',') if t.strip()]
-    elif not isinstance(tags, list):
-        # Wrap a single non-list value (e.g. an int) in a list so we don't
-        # reject otherwise-valid payloads over a schema quirk.
-        tags = [tags]
-    # Coerce non-string items to strings to keep the type contract stable.
-    tags = [str(t) for t in tags if t is not None]
 
-    normalized_subtasks = [
-        normalize_plan_step_payload(substep, i + 1)
-        for i, substep in enumerate(subtasks)
-    ]
+def _coerce_plan_step_tags(raw_tags: Any) -> list:
+    if raw_tags is None:
+        return []
+    if isinstance(raw_tags, str):
+        return [t.strip() for t in raw_tags.split(',') if t.strip()]
+    if isinstance(raw_tags, list):
+        return raw_tags
+    return [raw_tags]
 
-    # Auto-propagate: if all subtasks exist and are all done, the parent is done too.
+
+def _normalize_plan_step_tags(step: dict) -> list[str]:
+    return [str(t) for t in _coerce_plan_step_tags(step.get('tags', [])) if t is not None]
+
+
+def _resolve_plan_step_status(step: dict, normalized_subtasks: list) -> str:
     resolved_status = _normalize_plan_step_status(step.get('status'))
     if normalized_subtasks and all(
         s['status'] == TASK_STATUS_DONE for s in normalized_subtasks
     ):
         resolved_status = TASK_STATUS_DONE
+    return resolved_status
 
+
+def _build_plan_step_result(
+    step: dict,
+    fallback_id: str,
+    resolved_status: str,
+    normalized_subtasks: list,
+    tags: list[str],
+) -> dict[str, Any]:
     return {
         'id': str(step.get('id') or fallback_id),
         'description': str(step.get('description') or 'Untitled step'),
@@ -231,6 +230,26 @@ def normalize_plan_step_payload(step: Any, idx: int | None = None) -> dict[str, 
         'tags': [str(tag) for tag in tags],
         'subtasks': normalized_subtasks,
     }
+
+
+def normalize_plan_step_payload(step: Any, idx: int | None = None) -> dict[str, Any]:
+    """Normalize plan/task-tracker step payloads to the canonical schema."""
+    if not isinstance(step, dict):
+        msg = f'Plan step must be a dictionary, got {type(step)}'
+        raise TypeError(msg)
+
+    fallback_id = f'step-{idx}' if idx is not None else 'step'
+    subtasks = _normalize_plan_step_subtasks(step)
+    tags = _normalize_plan_step_tags(step)
+    normalized_subtasks = [
+        normalize_plan_step_payload(substep, i + 1)
+        for i, substep in enumerate(subtasks)
+    ]
+    resolved_status = _resolve_plan_step_status(step, normalized_subtasks)
+
+    return _build_plan_step_result(
+        step, fallback_id, resolved_status, normalized_subtasks, tags
+    )
 
 
 def build_plan_step_from_payload(

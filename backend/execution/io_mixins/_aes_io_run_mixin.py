@@ -71,24 +71,29 @@ class _AesIoRunMixin:
             if isinstance(observation, ErrorObservation):
                 return observation
 
-            if action.grep_pattern and isinstance(observation.content, str):
-                observation.content = self._apply_grep_filter(
-                    observation.content, action.grep_pattern
-                )
-            if isinstance(observation.content, str):
-                observation.content = truncate_cmd_output(observation.content)
-
-            self._annotate_environment_errors(observation)
-
-            if not action.is_static:
-                self._attach_detected_server(
-                    observation, self.session_manager.get_session('default')
-                )
-
-            return observation
+            return self._post_process_run_observation(action, observation)
         except Exception as exc:
             logger.error('Error running command: %s', exc)
             return ErrorObservation(str(exc))
+
+    def _post_process_run_observation(
+        self, action: CmdRunAction, observation: CmdOutputObservation
+    ) -> CmdOutputObservation | ErrorObservation | TerminalObservation:
+        if action.grep_pattern and isinstance(observation.content, str):
+            observation.content = self._apply_grep_filter(
+                observation.content, action.grep_pattern
+            )
+        if isinstance(observation.content, str):
+            observation.content = truncate_cmd_output(observation.content)
+
+        self._annotate_environment_errors(observation)
+
+        if not action.is_static:
+            self._attach_detected_server(
+                observation, self.session_manager.get_session('default')
+            )
+
+        return observation
 
     async def _run_background_cmd(self, action: CmdRunAction) -> TerminalObservation:
         session_id = f'bg-{uuid.uuid4().hex[:8]}'

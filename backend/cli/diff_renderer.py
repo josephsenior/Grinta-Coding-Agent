@@ -168,6 +168,46 @@ def _extract_tagged_block(content: str, start_tag: str, end_tag: str) -> str | N
     return block or None
 
 
+def _count_diff_totals(groups: list[dict[str, list[str]]]) -> tuple[int, int]:
+    total_added = 0
+    total_removed = 0
+    for g in groups:
+        for line in g.get('after_edits', []):
+            if line.startswith('+'):
+                total_added += 1
+        for line in g.get('before_edits', []):
+            if line.startswith('-'):
+                total_removed += 1
+    return total_added, total_removed
+
+
+def _style_diff_line(line: str) -> Text:
+    if line.startswith('-'):
+        return Text(f'  {line}', style=f'bold {CLR_DIFF_REM} on #7f1d1d')
+    if line.startswith('+'):
+        return Text(f'  {line}', style=f'bold {CLR_DIFF_ADD} on #14532d')
+    return Text(f'  {line}', style=f'dim {CLR_CARD_TITLE}')
+
+
+def _build_diff_header(file_path: str, total_added: int, total_removed: int) -> Text:
+    header_parts = [file_path]
+    if total_added:
+        header_parts.append(f'+{total_added}')
+    if total_removed:
+        header_parts.append(f'-{total_removed}')
+    header_text = ' · '.join(header_parts)
+    return Text(f'  {header_text}', style=f'bold {CLR_CARD_TITLE}')
+
+
+def _append_group_lines(
+    all_lines: list[Text], group: dict[str, list[str]]
+) -> None:
+    for line in group.get('before_edits', []):
+        all_lines.append(_style_diff_line(line))
+    for line in group.get('after_edits', []):
+        all_lines.append(_style_diff_line(line))
+
+
 class DiffPanel:
     """Rich renderable that shows a unified diff for a file edit."""
 
@@ -196,64 +236,51 @@ class DiffPanel:
         obs = self._obs
         path = getattr(obs, 'path', '?')
         prev_exist = getattr(obs, 'prev_exist', True)
-        verb = self._verb or ('Created' if not prev_exist else 'Edited')
+        verb = self._resolve_verb(prev_exist)
         parts: list[Any] = [format_activity_primary(verb, self._detail or path)]
         self._append_secondary(parts)
 
-        # New file creation — no diff, just show creation note
         if not prev_exist:
-            self._append_new_file_delta(parts)
-            preview_content = getattr(obs, 'new_content', None) or getattr(
-                obs, 'content', ''
-            )
-            preview_block = _preview_syntax_block(path, preview_content or '')
-            if preview_block is not None:
-                parts.append(preview_block)
-            else:
-                parts.extend(_preview_text_lines(preview_content or ''))
-            # Check for indentation warnings in content
-            self._append_indentation_warnings(parts, obs)
-            yield self._build_panel(parts)
-            return
+            self._render_new_file_parts(parts, obs, path)
+        else:
+            self._render_existing_file_parts(parts, obs)
 
-        # GRINTA_SHOW_DIFF=0: hide full diff output
+        self._append_indentation_warnings(parts, obs)
+        yield self._build_panel(parts)
+
+    def _resolve_verb(self, prev_exist: bool) -> str:
+        if self._verb:
+            return self._verb
+        return 'Created' if not prev_exist else 'Edited'
+
+    def _render_new_file_parts(self, parts: list[Any], obs: Any, path: str) -> None:
+        self._append_new_file_delta(parts)
+        preview_content = getattr(obs, 'new_content', None)
+        if not preview_content:
+            preview_content = getattr(obs, 'content', '')
+        preview_block = _preview_syntax_block(path, preview_content)
+        if preview_block is not None:
+            parts.append(preview_block)
+        else:
+            parts.extend(_preview_text_lines(preview_content))
+
+    def _render_existing_file_parts(self, parts: list[Any], obs: Any) -> None:
         if os.environ.get('GRINTA_SHOW_DIFF', '1') == '0':
             parts.append(format_activity_result_secondary('updated', kind='ok'))
-            # Check for indentation warnings in content
-            self._append_indentation_warnings(parts, obs)
-            yield self._build_panel(parts)
             return
-
-        # Try get_edit_groups for structured diff
         groups = self._extract_edit_groups()
         if groups:
             self._append_groups_diff(parts, groups)
-            # Check for indentation warnings in content
-            self._append_indentation_warnings(parts, obs)
-            yield self._build_panel(parts)
             return
-
-        # Fallback: visualize_diff or embedded diff
         diff_str = self._extract_visualize_diff()
         if diff_str:
             parts.append(Text(diff_str[:3000]))
-            # Check for indentation warnings in content
-            self._append_indentation_warnings(parts, obs)
-            yield self._build_panel(parts)
             return
-
         embedded = self._extract_embedded_diff()
         if embedded:
             parts.append(Text(embedded[:3000]))
-            # Check for indentation warnings in content
-            self._append_indentation_warnings(parts, obs)
-            yield self._build_panel(parts)
             return
-
         parts.append(format_activity_result_secondary('updated', kind='ok'))
-        # Check for indentation warnings in content
-        self._append_indentation_warnings(parts, obs)
-        yield self._build_panel(parts)
 
     def _append_indentation_warnings(self, parts: list[Any], obs: Any) -> None:
         """Append styled indentation warnings if present in observation content."""
@@ -395,56 +422,15 @@ class DiffPanel:
     def _render_groups(
         groups: list[dict[str, list[str]]], file_path: str = 'edited file'
     ) -> Any:
-        """Build colored diff lines with green/red backgrounds for +/- lines.
-
-        Format: filename +N lines -N lines (header) followed by colored diff lines
-        with line number prefixes.
-        """
         from rich.console import Group
         from rich.text import Text
 
-        all_lines: list[Text] = []
-
-        # Count totals for header
-        total_added = 0
-        total_removed = 0
-        for g in groups:
-            for line in g.get('after_edits', []):
-                if line.startswith('+'):
-                    total_added += 1
-            for line in g.get('before_edits', []):
-                if line.startswith('-'):
-                    total_removed += 1
-
-        # Build header: filename +N -N
-        header_parts = [file_path]
-        if total_added:
-            header_parts.append(f'+{total_added}')
-        if total_removed:
-            header_parts.append(f'-{total_removed}')
-        header_text = ' · '.join(header_parts)
-        all_lines.append(Text(f'  {header_text}', style=f'bold {CLR_CARD_TITLE}'))
+        total_added, total_removed = _count_diff_totals(groups)
+        all_lines: list[Text] = [_build_diff_header(file_path, total_added, total_removed)]
 
         for i, group in enumerate(groups):
             if i > 0:
                 all_lines.append(Text('  ···', style=f'dim {CLR_CARD_BORDER}'))
-
-            for line in group.get('before_edits', []):
-                if line.startswith('-'):
-                    styled = Text(f'  {line}', style=f'bold {CLR_DIFF_REM} on #7f1d1d')
-                elif line.startswith('+'):
-                    styled = Text(f'  {line}', style=f'bold {CLR_DIFF_ADD} on #14532d')
-                else:
-                    styled = Text(f'  {line}', style=f'dim {CLR_CARD_TITLE}')
-                all_lines.append(styled)
-
-            for line in group.get('after_edits', []):
-                if line.startswith('-'):
-                    styled = Text(f'  {line}', style=f'bold {CLR_DIFF_REM} on #7f1d1d')
-                elif line.startswith('+'):
-                    styled = Text(f'  {line}', style=f'bold {CLR_DIFF_ADD} on #14532d')
-                else:
-                    styled = Text(f'  {line}', style=f'dim {CLR_CARD_TITLE}')
-                all_lines.append(styled)
+            _append_group_lines(all_lines, group)
 
         return Group(*all_lines)

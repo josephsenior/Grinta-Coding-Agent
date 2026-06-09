@@ -102,15 +102,58 @@ class _AppScreenActionsMixin:
             return normalize_autonomy_level(getattr(state, 'autonomy_level', '')) == 'full'
         return False
 
-    async def _handle_confirmation_dialog(self) -> None:
-        """Show inline confirmation widget and wait for user decision."""
-        pending = None
+    def _get_pending_action(self) -> Any:
         try:
             action_service = getattr(self._controller, 'action_service', None)
             if action_service is not None:
-                pending = action_service.get_pending_action()
+                return action_service.get_pending_action()
         except Exception:
             pass
+        return None
+
+    def _extract_pending_details(self, pending: Any) -> tuple[str, str]:
+        target = ''
+        risk_raw = 'UNKNOWN'
+        if pending is None:
+            return target, risk_raw
+        if hasattr(pending, 'command') and pending.command:
+            target = pending.command
+        elif hasattr(pending, 'path') and pending.path:
+            target = pending.path
+        risk = getattr(pending, 'security_risk', None)
+        if risk is not None:
+            risk_raw = self._normalize_risk_key(risk)
+        return target, risk_raw
+
+    def _build_confirm_options(self) -> list[tuple[str, str]]:
+        options: list[tuple[str, str]] = [
+            ('approve', 'Accept'),
+        ]
+        ac = getattr(self._controller, 'autonomy_controller', None)
+        if ac is not None and hasattr(ac, 'remember_always_allow'):
+            options.append(('always', 'Always'))
+        options.append(('reject', 'Reject'))
+        return options
+
+    def _apply_confirm_result(
+        self,
+        result: str,
+        pending: Any,
+    ) -> None:
+        ac = getattr(self._controller, 'autonomy_controller', None)
+        if result == 'approve':
+            approved = True
+        elif result == 'always':
+            approved = True
+            if ac is not None and pending is not None:
+                ac.remember_always_allow(pending)
+        else:
+            approved = False
+        return self._controller.apply_user_decision(approved=approved)
+
+    async def _handle_confirmation_dialog(self) -> None:
+        """Show inline confirmation widget and wait for user decision."""
+        pending = self._get_pending_action()
 
         if self._is_full_autonomy():
             await self._controller.apply_user_decision(approved=True)
@@ -118,29 +161,10 @@ class _AppScreenActionsMixin:
 
         action_type_raw = type(pending).__name__ if pending else 'Unknown'
         action_type = self._ACTION_TYPE_LABELS.get(action_type_raw, action_type_raw)
-        target = ''
-        risk_raw = 'UNKNOWN'
-
-        if pending:
-            if hasattr(pending, 'command') and pending.command:
-                target = pending.command
-            elif hasattr(pending, 'path') and pending.path:
-                target = pending.path
-
-            risk = getattr(pending, 'security_risk', None)
-            if risk is not None:
-                risk_raw = self._normalize_risk_key(risk)
-
+        target, risk_raw = self._extract_pending_details(pending)
         risk_label, risk_class = self._RISK_LABELS.get(risk_raw, ('Unknown', 'dim'))
 
-        options: list[tuple[str, str]] = [
-            ('approve', 'Accept'),
-        ]
-
-        ac = getattr(self._controller, 'autonomy_controller', None)
-        if ac is not None and hasattr(ac, 'remember_always_allow'):
-            options.append(('always', 'Always'))
-        options.append(('reject', 'Reject'))
+        options = self._build_confirm_options()
 
         widget = self.query_one('#confirm-widget', ConfirmWidget)
         widget.configure(
@@ -152,13 +176,4 @@ class _AppScreenActionsMixin:
         finally:
             widget.hide()
 
-        if result == 'approve':
-            approved = True
-        elif result == 'always':
-            approved = True
-            if ac is not None and pending is not None:
-                ac.remember_always_allow(pending)
-        else:
-            approved = False
-
-        await self._controller.apply_user_decision(approved=approved)
+        await self._apply_confirm_result(result, pending)

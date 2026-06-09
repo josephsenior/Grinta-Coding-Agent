@@ -80,37 +80,29 @@ def get_tool_badge(tool_category: str) -> ToolBadge:
     return _BADGES.get(tool_category.lower(), _GENERIC)
 
 
+_NAME_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
+    (('error',), 'error'),
+    (('bash', 'powershell', 'shell'), 'shell'),
+    (('file', 'symbol'), 'files'),
+    (('search',), 'search'),
+    (('lsp', 'symbol'), 'code'),
+    (('browser',), 'browser'),
+    (('mcp',), 'mcp'),
+    (('delegate', 'worker'), 'workers'),
+    (('memory',), 'memory'),
+    (('task',), 'tasks'),
+    (('think', 'agent_think'), 'think'),
+    (('communicate', 'message'), 'message'),
+    (('terminal',), 'terminal'),
+    (('checkpoint',), 'checkpoint'),
+)
+
+
 def badge_for_tool_name(tool_name: str) -> ToolBadge:
     """Infer the badge category from tool name."""
     name = tool_name.lower()
-
-    if 'error' in name:
-        return _BADGES['error']
-    if 'bash' in name or 'powershell' in name or 'shell' in name:
-        return _BADGES['shell']
-    if 'file' in name or 'symbol' in name:
-        return _BADGES['files']
-    if 'search' in name:
-        return _BADGES['search']
-    if 'lsp' in name or 'symbol' in name:
-        return _BADGES['code']
-    if 'browser' in name:
-        return _BADGES['browser']
-    if 'mcp' in name:
-        return _BADGES['mcp']
-    if 'delegate' in name or 'worker' in name:
-        return _BADGES['workers']
-    if 'memory' in name:
-        return _BADGES['memory']
-    if 'task' in name:
-        return _BADGES['tasks']
-    if 'think' in name or 'agent_think' in name:
-        return _BADGES['think']
-    if 'communicate' in name or 'message' in name:
-        return _BADGES['message']
-    if 'terminal' in name:
-        return _BADGES['terminal']
-    if 'checkpoint' in name:
-        return _BADGES['checkpoint']
-
+    for keywords, badge_key in _NAME_RULES:
+        for kw in keywords:
+            if kw in name:
+                return _BADGES[badge_key]
     return _GENERIC

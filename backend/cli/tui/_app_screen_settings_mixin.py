@@ -61,41 +61,52 @@ class _AppScreenSettingsMixin:
         self._render_hud_bar()
         self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
 
-    def _apply_mode(self, new_mode: str) -> None:
-        mode = normalize_interaction_mode(new_mode, default='')
-        if mode not in set(VISIBLE_INTERACTION_MODES):
-            return
+    def _propagate_mode_to_agent(self, mode: str) -> None:
         agent_config = self._active_agent_config()
         if agent_config is not None:
             agent_config.mode = mode
         controller = self._controller
-        if controller is not None:
-            agent = getattr(controller, 'agent', None)
-            if agent is not None:
-                running_config = getattr(agent, 'config', None)
-                if running_config is not None:
-                    running_config.mode = mode
-                planner = getattr(agent, 'planner', None)
-                planner_config = getattr(planner, '_config', None)
-                if planner_config is not None:
-                    planner_config.mode = mode
-                if planner is not None and hasattr(planner, 'build_toolset'):
-                    try:
-                        agent.tools = planner.build_toolset()
-                    except Exception:
-                        _tui_logger.debug(
-                            'Failed to rebuild toolset on mode change', exc_info=True
-                        )
-            state = getattr(controller, 'state', None)
-            extra_data = (
-                getattr(state, 'extra_data', None) if state is not None else None
-            )
-            if isinstance(extra_data, dict):
-                if is_chat_mode(mode):
-                    extra_data.pop('active_run_mode', None)
-                else:
-                    extra_data['active_run_mode'] = mode
+        if controller is None:
+            return
+        self._apply_mode_to_controller(controller, mode)
+        self._update_mode_extra_data(controller, mode)
 
+    def _apply_mode_to_controller(self, controller, mode: str) -> None:
+        agent = getattr(controller, 'agent', None)
+        if agent is None:
+            return
+        running_config = getattr(agent, 'config', None)
+        if running_config is not None:
+            running_config.mode = mode
+        planner = getattr(agent, 'planner', None)
+        planner_config = getattr(planner, '_config', None)
+        if planner_config is not None:
+            planner_config.mode = mode
+        if planner is not None and hasattr(planner, 'build_toolset'):
+            try:
+                agent.tools = planner.build_toolset()
+            except Exception:
+                _tui_logger.debug(
+                    'Failed to rebuild toolset on mode change', exc_info=True
+                )
+
+    def _update_mode_extra_data(self, controller, mode: str) -> None:
+        state = getattr(controller, 'state', None)
+        extra_data = (
+            getattr(state, 'extra_data', None) if state is not None else None
+        )
+        if not isinstance(extra_data, dict):
+            return
+        if is_chat_mode(mode):
+            extra_data.pop('active_run_mode', None)
+        else:
+            extra_data['active_run_mode'] = mode
+
+    def _apply_mode(self, new_mode: str) -> None:
+        mode = normalize_interaction_mode(new_mode, default='')
+        if mode not in set(VISIBLE_INTERACTION_MODES):
+            return
+        self._propagate_mode_to_agent(mode)
         self._render_hud_bar()
         self._update_input_identity(mode)
         self._toggle_autonomy_tabs_visibility(mode)

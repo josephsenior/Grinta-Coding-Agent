@@ -233,20 +233,10 @@ class BaseShellSession(UnifiedShellSession, ABC):
             ``self._bg_stdout_capture``, and ``self._bg_stderr_capture`` are
             populated for the caller to consume.
         """
-        from backend.execution.utils.subprocess_background import OutputCapture
-
-        stdout_cap = OutputCapture(process.stdout, is_text=is_text)
-        stderr_cap = (
-            OutputCapture(process.stderr, is_text=is_text) if process.stderr else None
+        stdout_cap, stderr_cap = _create_output_captures(process, is_text)
+        hard_limit, idle_timeout, initial_grace = _compute_timeouts(
+            timeout, self.NO_CHANGE_TIMEOUT_SECONDS
         )
-
-        hard_limit = float(timeout or 600)
-        idle_timeout = float(self.NO_CHANGE_TIMEOUT_SECONDS)
-        # T-P0-1: Slow-start commands (npm install, pip install, cargo build…)
-        # often spend a long time fetching metadata before printing anything.
-        # Give them an extra grace window for the FIRST output only; once any
-        # output is observed, the normal idle threshold takes over.
-        initial_grace = idle_timeout * 2
 
         wall_start = time.monotonic()
         last_change_time = time.monotonic()
@@ -255,66 +245,31 @@ class BaseShellSession(UnifiedShellSession, ABC):
 
         while True:
             if process.poll() is not None:
-                # Command completed — drain remaining output.
-                stdout_cap._thread.join(timeout=2.0)
-                if stderr_cap:
-                    stderr_cap._thread.join(timeout=2.0)
-                return (
-                    stdout_cap.read_all(),
-                    stderr_cap.read_all() if stderr_cap else '',
-                    process.returncode,
-                )
+                return _drain_finished_process(process, stdout_cap, stderr_cap)
 
             now = time.monotonic()
-
-            current_len = len(stdout_cap.read_all()) + (
-                len(stderr_cap.read_all()) if stderr_cap else 0
+            last_output_len, last_change_time, first_output_seen = (
+                _update_output_tracking(
+                    stdout_cap,
+                    stderr_cap,
+                    last_output_len,
+                    last_change_time,
+                    first_output_seen,
+                    now,
+                )
             )
-            if current_len > last_output_len:
-                last_output_len = current_len
-                last_change_time = now
-                first_output_seen = True
 
-            effective_idle = idle_timeout if first_output_seen else initial_grace
-            if now - last_change_time >= effective_idle:
-                # Idle-output timeout — keep the process alive and detach it.
-                logger.info(
-                    'Subprocess idle-output timeout after %ss; detaching to bg session %s',
-                    self.NO_CHANGE_TIMEOUT_SECONDS,
-                    bg_id,
+            if _is_idle_timed_out(
+                first_output_seen, now, last_change_time, idle_timeout, initial_grace
+            ):
+                return _detach_idle_to_background(
+                    self, process, bg_id, stdout_cap, stderr_cap
                 )
-                self._bg_process = process
-                self._bg_session_id = bg_id
-                self._bg_stdout_capture = stdout_cap
-                self._bg_stderr_capture = stderr_cap
-                partial = stdout_cap.read_all()
-                err_partial = stderr_cap.read_all() if stderr_cap else ''
-                combined = partial + (
-                    f'\n[stderr so far]:\n{err_partial}' if err_partial else ''
-                )
-                return combined, '', -2
 
             if now - wall_start >= hard_limit:
-                # Hard wall-clock safety-net — kill (same as original behaviour).
-                logger.warning('Hard timeout after %ss; killing subprocess', hard_limit)
-                try:
-                    process.kill()
-                except Exception:
-                    pass
-                # T-P1-3: drain capture threads so partial output isn't lost.
-                try:
-                    process.wait(timeout=2)
-                except Exception:
-                    pass
-                stdout_cap._thread.join(timeout=2.0)
-                if stderr_cap:
-                    stderr_cap._thread.join(timeout=2.0)
-                partial_out = stdout_cap.read_all()
-                partial_err = stderr_cap.read_all() if stderr_cap else ''
-                err_msg = f'Command exceeded hard timeout of {int(hard_limit)}s\n' + (
-                    partial_err or ''
+                return _kill_on_hard_timeout(
+                    process, stdout_cap, stderr_cap, hard_limit
                 )
-                return partial_out, err_msg, 124
 
             time.sleep(0.5)
 
@@ -420,6 +375,204 @@ class BaseShellSession(UnifiedShellSession, ABC):
             logger.debug('Failed to update CWD: %s', e)
 
 
+def _create_output_captures(process: Any, is_text: bool) -> tuple[Any, Any]:
+    from backend.execution.utils.subprocess_background import OutputCapture
+
+    stdout_cap = OutputCapture(process.stdout, is_text=is_text)
+    stderr_cap = (
+        OutputCapture(process.stderr, is_text=is_text) if process.stderr else None
+    )
+    return stdout_cap, stderr_cap
+
+
+def _compute_timeouts(
+    timeout: int | None, no_change_timeout_seconds: int
+) -> tuple[float, float, float]:
+    hard_limit = float(timeout or 600)
+    idle_timeout = float(no_change_timeout_seconds)
+    initial_grace = idle_timeout * 2
+    return hard_limit, idle_timeout, initial_grace
+
+
+def _read_stderr(stderr_cap: Any) -> str:
+    return stderr_cap.read_all() if stderr_cap else ''
+
+
+def _join_capture_threads(stdout_cap: Any, stderr_cap: Any) -> None:
+    stdout_cap._thread.join(timeout=2.0)
+    if stderr_cap:
+        stderr_cap._thread.join(timeout=2.0)
+
+
+def _update_output_tracking(
+    stdout_cap: Any,
+    stderr_cap: Any,
+    last_output_len: int,
+    last_change_time: float,
+    first_output_seen: bool,
+    now: float,
+) -> tuple[int, float, bool]:
+    current_len = len(stdout_cap.read_all()) + (
+        len(stderr_cap.read_all()) if stderr_cap else 0
+    )
+    if current_len > last_output_len:
+        return current_len, now, True
+    return last_output_len, last_change_time, first_output_seen
+
+
+def _is_idle_timed_out(
+    first_output_seen: bool,
+    now: float,
+    last_change_time: float,
+    idle_timeout: float,
+    initial_grace: float,
+) -> bool:
+    effective_idle = idle_timeout if first_output_seen else initial_grace
+    return now - last_change_time >= effective_idle
+
+
+def _drain_finished_process(
+    process: Any, stdout_cap: Any, stderr_cap: Any
+) -> tuple[str, str, int]:
+    _join_capture_threads(stdout_cap, stderr_cap)
+    return stdout_cap.read_all(), _read_stderr(stderr_cap), process.returncode
+
+
+def _detach_idle_to_background(
+    session: Any, process: Any, bg_id: str, stdout_cap: Any, stderr_cap: Any
+) -> tuple[str, str, int]:
+    logger.info(
+        'Subprocess idle-output timeout after %ss; detaching to bg session %s',
+        session.NO_CHANGE_TIMEOUT_SECONDS,
+        bg_id,
+    )
+    session._bg_process = process
+    session._bg_session_id = bg_id
+    session._bg_stdout_capture = stdout_cap
+    session._bg_stderr_capture = stderr_cap
+    partial = stdout_cap.read_all()
+    err_partial = _read_stderr(stderr_cap)
+    combined = partial + (
+        f'\n[stderr so far]:\n{err_partial}' if err_partial else ''
+    )
+    return combined, '', -2
+
+
+def _kill_on_hard_timeout(
+    process: Any, stdout_cap: Any, stderr_cap: Any, hard_limit: float
+) -> tuple[str, str, int]:
+    logger.warning('Hard timeout after %ss; killing subprocess', hard_limit)
+    try:
+        process.kill()
+    except Exception:
+        pass
+    try:
+        process.wait(timeout=2)
+    except Exception:
+        pass
+    _join_capture_threads(stdout_cap, stderr_cap)
+    partial_out = stdout_cap.read_all()
+    partial_err = _read_stderr(stderr_cap)
+    err_msg = f'Command exceeded hard timeout of {int(hard_limit)}s\n' + (
+        partial_err or ''
+    )
+    return partial_out, err_msg, 124
+
+
+def _try_create_interactive_session(session_kwargs: dict[str, Any]) -> UnifiedShellSession | None:
+    try:
+        from backend.execution.utils.pty_session import PtyUnavailableError
+        from backend.execution.utils.pty_shell_session import (
+            PtyInteractiveShellSession,
+        )
+
+        logger.info('Using PtyInteractiveShellSession (OS-agnostic PTY)')
+        return PtyInteractiveShellSession(**session_kwargs)
+    except PtyUnavailableError as exc:
+        logger.warning(
+            'Interactive PTY backend unavailable (%s); falling back to '
+            'default shell session. Interactive read_output / write_input '
+            'may be limited.',
+            exc,
+        )
+    except Exception as exc:
+        logger.warning(
+            'Failed to start interactive PTY shell (%s); falling back to '
+            'default shell session.',
+            exc,
+        )
+    return None
+
+
+def _create_windows_powershell_session(
+    resolved_tools: ShellToolRegistryLike,
+    session_kwargs: dict[str, Any],
+) -> UnifiedShellSession:
+    from backend.execution.utils.windows_bash import WindowsPowershellSession
+
+    ps_exe = resolved_tools.shell_type if resolved_tools.has_powershell else None
+    return WindowsPowershellSession(**session_kwargs, powershell_exe=ps_exe)  # type: ignore[arg-type]
+
+
+def _create_windows_shell_session(
+    resolved_tools: ShellToolRegistryLike,
+    session_kwargs: dict[str, Any],
+) -> UnifiedShellSession:
+    prefer_powershell = resolve_windows_powershell_preference(
+        has_bash=resolved_tools.has_bash,
+        has_powershell=resolved_tools.has_powershell,
+    )
+
+    if prefer_powershell and resolved_tools.has_powershell:
+        logger.info(
+            'Using WindowsPowershellSession (preferred on Windows). '
+            'Set APP_WINDOWS_SHELL_PREFERENCE=bash to prefer Git Bash.'
+        )
+        return _create_windows_powershell_session(resolved_tools, session_kwargs)
+
+    if resolved_tools.has_bash:
+        from backend.execution.utils.simple_bash import SimpleBashSession
+
+        logger.info(
+            'Using SimpleBashSession (Git Bash on Windows). '
+            'Set APP_WINDOWS_SHELL_PREFERENCE=powershell to prefer PowerShell.'
+        )
+        return SimpleBashSession(**session_kwargs)
+
+    logger.warning(
+        'Bash unavailable on Windows; falling back to PowerShell session. '
+        'For full Linux runtime behavior (tmux/interactivity), use Docker or WSL.'
+    )
+    return _create_windows_powershell_session(resolved_tools, session_kwargs)
+
+
+def _create_unix_shell_session(
+    resolved_tools: ShellToolRegistryLike,
+    session_kwargs: dict[str, Any],
+    sandboxed_local: bool,
+    interactive: bool,
+) -> UnifiedShellSession:
+    if (
+        resolved_tools.has_tmux
+        and resolved_tools.has_bash
+        and (interactive or not sandboxed_local)
+    ):
+        from backend.execution.utils.bash import BashSession
+
+        logger.info('Using BashSession with tmux')
+        return BashSession(**session_kwargs)
+
+    if resolved_tools.has_bash:
+        from backend.execution.utils.simple_bash import SimpleBashSession
+
+        logger.info('Using SimpleBashSession (no tmux)')
+        return SimpleBashSession(**session_kwargs)
+
+    raise RuntimeError(
+        f'No suitable shell found for platform {sys.platform}. Detected shell: {resolved_tools.shell_type}'
+    )
+
+
 def create_shell_session(
     work_dir: str,
     tools: ShellToolRegistryLike | None = None,
@@ -472,7 +625,6 @@ def create_shell_session(
         getattr(resolved_tools, 'is_wsl_runtime', False),
     )
 
-    # Common session arguments
     session_kwargs: dict[str, Any] = {
         'work_dir': work_dir,
         'username': username,
@@ -486,95 +638,13 @@ def create_shell_session(
     sandboxed_local = is_sandboxed_local_profile(security_config)
 
     if interactive:
-        try:
-            from backend.execution.utils.pty_session import PtyUnavailableError
-            from backend.execution.utils.pty_shell_session import (
-                PtyInteractiveShellSession,
-            )
+        result = _try_create_interactive_session(session_kwargs)
+        if result is not None:
+            return result
 
-            logger.info('Using PtyInteractiveShellSession (OS-agnostic PTY)')
-            return PtyInteractiveShellSession(**session_kwargs)
-        except PtyUnavailableError as exc:
-            logger.warning(
-                'Interactive PTY backend unavailable (%s); falling back to '
-                'default shell session. Interactive read_output / write_input '
-                'may be limited.',
-                exc,
-            )
-        except Exception as exc:
-            logger.warning(
-                'Failed to start interactive PTY shell (%s); falling back to '
-                'default shell session.',
-                exc,
-            )
-
-    # Windows: Prefer PowerShell by default for native compatibility.
-    # Users can force bash with APP_WINDOWS_SHELL_PREFERENCE=bash.
     if OS_CAPS.is_windows:
-        prefer_powershell = resolve_windows_powershell_preference(
-            has_bash=resolved_tools.has_bash,
-            has_powershell=resolved_tools.has_powershell,
-        )
+        return _create_windows_shell_session(resolved_tools, session_kwargs)
 
-        if prefer_powershell and resolved_tools.has_powershell:
-            from backend.execution.utils.windows_bash import WindowsPowershellSession
-
-            logger.info(
-                'Using WindowsPowershellSession (preferred on Windows). '
-                'Set APP_WINDOWS_SHELL_PREFERENCE=bash to prefer Git Bash.'
-            )
-            return WindowsPowershellSession(
-                **session_kwargs,  # type: ignore[arg-type]
-                powershell_exe=(
-                    resolved_tools.shell_type if resolved_tools.has_powershell else None
-                ),
-            )
-
-        if resolved_tools.has_bash:
-            from backend.execution.utils.simple_bash import SimpleBashSession
-
-            logger.info(
-                'Using SimpleBashSession (Git Bash on Windows). '
-                'Set APP_WINDOWS_SHELL_PREFERENCE=powershell to prefer PowerShell.'
-            )
-            return SimpleBashSession(**session_kwargs)
-
-        # Fallback: no bash found — use PowerShell
-        from backend.execution.utils.windows_bash import WindowsPowershellSession
-
-        logger.warning(
-            'Bash unavailable on Windows; falling back to PowerShell session. '
-            'For full Linux runtime behavior (tmux/interactivity), use Docker or WSL.'
-        )
-        return WindowsPowershellSession(
-            **session_kwargs,  # type: ignore[arg-type]
-            powershell_exe=(
-                resolved_tools.shell_type if resolved_tools.has_powershell else None
-            ),
-        )
-
-    # Non-interactive sandboxed_local sessions must avoid tmux because command
-    # isolation is applied by wrapping each subprocess. Interactive sessions are
-    # intentionally unsandboxed, so tmux remains a valid fallback when the PTY
-    # backend is unavailable.
-    if (
-        resolved_tools.has_tmux
-        and resolved_tools.has_bash
-        and (interactive or not sandboxed_local)
-    ):
-        from backend.execution.utils.bash import BashSession
-
-        logger.info('Using BashSession with tmux')
-        return BashSession(**session_kwargs)
-
-    # Unix without tmux: Use simple Bash session
-    if resolved_tools.has_bash:
-        from backend.execution.utils.simple_bash import SimpleBashSession
-
-        logger.info('Using SimpleBashSession (no tmux)')
-        return SimpleBashSession(**session_kwargs)
-
-    # Fallback: Should not happen if tools are detected correctly
-    raise RuntimeError(
-        f'No suitable shell found for platform {sys.platform}. Detected shell: {resolved_tools.shell_type}'
+    return _create_unix_shell_session(
+        resolved_tools, session_kwargs, sandboxed_local, interactive
     )

@@ -18,6 +18,28 @@ _PATH_RE = re.compile(r'["\']?path["\']?\s*[:=]\s*["\']([^"\']+)["\']')
 _URL_RE = re.compile(r'https?://\S+')
 
 
+def _build_mcp_header(tool_name: str, duration: str) -> Any:
+    service_name = tool_name.split('::')[0] if '::' in tool_name else tool_name
+    short_name = tool_name.split('::')[-1] if '::' in tool_name else tool_name
+    if service_name != short_name:
+        detail = f'{service_name}  [dim]\u2192  {short_name}[/dim]'
+    else:
+        detail = short_name
+    if duration:
+        detail += f'  [dim]\u00b7  {duration}[/dim]'
+    return format_activity_primary('MCP', detail)
+
+
+def _append_mcp_result(lines: list[Any], result: Any | None) -> None:
+    if result is None:
+        return
+    result_lines = _format_mcp_result(result)
+    for line in result_lines[:10]:
+        lines.append(f'  {line}')
+    if len(result_lines) > 10:
+        lines.append(f'  [dim]... {len(result_lines) - 10} more[/dim]')
+
+
 def render_mcp_tool(
     tool_name: str,
     args: dict[str, Any] | None = None,
@@ -28,18 +50,7 @@ def render_mcp_tool(
     """Render an MCP tool call with structured display."""
     lines: list[Any] = []
 
-    service_name = tool_name.split('::')[0] if '::' in tool_name else tool_name
-    short_name = tool_name.split('::')[-1] if '::' in tool_name else tool_name
-
-    if service_name != short_name:
-        detail = f'{service_name}  [dim]→  {short_name}[/dim]'
-    else:
-        detail = short_name
-
-    if duration:
-        detail += f'  [dim]·  {duration}[/dim]'
-
-    lines.append(format_activity_primary('MCP', detail))
+    lines.append(_build_mcp_header(tool_name, duration))
 
     if args:
         args_summary = _summarize_mcp_args(tool_name, args)
@@ -47,15 +58,10 @@ def render_mcp_tool(
             lines.append(f'  {args_summary}')
 
     if error:
-        lines.append(f'  [{CLR_STATUS_ERR}]✗ {error}[/{CLR_STATUS_ERR}]')
+        lines.append(f'  [{CLR_STATUS_ERR}]\u2717 {error}[/{CLR_STATUS_ERR}]')
         return lines
 
-    if result is not None:
-        result_lines = _format_mcp_result(result)
-        for line in result_lines[:10]:
-            lines.append(f'  {line}')
-        if len(result_lines) > 10:
-            lines.append(f'  [dim]... {len(result_lines) - 10} more[/dim]')
+    _append_mcp_result(lines, result)
 
     return lines
 

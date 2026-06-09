@@ -174,36 +174,55 @@ class ActionRenderersMixin(_ActionRenderersBase):
     def _render_message_action(self, action: MessageAction) -> None:
         from rich.text import Text
 
-        host = cast(ActionRenderersHost, self)
         if bool(getattr(action, 'suppress_cli', False)):
             self._stop_reasoning()
-        thought = (getattr(action, 'thought', None) or '').strip()
+        thought = self._resolve_message_thought(action)
         content = (action.content or '').strip()
 
         if not thought:
-            # Only use committed thought lines (from AgentThinkAction events).
-            # _streaming_line is a transient live-panel buffer that must NOT be
-            # committed to the transcript — it is the last streamed reasoning
-            # preview and would duplicate content that is also in action.content.
+            self._render_message_without_thought(action, content)
+            return
+
+        display_parts = self._build_message_display_parts(thought, content)
+
+        if not display_parts:
+            self._stop_reasoning()
+            self.refresh()
+            return
+
+        self._stop_reasoning()
+        attachments = self._message_action_attachments(action)
+        self._finalize_message_display(display_parts, attachments)
+
+    def _resolve_message_thought(self, action: MessageAction) -> str:
+        host = cast(ActionRenderersHost, self)
+        thought = (getattr(action, 'thought', None) or '').strip()
+        if not thought:
             captured_thoughts = host._reasoning.snapshot_thoughts()
             if captured_thoughts:
                 thought = '\n'.join(captured_thoughts)
+        return thought
 
-        if not thought:
-            display_content = content
-            if display_content:
-                display_content = _sanitize_visible_transcript_text(display_content)
-            if not display_content:
-                self._stop_reasoning()
-                self.refresh()
-                return
+    def _render_message_without_thought(
+        self, action: MessageAction, content: str
+    ) -> None:
+        display_content = content
+        if display_content:
+            display_content = _sanitize_visible_transcript_text(display_content)
+        if not display_content:
             self._stop_reasoning()
-            attachments = self._message_action_attachments(action)
-            self._append_assistant_message(display_content, attachments=attachments)
+            self.refresh()
             return
+        self._stop_reasoning()
+        attachments = self._message_action_attachments(action)
+        self._append_assistant_message(display_content, attachments=attachments)
+
+    def _build_message_display_parts(
+        self, thought: str, content: str
+    ) -> list[Any]:
+        from rich.text import Text
 
         display_parts: list[Any] = []
-
         extra_lines = render_message(thought)
         text_parts: list[str] = []
         for item in extra_lines[1:]:
@@ -220,13 +239,12 @@ class ActionRenderersMixin(_ActionRenderersBase):
             if sanitized_content:
                 display_parts.append(Text(sanitized_content))
 
-        if not display_parts:
-            self._stop_reasoning()
-            self.refresh()
-            return
+        return display_parts
 
-        self._stop_reasoning()
-        attachments = self._message_action_attachments(action)
+    def _finalize_message_display(
+        self, display_parts: list[Any], attachments: list[Any]
+    ) -> None:
+        from rich.text import Text
 
         if len(display_parts) == 1:
             final_content = display_parts[0]
@@ -260,29 +278,34 @@ class ActionRenderersMixin(_ActionRenderersBase):
             self._render_tool_sourced_think(source_tool, thought)
             return
 
-        # De-duplicate consecutive thinking cards with identical content
+        if not self._check_think_dedup(thought):
+            return
+
+        self._render_think_card(thought)
+
+    def _check_think_dedup(self, thought: str) -> bool:
         import hashlib
 
         content_hash = hashlib.sha256((thought or '').encode()).hexdigest()[:16]
         if content_hash == getattr(self, '_last_think_action_hash', None):
             self.refresh()
-            return
+            return False
         self._last_think_action_hash = content_hash
+        return True
 
+    def _render_think_card(self, thought: str) -> None:
         extra_lines = render_think(thought)
-        kind = 'neutral'
         first_line = (
             thought.split('\n')[0].replace('\n', ' ').strip()[:100]
             if thought
             else 'Thinking'
         )
 
-        # Use 'Thinking:' verb for consistency with TUI
         inner = format_activity_block(
             'Thinking:',
             first_line[:100] or 'Thinking',
             secondary=None,
-            secondary_kind=kind,
+            secondary_kind='neutral',
             extra_lines=extra_lines,
         )
         self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
@@ -299,44 +322,81 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self._emit_activity_turn_header()
 
         if source_tool in ('grep', 'glob'):
-            from backend.cli._tool_display.renderers.search import (
-                extract_file_summary,
-                render_file_list,
-            )
-
-            raw_lines = [
-                ln
-                for ln in human_msg.splitlines()
-                if ln.strip() and not ln.startswith('Error running')
-            ]
-            is_grep = source_tool == 'grep'
-            if is_grep and raw_lines and any(
-                re.match(r'^.*:\d+:', ln) for ln in raw_lines[:5]
+            if self._try_render_search_think(
+                source_tool, human_msg, verb, title, detail
             ):
-                match_count, file_count, file_list = extract_file_summary(human_msg)
-                extra_lines = render_file_list(file_list, file_count, match_count)
-                kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
-
-                # Build secondary with match count and file count
-                secondary_parts = []
-                if match_count:
-                    secondary_parts.append(f'{match_count} matches')
-                if file_count:
-                    secondary_parts.append(f'in {file_count} files')
-                secondary = ' '.join(secondary_parts) if secondary_parts else None
-
-                inner = format_activity_block(
-                    verb,
-                    detail,
-                    secondary=secondary,
-                    secondary_kind=kind,
-                    extra_lines=extra_lines,
-                    title=title,
-                )
-                self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
-                self.refresh()
                 return
 
+        self._render_generic_tool_think(verb, title, detail, human_msg)
+
+    def _try_render_search_think(
+        self,
+        source_tool: str,
+        human_msg: str,
+        verb: str,
+        title: str,
+        detail: str,
+    ) -> bool:
+        if source_tool != 'grep':
+            return False
+
+        raw_lines = self._extract_search_lines(human_msg)
+        if not raw_lines:
+            return False
+        if not self._has_grep_format_matches(raw_lines):
+            return False
+
+        return self._render_search_result(human_msg, verb, title, detail)
+
+    @staticmethod
+    def _extract_search_lines(human_msg: str) -> list[str]:
+        return [
+            ln
+            for ln in human_msg.splitlines()
+            if ln.strip() and not ln.startswith('Error running')
+        ]
+
+    @staticmethod
+    def _has_grep_format_matches(raw_lines: list[str]) -> bool:
+        return any(re.match(r'^.*:\d+:', ln) for ln in raw_lines[:5])
+
+    def _render_search_result(
+        self, human_msg: str, verb: str, title: str, detail: str
+    ) -> bool:
+        from backend.cli._tool_display.renderers.search import (
+            extract_file_summary,
+            render_file_list,
+        )
+
+        match_count, file_count, file_list = extract_file_summary(human_msg)
+        extra_lines = render_file_list(file_list, file_count, match_count)
+        kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
+        secondary = self._build_search_secondary(match_count, file_count)
+
+        inner = format_activity_block(
+            verb,
+            detail,
+            secondary=secondary,
+            secondary_kind=kind,
+            extra_lines=extra_lines,
+            title=title,
+        )
+        self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
+        self.refresh()
+        return True
+
+    @staticmethod
+    def _build_search_secondary(match_count: int, file_count: int) -> str | None:
+        secondary_parts = []
+        if match_count:
+            secondary_parts.append(f'{match_count} matches')
+        if file_count:
+            secondary_parts.append(f'in {file_count} files')
+        return ' '.join(secondary_parts) if secondary_parts else None
+
+    def _render_generic_tool_think(
+        self, verb: str, title: str, detail: str, human_msg: str
+    ) -> None:
         kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
         self._print_or_buffer(
             Padding(
@@ -382,13 +442,15 @@ class ActionRenderersMixin(_ActionRenderersBase):
         if getattr(action, 'hidden', False):
             self.refresh()
             return
-        # Flush any previous buffered command that never received an observation
         if self._pending_shell_action is not None:
             self._flush_pending_shell_action()
         display_label = (getattr(action, 'display_label', '') or '').strip()
         if display_label:
             self._buffer_internal_shell_command(action, display_label)
             return
+        self._buffer_external_shell_command(action)
+
+    def _buffer_external_shell_command(self, action: CmdRunAction) -> None:
         self._pending_shell_is_internal = False
         self._pending_shell_title = None
         cmd_display = (action.command or '').strip()
@@ -597,15 +659,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
     def _render_condensation_action(self, action: CondensationAction) -> None:
         count = getattr(self, '_condensation_count', 0) + 1
         self._condensation_count = count
-        suffix = (
-            'st'
-            if count % 10 == 1 and count % 11 != 1
-            else (
-                'nd'
-                if count % 10 == 2 and count % 11 != 2
-                else ('rd' if count % 10 == 3 and count % 11 != 3 else 'th')
-            )
-        )
+        suffix = self._ordinal_suffix(count)
 
         self._ensure_reasoning()
         self._reasoning.update_action(f'Compressing context ({count}{suffix})…')
@@ -614,6 +668,16 @@ class ActionRenderersMixin(_ActionRenderersBase):
         if host is not None:
             host._hud.update_condensation_count(count)
         self.refresh()
+
+    @staticmethod
+    def _ordinal_suffix(n: int) -> str:
+        if n % 10 == 1 and n % 11 != 1:
+            return 'st'
+        if n % 10 == 2 and n % 11 != 2:
+            return 'nd'
+        if n % 10 == 3 and n % 11 != 3:
+            return 'rd'
+        return 'th'
 
     def _render_terminal_run_action(self, action: TerminalRunAction) -> None:
         self._flush_pending_tool_cards()

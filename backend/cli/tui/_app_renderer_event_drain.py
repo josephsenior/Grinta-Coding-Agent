@@ -120,12 +120,7 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
         orch._refresh_display()
 
 
-async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
-    """Async drain that yields control to the event loop periodically.
-    
-    This prevents blocking the Textual event loop when processing many events,
-    allowing keyboard and mouse input to be processed during active agent runs.
-    """
+def _cancel_drain_debounce(orch: '_AppRendererEventProcessorMixin') -> None:
     debounce_handle = getattr(orch, '_drain_debounce_handle', None)
     if debounce_handle is not None:
         try:
@@ -134,12 +129,68 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
             pass
         orch._drain_debounce_handle = None
 
+
+def _collect_pending_events(orch: '_AppRendererEventProcessorMixin') -> tuple[list[Any], int]:
     with orch._pending_lock:
         events = list(orch._pending_events)
         orch._pending_events.clear()
         orch._drain_scheduled = False
         dropped = orch._pending_events_dropped
         orch._pending_events_dropped = 0
+    return events, dropped
+
+
+def _record_dropped_events(orch: '_AppRendererEventProcessorMixin', dropped: int) -> None:
+    from backend.cli.tui._app_renderer_event_processor_mixin import (
+        _TUI_HISTORY_RENDER_LIMIT,
+    )
+    orch._history.append(
+        Text(
+            f'... {dropped} TUI event(s) dropped while the renderer was backlogged ...',
+            style=NAVY_TEXT_DIM,
+        )
+    )
+    orch._history.append(Text(''))
+    overflow = len(orch._history) - _TUI_HISTORY_RENDER_LIMIT
+    if overflow > 0:
+        del orch._history[:overflow]
+
+
+def _flush_and_refresh(
+    orch: '_AppRendererEventProcessorMixin',
+    events: list[Any],
+    streaming_only: bool,
+) -> None:
+    flush = getattr(orch, 'flush_live_ui', None)
+    if callable(flush):
+        flush()
+    if not streaming_only or any(
+        getattr(event, 'is_final', False) for event in events
+    ):
+        orch._refresh_display()
+
+
+async def _process_events_in_batches(
+    orch: '_AppRendererEventProcessorMixin',
+    events: list[Any],
+) -> None:
+    _BATCH_SIZE = 10
+    for i in range(0, len(events), _BATCH_SIZE):
+        batch = events[i:i + _BATCH_SIZE]
+        for event in batch:
+            orch._process_event(event)
+        await asyncio.sleep(0)
+
+
+async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
+    """Async drain that yields control to the event loop periodically.
+    
+    This prevents blocking the Textual event loop when processing many events,
+    allowing keyboard and mouse input to be processed during active agent runs.
+    """
+    _cancel_drain_debounce(orch)
+
+    events, dropped = _collect_pending_events(orch)
     if not events:
         flush = getattr(orch, 'flush_live_ui', None)
         if callable(flush):
@@ -147,42 +198,13 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
         orch._refresh_display()
         return
     if dropped:
-        from backend.cli.tui._app_renderer_event_processor_mixin import (
-            _TUI_HISTORY_RENDER_LIMIT,
-        )
+        _record_dropped_events(orch, dropped)
 
-        orch._history.append(
-            Text(
-                f'... {dropped} TUI event(s) dropped while the renderer was backlogged ...',
-                style=NAVY_TEXT_DIM,
-            )
-        )
-        orch._history.append(Text(''))
-        overflow = len(orch._history) - _TUI_HISTORY_RENDER_LIMIT
-        if overflow > 0:
-            del orch._history[:overflow]
-    
     events = _collapse_streaming_chunks(events)
     streaming_only = _is_streaming_only_batch(events)
 
-    # Process events in batches, yielding control between batches
-    # This allows Textual to process keyboard/mouse events
-    _BATCH_SIZE = 10
-    for i in range(0, len(events), _BATCH_SIZE):
-        batch = events[i:i + _BATCH_SIZE]
-        for event in batch:
-            orch._process_event(event)
-        # Yield control to the event loop between batches
-        await asyncio.sleep(0)
-
-    flush = getattr(orch, 'flush_live_ui', None)
-    if callable(flush):
-        flush()
-
-    if not streaming_only or any(
-        getattr(event, 'is_final', False) for event in events
-    ):
-        orch._refresh_display()
+    await _process_events_in_batches(orch, events)
+    _flush_and_refresh(orch, events, streaming_only)
 
 
 async def wait_for_activity(

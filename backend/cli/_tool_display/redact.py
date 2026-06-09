@@ -468,21 +468,27 @@ def _parse_json_body(body_text: str) -> tuple[str | None, Any]:
     return name, arguments
 
 
-def _xml_tool_call_to_dict(
-    attrs: dict[str, str],
-    body: str,
-    index: int,
-) -> dict[str, Any] | None:
-    body_text = (body or '').strip()
-    name = attrs.get('name') or attrs.get('tool') or attrs.get('function')
+def _xml_tool_call_resolve_name_from_attrs(attrs: dict[str, str]) -> str | None:
+    return attrs.get('name') or attrs.get('tool') or attrs.get('function')
+
+
+def _xml_tool_call_parse_json_body(body_text: str) -> tuple[str | None, Any]:
+    if not body_text.startswith('{'):
+        return None, None
+    return _parse_json_body(body_text)
+
+
+def _xml_tool_call_extract_name_and_args(
+    attrs: dict[str, str], body_text: str
+) -> tuple[str | None, Any]:
+    name = _xml_tool_call_resolve_name_from_attrs(attrs)
     arguments: Any = None
 
-    if body_text.startswith('{'):
-        json_name, json_args = _parse_json_body(body_text)
-        if json_name:
-            name = name or json_name
-        if json_args is not None:
-            arguments = json_args
+    json_name, json_args = _xml_tool_call_parse_json_body(body_text)
+    if json_name:
+        name = name or json_name
+    if json_args is not None:
+        arguments = json_args
 
     if not name:
         invoke = _parse_invoke_body(body_text)
@@ -490,15 +496,32 @@ def _xml_tool_call_to_dict(
             name, arguments = invoke
 
     if not name:
-        return None
+        return None, None
 
     if arguments is None:
         arguments = {'command': body_text} if body_text else {}
 
+    return name, arguments
+
+
+def _xml_tool_call_serialize_arguments(arguments: Any) -> str:
     if isinstance(arguments, str):
-        arguments_str = arguments
-    else:
-        arguments_str = json.dumps(arguments, ensure_ascii=False, separators=(',', ':'))
+        return arguments
+    return json.dumps(arguments, ensure_ascii=False, separators=(',', ':'))
+
+
+def _xml_tool_call_to_dict(
+    attrs: dict[str, str],
+    body: str,
+    index: int,
+) -> dict[str, Any] | None:
+    body_text = (body or '').strip()
+    name, arguments = _xml_tool_call_extract_name_and_args(attrs, body_text)
+
+    if not name:
+        return None
+
+    arguments_str = _xml_tool_call_serialize_arguments(arguments)
 
     return {
         'id': f'call_xml_{index + 1:02d}',

@@ -265,18 +265,7 @@ def _collect_api_key(console: Console, preset: dict[str, Any]) -> str:
     return api_key or f'${{{env_var}}}'
 
 
-def run_init(project_root: Path | None = None, console: Console | None = None) -> int:
-    """Run the wizard. Returns shell-style exit code.
-
-    Exit codes:
-        0 - Success
-        1 - General error
-        2 - Settings directory not writable
-        3 - Invalid input
-    """
-    console = console or Console(no_color=no_color_enabled())
-    platform_info = _get_platform_info()
-
+def _print_welcome(console: Console, platform_info: str) -> None:
     console.print(
         Panel.fit(
             f'[bold]Welcome to Grinta.[/bold] ({platform_info})\n'
@@ -289,10 +278,8 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
         )
     )
 
-    project_root = (project_root or Path.cwd()).resolve()
-    settings_file = _settings_path()
-    existing = _load_existing(settings_file)
 
+def _ensure_settings_writable(console: Console, settings_file: Path) -> int | None:
     can_write, write_error = _check_settings_directory_writable(settings_file)
     if not can_write:
         console.print(
@@ -303,18 +290,28 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
             f'  Example: APP_ROOT=~/.grinta grinta init[/]'
         )
         return 2
+    return None
 
-    if existing and not _confirm_overwrite_existing(console, existing):
-        return 0
 
+def _confirm_continue(console: Console, existing: dict[str, Any]) -> bool:
+    if not existing:
+        return True
+    return _confirm_overwrite_existing(console, existing)
+
+
+def _detect_and_report(console: Console) -> list[str]:
     console.print(f'[{CLR_META}]Detecting local model servers...[/]', end='')
     detected = _detect_local()
     console.print(' done.')
     if detected:
         console.print(f'[{CLR_STATUS_OK}]Found local:[/] {", ".join(detected)}')
+    return detected
 
+
+def _collect_user_choices(
+    console: Console, detected: list[str]
+) -> tuple[str, str, str, str] | None:
     _print_provider_table(console, detected)
-
     provider = Prompt.ask(
         'Provider',
         choices=list(_PROVIDER_PRESETS.keys()),
@@ -325,27 +322,34 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
         'Model id (provider/model)',
         default=preset['default_model'],
     )
-
     if not model or not model.strip():
         console.print(
             f'[{CLR_STATUS_WARN}]Error:[/] Model cannot be empty.',
             style=CLR_STATUS_WARN,
         )
-        return 3
-
+        return None
     api_key = _collect_api_key(console, preset)
     base_url = Prompt.ask(
         'Base URL (leave blank for default)',
         default=preset['base_url'],
     )
+    return provider, model, api_key, base_url
 
+
+def _write_settings_file(
+    console: Console,
+    settings_file: Path,
+    provider: str,
+    model: str,
+    api_key: str,
+    base_url: str,
+) -> int | None:
     settings = {
         'llm_provider': provider,
         'llm_model': model,
         'llm_api_key': LLM_API_KEY_SETTINGS_PLACEHOLDER if api_key else '',
         'llm_base_url': base_url,
     }
-
     try:
         _atomic_json_write(settings_file, settings)
     except PermissionError:
@@ -360,34 +364,73 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
             style=CLR_STATUS_WARN,
         )
         return 1
+    return None
 
-    if api_key:
-        try:
-            persist_llm_api_key_to_dotenv(api_key, settings_json_path=settings_file)
-        except PermissionError:
-            console.print(
-                f'[{CLR_STATUS_WARN}]Warning:[/] Could not write .env file. '
-                'API key will need to be set via environment variable.',
-                style=CLR_STATUS_WARN,
-            )
-        except Exception as e:
-            console.print(
-                f'[{CLR_STATUS_WARN}]Warning:[/] Could not persist API key: {e}',
-                style=CLR_STATUS_WARN,
-            )
 
-    global_dir = Path.home() / '.grinta'
-    is_global = False
+def _persist_api_key_safe(console: Console, api_key: str, settings_file: Path) -> None:
+    if not api_key:
+        return
     try:
-        if settings_file.is_relative_to(global_dir):
-            is_global = True
+        persist_llm_api_key_to_dotenv(api_key, settings_json_path=settings_file)
+    except PermissionError:
+        console.print(
+            f'[{CLR_STATUS_WARN}]Warning:[/] Could not write .env file. '
+            'API key will need to be set via environment variable.',
+            style=CLR_STATUS_WARN,
+        )
+    except Exception as e:
+        console.print(
+            f'[{CLR_STATUS_WARN}]Warning:[/] Could not persist API key: {e}',
+            style=CLR_STATUS_WARN,
+        )
+
+
+def _is_global_settings(settings_file: Path) -> bool:
+    global_dir = Path.home() / '.grinta'
+    try:
+        return settings_file.is_relative_to(global_dir)
     except Exception:
-        pass
+        return False
 
+
+def _get_console(console: Console | None) -> Console:
+    if console is None:
+        return Console(no_color=no_color_enabled())
+    return console
+
+
+def _resolve_project_root(project_root: Path | None) -> Path:
+    if project_root is None:
+        return Path.cwd().resolve()
+    return project_root.resolve()
+
+
+def _collect_and_persist(
+    console: Console,
+    settings_file: Path,
+    detected: list[str],
+) -> tuple[str, str, str, str] | None:
+    choices = _collect_user_choices(console, detected)
+    if choices is None:
+        return None
+    provider, model, api_key, base_url = choices
+    err = _write_settings_file(console, settings_file, provider, model, api_key, base_url)
+    if err is not None:
+        return None
+    _persist_api_key_safe(console, api_key, settings_file)
+    return choices
+
+
+def _print_success(
+    console: Console,
+    settings_file: Path,
+    provider: str,
+    model: str,
+    project_root: Path,
+) -> None:
     scope_note = ''
-    if not is_global:
+    if not _is_global_settings(settings_file):
         scope_note = f'[{CLR_STATUS_WARN}]Note: Running from source. Settings localized to this directory.[/]\n'
-
     console.print(
         Panel.fit(
             f'Wrote [bold]{settings_file}[/bold]\n'
@@ -400,7 +443,6 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
             border_style=CLR_STATUS_OK,
         )
     )
-
     checklist = project_root / 'docs' / 'SECURITY_CHECKLIST.md'
     if checklist.exists():
         console.print(
@@ -408,6 +450,33 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
             'before pointing Grinta at untrusted code.[/]'
         )
 
+
+def run_init(project_root: Path | None = None, console: Console | None = None) -> int:
+    """Run the wizard. Returns shell-style exit code.
+
+    Exit codes:
+        0 - Success
+        1 - General error
+        2 - Settings directory not writable
+        3 - Invalid input
+    """
+    console = _get_console(console)
+    platform_info = _get_platform_info()
+    _print_welcome(console, platform_info)
+    project_root = _resolve_project_root(project_root)
+    settings_file = _settings_path()
+    existing = _load_existing(settings_file)
+    err = _ensure_settings_writable(console, settings_file)
+    if err is not None:
+        return err
+    if not _confirm_continue(console, existing):
+        return 0
+    detected = _detect_and_report(console)
+    choices = _collect_and_persist(console, settings_file, detected)
+    if choices is None:
+        return 3
+    provider, model, api_key, base_url = choices
+    _print_success(console, settings_file, provider, model, project_root)
     return 0
 
 

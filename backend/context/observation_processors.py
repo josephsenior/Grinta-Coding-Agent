@@ -23,6 +23,16 @@ if TYPE_CHECKING:
     pass
 
 
+_OBSERVATION_DISPATCH: dict[type, callable] = {}
+
+
+def _register_observation_handler(obs_type: type):
+    def decorator(handler):
+        _OBSERVATION_DISPATCH[obs_type] = handler
+        return handler
+    return decorator
+
+
 def convert_observation_to_message(
     event: Observation,
     max_message_chars: int | None = None,
@@ -43,29 +53,24 @@ def convert_observation_to_message(
     """
     if _is_tool_backed_think_observation(event):
         return _handle_tool_backed_think_observation(event, max_message_chars)
-    if isinstance(event, FileReadObservation):
-        return _handle_file_read_observation(event, max_message_chars)
-    if isinstance(event, FileEditObservation):
-        return _handle_file_edit_observation(event, max_message_chars)
-    if isinstance(event, BrowserScreenshotObservation):
-        return _handle_browser_screenshot_observation(
-            event, max_message_chars, vision_is_active
-        )
-    if isinstance(event, CmdOutputObservation):
-        return _handle_cmd_output_observation(event, max_message_chars)
-    if isinstance(event, ErrorObservation):
-        return _handle_error_observation(event, max_message_chars)
-    if isinstance(event, UserRejectObservation):
-        return _handle_user_reject_observation(event, max_message_chars)
-    if isinstance(event, FileDownloadObservation):
-        return _handle_file_download_observation(event, max_message_chars)
-    if isinstance(event, MCPObservation):
-        return _handle_mcp_observation(event, max_message_chars)
-    if isinstance(event, AgentCondensationObservation):
-        return _handle_condensation_observation(event, max_message_chars)
 
-    # Fallback for generic/simple observations
+    handler = _OBSERVATION_DISPATCH.get(type(event))
+    if handler is not None:
+        if isinstance(event, BrowserScreenshotObservation):
+            return handler(event, max_message_chars, vision_is_active)
+        return handler(event, max_message_chars)
+
     return _handle_simple_observation(event, max_message_chars)
+
+
+@_register_observation_handler(FileReadObservation)
+def _handle_file_read_observation(
+    obs: FileReadObservation, max_message_chars: int | None
+) -> Message:
+    path = getattr(obs, 'path', 'unknown')
+    text = truncate_content(obs.content, max_message_chars, strategy='head_heavy')
+    text = f'[FILE_READ path={path}]\n{text}'
+    return Message(role='user', content=[TextContent(text=text)])
 
 
 def _is_tool_backed_think_observation(event: Observation) -> bool:
@@ -235,6 +240,7 @@ def _load_restored_context_snapshot() -> str:
         return ''
 
 
+@_register_observation_handler(AgentCondensationObservation)
 def _handle_condensation_observation(
     obs: AgentCondensationObservation, max_message_chars: int | None
 ) -> Message:
@@ -268,15 +274,6 @@ def _handle_condensation_observation(
         + _POST_CONDENSATION_RECOVERY,
         max_message_chars,
     )
-    return Message(role='user', content=[TextContent(text=text)])
-
-
-def _handle_file_read_observation(
-    obs: FileReadObservation, max_message_chars: int | None
-) -> Message:
-    path = getattr(obs, 'path', 'unknown')
-    text = truncate_content(obs.content, max_message_chars, strategy='head_heavy')
-    text = f'[FILE_READ path={path}]\n{text}'
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -378,6 +375,7 @@ def _truncate_diff_smart(content: str, max_chars: int) -> str:
     return '\n'.join(result_lines)
 
 
+@_register_observation_handler(FileEditObservation)
 def _handle_file_edit_observation(
     obs: FileEditObservation, max_message_chars: int | None
 ) -> Message:
@@ -431,6 +429,7 @@ _ERROR_CLASSIFIERS: list[tuple[str, list[str]]] = [
 ]
 
 
+@_register_observation_handler(BrowserScreenshotObservation)
 def _handle_browser_screenshot_observation(
     obs: BrowserScreenshotObservation,
     max_message_chars: int | None,
@@ -470,6 +469,7 @@ def _classify_cmd_error(content: str) -> str | None:
     return None
 
 
+@_register_observation_handler(CmdOutputObservation)
 def _handle_cmd_output_observation(
     obs: CmdOutputObservation, max_message_chars: int | None
 ) -> Message:
@@ -504,6 +504,7 @@ def _handle_cmd_output_observation(
     return Message(role='user', content=[TextContent(text=text)])
 
 
+@_register_observation_handler(ErrorObservation)
 def _handle_error_observation(
     obs: ErrorObservation, max_message_chars: int | None
 ) -> Message:
@@ -529,6 +530,7 @@ def _handle_error_observation(
     return Message(role='user', content=[TextContent(text='\n'.join(parts))])
 
 
+@_register_observation_handler(UserRejectObservation)
 def _handle_user_reject_observation(
     obs: UserRejectObservation, max_message_chars: int | None
 ) -> Message:
@@ -540,12 +542,14 @@ def _handle_user_reject_observation(
     )
 
 
+@_register_observation_handler(FileDownloadObservation)
 def _handle_file_download_observation(
     obs: FileDownloadObservation, max_message_chars: int | None
 ) -> Message:
     return _handle_simple_observation(obs, max_message_chars)
 
 
+@_register_observation_handler(MCPObservation)
 def _handle_mcp_observation(
     obs: MCPObservation, max_message_chars: int | None
 ) -> Message:

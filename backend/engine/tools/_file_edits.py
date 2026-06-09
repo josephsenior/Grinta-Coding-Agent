@@ -186,12 +186,11 @@ def _resolve_symbol_candidates_without_path(
     return Path(), '', candidates
 
 
-def _resolve_read_symbol_target(
+def _extract_read_symbol_fields(
     target: Mapping[str, Any],
-    *,
     default_path: str | None,
     default_symbol_kind: str | None,
-) -> dict[str, Any]:
+) -> tuple[str, str, str, str | None, str | None, int | None]:
     symbol_id = str(target.get('symbol_id') or '').strip()
     path = str(target.get('path') or default_path or '').strip()
     symbol_name = str(
@@ -204,38 +203,63 @@ def _resolve_read_symbol_target(
     symbol_kind = cast(str | None, target.get('symbol_kind') or default_symbol_kind)
     parent_symbol = cast(str | None, target.get('parent_symbol'))
     occurrence = _coerce_optional_int(target.get('occurrence'), 'occurrence')
-    requested_start: int | None = None
-    requested_end: int | None = None
+    return symbol_id, path, symbol_name, symbol_kind, parent_symbol, occurrence
 
+
+def _apply_read_symbol_id_override(
+    symbol_id: str,
+    path: str,
+    symbol_name: str,
+    occurrence: int | None,
+) -> tuple[str, str, int | None, int | None, int | None]:
     if symbol_id:
         path, symbol_name, requested_start, requested_end = _parse_symbol_id(symbol_id)
         occurrence = None
+    else:
+        requested_start = None
+        requested_end = None
+    return path, symbol_name, requested_start, requested_end, occurrence
 
-    display_target = symbol_id or symbol_name
-    if not symbol_name:
-        return {
-            'status': 'not_found',
-            'target': display_target,
-            'message': 'Symbol target requires qualified_name, symbol_name, or symbol_id.',
-        }
 
+def _resolve_read_symbol_lookup(
+    path: str,
+    symbol_name: str,
+    symbol_kind: str | None,
+    parent_symbol: str | None,
+    occurrence: int | None,
+) -> tuple[Path, str, list[dict[str, Any]]]:
     if path:
-        safe_path, content, candidates = _resolve_symbol_candidates_with_path(
+        return _resolve_symbol_candidates_with_path(
             path, symbol_name, symbol_kind, parent_symbol, occurrence,
         )
-    else:
-        safe_path, content, candidates = _resolve_symbol_candidates_without_path(
-            symbol_name, symbol_kind, parent_symbol, occurrence,
-        )
+    return _resolve_symbol_candidates_without_path(
+        symbol_name, symbol_kind, parent_symbol, occurrence,
+    )
 
+
+def _filter_candidates_by_position(
+    candidates: list[dict[str, Any]],
+    requested_start: int | None,
+    requested_end: int | None,
+) -> list[dict[str, Any]]:
     if requested_start is not None:
-        candidates = [
-            candidate
-            for candidate in candidates
-            if candidate.get('start_line') == requested_start
-            and candidate.get('end_line') == requested_end
+        return [
+            c
+            for c in candidates
+            if c.get('start_line') == requested_start
+            and c.get('end_line') == requested_end
         ]
+    return candidates
 
+
+def _build_read_symbol_final(
+    candidates: list[dict[str, Any]],
+    safe_path: Path,
+    content: str,
+    path: str,
+    display_target: str,
+    symbol_name: str,
+) -> dict[str, Any]:
     if not candidates:
         return {
             'status': 'not_found',
@@ -251,7 +275,6 @@ def _resolve_read_symbol_target(
             'message': f"Symbol '{symbol_name}' is ambiguous.",
             'candidates': candidates,
         }
-
     candidate = candidates[0]
     if not path:
         safe_path = _safe_workspace_path(str(candidate['path']), must_exist=True)
@@ -264,31 +287,74 @@ def _resolve_read_symbol_target(
     )
 
 
-def _coerce_read_symbol_targets(
+def _resolve_read_symbol_target(
+    target: Mapping[str, Any],
+    *,
+    default_path: str | None,
+    default_symbol_kind: str | None,
+) -> dict[str, Any]:
+    symbol_id, path, symbol_name, symbol_kind, parent_symbol, occurrence = (
+        _extract_read_symbol_fields(target, default_path, default_symbol_kind)
+    )
+    path, symbol_name, requested_start, requested_end, occurrence = (
+        _apply_read_symbol_id_override(symbol_id, path, symbol_name, occurrence)
+    )
+    display_target = symbol_id or symbol_name
+    if not symbol_name:
+        return {
+            'status': 'not_found',
+            'target': display_target,
+            'message': 'Symbol target requires qualified_name, symbol_name, or symbol_id.',
+        }
+    safe_path, content, candidates = _resolve_read_symbol_lookup(
+        path, symbol_name, symbol_kind, parent_symbol, occurrence,
+    )
+    candidates = _filter_candidates_by_position(candidates, requested_start, requested_end)
+    return _build_read_symbol_final(
+        candidates, safe_path, content, path, display_target, symbol_name,
+    )
+
+
+def _str_or_empty(value: object) -> str:
+    return str(value or '').strip()
+
+
+def _coerce_single_symbol_entry(
+    raw: object,
+    index: int,
+) -> Mapping[str, Any] | None:
+    if isinstance(raw, str):
+        if raw.strip():
+            return {'qualified_name': raw.strip()}
+        return None
+    if isinstance(raw, Mapping):
+        return raw
+    raise FunctionCallValidationError(
+        f'read type=symbols symbols[{index}] must be a string or object.'
+    )
+
+
+def _coerce_symbols_list_argument(
+    raw_symbols: object,
+) -> list[Mapping[str, Any]] | None:
+    if not isinstance(raw_symbols, list):
+        return None
+    targets: list[Mapping[str, Any]] = []
+    for index, raw in enumerate(raw_symbols):
+        entry = _coerce_single_symbol_entry(raw, index)
+        if entry is not None:
+            targets.append(entry)
+    return targets if targets else None
+
+
+def _build_single_symbol_target_from_scalars(
     arguments: Mapping[str, Any],
 ) -> list[Mapping[str, Any]]:
-    raw_symbols = arguments.get('symbols')
-    if isinstance(raw_symbols, list):
-        targets: list[Mapping[str, Any]] = []
-        for index, raw in enumerate(raw_symbols):
-            if isinstance(raw, str):
-                if raw.strip():
-                    targets.append({'qualified_name': raw.strip()})
-                continue
-            if isinstance(raw, Mapping):
-                targets.append(raw)
-                continue
-            raise FunctionCallValidationError(
-                f'read type=symbols symbols[{index}] must be a string or object.'
-            )
-        if targets:
-            return targets
-
-    symbol_id = str(arguments.get('symbol_id') or '').strip()
-    qualified_name = str(arguments.get('qualified_name') or '').strip()
-    symbol_name = str(
-        arguments.get('symbol_name') or arguments.get('query') or ''
-    ).strip()
+    symbol_id = _str_or_empty(arguments.get('symbol_id'))
+    qualified_name = _str_or_empty(arguments.get('qualified_name'))
+    symbol_name = _str_or_empty(
+        arguments.get('symbol_name') or arguments.get('query')
+    )
     if symbol_id or qualified_name or symbol_name:
         return [
             {
@@ -304,6 +370,16 @@ def _coerce_read_symbol_targets(
     raise FunctionCallValidationError(
         'read type=symbols requires symbols[], qualified_name, symbol_id, or symbol_name.'
     )
+
+
+def _coerce_read_symbol_targets(
+    arguments: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    raw_symbols = arguments.get('symbols')
+    result = _coerce_symbols_list_argument(raw_symbols)
+    if result is not None:
+        return result
+    return _build_single_symbol_target_from_scalars(arguments)
 
 
 def _handle_read_symbols_public(arguments: Mapping[str, Any]) -> AgentThinkAction:
@@ -484,6 +560,75 @@ def _handle_replace_string_tool(arguments: Mapping[str, Any]) -> Action:
     return action
 
 
+def _resolve_symbol_by_id(
+    symbol_id: str,
+) -> tuple[str, str, int | None, int | None]:
+    raw_path, symbol_name, start, end = _parse_symbol_id(symbol_id)
+    return raw_path, symbol_name, start, end
+
+
+def _resolve_symbol_by_name(
+    symbol_name: str,
+    symbol_kind: str | None,
+    parent_symbol: str | None,
+    occurrence: int | None,
+    raw_path: str,
+) -> tuple[Path, list[dict[str, Any]]]:
+    if raw_path:
+        safe_path, _content, candidates = _resolve_symbol_candidates(
+            path=raw_path,
+            symbol_name=symbol_name,
+            symbol_kind=symbol_kind,
+            parent_symbol=parent_symbol,
+            occurrence=occurrence,
+        )
+    else:
+        lookup_name = symbol_name.rsplit('.', 1)[-1]
+        if not parent_symbol and '.' in symbol_name:
+            maybe_parent, _, maybe_name = symbol_name.rpartition('.')
+            parent_symbol = maybe_parent or None
+            lookup_name = maybe_name
+        candidates = _filter_symbol_candidates(
+            _find_symbol_candidates(
+                lookup_name,
+                symbol_kind=symbol_kind,
+                include_private=True,
+            ),
+            symbol_name=lookup_name,
+            parent_symbol=parent_symbol,
+            occurrence=occurrence,
+        )
+        safe_path = Path()
+    return safe_path, candidates
+
+
+def _select_and_validate_symbol(
+    candidates: list[dict[str, Any]],
+    symbol_id: str,
+    symbol_name: str,
+    requested_start: int | None,
+    requested_end: int | None,
+    index: int,
+) -> dict[str, Any]:
+    if requested_start is not None:
+        candidates = [
+            c
+            for c in candidates
+            if c.get('start_line') == requested_start
+            and c.get('end_line') == requested_end
+        ]
+    if not candidates:
+        target = symbol_id or symbol_name
+        raise FunctionCallValidationError(
+            f'edit_symbols edits[{index}] could not find symbol {target!r}.'
+        )
+    if len(candidates) > 1:
+        raise FunctionCallValidationError(
+            _symbol_action_ambiguity_error(symbol_name, candidates)
+        )
+    return candidates[0]
+
+
 def _resolve_public_symbol_edit(
     *,
     item: Mapping[str, Any],
@@ -510,7 +655,7 @@ def _resolve_public_symbol_edit(
     requested_end: int | None = None
 
     if symbol_id:
-        raw_path, symbol_name, requested_start, requested_end = _parse_symbol_id(
+        raw_path, symbol_name, requested_start, requested_end = _resolve_symbol_by_id(
             symbol_id
         )
         occurrence = None
@@ -520,53 +665,17 @@ def _resolve_public_symbol_edit(
             f'edit_symbols edits[{index}] requires qualified_name, symbol_name, or symbol_id.'
         )
 
-    if raw_path:
-        safe_path, _content, candidates = _resolve_symbol_candidates(
-            path=raw_path,
-            symbol_name=symbol_name,
-            symbol_kind=symbol_kind,
-            parent_symbol=parent_symbol,
-            occurrence=occurrence,
-        )
-    else:
-        lookup_name = symbol_name.rsplit('.', 1)[-1]
-        if not parent_symbol and '.' in symbol_name:
-            maybe_parent, _, maybe_name = symbol_name.rpartition('.')
-            parent_symbol = maybe_parent or None
-            lookup_name = maybe_name
-        candidates = _filter_symbol_candidates(
-            _find_symbol_candidates(
-                lookup_name,
-                symbol_kind=symbol_kind,
-                include_private=True,
-            ),
-            symbol_name=lookup_name,
-            parent_symbol=parent_symbol,
-            occurrence=occurrence,
-        )
-        safe_path = Path()
+    safe_path, candidates = _resolve_symbol_by_name(
+        symbol_name, symbol_kind, parent_symbol, occurrence, raw_path
+    )
 
-    if requested_start is not None:
-        candidates = [
-            candidate
-            for candidate in candidates
-            if candidate.get('start_line') == requested_start
-            and candidate.get('end_line') == requested_end
-        ]
+    candidate = _select_and_validate_symbol(
+        candidates, symbol_id, symbol_name, requested_start, requested_end, index
+    )
 
-    if not candidates:
-        target = symbol_id or symbol_name
-        raise FunctionCallValidationError(
-            f'edit_symbols edits[{index}] could not find symbol {target!r}.'
-        )
-    if len(candidates) > 1:
-        raise FunctionCallValidationError(
-            _symbol_action_ambiguity_error(symbol_name, candidates)
-        )
-
-    candidate = candidates[0]
     if not raw_path:
         safe_path = _safe_workspace_path(str(candidate['path']), must_exist=True)
+
     return {
         'path': _relative_display_path(safe_path),
         'operation': 'symbol_body_replacement',
@@ -623,6 +732,69 @@ def _handle_edit_symbols_tool(arguments: Mapping[str, Any]) -> Action:
     return action
 
 
+def _normalize_multiedit_replace_string(
+    raw: Mapping[str, Any],
+    index: int,
+) -> dict[str, Any]:
+    path = raw.get('path')
+    if not isinstance(path, str) or not path.strip():
+        raise FunctionCallValidationError(
+            f'multiedit operations[{index}] replace_string requires path.'
+        )
+    old_string = raw.get('old_string')
+    new_string = raw.get('new_string')
+    if not isinstance(old_string, str) or not isinstance(new_string, str):
+        raise FunctionCallValidationError(
+            f'multiedit operations[{index}] replace_string requires old_string and new_string.'
+        )
+    return {
+        'path': path,
+        'operation': 'replace_string',
+        'old_string': old_string,
+        'new_string': new_string,
+        'replace_all': parse_bool_argument(raw.get('replace_all', False)),
+    }
+
+
+def _normalize_multiedit_edit_symbols(
+    raw: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    path = raw.get('path')
+    raw_edits = raw.get('edits')
+    if raw_edits is None:
+        raw_edits = [
+            {
+                'symbol_id': raw.get('symbol_id'),
+                'path': raw.get('path'),
+                'qualified_name': raw.get('qualified_name'),
+                'symbol_name': raw.get('symbol_name'),
+                'symbol_kind': raw.get('symbol_kind'),
+                'parent_symbol': raw.get('parent_symbol'),
+                'occurrence': raw.get('occurrence'),
+                'new_content': raw.get('new_content'),
+            }
+        ]
+    return _normalize_edit_symbols_public_edits(
+        raw_edits,
+        default_path=str(path).strip() if isinstance(path, str) else None,
+    )
+
+
+def _dispatch_multiedit_operation(
+    raw: Mapping[str, Any],
+    index: int,
+) -> list[dict[str, Any]]:
+    command = str(raw.get('command') or '').strip().lower()
+    if command == 'replace_string':
+        return [_normalize_multiedit_replace_string(raw, index)]
+    if command == 'edit_symbols':
+        return _normalize_multiedit_edit_symbols(raw)
+    raise FunctionCallValidationError(
+        f'multiedit operations[{index}] command {command!r} is unsupported. '
+        'Use replace_string or edit_symbols.'
+    )
+
+
 def _normalize_multiedit_operations(
     arguments: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
@@ -637,54 +809,7 @@ def _normalize_multiedit_operations(
             raise FunctionCallValidationError(
                 f'multiedit operations[{index}] must be an object.'
             )
-        command = str(raw.get('command') or '').strip().lower()
-        path = raw.get('path')
-        if command == 'replace_string':
-            if not isinstance(path, str) or not path.strip():
-                raise FunctionCallValidationError(
-                    f'multiedit operations[{index}] replace_string requires path.'
-                )
-            old_string = raw.get('old_string')
-            new_string = raw.get('new_string')
-            if not isinstance(old_string, str) or not isinstance(new_string, str):
-                raise FunctionCallValidationError(
-                    f'multiedit operations[{index}] replace_string requires old_string and new_string.'
-                )
-            normalized.append(
-                {
-                    'path': path,
-                    'operation': 'replace_string',
-                    'old_string': old_string,
-                    'new_string': new_string,
-                    'replace_all': parse_bool_argument(raw.get('replace_all', False)),
-                }
-            )
-        elif command == 'edit_symbols':
-            raw_edits = raw.get('edits')
-            if raw_edits is None:
-                raw_edits = [
-                    {
-                        'symbol_id': raw.get('symbol_id'),
-                        'path': raw.get('path'),
-                        'qualified_name': raw.get('qualified_name'),
-                        'symbol_name': raw.get('symbol_name'),
-                        'symbol_kind': raw.get('symbol_kind'),
-                        'parent_symbol': raw.get('parent_symbol'),
-                        'occurrence': raw.get('occurrence'),
-                        'new_content': raw.get('new_content'),
-                    }
-                ]
-            normalized.extend(
-                _normalize_edit_symbols_public_edits(
-                    raw_edits,
-                    default_path=str(path).strip() if isinstance(path, str) else None,
-                )
-            )
-        else:
-            raise FunctionCallValidationError(
-                f'multiedit operations[{index}] command {command!r} is unsupported. '
-                'Use replace_string or edit_symbols.'
-            )
+        normalized.extend(_dispatch_multiedit_operation(raw, index))
     return normalized
 
 

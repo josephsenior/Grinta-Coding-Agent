@@ -73,32 +73,32 @@ class _EventRendererPanelsMixin(CLIEventRenderer if TYPE_CHECKING else object):
             self._print_or_buffer(self._delegate_panel)
             self._last_printed_delegate_panel_signature = self._delegate_panel_signature
 
-    def _update_reasoning_for_delegate_state(self) -> None:
-        """Update the reasoning display to reflect delegate worker state."""
-        if not self._delegate_workers:
-            return
-        running = sum(
+    def _count_workers_by_status(self, statuses: frozenset[str]) -> int:
+        return sum(
             1
             for w in self._delegate_workers.values()
-            if w.get('status') in ('running', 'starting')
+            if w.get('status') in statuses
         )
-        done = sum(
-            1 for w in self._delegate_workers.values() if w.get('status') == 'done'
-        )
-        failed = sum(
-            1 for w in self._delegate_workers.values() if w.get('status') == 'failed'
-        )
-        total = len(self._delegate_workers)
 
-        parts = []
+    def _delegate_status_text(self, total: int) -> str:
+        running = self._count_workers_by_status(frozenset({'running', 'starting'}))
+        done = self._count_workers_by_status(frozenset({'done'}))
+        failed = self._count_workers_by_status(frozenset({'failed'}))
+        parts: list[str] = []
         if running:
             parts.append(f'{running} running')
         if done:
             parts.append(f'{done} done')
         if failed:
             parts.append(f'{failed} failed')
+        return ', '.join(parts) if parts else f'{total} worker(s)'
 
-        status_text = ', '.join(parts) if parts else f'{total} worker(s)'
+    def _update_reasoning_for_delegate_state(self) -> None:
+        """Update the reasoning display to reflect delegate worker state."""
+        if not self._delegate_workers:
+            return
+        total = len(self._delegate_workers)
+        status_text = self._delegate_status_text(total)
         self._ensure_reasoning()
         self._reasoning.commit_thought(f'Waiting for {total} worker(s) · {status_text}')
 

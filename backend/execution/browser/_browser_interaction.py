@@ -168,55 +168,78 @@ async def execute_scroll_impl(
     browser = await self._ensure_session()
     to_text = params.get('to_text')
     if to_text:
-        text = str(to_text).strip()
-        if not text:
-            return _finalize_observation(
-                cmd, ErrorObservation(content='ERROR: to_text is empty.')
-            )
-        await self._dispatch_bus_event(
-            browser, ScrollToTextEvent(text=text, direction='down')
+        return await self._scroll_to_text(cmd, browser, params, to_text)
+    if direction in ('top', 'bottom'):
+        return await self._scroll_to_edge(browser, params, direction)
+    return await self._scroll_directional(cmd, browser, params, direction)
+
+async def _scroll_to_text(
+    self, cmd: str, browser: Any, params: dict[str, Any], to_text: Any
+) -> Observation:
+    from browser_use.browser.events import ScrollToTextEvent
+
+    text = str(to_text).strip()
+    if not text:
+        return _finalize_observation(
+            cmd, ErrorObservation(content='ERROR: to_text is empty.')
         )
-        base = 'Scrolled toward text match.'
-    elif direction in ('top', 'bottom'):
-        amt = 50_000
-        dir1 = 'up' if direction == 'top' else 'down'
-        await self._dispatch_bus_event(
-            browser, ScrollEvent(direction=dir1, amount=amt, node=None)
-        )
-        base = f'Scrolled {direction}.'
-    else:
-        if direction not in ('up', 'down', 'left', 'right'):
-            return _finalize_observation(
-                cmd,
-                ErrorObservation(content='ERROR: invalid direction for scroll.'),
-            )
-        px = params.get('pixels')
-        amount = int(px) if px is not None else 500
-        node = None
-        if params.get('scroll_index') is not None:
-            six, err = self._parse_browser_index(
-                cmd, params.get('scroll_index'), action_name='scroll'
-            )
-            if err is not None:
-                return err
-            node, err2 = await self._get_browser_node(
-                browser, cmd=cmd, index=six or 0
-            )
-            if err2 is not None:
-                return err2
-        await self._dispatch_bus_event(
-            browser,
-            ScrollEvent(direction=direction, amount=amount, node=node),
-        )
-        base = f'Scrolled {direction} by {amount}px.'
-    content = await self._maybe_append_page_state(
-        browser, params=params, prefix=base
+    await self._dispatch_bus_event(
+        browser, ScrollToTextEvent(text=text, direction='down')
     )
+    base = 'Scrolled toward text match.'
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
-        cmd,
-        CmdOutputObservation(
-            content=content, command='browser scroll', exit_code=0
-        ),
+        cmd, CmdOutputObservation(content=content, command='browser scroll', exit_code=0)
+    )
+
+async def _scroll_to_edge(
+    self, browser: Any, params: dict[str, Any], direction: str
+) -> Observation:
+    from browser_use.browser.events import ScrollEvent
+
+    amt = 50_000
+    dir1 = 'up' if direction == 'top' else 'down'
+    await self._dispatch_bus_event(
+        browser, ScrollEvent(direction=dir1, amount=amt, node=None)
+    )
+    base = f'Scrolled {direction}.'
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
+    return _finalize_observation(
+        cmd, CmdOutputObservation(content=content, command='browser scroll', exit_code=0)
+    )
+
+async def _scroll_directional(
+    self, cmd: str, browser: Any, params: dict[str, Any], direction: str
+) -> Observation:
+    from browser_use.browser.events import ScrollEvent
+
+    if direction not in ('up', 'down', 'left', 'right'):
+        return _finalize_observation(
+            cmd,
+            ErrorObservation(content='ERROR: invalid direction for scroll.'),
+        )
+    px = params.get('pixels')
+    amount = int(px) if px is not None else 500
+    node = None
+    if params.get('scroll_index') is not None:
+        six, err = self._parse_browser_index(
+            cmd, params.get('scroll_index'), action_name='scroll'
+        )
+        if err is not None:
+            return err
+        node, err2 = await self._get_browser_node(
+            browser, cmd=cmd, index=six or 0
+        )
+        if err2 is not None:
+            return err2
+    await self._dispatch_bus_event(
+        browser,
+        ScrollEvent(direction=direction, amount=amount, node=node),
+    )
+    base = f'Scrolled {direction} by {amount}px.'
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
+    return _finalize_observation(
+        cmd, CmdOutputObservation(content=content, command='browser scroll', exit_code=0)
     )
 
 
@@ -329,25 +352,9 @@ async def execute_wait_impl(
     timeout_sec = min(float(params.get('timeout_sec') or 10.0), BROWSER_WAIT_TIMEOUT_SEC)
     browser = await self._ensure_session()
 
-    if wait_kind == 'timeout':
-        base = await _wait_for_timeout(browser, params, timeout_sec)
-    elif wait_kind == 'text':
-        base, err = await _wait_for_text(browser, params, timeout_sec, cmd)
-        if err is not None:
-            return err
-    elif wait_kind in ('selector', 'css'):
-        base, err = await _wait_for_selector(browser, params, timeout_sec, cmd)
-        if err is not None:
-            return err
-    elif wait_kind == 'network_idle':
-        base, err = await _wait_for_network_idle(browser, timeout_sec, cmd)
-        if err is not None:
-            return err
-    else:
-        return _finalize_observation(
-            cmd,
-            ErrorObservation(content=f'ERROR: unknown wait_kind {wait_kind!r}.'),
-        )
+    base, err = await self._dispatch_wait(browser, params, wait_kind, timeout_sec, cmd)
+    if err is not None:
+        return err
 
     content = await self._maybe_append_page_state(
         browser, params=params, prefix=base
@@ -355,6 +362,22 @@ async def execute_wait_impl(
     return _finalize_observation(
         cmd,
         CmdOutputObservation(content=content, command='browser wait', exit_code=0),
+    )
+
+async def _dispatch_wait(
+    self, browser: Any, params: dict[str, Any], wait_kind: str, timeout_sec: float, cmd: str
+) -> tuple[str, Observation | None]:
+    if wait_kind == 'timeout':
+        return await _wait_for_timeout(browser, params, timeout_sec), None
+    if wait_kind == 'text':
+        return await _wait_for_text(browser, params, timeout_sec, cmd)
+    if wait_kind in ('selector', 'css'):
+        return await _wait_for_selector(browser, params, timeout_sec, cmd)
+    if wait_kind == 'network_idle':
+        return await _wait_for_network_idle(browser, timeout_sec, cmd)
+    return '', _finalize_observation(
+        cmd,
+        ErrorObservation(content=f'ERROR: unknown wait_kind {wait_kind!r}.'),
     )
 
 

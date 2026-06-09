@@ -79,22 +79,15 @@ def _mcp_try_json_blob(blob: str) -> Any | None:
         return None
 
 
-def _mcp_summarize_github_repo_payload(
-    payload: dict[str, Any], *, max_len: int
-) -> str | None:
-    items = payload.get('items')
-    if not isinstance(items, list) or not items:
-        return None
-    first = items[0]
+def _mcp_github_repo_is_valid_first_item(first: Any) -> bool:
     if not isinstance(first, dict):
-        return None
-    if 'full_name' not in first and not (
-        'name' in first and isinstance(first.get('owner'), dict)
-    ):
-        return None
-    total = payload.get('total_count')
-    if not isinstance(total, int):
-        total = len(items)
+        return False
+    if 'full_name' in first:
+        return True
+    return 'name' in first and isinstance(first.get('owner'), dict)
+
+
+def _mcp_github_repo_extract_names(items: list[Any]) -> list[str]:
     names: list[str] = []
     for it in items:
         if not isinstance(it, dict):
@@ -104,6 +97,12 @@ def _mcp_summarize_github_repo_payload(
             names.append(fn.strip())
         if len(names) >= 4:
             break
+    return names
+
+
+def _mcp_github_repo_format_message(
+    total: int, names: list[str]
+) -> str:
     head = ', '.join(names)
     rest = max(0, total - len(names))
     msg = f'{total} repos'
@@ -111,7 +110,34 @@ def _mcp_summarize_github_repo_payload(
         msg += f' · {head}'
     if rest > 0:
         msg += f' (+{rest})'
+    return msg
+
+
+def _mcp_summarize_github_repo_payload(
+    payload: dict[str, Any], *, max_len: int
+) -> str | None:
+    items = payload.get('items')
+    if not isinstance(items, list) or not items:
+        return None
+    if not _mcp_github_repo_is_valid_first_item(items[0]):
+        return None
+    total = payload.get('total_count')
+    if not isinstance(total, int):
+        total = len(items)
+    names = _mcp_github_repo_extract_names(items)
+    msg = _mcp_github_repo_format_message(total, names)
     return _trunc(msg, max_len)
+
+
+def _mcp_path_entries_extract_labels(items: list[Any]) -> list[str]:
+    labels: list[str] = []
+    for it in items[:6]:
+        if not isinstance(it, dict):
+            continue
+        p = it.get('path') or it.get('name')
+        if isinstance(p, str) and p.strip():
+            labels.append(p.strip())
+    return labels
 
 
 def _mcp_summarize_path_entries(items: list[Any], *, max_len: int) -> str | None:
@@ -121,13 +147,7 @@ def _mcp_summarize_path_entries(items: list[Any], *, max_len: int) -> str | None
     t = first.get('type')
     if t not in {'file', 'dir', 'symlink'}:
         return None
-    labels: list[str] = []
-    for it in items[:6]:
-        if not isinstance(it, dict):
-            continue
-        p = it.get('path') or it.get('name')
-        if isinstance(p, str) and p.strip():
-            labels.append(p.strip())
+    labels = _mcp_path_entries_extract_labels(items)
     if not labels:
         return None
     n = len(items)

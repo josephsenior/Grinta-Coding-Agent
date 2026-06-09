@@ -99,6 +99,99 @@ def _confirmation_frame_style(risk_text: str) -> str:
     return CLR_CARD_BORDER
 
 
+def _print_high_risk_banner(console: Console) -> None:
+    from rich.panel import Panel as WarningPanel
+
+    console.print()
+    console.print(
+        WarningPanel(
+            'This action can modify your system or environment.\n'
+            'Type [bold]yes[/bold] to confirm, or [bold]n[/bold] to reject.',
+            title='[bold #f87171]⚠  REQUIRES APPROVAL[/bold #f87171]',
+            title_align='left',
+            border_style=CLR_RISK_HIGH,
+            box=box.HEAVY,
+            padding=(1, 2),
+        )
+    )
+
+
+def _print_thought_panel(console: Console, pending_action: Action) -> None:
+    thought = getattr(pending_action, 'thought', '')
+    if not thought:
+        return
+    console.print(
+        Panel(
+            thought,
+            title='[dim]Why the agent wants this[/dim]',
+            title_align='left',
+            border_style=CLR_CARD_BORDER,
+            box=box.ROUNDED,
+            padding=(1, 2),
+        ),
+    )
+
+
+def _prompt_high_risk(console: Console) -> ConfirmationDecision:
+    hint = Text('  ')
+    hint.append('[yes]', style=f'bold {CLR_RISK_HIGH}')
+    hint.append(' approve  ', style=CLR_META)
+    hint.append('[n]', style=f'bold {CLR_BRAND}')
+    hint.append('o  ', style=CLR_META)
+    hint.append('[a]', style=f'bold {CLR_BRAND}')
+    hint.append('lways allow', style=CLR_META)
+    console.print(hint)
+    answer = Prompt.ask(
+        '  Approve?',
+        console=console,
+        default='n',
+        show_choices=False,
+        show_default=False,
+    )
+    answer = (answer or 'n').strip().lower()
+    if answer in ('a', 'always'):
+        return ConfirmationDecision(approved=True, remember=True)
+    return ConfirmationDecision(approved=answer == 'yes', remember=False)
+
+
+def _build_normal_hint(risk_text: str) -> Text:
+    hint = Text('  ')
+    hint.append('[y]', style=f'bold {CLR_BRAND}')
+    hint.append('es ', style=CLR_META)
+    hint.append('[n]', style=f'bold {CLR_BRAND}')
+    hint.append('o ', style=CLR_META)
+    hint.append('[a]', style=f'bold {CLR_BRAND}')
+    hint.append('lways allow', style=CLR_META)
+    if risk_text == 'LOW':
+        hint.append('   ', style=CLR_META)
+        hint.append('[d]', style=f'bold {CLR_RISK_LOW}')
+        hint.append("don't ask again this session", style=CLR_META)
+    return hint
+
+
+def _prompt_normal(console: Console, risk_text: str) -> ConfirmationDecision:
+    console.print(_build_normal_hint(risk_text))
+    choices = ['y', 'n', 'a']
+    if risk_text == 'LOW':
+        choices.append('d')
+    answer = Prompt.ask(
+        '  Approve?',
+        console=console,
+        choices=choices,
+        default='n',
+        show_choices=False,
+        show_default=False,
+    )
+    answer = (answer or 'n').strip().lower()
+    if answer == 'a':
+        return ConfirmationDecision(approved=True, remember=True)
+    if answer == 'd':
+        return ConfirmationDecision(
+            approved=True, remember=False, suppress_low_risk=True
+        )
+    return ConfirmationDecision(approved=answer == 'y', remember=False)
+
+
 def render_confirmation(
     console: Console,
     pending_action: Action,
@@ -113,22 +206,8 @@ def render_confirmation(
     frame_style = _confirmation_frame_style(risk_text)
     is_high_risk = risk_text == 'HIGH'
 
-    # HIGH-risk actions get a prominent warning banner before the panel.
     if is_high_risk:
-        from rich.panel import Panel as WarningPanel
-
-        console.print()
-        console.print(
-            WarningPanel(
-                'This action can modify your system or environment.\n'
-                'Type [bold]yes[/bold] to confirm, or [bold]n[/bold] to reject.',
-                title='[bold #f87171]⚠  REQUIRES APPROVAL[/bold #f87171]',
-                title_align='left',
-                border_style=CLR_RISK_HIGH,
-                box=box.HEAVY,
-                padding=(1, 2),
-            )
-        )
+        _print_high_risk_banner(console)
 
     table = Table(
         show_header=True,
@@ -148,7 +227,6 @@ def render_confirmation(
         Text(risk_text, style=risk_style),
     )
 
-    # Cleaner title with risk badge
     title = Text()
     title.append('  ', style=STYLE_EMPTY)
     title.append('Approve this action  ', style=STYLE_BOLD)
@@ -166,72 +244,8 @@ def render_confirmation(
         )
     )
 
-    # Show the thought / rationale if present
-    thought = getattr(pending_action, 'thought', '')
-    if thought:
-        console.print(
-            Panel(
-                thought,
-                title='[dim]Why the agent wants this[/dim]',
-                title_align='left',
-                border_style=CLR_CARD_BORDER,
-                box=box.ROUNDED,
-                padding=(1, 2),
-            ),
-        )
+    _print_thought_panel(console, pending_action)
 
     if is_high_risk:
-        hint = Text('  ')
-        hint.append('[yes]', style=f'bold {CLR_RISK_HIGH}')
-        hint.append(' approve  ', style=CLR_META)
-        hint.append('[n]', style=f'bold {CLR_BRAND}')
-        hint.append('o  ', style=CLR_META)
-        hint.append('[a]', style=f'bold {CLR_BRAND}')
-        hint.append('lways allow', style=CLR_META)
-        console.print(hint)
-        answer = Prompt.ask(
-            '  Approve?',
-            console=console,
-            default='n',
-            show_choices=False,
-            show_default=False,
-        )
-        answer = (answer or 'n').strip().lower()
-        if answer in ('a', 'always'):
-            return ConfirmationDecision(approved=True, remember=True)
-        return ConfirmationDecision(approved=answer == 'yes', remember=False)
-
-    is_low_risk = risk_text == 'LOW'
-    hint = Text('  ')
-    hint.append('[y]', style=f'bold {CLR_BRAND}')
-    hint.append('es ', style=CLR_META)
-    hint.append('[n]', style=f'bold {CLR_BRAND}')
-    hint.append('o ', style=CLR_META)
-    hint.append('[a]', style=f'bold {CLR_BRAND}')
-    hint.append('lways allow', style=CLR_META)
-    if is_low_risk:
-        hint.append('   ', style=CLR_META)
-        hint.append('[d]', style=f'bold {CLR_RISK_LOW}')
-        hint.append("don't ask again this session", style=CLR_META)
-    console.print(hint)
-
-    choices = ['y', 'n', 'a']
-    if is_low_risk:
-        choices.append('d')
-
-    answer = Prompt.ask(
-        '  Approve?',
-        console=console,
-        choices=choices,
-        default='n',
-        show_choices=False,
-        show_default=False,
-    )
-    answer = (answer or 'n').strip().lower()
-    if answer == 'a':
-        return ConfirmationDecision(approved=True, remember=True)
-    if answer == 'd':
-        return ConfirmationDecision(
-            approved=True, remember=False, suppress_low_risk=True
-        )
-    return ConfirmationDecision(approved=answer == 'y', remember=False)
+        return _prompt_high_risk(console)
+    return _prompt_normal(console, risk_text)

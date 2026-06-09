@@ -196,30 +196,14 @@ class _AppScreenLifecycleMixin:
                 )
                 logger.exception('TUI _bootstrap: failed in phase1')
                 raise
-            if self._is_unmounted:
-                _tui_logger.debug('_bootstrap: screen already unmounted, aborting')
-                if event_stream is not None:
-                    close_fn = getattr(event_stream, 'close', None)
-                    if callable(close_fn):
-                        close_fn()
-                self._event_stream = None
+            if self._bootstrap_check_unmounted(event_stream):
                 return
 
             _tui_logger.debug(
                 f'_bootstrap: runtime created, type={type(runtime).__name__}'
             )
 
-            connect_fn = getattr(runtime, 'connect', None)
-            if callable(connect_fn):
-                try:
-                    _tui_logger.debug('_bootstrap: awaiting runtime.connect()')
-                    await connect_fn()
-                    _tui_logger.debug('_bootstrap: runtime.connect() OK')
-                except Exception as exc:
-                    _tui_logger.debug(
-                        f'_bootstrap: runtime.connect() FAILED: {type(exc).__name__}: {exc}'
-                    )
-                    raise
+            await self._bootstrap_connect_runtime(runtime)
 
             try:
                 memory, controller = await asyncio.to_thread(
@@ -237,20 +221,7 @@ class _AppScreenLifecycleMixin:
                 logger.exception('TUI _bootstrap: failed in phase2')
                 raise
 
-            # Warm up MCP servers (best-effort — failure is non-fatal)
-            try:
-                from backend.core.bootstrap.main import _setup_mcp_tools
-
-                await _setup_mcp_tools(agent, runtime, memory)
-                mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
-                try:
-                    mcp_n = int(mcp_status.get('connected_client_count') or 0)
-                except (TypeError, ValueError):
-                    mcp_n = 0
-                self._hud.update_mcp_servers(mcp_n)
-            except Exception:
-                _tui_logger.debug('_bootstrap: MCP warmup failed (non-fatal)')
-                self._hud.update_mcp_servers(0)
+            await self._bootstrap_mcp_warmup(agent, runtime, memory)
 
             _tui_logger.debug(
                 f'_bootstrap: controller created, state={controller.get_agent_state()}'
@@ -260,15 +231,7 @@ class _AppScreenLifecycleMixin:
                 controller.get_agent_state(),
                 type(controller.get_agent_state()),
             )
-            if self._is_unmounted:
-                _tui_logger.debug(
-                    '_bootstrap: screen unmounted after init, skipping subscribe'
-                )
-                if event_stream is not None:
-                    close_fn = getattr(event_stream, 'close', None)
-                    if callable(close_fn):
-                        close_fn()
-                self._event_stream = None
+            if self._bootstrap_check_unmounted(event_stream):
                 return
             self._runtime_stub = runtime
             self._memory_stub = memory
@@ -279,31 +242,7 @@ class _AppScreenLifecycleMixin:
             set_main_event_loop(self._loop)
             _tui_logger.debug(f'_bootstrap: set_main_event_loop to {self._loop}')
 
-            if self._renderer is None:
-                import sys
-
-                sys.stdin.isatty()
-                from backend.cli.tui.app import TUIRenderer
-
-                self._renderer = TUIRenderer(
-                    console=self._rich_console,
-                    hud=self._hud,
-                    reasoning=self._reasoning,
-                    tui=self,
-                    loop=self._loop,
-                )
-            self._renderer.subscribe(event_stream, event_stream.sid)
-
-            state_after_create = controller.get_agent_state()
-            _tui_logger.debug(f'_bootstrap: state after subscribe={state_after_create}')
-            logger.info(
-                'TUI _bootstrap: state after renderer subscribe=%s', state_after_create
-            )
-            # Show "Ready" once bootstrap completes — the agent is waiting for input
-            self._hud.update_agent_state('awaiting_user_input')
-            self._render_hud_bar()
-            self._render_hud_bar()
-            await self._renderer.drain_events_async()
+            await self._bootstrap_setup_renderer(event_stream, controller)
             _tui_logger.debug('_bootstrap: done')
         except BaseException:
             if event_stream is not None:
@@ -318,6 +257,76 @@ class _AppScreenLifecycleMixin:
             raise
         finally:
             _bootstrapping.set()
+
+    def _bootstrap_check_unmounted(self, event_stream: Any) -> bool:
+        if not self._is_unmounted:
+            return False
+        _tui_logger.debug('_bootstrap: screen unmounted, aborting')
+        if event_stream is not None:
+            close_fn = getattr(event_stream, 'close', None)
+            if callable(close_fn):
+                close_fn()
+        self._event_stream = None
+        return True
+
+    async def _bootstrap_connect_runtime(self, runtime: Any) -> None:
+        connect_fn = getattr(runtime, 'connect', None)
+        if callable(connect_fn):
+            try:
+                _tui_logger.debug('_bootstrap: awaiting runtime.connect()')
+                await connect_fn()
+                _tui_logger.debug('_bootstrap: runtime.connect() OK')
+            except Exception as exc:
+                _tui_logger.debug(
+                    f'_bootstrap: runtime.connect() FAILED: {type(exc).__name__}: {exc}'
+                )
+                raise
+
+    async def _bootstrap_mcp_warmup(
+        self, agent: Any, runtime: Any, memory: Any
+    ) -> None:
+        try:
+            from backend.core.bootstrap.main import _setup_mcp_tools
+
+            await _setup_mcp_tools(agent, runtime, memory)
+            mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
+            try:
+                mcp_n = int(mcp_status.get('connected_client_count') or 0)
+            except (TypeError, ValueError):
+                mcp_n = 0
+            self._hud.update_mcp_servers(mcp_n)
+        except Exception:
+            _tui_logger.debug('_bootstrap: MCP warmup failed (non-fatal)')
+            self._hud.update_mcp_servers(0)
+
+    async def _bootstrap_setup_renderer(
+        self, event_stream: Any, controller: Any
+    ) -> None:
+        if self._renderer is None:
+            import sys
+
+            sys.stdin.isatty()
+            from backend.cli.tui.app import TUIRenderer
+
+            self._renderer = TUIRenderer(
+                console=self._rich_console,
+                hud=self._hud,
+                reasoning=self._reasoning,
+                tui=self,
+                loop=self._loop,
+            )
+        self._renderer.subscribe(event_stream, event_stream.sid)
+
+        state_after_create = controller.get_agent_state()
+        _tui_logger.debug(f'_bootstrap: state after subscribe={state_after_create}')
+        logger.info(
+            'TUI _bootstrap: state after renderer subscribe=%s', state_after_create
+        )
+        self._hud.update_agent_state('awaiting_user_input')
+        self._render_hud_bar()
+        self._render_hud_bar()
+        await self._renderer.drain_events_async()
+
 
     def _bootstrap_sync_phase1(
         self,
@@ -507,6 +516,127 @@ class _AppScreenLifecycleMixin:
                 self._agent_task,
             )
 
+    async def _poll_wait(self):
+        if self._renderer is not None:
+            await self._renderer.wait_for_activity(wait_timeout_sec=0.5)
+        else:
+            await asyncio.sleep(0.5)
+
+    def _get_current_event_count(self) -> int:
+        try:
+            return self._event_stream.get_latest_event_id()
+        except Exception:
+            return 0
+
+    def _update_progress_tracking(
+        self,
+        state,
+        current_event_count: int,
+        last_event_count: int,
+        last_state,
+        stale_poll_count: int,
+        last_progress_at: float,
+    ):
+        progress_made = False
+        if current_event_count != last_event_count:
+            progress_made = True
+            stale_poll_count = 0
+            last_event_count = current_event_count
+        else:
+            stale_poll_count += 1
+
+        if state != last_state:
+            progress_made = True
+            last_state = state
+
+        if progress_made:
+            last_progress_at = _time.monotonic()
+
+        return last_event_count, last_state, stale_poll_count, last_progress_at
+
+    def _maybe_log_stale_polls(self, stale_poll_count: int, state):
+        STALE_POLL_THRESHOLD = 120
+        if (
+            stale_poll_count > 0
+            and stale_poll_count % STALE_POLL_THRESHOLD == 0
+            and state == AgentState.RUNNING
+        ):
+            _tui_logger.debug(
+                '_dispatch_to_agent: %d consecutive polls with no new events '
+                'in RUNNING state (LLM may be thinking silently; '
+                'no-step-progress watchdog will recover true stalls)',
+                stale_poll_count,
+            )
+
+    async def _check_stall_timeout(
+        self,
+        state,
+        last_progress_at: float,
+        started_at: float,
+        loop_count: int,
+    ):
+        elapsed_since_progress = _time.monotonic() - last_progress_at
+        if (
+            DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS > 0
+            and elapsed_since_progress > DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS
+        ):
+            total_elapsed = _time.monotonic() - started_at
+            _tui_logger.error(
+                '_dispatch_to_agent: TIMEOUT after %.0fs since last progress '
+                '(%.0fs total, poll #%d, state=%s) — forcing ERROR to break stall',
+                elapsed_since_progress,
+                total_elapsed,
+                loop_count,
+                state,
+            )
+            logger.error(
+                '[TUI] _dispatch_to_agent: STALL TIMEOUT after %.0fs since last progress '
+                '(%.0fs total, poll #%d, state=%s). '
+                'This usually indicates the _step_pending race condition. '
+                'Forcing ERROR state.',
+                elapsed_since_progress,
+                total_elapsed,
+                loop_count,
+                state,
+                extra={'msg_type': 'TUI_DISPATCH_STALL_TIMEOUT'},
+            )
+            try:
+                await self._controller.set_agent_state_to(AgentState.ERROR)
+            except Exception:
+                pass
+            return AgentState.ERROR, True
+        return state, False
+
+    def _maybe_log_periodic_status(self, loop_count: int, state):
+        if loop_count == 1 or loop_count % 20 == 0:
+            _tui_logger.debug(
+                f'_dispatch_to_agent: poll #{loop_count}, state={state}'
+            )
+            logger.info(
+                '[TUI] _dispatch_to_agent: poll #%d, state=%s',
+                loop_count,
+                state,
+            )
+
+    def _check_completion(self, state, end_states: set[AgentState]) -> bool:
+        if state in end_states:
+            _tui_logger.debug(
+                f'_dispatch_to_agent: reached end state {state}'
+            )
+            logger.info(
+                '[TUI] _dispatch_to_agent: reached end state %s', state
+            )
+            return True
+        if self._agent_task and self._agent_task.done():
+            _tui_logger.debug(
+                f'_dispatch_to_agent: agent task done, state={state}'
+            )
+            logger.info(
+                '[TUI] _dispatch_to_agent: agent task done, state=%s', state
+            )
+            return True
+        return False
+
     async def _poll_for_agent_completion(
         self,
         end_states: set[AgentState],
@@ -517,106 +647,36 @@ class _AppScreenLifecycleMixin:
         last_event_count = 0
         last_state = None
         stale_poll_count = 0
-        STALE_POLL_THRESHOLD = 120
 
         while True:
             try:
-                if self._renderer is not None:
-                    await self._renderer.wait_for_activity(wait_timeout_sec=0.5)
-                else:
-                    await asyncio.sleep(0.5)
+                await self._poll_wait()
                 loop_count += 1
                 state = self._controller.get_agent_state()
+                current_event_count = self._get_current_event_count()
 
-                current_event_count = 0
-                try:
-                    current_event_count = self._event_stream.get_latest_event_id()
-                except Exception:
-                    pass
-
-                progress_made = False
-                if current_event_count != last_event_count:
-                    progress_made = True
-                    stale_poll_count = 0
-                    last_event_count = current_event_count
-                else:
-                    stale_poll_count += 1
-
-                if state != last_state:
-                    progress_made = True
-                    last_state = state
-
-                if progress_made:
-                    last_progress_at = _time.monotonic()
-
-                if (
-                    stale_poll_count > 0
-                    and stale_poll_count % STALE_POLL_THRESHOLD == 0
-                    and state == AgentState.RUNNING
-                ):
-                    _tui_logger.debug(
-                        '_dispatch_to_agent: %d consecutive polls with no new events '
-                        'in RUNNING state (LLM may be thinking silently; '
-                        'no-step-progress watchdog will recover true stalls)',
+                last_event_count, last_state, stale_poll_count, last_progress_at = (
+                    self._update_progress_tracking(
+                        state,
+                        current_event_count,
+                        last_event_count,
+                        last_state,
                         stale_poll_count,
+                        last_progress_at,
                     )
+                )
 
-                elapsed_since_progress = _time.monotonic() - last_progress_at
-                if (
-                    DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS > 0
-                    and elapsed_since_progress > DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS
-                ):
-                    total_elapsed = _time.monotonic() - started_at
-                    _tui_logger.error(
-                        '_dispatch_to_agent: TIMEOUT after %.0fs since last progress '
-                        '(%.0fs total, poll #%d, state=%s) — forcing ERROR to break stall',
-                        elapsed_since_progress,
-                        total_elapsed,
-                        loop_count,
-                        state,
-                    )
-                    logger.error(
-                        '[TUI] _dispatch_to_agent: STALL TIMEOUT after %.0fs since last progress '
-                        '(%.0fs total, poll #%d, state=%s). '
-                        'This usually indicates the _step_pending race condition. '
-                        'Forcing ERROR state.',
-                        elapsed_since_progress,
-                        total_elapsed,
-                        loop_count,
-                        state,
-                        extra={'msg_type': 'TUI_DISPATCH_STALL_TIMEOUT'},
-                    )
-                    try:
-                        await self._controller.set_agent_state_to(AgentState.ERROR)
-                    except Exception:
-                        pass
-                    state = AgentState.ERROR
+                self._maybe_log_stale_polls(stale_poll_count, state)
+
+                state, timed_out = await self._check_stall_timeout(
+                    state, last_progress_at, started_at, loop_count
+                )
+                if timed_out:
                     break
 
-                if loop_count == 1 or loop_count % 20 == 0:
-                    _tui_logger.debug(
-                        f'_dispatch_to_agent: poll #{loop_count}, state={state}'
-                    )
-                    logger.info(
-                        '[TUI] _dispatch_to_agent: poll #%d, state=%s',
-                        loop_count,
-                        state,
-                    )
-                if state in end_states:
-                    _tui_logger.debug(
-                        f'_dispatch_to_agent: reached end state {state}'
-                    )
-                    logger.info(
-                        '[TUI] _dispatch_to_agent: reached end state %s', state
-                    )
-                    break
-                if self._agent_task and self._agent_task.done():
-                    _tui_logger.debug(
-                        f'_dispatch_to_agent: agent task done, state={state}'
-                    )
-                    logger.info(
-                        '[TUI] _dispatch_to_agent: agent task done, state=%s', state
-                    )
+                self._maybe_log_periodic_status(loop_count, state)
+
+                if self._check_completion(state, end_states):
                     break
             except Exception as exc:
                 _tui_logger.debug(

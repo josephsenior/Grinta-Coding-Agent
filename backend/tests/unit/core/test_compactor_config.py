@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from backend.core.config.compactor_config import (
     AmortizedPruningCompactorConfig,
     CompactorPipelineConfig,
+    ContextPipelineConfig,
     NoOpCompactorConfig,
     ObservationMaskingCompactorConfig,
     RecentEventsCompactorConfig,
@@ -150,11 +151,11 @@ class TestCompactorConfigFromTomlSection:
         assert 'compactor' in result
         assert isinstance(result['compactor'], NoOpCompactorConfig)
 
-    def test_defaults_to_smart(self):
-        """When no type is specified, defaults to 'smart'."""
+    def test_defaults_to_context_pipeline(self):
+        """When no type is specified, defaults to unified context pipeline."""
         result = compactor_config_from_toml_section({})
         assert 'compactor' in result
-        assert isinstance(result['compactor'], SmartCompactorConfig)
+        assert isinstance(result['compactor'], ContextPipelineConfig)
 
     def test_invalid_config_falls_back_to_noop(self):
         """Invalid config should produce NoOpCompactorConfig with warning."""

@@ -10,6 +10,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from rich.markup import escape as _markup_escape
+
 from backend.cli.theme import (
     CLR_SECONDARY,
     CLR_STATUS_ERR,
@@ -82,6 +84,26 @@ _OUTPUT_TYPE_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
     ('linter', ('ruff', 'flake8', 'mypy')),
 ]
 
+_PYTEST_SUMMARY_PATTERNS: list[tuple[str, str]] = [
+    (r'(\d+) passed', 'passed'),
+    (r'(\d+) failed', 'failed'),
+    (r'(\d+) error', 'errors'),
+    (r'(\d+) skipped', 'skipped'),
+]
+
+_PYTEST_SUMMARY_KEYWORDS: tuple[str, ...] = (
+    ' passed',
+    ' failed',
+    ' error',
+    ' skipped',
+)
+
+_PYTEST_SUMMARY_FORMATS: list[tuple[str, str, str]] = [
+    ('passed', CLR_STATUS_OK, 'passed'),
+    ('failed', CLR_STATUS_ERR, 'failed'),
+    ('skipped', CLR_SECONDARY, 'skipped'),
+]
+
 
 def _match_command_pattern(cmd_lower: str, patterns: tuple[str, ...]) -> bool:
     for pattern in patterns:
@@ -104,195 +126,256 @@ def detect_output_type(command: str, output: str) -> str:
     return 'plain'
 
 
+def _is_pytest_summary_line(stripped: str) -> bool:
+    for kw in _PYTEST_SUMMARY_KEYWORDS:
+        if kw in stripped:
+            return True
+    return False
+
+
+def _apply_pytest_summary_counts(result: ParsedTestResult, stripped: str) -> None:
+    for pattern, attr in _PYTEST_SUMMARY_PATTERNS:
+        m = re.search(pattern, stripped)
+        if m:
+            setattr(result, attr, int(m.group(1)))
+    if result.failed:
+        result.has_failures = True
+    m = re.search(r'[\d.]+s', stripped)
+    if m:
+        result.duration = m.group()
+    result.summary = stripped
+
+
+def _determine_test_status(stripped: str) -> str:
+    if 'FAILED' in stripped:
+        return 'fail'
+    if 'SKIPPED' in stripped:
+        return 'skip'
+    return 'pass'
+
+
+def _parse_pytest_test_line(
+    result: ParsedTestResult, stripped: str
+) -> None:
+    if '::test_' not in stripped and '---' not in stripped:
+        return
+    status = _determine_test_status(stripped)
+    parts = stripped.split('::')
+    if len(parts) >= 2:
+        file_part = parts[0].strip()
+        test_part = '::'.join(parts[1:])
+        result.lines.append((status, file_part, test_part))
+    elif '---' in stripped:
+        result.lines.append(('context', '', stripped))
+
+
 def parse_pytest_output(output: str) -> ParsedTestResult:
     """Parse pytest output into structured test results."""
     result = ParsedTestResult()
-    lines = output.splitlines()
 
-    for line in lines:
+    for line in output.splitlines():
         stripped = line.strip()
         if not stripped:
             continue
-
-        if (
-            ' passed' in stripped
-            or ' failed' in stripped
-            or ' error' in stripped
-            or ' skipped' in stripped
-        ):
-            m = re.search(r'(\d+) passed', stripped)
-            if m:
-                result.passed = int(m.group(1))
-            m = re.search(r'(\d+) failed', stripped)
-            if m:
-                result.failed = int(m.group(1))
-                result.has_failures = True
-            m = re.search(r'(\d+) error', stripped)
-            if m:
-                result.errors = int(m.group(1))
-            m = re.search(r'(\d+) skipped', stripped)
-            if m:
-                result.skipped = int(m.group(1))
-            m = re.search(r'[\d.]+s', stripped)
-            if m:
-                result.duration = m.group()
-            result.summary = stripped
+        if _is_pytest_summary_line(stripped):
+            _apply_pytest_summary_counts(result, stripped)
             break
-
-        if '::test_' in stripped or '---' in stripped:
-            status = 'pass'
-            if 'FAILED' in stripped:
-                status = 'fail'
-            elif 'SKIPPED' in stripped:
-                status = 'skip'
-            elif 'PASSED' in stripped:
-                status = 'pass'
-
-            parts = stripped.split('::')
-            if len(parts) >= 2:
-                file_part = parts[0].strip()
-                test_part = '::'.join(parts[1:])
-                result.lines.append((status, file_part, test_part))
-            elif '---' in stripped:
-                result.lines.append(('context', '', stripped))
+        _parse_pytest_test_line(result, stripped)
 
     return result
 
 
+def _pytest_status_icon(status: str) -> str:
+    if status == 'pass':
+        return f'[{CLR_STATUS_OK}]\u2713[/{CLR_STATUS_OK}]'
+    if status == 'fail':
+        return f'[{CLR_STATUS_ERR}]\u2717[/{CLR_STATUS_ERR}]'
+    if status == 'skip':
+        return f'[{CLR_SECONDARY}]\u25cb[/{CLR_SECONDARY}]'
+    return f'[{CLR_SECONDARY}]\u00b7[/{CLR_SECONDARY}]'
+
+
+def _append_pytest_overflow(output: list[str], total: int) -> None:
+    if total > 15:
+        output.append(f'  [dim]... {total - 15} more[/dim]')
+
+
+def _format_pytest_test_lines(result: ParsedTestResult) -> list[str]:
+    output: list[str] = []
+    if not result.lines:
+        return output
+    output.append('')
+    for status, file_part, test_part in result.lines[:15]:
+        icon = _pytest_status_icon(status)
+        if file_part:
+            output.append(f'  {icon} {_markup_escape(file_part)}')
+        if test_part:
+            output.append(f'     {_markup_escape(test_part)}')
+    _append_pytest_overflow(output, len(result.lines))
+    return output
+
+
+def _append_pytest_duration(parts: list[str], duration: str) -> None:
+    if duration:
+        parts.append(f'[dim]{_markup_escape(duration)}[/dim]')
+
+
+def _format_pytest_summary(result: ParsedTestResult) -> list[str]:
+    if not result.summary:
+        return []
+    parts: list[str] = []
+    for attr, color, label in _PYTEST_SUMMARY_FORMATS:
+        value = getattr(result, attr)
+        if value:
+            parts.append(f'[{color}]{value} {label}[/{color}]')
+    _append_pytest_duration(parts, result.duration)
+    if parts:
+        return [f'  {" \u00b7 ".join(parts)}']
+    return []
+
+
 def format_pytest_panel(result: ParsedTestResult) -> list[str]:
     """Format pytest results as lines for display."""
-    output: list[str] = []
-
-    if result.lines:
-        output.append('')
-        for status, file_part, test_part in result.lines[:15]:
-            if status == 'pass':
-                icon = f'[{CLR_STATUS_OK}]✓[/{CLR_STATUS_OK}]'
-            elif status == 'fail':
-                icon = f'[{CLR_STATUS_ERR}]✗[/{CLR_STATUS_ERR}]'
-            elif status == 'skip':
-                icon = f'[{CLR_SECONDARY}]○[/{CLR_SECONDARY}]'
-            else:
-                icon = f'[{CLR_SECONDARY}]·[/{CLR_SECONDARY}]'
-
-            if file_part:
-                # Escape file_part to prevent MarkupError
-                from rich.markup import escape as markup_escape
-
-                escaped_file = markup_escape(file_part)
-                output.append(f'  {icon} {escaped_file}')
-            if test_part:
-                # Escape test_part to prevent MarkupError
-                from rich.markup import escape as markup_escape
-
-                escaped_test = markup_escape(test_part)
-                output.append(f'     {escaped_test}')
-
-        if len(result.lines) > 15:
-            output.append(f'  [dim]... {len(result.lines) - 15} more[/dim]')
-
-    if result.summary:
-        parts = []
-        if result.passed:
-            parts.append(f'[{CLR_STATUS_OK}]{result.passed} passed[/{CLR_STATUS_OK}]')
-        if result.failed:
-            parts.append(f'[{CLR_STATUS_ERR}]{result.failed} failed[/{CLR_STATUS_ERR}]')
-        if result.skipped:
-            parts.append(f'[{CLR_SECONDARY}]{result.skipped} skipped[/{CLR_SECONDARY}]')
-        if result.duration:
-            # Escape duration to prevent MarkupError
-            from rich.markup import escape as markup_escape
-
-            escaped_duration = markup_escape(result.duration)
-            parts.append(f'[dim]{escaped_duration}[/dim]')
-        if parts:
-            output.append(f'  {" · ".join(parts)}')
-
+    output = _format_pytest_test_lines(result)
+    output.extend(_format_pytest_summary(result))
     return output
+
+
+def _check_git_clean_status(result: ParsedGitStatus, stripped: str) -> None:
+    if 'nothing to commit' in stripped or 'working tree clean' in stripped:
+        result.clean = True
+
+
+def _is_git_staged_change(stripped: str) -> bool:
+    for keyword in ('new file:', 'modified:', 'deleted:'):
+        if keyword in stripped:
+            return True
+    return False
+
+
+def _try_parse_git_file_change(result: ParsedGitStatus, stripped: str) -> bool:
+    if _is_git_staged_change(stripped):
+        result.staged.append(stripped)
+        return True
+    if stripped.startswith('??'):
+        result.untracked.append(stripped[2:].strip())
+        return True
+    return False
+
+
+def _has_any_git_changes(result: ParsedGitStatus) -> bool:
+    if result.staged:
+        return True
+    if result.unstaged:
+        return True
+    if result.untracked:
+        return True
+    return False
+
+
+def _parse_git_branch_info(result: ParsedGitStatus, stripped: str) -> None:
+    if 'Your branch is ahead' in stripped:
+        m = re.search(r'(\d+) commit', stripped)
+        if m:
+            result.ahead = int(m.group(1))
+    elif 'Your branch is behind' in stripped:
+        m = re.search(r'(\d+) commit', stripped)
+        if m:
+            result.behind = int(m.group(1))
+
+
+def _is_git_header_line(stripped: str) -> bool:
+    if stripped.startswith('Changes to be committed'):
+        return True
+    if stripped.startswith('Untracked files'):
+        return True
+    return False
+
+
+def _classify_git_line(result: ParsedGitStatus, stripped: str) -> None:
+    if _is_git_header_line(stripped):
+        return
+    if stripped.startswith('Changes not staged'):
+        result.unstaged.append(stripped)
+        return
+    if _try_parse_git_file_change(result, stripped):
+        return
+    if _has_any_git_changes(result):
+        _parse_git_branch_info(result, stripped)
+
+
+def _process_git_line(result: ParsedGitStatus, stripped: str) -> None:
+    if not stripped:
+        return
+    _check_git_clean_status(result, stripped)
+    _classify_git_line(result, stripped)
 
 
 def parse_git_status(output: str) -> ParsedGitStatus:
     """Parse git status output."""
     result = ParsedGitStatus()
-    lines = output.splitlines()
 
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if stripped.startswith('Changes to be committed'):
-            continue
-        if stripped.startswith('Changes not staged'):
-            result.unstaged.append(stripped)
-        elif stripped.startswith('Untracked files'):
-            continue
-        elif (
-            'new file:' in stripped or 'modified:' in stripped or 'deleted:' in stripped
-        ):
-            result.staged.append(stripped)
-        elif stripped.startswith('??'):
-            result.untracked.append(stripped[2:].strip())
-        elif result.staged or result.unstaged or result.untracked:
-            if 'Your branch is ahead' in stripped:
-                m = re.search(r'(\d+) commit', stripped)
-                if m:
-                    result.ahead = int(m.group(1))
-            elif 'Your branch is behind' in stripped:
-                m = re.search(r'(\d+) commit', stripped)
-                if m:
-                    result.behind = int(m.group(1))
-        if 'nothing to commit' in stripped or 'working tree clean' in stripped:
-            result.clean = True
+    for line in output.splitlines():
+        _process_git_line(result, line.strip())
 
     return result
 
 
+def _append_section_overflow(
+    output: list[str], items: list[str], max_items: int
+) -> None:
+    if len(items) > max_items:
+        output.append(f'  [dim]... {len(items) - max_items} more[/dim]')
+
+
+def _format_git_file_section(
+    output: list[str],
+    title: str,
+    items: list[str],
+    title_color: str,
+    line_color: str,
+    line_prefix: str,
+    show_more: bool = True,
+) -> None:
+    if not items:
+        return
+    if output:
+        output.append('')
+    output.append(f'[{title_color}]{title} ({len(items)}):[/{title_color}]')
+    for item in items[:5]:
+        escaped = _markup_escape(item)
+        output.append(f'  [{line_color}]{line_prefix}{escaped}[/{line_color}]')
+    if show_more:
+        _append_section_overflow(output, items, 5)
+
+
+def _format_git_clean_line(result: ParsedGitStatus, output: list[str]) -> None:
+    if not result.clean:
+        return
+    if output:
+        output.append('')
+    output.append(f'[{CLR_STATUS_OK}]\u2713 Working tree clean[/{CLR_STATUS_OK}]')
+
+
 def format_git_status_panel(result: ParsedGitStatus) -> list[str]:
     """Format git status as lines."""
-    from rich.markup import escape as markup_escape
-
     output: list[str] = []
-
-    if result.staged:
-        output.append(
-            f'[{CLR_STATUS_OK}]Staged ({len(result.staged)}):[/{CLR_STATUS_OK}]'
-        )
-        for item in result.staged[:5]:
-            # Escape item to prevent MarkupError
-            escaped_item = markup_escape(item)
-            output.append(f'  [green]+ {escaped_item}[/green]')
-        if len(result.staged) > 5:
-            output.append(f'  [dim]... {len(result.staged) - 5} more[/dim]')
-
-    if result.unstaged:
-        if output:
-            output.append('')
-        output.append(
-            f'[{CLR_STATUS_WARN}]Changed ({len(result.unstaged)}):[/{CLR_STATUS_WARN}]'
-        )
-        for item in result.unstaged[:5]:
-            # Escape item to prevent MarkupError
-            escaped_item = markup_escape(item)
-            output.append(f'  [yellow]~ {escaped_item}[/yellow]')
-        if len(result.unstaged) > 5:
-            output.append(f'  [dim]... {len(result.unstaged) - 5} more[/dim]')
-
-    if result.untracked:
-        if output:
-            output.append('')
-        output.append(
-            f'[{CLR_SECONDARY}]Untracked ({len(result.untracked)}):[/{CLR_SECONDARY}]'
-        )
-        for item in result.untracked[:5]:
-            # Escape item to prevent MarkupError
-            escaped_item = markup_escape(item)
-            output.append(f'  [dim]? {escaped_item}[/dim]')
-
-    if result.clean:
-        if output:
-            output.append('')
-        output.append(f'[{CLR_STATUS_OK}]✓ Working tree clean[/{CLR_STATUS_OK}]')
-
+    _format_git_file_section(
+        output, 'Staged', result.staged, CLR_STATUS_OK, 'green', '+ '
+    )
+    _format_git_file_section(
+        output, 'Changed', result.unstaged, CLR_STATUS_WARN, 'yellow', '~ '
+    )
+    _format_git_file_section(
+        output,
+        'Untracked',
+        result.untracked,
+        CLR_SECONDARY,
+        'dim',
+        '? ',
+        show_more=False,
+    )
+    _format_git_clean_line(result, output)
     return output
 
 
@@ -321,26 +404,37 @@ def parse_shell_output(
     return result
 
 
+def _should_skip_ls_entry(name: str) -> bool:
+    if not name:
+        return True
+    if name in ('.', '..'):
+        return True
+    return False
+
+
+def _classify_ls_entry(
+    result: ParsedLsOutput, perms: str, name: str, parts: list[str]
+) -> None:
+    if perms.startswith('d'):
+        result.dirs.append(('\U0001f4c1', name))
+        return
+    size = parts[4] if len(parts) > 4 else ''
+    result.files.append(('\U0001f4c4', name, size))
+
+
 def _parse_ls_output(output: str) -> ParsedLsOutput:
     """Parse ls -la output into files/dirs."""
     result = ParsedLsOutput()
-    lines = output.splitlines()
 
-    for line in lines:
+    for line in output.splitlines():
         parts = line.split()
         if len(parts) < 9:
             continue
         perms = parts[0]
-        name = ' '.join(parts[8:]) if len(parts) > 8 else ''
-
-        if not name or name in ('.', '..'):
+        name = ' '.join(parts[8:])
+        if _should_skip_ls_entry(name):
             continue
-
-        if perms.startswith('d'):
-            result.dirs.append(('📁', name))
-        else:
-            size = parts[4] if len(parts) > 4 else ''
-            result.files.append(('📄', name, size))
+        _classify_ls_entry(result, perms, name, parts)
 
     return result
 

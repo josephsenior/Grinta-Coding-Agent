@@ -19,6 +19,96 @@ from backend.cli.transcript import format_activity_primary
 _LINE_NUM_RE = re.compile(r'^([^:]+):(\d+)(?::(.*))?$')
 
 
+def _filter_raw_lines(output: str) -> list[str]:
+    return [
+        line
+        for line in output.splitlines()
+        if line.strip() and not line.startswith('Error running')
+    ]
+
+
+def _add_to_grouped(
+    grouped: dict[str, list[tuple[int, str]]],
+    line: str,
+) -> None:
+    m = _LINE_NUM_RE.match(line)
+    if m:
+        filepath = m.group(1)
+        lineno = int(m.group(2))
+        content = m.group(3) or ''
+        if filepath not in grouped:
+            grouped[filepath] = []
+        grouped[filepath].append((lineno, content))
+    else:
+        grouped['output'] = grouped.get('output', [])  # type: ignore[unreachable]
+        grouped['output'].append((0, line))
+
+
+def _parse_search_lines(
+    output: str,
+) -> dict[str, list[tuple[int, str]]]:
+    raw_lines = _filter_raw_lines(output)
+    if not raw_lines:
+        return {}
+    grouped: dict[str, list[tuple[int, str]]] = {}
+    for line in raw_lines:
+        _add_to_grouped(grouped, line)
+    return grouped
+
+
+def _render_output_group(grouped: dict[str, list[tuple[int, str]]]) -> list[Any]:
+    lines: list[Any] = []
+    for _, content in grouped['output'][:5]:
+        escaped = markup_escape(content)
+        lines.append(f'  [dim]{escaped}[/dim]')
+    return lines
+
+
+def _render_file_matches(
+    matches: list[tuple[int, str]],
+    query: str,
+    max_lines_per_file: int,
+) -> list[Any]:
+    lines: list[Any] = []
+    for lineno, content in matches[:max_lines_per_file]:
+        content = content.strip()
+        if len(content) > 80:
+            content = content[:77] + '…'
+        if content:
+            highlighted = _highlight_query(content, query)
+            lines.append(
+                f'    [{CLR_SECONDARY}]{lineno:>4}[/{CLR_SECONDARY}]  {highlighted}'
+            )
+    match_count = len(matches)
+    if match_count > max_lines_per_file:
+        lines.append(f'    [dim]... {match_count - max_lines_per_file} more[/dim]')
+    return lines
+
+
+def _render_file_groups(
+    grouped: dict[str, list[tuple[int, str]]],
+    query: str,
+    max_files: int,
+    max_lines_per_file: int,
+) -> list[Any]:
+    lines: list[Any] = []
+    sorted_files = sorted(grouped.items(), key=lambda x: len(x[1]), reverse=True)
+    for filepath, matches in sorted_files[:max_files]:
+        match_count = len(matches)
+        escaped_path = markup_escape(filepath)
+        lines.append(
+            f'  [{CLR_BRAND_HUE} bold]{escaped_path}[/{CLR_BRAND_HUE} bold]  [dim]{match_count} matches[/dim]'
+        )
+        lines.extend(_render_file_matches(matches, query, max_lines_per_file))
+    if len(grouped) > max_files:
+        remaining_files = len(grouped) - max_files
+        remaining_matches = sum(len(m) for _, m in list(grouped.items())[max_files:])
+        lines.append(
+            f'  [dim]... {remaining_files} more files, {remaining_matches} matches[/dim]'
+        )
+    return lines
+
+
 def render_search_results(
     output: str,
     query: str = '',
@@ -30,71 +120,12 @@ def render_search_results(
     Format: filepath:line:content
     Returns Rich markup lines (no badge/verb — just the file+match rows).
     """
-    lines: list[Any] = []
-
-    raw_lines = [
-        line
-        for line in output.splitlines()
-        if line.strip() and not line.startswith('Error running')
-    ]
-
-    if not raw_lines:
+    grouped = _parse_search_lines(output)
+    if not grouped:
         return []
-
-    grouped: dict[str, list[tuple[int, str]]] = {}
-
-    for line in raw_lines:
-        m = _LINE_NUM_RE.match(line)
-        if m:
-            filepath = m.group(1)
-            lineno = int(m.group(2))
-            content = m.group(3) or ''
-            if filepath not in grouped:
-                grouped[filepath] = []
-            grouped[filepath].append((lineno, content))
-        else:
-            grouped['output'] = grouped.get('output', [])  # type: ignore[unreachable]
-            grouped['output'].append((0, line))
-
     if 'output' in grouped:
-        for _, content in grouped['output'][:5]:
-            # Escape content to prevent MarkupError
-            escaped = markup_escape(content)
-            lines.append(f'  [dim]{escaped}[/dim]')
-        return lines
-
-    sorted_files = sorted(grouped.items(), key=lambda x: len(x[1]), reverse=True)
-
-    for filepath, matches in sorted_files[:max_files]:
-        match_count = len(matches)
-        # Escape filepath to prevent MarkupError
-        escaped_path = markup_escape(filepath)
-        lines.append(
-            f'  [{CLR_BRAND_HUE} bold]{escaped_path}[/{CLR_BRAND_HUE} bold]  [dim]{match_count} matches[/dim]'
-        )
-
-        for lineno, content in matches[:max_lines_per_file]:
-            content = content.strip()
-            if len(content) > 80:
-                content = content[:77] + '…'
-
-            if content:
-                highlighted = _highlight_query(content, query)
-                lines.append(
-                    f'    [{CLR_SECONDARY}]{lineno:>4}[/{CLR_SECONDARY}]  {highlighted}'
-                )
-
-        if match_count > max_lines_per_file:
-            lines.append(f'    [dim]... {match_count - max_lines_per_file} more[/dim]')
-
-    if len(grouped) > max_files:
-        remaining_files = len(grouped) - max_files
-        remaining_matches = sum(len(m) for _, m in list(grouped.items())[max_files:])
-        lines.append(
-            f'  [dim]... {remaining_files} more files, {remaining_matches} matches[/dim]'
-        )
-
-    return lines
+        return _render_output_group(grouped)
+    return _render_file_groups(grouped, query, max_files, max_lines_per_file)
 
 
 def _highlight_query(text: str, query: str) -> str:

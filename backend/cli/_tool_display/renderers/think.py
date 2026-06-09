@@ -13,6 +13,24 @@ from backend.cli.theme import CLR_SECONDARY, CLR_THOUGHT_BODY
 from backend.cli.transcript import format_activity_primary
 
 
+def _render_think_continuation(paragraphs: list[str]) -> list[Any]:
+    lines: list[Any] = []
+    for para in paragraphs[1:4]:
+        if not para.strip():
+            continue
+        para_lines = [ln.strip() for ln in para.split('\n') if ln.strip()]
+        for pl in para_lines[:6]:
+            if len(pl) > 100:
+                pl = pl[:97] + '\u2026'
+            escaped = markup_escape(pl)
+            lines.append(f'    [{CLR_THOUGHT_BODY}]{escaped}[/{CLR_THOUGHT_BODY}]')
+        if len(para_lines) > 6:
+            lines.append(
+                f'    [{CLR_THOUGHT_BODY}]\u2026 ({len(para_lines) - 6} more lines)[/{CLR_THOUGHT_BODY}]'
+            )
+    return lines
+
+
 def render_think(thought: str, source_tool: str = '') -> list[Any]:
     """Render internal agent reasoning as structured extra lines.
 
@@ -28,27 +46,12 @@ def render_think(thought: str, source_tool: str = '') -> list[Any]:
 
     first_para = paragraphs[0].replace('\n', ' ').strip()
     if len(first_para) > 100:
-        first_para = first_para[:97] + '…'
+        first_para = first_para[:97] + '\u2026'
 
-    # Use 'Thinking:' prefix instead of 'Thought' for consistency with TUI
     lines.append(format_activity_primary('Thinking:', first_para))
 
     if len(paragraphs) > 1:
-        for para in paragraphs[1:4]:
-            if not para.strip():
-                continue
-            # Build continuation lines preserving internal line breaks
-            para_lines = [ln.strip() for ln in para.split('\n') if ln.strip()]
-            for pl in para_lines[:6]:
-                if len(pl) > 100:
-                    pl = pl[:97] + '…'
-                escaped = markup_escape(pl)
-                # Aligned with _ACTIVITY_SECONDARY_INDENT (4 spaces)
-                lines.append(f'    [{CLR_THOUGHT_BODY}]{escaped}[/{CLR_THOUGHT_BODY}]')
-            if len(para_lines) > 6:
-                lines.append(
-                    f'    [{CLR_THOUGHT_BODY}]… ({len(para_lines) - 6} more lines)[/{CLR_THOUGHT_BODY}]'
-                )
+        lines.extend(_render_think_continuation(paragraphs))
 
     return lines
 

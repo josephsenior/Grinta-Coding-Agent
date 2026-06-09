@@ -41,6 +41,42 @@ def _invoke_zero_arg_callback(callback: Callable[[], object]) -> object:
     return callback()
 
 
+def _detach_parallel_batch(queue: object, expected: list[Action]) -> bool:
+    if not expected:
+        return True
+    popleft = getattr(queue, 'popleft', None)
+    if callable(popleft):
+        for exp in expected:
+            try:
+                got = popleft()
+            except Exception:
+                return False
+            if got is not exp:
+                appendleft = getattr(queue, 'appendleft', None)
+                if callable(appendleft):
+                    appendleft(got)
+                return False
+        return True
+    if isinstance(queue, list):
+        if len(queue) < len(expected):
+            return False
+        if any(queue[i] is not expected[i] for i in range(len(expected))):
+            return False
+        del queue[: len(expected)]
+        return True
+    return False
+
+
+def _prepend_action(queue: object, action: Action) -> None:
+    appendleft = getattr(queue, 'appendleft', None)
+    if callable(appendleft):
+        appendleft(action)
+        return
+    insert = getattr(queue, 'insert', None)
+    if callable(insert):
+        insert(0, action)
+
+
 if TYPE_CHECKING:
     from backend.core.enums import AgentState
     from backend.ledger.action import Action
@@ -86,177 +122,98 @@ class _SessionOrchestratorParallelMixin:
         False when parallel scheduling is disabled or unsafe for the current queue.
 
         """
-        pending = getattr(self.agent, 'pending_actions', None)
-
-        if not pending:
+        pre = self._can_attempt_parallel_batch()
+        if pre is None:
             return False
-
-        if any(
-            getattr(action, '_retry_serial_after_parallel_failure', False)
-            for action in pending
-        ):
-            return False
-
-        scheduler = getattr(self, 'action_scheduler', None)
-
-        if scheduler is None:
-            return False
-
-        decision = scheduler.decide_parallel_batch(list(pending))
-
-        if not decision.should_execute_parallel:
-            return False
-
-        batch = list(decision.actions)
-
-        if not batch:
-            return False
-
-        def _detach_parallel_batch(queue: object, expected: list[Action]) -> bool:
-            if not expected:
-                return True
-
-            popleft = getattr(queue, 'popleft', None)
-
-            if callable(popleft):
-                for exp in expected:
-                    try:
-                        got = popleft()
-
-                    except Exception:
-                        return False
-
-                    if got is not exp:
-                        appendleft = getattr(queue, 'appendleft', None)
-
-                        if callable(appendleft):
-                            appendleft(got)
-
-                        return False
-
-                return True
-
-            if isinstance(queue, list):
-                if len(queue) < len(expected):
-                    return False
-
-                if any(queue[i] is not expected[i] for i in range(len(expected))):
-                    return False
-
-                del queue[: len(expected)]
-
-                return True
-
-            return False
-
+        batch, decision, pending = pre
         if not _detach_parallel_batch(pending, batch):
             return False
-
         logger.debug(
             '[scheduler] Parallel tool batch: executing %d actions (%s, %d overflow deferred)',
             len(batch),
             decision.reason,
             len(decision.overflow),
         )
+        failed_actions, last_failures = await self._execute_parallel_batch_with_retries(batch)
+        await self._handle_parallel_batch_failures(failed_actions, last_failures)
+        await self._handle_post_execution()
+        return True
 
-        def _prepend_action(queue: object, action: Action) -> None:
-            appendleft = getattr(queue, 'appendleft', None)
+    def _can_attempt_parallel_batch(self):
+        pending = getattr(self.agent, 'pending_actions', None)
+        if not pending:
+            return None
+        if any(
+            getattr(action, '_retry_serial_after_parallel_failure', False)
+            for action in pending
+        ):
+            return None
+        scheduler = getattr(self, 'action_scheduler', None)
+        if scheduler is None:
+            return None
+        decision = scheduler.decide_parallel_batch(list(pending))
+        if not decision.should_execute_parallel:
+            return None
+        batch = list(decision.actions)
+        if not batch:
+            return None
+        return (batch, decision, pending)
 
-            if callable(appendleft):
-                appendleft(action)
-
-                return
-
-            insert = getattr(queue, 'insert', None)
-
-            if callable(insert):
-                insert(0, action)
-
+    async def _execute_parallel_batch_with_retries(self, batch):
         to_run = list(batch)
-
         attempt = 0
-
         failed_actions: list[Action] = []
-
         last_failures: list[BaseException] = []
-
         while True:
             results = await asyncio.gather(
                 *(self.action_execution.execute_action(a) for a in to_run),
                 return_exceptions=True,
             )
-
             failed_actions = []
-
             last_failures = []
-
             for i, result in enumerate(results):
                 if isinstance(result, BaseException):
                     if isinstance(
                         result, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)
                     ):
                         raise result
-
                     failed_action = to_run[i]
-
                     failed_actions.append(failed_action)
-
                     last_failures.append(result)
-
                     action_type = getattr(
                         failed_action, 'action', type(failed_action).__name__
                     )
-
                     logger.warning(
                         '[P2-B] Parallel batch action %d (%s) failed: %s',
                         i,
                         action_type,
                         result,
                     )
-
             if not failed_actions or attempt >= PARALLEL_TOOL_BATCH_RETRIES:
                 break
-
             await asyncio.sleep(PARALLEL_TOOL_BATCH_BACKOFF_SECONDS * (2**attempt))
-
             to_run = list(failed_actions)
-
             attempt += 1
+        return (failed_actions, last_failures)
 
-        # Mark only FAILED actions for serial retry. Successful actions must NOT
-
-        # be marked — once they succeed on retry, the flag would cause them to be
-
-        # returned serially on every subsequent get_next_action() call even though
-
-        # they already succeeded, creating an infinite re-execution loop.
-
+    async def _handle_parallel_batch_failures(self, failed_actions, last_failures):
         for failed_action in failed_actions:
             _mark_retry_serial_after_parallel_failure(failed_action)
-
         if failed_actions:
             for failure in last_failures:
                 try:
                     if isinstance(failure, Exception):
                         await self._react_to_exception(failure)
-
                     else:
                         await self._react_to_exception(RuntimeError(str(failure)))
-
                 except Exception:
                     logger.debug(
                         'Failed to react to parallel batch exception', exc_info=True
                     )
-
             current_pending = getattr(self.agent, 'pending_actions', None)
-
             if current_pending is not None:
                 for action in reversed(failed_actions):
                     _prepend_action(current_pending, action)
-
-        await self._handle_post_execution()
-
-        return True
 
     async def _drain_step_barrier(self, *, timeout: float = 2.0) -> bool:
         """Drain background tasks and wait for outstanding pending actions."""

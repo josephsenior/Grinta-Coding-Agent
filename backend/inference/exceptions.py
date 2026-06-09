@@ -108,6 +108,25 @@ def format_html_api_error_response(
     return '\n'.join(lines)
 
 
+_CONTEXT_WINDOW_PATTERNS = (
+    'contextwindowexceedederror',
+    'prompt is too long',
+    'input length and `max_tokens` exceed context limit',
+    'please reduce the length of either one',
+    'the request exceeds the available context size',
+    'context length exceeded',
+    'context window exceeds limit',
+)
+
+
+def _matches_context_pattern(lowered: str) -> bool:
+    return any(p in lowered for p in _CONTEXT_WINDOW_PATTERNS)
+
+
+def _is_sambanova_context_error(lowered: str) -> bool:
+    return 'sambanovaexception' in lowered and 'maximum context length' in lowered
+
+
 def is_context_window_error(error_str: str, exc: Exception) -> bool:
     """Return True when *exc* (with lowered *error_str*) looks like a context-window overflow.
 
@@ -117,14 +136,8 @@ def is_context_window_error(error_str: str, exc: Exception) -> bool:
     """
     lowered = error_str.lower() if error_str != error_str.lower() else error_str
     return (
-        'contextwindowexceedederror' in lowered
-        or 'prompt is too long' in lowered
-        or 'input length and `max_tokens` exceed context limit' in lowered
-        or 'please reduce the length of either one' in lowered
-        or 'the request exceeds the available context size' in lowered
-        or 'context length exceeded' in lowered
-        or 'context window exceeds limit' in lowered
-        or ('sambanovaexception' in lowered and 'maximum context length' in lowered)
+        _matches_context_pattern(lowered)
+        or _is_sambanova_context_error(lowered)
         or isinstance(exc, ContextWindowExceededError)
     )
 

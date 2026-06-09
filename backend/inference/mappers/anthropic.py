@@ -120,6 +120,37 @@ def _parse_tool_arguments(arguments: Any) -> dict[str, Any]:
     return {}
 
 
+def _is_valid_tool_call_id(tool_id: Any) -> bool:
+    return isinstance(tool_id, str) and tool_id.strip()
+
+
+def _is_valid_tool_name(name: Any) -> bool:
+    return isinstance(name, str) and name.strip()
+
+
+def _build_tool_use_block(
+    tool_call: dict[str, Any],
+) -> tuple[dict[str, Any] | None, str | None]:
+    tool_id = tool_call.get('id')
+    function = tool_call.get('function')
+    if not _is_valid_tool_call_id(tool_id):
+        return None, None
+    if not isinstance(function, dict):
+        return None, None
+    name = function.get('name')
+    if not _is_valid_tool_name(name):
+        return None, None
+    return (
+        {
+            'type': 'tool_use',
+            'id': tool_id,
+            'name': name.strip(),
+            'input': _parse_tool_arguments(function.get('arguments')),
+        },
+        tool_id,
+    )
+
+
 def _normalize_assistant_message(
     message: dict[str, Any],
     known_tool_ids: set[str],
@@ -136,24 +167,11 @@ def _normalize_assistant_message(
     for tool_call in tool_calls:
         if not isinstance(tool_call, dict):
             continue
-        tool_id = tool_call.get('id')
-        function = tool_call.get('function')
-        if not isinstance(tool_id, str) or not tool_id.strip():
-            continue
-        if not isinstance(function, dict):
-            continue
-        name = function.get('name')
-        if not isinstance(name, str) or not name.strip():
+        block, tool_id = _build_tool_use_block(tool_call)
+        if block is None:
             continue
         known_tool_ids.add(tool_id)
-        content_blocks.append(
-            {
-                'type': 'tool_use',
-                'id': tool_id,
-                'name': name.strip(),
-                'input': _parse_tool_arguments(function.get('arguments')),
-            }
-        )
+        content_blocks.append(block)
 
     if not content_blocks:
         return None

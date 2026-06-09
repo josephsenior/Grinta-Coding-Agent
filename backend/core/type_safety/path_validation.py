@@ -257,7 +257,7 @@ def _reject_dangerous_characters(path: str, *, must_be_relative: bool = True) ->
     )
 
 
-def _reject_windows_invalid_path(path: str, *, must_be_relative: bool) -> None:
+def _reject_windows_illegal_chars(path: str) -> None:
     illegal_char = next(
         (char for char in WINDOWS_ILLEGAL_PATH_CHARS if char in path),
         None,
@@ -268,38 +268,60 @@ def _reject_windows_invalid_path(path: str, *, must_be_relative: bool) -> None:
             path,
         )
 
-    colon_indexes = [index for index, char in enumerate(path) if char == ':']
-    if colon_indexes:
-        drive_colon_allowed = (
-            not must_be_relative
-            and len(path) >= 3
-            and path[1] == ':'
-            and path[0].isalpha()
-            and path[2] in {'\\', '/'}
-        )
-        allowed_colons = {1} if drive_colon_allowed else set()
-        if any(index not in allowed_colons for index in colon_indexes):
-            raise PathValidationError(
-                "Path contains invalid Windows path character: ':'",
-                path,
-            )
 
+def _is_drive_colon_allowed(path: str, *, must_be_relative: bool) -> bool:
+    return (
+        not must_be_relative
+        and len(path) >= 3
+        and path[1] == ':'
+        and path[0].isalpha()
+        and path[2] in {'\\', '/'}
+    )
+
+
+def _has_disallowed_colons(path: str, *, must_be_relative: bool) -> bool:
+    colon_indexes = [index for index, char in enumerate(path) if char == ':']
+    if not colon_indexes:
+        return False
+    allowed_colons = {1} if _is_drive_colon_allowed(path, must_be_relative=must_be_relative) else set()
+    return any(index not in allowed_colons for index in colon_indexes)
+
+
+def _reject_windows_invalid_colons(path: str, *, must_be_relative: bool) -> None:
+    if _has_disallowed_colons(path, must_be_relative=must_be_relative):
+        raise PathValidationError(
+            "Path contains invalid Windows path character: ':'",
+            path,
+        )
+
+
+def _validate_windows_path_segment(path: str, segment: str) -> None:
+    if segment[-1:] in {' ', '.'}:
+        raise PathValidationError(
+            'Windows path segments may not end with a space or dot',
+            path,
+        )
+    stem = segment.split('.', maxsplit=1)[0].upper()
+    if stem in WINDOWS_RESERVED_NAMES:
+        raise PathValidationError(
+            f'Path uses reserved Windows device name: {segment}',
+            path,
+        )
+
+
+def _reject_windows_invalid_segments(path: str) -> None:
     for segment in _normalized_input_path(path).split('/'):
         if not segment or segment.endswith(':'):
             continue
         if segment in {'.', '..'}:
             continue
-        if segment[-1:] in {' ', '.'}:
-            raise PathValidationError(
-                'Windows path segments may not end with a space or dot',
-                path,
-            )
-        stem = segment.split('.', maxsplit=1)[0].upper()
-        if stem in WINDOWS_RESERVED_NAMES:
-            raise PathValidationError(
-                f'Path uses reserved Windows device name: {segment}',
-                path,
-            )
+        _validate_windows_path_segment(path, segment)
+
+
+def _reject_windows_invalid_path(path: str, *, must_be_relative: bool) -> None:
+    _reject_windows_illegal_chars(path)
+    _reject_windows_invalid_colons(path, must_be_relative=must_be_relative)
+    _reject_windows_invalid_segments(path)
 
 
 def _normalized_input_path(path: str) -> str:

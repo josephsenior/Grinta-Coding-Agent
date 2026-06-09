@@ -306,23 +306,19 @@ class ReasoningDisplay:
 
         return Group(*rows)
 
-    def _append_thought_rows(
-        self,
-        rows: list[Any],
-        max_width: int | None,
-        max_lines: int | None,
-    ) -> None:
-        stable: int | None = None
+    def _compute_stable_wrap_width(self, max_width: int | None) -> int | None:
         if self._streaming and max_width and max_width > _PANEL_CHROME_WIDTH + 12:
             inner = max(12, max_width - _PANEL_CHROME_WIDTH)
             if self._stream_wrap_width is None:
                 self._stream_wrap_width = inner
-            stable = self._stream_wrap_width
+            return self._stream_wrap_width
+        return None
 
+    def _build_wrapped_rows(
+        self, max_width: int | None, stable: int | None,
+    ) -> tuple[list[str], set[int]]:
         wrapped_rows: list[str] = []
         entry_starts: set[int] = set()
-
-        # Each committed line is its own thought entry with a gutter marker.
         for line in self._committed_lines:
             entry_wrapped = _thought_lines_for_display(
                 line, max_width, stable_wrap_width=stable
@@ -330,8 +326,6 @@ class ReasoningDisplay:
             if entry_wrapped:
                 entry_starts.add(len(wrapped_rows))
                 wrapped_rows.extend(entry_wrapped)
-
-        # The streaming line is rendered as a separate final entry.
         if self._streaming and self._streaming_line:
             stream_wrapped = _thought_lines_for_display(
                 self._streaming_line, max_width, stable_wrap_width=stable
@@ -339,23 +333,43 @@ class ReasoningDisplay:
             if stream_wrapped:
                 entry_starts.add(len(wrapped_rows))
                 wrapped_rows.extend(stream_wrapped)
+        return wrapped_rows, entry_starts
 
+    def _clip_and_cursor(
+        self, wrapped_rows: list[str], max_lines: int | None,
+    ) -> tuple[list[str], bool]:
         clipped = False
         if max_lines is not None and max_lines >= 0 and len(wrapped_rows) > max_lines:
             wrapped_rows = wrapped_rows[-max_lines:]
             clipped = True
-
         if wrapped_rows and self._streaming and self._streaming_line:
             wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
+        return wrapped_rows, clipped
 
+    def _emit_thought_rows(
+        self,
+        rows: list[Any],
+        wrapped_rows: list[str],
+        entry_starts: set[int],
+        clipped: bool,
+    ) -> None:
         for i, row in enumerate(wrapped_rows):
-            # First row of each entry gets the gutter marker
             if i in entry_starts:
                 rows.append(Text(f'{_GUTTER_MARKER} {row}', style=NAVY_TEXT_DIM))
             else:
                 rows.append(Text(f'  {row}', style=NAVY_TEXT_DIM))
-
         if clipped:
             rows.append(
                 Text(f'{_GUTTER_MARKER} … showing latest thoughts', style=CLR_META)
             )
+
+    def _append_thought_rows(
+        self,
+        rows: list[Any],
+        max_width: int | None,
+        max_lines: int | None,
+    ) -> None:
+        stable = self._compute_stable_wrap_width(max_width)
+        wrapped_rows, entry_starts = self._build_wrapped_rows(max_width, stable)
+        wrapped_rows, clipped = self._clip_and_cursor(wrapped_rows, max_lines)
+        self._emit_thought_rows(rows, wrapped_rows, entry_starts, clipped)

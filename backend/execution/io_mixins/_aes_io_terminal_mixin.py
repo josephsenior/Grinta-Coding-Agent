@@ -283,33 +283,12 @@ class _AesIoTerminalMixin:
 
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         try:
-            guard_err = self._terminal_open_guardrail_error(action.command or '')
-            if guard_err is not None:
-                self._log_terminal_debug(
-                    'H7_terminal_run_branch',
-                    'backend/execution/action_execution_server_io.py:terminal_run',
-                    'terminal-run-guard-error',
-                    {'command': action.command or ''},
-                )
-                return guard_err
+            validation_error = self._terminal_run_validate(action)
+            if validation_error is not None:
+                return validation_error
 
             session_id = self._next_terminal_session_id()
             cwd = self._resolve_terminal_cwd(action.cwd)
-
-            cwd_error = self._validate_workspace_scoped_cwd(
-                action.command or '<interactive terminal>',
-                action.cwd,
-                cwd,
-            )
-            if cwd_error is not None:
-                self._log_terminal_debug(
-                    'H7_terminal_run_branch',
-                    'backend/execution/action_execution_server_io.py:terminal_run',
-                    'terminal-run-cwd-error',
-                    {'command': action.command or '', 'cwd': cwd},
-                )
-                return cwd_error
-
             session = self.session_manager.create_session(
                 session_id=session_id, cwd=cwd, interactive=True
             )
@@ -319,82 +298,16 @@ class _AesIoTerminalMixin:
                 session, action.rows, action.cols
             )
             if resize_err is not None:
-                self.session_manager.close_session(session_id)
-                self._clear_terminal_read_cursor(session_id)
-                self._log_terminal_debug(
-                    'H8_terminal_resize_branch',
-                    'backend/execution/action_execution_server_io.py:terminal_run',
-                    'terminal-run-resize-error',
-                    {'rows': action.rows, 'cols': action.cols},
-                )
-                return resize_err
+                return self._terminal_run_resize_error(session_id, resize_err, action)
 
             if action.command:
-                preflight_err = self._terminal_input_preflight_error(
-                    action.command,
-                    shell_kind=shell_kind,
+                preflight_result = self._terminal_run_preflight_and_execute(
+                    session, session_id, action, shell_kind, cwd
                 )
-                if preflight_err is not None:
-                    self.session_manager.close_session(session_id)
-                    self._clear_terminal_read_cursor(session_id)
-                    preflight_err.tool_result = {
-                        'tool': 'terminal_manager',
-                        'ok': False,
-                        'error_code': 'TERMINAL_INPUT_PREFLIGHT_REJECTED',
-                        'retryable': True,
-                        'state': 'SESSION_NOT_OPENED',
-                        'payload': {
-                            'session_id': session_id,
-                            'shell_kind': shell_kind,
-                            'command_was_sent': False,
-                        },
-                        'progress': False,
-                    }
-                    return preflight_err
+                if preflight_result is not None:
+                    return preflight_result
 
-                predicted_cwd, policy_error = (
-                    self._evaluate_interactive_terminal_command(
-                        action.command,
-                        Path(cwd).resolve(),
-                    )
-                )
-                if policy_error is not None:
-                    self.session_manager.close_session(session_id)
-                    self._clear_terminal_read_cursor(session_id)
-                    return policy_error
-                logger.debug(
-                    'Running initial command in terminal %s: %s',
-                    session_id,
-                    action.command,
-                )
-                session.write_input(action.command + '\n')
-                if predicted_cwd is not None and hasattr(session, '_cwd'):
-                    session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
-
-                await self._poll_terminal_output(session, 0, PTY_OPEN_READ_TIMEOUT_SECONDS)
-
-            content, next_offset, has_new_output, dropped_chars = (
-                self._read_terminal_with_mode(
-                    session=session,
-                    mode='delta',
-                    offset=0,
-                )
-            )
-            state = self._terminal_output_state(
-                content,
-                default='SESSION_OPENED',
-                shell_kind=shell_kind,
-            )
-            self._terminal_sessions_awaiting_interaction.append(session_id)
-            self._terminal_open_commands_no_interaction.append(
-                self._normalize_terminal_command(action.command or '')
-            )
-            obs = self._build_terminal_observation(
-                session_id, content, next_offset, has_new_output, dropped_chars,
-                state, shell_kind,
-            )
-            self._advance_terminal_read_cursor(session_id, next_offset, mode='delta')
-            return obs
+            return self._terminal_run_build_observation(session, session_id, action, shell_kind)
         except Exception as exc:
             self._log_terminal_debug(
                 'H9_terminal_run_exception',
@@ -404,6 +317,124 @@ class _AesIoTerminalMixin:
             )
             logger.error('Error starting terminal session: %s', exc, exc_info=True)
             return ErrorObservation(f'Failed to start terminal: {exc}')
+
+    def _terminal_run_validate(self, action: TerminalRunAction) -> ErrorObservation | None:
+        guard_err = self._terminal_open_guardrail_error(action.command or '')
+        if guard_err is not None:
+            self._log_terminal_debug(
+                'H7_terminal_run_branch',
+                'backend/execution/action_execution_server_io.py:terminal_run',
+                'terminal-run-guard-error',
+                {'command': action.command or ''},
+            )
+            return guard_err
+
+        cwd = self._resolve_terminal_cwd(action.cwd)
+        cwd_error = self._validate_workspace_scoped_cwd(
+            action.command or '<interactive terminal>',
+            action.cwd,
+            cwd,
+        )
+        if cwd_error is not None:
+            self._log_terminal_debug(
+                'H7_terminal_run_branch',
+                'backend/execution/action_execution_server_io.py:terminal_run',
+                'terminal-run-cwd-error',
+                {'command': action.command or '', 'cwd': cwd},
+            )
+            return cwd_error
+        return None
+
+    def _terminal_run_resize_error(
+        self, session_id: str, resize_err: ErrorObservation, action: TerminalRunAction
+    ) -> ErrorObservation:
+        self.session_manager.close_session(session_id)
+        self._clear_terminal_read_cursor(session_id)
+        self._log_terminal_debug(
+            'H8_terminal_resize_branch',
+            'backend/execution/action_execution_server_io.py:terminal_run',
+            'terminal-run-resize-error',
+            {'rows': action.rows, 'cols': action.cols},
+        )
+        return resize_err
+
+    async def _terminal_run_preflight_and_execute(
+        self,
+        session: Any,
+        session_id: str,
+        action: TerminalRunAction,
+        shell_kind: str,
+        cwd: str,
+    ) -> ErrorObservation | None:
+        preflight_err = self._terminal_input_preflight_error(
+            action.command,
+            shell_kind=shell_kind,
+        )
+        if preflight_err is not None:
+            self.session_manager.close_session(session_id)
+            self._clear_terminal_read_cursor(session_id)
+            preflight_err.tool_result = {
+                'tool': 'terminal_manager',
+                'ok': False,
+                'error_code': 'TERMINAL_INPUT_PREFLIGHT_REJECTED',
+                'retryable': True,
+                'state': 'SESSION_NOT_OPENED',
+                'payload': {
+                    'session_id': session_id,
+                    'shell_kind': shell_kind,
+                    'command_was_sent': False,
+                },
+                'progress': False,
+            }
+            return preflight_err
+
+        predicted_cwd, policy_error = (
+            self._evaluate_interactive_terminal_command(
+                action.command,
+                Path(cwd).resolve(),
+            )
+        )
+        if policy_error is not None:
+            self.session_manager.close_session(session_id)
+            self._clear_terminal_read_cursor(session_id)
+            return policy_error
+        logger.debug(
+            'Running initial command in terminal %s: %s',
+            session_id,
+            action.command,
+        )
+        session.write_input(action.command + '\n')
+        if predicted_cwd is not None and hasattr(session, '_cwd'):
+            session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
+
+        await self._poll_terminal_output(session, 0, PTY_OPEN_READ_TIMEOUT_SECONDS)
+        return None
+
+    def _terminal_run_build_observation(
+        self, session: Any, session_id: str, action: TerminalRunAction, shell_kind: str
+    ) -> TerminalObservation:
+        content, next_offset, has_new_output, dropped_chars = (
+            self._read_terminal_with_mode(
+                session=session,
+                mode='delta',
+                offset=0,
+            )
+        )
+        state = self._terminal_output_state(
+            content,
+            default='SESSION_OPENED',
+            shell_kind=shell_kind,
+        )
+        self._terminal_sessions_awaiting_interaction.append(session_id)
+        self._terminal_open_commands_no_interaction.append(
+            self._normalize_terminal_command(action.command or '')
+        )
+        obs = self._build_terminal_observation(
+            session_id, content, next_offset, has_new_output, dropped_chars,
+            state, shell_kind,
+        )
+        self._advance_terminal_read_cursor(session_id, next_offset, mode='delta')
+        return obs
 
     async def terminal_input(self, action: TerminalInputAction) -> Observation:
         session = self.session_manager.get_session(action.session_id)
@@ -426,116 +457,181 @@ class _AesIoTerminalMixin:
                 return resize_err
 
             shell_kind = self._terminal_shell_kind(session)
-            write_content = action.input
-            predicted_cwd: Path | None = None
-            if write_content and not action.is_control:
-                policy_line = write_content.rstrip('\r\n')
-                preflight_err = self._terminal_input_preflight_error(
-                    policy_line,
-                    shell_kind=shell_kind,
-                )
-                if preflight_err is not None:
-                    preflight_err.tool_result = {
-                        'tool': 'terminal_manager',
-                        'ok': False,
-                        'error_code': 'TERMINAL_INPUT_PREFLIGHT_REJECTED',
-                        'retryable': True,
-                        'state': 'SESSION_UNCHANGED',
-                        'next_actions': ['input', 'read'],
-                        'payload': {
-                            'session_id': action.session_id,
-                            'shell_kind': shell_kind,
-                            'command_was_sent': False,
-                        },
-                        'progress': False,
-                    }
-                    return preflight_err
 
-            sent_input = False
-            if action.control is not None and str(action.control).strip() != '':
-                session.write_input(str(action.control), is_control=True)
-                sent_input = True
+            preflight_err = self._terminal_input_preflight(
+                action.input, action, shell_kind
+            )
+            if preflight_err is not None:
+                return preflight_err
 
-            if write_content:
-                if not action.is_control:
-                    policy_line = write_content.rstrip('\r\n')
-                    predicted_cwd, policy_error = (
-                        self._evaluate_interactive_terminal_command(
-                            policy_line,
-                            Path(getattr(session, 'cwd', self._initial_cwd)).resolve(),
-                        )
-                    )
-                    if policy_error is not None:
-                        return policy_error
-
-                to_send = write_content
-                if (
-                    action.submit
-                    and not action.is_control
-                    and to_send
-                    and not to_send.endswith(('\n', '\r\n'))
-                ):
-                    to_send = f'{to_send}\n'
-
-                session.write_input(to_send, is_control=action.is_control)
-                sent_input = True
-            if predicted_cwd is not None and hasattr(session, '_cwd'):
-                session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
+            sent_input, predicted_cwd, policy_error = (
+                self._terminal_input_write(session, action, shell_kind)
+            )
+            if policy_error is not None:
+                return policy_error
 
             read_offset = self._get_terminal_read_cursor(action.session_id)
-            probe_reads = 0
-            if sent_input and self._should_poll_terminal_input_delta(session):
-                poll_interval = PTY_READ_POLL_INTERVAL_SECONDS
-                poll_timeout = PTY_INPUT_READ_TIMEOUT_SECONDS
-                waited = 0.0
-                while waited < poll_timeout:
-                    await asyncio.sleep(poll_interval)
-                    waited += poll_interval
-                    probe_reads += 1
-                    probe, *_ = self._read_terminal_with_mode(
-                        session=session, mode='delta', offset=read_offset
-                    )
-                    if probe:
-                        break
+            probe_reads = await self._terminal_input_poll(
+                session, sent_input, read_offset
+            )
 
-            content, next_offset, has_new_output, dropped_chars = (
-                self._read_terminal_with_mode(
-                    session=session,
-                    mode='delta',
-                    offset=read_offset,
-                )
+            return self._terminal_input_build_observation(
+                action, session, read_offset, probe_reads, shell_kind
             )
-            state = self._terminal_output_state(
-                content,
-                default='SESSION_INTERACTED',
-                shell_kind=shell_kind,
-            )
-            self._log_terminal_debug(
-                'H6_terminal_input_probe_loop',
-                'backend/execution/action_execution_server_io.py:terminal_input',
-                'terminal-input-read-stats',
-                {
-                    'session_id': action.session_id,
-                    'read_offset': read_offset,
-                    'probe_reads': probe_reads,
-                    'next_offset': next_offset,
-                    'has_new_output': has_new_output,
-                },
-            )
-            self._advance_terminal_read_cursor(
-                action.session_id, next_offset, mode='delta'
-            )
-            self._mark_terminal_session_interaction(action.session_id)
-            obs = self._build_terminal_observation(
-                action.session_id, content, next_offset, has_new_output,
-                dropped_chars, state, shell_kind,
-            )
-            return obs
         except Exception as exc:
             logger.error(
                 'Error sending input to terminal %s: %s', action.session_id, exc
             )
             return ErrorObservation(f'Failed to send input: {exc}')
+
+    def _terminal_input_preflight(
+        self,
+        write_content: str,
+        action: TerminalInputAction,
+        shell_kind: str,
+    ) -> ErrorObservation | None:
+        if write_content and not action.is_control:
+            policy_line = write_content.rstrip('\r\n')
+            preflight_err = self._terminal_input_preflight_error(
+                policy_line,
+                shell_kind=shell_kind,
+            )
+            if preflight_err is not None:
+                preflight_err.tool_result = {
+                    'tool': 'terminal_manager',
+                    'ok': False,
+                    'error_code': 'TERMINAL_INPUT_PREFLIGHT_REJECTED',
+                    'retryable': True,
+                    'state': 'SESSION_UNCHANGED',
+                    'next_actions': ['input', 'read'],
+                    'payload': {
+                        'session_id': action.session_id,
+                        'shell_kind': shell_kind,
+                        'command_was_sent': False,
+                    },
+                    'progress': False,
+                }
+                return preflight_err
+        return None
+
+    def _terminal_input_write(
+        self,
+        session: Any,
+        action: TerminalInputAction,
+        shell_kind: str,
+    ) -> tuple[bool, Path | None, ErrorObservation | None]:
+        write_content = action.input
+        predicted_cwd: Path | None = None
+        sent_input = False
+
+        if action.control is not None and str(action.control).strip() != '':
+            session.write_input(str(action.control), is_control=True)
+            sent_input = True
+
+        if write_content:
+            result = self._terminal_input_write_text(session, action, write_content)
+            if result[2] is not None:
+                return sent_input, result[1], result[2]
+            predicted_cwd = result[1]
+            sent_input = sent_input or result[0]
+
+        if predicted_cwd is not None and hasattr(session, '_cwd'):
+            session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
+
+        return sent_input, predicted_cwd, None
+
+    def _terminal_input_write_text(
+        self,
+        session: Any,
+        action: TerminalInputAction,
+        write_content: str,
+    ) -> tuple[bool, Path | None, ErrorObservation | None]:
+        predicted_cwd: Path | None = None
+        if not action.is_control:
+            policy_line = write_content.rstrip('\r\n')
+            predicted_cwd, policy_error = (
+                self._evaluate_interactive_terminal_command(
+                    policy_line,
+                    Path(getattr(session, 'cwd', self._initial_cwd)).resolve(),
+                )
+            )
+            if policy_error is not None:
+                return False, predicted_cwd, policy_error
+
+        to_send = write_content
+        if (
+            action.submit
+            and not action.is_control
+            and to_send
+            and not to_send.endswith(('\n', '\r\n'))
+        ):
+            to_send = f'{to_send}\n'
+
+        session.write_input(to_send, is_control=action.is_control)
+        return True, predicted_cwd, None
+
+    async def _terminal_input_poll(
+        self,
+        session: Any,
+        sent_input: bool,
+        read_offset: int,
+    ) -> int:
+        probe_reads = 0
+        if sent_input and self._should_poll_terminal_input_delta(session):
+            poll_interval = PTY_READ_POLL_INTERVAL_SECONDS
+            poll_timeout = PTY_INPUT_READ_TIMEOUT_SECONDS
+            waited = 0.0
+            while waited < poll_timeout:
+                await asyncio.sleep(poll_interval)
+                waited += poll_interval
+                probe_reads += 1
+                probe, *_ = self._read_terminal_with_mode(
+                    session=session, mode='delta', offset=read_offset
+                )
+                if probe:
+                    break
+        return probe_reads
+
+    def _terminal_input_build_observation(
+        self,
+        action: TerminalInputAction,
+        session: Any,
+        read_offset: int,
+        probe_reads: int,
+        shell_kind: str,
+    ) -> Observation:
+        content, next_offset, has_new_output, dropped_chars = (
+            self._read_terminal_with_mode(
+                session=session,
+                mode='delta',
+                offset=read_offset,
+            )
+        )
+        state = self._terminal_output_state(
+            content,
+            default='SESSION_INTERACTED',
+            shell_kind=shell_kind,
+        )
+        self._log_terminal_debug(
+            'H6_terminal_input_probe_loop',
+            'backend/execution/action_execution_server_io.py:terminal_input',
+            'terminal-input-read-stats',
+            {
+                'session_id': action.session_id,
+                'read_offset': read_offset,
+                'probe_reads': probe_reads,
+                'next_offset': next_offset,
+                'has_new_output': has_new_output,
+            },
+        )
+        self._advance_terminal_read_cursor(
+            action.session_id, next_offset, mode='delta'
+        )
+        self._mark_terminal_session_interaction(action.session_id)
+        return self._build_terminal_observation(
+            action.session_id, content, next_offset, has_new_output,
+            dropped_chars, state, shell_kind,
+        )
 
     async def terminal_read(self, action: TerminalReadAction) -> Observation:
         session = self.session_manager.get_session(action.session_id)

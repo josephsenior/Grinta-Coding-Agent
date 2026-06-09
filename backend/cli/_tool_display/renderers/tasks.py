@@ -14,66 +14,71 @@ from backend.cli.theme import (
 from backend.cli.transcript import format_activity_primary
 
 
+_ACTIVE_STATUSES = ('active', 'in_progress', 'running')
+_DONE_STATUSES = ('done', 'completed', 'finished')
+_BLOCKED_STATUSES = ('blocked', 'waiting')
+
+
+def _count_matching(tasks: list[dict[str, str]], statuses: tuple[str, ...]) -> int:
+    return sum(1 for t in tasks if t.get('status') in statuses)
+
+
+def _count_statuses(tasks: list[dict[str, str]]) -> tuple[int, int, int]:
+    return (
+        _count_matching(tasks, _ACTIVE_STATUSES),
+        _count_matching(tasks, _DONE_STATUSES),
+        _count_matching(tasks, _BLOCKED_STATUSES),
+    )
+
+
+def _build_status_str(active: int, done: int, blocked: int, total: int) -> str:
+    parts = []
+    if active:
+        parts.append(f'[{CLR_BRAND_HUE}]{active} active[/]')
+    if done:
+        parts.append(f'[{CLR_STATUS_OK}]{done} done[/]')
+    if blocked:
+        parts.append(f'[{CLR_STATUS_ERR}]{blocked} blocked[/]')
+    return '  '.join(parts) if parts else f'{total} tasks'
+
+
+def _task_dot_and_style(status: str) -> tuple[str, str]:
+    if status in _DONE_STATUSES:
+        return f'[{CLR_STATUS_OK}]✓[/{CLR_STATUS_OK}]', CLR_SECONDARY
+    if status in _BLOCKED_STATUSES:
+        return f'[{CLR_STATUS_ERR}]□[/{CLR_STATUS_ERR}]', CLR_STATUS_ERR
+    if status in _ACTIVE_STATUSES:
+        return f'[{CLR_BRAND_HUE}]●[/{CLR_BRAND_HUE}]', CLR_DETAIL
+    return f'[{CLR_SECONDARY}]○[/{CLR_SECONDARY}]', CLR_SECONDARY
+
+
+def _render_task_item(task: dict[str, str]) -> str:
+    name = task.get(
+        'description', task.get('name', task.get('title', 'Unknown task'))
+    )
+    status = task.get('status', 'pending')
+    progress = task.get('progress', task.get('pct', ''))
+    dot, name_style = _task_dot_and_style(status)
+    progress_str = f'  [dim]{progress}[/dim]' if progress else ''
+    if len(name) > 60:
+        name = name[:57] + '…'
+    return f'  {dot}  [{name_style}]{name}[/{name_style}]{progress_str}'
+
+
 def render_task_list(
     tasks: list[dict[str, str]],
     title: str = 'Tasks',
 ) -> list[Any]:
     """Render a task list with status indicators."""
     lines: list[Any] = []
-
-    active = sum(
-        1 for t in tasks if t.get('status') in ('active', 'in_progress', 'running')
-    )
-    done = sum(1 for t in tasks if t.get('status') in ('done', 'completed', 'finished'))
-    blocked = sum(1 for t in tasks if t.get('status') in ('blocked', 'waiting'))
-
-    status_parts = []
-    if active:
-        status_parts.append(f'[{CLR_BRAND_HUE}]{active} active[/]')
-    if done:
-        status_parts.append(f'[{CLR_STATUS_OK}]{done} done[/]')
-    if blocked:
-        status_parts.append(f'[{CLR_STATUS_ERR}]{blocked} blocked[/]')
-
-    status_str = '  '.join(status_parts) if status_parts else f'{len(tasks)} tasks'
-
+    active, done, blocked = _count_statuses(tasks)
+    status_str = _build_status_str(active, done, blocked, len(tasks))
     lines.append(format_activity_primary('Tracked', status_str))
-
     lines.append('')
-
     for task in tasks[:8]:
-        name = task.get(
-            'description', task.get('name', task.get('title', 'Unknown task'))
-        )
-        status = task.get('status', 'pending')
-        progress = task.get('progress', task.get('pct', ''))
-
-        if status in ('done', 'completed', 'finished'):
-            dot = f'[{CLR_STATUS_OK}]✓[/{CLR_STATUS_OK}]'
-            name_style = CLR_SECONDARY
-        elif status in ('blocked', 'waiting'):
-            dot = f'[{CLR_STATUS_ERR}]□[/{CLR_STATUS_ERR}]'
-            name_style = CLR_STATUS_ERR
-        elif status in ('active', 'in_progress', 'running'):
-            dot = f'[{CLR_BRAND_HUE}]●[/{CLR_BRAND_HUE}]'
-            name_style = CLR_DETAIL
-        else:
-            dot = f'[{CLR_SECONDARY}]○[/{CLR_SECONDARY}]'
-            name_style = CLR_SECONDARY
-
-        progress_str = f'  [dim]{progress}[/dim]' if progress else ''
-
-        name_display = name
-        if len(name_display) > 60:
-            name_display = name_display[:57] + '…'
-
-        lines.append(
-            f'  {dot}  [{name_style}]{name_display}[/{name_style}]{progress_str}'
-        )
-
+        lines.append(_render_task_item(task))
     if len(tasks) > 8:
         lines.append(f'  [dim]... {len(tasks) - 8} more tasks[/dim]')
-
     return lines
 
 

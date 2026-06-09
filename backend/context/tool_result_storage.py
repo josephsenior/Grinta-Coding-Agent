@@ -26,6 +26,7 @@ from backend.ledger.serialization.event import event_from_dict, event_to_dict
 
 PERSISTED_OUTPUT_TAG = '<persisted-output>'
 TOOL_RESULT_CLEARED_MESSAGE = '[Old tool result content cleared]'
+TOOL_RESULT_REPLACEMENTS_KEY = 'tool_result_replacements'
 
 _PYTEST_SUMMARY_RE = re.compile(
     r'=+\s*(\d+\s+(?:failed|passed|error)[^\n=]+)\s*=+',
@@ -129,6 +130,67 @@ def _shrink_observation_batch(
         result[idx] = _copy_event_with_content(event, content)
 
 
+def _get_replacement_map(state: object | None) -> dict[str, str]:
+    if state is None:
+        return {}
+    extra = getattr(state, 'extra_data', None)
+    if not isinstance(extra, dict):
+        return {}
+    raw = extra.get(TOOL_RESULT_REPLACEMENTS_KEY)
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _set_replacement_map(state: object, replacements: dict[str, str]) -> None:
+    state.set_extra(  # type: ignore[attr-defined]
+        TOOL_RESULT_REPLACEMENTS_KEY,
+        replacements,
+        source='tool_result_storage',
+    )
+
+
+def persist_tool_result_on_observation(event: Event, state: object | None) -> None:
+    """Persist oversized tool output at observation emit time with frozen preview."""
+    if state is None or not isinstance(event, Observation):
+        return
+    content = str(getattr(event, 'content', '') or '')
+    if not content:
+        return
+    event_id = getattr(event, 'id', None)
+    if not isinstance(event_id, int):
+        return
+    if not _should_persist_observation(event, content, DEFAULT_TOOL_RESULT_PERSIST_THRESHOLD_CHARS):
+        return
+    replacements = _get_replacement_map(state)
+    key = str(event_id)
+    if key in replacements:
+        return
+    try:
+        _, preview = persist_tool_output(content, event)
+        replacements[key] = preview
+        _set_replacement_map(state, replacements)
+        logger.debug('Frozen tool result replacement for event id=%d', event_id)
+    except OSError:
+        logger.debug('Tool result persistence at emit failed', exc_info=True)
+
+
+def apply_frozen_tool_replacements(
+    events: list[Event],
+    state: object | None,
+) -> list[Event]:
+    """Re-apply cached tool-result previews keyed by event id."""
+    replacements = _get_replacement_map(state)
+    if not replacements:
+        return events
+    result: list[Event] = []
+    for event in events:
+        event_id = getattr(event, 'id', None)
+        if isinstance(event_id, int) and str(event_id) in replacements:
+            result.append(_copy_event_with_content(event, replacements[str(event_id)]))
+            continue
+        result.append(event)
+    return result
+
+
 def apply_tool_result_budget(
     events: list[Event],
     *,
@@ -197,7 +259,10 @@ def extract_latest_pytest_summary(events: list[Event]) -> str | None:
 __all__ = [
     'PERSISTED_OUTPUT_TAG',
     'TOOL_RESULT_CLEARED_MESSAGE',
+    'TOOL_RESULT_REPLACEMENTS_KEY',
+    'apply_frozen_tool_replacements',
     'apply_tool_result_budget',
     'extract_latest_pytest_summary',
     'persist_tool_output',
+    'persist_tool_result_on_observation',
 ]

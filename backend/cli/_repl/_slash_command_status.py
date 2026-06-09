@@ -8,18 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 
-def build_status_diagnostics(host: Any) -> str:
-    """Best-effort runtime diagnostics for ``/status verbose``.
-
-    All attribute accesses are wrapped — if any subsystem isn't wired up
-    yet (no active controller, no breaker, etc.) the line is shown as
-    ``n/a`` rather than raising.
-    """
-    import os
-
-    lines: list[str] = ['Diagnostics:']
-
-    controller = host._controller
+def _circuit_breaker_diag(controller: Any) -> str:
     breaker_state = 'n/a'
     consecutive_errors: int | str = 'n/a'
     error_rate: float | str = 'n/a'
@@ -42,12 +31,14 @@ def build_status_diagnostics(host: Any) -> str:
                 )
                 else 'closed'
             )
-    lines.append(
+    return (
         f'  circuit_breaker: state={breaker_state} '
         f'consecutive_errors={consecutive_errors} error_rate={error_rate}'
     )
 
-    event_stream_depth: int | str = 'n/a'
+
+def _event_stream_depth(controller: Any) -> str:
+    depth: int | str = 'n/a'
     if controller is not None:
         stream = getattr(controller, 'event_stream', None) or getattr(
             controller, '_event_stream', None
@@ -56,12 +47,14 @@ def build_status_diagnostics(host: Any) -> str:
             queue = getattr(stream, '_queue', None)
             if queue is not None:
                 try:
-                    event_stream_depth = queue.qsize()
+                    depth = queue.qsize()
                 except Exception:
-                    event_stream_depth = 'n/a'
-    lines.append(f'  event_stream_queue_depth: {event_stream_depth}')
+                    depth = 'n/a'
+    return f'  event_stream_queue_depth: {depth}'
 
-    checkpoint_count: int | str = 'n/a'
+
+def _checkpoint_count(controller: Any) -> str:
+    count: int | str = 'n/a'
     if controller is not None:
         ckpt_mgr = getattr(controller, 'checkpoint_manager', None)
         if ckpt_mgr is not None:
@@ -70,23 +63,31 @@ def build_status_diagnostics(host: Any) -> str:
             )
             try:
                 if checkpoints is not None:
-                    checkpoint_count = len(checkpoints)
+                    count = len(checkpoints)
             except Exception:
-                checkpoint_count = 'n/a'
-    lines.append(f'  checkpoints: {checkpoint_count}')
+                count = 'n/a'
+    return f'  checkpoints: {count}'
 
-    condensation_count: int | str = 'n/a'
+
+def _condensation_count(controller: Any) -> str:
+    count: int | str = 'n/a'
     if controller is not None:
         monitor = getattr(controller, 'memory_pressure', None)
         if monitor is not None:
-            condensation_count = monitor._condensation_count
-    lines.append(f'  condensation_events: {condensation_count}')
+            count = monitor._condensation_count
+    return f'  condensation_events: {count}'
 
+
+def _cost_line(host: Any) -> str:
     hud = host._hud.state
-    lines.append(
+    return (
         f'  cost: ${hud.cost_usd:.4f} ({hud.context_tokens:,} ctx tokens, '
         f'{hud.llm_calls} LLM calls)'
     )
+
+
+def _tracing_line() -> str:
+    import os
 
     tracing_optout = any(
         os.getenv(var, '').strip().lower() in ('1', 'true', 'yes', 'on')
@@ -96,10 +97,26 @@ def build_status_diagnostics(host: Any) -> str:
         os.getenv('TRACING_ENABLED', 'true').lower() == 'true'
         and not tracing_optout
     )
-    lines.append(
+    return (
         f'  tracing: enabled={tracing_enabled_env} opt_out_env={tracing_optout}'
     )
 
+
+def build_status_diagnostics(host: Any) -> str:
+    """Best-effort runtime diagnostics for ``/status verbose``.
+
+    All attribute accesses are wrapped — if any subsystem isn't wired up
+    yet (no active controller, no breaker, etc.) the line is shown as
+    ``n/a`` rather than raising.
+    """
+    controller = host._controller
+    lines: list[str] = ['Diagnostics:']
+    lines.append(_circuit_breaker_diag(controller))
+    lines.append(_event_stream_depth(controller))
+    lines.append(_checkpoint_count(controller))
+    lines.append(_condensation_count(controller))
+    lines.append(_cost_line(host))
+    lines.append(_tracing_line())
     return '\n'.join(lines)
 
 

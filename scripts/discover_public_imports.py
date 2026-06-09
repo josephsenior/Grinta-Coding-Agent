@@ -247,57 +247,43 @@ def _classify(module: str) -> str:
     return 'third_party'
 
 
-def build_manifest(roots: Iterable[Path]) -> dict[str, Any]:
-    """Walk ``roots`` and return the full manifest dict."""
-    files = list(_iter_python_files(roots))
-    modules: dict[str, ModuleInfo] = {}
-    all_imports: list[ImportRecord] = []
-    parse_failures: list[str] = []
+def _parse_python_file(
+    path: Path, rel: str
+) -> tuple[ModuleInfo | None, list[ImportRecord], str | None]:
+    try:
+        byte_size = path.stat().st_size
+        loc = sum(1 for _ in path.open('rb'))
+    except OSError:
+        return None, [], rel
 
-    for path in files:
-        rel = path.relative_to(REPO_ROOT).as_posix()
-        try:
-            byte_size = path.stat().st_size
-            loc = sum(1 for _ in path.open('rb'))
-        except OSError:
-            parse_failures.append(rel)
-            continue
-
-        try:
-            tree = ast.parse(
-                path.read_text(encoding='utf-8', errors='replace'),
-                filename=str(path),
-            )
-            class_count, def_count = _count_top_level_defs(tree)
-        except SyntaxError:
-            class_count = 0
-            def_count = 0
-            parse_failures.append(rel)
-
-        module_path = _module_path_for(path)
-        modules[module_path] = ModuleInfo(
-            module_path=module_path,
-            file_path=rel,
-            byte_size=byte_size,
-            loc=loc,
-            class_count=class_count,
-            def_count=def_count,
+    parse_failure: str | None = None
+    try:
+        tree = ast.parse(
+            path.read_text(encoding='utf-8', errors='replace'),
+            filename=str(path),
         )
+        class_count, def_count = _count_top_level_defs(tree)
+    except SyntaxError:
+        class_count = 0
+        def_count = 0
+        parse_failure = rel
 
-        for record in _extract_imports(path):
-            all_imports.append(record)
-            target = record.module
-            if target in modules:
-                modules[target].imported_by.append(
-                    {
-                        'importer': record.importer,
-                        'lineno': record.lineno,
-                        'names': list(record.names),
-                        'is_type_checking': record.is_type_checking,
-                    }
-                )
+    module_path = _module_path_for(path)
+    info = ModuleInfo(
+        module_path=module_path,
+        file_path=rel,
+        byte_size=byte_size,
+        loc=loc,
+        class_count=class_count,
+        def_count=def_count,
+    )
+    imports = _extract_imports(path)
+    return info, imports, parse_failure
 
-    # ── Per-module extra facts (intra-package edges) ─────────────────────
+
+def _compute_package_edges(
+    all_imports: list[ImportRecord], modules: dict[str, ModuleInfo]
+) -> None:
     package_edges: dict[str, set[str]] = {}
     for record in all_imports:
         if not (
@@ -310,8 +296,6 @@ def build_manifest(roots: Iterable[Path]) -> dict[str, Any]:
         target_pkg = record.module.split('.', 1)[0]
         if importer_pkg != target_pkg:
             continue
-        # record.importer looks like "backend/cli/tui/main.py"; its top
-        # subpackage is "backend.cli.tui.main" without the .py suffix.
         importer_mod = record.importer.removesuffix('.py').replace('/', '.')
         package_edges.setdefault(importer_mod, set()).add(record.module)
 
@@ -320,22 +304,10 @@ def build_manifest(roots: Iterable[Path]) -> dict[str, Any]:
             pkg for pkg in package_edges.get(module_path, set()) if pkg != module_path
         )
 
-    # ── Roll-ups ──────────────────────────────────────────────────────────
-    classification = Counter(_classify(r.module) for r in all_imports)
-    type_checking_only = sum(1 for r in all_imports if r.is_type_checking)
 
-    most_imported = sorted(
-        modules.values(),
-        key=lambda m: (-len(m.imported_by), m.byte_size),
-    )[:25]
-    biggest_files = sorted(
-        modules.values(),
-        key=lambda m: -m.byte_size,
-    )[:25]
-
-    # The "public surface" of a module is the set of names other modules
-    # import from it. For each known monolith, list those names so a
-    # re-export shim can be planned with zero guesswork.
+def _compute_public_surface(
+    modules: dict[str, ModuleInfo],
+) -> dict[str, list[dict[str, Any]]]:
     public_surface: dict[str, list[dict[str, Any]]] = {}
     for monolith in KNOWN_MONOLITHS:
         if monolith not in modules:
@@ -347,8 +319,94 @@ def build_manifest(roots: Iterable[Path]) -> dict[str, Any]:
             for name in entry['names']:
                 names[name] += 1
         public_surface[monolith] = [
-            {'name': name, 'import_count': count} for name, count in names.most_common()
+            {'name': name, 'import_count': count}
+            for name, count in names.most_common()
         ]
+    return public_surface
+
+
+def _build_manifest_summary(
+    modules: dict[str, ModuleInfo],
+    all_imports: list[ImportRecord],
+    parse_failures: list[str],
+) -> dict[str, Any]:
+    classification = Counter(_classify(r.module) for r in all_imports)
+    type_checking_only = sum(1 for r in all_imports if r.is_type_checking)
+    return {
+        'module_count': len(modules),
+        'import_count': len(all_imports),
+        'type_checking_only_import_count': type_checking_only,
+        'parse_failure_count': len(parse_failures),
+        'import_classification': dict(classification),
+    }
+
+
+def _build_manifest_sorteds(
+    modules: dict[str, ModuleInfo],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    most_imported = sorted(
+        modules.values(),
+        key=lambda m: (-len(m.imported_by), m.byte_size),
+    )[:25]
+    biggest_files = sorted(
+        modules.values(),
+        key=lambda m: -m.byte_size,
+    )[:25]
+    most_imported_dicts = [
+        {
+            'module_path': m.module_path,
+            'file_path': m.file_path,
+            'byte_size': m.byte_size,
+            'importer_count': len(m.imported_by),
+        }
+        for m in most_imported
+    ]
+    biggest_files_dicts = [
+        {
+            'module_path': m.module_path,
+            'file_path': m.file_path,
+            'byte_size': m.byte_size,
+            'loc': m.loc,
+            'importer_count': len(m.imported_by),
+        }
+        for m in biggest_files
+    ]
+    return most_imported_dicts, biggest_files_dicts
+
+
+def build_manifest(roots: Iterable[Path]) -> dict[str, Any]:
+    """Walk ``roots`` and return the full manifest dict."""
+    files = list(_iter_python_files(roots))
+    modules: dict[str, ModuleInfo] = {}
+    all_imports: list[ImportRecord] = []
+    parse_failures: list[str] = []
+
+    for path in files:
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        info, imports, failure = _parse_python_file(path, rel)
+        if info is None:
+            parse_failures.append(failure)
+            continue
+        if failure is not None:
+            parse_failures.append(failure)
+        modules[info.module_path] = info
+        for record in imports:
+            all_imports.append(record)
+            target = record.module
+            if target in modules:
+                modules[target].imported_by.append(
+                    {
+                        'importer': record.importer,
+                        'lineno': record.lineno,
+                        'names': list(record.names),
+                        'is_type_checking': record.is_type_checking,
+                    }
+                )
+
+    _compute_package_edges(all_imports, modules)
+    public_surface = _compute_public_surface(modules)
+    summary = _build_manifest_summary(modules, all_imports, parse_failures)
+    most_imported, biggest_files = _build_manifest_sorteds(modules)
 
     return {
         'schema_version': 1,
@@ -357,32 +415,9 @@ def build_manifest(roots: Iterable[Path]) -> dict[str, Any]:
         'options': {
             'include_tests': _include_tests,
         },
-        'summary': {
-            'module_count': len(modules),
-            'import_count': len(all_imports),
-            'type_checking_only_import_count': type_checking_only,
-            'parse_failure_count': len(parse_failures),
-            'import_classification': dict(classification),
-        },
-        'biggest_files': [
-            {
-                'module_path': m.module_path,
-                'file_path': m.file_path,
-                'byte_size': m.byte_size,
-                'loc': m.loc,
-                'importer_count': len(m.imported_by),
-            }
-            for m in biggest_files
-        ],
-        'most_imported': [
-            {
-                'module_path': m.module_path,
-                'file_path': m.file_path,
-                'byte_size': m.byte_size,
-                'importer_count': len(m.imported_by),
-            }
-            for m in most_imported
-        ],
+        'summary': summary,
+        'biggest_files': biggest_files,
+        'most_imported': most_imported,
         'public_surface': public_surface,
         'modules': {path: info.to_dict() for path, info in sorted(modules.items())},
         'parse_failures': parse_failures,

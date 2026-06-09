@@ -68,7 +68,6 @@ class _AppRendererActionHandlersMixin:
         """
         import re
 
-        # Strip the [SEARCH_RESULTS] opener only (no close tag is emitted)
         content = re.sub(r'^\[SEARCH_RESULTS\]\s*', '', thought).strip()
         if not content:
             return
@@ -77,35 +76,7 @@ class _AppRendererActionHandlersMixin:
 
         match_count, file_count, file_list = extract_file_summary(content)
         lines = content.splitlines()
-        query = ''
-        scope = ''
-        result_lines: list[str] = []
-
-        if lines:
-            first = lines[0].strip()
-            # Check if first line has an embedded query hint like "Query: ..." or "pattern: ..."
-            query_match = re.match(
-                r'^(?:query|pattern|searching for):\s*(.+?)$', first, re.I
-            )
-            if query_match:
-                query = query_match.group(1).strip().strip('"\'')
-                result_lines = [
-                    line
-                    for line in lines[1:]
-                    if line.strip() and ':' in line.split(None, 1)[0]
-                ]
-            elif re.match(r'^.*:\d+:', first):
-                # First line is already file:line:content — no separate query line
-                result_lines = [line for line in lines if line.strip()]
-            else:
-                # First line is the query itself
-                query = first.strip().strip('"\'')
-                result_lines = [
-                    line
-                    for line in lines[1:]
-                    if line.strip() and ':' in line.split(None, 1)[0]
-                ]
-
+        query, result_lines = self._parse_search_query_and_results(lines)
         if not query:
             query = 'code search'
 
@@ -115,10 +86,35 @@ class _AppRendererActionHandlersMixin:
             file_count=file_count,
             file_list=file_list,
             result_lines=result_lines,
-            scope=scope,
+            scope='',
             source_tool=source_tool,
         )
         self._write_card(card)
+
+    @staticmethod
+    def _parse_search_query_and_results(lines: list[str]) -> tuple[str, list[str]]:
+        import re
+        query = ''
+        result_lines: list[str] = []
+        if not lines:
+            return query, result_lines
+        first = lines[0].strip()
+        query_match = re.match(
+            r'^(?:query|pattern|searching for):\s*(.+?)$', first, re.I
+        )
+        if query_match:
+            query = query_match.group(1).strip().strip('"\'')
+            result_lines = _AppRendererActionHandlersMixin._filter_colon_result_lines(lines[1:])
+        elif re.match(r'^.*:\d+:', first):
+            result_lines = [line for line in lines if line.strip()]
+        else:
+            query = first.strip().strip('"\'')
+            result_lines = _AppRendererActionHandlersMixin._filter_colon_result_lines(lines[1:])
+        return query, result_lines
+
+    @staticmethod
+    def _filter_colon_result_lines(lines: list[str]) -> list[str]:
+        return [line for line in lines if line.strip() and ':' in line.split(None, 1)[0]]
 
     @staticmethod
     def _is_user_source(source: Any) -> bool:
@@ -242,20 +238,7 @@ class _AppRendererActionHandlersMixin:
         thinking = (action.thinking_accumulated or '').strip()
         content = self._normalize_final_response_text(action.accumulated or '')
 
-        if thinking:
-            _chunk_n = getattr(self, '_dbg_chunk_n', 0) + 1
-            self._dbg_chunk_n = _chunk_n
-            if _chunk_n % 5 == 1:
-                import logging as _logging
-                _log = _logging.getLogger(__name__)
-                _log.info(
-                    '[streaming-dbg] chunk=%d thinking_accumulated len=%d '
-                    'head=%r tail=%r',
-                    _chunk_n,
-                    len(thinking),
-                    thinking[:80],
-                    thinking[-80:],
-                )
+        self._debug_log_thinking_chunk(thinking)
 
         if self._is_visible_thinking_text(thinking):
             self._render_thinking_payload(thinking)
@@ -265,18 +248,38 @@ class _AppRendererActionHandlersMixin:
             self._finalize_live_thinking()
 
         if action.is_final:
-            if bool(getattr(action, 'suppress_live_response', False)):
-                self.clear_live_response()
-                return
-            final_text = content or self._live_response
-            if final_text:
-                self._commit_final_response(final_text)
-            else:
-                self.clear_live_response()
+            self._finalize_streaming_response(action, content)
             return
 
         if content:
             self.update_live_response(content)
+
+    def _debug_log_thinking_chunk(self, thinking: str) -> None:
+        if not thinking:
+            return
+        _chunk_n = getattr(self, '_dbg_chunk_n', 0) + 1
+        self._dbg_chunk_n = _chunk_n
+        if _chunk_n % 5 == 1:
+            import logging as _logging
+            _log = _logging.getLogger(__name__)
+            _log.info(
+                '[streaming-dbg] chunk=%d thinking_accumulated len=%d '
+                'head=%r tail=%r',
+                _chunk_n,
+                len(thinking),
+                thinking[:80],
+                thinking[-80:],
+            )
+
+    def _finalize_streaming_response(self, action: StreamingChunkAction, content: str) -> None:
+        if bool(getattr(action, 'suppress_live_response', False)):
+            self.clear_live_response()
+            return
+        final_text = content or self._live_response
+        if final_text:
+            self._commit_final_response(final_text)
+        else:
+            self.clear_live_response()
 
     def _update_metrics(self, event: Any) -> None:
         if hasattr(event, 'model') and event.model:
@@ -319,7 +322,11 @@ class _AppRendererActionHandlersMixin:
             self._hud.update_agent_state(str(state))
             self._tui.set_agent_phase(str(state))
 
-        # End agent turn when reaching idle/terminal state
+        self._maybe_end_agent_turn(state)
+        self._state_event.set()
+        self._tui._render_hud_bar()
+
+    def _maybe_end_agent_turn(self, state: Any) -> None:
         if self._in_agent_turn and state in (
             AgentState.AWAITING_USER_INPUT,
             AgentState.FINISHED,
@@ -329,19 +336,16 @@ class _AppRendererActionHandlersMixin:
             self._in_agent_turn = False
             if self._tools_in_turn > 0:
                 elapsed = time.monotonic() - self._turn_start_time
-                total_seconds = int(elapsed)
-                hours, remainder = divmod(total_seconds, 3600)
-                minutes, seconds = divmod(remainder, 60)
-                if hours > 0:
-                    duration_str = f'{hours}h {minutes}m {seconds}s'
-                elif minutes > 0:
-                    duration_str = f'{minutes}m {seconds}s'
-                else:
-                    duration_str = f'{seconds}s'
-
+                duration_str = self._format_turn_duration(int(elapsed))
                 from backend.cli.tui.widgets.activity_card import TurnCompletion
-
                 self._tui._write_log(TurnCompletion(duration_str))
 
-        self._state_event.set()
-        self._tui._render_hud_bar()
+    @staticmethod
+    def _format_turn_duration(total_seconds: int) -> str:
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours > 0:
+            return f'{hours}h {minutes}m {seconds}s'
+        elif minutes > 0:
+            return f'{minutes}m {seconds}s'
+        return f'{seconds}s'
