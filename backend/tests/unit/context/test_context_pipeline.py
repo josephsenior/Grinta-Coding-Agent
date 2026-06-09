@@ -88,47 +88,103 @@ async def test_prepare_step_commits_degraded_boundary_when_over_threshold(pipeli
     for i in range(2, 402):
         events.append(_cmd_output(f'output line {i}\n' * 20, i))
     state = _make_state(events)
+    llm_config = SimpleNamespace(max_input_tokens=8_000, model='test-model')
+    state.agent = SimpleNamespace(llm=SimpleNamespace(config=llm_config))
     with (
-        patch('backend.context.context_pipeline.ContextBudget') as mock_budget,
         patch(
             'backend.context.context_pipeline.session_memory_exists',
             return_value=False,
-        ),
-        patch(
-            'backend.context.context_pipeline.build_compaction_summary',
-            return_value='# Session Memory\npytest failing',
         ),
         patch('backend.context.context_pipeline.commit_snapshot'),
         patch('backend.context.context_pipeline.delete_staging_snapshot'),
         patch('backend.context.context_pipeline.maybe_update'),
         patch('backend.context.context_pipeline.sync_snapshot_to_working_memory'),
+        patch.object(pipeline, '_llm_config', return_value=llm_config),
     ):
-        mock_budget.from_events.return_value = SimpleNamespace(should_autocompact=True)
         result = await pipeline.prepare_step(state)
     assert result.pending_action is not None
     assert isinstance(result.pending_action, CondensationAction)
     assert result.pending_action.summary
-    assert len(result.pending_action.pruned) > 0
+    assert len(result.pending_action.pruned) >= 20
     assert result.events == []
 
 
 @pytest.mark.asyncio
 async def test_prepare_step_uses_prewarmed_compaction(pipeline):
+    events = [_user('run pytest', 1)]
+    for i in range(2, 202):
+        events.append(_cmd_output(f'output line {i}\n' * 20, i))
     action = CondensationAction(
-        pruned_event_ids=[1, 2],
-        summary='prewarmed',
+        pruned_event_ids=list(range(2, 182)),
+        summary='prewarmed summary ' * 200,
         summary_offset=0,
     )
     prewarmed = Compaction(action=action)
-    state = _make_state([_user('hello', 1)])
+    state = _make_state(events)
     state.turn_signals.prewarmed_compaction = prewarmed
     with (
         patch('backend.context.context_pipeline.commit_snapshot'),
         patch('backend.context.context_pipeline.sync_snapshot_to_working_memory'),
+        patch('backend.context.context_pipeline.maybe_update'),
     ):
         result = await pipeline.prepare_step(state)
     assert result.pending_action is action
     assert result.events == []
+
+
+@pytest.mark.asyncio
+async def test_prepare_step_rejects_micro_prune_and_respects_cooldown(pipeline):
+    """Ineffective 4-event prunes must not commit; cooldown blocks rapid re-compaction."""
+    events = [_user('fix tests', 1)]
+    for i in range(2, 52):
+        events.append(_cmd_output(f'small {i}', i))
+    state = _make_state(events)
+    llm_config = SimpleNamespace(max_input_tokens=200_000, model='test-model')
+    state.agent = SimpleNamespace(llm=SimpleNamespace(config=llm_config))
+
+    with (
+        patch('backend.context.context_pipeline.session_memory_exists', return_value=True),
+        patch(
+            'backend.context.context_pipeline.build_compaction_summary',
+            return_value='# Session Memory\nsummary',
+        ),
+        patch(
+            'backend.context.context_pipeline._select_compaction_tail',
+            return_value=events[-47:],
+        ),
+        patch('backend.context.context_pipeline.commit_snapshot') as mock_commit,
+        patch('backend.context.context_pipeline.delete_staging_snapshot'),
+        patch('backend.context.context_pipeline.maybe_update'),
+    ):
+        with patch.object(pipeline, '_llm_config', return_value=llm_config):
+            with patch(
+                'backend.context.context_pipeline.ContextBudget.from_events',
+                return_value=SimpleNamespace(
+                    should_autocompact=True,
+                    estimated_tokens=190_000,
+                    autocompact_threshold=180_000,
+                    effective_window=200_000,
+                ),
+            ):
+                first = await pipeline.prepare_step(state)
+        assert first.pending_action is None
+        mock_commit.assert_not_called()
+
+        state.extra_data['context_pipeline_state'] = {
+            'last_boundary_compact_at': __import__('time').time(),
+        }
+        with patch.object(pipeline, '_llm_config', return_value=llm_config):
+            with patch(
+                'backend.context.context_pipeline.ContextBudget.from_events',
+                return_value=SimpleNamespace(
+                    should_autocompact=True,
+                    estimated_tokens=190_000,
+                    autocompact_threshold=180_000,
+                    effective_window=200_000,
+                ),
+            ):
+                second = await pipeline.prepare_step(state)
+        assert second.pending_action is None
 
 
 def test_build_prompt_events_injects_working_set(pipeline):

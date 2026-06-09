@@ -192,58 +192,45 @@ def _process_single_tool_call(
     """Process a single tool call and return the corresponding action."""
     logger.debug('Tool call in function_calling.py: %s', tool_call)
     tool_dispatch = _get_tool_dispatch_map()
-
     tool_name = cast(str, tool_call.function.name)
     normalized_mode = normalize_interaction_mode(mode)
     mcp_tool_names = cast(list[str] | None, getattr(tool_call, '_mcp_tool_names', None))
-    if is_chat_mode(normalized_mode):
-        if tool_name not in CHAT_MODE_ALLOWED_TOOLS or (
-            mcp_tool_names and tool_name in mcp_tool_names
-        ):
-            raise FunctionCallValidationError(
-                f'Tool `{tool_name}` is not available in Chat Mode. '
-                'Chat Mode is pure conversation; use plain text only.'
-            )
-    if normalized_mode == PLAN_MODE and tool_name not in PLAN_MODE_ALLOWED_TOOLS:
-        raise FunctionCallValidationError(
-            f'Tool `{tool_name}` is not available in Plan Mode. '
-            'Use file, shell, search, task tracking, or ask_user tools.'
-        )
-    if tool_name == 'file_editor':
-        raise FunctionCallValidationError(
-            'The legacy file_editor tool has been removed. Use read, create, '
-            'replace_string, edit_symbols, or multiedit.'
-        )
-    if '__xml_syntax_error__' in arguments:
-        from backend.engine.common import _check_format_error_retry_guard
 
-        serialized_args = json.dumps(arguments, sort_keys=True, ensure_ascii=False)
-        error_sig = f'xml_syntax_error:{arguments["__xml_syntax_error__"]}'
-        allowed, reason = _check_format_error_retry_guard(
-            tool_name, serialized_args, error_sig
-        )
-        if not allowed:
-            logger.error(
-                'FORMAT_ERROR retry guard in _process_single_tool_call: %s', reason
-            )
-            raise FunctionCallValidationError(
-                f'[FORMAT_ERROR] Retry guard stopped repeated FORMAT_ERROR for '
-                f'tool `{tool_name}` after multiple attempts.\n'
-                f'{reason}\n'
-                f'[SYSTEM_ACTION] Report this as a system/tool error.'
-            )
-        raise FunctionCallValidationError(
-            f'Malformed XML tool call for {tool_name}: '
-            f'{arguments["__xml_syntax_error__"]}'
-        )
+    _validate_tool_mode(tool_name, normalized_mode, mcp_tool_names)
+    _validate_tool_exists(tool_name)
+    _check_xml_syntax_errors(tool_name, arguments)
+
     if tool_name in tool_dispatch:
         return tool_dispatch[tool_name](arguments)
     if mcp_tool_names and tool_name in mcp_tool_names:
         return _handle_mcp_tool(tool_name, arguments)
-    msg = f'Tool {tool_name} is not registered. (arguments: {arguments}). Please check the tool name and retry with an existing tool.'
-    raise FunctionCallNotExistsError(
-        msg,
-    )
+    raise FunctionCallNotExistsError(f'Tool {tool_name} is not registered. (arguments: {arguments}). Please check the tool name and retry with an existing tool.')
+
+
+def _validate_tool_mode(tool_name: str, normalized_mode: str, mcp_tool_names: list[str] | None) -> None:
+    if is_chat_mode(normalized_mode):
+        if tool_name not in CHAT_MODE_ALLOWED_TOOLS or (mcp_tool_names and tool_name in mcp_tool_names):
+            raise FunctionCallValidationError(f'Tool `{tool_name}` is not available in Chat Mode. Chat Mode is pure conversation; use plain text only.')
+    if normalized_mode == PLAN_MODE and tool_name not in PLAN_MODE_ALLOWED_TOOLS:
+        raise FunctionCallValidationError(f'Tool `{tool_name}` is not available in Plan Mode. Use file, shell, search, task tracking, or ask_user tools.')
+
+
+def _validate_tool_exists(tool_name: str) -> None:
+    if tool_name == 'file_editor':
+        raise FunctionCallValidationError('The legacy file_editor tool has been removed. Use read, create, replace_string, edit_symbols, or multiedit.')
+
+
+def _check_xml_syntax_errors(tool_name: str, arguments: dict[str, Any]) -> None:
+    if '__xml_syntax_error__' not in arguments:
+        return
+    from backend.engine.common import _check_format_error_retry_guard
+    serialized_args = json.dumps(arguments, sort_keys=True, ensure_ascii=False)
+    error_sig = f'xml_syntax_error:{arguments["__xml_syntax_error__"]}'
+    allowed, reason = _check_format_error_retry_guard(tool_name, serialized_args, error_sig)
+    if not allowed:
+        logger.error('FORMAT_ERROR retry guard in _process_single_tool_call: %s', reason)
+        raise FunctionCallValidationError(f'[FORMAT_ERROR] Retry guard stopped repeated FORMAT_ERROR for tool `{tool_name}` after multiple attempts.\n{reason}\n[SYSTEM_ACTION] Report this as a system/tool error.')
+    raise FunctionCallValidationError(f'Malformed XML tool call for {tool_name}: {arguments["__xml_syntax_error__"]}')
 
 
 # ---------------------------------------------------------------------------

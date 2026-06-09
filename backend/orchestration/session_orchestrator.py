@@ -285,137 +285,86 @@ class SessionOrchestrator(
         self._create_step_task()
 
     async def _step(self) -> None:
-        """Execute one agent step.
-
-        Detects stuck agents and enforces iteration and task budget limits.
-        When the agent returns a non-blocking action (e.g. AgentThinkAction)
-        and has more queued actions from the same LLM response, those are
-        drained immediately without re-entering the full polling cycle.
-
-        The drain loop is driven by ``_step_request``: ``_request_step``
-        sets the event when a fresh ``step()`` call arrives while this
-        coroutine is alive.  Between iterations we atomically check + clear
-        the event — no separate counter or threading lock is needed.
-
-        **Liveness watchdog (Layer 5 of the bounded-pipeline plan):**
-        Each ``_step_inner`` call is wrapped in ``asyncio.wait_for`` with
-        a hard ceiling (``DEFAULT_STEP_TASK_LIVENESS_SECONDS``).  If a
-        single drain iteration hangs past that bound, the inner coroutine
-        is cancelled, the pending state is force-cleared, and the drain
-        loop exits.  The next ``step()`` request will then create a
-        fresh task.  This is the last-line-of-defense safety net that
-        catches hangs in any code path inside ``_step_inner`` (LLM
-        call, observation processing, tool pipeline, plugin hooks, etc.)
-        where the more specific timeouts (Layers 1, 2, 3) do not apply.
-        """
+        """Execute one agent step."""
         from backend.core.constants import DEFAULT_STEP_TASK_LIVENESS_SECONDS
         from backend.core.llm_step_timeout import resolve_step_task_liveness_seconds
 
+        self.services.retry.ensure_worker_started()
+
         step_liveness_seconds = resolve_step_task_liveness_seconds(
-            getattr(self, 'agent', None),
-            default_liveness_seconds=DEFAULT_STEP_TASK_LIVENESS_SECONDS,
+            getattr(self, 'agent', None), default_liveness_seconds=DEFAULT_STEP_TASK_LIVENESS_SECONDS,
         )
 
         async with self._step_lock:
             self._step_owner_task = asyncio.current_task()
             try:
-                drained_count = 0
-                while drained_count < DEFAULT_AGENT_STEP_DRAIN_LIMIT:
-                    drained_count += 1
-                    try:
-                        await asyncio.wait_for(
-                            self._step_inner(),
-                            timeout=step_liveness_seconds,
-                        )
-                    except asyncio.TimeoutError:
-                        logger.error(
-                            'STEP_TASK_LIVENESS_TIMEOUT: _step_inner did not '
-                            'complete within %.0fs; force-cancelling and '
-                            'clearing pending state. The agent loop will '
-                            'recover on the next step() request.',
-                            step_liveness_seconds,
-                            extra={'msg_type': 'STEP_TASK_LIVENESS_TIMEOUT'},
-                        )
-                        # Force-clear pending state so can_step() returns True
-                        # on the next attempt.  Use the same recovery the
-                        # observation-handler timeout uses (Layer 2).
-                        try:
-                            agent = getattr(self, 'agent', None)
-                            if agent is not None:
-                                executor = getattr(agent, 'executor', None)
-                                cancel_fn = (
-                                    getattr(executor, 'cancel_step', None)
-                                    if executor is not None
-                                    else None
-                                )
-                                if callable(cancel_fn):
-                                    cancel_fn()
-                        except Exception:
-                            logger.debug(
-                                'Failed to cancel executor after '
-                                'step-task liveness timeout',
-                                exc_info=True,
-                            )
-                        try:
-                            pending_service = getattr(
-                                getattr(self, 'services', None),
-                                'pending_action',
-                                None,
-                            )
-                            if pending_service is not None:
-                                pending_service.clear_primary()
-                        except Exception:
-                            logger.debug(
-                                'Failed to clear pending state after '
-                                'step-task liveness timeout',
-                                exc_info=True,
-                            )
-                        # Emit a visible error so the LLM sees what happened
-                        # in its next turn.
-                        try:
-                            from backend.ledger import EventSource
-                            from backend.ledger.observation import ErrorObservation
-                            self.event_stream.add_event(
-                                ErrorObservation(
-                                    content=(
-                                        f'Step task exceeded the liveness '
-                                        f'ceiling of '
-                                        f'{step_liveness_seconds:.0f}s '
-                                        f'and was force-cancelled. Pending '
-                                        f'state was cleared; the next step '
-                                        f'will retry. The underlying cause is '
-                                        f'a hang in the agent loop — check the '
-                                        f'log for the last completed step.'
-                                    ),
-                                    error_id='STEP_TASK_LIVENESS_TIMEOUT',
-                                    notify_ui_only=True,
-                                ),
-                                EventSource.ENVIRONMENT,
-                            )
-                        except Exception:
-                            logger.debug(
-                                'Failed to emit STEP_TASK_LIVENESS_TIMEOUT '
-                                'observation',
-                                exc_info=True,
-                            )
-                        # Break the drain loop.  The next step() request
-                        # will create a fresh task with cleared state.
-                        break
-                    except asyncio.CancelledError:
-                        # Cooperative cancellation — propagate without
-                        # treating as a hang.
-                        raise
-                    await asyncio.sleep(0)
-                    if self._step_request_count <= 0:
-                        break
-                    self._step_request_count -= 1
-                    if not self.step_prerequisites.can_step():
-                        break
+                await self._drain_steps(step_liveness_seconds)
             finally:
                 self._step_owner_task = None
                 if not self._closed and self._step_request_count > 0:
-                    loop = asyncio.get_event_loop()
-                    loop.call_soon(self._create_step_task)
+                    asyncio.get_event_loop().call_soon(self._create_step_task)
+
+    async def _drain_steps(self, step_liveness_seconds: float) -> None:
+        from backend.core.constants import DEFAULT_AGENT_STEP_DRAIN_LIMIT
+        drained_count = 0
+        while drained_count < DEFAULT_AGENT_STEP_DRAIN_LIMIT:
+            drained_count += 1
+            try:
+                await asyncio.wait_for(self._step_inner(), timeout=step_liveness_seconds)
+            except asyncio.TimeoutError:
+                await self._handle_liveness_timeout(step_liveness_seconds)
+                break
+            except asyncio.CancelledError:
+                raise
+            await asyncio.sleep(0)
+            if self._step_request_count <= 0:
+                break
+            self._step_request_count -= 1
+            if not self.step_prerequisites.can_step():
+                break
+
+    async def _handle_liveness_timeout(self, step_liveness_seconds: float) -> None:
+        logger.error(
+            'STEP_TASK_LIVENESS_TIMEOUT: _step_inner did not complete within %.0fs; force-cancelling and clearing pending state.',
+            step_liveness_seconds, extra={'msg_type': 'STEP_TASK_LIVENESS_TIMEOUT'},
+        )
+        self._cancel_executor_on_timeout()
+        self._clear_pending_state_on_timeout()
+        self._emit_liveness_timeout_observation(step_liveness_seconds)
+
+    def _cancel_executor_on_timeout(self) -> None:
+        try:
+            agent = getattr(self, 'agent', None)
+            if agent is None:
+                return
+            executor = getattr(agent, 'executor', None)
+            cancel_fn = getattr(executor, 'cancel_step', None) if executor is not None else None
+            if callable(cancel_fn):
+                cancel_fn()
+        except Exception:
+            logger.debug('Failed to cancel executor after step-task liveness timeout', exc_info=True)
+
+    def _clear_pending_state_on_timeout(self) -> None:
+        try:
+            pending_service = getattr(getattr(self, 'services', None), 'pending_action', None)
+            if pending_service is not None:
+                pending_service.clear_primary()
+        except Exception:
+            logger.debug('Failed to clear pending state after step-task liveness timeout', exc_info=True)
+
+    def _emit_liveness_timeout_observation(self, step_liveness_seconds: float) -> None:
+        try:
+            from backend.ledger import EventSource
+            from backend.ledger.observation import ErrorObservation
+            self.event_stream.add_event(
+                ErrorObservation(
+                    content=f'Step task exceeded the liveness ceiling of {step_liveness_seconds:.0f}s and was force-cancelled. Pending state was cleared; the next step will retry. The underlying cause is a hang in the agent loop — check the log for the last completed step.',
+                    error_id='STEP_TASK_LIVENESS_TIMEOUT', notify_ui_only=True,
+                ),
+                EventSource.ENVIRONMENT,
+            )
+        except Exception:
+            logger.debug('Failed to emit STEP_TASK_LIVENESS_TIMEOUT observation', exc_info=True)
 
     async def _step_inner_connect_and_check(self, _step_inner_start: float) -> bool:
         """Connect runtime and check prerequisites. Returns False if should exit."""

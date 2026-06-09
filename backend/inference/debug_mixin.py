@@ -61,40 +61,34 @@ class DebugMixin:
         """Log the LLM response at DEBUG level."""
         if not logger.isEnabledFor(logging.DEBUG):
             return
-
         if isinstance(response, str):
             if response:
                 llm_response_logger.debug(response)
             return
-
         if isinstance(response, dict):
-            choices = response.get('choices')
-            if not choices:
-                return
-            message = choices[0].get('message', {})
-            content = message.get('content') or ''
-            tool_calls = message.get('tool_calls')
-            if tool_calls:
-                for tc in tool_calls:
-                    func = (
-                        tc.get('function')
-                        if isinstance(tc, dict)
-                        else getattr(tc, 'function', None)
-                    )
-                    if func:
-                        name = (
-                            func.get('name')
-                            if isinstance(func, dict)
-                            else getattr(func, 'name', '')
-                        )
-                        arguments = (
-                            func.get('arguments')
-                            if isinstance(func, dict)
-                            else getattr(func, 'arguments', '')
-                        )
-                        content += f'\nFunction call: {name}({arguments})'
-            if content:
-                llm_response_logger.debug(content)
+            self._log_dict_response(response)
+
+    def _log_dict_response(self, response: dict) -> None:
+        choices = response.get('choices')
+        if not choices:
+            return
+        message = choices[0].get('message', {})
+        content = message.get('content') or ''
+        content = _append_tool_calls_content(content, message.get('tool_calls'))
+        if content:
+            llm_response_logger.debug(content)
+
+
+def _append_tool_calls_content(content: str, tool_calls: Any) -> str:
+    if not tool_calls:
+        return content
+    for tc in tool_calls:
+        func = tc.get('function') if isinstance(tc, dict) else getattr(tc, 'function', None)
+        if func:
+            name = func.get('name') if isinstance(func, dict) else getattr(func, 'name', '')
+            arguments = func.get('arguments') if isinstance(func, dict) else getattr(func, 'arguments', '')
+            content += f'\nFunction call: {name}({arguments})'
+    return content
 
     def _format_message_content(self, message: dict[str, Any]) -> str:
         """Extract and format the content field of a single message dict."""

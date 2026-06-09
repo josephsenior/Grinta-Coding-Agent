@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.context.prompt_window import estimate_events_tokens
-from backend.core.constants import DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS
+from backend.core.constants import (
+    DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
+    DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS,
+)
 from backend.inference.provider_capabilities import model_token_correction
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event
     from backend.orchestration.state.state import State
+
+_POST_COMPACT_BASELINE_KEY = 'post_compact_baseline_tokens'
+_LAST_BOUNDARY_COMPACT_KEY = 'last_boundary_compact_at'
 
 
 @dataclass(frozen=True)
@@ -53,6 +60,16 @@ class ContextBudget:
         )
 
 
+def record_post_compact_baseline(state: object, events: list[Event]) -> None:
+    """Store post-boundary token baseline after a committed compaction."""
+    if not hasattr(state, 'set_extra'):
+        return
+    pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
+    pipe[_POST_COMPACT_BASELINE_KEY] = estimate_events_tokens(events)
+    pipe[_LAST_BOUNDARY_COMPACT_KEY] = time.time()
+    state.set_extra('context_pipeline_state', pipe, source='ContextBudget')  # type: ignore[attr-defined]
+
+
 def _effective_context_window(llm_config: object | None) -> int:
     if llm_config is None:
         return 200_000
@@ -69,12 +86,39 @@ def _effective_context_window(llm_config: object | None) -> int:
     return 200_000
 
 
+def _pipeline_state(state: State | None) -> dict[str, Any]:
+    if state is None:
+        return {}
+    raw = getattr(state, 'extra_data', {}).get('context_pipeline_state')
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _recent_compaction(state: State | None) -> bool:
+    pipe = _pipeline_state(state)
+    last = pipe.get(_LAST_BOUNDARY_COMPACT_KEY)
+    if not isinstance(last, (int, float)):
+        return False
+    return (time.time() - last) < DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS
+
+
 def _estimate_tokens(
     events: list[Event],
     *,
     llm_config: object | None,
     state: State | None,
 ) -> int:
+    if _recent_compaction(state):
+        raw = estimate_events_tokens(events)
+        model = str(getattr(llm_config, 'model', '') or '')
+        factor, _ = model_token_correction(model)
+        return int(raw * factor)
+
+    pipe = _pipeline_state(state)
+    baseline = pipe.get(_POST_COMPACT_BASELINE_KEY)
+    if isinstance(baseline, int) and baseline > 0 and len(events) <= 120:
+        tail = estimate_events_tokens(events[-12:])
+        return baseline + tail
+
     api_tokens = _last_api_prompt_tokens(state)
     if api_tokens > 0:
         tail = estimate_events_tokens(events[-12:])
@@ -100,4 +144,4 @@ def _last_api_prompt_tokens(state: State | None) -> int:
     return total if isinstance(total, int) and total > 0 else 0
 
 
-__all__ = ['ContextBudget']
+__all__ = ['ContextBudget', 'record_post_compact_baseline']

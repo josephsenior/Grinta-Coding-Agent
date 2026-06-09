@@ -373,46 +373,8 @@ class EventPersistence:
         """Fix stale checksum rows left by pre-deepcopy persistence."""
         if self._sqlite_store is None:
             return
-        if self._sync_checksum_repair_enabled():
-            self._run_checksum_repair()
-            return
-        if (
-            self._checksum_repair_thread is not None
-            and self._checksum_repair_thread.is_alive()
-        ):
-            return
-        store = self._sqlite_store
-        sid = self.sid
-
-        def _background_repair() -> None:
-            try:
-                fixed = store.repair_event_checksums()
-                if fixed:
-                    logger.info(
-                        'Background checksum repair fixed %d row(s) for session %s',
-                        fixed,
-                        sid,
-                    )
-            except Exception as exc:
-                logger.warning(
-                    'Background SQLite checksum repair failed for session %s: %s',
-                    sid,
-                    exc,
-                )
-            finally:
-                self._checksum_repair_done.set()
-
-        thread = threading.Thread(
-            target=_background_repair,
-            name=f'checksum-repair-{sid[:8]}',
-            daemon=True,
-        )
-        self._checksum_repair_thread = thread
-        thread.start()
-        logger.debug(
-            'Started background SQLite checksum repair for session %s',
-            sid,
-        )
+        self._run_checksum_repair()
+        self._checksum_repair_done.set()
 
     def _run_checksum_repair(self) -> None:
         if self._sqlite_store is None:

@@ -144,7 +144,13 @@ class MemoryPressureMonitor:
         """Return True when the orchestrator should schedule foreground compaction."""
         if self.is_critical():
             return True
-        return self.pressure_ratio() >= self._signal_ratio
+        if self.pressure_ratio() < self._signal_ratio:
+            return False
+        if self._last_condensation_at > 0:
+            elapsed = time.monotonic() - self._last_condensation_at
+            if elapsed < self._cooldown_s:
+                return False
+        return True
 
     def should_condense(self, history_events: int | None = None) -> bool:
         """Return True if memory pressure warrants proactive condensation.

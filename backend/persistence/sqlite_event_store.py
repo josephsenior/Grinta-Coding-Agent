@@ -491,9 +491,12 @@ class SQLiteEventStore:
             if event_id is not None and event_id != row_id:
                 raise ValueError(f'Event {row_id}: payload id mismatch ({event_id!r})')
             if not verify_event_integrity(data, row_id):
-                raise ValueError(
-                    f'Event {row_id}: integrity checksum mismatch in SQLite ledger'
+                logger.warning(
+                    'Skipping SQLite event id=%s with checksum mismatch in %s',
+                    row_id,
+                    self._db_path,
                 )
+                continue
             results.append(data)
         return results
 

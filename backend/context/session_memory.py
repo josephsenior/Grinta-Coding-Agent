@@ -123,6 +123,16 @@ def _count_tool_calls_since(events: list[Event], since_id: int | None) -> int:
     return count
 
 
+def _should_skip_during_condensation_loop(state: State | None) -> bool:
+    """Skip expensive session-memory writes during condensation-only loops."""
+    pipe = _pipeline_state(state)
+    if pipe.get('consecutive_condensation_steps', 0) >= 1:
+        return True
+    if pipe.get('skip_compaction_until_event_id') is not None:
+        return True
+    return False
+
+
 def maybe_update(
     state: State | None,
     events: list[Event],
@@ -131,6 +141,8 @@ def maybe_update(
 ) -> bool:
     """Update session_memory.md when token or tool-call thresholds are crossed."""
     if not events:
+        return False
+    if _should_skip_during_condensation_loop(state):
         return False
     estimated = estimate_events_tokens(events)
     pipe = _pipeline_state(state)

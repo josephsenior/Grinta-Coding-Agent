@@ -535,34 +535,37 @@ class WhitespaceHandler:
         orig_pos = 0
         while norm_pos < normalized_offset and orig_pos < len(original):
             ch = original[orig_pos]
-
-            # Trailing spaces/tabs before newline/EOF are stripped by
-            # normalize_for_match, so they do not advance normalized offset.
             if ch in (' ', '\t'):
-                lookahead = orig_pos
-                while lookahead < len(original) and original[lookahead] in (' ', '\t'):
-                    lookahead += 1
-                if lookahead >= len(original) or original[lookahead] in ('\n', '\r'):
-                    orig_pos = lookahead
-                    continue
-
-            if ch == '\t':
-                norm_pos += 4
-            else:
-                norm_pos += 1
+                orig_pos = WhitespaceHandler._skip_trailing_whitespace(original, orig_pos)
+                continue
+            norm_pos += 4 if ch == '\t' else 1
             orig_pos += 1
             if ch in (' ', '\t'):
-                while (
-                    orig_pos < len(original)
-                    and original[orig_pos] in (' ', '\t')
-                    and norm_pos < normalized_offset
-                ):
-                    if original[orig_pos] == '\t':
-                        norm_pos += 4
-                    else:
-                        norm_pos += 1
-                    orig_pos += 1
-                    if norm_pos >= normalized_offset:
-                        break
-                continue
+                norm_pos, orig_pos = WhitespaceHandler._advance_through_whitespace(
+                    original, orig_pos, norm_pos, normalized_offset
+                )
         return orig_pos
+
+    @staticmethod
+    def _skip_trailing_whitespace(original: str, orig_pos: int) -> int:
+        lookahead = orig_pos
+        while lookahead < len(original) and original[lookahead] in (' ', '\t'):
+            lookahead += 1
+        if lookahead >= len(original) or original[lookahead] in ('\n', '\r'):
+            return lookahead
+        return orig_pos
+
+    @staticmethod
+    def _advance_through_whitespace(
+        original: str, orig_pos: int, norm_pos: int, normalized_offset: int
+    ) -> tuple[int, int]:
+        while (
+            orig_pos < len(original)
+            and original[orig_pos] in (' ', '\t')
+            and norm_pos < normalized_offset
+        ):
+            norm_pos += 4 if original[orig_pos] == '\t' else 1
+            orig_pos += 1
+            if norm_pos >= normalized_offset:
+                break
+        return norm_pos, orig_pos

@@ -59,14 +59,7 @@ class LLMRateGovernor:
         kind: Any,
         tokens_in_last_window: int | None = None,
     ) -> None:
-        """Learn from a provider 429 so future calls can throttle proactively.
-
-        Called by the LLM client layer after a ``RateLimitError`` is mapped.
-        Only TPM events update the observed ceiling; other kinds are ignored
-        because they are not bounded by the token budget this governor tracks.
-        ``tokens_in_last_window`` may be supplied when the caller knows the
-        actual window usage; otherwise the governor uses its own history.
-        """
+        """Learn from a provider 429 so future calls can throttle proactively."""
         try:
             from backend.inference.exceptions import RateLimitKind
         except Exception:
@@ -77,33 +70,38 @@ class LLMRateGovernor:
         mdl = (model or '').lower()
         if not prov or not mdl:
             return
-        if tokens_in_last_window is None and self._history:
-            _, oldest = self._history[0]
-            current = self._history[-1][1]
-            tokens_in_last_window = max(0, current - oldest)
-        if not tokens_in_last_window or tokens_in_last_window <= 0:
+        tokens = tokens_in_last_window or self._estimate_tokens_from_history()
+        if not tokens or tokens <= 0:
             return
-        # Treat the observed usage at the time of the 429 as a soft ceiling.
-        # Apply a 5% safety margin so we throttle a touch earlier next time.
-        ceiling = max(1, int(tokens_in_last_window * 0.95))
+        self._update_tpm_ceiling(prov, mdl, tokens)
+
+    def _estimate_tokens_from_history(self) -> int | None:
+        if not self._history:
+            return None
+        _, oldest = self._history[0]
+        current = self._history[-1][1]
+        return max(0, current - oldest)
+
+    def _update_tpm_ceiling(self, prov: str, mdl: str, tokens: int) -> None:
+        ceiling = max(1, int(tokens * 0.95))
         key = (prov, mdl)
         prev = self._observed_tpm_ceiling.get(key)
-        if prev is None or ceiling < prev:
-            self._observed_tpm_ceiling[key] = ceiling
-            if len(self._observed_tpm_ceiling) > self._observed_tpm_ceiling_max:
-                oldest_keys = list(self._observed_tpm_ceiling.keys())[
-                    : len(self._observed_tpm_ceiling) - self._observed_tpm_ceiling_max
-                ]
-                for k in oldest_keys:
-                    del self._observed_tpm_ceiling[k]
-            logger.info(
-                'Learned TPM ceiling for %s/%s: %d tokens/%ds (was %s)',
-                prov,
-                mdl,
-                ceiling,
-                self.history_window_seconds,
-                prev,
-            )
+        if prev is not None and ceiling >= prev:
+            return
+        self._observed_tpm_ceiling[key] = ceiling
+        self._evict_old_ceilings()
+        logger.info(
+            'Learned TPM ceiling for %s/%s: %d tokens/%ds (was %s)',
+            prov, mdl, ceiling, self.history_window_seconds, prev,
+        )
+
+    def _evict_old_ceilings(self) -> None:
+        if len(self._observed_tpm_ceiling) > self._observed_tpm_ceiling_max:
+            oldest_keys = list(self._observed_tpm_ceiling.keys())[
+                : len(self._observed_tpm_ceiling) - self._observed_tpm_ceiling_max
+            ]
+            for k in oldest_keys:
+                del self._observed_tpm_ceiling[k]
 
     def set_memory_pressure_factor(self, factor: float) -> None:
         """Set a memory-pressure scaling factor [0.0, 1.0].

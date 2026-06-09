@@ -103,33 +103,36 @@ def _filter_sessions_fuzzy(
     try:
         from rapidfuzz import fuzz
     except ImportError:
-        # Fallback to simple substring matching
-        search_lower = search_term.lower()
-        return [
-            r
-            for r in rows
-            if search_lower in str(r[1].get('title', '') or '').lower()
-            or search_lower in str(r[1].get('name', '') or '').lower()
-            or search_lower in str(r[1].get('llm_model', '') or '').lower()
-        ]
+        return _filter_sessions_plain(rows, search_term)
 
     search_lower = search_term.lower()
     scored: list[tuple[int, tuple[str, dict[str, Any], int, Path]]] = []
-
     for row in rows:
-        sid, meta, count, path = row
-        title = str(meta.get('title') or meta.get('name') or '').lower()
-        model = str(meta.get('llm_model') or '').lower()
-
-        title_score = fuzz.partial_ratio(search_lower, title)
-        model_score = fuzz.partial_ratio(search_lower, model)
-        max_score = max(title_score, model_score)
-
-        if max_score > 50:
-            scored.append((int(100 - max_score), row))  # Negate for ascending sort
-
+        score = _fuzzy_session_score(search_lower, row[1])
+        if score > 50:
+            scored.append((int(100 - score), row))
     scored.sort()
     return [r for _, r in scored]
+
+
+def _filter_sessions_plain(
+    rows: list[tuple[str, dict[str, Any], int, Path]],
+    search_term: str,
+) -> list[tuple[str, dict[str, Any], int, Path]]:
+    search_lower = search_term.lower()
+    return [
+        r for r in rows
+        if search_lower in str(r[1].get('title', '') or '').lower()
+        or search_lower in str(r[1].get('name', '') or '').lower()
+        or search_lower in str(r[1].get('llm_model', '') or '').lower()
+    ]
+
+
+def _fuzzy_session_score(search_lower: str, meta: dict[str, Any]) -> int:
+    from rapidfuzz import fuzz
+    title = str(meta.get('title') or meta.get('name') or '').lower()
+    model = str(meta.get('llm_model') or '').lower()
+    return max(fuzz.partial_ratio(search_lower, title), fuzz.partial_ratio(search_lower, model))
 
 
 def _build_session_table(console: Console) -> Table:

@@ -814,126 +814,84 @@ def get_direct_client(
     base_url: str | None = None,
     timeout: float | int | None = None,
 ) -> DirectLLMClient:
-    """Factory function to get the correct direct client using explicit routing.
-
-    This function automatically resolves the provider and base URL based on:
-    1. Explicit provider prefix (``provider/model``)
-    2. Exact model catalog entries (catalog.json)
-    3. Local endpoint discovery (Ollama, LM Studio, vLLM)
-
-    Args:
-        model: Model name (e.g., "gpt-4o", "claude-opus-4", "ollama/llama3")
-        api_key: API key for the provider
-        base_url: Optional explicit base URL (overrides auto-resolution)
-        timeout: Optional request timeout in seconds
-
-    Returns:
-        Appropriate DirectLLMClient instance
-    """
+    """Factory function to get the correct direct client using explicit routing."""
     from backend.inference.provider_resolver import get_resolver
 
     resolver = get_resolver()
-
-    # Strip provider prefix if present (e.g., "ollama/llama3" → "llama3")
     stripped_model = resolver.strip_provider_prefix(model)
-
-    # Resolve provider from explicit prefix or exact catalog entry
     provider = resolver.resolve_provider(model)
-
-    # Resolve base URL (handles local discovery and environment variables)
     resolved_base_url = resolver.resolve_base_url(model, base_url)
 
     logger.debug(
-        'Resolved model=%s → provider=%s, base_url=%s, stripped=%s',
-        model,
-        provider,
-        resolved_base_url or 'default',
-        stripped_model,
+        'Resolved model=%s -> provider=%s, base_url=%s, stripped=%s',
+        model, provider, resolved_base_url or 'default', stripped_model,
     )
 
-    if provider == 'opencode-go':
-        from backend.inference.provider_resolver import opencode_go_required_endpoint
+    client = _try_opencode_go_client(provider, stripped_model, api_key, timeout, resolved_base_url)
+    if client is not None:
+        return client
 
-        required_endpoint = opencode_go_required_endpoint(stripped_model)
-        if required_endpoint == '/messages':
-            anthropic_base_url = resolved_base_url
-            if anthropic_base_url and anthropic_base_url.rstrip('/').endswith('/v1'):
-                anthropic_base_url = anthropic_base_url.rstrip('/')[:-3]
-            return AnthropicClient(
-                model_name=stripped_model,
-                api_key=api_key,
-                timeout=timeout,
-                base_url=anthropic_base_url,
-                provider_name='opencode-go',
-            )
+    client = _try_proxy_client(provider, resolved_base_url, model, api_key, timeout)
+    if client is not None:
+        return client
 
-    # When a custom base_url is provided that differs from the provider's own
-    # native endpoint, the caller is routing the model through a third-party
-    # proxy (e.g. Lightning AI, OpenRouter).  In that case we MUST use the
-    # OpenAI-compatible client with the *original* model name so the proxy
-    # receives the full identifier it expects (e.g.
-    # "google/gemini-3-flash-preview" on Lightning AI).
-    if resolved_base_url:
-        # Collect known native endpoints for providers that have their own SDK
-        # clients (i.e. Anthropic and Google).  All other providers already use
-        # the OpenAI-compatible client so no special handling is needed.
-        _NATIVE_ENDPOINTS: dict[str, str] = {
-            'anthropic': 'https://api.anthropic.com',
-            'google': 'https://generativelanguage.googleapis.com',
-        }
-        native = _NATIVE_ENDPOINTS.get(provider or '', '')
-        is_native = native and resolved_base_url.rstrip('/').startswith(
-            native.rstrip('/')
-        )
-        if not is_native and provider in ('anthropic', 'google'):
-            # Proxy route: use OpenAI-compatible client with full model name
-            profile = _resolve_transport_profile(provider, resolved_base_url)
-            return OpenAIClient(
-                model_name=model,
-                api_key=api_key,
-                base_url=resolved_base_url,
-                profile=profile,
-                timeout=timeout,
-                provider_name=provider,
-            )
+    return _route_by_provider(provider, stripped_model, api_key, base_url, resolved_base_url, timeout, model, resolver)
 
-    # Route to appropriate client based on provider
+
+def _try_opencode_go_client(provider, stripped_model, api_key, timeout, resolved_base_url):
+    if provider != 'opencode-go':
+        return None
+    from backend.inference.provider_resolver import opencode_go_required_endpoint
+    required_endpoint = opencode_go_required_endpoint(stripped_model)
+    if required_endpoint != '/messages':
+        return None
+    anthropic_base_url = resolved_base_url
+    if anthropic_base_url and anthropic_base_url.rstrip('/').endswith('/v1'):
+        anthropic_base_url = anthropic_base_url.rstrip('/')[:-3]
+    return AnthropicClient(
+        model_name=stripped_model, api_key=api_key,
+        timeout=timeout, base_url=anthropic_base_url, provider_name='opencode-go',
+    )
+
+
+def _try_proxy_client(provider, resolved_base_url, model, api_key, timeout):
+    if not resolved_base_url:
+        return None
+    _NATIVE_ENDPOINTS = {
+        'anthropic': 'https://api.anthropic.com',
+        'google': 'https://generativelanguage.googleapis.com',
+    }
+    native = _NATIVE_ENDPOINTS.get(provider or '', '')
+    is_native = native and resolved_base_url.rstrip('/').startswith(native.rstrip('/'))
+    if is_native or provider not in ('anthropic', 'google'):
+        return None
+    profile = _resolve_transport_profile(provider, resolved_base_url)
+    return OpenAIClient(
+        model_name=model, api_key=api_key,
+        base_url=resolved_base_url, profile=profile,
+        timeout=timeout, provider_name=provider,
+    )
+
+
+def _route_by_provider(provider, stripped_model, api_key, base_url, resolved_base_url, timeout, model, resolver):
     if provider == 'anthropic':
-        return AnthropicClient(
-            model_name=stripped_model,
-            api_key=api_key,
-            timeout=timeout,
-            provider_name='anthropic',
-        )
+        return AnthropicClient(model_name=stripped_model, api_key=api_key, timeout=timeout, provider_name='anthropic')
 
-    from backend.inference.direct_clients_gemini_ops import GeminiClient  # noqa: I001, PLC0415
-
+    from backend.inference.direct_clients_gemini_ops import GeminiClient
     if provider == 'google':
         return GeminiClient(model_name=stripped_model, api_key=api_key, timeout=timeout)
 
-    # All OpenAI-compatible providers use OpenAI client
-    # (OpenAI, xAI, DeepSeek, Mistral, Ollama, LM Studio, vLLM, Lightning, etc.)
-    #
-    # Detect true model family from stripped_model, not provider.
-    # Example: model='openai/google/gemini-3-flash-preview' → provider='openai'
-    # but stripped_model='google/gemini-3-flash-preview' → family='google'.
-    # Lightning AI canonicalizes all models with an 'openai/' transport prefix,
-    # which hides the actual model family from the outer provider field.
     model_family = provider
     if '/' in stripped_model:
         try:
             model_family = resolver.resolve_provider(stripped_model)
         except (ValueError, Exception):
             pass
-
     profile = _resolve_transport_profile(model_family, resolved_base_url)
     return OpenAIClient(
-        model_name=stripped_model,
-        api_key=api_key,
-        base_url=resolved_base_url,
-        profile=profile,
-        timeout=timeout,
-        provider_name=provider,
+        model_name=stripped_model, api_key=api_key,
+        base_url=resolved_base_url, profile=profile,
+        timeout=timeout, provider_name=provider,
     )
 
 
