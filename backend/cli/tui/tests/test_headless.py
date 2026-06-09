@@ -2729,39 +2729,48 @@ async def test_tui_file_read_card_completes_without_expanded_body(mock_config):
 
     async with app.run_test(size=(120, 36)) as pilot:
         await pilot.pause()
-
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
-
         renderer = TUIRenderer(
-            console=console,
-            hud=HUDBar(),
-            reasoning=ReasoningDisplay(),
-            tui=s,
-            loop=loop,
+            console=console, hud=HUDBar(), reasoning=ReasoningDisplay(),
+            tui=s, loop=loop,
         )
-
         long_path = 'backend/cli/tui/some/really/long/path/that/should/not/stretch/read_card.py'
         renderer._process_event(FileReadAction(path=long_path))
         await pilot.pause()
 
         file_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
+            card for card in s.query(TUIActivityCard).results()
             if 'category-files' in card.classes
         ]
         assert len(file_cards) == 1
         assert file_cards[0]._collapsible is False
         assert file_cards[0].query_one('#expanded-body').display is False
 
+
+@pytest.mark.asyncio
+async def test_tui_file_read_observation_updates_card_collapsed_markup(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        renderer = TUIRenderer(
+            console=console, hud=HUDBar(), reasoning=ReasoningDisplay(),
+            tui=s, loop=loop,
+        )
+        long_path = 'backend/cli/tui/some/really/long/path/that/should/not/stretch/read_card.py'
+        renderer._process_event(FileReadAction(path=long_path))
         renderer._process_event(
             FileReadObservation(path=long_path, content='alpha\nbeta\ngamma')
         )
         await pilot.pause()
 
         file_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
+            card for card in s.query(TUIActivityCard).results()
             if 'category-files' in card.classes
         ]
         assert len(file_cards) == 1
@@ -2776,6 +2785,21 @@ async def test_tui_file_read_card_completes_without_expanded_body(mock_config):
         assert not list(card.query('#caret').results())
         assert card.query_one('#expanded-body').display is False
 
+
+@pytest.mark.asyncio
+async def test_tui_file_read_ranged_card_shows_range_info(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        renderer = TUIRenderer(
+            console=console, hud=HUDBar(), reasoning=ReasoningDisplay(),
+            tui=s, loop=loop,
+        )
         renderer._process_event(
             FileReadAction(path='backend/cli/tui/ranged_read.py', view_range=[50, 100])
         )
@@ -2788,8 +2812,7 @@ async def test_tui_file_read_card_completes_without_expanded_body(mock_config):
         await pilot.pause()
 
         ranged_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
+            card for card in s.query(TUIActivityCard).results()
             if 'category-files' in card.classes and 'ranged_read.py' in card._detail
         ]
         assert len(ranged_cards) == 1

@@ -59,41 +59,8 @@ def _build_restore_block(
         parts.append(f'Latest pytest: {pytest_summary}')
 
     snapshot = load_snapshot()
-    if snapshot:
-        runtime = snapshot.get('runtime')
-        if isinstance(runtime, dict):
-            iteration = runtime.get('iteration')
-            if iteration is not None:
-                parts.append(f'Resume at iteration: {iteration}')
-        test_results = snapshot.get('test_results')
-        if isinstance(test_results, list) and test_results:
-            latest = test_results[-1]
-            if isinstance(latest, dict):
-                status = latest.get('status', '?')
-                command = str(latest.get('command', ''))[:120]
-                parts.append(f'Last test run: {status} — {command}')
-
-    tail_ids = _tail_event_ids(preserved_tail)
-    files = snapshot.get('files_touched', {}) if isinstance(snapshot, dict) else {}
-    if isinstance(files, dict):
-        restored_files = 0
-        for path in reversed(list(files.keys())):
-            if restored_files >= DEFAULT_POST_COMPACT_MAX_FILES:
-                break
-            if not isinstance(path, str) or not path:
-                continue
-            if any(
-                isinstance(getattr(event, 'content', ''), str)
-                and path in getattr(event, 'content', '')
-                for event in preserved_tail
-            ):
-                continue
-            preview = _read_file_preview(
-                path, max_chars=DEFAULT_POST_COMPACT_FILE_PREVIEW_CHARS
-            )
-            if preview:
-                parts.append(f'File: {path}\n```\n{preview}\n```')
-                restored_files += 1
+    parts.extend(_extract_snapshot_sections(snapshot))
+    parts.extend(_extract_restored_files(snapshot, preserved_tail))
 
     parts.append('</POST_COMPACT_RESTORE>')
     block = '\n\n'.join(parts)
@@ -101,6 +68,59 @@ def _build_restore_block(
     if len(block) > budget_chars:
         block = block[: budget_chars - 60] + '\n... (post-compact restore truncated)\n'
     return block
+
+
+def _extract_snapshot_sections(snapshot: dict | None) -> list[str]:
+    sections: list[str] = []
+    if not snapshot:
+        return sections
+    runtime = snapshot.get('runtime')
+    if isinstance(runtime, dict):
+        iteration = runtime.get('iteration')
+        if iteration is not None:
+            sections.append(f'Resume at iteration: {iteration}')
+    test_results = snapshot.get('test_results')
+    if isinstance(test_results, list) and test_results:
+        latest = test_results[-1]
+        if isinstance(latest, dict):
+            status = latest.get('status', '?')
+            command = str(latest.get('command', ''))[:120]
+            sections.append(f'Last test run: {status} — {command}')
+    return sections
+
+
+def _extract_restored_files(
+    snapshot: dict | None, preserved_tail: list[Event]
+) -> list[str]:
+    files = snapshot.get('files_touched', {}) if isinstance(snapshot, dict) else {}
+    if not isinstance(files, dict):
+        return []
+    tail_contents = _tail_content_set(preserved_tail)
+    parts: list[str] = []
+    restored_files = 0
+    for path in reversed(list(files.keys())):
+        if restored_files >= DEFAULT_POST_COMPACT_MAX_FILES:
+            break
+        if not isinstance(path, str) or not path:
+            continue
+        if path in tail_contents:
+            continue
+        preview = _read_file_preview(
+            path, max_chars=DEFAULT_POST_COMPACT_FILE_PREVIEW_CHARS
+        )
+        if preview:
+            parts.append(f'File: {path}\n```\n{preview}\n```')
+            restored_files += 1
+    return parts
+
+
+def _tail_content_set(events: list[Event]) -> set[str]:
+    return {
+        getattr(event, 'content', '')
+        for event in events
+        if isinstance(getattr(event, 'content', ''), str)
+        and getattr(event, 'content', '')
+    }
 
 
 def inject_post_compact_restore(

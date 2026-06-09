@@ -59,18 +59,28 @@ def _normalize_metric(value: Any, metric_name: str) -> float:
 def load_eval_pack(path: str | Path) -> dict[str, Any]:
     """Load and validate an eval pack definition."""
     pack = _load_json(path)
+    _validate_required_keys(pack)
+    _validate_agents(pack.get('agents'))
+    _validate_tasks(pack.get('tasks'))
+    _validate_metric_weights(pack.get('metric_weights'))
+    return pack
+
+
+def _validate_required_keys(pack: dict) -> None:
     required_keys = {'pack_id', 'version', 'agents', 'metric_weights', 'tasks'}
     missing = sorted(required_keys - set(pack))
     if missing:
         raise EvalPackError(f'Pack is missing required keys: {", ".join(missing)}')
 
-    agents = pack.get('agents')
+
+def _validate_agents(agents: Any) -> None:
     if not isinstance(agents, list) or not agents:
         raise EvalPackError('Pack must define a non-empty agents list')
-    tasks = pack.get('tasks')
+
+
+def _validate_tasks(tasks: Any) -> None:
     if not isinstance(tasks, list) or not tasks:
         raise EvalPackError('Pack must define a non-empty tasks list')
-
     task_ids: set[str] = set()
     for task in tasks:
         if not isinstance(task, dict):
@@ -82,7 +92,8 @@ def load_eval_pack(path: str | Path) -> dict[str, Any]:
             raise EvalPackError(f'Duplicate task id: {task_id}')
         task_ids.add(task_id)
 
-    weights = pack.get('metric_weights')
+
+def _validate_metric_weights(weights: Any) -> None:
     if not isinstance(weights, dict) or 'success' not in weights:
         raise EvalPackError('Pack must define metric_weights including success')
     for metric_name in ('success', *_FIVE_POINT_METRICS):
@@ -91,7 +102,6 @@ def load_eval_pack(path: str | Path) -> dict[str, Any]:
             raise EvalPackError(
                 f'metric_weights.{metric_name} must be a positive number'
             )
-    return pack
 
 
 def load_results_document(path: str | Path) -> dict[str, Any]:

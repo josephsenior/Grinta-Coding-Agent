@@ -156,42 +156,56 @@ def _find_symbol_references(
     if not symbols or not session_files:
         return ''
 
-    try:
-        norm_exclude = str(Path(exclude_path).resolve())
-    except Exception:
-        norm_exclude = exclude_path
-
+    norm_exclude = _normalize_exclude_path(exclude_path)
     report: list[str] = []
     files_reported = 0
     for filepath in session_files:
         if files_reported >= max_files:
             break
-        try:
-            norm_fp = str(Path(filepath).resolve())
-        except Exception:
-            norm_fp = filepath
-        if norm_fp == norm_exclude:
+        if _is_excluded_file(filepath, norm_exclude):
             continue
-        try:
-            text = Path(filepath).read_text(encoding='utf-8', errors='replace')
-        except OSError:
-            continue
-        file_lines: list[str] = []
-        for sym in symbols:
-            if sym not in text:
-                continue
-            for lineno, line in enumerate(text.splitlines(), 1):
-                stripped = line.strip()
-                if sym in line and stripped and not stripped.startswith('#'):
-                    file_lines.append(f'  {filepath}:{lineno}: {stripped[:100]}')
-                    if len(file_lines) >= max_lines_per_file:
-                        break
-            if len(file_lines) >= max_lines_per_file:
-                break
+        file_lines = _find_matches_in_file(filepath, symbols, max_lines_per_file)
         if file_lines:
             report.extend(file_lines)
             files_reported += 1
     return '\n'.join(report)
+
+
+def _normalize_exclude_path(exclude_path: str) -> str:
+    try:
+        return str(Path(exclude_path).resolve())
+    except Exception:
+        return exclude_path
+
+
+def _is_excluded_file(filepath: str, norm_exclude: str) -> bool:
+    try:
+        norm_fp = str(Path(filepath).resolve())
+    except Exception:
+        norm_fp = filepath
+    return norm_fp == norm_exclude
+
+
+def _find_matches_in_file(
+    filepath: str, symbols: list[str], max_lines: int
+) -> list[str]:
+    try:
+        text = Path(filepath).read_text(encoding='utf-8', errors='replace')
+    except OSError:
+        return []
+    file_lines: list[str] = []
+    for sym in symbols:
+        if sym not in text:
+            continue
+        for lineno, line in enumerate(text.splitlines(), 1):
+            stripped = line.strip()
+            if sym in line and stripped and not stripped.startswith('#'):
+                file_lines.append(f'  {filepath}:{lineno}: {stripped[:100]}')
+                if len(file_lines) >= max_lines:
+                    break
+        if len(file_lines) >= max_lines:
+            break
+    return file_lines
 
 
 class FileStateMiddleware(ToolInvocationMiddleware):

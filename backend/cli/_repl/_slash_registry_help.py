@@ -152,48 +152,11 @@ def build_help_table(
     table.add_column('Command', style='bold cyan', no_wrap=True)
     table.add_column('Description', style=STYLE_DIM)
 
-    by_section: dict[str, list[SlashCommandSpec]] = defaultdict(list)
-    for spec in _SLASH_COMMANDS:
-        by_section[spec.help_section].append(spec)
-
+    by_section = _group_commands_by_section()
     if search_term:
-        search_lower = search_term.lower()
-        filtered_sections: dict[str, list[SlashCommandSpec]] = {}
-        for section, specs in by_section.items():
-            matched = []
-            for spec in specs:
-                score = max(
-                    fuzz.partial_ratio(search_lower, spec.name.lower()),
-                    fuzz.partial_ratio(search_lower, spec.description.lower()),
-                    fuzz.partial_ratio(search_lower, spec.usage.lower()),
-                )
-                if score > 60:
-                    matched.append(spec)
-            if matched:
-                filtered_sections[section] = matched
-        by_section = filtered_sections
+        by_section = _filter_sections_fuzzy(by_section, search_term, fuzz)
 
-    for section_key, title in HELP_SECTIONS_ORDER:
-        specs_list = by_section.get(section_key)
-        if not specs_list:
-            continue
-        table.add_row('', '')
-        count = len(specs_list)
-        collapsed = (
-            not show_all
-            and count > HELP_SECTION_COLLAPSE_THRESHOLD
-            and not search_term
-        )
-        if collapsed:
-            table.add_row(
-                f'[bold]{title}[/bold]  [dim]({count} commands — use /help --all to expand)[/dim]',
-                '',
-            )
-        else:
-            table.add_row(f'[bold]{title}[/bold]  [dim]({count})[/dim]', '')
-            for spec in specs_list:
-                table.add_row(spec.usage, spec.description)
-
+    _populate_table_rows(table, by_section, search_term, show_all)
     return table
 
 
@@ -215,24 +178,66 @@ def build_help_table_fallback(
     table.add_column('Command', style='bold cyan', no_wrap=True)
     table.add_column('Description', style=STYLE_DIM)
 
+    by_section = _group_commands_by_section()
+    if search_term:
+        by_section = _filter_sections_plain(by_section, search_term)
+
+    _populate_table_rows(table, by_section, search_term, show_all)
+    return table
+
+
+def _group_commands_by_section() -> dict[str, list[SlashCommandSpec]]:
+    from collections import defaultdict
     by_section: dict[str, list[SlashCommandSpec]] = defaultdict(list)
     for spec in _SLASH_COMMANDS:
         by_section[spec.help_section].append(spec)
+    return by_section
 
-    if search_term:
-        search_lower = search_term.lower()
-        filtered_sections = {}
-        for section, specs in by_section.items():
-            matched = [
-                spec
-                for spec in specs
-                if search_lower in spec.name.lower()
-                or search_lower in spec.description.lower()
-            ]
-            if matched:
-                filtered_sections[section] = matched
-        by_section = filtered_sections
 
+def _filter_sections_fuzzy(
+    by_section: dict[str, list[SlashCommandSpec]],
+    search_term: str,
+    fuzz: Any,
+) -> dict[str, list[SlashCommandSpec]]:
+    search_lower = search_term.lower()
+    filtered: dict[str, list[SlashCommandSpec]] = {}
+    for section, specs in by_section.items():
+        matched = [
+            spec for spec in specs
+            if max(
+                fuzz.partial_ratio(search_lower, spec.name.lower()),
+                fuzz.partial_ratio(search_lower, spec.description.lower()),
+                fuzz.partial_ratio(search_lower, spec.usage.lower()),
+            ) > 60
+        ]
+        if matched:
+            filtered[section] = matched
+    return filtered
+
+
+def _filter_sections_plain(
+    by_section: dict[str, list[SlashCommandSpec]],
+    search_term: str,
+) -> dict[str, list[SlashCommandSpec]]:
+    search_lower = search_term.lower()
+    filtered: dict[str, list[SlashCommandSpec]] = {}
+    for section, specs in by_section.items():
+        matched = [
+            spec for spec in specs
+            if search_lower in spec.name.lower()
+            or search_lower in spec.description.lower()
+        ]
+        if matched:
+            filtered[section] = matched
+    return filtered
+
+
+def _populate_table_rows(
+    table: Table,
+    by_section: dict[str, list[SlashCommandSpec]],
+    search_term: str | None,
+    show_all: bool,
+) -> None:
     for section_key, title in HELP_SECTIONS_ORDER:
         specs_list = by_section.get(section_key)
         if not specs_list:
@@ -253,8 +258,6 @@ def build_help_table_fallback(
             table.add_row(f'[bold]{title}[/bold]  [dim]({count})[/dim]', '')
             for spec in specs_list:
                 table.add_row(spec.usage, spec.description)
-
-    return table
 
 
 def closest_command_names(command: str, *, limit: int = 2) -> list[str]:

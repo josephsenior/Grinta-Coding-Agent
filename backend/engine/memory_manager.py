@@ -521,16 +521,48 @@ class ContextMemoryManager:
 
         condensed_list = list(condensed_history)
         window_started = time.perf_counter()
+        events_for_prompt, prompt_window = self._resolve_prompt_events(
+            condensed_list, state, llm_config
+        )
+        window_elapsed = time.perf_counter() - window_started
+
+        messages = self._process_events(
+            events_for_prompt, initial_user_message, llm_config, prompt_window
+        )
+
+        self._log_build_messages(metrics={
+            'events_for_prompt': len(events_for_prompt),
+            'original_events': prompt_window.original_events,
+            'messages': len(messages),
+            'elapsed': time.perf_counter() - window_started,
+            'window_elapsed': window_elapsed,
+            'windowed': prompt_window.windowed,
+            'prompt_window': prompt_window,
+        })
+
+        if not messages:
+            self._build_messages_cache = None
+            return messages
+
+        config_key = self._llm_build_config_key(llm_config)
+        fingerprints = tuple(event_fingerprint(event) for event in events_for_prompt)
+        self._build_messages_cache = _BuildMessagesCache(
+            event_fingerprints=fingerprints,
+            messages=copy.deepcopy(messages),
+            llm_config_key=config_key,
+        )
+        self._apply_prompt_cache_hints(messages, llm_config)
+        return messages
+
+    def _resolve_prompt_events(
+        self, condensed_list: list, state: State | None, llm_config
+    ):
         if self._pipeline is not None:
             full_history = list(getattr(state, 'history', [])) if state is not None else condensed_list
             events_for_prompt = self._pipeline.build_prompt_events(
-                condensed_list,
-                state=state,
-                llm_config=llm_config,
-                full_history=full_history,
+                condensed_list, state=state, llm_config=llm_config, full_history=full_history,
             )
             from backend.context.prompt_window import PromptWindowResult, estimate_events_tokens
-
             prompt_window = PromptWindowResult(
                 events=events_for_prompt,
                 original_events=len(full_history),
@@ -550,42 +582,22 @@ class ContextMemoryManager:
             if info is not None:
                 logger.debug(
                     'Prompt projection after compact boundary id=%d pruned=%d post_boundary=%d',
-                    info.boundary_event_id,
-                    info.pruned_event_count,
-                    info.post_boundary_event_count,
+                    info.boundary_event_id, info.pruned_event_count, info.post_boundary_event_count,
                 )
             prompt_window = select_prompt_events(events, llm_config)
             events_for_prompt = prompt_window.events
-        window_elapsed = time.perf_counter() - window_started
+        return events_for_prompt, prompt_window
+
+    def _process_events(
+        self, events_for_prompt, initial_user_message, llm_config, prompt_window
+    ) -> list[Message]:
         config_key = self._llm_build_config_key(llm_config)
         fingerprints = tuple(event_fingerprint(event) for event in events_for_prompt)
         cache = self._build_messages_cache
-        incremental = (
-            cache is not None
-            and cache.llm_config_key == config_key
-            and not prompt_window.windowed
-            and len(fingerprints) > len(cache.event_fingerprints)
-            and fingerprints[: len(cache.event_fingerprints)] == cache.event_fingerprints
-        )
-        if prompt_window.windowed:
-            logger.info(
-                'ContextMemoryManager.prompt_window selected %d/%d events '
-                '(dropped=%d estimated_tokens=%d selected_tokens=%d budget=%s '
-                'protected=%d reason=%s fingerprint=%s elapsed=%.3fs)',
-                prompt_window.selected_events,
-                prompt_window.original_events,
-                prompt_window.dropped_events,
-                prompt_window.estimated_tokens,
-                prompt_window.selected_estimated_tokens,
-                prompt_window.token_budget,
-                prompt_window.protected_events,
-                prompt_window.reason,
-                prompt_window.cache_fingerprint,
-                window_elapsed,
-            )
-        started = time.perf_counter()
+        incremental = self._is_incremental(cache, config_key, fingerprints, prompt_window)
         max_message_chars = getattr(llm_config, 'max_message_chars', None)
         vision_is_active = getattr(llm_config, 'vision_is_active', False)
+
         if incremental and cache is not None:
             messages = self.conversation_memory.process_events_appending(
                 condensed_history=events_for_prompt,
@@ -597,8 +609,7 @@ class ContextMemoryManager:
             )
             logger.debug(
                 'ContextMemoryManager.build_messages incremental tail=%d/%d events',
-                len(fingerprints) - len(cache.event_fingerprints),
-                len(fingerprints),
+                len(fingerprints) - len(cache.event_fingerprints), len(fingerprints),
             )
         else:
             messages = self.conversation_memory.process_events(
@@ -607,29 +618,38 @@ class ContextMemoryManager:
                 max_message_chars=max_message_chars,
                 vision_is_active=vision_is_active,
             )
-        elapsed = time.perf_counter() - started
-        if elapsed >= 0.25 or len(events_for_prompt) >= 100 or prompt_window.windowed:
+        return messages
+
+    @staticmethod
+    def _is_incremental(cache, config_key, fingerprints, prompt_window) -> bool:
+        return (
+            cache is not None
+            and cache.llm_config_key == config_key
+            and not prompt_window.windowed
+            and len(fingerprints) > len(cache.event_fingerprints)
+            and fingerprints[: len(cache.event_fingerprints)] == cache.event_fingerprints
+        )
+
+    def _log_build_messages(self, metrics: dict) -> None:
+        prompt_window = metrics['prompt_window']
+        if prompt_window.windowed:
+            logger.info(
+                'ContextMemoryManager.prompt_window selected %d/%d events '
+                '(dropped=%d estimated_tokens=%d selected_tokens=%d budget=%s '
+                'protected=%d reason=%s fingerprint=%s elapsed=%.3fs)',
+                prompt_window.selected_events, prompt_window.original_events,
+                prompt_window.dropped_events, prompt_window.estimated_tokens,
+                prompt_window.selected_estimated_tokens, prompt_window.token_budget,
+                prompt_window.protected_events, prompt_window.reason,
+                prompt_window.cache_fingerprint, metrics['window_elapsed'],
+            )
+        if metrics['elapsed'] >= 0.25 or metrics['events_for_prompt'] >= 100 or prompt_window.windowed:
             logger.info(
                 'ContextMemoryManager.build_messages processed %d/%d events into %d '
                 'messages in %.3fs (window=%.3fs)',
-                len(events_for_prompt),
-                prompt_window.original_events,
-                len(messages),
-                elapsed,
-                window_elapsed,
+                metrics['events_for_prompt'], metrics['original_events'],
+                metrics['messages'], metrics['elapsed'], metrics['window_elapsed'],
             )
-
-        if not messages:
-            self._build_messages_cache = None
-            return messages
-
-        self._build_messages_cache = _BuildMessagesCache(
-            event_fingerprints=fingerprints,
-            messages=copy.deepcopy(messages),
-            llm_config_key=config_key,
-        )
-        self._apply_prompt_cache_hints(messages, llm_config)
-        return messages
 
     @staticmethod
     def _apply_prompt_cache_hints(messages: list[Message], llm_config: object) -> None:

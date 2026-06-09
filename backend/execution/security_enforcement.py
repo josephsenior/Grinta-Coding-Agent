@@ -178,18 +178,12 @@ def evaluate_hardened_local_command_policy(
     if not is_workspace_restricted_profile(security_config):
         return None
 
-    if is_background and not getattr(
-        security_config, 'allow_background_processes', False
-    ):
-        return (
-            'Action blocked by hardened_local policy: background processes are disabled. '
-            f'Command: {command}'
-        )
+    blocked = _check_background_policy(command, security_config, is_background)
+    if blocked:
+        return blocked
 
     effective_cwd = resolve_command_cwd(
-        requested_cwd,
-        workspace_root=workspace_root,
-        base_cwd=base_cwd,
+        requested_cwd, workspace_root=workspace_root, base_cwd=base_cwd,
     )
     if not path_is_within_workspace(effective_cwd, workspace_root):
         return (
@@ -197,50 +191,76 @@ def evaluate_hardened_local_command_policy(
             f'Command: {command} | cwd={effective_cwd}'
         )
 
-    git_subcommand = extract_git_subcommand(command or '')
-    if git_subcommand is not None:
-        if git_subcommand in normalize_allowlist(
-            getattr(security_config, 'hardened_local_git_allowlist', ())
-        ):
-            return None
+    blocked = _check_git_policy(command, security_config)
+    if blocked:
+        return blocked
+
+    blocked = _check_package_policy(command, security_config)
+    if blocked:
+        return blocked
+
+    return _check_network_policy(command, security_config)
+
+
+def _check_background_policy(
+    command: str, security_config: Any, is_background: bool
+) -> str | None:
+    if is_background and not getattr(security_config, 'allow_background_processes', False):
         return (
-            'Action blocked by hardened_local policy: git '
-            f'{git_subcommand} is not in the workspace-scoped allowlist for git subcommands. '
+            'Action blocked by hardened_local policy: background processes are disabled. '
             f'Command: {command}'
         )
-
-    package_key = classify_package_command(command or '')
-    if package_key is not None:
-        if getattr(security_config, 'allow_package_installs', False):
-            return None
-        if package_key in normalize_allowlist(
-            getattr(security_config, 'hardened_local_package_allowlist', ())
-        ):
-            return None
-        return (
-            'Action blocked by hardened_local policy: '
-            f'{package_key} is not in the workspace-scoped allowlist for package installation commands. '
-            f'Command: {command}'
-        )
-
-    assessment = CommandAnalyzer().analyze_command(command)
-    network_key = classify_network_command(
-        command or '', assessment.is_network_operation
-    )
-    if network_key is not None:
-        if getattr(security_config, 'allow_network_commands', False):
-            return None
-        if network_key in normalize_allowlist(
-            getattr(security_config, 'hardened_local_network_allowlist', ())
-        ):
-            return None
-        return (
-            'Action blocked by hardened_local policy: '
-            f'{network_key} is not in the workspace-scoped allowlist for network-capable commands. '
-            f'Command: {command}'
-        )
-
     return None
+
+
+def _check_git_policy(command: str, security_config: Any) -> str | None:
+    git_subcommand = extract_git_subcommand(command or '')
+    if git_subcommand is None:
+        return None
+    if git_subcommand in normalize_allowlist(
+        getattr(security_config, 'hardened_local_git_allowlist', ())
+    ):
+        return None
+    return (
+        'Action blocked by hardened_local policy: git '
+        f'{git_subcommand} is not in the workspace-scoped allowlist for git subcommands. '
+        f'Command: {command}'
+    )
+
+
+def _check_package_policy(command: str, security_config: Any) -> str | None:
+    package_key = classify_package_command(command or '')
+    if package_key is None:
+        return None
+    if getattr(security_config, 'allow_package_installs', False):
+        return None
+    if package_key in normalize_allowlist(
+        getattr(security_config, 'hardened_local_package_allowlist', ())
+    ):
+        return None
+    return (
+        'Action blocked by hardened_local policy: '
+        f'{package_key} is not in the workspace-scoped allowlist for package installation commands. '
+        f'Command: {command}'
+    )
+
+
+def _check_network_policy(command: str, security_config: Any) -> str | None:
+    assessment = CommandAnalyzer().analyze_command(command)
+    network_key = classify_network_command(command or '', assessment.is_network_operation)
+    if network_key is None:
+        return None
+    if getattr(security_config, 'allow_network_commands', False):
+        return None
+    if network_key in normalize_allowlist(
+        getattr(security_config, 'hardened_local_network_allowlist', ())
+    ):
+        return None
+    return (
+        'Action blocked by hardened_local policy: '
+        f'{network_key} is not in the workspace-scoped allowlist for network-capable commands. '
+        f'Command: {command}'
+    )
 
 
 def evaluate_hardened_local_file_policy(

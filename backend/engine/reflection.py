@@ -25,28 +25,46 @@ def format_reflection_metrics(state: State) -> list[str]:
     metrics = getattr(state, 'metrics', None)
     if not metrics:
         return parts
-    prompt_tok = 0
-    ctx_window = 0
-    token_usages = list(getattr(metrics, 'token_usages', []) or [])
-    if token_usages:
-        for usage in token_usages:
-            candidate_prompt = int(getattr(usage, 'prompt_tokens', 0) or 0)
-            candidate_window = int(getattr(usage, 'context_window', 0) or 0)
-            if candidate_prompt >= prompt_tok:
-                prompt_tok = candidate_prompt
-                ctx_window = candidate_window or ctx_window
-    else:
-        atu = getattr(metrics, 'accumulated_token_usage', None)
-        if atu:
-            prompt_tok = int(getattr(atu, 'prompt_tokens', 0) or 0)
-            ctx_window = int(getattr(atu, 'context_window', 0) or 0)
+
+    prompt_tok, ctx_window = _extract_token_usage(metrics)
     if prompt_tok and ctx_window:
         pct = min(100, int(prompt_tok / ctx_window * 100))
         parts.append(f'  • Context usage: {pct}% ({prompt_tok}/{ctx_window} tokens)')
+
     cost = getattr(metrics, 'accumulated_cost', 0.0)
     if cost > 0:
         parts.append(f'  • Cost so far: ${cost:.4f}')
+
     return parts
+
+
+def _extract_token_usage(metrics: Any) -> tuple[int, int]:
+    token_usages = list(getattr(metrics, 'token_usages', []) or [])
+    if token_usages:
+        return _max_from_token_usages(token_usages)
+    return _from_accumulated_usage(metrics)
+
+
+def _max_from_token_usages(usages: list) -> tuple[int, int]:
+    prompt_tok = 0
+    ctx_window = 0
+    for usage in usages:
+        candidate_prompt = int(getattr(usage, 'prompt_tokens', 0) or 0)
+        candidate_window = int(getattr(usage, 'context_window', 0) or 0)
+        if candidate_prompt >= prompt_tok:
+            prompt_tok = candidate_prompt
+            ctx_window = candidate_window or ctx_window
+    return prompt_tok, ctx_window
+
+
+def _from_accumulated_usage(metrics: Any) -> tuple[int, int]:
+    atu = getattr(metrics, 'accumulated_token_usage', None)
+    if not atu:
+        return 0, 0
+    return (
+        int(getattr(atu, 'prompt_tokens', 0) or 0),
+        int(getattr(atu, 'context_window', 0) or 0),
+    )
 
 
 def format_reflection_modified_files(modified_files: list[str]) -> str:

@@ -224,7 +224,8 @@ class DAPDebugManager:
     def _action_continue(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
         return session.continue_execution(action.thread_id, timeout=timeout)
 
-    def _action_step(self, step_kind: str):
+    @staticmethod
+    def _action_step(step_kind: str):
         def handler(self, session: DAPDebugSession, action: DebuggerAction, timeout: float) -> dict[str, Any]:
             return session.step(step_kind, action.thread_id, timeout=timeout)
         return handler

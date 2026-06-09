@@ -663,10 +663,6 @@ class RecoveryService:
 
     @staticmethod
     def _format_exception(exc: Exception) -> tuple[str, str, bool]:
-        # Rate-limit / 503 / LLM Timeout / connection & 5xx after inner retries:
-        # orchestrator recovers without model help. Same mechanism as auth failures:
-        # emit for HUD/toast but omit from LLM context (see
-        # ContextMemory._process_observation notify_ui_only guard).
         notify_ui_only = (
             isinstance(
                 exc,
@@ -675,68 +671,75 @@ class RecoveryService:
             or isinstance(exc, _RATE_LIMITED_EXCEPTIONS)
             or isinstance(exc, _TRANSIENT_LLM_INFRA_EXCEPTIONS)
         )
-        err_id = 'AGENT_STEP_EXCEPTION'
-        if isinstance(exc, Timeout):
-            err_id = 'LLM_TIMEOUT'
-        elif isinstance(exc, LLMContextWindowExceedError | ContextWindowExceededError):
-            err_id = 'LLM_CONTEXT_WINDOW_EXCEEDED'
-        elif isinstance(exc, AgentRuntimeDisconnectedError):
-            err_id = 'AGENT_RUNTIME_DISCONNECTED'
-        elif isinstance(exc, AgentRuntimeError):
-            err_id = 'AGENT_RUNTIME_ERROR'
-
-        if isinstance(exc, AuthenticationError):
-            model = getattr(exc, 'model', None) or '?'
-            provider = getattr(exc, 'llm_provider', None) or '?'
-            text = (
-                f'{exc}\n'
-                f'The LLM provider ({provider}) rejected access to model "{model}".\n'
-                f'Run /settings to update your model or API key.'
-            )
-        elif isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
-            rate_kind = getattr(exc, 'kind', None)
-            retry_after = getattr(exc, 'retry_after', None)
-            text = _format_rate_limit_text(exc, rate_kind, retry_after)
-        else:
-            text = f'{type(exc).__name__}: {exc}'
-
-        # Hard stops need user action; survivable errors get guidance for the model.
-        if isinstance(exc, AgentRuntimeDisconnectedError):
-            guidance = (
-                'The agent runtime has disconnected or failed to initialize. '
-                'This is a persistent state that requires a session reset or '
-                'infrastructure check. CONTROL IS RETURNED TO USER.'
-            )
-        elif isinstance(exc, AuthenticationError):
-            guidance = ''
-        elif isinstance(exc, _HARD_STOP_EXCEPTIONS):
-            guidance = (
-                'This error requires user intervention (check credentials, model name, '
-                'or context window). Wait for the user to fix the configuration.'
-            )
-        elif isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
-            rate_kind = getattr(exc, 'kind', None)
-            retry_after = getattr(exc, 'retry_after', None)
-            guidance = _format_rate_limit_guidance(rate_kind, retry_after)
-        elif isinstance(exc, Timeout):
-            guidance = (
-                'The provider timed out on this step. Automatic backoff and retry '
-                'will run if the retry queue is available; otherwise the agent will '
-                'return to the prompt.'
-            )
-        elif isinstance(exc, _TRANSIENT_LLM_INFRA_EXCEPTIONS):
-            guidance = (
-                'Transient provider or network issue; the runtime retries automatically. '
-                'No change to your approach is required unless this keeps failing.'
-            )
-        else:
-            guidance = (
-                'A transient error occurred on this step. The error has been recorded. '
-                'Review what went wrong, choose a different approach or tool, and continue.'
-            )
+        err_id = _resolve_error_id(exc)
+        text = _format_error_text(exc)
+        guidance = _format_error_guidance(exc)
         if guidance:
             text = f'{text}\n\n{guidance}'
         return text, err_id, notify_ui_only
+
+
+def _resolve_error_id(exc: Exception) -> str:
+    if isinstance(exc, Timeout):
+        return 'LLM_TIMEOUT'
+    if isinstance(exc, LLMContextWindowExceedError | ContextWindowExceededError):
+        return 'LLM_CONTEXT_WINDOW_EXCEEDED'
+    if isinstance(exc, AgentRuntimeDisconnectedError):
+        return 'AGENT_RUNTIME_DISCONNECTED'
+    if isinstance(exc, AgentRuntimeError):
+        return 'AGENT_RUNTIME_ERROR'
+    return 'AGENT_STEP_EXCEPTION'
+
+
+def _format_error_text(exc: Exception) -> str:
+    if isinstance(exc, AuthenticationError):
+        model = getattr(exc, 'model', None) or '?'
+        provider = getattr(exc, 'llm_provider', None) or '?'
+        return (
+            f'{exc}\n'
+            f'The LLM provider ({provider}) rejected access to model "{model}".\n'
+            f'Run /settings to update your model or API key.'
+        )
+    if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
+        return _format_rate_limit_text(
+            exc, getattr(exc, 'kind', None), getattr(exc, 'retry_after', None)
+        )
+    return f'{type(exc).__name__}: {exc}'
+
+
+def _format_error_guidance(exc: Exception) -> str:
+    if isinstance(exc, AgentRuntimeDisconnectedError):
+        return (
+            'The agent runtime has disconnected or failed to initialize. '
+            'This is a persistent state that requires a session reset or '
+            'infrastructure check. CONTROL IS RETURNED TO USER.'
+        )
+    if isinstance(exc, AuthenticationError):
+        return ''
+    if isinstance(exc, _HARD_STOP_EXCEPTIONS):
+        return (
+            'This error requires user intervention (check credentials, model name, '
+            'or context window). Wait for the user to fix the configuration.'
+        )
+    if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
+        return _format_rate_limit_guidance(
+            getattr(exc, 'kind', None), getattr(exc, 'retry_after', None)
+        )
+    if isinstance(exc, Timeout):
+        return (
+            'The provider timed out on this step. Automatic backoff and retry '
+            'will run if the retry queue is available; otherwise the agent will '
+            'return to the prompt.'
+        )
+    if isinstance(exc, _TRANSIENT_LLM_INFRA_EXCEPTIONS):
+        return (
+            'Transient provider or network issue; the runtime retries automatically. '
+            'No change to your approach is required unless this keeps failing.'
+        )
+    return (
+        'A transient error occurred on this step. The error has been recorded. '
+        'Review what went wrong, choose a different approach or tool, and continue.'
+    )
 
 
 def _format_rate_limit_text(exc: Exception, rate_kind, retry_after) -> str:

@@ -38,17 +38,7 @@ class _ExecutorLifecycleMixin:
 
         input_limit = self._llm_input_token_limit()
         output_limit = self._llm_output_token_limit()
-
-        total_limit = 0
-        context_window = getattr(self._llm, 'context_window', None)
-        if callable(context_window):
-            with contextlib.suppress(Exception):
-                total_limit = self._positive_int(context_window()) or 0
-        if total_limit <= 0:
-            if input_limit > 0 and output_limit is not None:
-                total_limit = input_limit + output_limit
-            else:
-                total_limit = input_limit
+        total_limit = self._resolve_total_limit(input_limit, output_limit)
 
         if input_limit <= 0 and total_limit <= 0:
             return call_params
@@ -75,28 +65,47 @@ class _ExecutorLifecycleMixin:
             )
 
         field_name, requested_completion = self._preflight_completion_field(call_params)
-        desired_completion = requested_completion
-        if output_limit is not None:
-            desired_completion = (
-                output_limit
-                if desired_completion is None
-                else min(desired_completion, output_limit)
-            )
+        desired = self._clamp_completion(
+            requested_completion, output_limit, available_completion, model_name
+        )
+        guarded = dict(call_params)
+        guarded[field_name] = desired
+        return guarded
 
-        if desired_completion is None:
-            desired_completion = available_completion
-        elif desired_completion > available_completion:
+    def _resolve_total_limit(self, input_limit: int, output_limit: int | None) -> int:
+        total_limit = 0
+        context_window = getattr(self._llm, 'context_window', None)
+        if callable(context_window):
+            with contextlib.suppress(Exception):
+                total_limit = self._positive_int(context_window()) or 0
+        if total_limit <= 0:
+            if input_limit > 0 and output_limit is not None:
+                total_limit = input_limit + output_limit
+            else:
+                total_limit = input_limit
+        return total_limit
+
+    @staticmethod
+    def _clamp_completion(
+        requested: int | None,
+        output_limit: int | None,
+        available: int,
+        model_name: str,
+    ) -> int:
+        desired = requested
+        if output_limit is not None:
+            desired = output_limit if desired is None else min(desired, output_limit)
+        if desired is None:
+            return available
+        if desired > available:
             logger.warning(
                 'Clamping completion budget from %d to %d tokens for %s to stay within the context window',
-                desired_completion,
-                available_completion,
+                desired,
+                available,
                 model_name,
             )
-            desired_completion = available_completion
-
-        guarded = dict(call_params)
-        guarded[field_name] = desired_completion
-        return guarded
+            return available
+        return desired
 
     @staticmethod
     def _checkpoint_anchor_event_id(event_stream: EventStream | None) -> int | None:

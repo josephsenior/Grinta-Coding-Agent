@@ -94,64 +94,71 @@ class SmartChunker:
             header_level = len(line) - len(line.lstrip('#')) if is_header else 0
 
             if is_header and header_level <= 2 and current_section:
-                if current_size > 0:
-                    chunk_text = '\n'.join(current_section).strip()
-                    if chunk_text:
-                        chunks.append(
-                            DocumentChunk(
-                                id=f'{document_id}_chunk_{chunk_index}',
-                                document_id=document_id,
-                                chunk_index=chunk_index,
-                                content=chunk_text,
-                                metadata={
-                                    **(metadata or {}),
-                                    '_section_type': 'markdown_header',
-                                },
-                            )
-                        )
-                        chunk_index += 1
+                chunk_index, current_section, current_size = self._flush_section(
+                    chunks, current_section, chunk_index, document_id, metadata,
+                    'markdown_header', max_size,
+                )
                 current_section = [line]
                 current_size = len(line)
+            elif current_size + len(line) + 1 > max_size and current_section:
+                chunk_index, current_section, current_size = self._flush_section(
+                    chunks, current_section, chunk_index, document_id, metadata,
+                    'markdown_body', max_size, overlap, next_line=line,
+                )
             else:
-                if current_size + len(line) + 1 > max_size and current_section:
-                    chunk_text = '\n'.join(current_section).strip()
-                    if chunk_text:
-                        chunks.append(
-                            DocumentChunk(
-                                id=f'{document_id}_chunk_{chunk_index}',
-                                document_id=document_id,
-                                chunk_index=chunk_index,
-                                content=chunk_text,
-                                metadata={
-                                    **(metadata or {}),
-                                    '_section_type': 'markdown_body',
-                                },
-                            )
-                        )
-                        chunk_index += 1
-                        overlap_lines = current_section[-overlap // 50 :]
-                        current_section = overlap_lines + [line]
-                        current_size = sum(
-                            len(line_item) + 1 for line_item in current_section
-                        )
-                else:
-                    current_section.append(line)
-                    current_size += len(line) + 1
+                current_section.append(line)
+                current_size += len(line) + 1
 
         if current_section:
-            chunk_text = '\n'.join(current_section).strip()
-            if chunk_text:
-                chunks.append(
-                    DocumentChunk(
-                        id=f'{document_id}_chunk_{chunk_index}',
-                        document_id=document_id,
-                        chunk_index=chunk_index,
-                        content=chunk_text,
-                        metadata={**(metadata or {}), '_section_type': 'markdown_body'},
-                    )
-                )
+            self._append_chunk(
+                chunks, current_section, chunk_index, document_id, metadata, 'markdown_body'
+            )
 
         return chunks
+
+    def _flush_section(
+        self,
+        chunks: list[DocumentChunk],
+        section: list[str],
+        chunk_index: int,
+        document_id: str,
+        metadata: dict[str, Any] | None,
+        section_type: str,
+        max_size: int,
+        overlap: int = 0,
+        next_line: str | None = None,
+    ) -> tuple[int, list[str], int]:
+        chunk_text = '\n'.join(section).strip()
+        if chunk_text:
+            self._append_chunk(chunks, section, chunk_index, document_id, metadata, section_type)
+            chunk_index += 1
+        if next_line is not None and overlap > 0:
+            overlap_lines = section[-overlap // 50 :]
+            new_section = overlap_lines + [next_line]
+            new_size = sum(len(line_item) + 1 for line_item in new_section)
+            return chunk_index, new_section, new_size
+        return chunk_index, [], 0
+
+    def _append_chunk(
+        self,
+        chunks: list[DocumentChunk],
+        section: list[str],
+        chunk_index: int,
+        document_id: str,
+        metadata: dict[str, Any] | None,
+        section_type: str,
+    ) -> None:
+        chunk_text = '\n'.join(section).strip()
+        if chunk_text:
+            chunks.append(
+                DocumentChunk(
+                    id=f'{document_id}_chunk_{chunk_index}',
+                    document_id=document_id,
+                    chunk_index=chunk_index,
+                    content=chunk_text,
+                    metadata={**(metadata or {}), '_section_type': section_type},
+                )
+            )
 
     def chunk_json(
         self, content: str, document_id: str, metadata: dict[str, Any] | None
@@ -213,43 +220,22 @@ class SmartChunker:
         current_doc: list[str] = []
         current_size = 0
 
-        for i, line in enumerate(lines):
+        for line in lines:
             is_document_start = bool(re.match(r'^---\s*$', line))
-            bool(re.match(r'^-\s+', line))
-            bool(re.match(r'^[\w\-]+:\s', line))
 
             if is_document_start and current_doc:
-                chunk_text = '\n'.join(current_doc).strip()
-                if chunk_text:
-                    chunks.append(
-                        DocumentChunk(
-                            id=f'{document_id}_chunk_{chunk_index}',
-                            document_id=document_id,
-                            chunk_index=chunk_index,
-                            content=chunk_text,
-                            metadata={
-                                **(metadata or {}),
-                                '_section_type': 'yaml_document',
-                            },
-                        )
-                    )
-                    chunk_index += 1
+                chunk_index = self._flush_yaml_section(
+                    chunks, current_doc, chunk_index, document_id, metadata,
+                    'yaml_document',
+                )
                 current_doc = []
                 current_size = 0
 
             if current_size + len(line) + 1 > max_size and current_doc:
-                chunk_text = '\n'.join(current_doc).strip()
-                if chunk_text:
-                    chunks.append(
-                        DocumentChunk(
-                            id=f'{document_id}_chunk_{chunk_index}',
-                            document_id=document_id,
-                            chunk_index=chunk_index,
-                            content=chunk_text,
-                            metadata={**(metadata or {}), '_section_type': 'yaml_body'},
-                        )
-                    )
-                    chunk_index += 1
+                chunk_index = self._flush_yaml_section(
+                    chunks, current_doc, chunk_index, document_id, metadata,
+                    'yaml_body',
+                )
                 current_doc = []
                 current_size = 0
 
@@ -257,23 +243,30 @@ class SmartChunker:
             current_size += len(line) + 1
 
         if current_doc:
-            chunk_text = '\n'.join(current_doc).strip()
-            if chunk_text:
-                chunks.append(
-                    DocumentChunk(
-                        id=f'{document_id}_chunk_{chunk_index}',
-                        document_id=document_id,
-                        chunk_index=chunk_index,
-                        content=chunk_text,
-                        metadata={**(metadata or {}), '_section_type': 'yaml_body'},
-                    )
-                )
+            self._append_chunk(
+                chunks, current_doc, chunk_index, document_id, metadata, 'yaml_body'
+            )
 
         return (
             chunks
             if chunks
             else self.chunk_text_fallback(content, document_id, metadata)
         )
+
+    def _flush_yaml_section(
+        self,
+        chunks: list[DocumentChunk],
+        section: list[str],
+        chunk_index: int,
+        document_id: str,
+        metadata: dict[str, Any] | None,
+        section_type: str,
+    ) -> int:
+        chunk_text = '\n'.join(section).strip()
+        if chunk_text:
+            self._append_chunk(chunks, section, chunk_index, document_id, metadata, section_type)
+            return chunk_index + 1
+        return chunk_index
 
     def chunk_text_fallback(
         self, content: str, document_id: str, metadata: dict[str, Any] | None
