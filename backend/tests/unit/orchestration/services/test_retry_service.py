@@ -50,23 +50,53 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
     @patch('backend.orchestration.services.retry_service.get_retry_queue')
     @patch('backend.orchestration.services.retry_service.logger')
     async def test_initialize_no_event_loop(self, mock_logger, mock_get_queue):
-        """Test initialize warns when no event loop available."""
+        """Test initialize defers worker when no event loop is available."""
         mock_queue = MagicMock()
         mock_get_queue.return_value = mock_queue
 
-        # Create service without running loop
         service_no_loop = RetryService(self.mock_context)
 
-        # Call initialize outside async context
-        with patch(
-            'backend.orchestration.services.retry_service.asyncio.get_running_loop',
-            side_effect=RuntimeError('No loop'),
+        with (
+            patch(
+                'backend.orchestration.services.retry_service.asyncio.get_running_loop',
+                side_effect=RuntimeError('No loop'),
+            ),
+            patch(
+                'backend.utils.async_utils.get_main_event_loop',
+                return_value=None,
+            ),
         ):
             service_no_loop.initialize()
 
-        # Should log warning
-        mock_logger.warning.assert_called_once()
+        deferred_logged = any(
+            'deferred' in str(call).lower()
+            for call in mock_logger.debug.call_args_list
+        )
+        self.assertTrue(deferred_logged)
         self.assertIsNone(service_no_loop._retry_worker_task)
+
+    @patch('backend.orchestration.services.retry_service.get_retry_queue')
+    async def test_ensure_worker_started_after_deferred_init(self, mock_get_queue):
+        """Worker starts once the main loop is available."""
+        mock_queue = MagicMock()
+        mock_get_queue.return_value = mock_queue
+
+        service = RetryService(self.mock_context)
+        with (
+            patch(
+                'backend.orchestration.services.retry_service.asyncio.get_running_loop',
+                side_effect=RuntimeError('No loop'),
+            ),
+            patch(
+                'backend.utils.async_utils.get_main_event_loop',
+                return_value=None,
+            ),
+        ):
+            service.initialize()
+        self.assertIsNone(service._retry_worker_task)
+
+        service.ensure_worker_started()
+        self.assertIsNotNone(service._retry_worker_task)
 
     @patch('backend.orchestration.services.retry_service.get_retry_queue')
     async def test_initialize_with_queue(self, mock_get_queue):

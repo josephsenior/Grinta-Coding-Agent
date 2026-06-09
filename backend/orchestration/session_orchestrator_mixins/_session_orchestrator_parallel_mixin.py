@@ -310,13 +310,14 @@ class _SessionOrchestratorParallelMixin:
             return
 
         mm = getattr(self.agent, 'memory_manager', None)
-        if mm is None or getattr(mm, 'compactor', None) is None:
+        pipeline = getattr(mm, '_pipeline', None) if mm is not None else None
+        compactor = getattr(mm, 'compactor', None) if mm is not None else None
+        if mm is None or (pipeline is None and compactor is None):
             return
 
         import asyncio
         import copy as _copy_mod
 
-        compactor = mm.compactor
         state_copy = _copy_mod.copy(self.state)
         state_copy.history = list(history) if history else []
         state_copy.turn_signals = _copy_mod.deepcopy(self.state.turn_signals)
@@ -326,6 +327,8 @@ class _SessionOrchestratorParallelMixin:
 
         async def _run_bg():
             import inspect
+            if pipeline is not None:
+                return await pipeline.prewarm_compaction(state_copy)
             background_compact = getattr(compactor, 'compacted_history_background', None)
             if callable(background_compact):
                 background_result = background_compact(state_copy)

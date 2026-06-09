@@ -421,6 +421,9 @@ async def _execute_llm_step_async(
         orch.executor._state = state  # type: ignore[attr-defined]
         result = await orch.executor.async_execute(params, orch.event_stream)
         orch._consecutive_invalid_protocol_outputs = 0
+        pipeline = getattr(orch.memory_manager, '_pipeline', None)
+        if pipeline is not None and hasattr(pipeline, 'note_llm_step'):
+            pipeline.note_llm_step(state)
     except Exception:
         raise
 

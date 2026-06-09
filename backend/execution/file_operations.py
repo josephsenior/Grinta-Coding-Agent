@@ -53,93 +53,51 @@ def execute_file_editor(
     expected_hash: str | None = None,
     overwrite_existing: bool = False,
 ) -> tuple[str, tuple[str | None, str | None], dict[str, Any]]:
-    """Execute file editor command and handle exceptions."""
     insert_line, error_msg = _parse_insert_line(insert_line)
     if error_msg:
-        return (
-            error_msg,
-            (None, None),
-            {
-                'tool': 'file_edit',
-                'ok': False,
-                'error_code': 'INVALID_INSERT_LINE',
-                'retryable': False,
-            },
-        )
+        return _make_error_response(error_msg, 'INVALID_INSERT_LINE', False)
 
     result = _invoke_editor(
-        editor,
-        command,
-        path,
-        file_text,
-        view_range,
-        new_str,
-        old_string,
-        replace_all,
-        insert_line,
-        start_line,
-        end_line,
-        dry_run,
-        edit_mode=edit_mode,
-        expected_hash=expected_hash,
-        overwrite_existing=overwrite_existing,
+        editor, command, path, file_text, view_range, new_str, old_string,
+        replace_all, insert_line, start_line, end_line, dry_run,
+        edit_mode=edit_mode, expected_hash=expected_hash, overwrite_existing=overwrite_existing,
     )
 
     if result.error:
-        enriched_error = append_editor_recovery_guidance(
-            result.error,
-            path=path,
-            tool_name='file_edit',
-            content=file_text or new_str,
-        )
-        return (
-            f'ERROR:\n{enriched_error}',
-            (None, None),
-            {
-                'tool': 'file_edit',
-                'ok': False,
-                'error_code': result.error_code or 'EDITOR_ERROR',
-                'retryable': result.retryable,
-                'operation': result.operation or command,
-                'payload': result.metadata or {},
-                'verification_passed': bool(
-                    (result.metadata or {}).get('verification_passed', False)
-                ),
-            },
-        )
+        return _make_editor_error_response(result, path, file_text, new_str, command)
     if not result.output:
         logger.warning('No output from file edit pipeline for %s', path)
-        return (
-            '',
-            (None, None),
-            {
-                'tool': 'file_edit',
-                'ok': True,
-                'error_code': None,
-                'retryable': False,
-                'operation': result.operation or command,
-                'payload': result.metadata or {},
-                'verification_passed': bool(
-                    (result.metadata or {}).get('verification_passed', False)
-                ),
-            },
-        )
+        return _make_empty_response(result, command)
+    return _make_success_response(result)
 
-    return (
-        result.output,
-        (result.old_content, result.new_content),
-        {
-            'tool': 'file_edit',
-            'ok': True,
-            'error_code': None,
-            'retryable': False,
-            'operation': result.operation or command,
-            'payload': result.metadata or {},
-            'verification_passed': bool(
-                (result.metadata or {}).get('verification_passed', False)
-            ),
-        },
-    )
+
+def _make_error_response(error_msg: str, error_code: str, retryable: bool) -> tuple[str, tuple[None, None], dict[str, Any]]:
+    return (error_msg, (None, None), {'tool': 'file_edit', 'ok': False, 'error_code': error_code, 'retryable': retryable})
+
+
+def _make_editor_error_response(result: Any, path: str, file_text: str | None, new_str: str | None, command: str) -> tuple[str, tuple[None, None], dict[str, Any]]:
+    enriched_error = append_editor_recovery_guidance(result.error, path=path, tool_name='file_edit', content=file_text or new_str)
+    return (f'ERROR:\n{enriched_error}', (None, None), {
+        'tool': 'file_edit', 'ok': False, 'error_code': result.error_code or 'EDITOR_ERROR',
+        'retryable': result.retryable, 'operation': result.operation or command,
+        'payload': result.metadata or {}, 'verification_passed': bool((result.metadata or {}).get('verification_passed', False)),
+    })
+
+
+def _make_empty_response(result: Any, command: str) -> tuple[str, tuple[None, None], dict[str, Any]]:
+    return ('', (None, None), {
+        'tool': 'file_edit', 'ok': True, 'error_code': None, 'retryable': False,
+        'operation': result.operation or command, 'payload': result.metadata or {},
+        'verification_passed': bool((result.metadata or {}).get('verification_passed', False)),
+    })
+
+
+def _make_success_response(result: Any) -> tuple[str, tuple[str | None, str | None], dict[str, Any]]:
+    return (result.output, (result.old_content, result.new_content), {
+        'tool': 'file_edit', 'ok': True, 'error_code': None, 'retryable': False,
+        'operation': result.operation, 'payload': result.metadata or {},
+        'verification_passed': bool((result.metadata or {}).get('verification_passed', False)),
+    })
 
 
 def _parse_insert_line(insert_line: int | str | None) -> tuple[int | None, str | None]:
@@ -297,40 +255,37 @@ def _extract_error_context(
     tail_count: int,
     budget: int,
 ) -> list[str]:
-    """Extract error-context lines from the truncated middle of output.
-
-    Scans the middle section (between head and tail) for lines matching
-    error/traceback keywords and returns up to ``budget`` characters worth,
-    with ±2 surrounding lines for context.
-    """
+    """Extract error-context lines from the truncated middle of output."""
     if head_count + tail_count >= len(lines):
         return []
 
-    middle_start = head_count
-    middle_end = len(lines) - tail_count
-    middle = lines[middle_start:middle_end]
-
-    # Find indices of error lines within the middle slice.
-    error_indices: list[int] = []
-    for i, line in enumerate(middle):
-        if _ERROR_LINE_RE.search(line):
-            error_indices.append(i)
-
+    middle = lines[head_count:len(lines) - tail_count]
+    error_indices = _find_error_line_indices(middle)
     if not error_indices:
         return []
 
-    # Expand each error index by ±2 lines for context, dedup via set.
+    selected = _expand_error_context(error_indices, len(middle))
+    return _collect_lines_within_budget(middle, selected, budget)
+
+
+def _find_error_line_indices(middle: list[str]) -> list[int]:
+    return [i for i, line in enumerate(middle) if _ERROR_LINE_RE.search(line)]
+
+
+def _expand_error_context(error_indices: list[int], middle_len: int) -> set[int]:
     selected: set[int] = set()
     for idx in error_indices:
         for offset in range(-2, 3):
             pos = idx + offset
-            if 0 <= pos < len(middle):
+            if 0 <= pos < middle_len:
                 selected.add(pos)
+    return selected
 
-    # Collect lines in order, respecting budget.
+
+def _collect_lines_within_budget(middle: list[str], selected: set[int], budget: int) -> list[str]:
     result: list[str] = []
     chars = 0
-    prev_idx = -2  # sentinel for gap detection
+    prev_idx = -2
     for idx in sorted(selected):
         line = middle[idx]
         if chars + len(line) > budget:
@@ -344,7 +299,6 @@ def _extract_error_context(
         result.append(line)
         chars += len(line)
         prev_idx = idx
-
     return result
 
 

@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from backend.ledger.event.event_filter import EventFilter
     from backend.persistence.files import FileStore
 
+_SEARCH_ABORT = object()
+
 
 def _verify_event_checksum(data: dict, event_id: int) -> None:
     """Verify integrity checksum if present; raise ValueError on mismatch."""
@@ -105,10 +107,14 @@ class EventStore(EventStoreABC):
                         'events.db',
                     )
                     store = SQLiteEventStore(db_path=db_path)
-                    verify_checksums = str(
-                        os.getenv('GRINTA_SYNC_CHECKSUM_REPAIR', '')
-                    ).lower() in ('1', 'true', 'yes')
-                    if store.check_integrity(verify_checksums=verify_checksums):
+                    repaired = store.repair_event_checksums()
+                    if repaired:
+                        logger.info(
+                            'Repaired %d SQLite event checksum(s) for session %s at init',
+                            repaired,
+                            self.sid,
+                        )
+                    if store.check_integrity(verify_checksums=True):
                         self._sqlite_store = store
                     else:
                         store.close()
@@ -305,16 +311,14 @@ class EventStore(EventStoreABC):
             if not cache_page.covers(index):
                 cache_page = self._load_cache_page_for_index(index)
 
-            event = self._load_event_with_corruption_guard(
+            load_result = self._load_event_with_corruption_guard(
                 index, cache_page, corrupt_seen, max_corrupt
             )
-            if event is None:
-                continue
-            if isinstance(event, bool):
+            if load_result is _SEARCH_ABORT:
                 return
-            corrupt_seen = event[1]
-
-            event_obj = event[0]
+            event_obj, corrupt_seen = load_result
+            if event_obj is None:
+                continue
             if event_filter and not event_filter.include(event_obj):
                 continue
 
@@ -325,7 +329,7 @@ class EventStore(EventStoreABC):
 
     def _load_event_with_corruption_guard(
         self, index: int, cache_page: Any, corrupt_seen: int, max_corrupt: int
-    ) -> Event | None | tuple[None, int]:
+    ) -> tuple[Event | None, int] | object:
         try:
             event = self._get_event_from_cache_or_storage(index, cache_page)
         except (json.JSONDecodeError, ValueError) as exc:
@@ -340,9 +344,9 @@ class EventStore(EventStoreABC):
                     'Aborting event search for %s: %s consecutive corrupt events',
                     self.sid, max_corrupt,
                 )
-                return True
+                return _SEARCH_ABORT
             return None, corrupt_seen
-        return event
+        return event, corrupt_seen
 
     def get_event(self, event_id: int) -> Event:
         """Get event by ID from persistent storage.

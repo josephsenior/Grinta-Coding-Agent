@@ -201,6 +201,37 @@ class TestEventStoreSearch:
 
         assert len(events) == 1
 
+    def test_search_events_returns_valid_event_after_corrupt_rows(self):
+        """Regression: success path must not subscript Event objects as tuples."""
+        from backend.ledger.event import EventSource
+        from backend.ledger.observation.agent import AgentStateChangedObservation
+
+        valid_obs = AgentStateChangedObservation(
+            content='',
+            agent_state='RUNNING',
+            reason='LOADING -> RUNNING',
+        )
+        valid_obs.id = 2
+        valid_obs.source = EventSource.ENVIRONMENT
+
+        def _mock_get_event(event_id):
+            if event_id in (0, 1):
+                raise ValueError('checksum mismatch')
+            if event_id == 2:
+                return valid_obs
+            raise FileNotFoundError(event_id)
+
+        fs = MagicMock()
+        fs.read.side_effect = FileNotFoundError
+        store = EventStore(sid='s1', file_store=fs, user_id=None)
+        store._cur_id = 3
+        store.get_event = _mock_get_event
+
+        events = list(store.search_events(start_id=0, end_id=3))
+        assert len(events) == 1
+        assert events[0].id == 2
+        assert isinstance(events[0], AgentStateChangedObservation)
+
     def test_search_events_skips_corrupt_events_continues(self):
         """Corrupt events are skipped and search continues to subsequent events."""
         action_dicts = [

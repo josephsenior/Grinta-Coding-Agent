@@ -193,11 +193,19 @@ class StateTransitionService:
         start_watchdog = getattr(controller, '_start_watchdog', None)
         stop_watchdog = getattr(controller, '_stop_watchdog', None)
 
-        if new_state == AgentState.RUNNING and callable(start_watchdog):
-            try:
-                start_watchdog()
-            except Exception:
-                pass
+        if new_state == AgentState.RUNNING:
+            if callable(start_watchdog):
+                try:
+                    start_watchdog()
+                except Exception:
+                    pass
+            retry_service = getattr(controller, 'retry_service', None)
+            ensure_worker = getattr(retry_service, 'ensure_worker_started', None)
+            if callable(ensure_worker):
+                try:
+                    ensure_worker()
+                except Exception:
+                    pass
         elif (
             old_state == AgentState.RUNNING
             and new_state != AgentState.RUNNING

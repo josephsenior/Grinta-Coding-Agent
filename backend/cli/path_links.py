@@ -93,11 +93,7 @@ def linkify_plain(
             out.append(s[pos:start], style=base)
         raw_seg = m.group(0)
         seg, trail = _strip_trailing_punct(raw_seg)
-        link: str | None = None
-        if want_url and seg.lower().startswith(('http://', 'https://')):
-            link = seg
-        elif want_file and not seg.lower().startswith(('http://', 'https://')):
-            link = _to_file_uri(seg)
+        link = _resolve_link(seg, want_url, want_file)
         if link:
             out.append(seg, style=base.update_link(link))
             if trail:
@@ -108,3 +104,11 @@ def linkify_plain(
     if pos < len(s):
         out.append(s[pos:], style=base)
     return out
+
+
+def _resolve_link(seg: str, want_url: bool, want_file: bool) -> str | None:
+    if want_url and seg.lower().startswith(('http://', 'https://')):
+        return seg
+    if want_file and not seg.lower().startswith(('http://', 'https://')):
+        return _to_file_uri(seg)
+    return None

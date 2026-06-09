@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from backend.context.context_budget import ContextBudget
+from backend.context.context_budget import ContextBudget, record_post_compact_baseline
 from backend.core.constants import DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import EventSource
@@ -33,3 +33,31 @@ def test_should_autocompact_when_estimate_exceeds_threshold():
     huge = _user_event('x' * 50_000, 1)
     budget = ContextBudget.from_events([huge], llm_config=llm_config)
     assert budget.should_autocompact is True
+
+
+def test_post_compact_estimate_uses_post_boundary_events_not_api_tokens():
+    llm_config = SimpleNamespace(max_input_tokens=200_000, model='claude-test')
+    state = MagicMock()
+    state.extra_data = {}
+    events = [_user_event('hello', 1)]
+    for i in range(2, 52):
+        events.append(_user_event(f'chunk {i} ' * 50, i))
+
+    def _set_extra(key, value, source='test'):
+        state.extra_data[key] = value
+
+    state.set_extra = _set_extra
+    state.metrics = SimpleNamespace(
+        token_usages=[SimpleNamespace(prompt_tokens=500_000, total_tokens=500_000)]
+    )
+
+    pre_compact = ContextBudget.from_events(events, llm_config=llm_config, state=state)
+    assert pre_compact.estimated_tokens > 500_000
+
+    post_boundary = events[-10:]
+    record_post_compact_baseline(state, post_boundary)
+    post_compact = ContextBudget.from_events(
+        post_boundary, llm_config=llm_config, state=state
+    )
+    assert post_compact.estimated_tokens < pre_compact.estimated_tokens // 2
+    assert post_compact.estimated_tokens < 500_000

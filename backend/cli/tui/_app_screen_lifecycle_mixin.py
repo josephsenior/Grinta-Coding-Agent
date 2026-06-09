@@ -241,6 +241,10 @@ class _AppScreenLifecycleMixin:
 
             set_main_event_loop(self._loop)
             _tui_logger.debug(f'_bootstrap: set_main_event_loop to {self._loop}')
+            retry_service = getattr(controller, 'retry_service', None)
+            ensure_worker = getattr(retry_service, 'ensure_worker_started', None)
+            if callable(ensure_worker):
+                ensure_worker()
 
             await self._bootstrap_setup_renderer(event_stream, controller)
             _tui_logger.debug('_bootstrap: done')

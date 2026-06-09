@@ -352,65 +352,52 @@ class OrchestratorPlanner:
         tools: list[ChatCompletionToolParam],
     ) -> dict:
         tool_choice = self._determine_tool_choice(messages, state)
-
-        # NOTE: We inject control/status messages *after* tool selection so
-        # tool selection heuristics see the original user/assistant content.
-
         messages = self._inject_turn_status(messages, state)
         mode = self._active_mode_for_state(state)
         tools = self._filter_tools_for_mode(tools, mode)
         messages = self._inject_mode_instructions(messages, state, mode)
         _maybe_log_prompt_metrics(messages)
         self._warn_if_degraded_emergency_prompt(messages)
+        self._log_debug_mode_info(messages, state, mode)
 
-        # APP_DEBUG_MODE=1 logs what the model actually sees each turn:
-        # the resolved mode and the injected mode instruction
-        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in (
-            '1',
-            'true',
-            'yes',
-            'on',
-        ):
-            mode_injected = None
-            for i in range(len(messages) - 1, -1, -1):
-                messages[i].get('role', '')
-                content = messages[i].get('content', '')
-                if isinstance(content, str) and '===' in content and 'MODE' in content:
-                    mode_injected = content[:200]
-                    break
-            logger.info(
-                '[APP_DEBUG_MODE] turn mode=%s active_run_mode=%s | injected_msg=%r',
-                mode,
-                (getattr(state, 'extra_data', {}) or {}).get('active_run_mode', 'N/A'),
-                mode_injected,
-            )
-
-        params: dict[str, Any] = {
-            'messages': messages,
-            'stream': True,
-        }
-
-        # ── Tool routing ─────────────────────────────────────────────
-        # All normal tools are native provider function calls.
-        native_tools, xml_tools = self.partition_tools(tools)
-
-        if self._llm_supports_function_calling():
-            self._refresh_checked_tools_cache(native_tools)
-            params['tools'] = self._checked_tools_cache
-
-        if xml_tools:
-            messages = self._inject_xml_tool_descriptions(messages, xml_tools)
-            params['messages'] = messages
-
-        if 'tools' in params and tool_choice and self._llm_supports_tool_choice():
-            params['tool_choice'] = tool_choice
-
+        params: dict[str, Any] = {'messages': messages, 'stream': True}
+        params = self._configure_tool_routing(params, tools, messages, tool_choice)
         params['extra_body'] = {
             'metadata': state.to_llm_metadata(
                 model_name=(self._llm.config.model or '').strip() or 'unknown',
                 agent_name=getattr(state, 'agent_name', 'Orchestrator'),
             )
         }
+        return params
+
+    def _log_debug_mode_info(self, messages: list, state: State, mode: str) -> None:
+        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() not in ('1', 'true', 'yes', 'on'):
+            return
+        mode_injected = None
+        for i in range(len(messages) - 1, -1, -1):
+            content = messages[i].get('content', '')
+            if isinstance(content, str) and '===' in content and 'MODE' in content:
+                mode_injected = content[:200]
+                break
+        logger.info(
+            '[APP_DEBUG_MODE] turn mode=%s active_run_mode=%s | injected_msg=%r',
+            mode,
+            (getattr(state, 'extra_data', {}) or {}).get('active_run_mode', 'N/A'),
+            mode_injected,
+        )
+
+    def _configure_tool_routing(
+        self, params: dict, tools: list, messages: list, tool_choice: str
+    ) -> dict:
+        native_tools, xml_tools = self.partition_tools(tools)
+        if self._llm_supports_function_calling():
+            self._refresh_checked_tools_cache(native_tools)
+            params['tools'] = self._checked_tools_cache
+        if xml_tools:
+            messages = self._inject_xml_tool_descriptions(messages, xml_tools)
+            params['messages'] = messages
+        if 'tools' in params and tool_choice and self._llm_supports_tool_choice():
+            params['tool_choice'] = tool_choice
         return params
 
     @staticmethod

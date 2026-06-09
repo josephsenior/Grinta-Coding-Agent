@@ -141,85 +141,34 @@ class ActionScheduler:
     # ------------------------------------------------------------------
 
     def decide_parallel_batch(self, actions: list[Any]) -> ParallelBatchDecision:
-        """Return a parallel-execution decision for the pending *actions*.
-
-        The decision is conservative: when the policy cannot guarantee safety,
-        ``should_execute_parallel`` is ``False`` and the caller falls through
-        to sequential execution.
-        """
         if not self.enabled:
-            return ParallelBatchDecision(
-                should_execute_parallel=False,
-                actions=(),
-                reason='parallel_disabled',
-            )
-
+            return ParallelBatchDecision(should_execute_parallel=False, actions=(), reason='parallel_disabled')
         if len(actions) < 2:
-            return ParallelBatchDecision(
-                should_execute_parallel=False,
-                actions=(),
-                reason='insufficient_actions',
-            )
+            return ParallelBatchDecision(should_execute_parallel=False, actions=(), reason='insufficient_actions')
 
-        # Classify every action.
-        classified: list[tuple[str | None, str | None]] = [
-            (self._classify(a), self._resource_key(a)) for a in actions
-        ]
-
+        classified = [(self._classify(a), self._resource_key(a)) for a in actions]
         categories = {c for c, _ in classified}
 
-        # Any action that is None (opaque MCP tool, legacy run, etc.) forces
-        # the entire batch to sequential.
         if None in categories:
-            return ParallelBatchDecision(
-                should_execute_parallel=False,
-                actions=(),
-                reason='mixed_batch_sequential',
-            )
-
-        # All read-only → parallel irrespective of mix.
+            return ParallelBatchDecision(should_execute_parallel=False, actions=(), reason='mixed_batch_sequential')
         if categories == {'read_only'}:
-            capped = tuple(actions[: self.max_parallel_batch_size])
-            overflow = tuple(actions[self.max_parallel_batch_size :])
-            reason = (
-                'parallel_safe_batch' if not overflow else 'parallel_safe_batch_capped'
-            )
-            return ParallelBatchDecision(
-                should_execute_parallel=True,
-                actions=capped,
-                reason=reason,
-                overflow=overflow,
-            )
+            return self._make_parallel_decision(actions)
+        if len(categories) == 1 and self._no_resource_conflicts(classified):
+            return self._make_parallel_decision(actions)
 
-        # All actions share the same side-effect category → check resources.
-        if len(categories) == 1:
-            resource_keys = [k for _, k in classified]
-            seen: set[str] = set()
-            for rk in resource_keys:
-                if rk is not None:
-                    if rk in seen:
-                        return ParallelBatchDecision(
-                            should_execute_parallel=False,
-                            actions=(),
-                            reason='same_resource_conflict',
-                        )
-                    seen.add(rk)
+        return ParallelBatchDecision(should_execute_parallel=False, actions=(), reason='mixed_batch_sequential')
 
-            capped = tuple(actions[: self.max_parallel_batch_size])
-            overflow = tuple(actions[self.max_parallel_batch_size :])
-            reason = (
-                'parallel_safe_batch' if not overflow else 'parallel_safe_batch_capped'
-            )
-            return ParallelBatchDecision(
-                should_execute_parallel=True,
-                actions=capped,
-                reason=reason,
-                overflow=overflow,
-            )
+    def _make_parallel_decision(self, actions: list[Any]) -> ParallelBatchDecision:
+        capped = tuple(actions[: self.max_parallel_batch_size])
+        overflow = tuple(actions[self.max_parallel_batch_size:])
+        reason = 'parallel_safe_batch' if not overflow else 'parallel_safe_batch_capped'
+        return ParallelBatchDecision(should_execute_parallel=True, actions=capped, reason=reason, overflow=overflow)
 
-        # Mixed categories (e.g. read_only + file_write) → sequential.
-        return ParallelBatchDecision(
-            should_execute_parallel=False,
-            actions=(),
-            reason='mixed_batch_sequential',
-        )
+    def _no_resource_conflicts(self, classified: list[tuple[str | None, str | None]]) -> bool:
+        seen: set[str] = set()
+        for _, rk in classified:
+            if rk is not None and rk in seen:
+                return False
+            if rk is not None:
+                seen.add(rk)
+        return True

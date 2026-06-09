@@ -33,20 +33,32 @@ class RetryService:
     # Public API
     # ------------------------------------------------------------------ #
     def initialize(self) -> None:
-        """Start background retry worker if retry queue is enabled.
-
-        Recovers any retry tasks that were persisted to sidecar files
-        during a previous crash so they are not silently lost.
-        """
+        """Recover persisted retries; defer worker start until the main loop runs."""
         self._retry_queue = get_retry_queue()
         if not self._retry_queue:
             return
         self._recover_crashed_retries()
+        self.ensure_worker_started()
+
+    def ensure_worker_started(self) -> None:
+        """Start the retry worker on the main event loop when available."""
+        if self._retry_queue is None:
+            self._retry_queue = get_retry_queue()
+        if not self._retry_queue:
+            return
+        if self._retry_worker_task is not None and not self._retry_worker_task.done():
+            return
+
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            logger.warning(
-                'Retry queue enabled but no running event loop; worker for %s not started',
+            from backend.utils.async_utils import get_main_event_loop
+
+            loop = get_main_event_loop()
+
+        if loop is None or not loop.is_running():
+            logger.debug(
+                'Retry queue enabled but no running event loop; worker for %s deferred',
                 self.controller.id,
             )
             return
@@ -55,15 +67,17 @@ class RetryService:
             try:
                 await self._retry_worker()
             except Exception as exc:  # pragma: no cover - logged for diagnostics
-                # CancelledError propagates; only log/handle Exception
                 logger.exception(
                     'Retry worker crashed for controller %s: %s',
                     self.controller.id,
                     exc,
                 )
 
-        self._retry_worker_task = loop.create_task(
-            _worker_wrapper(), name=f'app-retry-worker-{self.controller.id}'
+        from backend.utils.async_utils import create_tracked_task
+
+        self._retry_worker_task = create_tracked_task(
+            _worker_wrapper(),
+            name=f'app-retry-worker-{self.controller.id}',
         )
         self._task_loop = loop
         logger.debug('Retry worker started for controller %s', self.controller.id)

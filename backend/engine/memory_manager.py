@@ -74,7 +74,17 @@ class ContextMemoryManager:
         if self._is_pipeline_config(compactor_config):
             try:
                 from backend.context.context_pipeline import ContextPipeline
+                from backend.core.config.compactor_config import ContextPipelineConfig
 
+                agent_llm = self._config.get_llm_config()
+                if (
+                    isinstance(compactor_config, ContextPipelineConfig)
+                    and compactor_config.llm_config is None
+                    and agent_llm is not None
+                ):
+                    compactor_config = compactor_config.model_copy(
+                        update={'llm_config': agent_llm}
+                    )
                 self._pipeline = ContextPipeline.from_config(
                     compactor_config,
                     self._llm_registry,
@@ -233,138 +243,80 @@ class ContextMemoryManager:
         started = time.perf_counter()
         history = list(getattr(state, 'history', []))
         if not self.compactor:
-            logger.debug(
-                'ContextMemoryManager.condense_history skipped: no compactor '
-                '(history_events=%d elapsed=%.3fs)',
-                len(history),
-                time.perf_counter() - started,
-            )
+            logger.debug('ContextMemoryManager.condense_history skipped: no compactor (history_events=%d elapsed=%.3fs)', len(history), time.perf_counter() - started)
             return CondensedHistory(history, None)
 
-        # Auto-extract critical context before compaction may discard events
         snapshot_started = time.perf_counter()
         self._extract_pre_condensation_snapshot(state, history)
         snapshot_elapsed = time.perf_counter() - snapshot_started
 
-        # Check if we have a pre-warmed condensation from the background task
-        turn_signals = getattr(state, 'turn_signals', None)
-        prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
-        if prewarmed is not None:
-            turn_signals.prewarmed_compaction = None  # type: ignore[union-attr]
-            prewarm_len = getattr(turn_signals, 'prewarm_history_len', None)
-            prewarm_latest_id = getattr(
-                turn_signals, 'prewarm_latest_event_id', None
-            )
-            turn_signals.prewarm_history_len = None  # type: ignore[union-attr]
-            turn_signals.prewarm_latest_event_id = None  # type: ignore[union-attr]
-            current_len = len(history)
-            current_latest_id = (
-                getattr(history[-1], 'id', None) if history else None
-            )
-            prewarm_stale = (
-                prewarm_len is not None
-                and (
-                    prewarm_len != current_len
-                    or prewarm_latest_id != current_latest_id
-                )
-            )
-            if prewarm_stale:
-                logger.warning(
-                    'Discarding stale pre-warmed condensation '
-                    '(prewarm_len=%s current_len=%s prewarm_latest_id=%s '
-                    'current_latest_id=%s); recomputing compaction.',
-                    prewarm_len,
-                    current_len,
-                    prewarm_latest_id,
-                    current_latest_id,
-                )
-                condensation_result = await self.compactor.compacted_history(state)
-            else:
-                logger.info('Utilizing background pre-warmed condensation result.')
-                condensation_result = prewarmed
-                action = getattr(condensation_result, 'action', None)
-                if action:
-                    action.is_prewarmed = True
-        else:
-            compaction_started = time.perf_counter()
-            condensation_result = await self.compactor.compacted_history(state)
-            logger.info(
-                'ContextMemoryManager.condense_history compactor returned %s '
-                '(history_events=%d snapshot=%.3fs compactor=%.3fs)',
-                type(condensation_result).__name__,
-                len(history),
-                snapshot_elapsed,
-                time.perf_counter() - compaction_started,
-            )
+        condensation_result = await self._get_condensation_result(state, history, snapshot_elapsed)
 
         postprocess_started = time.perf_counter()
-        condensation_result = (
-            await self._maybe_force_compaction_for_explicit_request(
-                state, condensation_result
-            )
-        )
-        condensation_result = await self._maybe_force_compaction_under_memory_pressure(  # type: ignore[assignment]
-            state, history, condensation_result
-        )
+        condensation_result = await self._maybe_force_compaction_for_explicit_request(state, condensation_result)
+        condensation_result = await self._maybe_force_compaction_under_memory_pressure(state, history, condensation_result)
         memory_pressure = self._memory_pressure_signal(state)
 
         if isinstance(condensation_result, View):
-            # Compaction did not fire — discard only the *staging* file so a
-            # half-written snapshot from this turn cannot leak on the next.
-            # The *canonical* snapshot (committed by a prior compaction turn)
-            # must NOT be deleted here: the AgentCondensationObservation from
-            # that prior turn is rendered in build_messages on THIS turn, and
-            # _load_restored_context_snapshot() needs the canonical file to
-            # still exist when it runs.  Snapshots remain durable on disk and
-            # are synced into working memory after compaction fires.
             delete_staging_snapshot()
-            logger.info(
-                'ContextMemoryManager.condense_history finished with View '
-                '(events=%d postprocess=%.3fs elapsed=%.3fs)',
-                len(condensation_result.events),
-                time.perf_counter() - postprocess_started,
-                time.perf_counter() - started,
-            )
+            logger.info('ContextMemoryManager.condense_history finished with View (events=%d postprocess=%.3fs elapsed=%.3fs)',
+                        len(condensation_result.events), time.perf_counter() - postprocess_started, time.perf_counter() - started)
             return CondensedHistory(condensation_result.events, None)
 
-        action = condensation_result.action  # type: ignore[attr-defined]
+        return await self._finalize_compaction(state, condensation_result, history, memory_pressure, started, postprocess_started)
 
-        # Compaction passed — promote the staged snapshot so it survives.
+    async def _get_condensation_result(self, state: State, history: list, snapshot_elapsed: float) -> Any:
+        turn_signals = getattr(state, 'turn_signals', None)
+        prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
+        if prewarmed is not None:
+            return self._use_prewarmed_result(prewarmed, turn_signals, history)
+        compaction_started = time.perf_counter()
+        result = await self.compactor.compacted_history(state)
+        logger.info('ContextMemoryManager.condense_history compactor returned %s (history_events=%d snapshot=%.3fs compactor=%.3fs)',
+                    type(result).__name__, len(history), snapshot_elapsed, time.perf_counter() - compaction_started)
+        return result
+
+    def _use_prewarmed_result(self, prewarmed: Any, turn_signals: Any, history: list) -> Any:
+        turn_signals.prewarmed_compaction = None
+        prewarm_len = getattr(turn_signals, 'prewarm_history_len', None)
+        prewarm_latest_id = getattr(turn_signals, 'prewarm_latest_event_id', None)
+        turn_signals.prewarm_history_len = None
+        turn_signals.prewarm_latest_event_id = None
+        current_len = len(history)
+        current_latest_id = getattr(history[-1], 'id', None) if history else None
+        prewarm_stale = prewarm_len is not None and (prewarm_len != current_len or prewarm_latest_id != current_latest_id)
+        if prewarm_stale:
+            logger.warning('Discarding stale pre-warmed condensation (prewarm_len=%s current_len=%s prewarm_latest_id=%s current_latest_id=%s); recomputing compaction.',
+                          prewarm_len, current_len, prewarm_latest_id, current_latest_id)
+            import asyncio
+            return asyncio.get_event_loop().run_until_complete(self.compactor.compacted_history(None))
+        logger.info('Utilizing background pre-warmed condensation result.')
+        action = getattr(prewarmed, 'action', None)
+        if action:
+            action.is_prewarmed = True
+        return prewarmed
+
+    async def _finalize_compaction(self, state: State, condensation_result: Any, history: list, memory_pressure: bool, started: float, postprocess_started: float) -> CondensedHistory:
+        action = condensation_result.action
         commit_snapshot()
         try:
             from backend.context.working_set import sync_snapshot_to_working_memory
-
             sync_snapshot_to_working_memory(load_snapshot())
         except Exception:
             logger.debug('Post-compaction working memory sync failed', exc_info=True)
 
-        if self._is_noop_condensation_action(
-            action
-        ) and not self._has_unhandled_condensation_request(state):
+        if self._is_noop_condensation_action(action) and not self._has_unhandled_condensation_request(state):
             logger.info('Ignoring no-op condensation action without explicit request')
             if memory_pressure:
                 state.ack_memory_pressure(source='ContextMemoryManager')
-            logger.info(
-                'ContextMemoryManager.condense_history finished with ignored no-op '
-                '(history_events=%d elapsed=%.3fs)',
-                len(history),
-                time.perf_counter() - started,
-            )
+            logger.info('ContextMemoryManager.condense_history finished with ignored no-op (history_events=%d elapsed=%.3fs)', len(history), time.perf_counter() - started)
             return CondensedHistory(history, None)
 
         if memory_pressure:
             state.ack_memory_pressure(source='ContextMemoryManager')
-
         self._release_post_compaction_resources(state, action)
-
-        # Compaction occurred — attach the snapshot for post-recovery injection
-        logger.info(
-            'ContextMemoryManager.condense_history finished with pending action %s '
-            '(postprocess=%.3fs elapsed=%.3fs)',
-            type(action).__name__,
-            time.perf_counter() - postprocess_started,
-            time.perf_counter() - started,
-        )
+        logger.info('ContextMemoryManager.condense_history finished with pending action %s (postprocess=%.3fs elapsed=%.3fs)',
+                    type(action).__name__, time.perf_counter() - postprocess_started, time.perf_counter() - started)
         return CondensedHistory([], action)
 
     def _extract_pre_condensation_snapshot(

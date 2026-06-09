@@ -171,40 +171,14 @@ class OrchestratorExecutor(
     ) -> ExecutionResult:
         """Execute LLM call with async interface natively streaming tokens."""
         checkpoint = self._get_checkpoint(event_stream)
-
         start_time = time.time()
         error_message: str | None = None
         self._step_cancelled = False
 
-        call_params = dict(params)
-        call_params.pop('stream', None)
-        call_params['stream'] = True
-        call_params = self._apply_context_window_preflight(call_params)
+        call_params = self._prepare_call_params(params)
+        self._log_debug_mode_tools(call_params)
 
-        # APP_DEBUG_MODE=1: log tools sent to LLM (same as execute for sync)
-        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in (
-            '1',
-            'true',
-            'yes',
-            'on',
-        ):
-            tool_list = call_params.get('tools', [])
-            tool_names = (
-                [t.get('function', {}).get('name', '?') for t in tool_list]
-                if tool_list
-                else []
-            )
-            active_mode = getattr(self, '_active_run_mode', 'N/A')
-            logger.info(
-                '[APP_DEBUG_MODE] async_execute: mode=%r tools=%r',
-                active_mode,
-                tool_names,
-            )
-
-        ckpt_token = checkpoint.begin(
-            call_params,
-            anchor_event_id=self._checkpoint_anchor_event_id(event_stream),
-        )
+        ckpt_token = checkpoint.begin(call_params, anchor_event_id=self._checkpoint_anchor_event_id(event_stream))
 
         response = None
         loop = asyncio.get_running_loop()
@@ -213,77 +187,69 @@ class OrchestratorExecutor(
         consume_task: asyncio.Task[Any] | None = None
 
         try:
-            logger.info('OrchestratorExecutor.async_execute: calling LLM.astream')
-            stream_iter = self._llm.astream(**call_params)
-            consume_task = loop.create_task(
-                self._consume_async_stream(
-                    stream_iter,
-                    call_params,
-                    event_stream,
-                    state,
-                )
-            )
-            self._active_stream_iter = stream_iter
-            self._active_stream_task = consume_task
-            await consume_task
-            if self._step_cancelled:
-                raise asyncio.CancelledError()
-            await self._flush_stream_paint_events(state, event_stream)
-            tool_calls_list = self._finalize_stream_tool_calls(state)
-            visible_accum = self._visible_stream_content(state.content_accumulate)
-            self._emit_final_stream_event(
-                event_stream,
-                state.content_accumulate,
-                visible_accum,
-                tool_calls_list,
-            )
-            response = self._build_streaming_response(
-                call_params,
-                visible_accum,
-                state.thinking_accumulate,
-                tool_calls_list,
-                state.streamed_usage,
-            )
-            self._record_streaming_metrics(response, start_time)
-
+            response = await self._execute_stream(call_params, event_stream, state, loop)
         except asyncio.CancelledError:
             self.cancel_step()
             checkpoint.discard()
             raise
         except Exception as exc:
-            from backend.inference.exceptions import LLMError, RateLimitError
-
-            # Explicitly catch RateLimitError to prevent it from being wrapped or swallowed
-            if isinstance(exc, RateLimitError):
-                logger.debug(
-                    'OrchestratorExecutor.async_execute: bubbling up RateLimitError natively'
-                )
-                raise
-            if isinstance(exc, LLMError):
-                raise
-            error_message = str(exc)
-            raise ModelProviderError(
-                'LLM streaming failed', context={'error': error_message}
-            ) from exc
+            response = self._handle_stream_error(exc, error_message)
         finally:
-            if consume_task is not None and self._active_stream_task is consume_task:
-                self._active_stream_task = None
-            if stream_iter is not None and self._active_stream_iter is stream_iter:
-                self._active_stream_iter = None
+            self._cleanup_stream_refs(consume_task, stream_iter)
 
         if response is None:
             raise ModelProviderError('LLM returned no response')
 
-        logger.info(
-            'OrchestratorExecutor.async_execute done in %.3fs', time.time() - start_time
-        )
-
+        logger.info('OrchestratorExecutor.async_execute done in %.3fs', time.time() - start_time)
         execution_time = time.time() - start_time
-        actions = self._without_blank_agent_messages(
-            self._response_to_actions(response)
-        )
-        checkpoint.commit(ckpt_token)
+        actions = self._without_blank_agent_messages(self._response_to_actions(response))
         return ExecutionResult(actions, response, execution_time, error_message)
+
+    def _prepare_call_params(self, params: dict) -> dict:
+        call_params = dict(params)
+        call_params.pop('stream', None)
+        call_params['stream'] = True
+        return self._apply_context_window_preflight(call_params)
+
+    def _log_debug_mode_tools(self, call_params: dict) -> None:
+        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() not in ('1', 'true', 'yes', 'on'):
+            return
+        tool_list = call_params.get('tools', [])
+        tool_names = [t.get('function', {}).get('name', '?') for t in tool_list] if tool_list else []
+        logger.info('[APP_DEBUG_MODE] async_execute: mode=%r tools=%r', getattr(self, '_active_run_mode', 'N/A'), tool_names)
+
+    async def _execute_stream(self, call_params: dict, event_stream: EventStream | None, state: _AsyncStreamingState, loop: Any) -> Any:
+        logger.info('OrchestratorExecutor.async_execute: calling LLM.astream')
+        stream_iter = self._llm.astream(**call_params)
+        consume_task = loop.create_task(self._consume_async_stream(stream_iter, call_params, event_stream, state))
+        self._active_stream_iter = stream_iter
+        self._active_stream_task = consume_task
+        await consume_task
+        if self._step_cancelled:
+            raise asyncio.CancelledError()
+        await self._flush_stream_paint_events(state, event_stream)
+        tool_calls_list = self._finalize_stream_tool_calls(state)
+        visible_accum = self._visible_stream_content(state.content_accumulate)
+        self._emit_final_stream_event(event_stream, state.content_accumulate, visible_accum, tool_calls_list)
+        response = self._build_streaming_response(call_params, visible_accum, state.thinking_accumulate, tool_calls_list, state.streamed_usage)
+        self._record_streaming_metrics(response, time.time())
+        return response
+
+    def _handle_stream_error(self, exc: Exception, error_message: str | None) -> None:
+        from backend.inference.exceptions import LLMError, RateLimitError
+        if isinstance(exc, RateLimitError):
+            logger.debug('OrchestratorExecutor.async_execute: bubbling up RateLimitError natively')
+            raise
+        if isinstance(exc, LLMError):
+            raise
+        error_message = str(exc)
+        raise ModelProviderError('LLM streaming failed', context={'error': error_message}) from exc
+
+    def _cleanup_stream_refs(self, consume_task: Any, stream_iter: Any) -> None:
+        if consume_task is not None and self._active_stream_task is consume_task:
+            self._active_stream_task = None
+        if stream_iter is not None and self._active_stream_iter is stream_iter:
+            self._active_stream_iter = None
 
 
 # ---------------------------------------------------------------------------

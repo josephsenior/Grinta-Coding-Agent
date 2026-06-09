@@ -1,4 +1,12 @@
-"""Integration-style test for unified context pipeline long sessions."""
+"""Integration-style test for unified context pipeline long sessions.
+
+Manual 45+ minute session replay checklist (workspace ``New folder (4)``):
+- CONDENSATION actions total < 20 (not hundreds of micro-prunes)
+- No burst of degraded boundary (5c) every few seconds
+- LLM calls completed grows steadily in the second half
+- No ON_EVENT_EXCEPTION at session start
+- No retry-queue worker warning after RUNNING
+"""
 
 from __future__ import annotations
 
@@ -96,24 +104,23 @@ async def test_six_hundred_event_pytest_session_commits_boundary_and_preserves_p
     )
 
     with (
-        patch('backend.context.context_pipeline.ContextBudget') as mock_budget,
         patch('backend.context.context_pipeline.commit_snapshot'),
         patch('backend.context.context_pipeline.delete_staging_snapshot'),
         patch('backend.context.context_pipeline.maybe_update'),
         patch('backend.context.context_pipeline.sync_snapshot_to_working_memory'),
         patch(
-            'backend.context.context_pipeline.build_compaction_summary',
-            return_value='# Session Memory\npytest: 2 failed, 10 passed',
+            'backend.context.context_pipeline.session_memory_exists',
+            return_value=False,
         ),
+        patch.object(pipeline, '_llm_config', return_value=llm_config),
     ):
-        mock_budget.from_events.return_value = SimpleNamespace(should_autocompact=True)
         condensed = await pipeline.prepare_step(state)
 
     assert condensed.pending_action is not None
     action = condensed.pending_action
     assert isinstance(action, CondensationAction)
     assert action.summary
-    assert 'pytest' in action.summary.lower() or 'failed' in action.summary.lower()
+    assert len(action.pruned) >= 20
 
     synthetic_history = [*events, action]
     projected = project_after_compact_boundary(synthetic_history)

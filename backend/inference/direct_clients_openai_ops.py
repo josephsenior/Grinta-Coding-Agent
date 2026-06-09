@@ -422,28 +422,31 @@ def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
     kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)
     kwargs = client._strip_unsupported_params(kwargs)
     kwargs['model'] = client.model_name
+
+    response = _call_openai_chat(client, messages, kwargs)
+    _warn_empty_response(response, client.model_name)
+    return _build_llm_response(response, client)
+
+
+def _call_openai_chat(client, messages, kwargs):
     try:
-        response = client.client.chat.completions.create(
-            messages=messages,  # type: ignore[arg-type]
-            **kwargs,
-        )
+        return client.client.chat.completions.create(messages=messages, **kwargs)
     except Exception as e:
         raise client._map_openai_error(e) from e
+
+
+def _warn_empty_response(response, model_name):
+    from backend.inference import direct_clients as dc
     if not getattr(response, 'choices', None) or len(response.choices) == 0:
+        from backend.inference.exceptions import BadRequestError
         raise BadRequestError(
             'OpenAI completion returned no choices',
-            llm_provider='openai',
-            model=client.model_name,
+            llm_provider='openai', model=model_name,
         )
     first = response.choices[0]
     msg = first.message
-    tool_calls = client._extract_openai_tool_calls(msg)
-
     content_value = getattr(msg, 'content', None)
-    if (
-        content_value is None
-        or (isinstance(content_value, str) and not content_value.strip())
-    ) and not tool_calls:
+    if (content_value is None or (isinstance(content_value, str) and not content_value.strip())):
         try:
             msg_dump = msg.model_dump() if hasattr(msg, 'model_dump') else str(msg)
         except Exception:
@@ -451,23 +454,25 @@ def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
         dc.logger.warning(
             'OpenAI-compatible completion returned empty message (no tool calls). '
             'model=%s finish_reason=%s msg=%s',
-            client.model_name,
-            getattr(first, 'finish_reason', None),
-            msg_dump,
+            model_name, getattr(first, 'finish_reason', None), msg_dump,
         )
+
+
+def _build_llm_response(response, client):
+    from backend.inference import direct_clients as dc
+    first = response.choices[0]
+    msg = first.message
     return dc.LLMResponse(
         content=msg.content or '',
         model=response.model,
         usage={
             'prompt_tokens': response.usage.prompt_tokens if response.usage else 0,
-            'completion_tokens': response.usage.completion_tokens
-            if response.usage
-            else 0,
+            'completion_tokens': response.usage.completion_tokens if response.usage else 0,
             'total_tokens': response.usage.total_tokens if response.usage else 0,
         },
         id=response.id,
         finish_reason=getattr(first, 'finish_reason', None) or '',
-        tool_calls=tool_calls,
+        tool_calls=client._extract_openai_tool_calls(msg),
     )
 
 

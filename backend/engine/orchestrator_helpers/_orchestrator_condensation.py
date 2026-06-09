@@ -51,6 +51,20 @@ def _emit_compaction_status_if_needed(orch: Orchestrator, state: State) -> bool:
     return True
 
 
+def _set_skip_compaction_flag(state: State) -> None:
+    """Mark pipeline state so ineffective compactions are skipped on the next turn."""
+    history = list(getattr(state, 'history', []))
+    latest_id = getattr(history[-1], 'id', None) if history else None
+    pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
+    if isinstance(latest_id, int):
+        pipe['skip_compaction_until_event_id'] = latest_id
+    count = pipe.get('consecutive_condensation_steps', 0)
+    if not isinstance(count, int):
+        count = 0
+    pipe['consecutive_condensation_steps'] = count + 1
+    state.set_extra('context_pipeline_state', pipe, source='OrchestratorCondensation')
+
+
 def _queue_post_condensation_recovery(orch: Orchestrator, task_text: str = '') -> None:
     """Queue a brief think action after condensation to break the re-condensation loop.
 
@@ -69,6 +83,9 @@ def _queue_post_condensation_recovery(orch: Orchestrator, task_text: str = '') -
     state.history already contains the original CondensationAction.
     """
     del task_text  # Currently unused; reserved for future personalization.
+    orch_state = getattr(orch, 'state', None)
+    if orch_state is not None:
+        _set_skip_compaction_flag(orch_state)
     orch.pending_actions.append(
         AgentThinkAction(thought='Memory condensed. Resuming task.')
     )

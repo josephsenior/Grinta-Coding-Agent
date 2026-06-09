@@ -335,18 +335,6 @@ def common_response_to_actions(
     mcp_tool_names: list[str] | None = None,
     xml_tool_names: frozenset[str] | None = None,
 ) -> list[Action]:
-    """Common implementation for converting model response to actions.
-
-    Supports hybrid tool calling: native provider tool_calls for simple
-    tools **plus** pseudo-XML ``<function=...>`` blocks in response content
-    for code-heavy tools (editors).  The ``xml_tool_names`` parameter
-    lists tool names expected via the XML transport.
-
-    When the model emits both native tool_calls and valid pseudo-XML for the
-    same code-heavy tool, the XML transport wins and duplicate native calls are
-    dropped.  Remaining native calls for code-heavy tools still raise a
-    directive error so the model re-emits using the XML format.
-    """
     validate_response_choices(response)
     assistant_msg = extract_assistant_message(response)
 
@@ -355,77 +343,68 @@ def common_response_to_actions(
     content_text = _raw_message_content_text(content)
     text_marker_tool_calls = _extract_text_marker_tool_calls_from_content(content_text)
 
-    # ── Parse pseudo-XML tool calls from content text ────────────────
-    xml_tool_calls: list[Any] = []
-    if xml_tool_names:
-        xml_tool_calls = _extract_xml_tool_calls_from_content(
-            content_text, xml_tool_names
-        )
+    xml_tool_calls = _parse_xml_tool_calls(content_text, xml_tool_names)
+    native_tool_calls = _deduplicate_xml_native_calls(native_tool_calls, xml_tool_calls, xml_tool_names)
+    _enforce_xml_compliance_if_needed(native_tool_calls, xml_tool_names)
 
-    # ── Prefer XML over duplicate native calls ───────────────────────
-    if xml_tool_names and native_tool_calls and xml_tool_calls:
-        native_tool_calls = _filter_native_tool_calls_superseded_by_xml(
-            native_tool_calls, xml_tool_calls, xml_tool_names
-        )
+    all_tool_calls = native_tool_calls + text_marker_tool_calls + xml_tool_calls
+    actions = _build_message_actions(content, all_tool_calls)
 
-    # ── Compliance guard ─────────────────────────────────────────────
-    # Reject native tool calls that target code-heavy tools.  These
-    # must use the XML transport so code is never JSON-encoded.
+    if all_tool_calls:
+        actions.extend(_build_tool_actions(assistant_msg, response, all_tool_calls, create_action_fn, combine_thought_fn, mcp_tool_names))
+    elif not actions:
+        actions.append(_empty_message_action())
+
+    return actions
+
+
+def _parse_xml_tool_calls(content_text: str, xml_tool_names: frozenset[str] | None) -> list[Any]:
+    if not xml_tool_names:
+        return []
+    return _extract_xml_tool_calls_from_content(content_text, xml_tool_names)
+
+
+def _deduplicate_xml_native_calls(
+    native_tool_calls: list, xml_tool_calls: list, xml_tool_names: frozenset[str] | None
+) -> list:
+    if not (xml_tool_names and native_tool_calls and xml_tool_calls):
+        return native_tool_calls
+    return _filter_native_tool_calls_superseded_by_xml(native_tool_calls, xml_tool_calls, xml_tool_names)
+
+
+def _enforce_xml_compliance_if_needed(native_tool_calls: list, xml_tool_names: frozenset[str] | None) -> None:
     if xml_tool_names and native_tool_calls:
         _enforce_xml_compliance(native_tool_calls, xml_tool_names)
 
-    all_tool_calls = native_tool_calls + text_marker_tool_calls + xml_tool_calls
 
-    actions: list[Action] = []
-
+def _build_message_actions(content: Any, all_tool_calls: list) -> list[Action]:
+    from backend.ledger.action import MessageAction
     text_content = _coerce_visible_message_content_text(content)
-    if text_content.strip():
-        from backend.ledger.action import MessageAction
+    if not text_content.strip():
+        return []
+    cot = ''
+    if not all_tool_calls:
+        cot = extract_redacted_thinking_inner(_raw_message_content_text(content)).strip()
+    return [MessageAction(
+        content=text_content, thought=cot, wait_for_response=False,
+        suppress_cli=False, transcript_only=bool(all_tool_calls),
+        final_response=not all_tool_calls,
+    )]
 
-        cot = ''
-        if not all_tool_calls:
-            cot = extract_redacted_thinking_inner(
-                _raw_message_content_text(content)
-            ).strip()
-        actions.append(
-            MessageAction(
-                content=text_content,
-                thought=cot,
-                wait_for_response=False,
-                suppress_cli=False,
-                transcript_only=bool(all_tool_calls),
-                final_response=not all_tool_calls,
-            )
-        )
 
-    if all_tool_calls:
-        # Pass mcp_tool_names through tool_call object for the factory function
-        for tc in all_tool_calls:
-            if not hasattr(tc, '_mcp_tool_names'):
-                tc._mcp_tool_names = mcp_tool_names
-            else:
-                tc._mcp_tool_names = mcp_tool_names
+def _build_tool_actions(
+    assistant_msg: Any, response: Any, all_tool_calls: list,
+    create_action_fn: Callable, combine_thought_fn: Callable, mcp_tool_names: list | None,
+) -> list[Action]:
+    for tc in all_tool_calls:
+        tc._mcp_tool_names = mcp_tool_names
+    assistant_msg.tool_calls = all_tool_calls
+    return process_tool_calls(assistant_msg, response, create_action_fn, extract_thought_from_message, combine_thought_fn)
 
-        # Replace the tool_calls on the assistant message so
-        # process_tool_calls sees the merged list.
-        assistant_msg.tool_calls = all_tool_calls
 
-        actions.extend(process_tool_calls(
-            assistant_msg,
-            response,
-            create_action_fn,
-            extract_thought_from_message,
-            combine_thought_fn,
-        ))
-    elif not actions:
-        from backend.ledger.action import MessageAction
-        actions.append(
-            MessageAction(
-                content='',
-                thought='',
-                wait_for_response=False,
-            )
-        )
+def _empty_message_action() -> Action:
+    from backend.ledger.action import MessageAction
+    return MessageAction(content='', thought='', wait_for_response=False)
 
     set_response_id_for_actions(actions, response)
     return actions
