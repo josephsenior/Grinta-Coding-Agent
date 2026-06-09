@@ -111,35 +111,44 @@ def _extract_post_edit_paths(
 
     action = ctx.action
     paths: list[str] = []
-
-    tool_result = getattr(observation, 'tool_result', None)
-    if isinstance(tool_result, dict):
-        files = tool_result.get('files')
-        if isinstance(files, list):
-            for item in files:
-                if not isinstance(item, dict):
-                    continue
-                raw_path = item.get('absolute_path') or item.get('path')
-                if isinstance(raw_path, str) and raw_path.strip():
-                    paths.append(raw_path.strip())
-
-    if isinstance(action, FileEditAction):
-        command = str(action.command or '').strip().lower()
-        if command == 'read_file':
-            return []
-        if action.path:
-            paths.append(action.path)
-    elif isinstance(action, FileWriteAction):
-        if action.path:
-            paths.append(action.path)
-    else:
-        return []
+    paths.extend(_extract_paths_from_tool_result(observation))
+    paths.extend(_extract_paths_from_action(action))
 
     obs_path = getattr(observation, 'path', '')
     if isinstance(obs_path, str) and obs_path:
         paths.append(obs_path)
 
     return _dedupe(paths)
+
+
+def _extract_paths_from_tool_result(observation: Observation) -> list[str]:
+    paths: list[str] = []
+    tool_result = getattr(observation, 'tool_result', None)
+    if not isinstance(tool_result, dict):
+        return paths
+    files = tool_result.get('files')
+    if not isinstance(files, list):
+        return paths
+    for item in files:
+        if not isinstance(item, dict):
+            continue
+        raw_path = item.get('absolute_path') or item.get('path')
+        if isinstance(raw_path, str) and raw_path.strip():
+            paths.append(raw_path.strip())
+    return paths
+
+
+def _extract_paths_from_action(action: Any) -> list[str]:
+    from backend.ledger.action import FileEditAction, FileWriteAction
+
+    if isinstance(action, FileEditAction):
+        command = str(action.command or '').strip().lower()
+        if command == 'read_file':
+            return []
+        return [action.path] if action.path else []
+    if isinstance(action, FileWriteAction):
+        return [action.path] if action.path else []
+    return []
 
 
 def _resolve_for_diagnostics(raw_path: str, ctx: ToolInvocationContext) -> Path:
@@ -173,27 +182,9 @@ def _run_lsp_diagnostics(
     max_diagnostics: int,
     max_file_bytes: int,
 ) -> LspDiagnosticReceipt | None:
-    if not _known_lsp_extension(path):
-        return None
-    if not path.exists() or not path.is_file():
-        return LspDiagnosticReceipt(
-            path=str(path),
-            status='skipped',
-            reason='file not found after edit',
-        )
-    try:
-        if path.stat().st_size > max_file_bytes:
-            return LspDiagnosticReceipt(
-                path=str(path),
-                status='skipped',
-                reason='file too large for automatic LSP diagnostics',
-            )
-    except OSError:
-        return LspDiagnosticReceipt(
-            path=str(path),
-            status='skipped',
-            reason='file stat failed',
-        )
+    skip_reason = _check_skip_conditions(path, max_file_bytes)
+    if skip_reason:
+        return LspDiagnosticReceipt(path=str(path), status='skipped', reason=skip_reason)
 
     command = _installed_lsp_command(path)
     if command is None:
@@ -203,37 +194,53 @@ def _run_lsp_diagnostics(
             reason=f'no installed LSP for {path.suffix or "this file type"}',
         )
 
+    result = _query_lsp(path, timeout_seconds)
+    if isinstance(result, LspDiagnosticReceipt):
+        return result
+    return _evaluate_lsp_result(result, path, max_diagnostics)
+
+
+def _check_skip_conditions(path: Path, max_file_bytes: int) -> str | None:
+    if not _known_lsp_extension(path):
+        return 'not a known LSP file type'
+    if not path.exists() or not path.is_file():
+        return 'file not found after edit'
+    try:
+        if path.stat().st_size > max_file_bytes:
+            return 'file too large for automatic LSP diagnostics'
+    except OSError:
+        return 'file stat failed'
+    return None
+
+
+def _query_lsp(path: Path, timeout_seconds: float):
     try:
         from backend.utils.lsp_client import get_lsp_client
-
-        result = get_lsp_client().query(
+        return get_lsp_client().query(
             'diagnostics',
             str(path),
             process_timeout=timeout_seconds,
         )
     except TypeError:
         return LspDiagnosticReceipt(
-            path=str(path),
-            status='skipped',
+            path=str(path), status='skipped',
             reason='LSP client does not support bounded diagnostics',
         )
     except Exception as exc:
         return LspDiagnosticReceipt(
-            path=str(path),
-            status='skipped',
+            path=str(path), status='skipped',
             reason=f'LSP diagnostics error: {exc}',
         )
 
+
+def _evaluate_lsp_result(
+    result: Any, path: Path, max_diagnostics: int
+) -> LspDiagnosticReceipt:
     if not getattr(result, 'available', True):
-        return LspDiagnosticReceipt(
-            path=str(path),
-            status='skipped',
-            reason='LSP unavailable',
-        )
+        return LspDiagnosticReceipt(path=str(path), status='skipped', reason='LSP unavailable')
     if getattr(result, 'error', ''):
         return LspDiagnosticReceipt(
-            path=str(path),
-            status='skipped',
+            path=str(path), status='skipped',
             reason=f'LSP error: {str(result.error)[:300]}',
         )
 

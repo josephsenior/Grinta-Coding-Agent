@@ -600,42 +600,48 @@ def _normalize_cross_family_tool_messages(
     for raw_msg in messages:
         msg = dict(raw_msg)
         msg.pop('tool_ok', None)
-
         role = msg.get('role')
+
         if role == 'assistant' and isinstance(msg.get('tool_calls'), list):
-            text = _extract_openai_message_text(msg.get('content'))
-            tool_lines: list[str] = []
-            for tc in msg.get('tool_calls', []) or []:
-                if not isinstance(tc, dict):
-                    continue
-                fn = tc.get('function') or {}
-                name = str(fn.get('name') or 'tool')
-                arguments = str(fn.get('arguments') or '{}')
-                tool_lines.append(flatten_tool_call_for_history(name, arguments))
-            normalized = {k: v for k, v in msg.items() if k != 'tool_calls'}
-            normalized['content'] = (
-                '\n'.join(part for part in [text, *tool_lines] if part)
-                or '[Assistant requested tool execution.]'
-            )
-            cleaned.append(normalized)
+            cleaned.append(_normalize_assistant_tool_calls(msg))
             continue
 
         if role == 'tool':
-            tool_name = str(msg.get('name') or 'tool')
-            tool_output = _extract_openai_message_text(msg.get('content'))
-            cleaned.append(
-                {
-                    'role': 'user',
-                    'content': (
-                        f'[Tool result from {tool_name}]\n{tool_output}'.strip()
-                        or f'[Tool result from {tool_name}]'
-                    ),
-                }
-            )
+            cleaned.append(_normalize_tool_result(msg))
             continue
 
         cleaned.append(msg)
     return cleaned
+
+
+def _normalize_assistant_tool_calls(msg: dict[str, Any]) -> dict[str, Any]:
+    text = _extract_openai_message_text(msg.get('content'))
+    tool_lines: list[str] = []
+    for tc in msg.get('tool_calls', []) or []:
+        if not isinstance(tc, dict):
+            continue
+        fn = tc.get('function') or {}
+        name = str(fn.get('name') or 'tool')
+        arguments = str(fn.get('arguments') or '{}')
+        tool_lines.append(flatten_tool_call_for_history(name, arguments))
+    normalized = {k: v for k, v in msg.items() if k != 'tool_calls'}
+    normalized['content'] = (
+        '\n'.join(part for part in [text, *tool_lines] if part)
+        or '[Assistant requested tool execution.]'
+    )
+    return normalized
+
+
+def _normalize_tool_result(msg: dict[str, Any]) -> dict[str, Any]:
+    tool_name = str(msg.get('name') or 'tool')
+    tool_output = _extract_openai_message_text(msg.get('content'))
+    return {
+        'role': 'user',
+        'content': (
+            f'[Tool result from {tool_name}]\n{tool_output}'.strip()
+            or f'[Tool result from {tool_name}]'
+        ),
+    }
 
 
 class DirectLLMClient(ABC):

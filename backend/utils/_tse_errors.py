@@ -106,47 +106,56 @@ def _format_treesitter_error_block(
     start_byte = getattr(node, 'start_byte', None)
     end_byte = getattr(node, 'end_byte', None)
 
-    node_text = ''
-    if start_byte is not None and end_byte is not None:
-        b = code.encode('utf-8')
-        if 0 <= start_byte < end_byte <= len(b):
-            node_text = b[start_byte:end_byte].decode('utf-8', errors='replace')
-
+    node_text = _extract_node_text(code, start_byte, end_byte)
     if not isinstance(start_col, int) or start_col < 0:
         start_col = 0
 
     missing = (
         node if getattr(node, 'is_missing', False) else _find_first_missing_node(node)
     )
-    expected = None
-    if missing is not None:
-        expected = getattr(missing, 'type', None) or None
+    expected = getattr(missing, 'type', None) or None
 
     parts: list[str] = [
         f'Syntax error at {file_path}:{start_row + 1}:{start_col + 1}',
     ]
-    if expected:
-        parts.append(f'Expected: `{expected}` (grammar token)')
-    else:
-        parts.append('Expected: (not inferred — parser landed on an ERROR node)')
+    parts.append(_format_expected_line(expected))
+    parts.extend(_format_found_lines(node, node_text))
+    parts.extend(_format_source_lines(lines, start_row, start_col))
+    parts.append(_what_to_try_for_expected_token(expected, language))
+    return parts
 
+
+def _extract_node_text(code: str, start_byte: int | None, end_byte: int | None) -> str:
+    if start_byte is None or end_byte is None:
+        return ''
+    b = code.encode('utf-8')
+    if 0 <= start_byte < end_byte <= len(b):
+        return b[start_byte:end_byte].decode('utf-8', errors='replace')
+    return ''
+
+
+def _format_expected_line(expected: str | None) -> str:
+    if expected:
+        return f'Expected: `{expected}` (grammar token)'
+    return 'Expected: (not inferred — parser landed on an ERROR node)'
+
+
+def _format_found_lines(node: Any, node_text: str) -> list[str]:
+    parts: list[str] = []
     if node_text:
         preview = node_text.replace('\n', '\\n')
         if len(preview) > 120:
             preview = preview[:117] + '...'
         parts.append(f'Found: {preview!r}')
-    elif getattr(node, 'type', None) == 'ERROR' and not getattr(
-        node, 'is_missing', False
-    ):
-        parts.append(
-            'Found: unexpected token(s) at this position (see source line below).'
-        )
+    elif getattr(node, 'type', None) == 'ERROR' and not getattr(node, 'is_missing', False):
+        parts.append('Found: unexpected token(s) at this position (see source line below).')
+    return parts
 
-    src_line = ''
+
+def _format_source_lines(lines: list[str], start_row: int, start_col: int) -> list[str]:
+    parts: list[str] = []
     if isinstance(start_row, int) and 0 <= start_row < len(lines):
         src_line = lines[start_row]
         parts.append(f'  {src_line}')
         parts.append(f'  {" " * start_col}^')
-
-    parts.append(_what_to_try_for_expected_token(expected, language))
     return parts

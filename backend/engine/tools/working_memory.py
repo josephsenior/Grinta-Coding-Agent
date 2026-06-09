@@ -134,33 +134,40 @@ def _update_all_sections(content: str) -> AgentThinkAction:
         )
 
     memory = _load_memory()
-    updated: list[str] = []
 
-    # 1) Try JSON mapping first.
+    updated = _apply_json_sections(content, memory)
+    if updated:
+        return _save_and_respond(memory, updated)
+
+    updated = _apply_text_sections(content, memory)
+    if updated:
+        return _save_and_respond(memory, updated)
+
+    memory['findings'] = content
+    memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
+    _save_memory(memory)
+    return AgentThinkAction(
+        thought="[WORKING_MEMORY] Updated 'findings' section (fallback from section='all')."
+    )
+
+
+def _apply_json_sections(content: str, memory: dict[str, str]) -> list[str]:
     try:
         maybe = json.loads(content)
     except json.JSONDecodeError:
-        maybe = None
+        return []
+    if not isinstance(maybe, dict):
+        return []
+    updated: list[str] = []
+    for sec in _VALID_SECTIONS:
+        val = maybe.get(sec)
+        if isinstance(val, str) and val.strip():
+            memory[sec] = val
+            updated.append(sec)
+    return updated
 
-    if isinstance(maybe, dict):
-        for sec in _VALID_SECTIONS:
-            val = maybe.get(sec)
-            if isinstance(val, str) and val.strip():
-                memory[sec] = val
-                updated.append(sec)
 
-        if updated:
-            memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
-            _save_memory(memory)
-            return AgentThinkAction(
-                thought=f'[WORKING_MEMORY] Updated sections: {", ".join(updated)}.'
-            )
-
-    # 2) Parse a simple multi-section text block.
-    # Supported headers:
-    #   ## HYPOTHESIS
-    #   [HYPOTHESIS]
-    # (case-insensitive)
+def _apply_text_sections(content: str, memory: dict[str, str]) -> list[str]:
     sections: dict[str, list[str]] = {}
     current: str | None = None
     for raw_line in content.splitlines():
@@ -181,25 +188,22 @@ def _update_all_sections(content: str) -> AgentThinkAction:
         if current is not None:
             sections[current].append(raw_line)
 
+    updated: list[str] = []
     for sec, lines in sections.items():
         val = '\n'.join(lines).strip('\n')
         if val.strip():
             memory[sec] = val
             updated.append(sec)
+    return updated
 
-    if updated:
-        memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
-        _save_memory(memory)
-        return AgentThinkAction(
-            thought=f'[WORKING_MEMORY] Updated sections: {", ".join(updated)}.'
-        )
 
-    # 3) Fallback: store everything as findings.
-    memory['findings'] = content
+def _save_and_respond(
+    memory: dict[str, str], updated: list[str]
+) -> AgentThinkAction:
     memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
     _save_memory(memory)
     return AgentThinkAction(
-        thought="[WORKING_MEMORY] Updated 'findings' section (fallback from section='all')."
+        thought=f'[WORKING_MEMORY] Updated sections: {", ".join(updated)}.'
     )
 
 

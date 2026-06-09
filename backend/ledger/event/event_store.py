@@ -242,82 +242,107 @@ class EventStore(EventStoreABC):
         start_id, end_id = self._normalize_search_range(start_id, end_id)
         start_id, end_id, step = self._setup_reverse_search(start_id, end_id, reverse)
 
-        if (
+        if self._can_use_sqlite_batch(reverse, event_filter, step):
+            batch_events = self._search_sqlite_batch(start_id, end_id, limit)
+            if batch_events:
+                yield from batch_events
+                return
+
+        yield from self._search_event_files(
+            start_id, end_id, step, event_filter, limit
+        )
+
+    def _can_use_sqlite_batch(
+        self, reverse: bool, event_filter: EventFilter | None, step: int
+    ) -> bool:
+        return (
             getattr(self, '_sqlite_store', None) is not None
             and not reverse
             and event_filter is None
             and step == 1
-        ):
-            yielded = 0
-            try:
-                batch = self._sqlite_store.list_events(
-                    start_id=start_id,
-                    end_id=end_id,
-                    limit=limit,
-                )
-            except (json.JSONDecodeError, ValueError) as exc:
-                logger.debug(
-                    'SQLite batch read failed for %s; falling back to per-event scan: %s',
-                    self.sid,
-                    exc,
-                )
-            else:
-                for data in batch:
-                    try:
-                        event = event_from_dict(data)
-                    except (json.JSONDecodeError, ValueError, TypeError) as exc:
-                        logger.warning(
-                            'Skipping corrupt SQLite event in batch for %s: %s',
-                            self.sid,
-                            exc,
-                        )
-                        continue
-                    yield event
-                    yielded += 1
-                return
+        )
 
+    def _search_sqlite_batch(
+        self, start_id: int, end_id: int, limit: int | None
+    ) -> list[Event]:
+        try:
+            batch = self._sqlite_store.list_events(
+                start_id=start_id, end_id=end_id, limit=limit,
+            )
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.debug(
+                'SQLite batch read failed for %s; falling back to per-event scan: %s',
+                self.sid, exc,
+            )
+            return []
+        events: list[Event] = []
+        for data in batch:
+            try:
+                event = event_from_dict(data)
+            except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                logger.warning(
+                    'Skipping corrupt SQLite event in batch for %s: %s',
+                    self.sid, exc,
+                )
+                continue
+            events.append(event)
+        return events
+
+    def _search_event_files(
+        self,
+        start_id: int,
+        end_id: int,
+        step: int,
+        event_filter: EventFilter | None,
+        limit: int | None,
+    ) -> Iterable[Event]:
         cache_page = _DUMMY_PAGE
         num_results = 0
-
-        max_corrupt = 5
         corrupt_seen = 0
+        max_corrupt = 5
 
         for index in range(start_id, end_id, step):
             if not cache_page.covers(index):
                 cache_page = self._load_cache_page_for_index(index)
 
-            try:
-                event = self._get_event_from_cache_or_storage(index, cache_page)
-            except (json.JSONDecodeError, ValueError) as exc:
-                # Corrupt or partially-written event file; skip it so the
-                # rest of the event history remains accessible.
-                corrupt_seen += 1
-                logger.warning(
-                    'Skipping corrupt event id=%s in search for %s: %s (skipped %s/%s)',
-                    index,
-                    self.sid,
-                    exc,
-                    corrupt_seen,
-                    max_corrupt,
-                    extra={'session_id': self.sid, 'event_id': index},
-                )
-                if corrupt_seen >= max_corrupt:
-                    logger.error(
-                        'Aborting event search for %s: %s consecutive corrupt events',
-                        self.sid,
-                        max_corrupt,
-                    )
-                    return
-                continue
+            event = self._load_event_with_corruption_guard(
+                index, cache_page, corrupt_seen, max_corrupt
+            )
             if event is None:
                 continue
-            if event_filter and not event_filter.include(event):
+            if isinstance(event, bool):
+                return
+            corrupt_seen = event[1]
+
+            event_obj = event[0]
+            if event_filter and not event_filter.include(event_obj):
                 continue
 
-            yield event
+            yield event_obj
             num_results += 1
             if limit and limit <= num_results:
                 return
+
+    def _load_event_with_corruption_guard(
+        self, index: int, cache_page: Any, corrupt_seen: int, max_corrupt: int
+    ) -> Event | None | tuple[None, int]:
+        try:
+            event = self._get_event_from_cache_or_storage(index, cache_page)
+        except (json.JSONDecodeError, ValueError) as exc:
+            corrupt_seen += 1
+            logger.warning(
+                'Skipping corrupt event id=%s in search for %s: %s (skipped %s/%s)',
+                index, self.sid, exc, corrupt_seen, max_corrupt,
+                extra={'session_id': self.sid, 'event_id': index},
+            )
+            if corrupt_seen >= max_corrupt:
+                logger.error(
+                    'Aborting event search for %s: %s consecutive corrupt events',
+                    self.sid, max_corrupt,
+                )
+                return True
+            return None, corrupt_seen
+        return event
 
     def get_event(self, event_id: int) -> Event:
         """Get event by ID from persistent storage.
@@ -448,15 +473,32 @@ class EventStore(EventStoreABC):
         """
         from backend.persistence.locations import get_conversation_events_dir
 
+        cutoff_id = self._compute_prune_cutoff(keep_recent)
+        if cutoff_id <= 0:
+            return 0
+
+        events_dir = get_conversation_events_dir(self.sid, self.user_id)
+        pruned = self._prune_event_files(events_dir, cutoff_id)
+        self._prune_stale_cache_pages(events_dir, cutoff_id)
+
+        if pruned > 0:
+            logger.info(
+                'prune_old_events: removed %d events older than id %d for session %s',
+                pruned, cutoff_id, self.sid,
+            )
+        return pruned
+
+    def _compute_prune_cutoff(self, keep_recent: int) -> int:
         try:
             latest_id = self.get_latest_event_id()
         except Exception:
             return 0
         if latest_id <= keep_recent:
             return 0
-        cutoff_id = latest_id - keep_recent
+        return latest_id - keep_recent
+
+    def _prune_event_files(self, events_dir: str, cutoff_id: int) -> int:
         pruned = 0
-        events_dir = get_conversation_events_dir(self.sid, self.user_id)
         try:
             entries = self.file_store.list(events_dir)
         except Exception:
@@ -474,34 +516,31 @@ class EventStore(EventStoreABC):
                 logger.debug(
                     'prune_old_events: could not delete %s', entry, exc_info=True
                 )
-        # Also prune stale cache pages.
+        return pruned
+
+    def _prune_stale_cache_pages(self, events_dir: str, cutoff_id: int) -> None:
         try:
             cache_dir = f'{events_dir}event_cache/'
             cache_entries = self.file_store.list(cache_dir)
             for entry in cache_entries:
                 if not entry.endswith('.json'):
                     continue
-                # Cache pages are named start-end.json
-                try:
-                    parts = entry.replace('.json', '').split('-')
-                    page_end = int(parts[1])
-                except (ValueError, IndexError):
-                    continue
-                if page_end <= cutoff_id:
+                page_end = self._parse_cache_page_end(entry)
+                if page_end is not None and page_end <= cutoff_id:
                     try:
                         self.file_store.delete(f'{cache_dir}{entry}')
                     except Exception:
                         pass
         except Exception:
             pass
-        if pruned > 0:
-            logger.info(
-                'prune_old_events: removed %d events older than id %d for session %s',
-                pruned,
-                cutoff_id,
-                self.sid,
-            )
-        return pruned
+
+    @staticmethod
+    def _parse_cache_page_end(entry: str) -> int | None:
+        try:
+            parts = entry.replace('.json', '').split('-')
+            return int(parts[1])
+        except (ValueError, IndexError):
+            return None
 
 
 __all__ = ['EventStore']

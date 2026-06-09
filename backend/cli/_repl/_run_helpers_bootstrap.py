@@ -180,28 +180,9 @@ async def _bootstrap_mcp_warmup(
     from backend.core.bootstrap.main import _setup_mcp_tools
 
     verbose = os.environ.get('GRINTA_VERBOSE') == '1'
+    server_count, server_names = _count_mcp_servers(agent)
 
-    # Count configured MCP servers for progress reporting
-    server_count = 0
-    server_names: list[str] = []
-    try:
-        mcp_config = getattr(agent.config, 'mcp', None) or getattr(
-            agent.config, 'mcp_config', None
-        )
-        if mcp_config is not None:
-            servers = getattr(mcp_config, 'servers', []) or []
-            server_count = len(servers)
-            server_names = [getattr(s, 'name', '?') for s in servers]
-    except Exception:
-        pass
-
-    if server_count > 0:
-        msg = f'MCP: connecting to {server_count} server(s)…'
-        if verbose and server_names:
-            msg += f' ({", ".join(server_names[:5])})'
-    else:
-        msg = 'Loading MCP tools…'
-    host._bootstrap_status(msg, session, renderer)
+    host._bootstrap_status(_format_warmup_msg(server_count, server_names, verbose), session, renderer)
 
     try:
         await _setup_mcp_tools(agent, host._runtime, host._memory)
@@ -209,31 +190,56 @@ async def _bootstrap_mcp_warmup(
         logger.warning('MCP warmup failed after chat became ready', exc_info=True)
         host._hud.update_mcp_servers(0)
         host._handle_mcp_partial_state(agent)
-        err_msg = f'MCP warmup failed: {exc}'
-        host._bootstrap_status(err_msg, session, renderer, kind='warning')
+        host._bootstrap_status(f'MCP warmup failed: {exc}', session, renderer, kind='warning')
         return
 
     host._update_mcp_count_from_agent(agent)
-    from backend.integrations.mcp.mcp_bootstrap_status import (
-        get_mcp_bootstrap_status,
-    )
+    host._bootstrap_status(_format_warmup_result(agent, server_count, verbose), session, renderer)
+
+
+def _count_mcp_servers(agent: Any) -> tuple[int, list[str]]:
+    server_count = 0
+    server_names: list[str] = []
+    try:
+        mcp_config = getattr(agent.config, 'mcp', None) or getattr(agent.config, 'mcp_config', None)
+        if mcp_config is not None:
+            servers = getattr(mcp_config, 'servers', []) or []
+            server_count = len(servers)
+            server_names = [getattr(s, 'name', '?') for s in servers]
+    except Exception:
+        pass
+    return server_count, server_names
+
+
+def _format_warmup_msg(server_count: int, server_names: list[str], verbose: bool) -> str:
+    if server_count > 0:
+        msg = f'MCP: connecting to {server_count} server(s)…'
+        if verbose and server_names:
+            msg += f' ({", ".join(server_names[:5])})'
+        return msg
+    return 'Loading MCP tools…'
+
+
+def _format_warmup_result(agent: Any, server_count: int, verbose: bool) -> str:
+    from backend.integrations.mcp.mcp_bootstrap_status import get_mcp_bootstrap_status
 
     status = get_mcp_bootstrap_status()
     client_count = int(status.get('connected_client_count', 0))
     errors = status.get('conversion_errors', []) or []
 
     if client_count > 0:
-        if server_count > 0:
-            detail = f'{client_count}/{server_count} MCP server(s) connected.'
-        else:
-            detail = f'{client_count} MCP server(s) connected.'
+        detail = (
+            f'{client_count}/{server_count} MCP server(s) connected.'
+            if server_count > 0
+            else f'{client_count} MCP server(s) connected.'
+        )
         if verbose and errors:
             detail += f' {len(errors)} conversion error(s).'
     else:
         detail = 'MCP tools loaded.'
         if verbose and errors:
             detail += f' ({len(errors)} conversion errors)'
-    host._bootstrap_status(detail, session, renderer)
+    return detail
 
 
 def _bootstrap_status(

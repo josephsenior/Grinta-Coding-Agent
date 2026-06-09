@@ -919,86 +919,105 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
     command = str(action.command or '').strip().lower()
     payload = _structured_payload_dict(action)
 
-    if command == 'multi_edit':
-        original_snapshots: dict[Path, tuple[str | None, str]] = {}
-        for item in payload.get('file_edits') or []:
-            if not isinstance(item, dict):
-                continue
-            item_path = item.get('path')
-            if not isinstance(item_path, str) or not item_path.strip():
-                continue
-            resolved_item_path = _resolve_structured_edit_path(executor, item_path)
-            if resolved_item_path not in original_snapshots:
-                original_snapshots[resolved_item_path] = (
-                    _read_existing_text(resolved_item_path),
-                    item_path.strip(),
-                )
-        try:
-            outcome = _handle_multi_edit_command(
-                action.path,
-                {'file_edits': payload.get('file_edits')},
-            )
-        except (FunctionCallValidationError, ToolExecutionError, ValueError) as exc:
-            obs: ErrorObservation | FileEditObservation = ErrorObservation(str(exc))
-            obs.tool_result = {
-                'tool': 'file_edit',
-                'ok': False,
-                'error_code': 'STRUCTURED_EDIT_ERROR',
-                'retryable': False,
-                'operation': command,
-                'payload': payload,
-            }
-            return obs
+    if command != 'multi_edit':
+        return ErrorObservation(f'Unsupported structured file edit command: {command}')
 
-        for resolved_item_path, (
-            original_content,
-            _display_path,
-        ) in original_snapshots.items():
-            _record_runtime_undo_snapshot(
-                executor, resolved_item_path, original_content
-            )
+    return _execute_multi_edit(executor, action, payload)
 
-        diff = _combined_structured_edit_diff(original_snapshots)
-        verification_text, file_receipts, verification_passed = (
-            _structured_edit_verification_receipt(original_snapshots)
-        )
-        summary = (
-            outcome.content
-            if isinstance(outcome, MessageAction)
-            else getattr(outcome, 'thought', '') or getattr(outcome, 'content', '')
-        )
-        content = f'{summary}\n\n{verification_text}' if summary else verification_text
-        if diff:
-            content = (
-                f'{summary}\n\n[EDIT_DIFF]\n{diff}'
-                if summary
-                else f'[EDIT_DIFF]\n{diff}'
-            )
-            content += f'\n\n{verification_text}'
-        final_obs: ErrorObservation | FileEditObservation = FileEditObservation(
-            content=content,
-            path=action.path,
-            prev_exist=True,
-            old_content=None,
-            new_content=None,
-            diff=diff,
-            impl_source=FileEditSource.FILE_EDITOR,
-        )
-        final_obs.tool_result = {
-            'tool': 'file_edit',
-            'ok': verification_passed,
-            'error_code': None
-            if verification_passed
-            else 'STRUCTURED_EDIT_VERIFICATION_FAILED',
-            'retryable': not verification_passed,
-            'operation': command,
-            'payload': payload,
-            'files': file_receipts,
-            'verification_passed': verification_passed,
-        }
-        return final_obs
 
-    return ErrorObservation(f'Unsupported structured file edit command: {command}')
+def _execute_multi_edit(executor: Any, action: Any, payload: dict) -> Any:
+    from backend.core.errors import FunctionCallValidationError, ToolExecutionError
+    from backend.engine.function_calling import _handle_multi_edit_command
+    from backend.ledger.action import MessageAction
+    from backend.ledger.observation import ErrorObservation, FileEditObservation
+
+    original_snapshots = _collect_edit_snapshots(executor, payload)
+    try:
+        outcome = _handle_multi_edit_command(
+            action.path, {'file_edits': payload.get('file_edits')},
+        )
+    except (FunctionCallValidationError, ToolExecutionError, ValueError) as exc:
+        return _make_edit_error_obs(exc, payload, command='multi_edit')
+
+    _record_undo_snapshots(executor, original_snapshots)
+    return _build_edit_result_obs(outcome, original_snapshots, action, payload)
+
+
+def _collect_edit_snapshots(executor: Any, payload: dict) -> dict:
+    snapshots: dict = {}
+    for item in payload.get('file_edits') or []:
+        if not isinstance(item, dict):
+            continue
+        item_path = item.get('path')
+        if not isinstance(item_path, str) or not item_path.strip():
+            continue
+        resolved_path = _resolve_structured_edit_path(executor, item_path)
+        if resolved_path not in snapshots:
+            snapshots[resolved_path] = (
+                _read_existing_text(resolved_path), item_path.strip(),
+            )
+    return snapshots
+
+
+def _record_undo_snapshots(executor: Any, snapshots: dict) -> None:
+    for resolved_path, (original_content, _) in snapshots.items():
+        _record_runtime_undo_snapshot(executor, resolved_path, original_content)
+
+
+def _make_edit_error_obs(exc: Exception, payload: dict, command: str) -> Any:
+    from backend.ledger.observation import ErrorObservation
+    obs: ErrorObservation = ErrorObservation(str(exc))
+    obs.tool_result = {
+        'tool': 'file_edit',
+        'ok': False,
+        'error_code': 'STRUCTURED_EDIT_ERROR',
+        'retryable': False,
+        'operation': command,
+        'payload': payload,
+    }
+    return obs
+
+
+def _build_edit_result_obs(outcome: Any, original_snapshots: dict, action: Any, payload: dict) -> Any:
+    from backend.ledger.observation import FileEditObservation
+
+    diff = _combined_structured_edit_diff(original_snapshots)
+    verification_text, file_receipts, verification_passed = (
+        _structured_edit_verification_receipt(original_snapshots)
+    )
+    summary = (
+        outcome.content
+        if isinstance(outcome, MessageAction)
+        else getattr(outcome, 'thought', '') or getattr(outcome, 'content', '')
+    )
+    content = _format_edit_content(summary, diff, verification_text)
+    final_obs = FileEditObservation(
+        content=content,
+        path=action.path,
+        prev_exist=True,
+        old_content=None,
+        new_content=None,
+        diff=diff,
+        impl_source=FileEditSource.FILE_EDITOR,
+    )
+    final_obs.tool_result = {
+        'tool': 'file_edit',
+        'ok': verification_passed,
+        'error_code': None if verification_passed else 'STRUCTURED_EDIT_VERIFICATION_FAILED',
+        'retryable': not verification_passed,
+        'operation': 'multi_edit',
+        'payload': payload,
+        'files': file_receipts,
+        'verification_passed': verification_passed,
+    }
+    return final_obs
+
+
+def _format_edit_content(summary: str, diff: str, verification_text: str) -> str:
+    if diff:
+        diff_section = f'{summary}\n\n[EDIT_DIFF]\n{diff}' if summary else f'[EDIT_DIFF]\n{diff}'
+        return f'{diff_section}\n\n{verification_text}'
+    return f'{summary}\n\n{verification_text}' if summary else verification_text
 
 
 def is_auto_lint_enabled(executor: Any) -> bool:
