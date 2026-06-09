@@ -190,10 +190,12 @@ class TestSelectCompactorConfig:
         config = select_compactor_config(events, llm_config=None)
         assert isinstance(config, AmortizedPruningCompactorConfig)
 
-    def test_medium_session_returns_observation_masking(self):
+    def test_medium_session_returns_microcompact(self):
         events = _make_events(_MEDIUM_SESSION + 10)
         config = select_compactor_config(events)
-        assert isinstance(config, ObservationMaskingCompactorConfig)
+        from backend.core.config.compactor_config import MicrocompactCompactorConfig
+
+        assert isinstance(config, MicrocompactCompactorConfig)
 
     def test_below_short_returns_noop(self):
         events = _make_events(_SHORT_SESSION - 5)
@@ -363,13 +365,13 @@ class TestAutoCompactorConfig:
         cfg = AutoCompactorConfig(llm_config='my_llm')
         assert cfg.llm_config == 'my_llm'
 
-    def test_llm_hot_path_disabled_by_default(self):
+    def test_llm_hot_path_enabled_by_default(self):
         cfg = AutoCompactorConfig()
-        assert cfg.allow_llm_hot_path is False
-
-    def test_can_enable_llm_hot_path(self):
-        cfg = AutoCompactorConfig(allow_llm_hot_path=True)
         assert cfg.allow_llm_hot_path is True
+
+    def test_can_disable_llm_hot_path(self):
+        cfg = AutoCompactorConfig(allow_llm_hot_path=False)
+        assert cfg.allow_llm_hot_path is False
 
     def test_rejects_extra_fields(self):
         with pytest.raises(Exception):

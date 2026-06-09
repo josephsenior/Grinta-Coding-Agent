@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel
 
 from backend.context.view import View
+from backend.core.constants import DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS
 from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.compaction import EventCompactor
@@ -472,18 +473,30 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         factor, _ = model_token_correction(model)
         return factor
 
+    def _effective_token_budget(self) -> int | None:
+        """Budget with headroom reserved for summarizer output."""
+        if self.token_budget is None:
+            return None
+        if self.token_budget <= DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS:
+            return self.token_budget
+        return self.token_budget - DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS
+
     def _exceeds_token_budget(self, view: View) -> bool:
         """Return True when a token_budget is set and the view exceeds it."""
-        if self.token_budget is None:
+        effective_budget = self._effective_token_budget()
+        if effective_budget is None:
             return False
         raw = self.estimate_view_tokens(view)
         estimated = int(raw * self._model_token_multiplier())
-        if estimated > self.token_budget:
+        if estimated > effective_budget:
             logger.debug(
-                'Token budget exceeded: %d estimated (×%.2f) > %d budget',
+                'Token budget exceeded: %d estimated (×%.2f) > %d effective budget '
+                '(raw budget=%d reserved=%d)',
                 estimated,
                 self._model_token_multiplier(),
+                effective_budget,
                 self.token_budget,
+                DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS,
             )
             return True
         return False

@@ -577,8 +577,8 @@ def load_snapshot() -> dict[str, Any] | None:
     """Load the most recent committed snapshot from disk.
 
     Falls back to the staging path (written during a prior run that
-    crashed before commit).  The caller should call ``delete_snapshot()``
-    after consuming the result to prevent double-injection.
+    crashed before commit).  Snapshots are durable across turns and are
+    also synced into working memory after compaction.
     """
     for getter in (_snapshot_path, _snapshot_staging_path):
         p = getter()

@@ -12,9 +12,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from backend.context.pre_condensation_snapshot import extract_snapshot
+from backend.core.constants import DEFAULT_CONTINUITY_GATE_MIN_SCORE
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event
+
+_CRITICAL_CONTINUITY_CATEGORIES = frozenset(
+    {'test_result', 'decision', 'failed_approach'}
+)
 
 
 @dataclass(frozen=True)
@@ -90,6 +95,26 @@ def build_continuity_facts(events: list[Event]) -> tuple[ContinuityFact, ...]:
     return tuple(facts)
 
 
+def compaction_passes_continuity_gate(
+    events: list[Event],
+    restored_context: str,
+    *,
+    min_score: float = DEFAULT_CONTINUITY_GATE_MIN_SCORE,
+) -> tuple[bool, ContinuityEvalResult]:
+    """Return whether a pending compaction preserves critical coding-agent facts."""
+    result = evaluate_restored_context(events, restored_context)
+    critical_missing = tuple(
+        fact
+        for fact in result.missing
+        if fact.category in _CRITICAL_CONTINUITY_CATEGORIES
+    )
+    if critical_missing:
+        return False, result
+    if result.total == 0:
+        return True, result
+    return result.score >= min_score, result
+
+
 def evaluate_restored_context(
     events: list[Event],
     restored_context: str,
@@ -138,5 +163,6 @@ __all__ = [
     'ContinuityEvalResult',
     'ContinuityFact',
     'build_continuity_facts',
+    'compaction_passes_continuity_gate',
     'evaluate_restored_context',
 ]

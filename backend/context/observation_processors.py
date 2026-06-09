@@ -218,10 +218,9 @@ def _load_working_memory_snapshot() -> str:
 
 
 def _load_restored_context_snapshot() -> str:
-    """Load and consume the pre-condensation snapshot for one-time recovery."""
+    """Load durable pre-condensation snapshot for recovery injection."""
     try:
         from backend.context.pre_condensation_snapshot import (
-            delete_snapshot,
             format_snapshot_for_injection,
             load_snapshot,
         )
@@ -231,7 +230,6 @@ def _load_restored_context_snapshot() -> str:
             return ''
 
         block = format_snapshot_for_injection(snapshot)
-        delete_snapshot()
         return '\n' + '─' * 60 + '\n' + f'{_sanitize_memory_content(block)}\n'
     except Exception:
         return ''
@@ -282,6 +280,54 @@ def _handle_file_read_observation(
     return Message(role='user', content=[TextContent(text=text)])
 
 
+def _find_diff_hunk_boundaries(lines: list[str]) -> tuple[list[int], list[int]]:
+    hunk_starts: list[int] = []
+    hunk_ends: list[int] = []
+    for i, line in enumerate(lines):
+        if line.startswith('[begin of edit') or line.startswith('[begin of ATTEMPTED'):
+            hunk_starts.append(i)
+        elif line.startswith('[end of edit') or line.startswith('[end of ATTEMPTED'):
+            hunk_ends.append(i)
+    return hunk_starts, hunk_ends
+
+
+def _truncate_hunk_section(section: list[str], half: int) -> list[str]:
+    if len(section) <= half * 2:
+        return section
+    return section[:half] + ['  [... truncated ...]'] + section[-half:]
+
+
+def _truncate_oversized_hunk(
+    hunk_lines: list[str], lines_per_hunk: int
+) -> list[str]:
+    header_lines = []
+    body_lines = []
+    for line in hunk_lines:
+        if line.startswith('[begin of') or line.startswith('(content before'):
+            header_lines.append(line)
+        elif line.startswith('(content after') or line.startswith('[end of'):
+            body_lines.append(line)
+        else:
+            body_lines.append(line)
+
+    after_idx = None
+    for i, line in enumerate(body_lines):
+        if line.startswith('(content after'):
+            after_idx = i
+            break
+
+    if after_idx is not None:
+        before_section = body_lines[:after_idx]
+        after_section = body_lines[after_idx:]
+        half = lines_per_hunk // 4
+        kept_before = _truncate_hunk_section(before_section, half)
+        kept_after = _truncate_hunk_section(after_section, half)
+        return header_lines + kept_before + kept_after
+    else:
+        half = lines_per_hunk // 2
+        return _truncate_hunk_section(hunk_lines, half)
+
+
 def _truncate_diff_smart(content: str, max_chars: int) -> str:
     """Truncate a file edit observation while preserving diff hunk structure.
 
@@ -300,103 +346,31 @@ def _truncate_diff_smart(content: str, max_chars: int) -> str:
     result_lines: list[str] = []
     remaining = max_chars
 
-    # Always keep the first line (summary/hash) — it's critical
     if lines:
         first_line = lines[0]
         result_lines.append(first_line)
-        remaining -= len(first_line) + 1  # +1 for newline
+        remaining -= len(first_line) + 1
 
-    # Find diff hunk boundaries
-    hunk_starts: list[int] = []
-    hunk_ends: list[int] = []
-    for i, line in enumerate(lines):
-        if line.startswith('[begin of edit') or line.startswith('[begin of ATTEMPTED'):
-            hunk_starts.append(i)
-        elif line.startswith('[end of edit') or line.startswith('[end of ATTEMPTED'):
-            hunk_ends.append(i)
+    hunk_starts, hunk_ends = _find_diff_hunk_boundaries(lines)
 
     if not hunk_starts:
-        # No structured hunks found — fall back to head_heavy truncation
         return truncate_content(content, max_chars, strategy='head_heavy')
 
-    # Budget per hunk: divide remaining budget across hunks
     budget_per_hunk = max(200, remaining // len(hunk_starts)) if hunk_starts else 200
-    lines_per_hunk = max(10, budget_per_hunk // 80)  # ~80 chars per line avg
+    lines_per_hunk = max(10, budget_per_hunk // 80)
 
     for hunk_idx, (start, end) in enumerate(zip(hunk_starts, hunk_ends, strict=False)):
         hunk_lines = lines[start : end + 1]
         hunk_size = sum(len(line) + 1 for line in hunk_lines)
 
         if hunk_size <= budget_per_hunk:
-            # Entire hunk fits — keep it all
             result_lines.extend(hunk_lines)
             remaining -= hunk_size
         else:
-            # Hunk is too large — keep header, first N lines, last N lines
-            header_lines = []
-            body_lines = []
-            for line in hunk_lines:
-                if line.startswith('[begin of') or line.startswith('(content before'):
-                    header_lines.append(line)
-                elif line.startswith('(content after') or line.startswith('[end of'):
-                    body_lines.append(line)
-                else:
-                    body_lines.append(line)
-
-            # Split body into before/after sections around the "(content after" marker
-            after_idx = None
-            for i, line in enumerate(body_lines):
-                if line.startswith('(content after'):
-                    after_idx = i
-                    break
-
-            if after_idx is not None:
-                before_section = body_lines[:after_idx]
-                after_section = body_lines[after_idx:]
-
-                # Keep first/last N lines of each section
-                half = lines_per_hunk // 4
-                kept_before = (
-                    before_section[:half]
-                    + (
-                        ['  [... truncated ...]']
-                        if len(before_section) > half * 2
-                        else []
-                    )
-                    + before_section[-half:]
-                    if len(before_section) > half * 2
-                    else before_section
-                )
-                kept_after = (
-                    after_section[:half]
-                    + (
-                        ['  [... truncated ...]']
-                        if len(after_section) > half * 2
-                        else []
-                    )
-                    + after_section[-half:]
-                    if len(after_section) > half * 2
-                    else after_section
-                )
-
-                result_lines.extend(header_lines)
-                result_lines.extend(kept_before)
-                result_lines.extend(kept_after)
-            else:
-                # No clear before/after split — keep first/last N lines
-                half = lines_per_hunk // 2
-                kept = (
-                    hunk_lines[:half]
-                    + (['  [... truncated ...]'] if len(hunk_lines) > half * 2 else [])
-                    + hunk_lines[-half:]
-                    if len(hunk_lines) > half * 2
-                    else hunk_lines
-                )
-                result_lines.extend(kept)
-
+            truncated_hunk = _truncate_oversized_hunk(hunk_lines, lines_per_hunk)
+            result_lines.extend(truncated_hunk)
             remaining -= budget_per_hunk
 
-        # Add separator between hunks
         if hunk_idx < len(hunk_starts) - 1:
             result_lines.append('-------------------------')
             remaining -= 26

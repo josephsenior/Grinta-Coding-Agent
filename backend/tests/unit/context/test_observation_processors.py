@@ -207,4 +207,5 @@ class TestConvertObservation:
         second = convert_observation_to_message(obs, max_message_chars=None)
         second_text = extract_first_text(second)
         assert second_text is not None
-        assert '<RESTORED_CONTEXT>' not in second_text
+        assert '<RESTORED_CONTEXT>' in second_text
+        assert 'src/main.py' in second_text

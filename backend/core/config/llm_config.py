@@ -176,6 +176,22 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         ge=1,
         description='Safety cap for rendered prompt history events after causal windowing.',
     )
+    prompt_history_min_tool_loops: int = Field(
+        default=12,
+        ge=0,
+        description=(
+            'Minimum recent action→observation causal chunks to keep in the '
+            'prompt window after compaction.'
+        ),
+    )
+    prompt_history_min_tail_tokens: int = Field(
+        default=8000,
+        ge=0,
+        description=(
+            'Minimum estimated tokens to preserve in the recent prompt tail '
+            'after windowing.'
+        ),
+    )
     input_cost_per_token: float | None = Field(
         default=None, ge=0.0, description='The cost per input token'
     )

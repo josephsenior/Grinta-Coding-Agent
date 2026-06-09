@@ -7,6 +7,7 @@ public surface of the mixin; this module contains the actual logic.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 from backend.cli.config_manager import get_current_model
@@ -67,110 +68,124 @@ def cmd_clear(host: Any, parsed: Any) -> bool:
     return True
 
 
-def cmd_sessions(host: Any, parsed: Any) -> bool:
-    from backend.cli.session_manager import (
-        delete_sessions,
-        list_sessions,
-        show_session,
-    )
+@dataclass
+class _SessionsCommandArgs:
+    search: str | None = None
+    sort_by: str = 'updated'
+    limit: int = 20
+    preview_idx: str | None = None
+    delete_targets: list[str] = field(default_factory=list)
+    error: str | None = None
 
-    args = list(parsed.args)
-    if args and args[0].lower() == 'list':
-        args.pop(0)
 
-    search = None
-    sort_by = 'updated'
-    limit = 20
-    preview_idx = None
-    delete_targets: list[str] = []
-
+def _parse_sessions_args(args: list[str], host: Any) -> _SessionsCommandArgs | None:
+    result = _SessionsCommandArgs()
     i = 0
     while i < len(args):
         a = args[i]
         if a in ('--search', '-s') and i + 1 < len(args):
-            search = args[i + 1]
+            result.search = args[i + 1]
             i += 2
         elif a in ('--sort',) and i + 1 < len(args):
             allowed = ('updated', 'created', 'events', 'cost', 'model')
             if args[i + 1] in allowed:
-                sort_by = args[i + 1]
+                result.sort_by = args[i + 1]
             else:
                 host._warn(f'Sort must be one of: {", ".join(allowed)}')
-                return True
+                return None
             i += 2
         elif a in ('--delete', '-d') and i + 1 < len(args):
             i += 1
             while i < len(args) and not args[i].startswith('-'):
-                delete_targets.append(args[i])
+                result.delete_targets.append(args[i])
                 i += 1
         elif a in ('--limit', '-l') and i + 1 < len(args):
             try:
-                limit = int(args[i + 1])
+                result.limit = int(args[i + 1])
             except ValueError:
                 host._warn('Limit must be a number.')
-                return True
-            if limit < 1:
+                return None
+            if result.limit < 1:
                 host._warn('Limit must be 1 or greater.')
-                return True
+                return None
             i += 2
         elif a == '--preview' and i + 1 < len(args):
-            preview_idx = args[i + 1]
+            result.preview_idx = args[i + 1]
             i += 2
         else:
-            # Positional: session limit (use --preview <N> for preview)
             try:
                 parsed_limit = int(a)
             except ValueError:
                 host._warn(f'Unknown option: {a}')
-                return True
+                return None
             if parsed_limit < 1:
                 host._warn('Limit must be 1 or greater.')
-                return True
-            limit = parsed_limit
+                return None
+            result.limit = parsed_limit
             i += 1
+    return result
 
-    if delete_targets:
-        if host._renderer is not None:
-            with host._renderer.suspend_live():
-                delete_sessions(host._console, delete_targets, config=host._config)
-        else:
+
+def _run_sessions_delete(host: Any, delete_targets: list[str]) -> bool:
+    from backend.cli.session_manager import delete_sessions
+    if host._renderer is not None:
+        with host._renderer.suspend_live():
             delete_sessions(host._console, delete_targets, config=host._config)
-        return True
+    else:
+        delete_sessions(host._console, delete_targets, config=host._config)
+    return True
 
-    if preview_idx is not None:
-        if host._renderer is not None:
-            with host._renderer.suspend_live():
-                found = show_session(
-                    host._console, config=host._config, target=preview_idx
-                )
-                if not found:
-                    host._warn(f"No session at '{preview_idx}'")
-        else:
-            found = show_session(
-                host._console, config=host._config, target=preview_idx
-            )
+
+def _run_sessions_preview(host: Any, preview_idx: str) -> bool:
+    from backend.cli.session_manager import show_session
+    if host._renderer is not None:
+        with host._renderer.suspend_live():
+            found = show_session(host._console, config=host._config, target=preview_idx)
             if not found:
                 host._warn(f"No session at '{preview_idx}'")
-        return True
+    else:
+        found = show_session(host._console, config=host._config, target=preview_idx)
+        if not found:
+            host._warn(f"No session at '{preview_idx}'")
+    return True
 
+
+def _run_sessions_list(host: Any, cmd: _SessionsCommandArgs) -> bool:
+    from backend.cli.session_manager import list_sessions
     if host._renderer is not None:
         with host._renderer.suspend_live():
             list_sessions(
                 host._console,
-                limit=limit,
+                limit=cmd.limit,
                 config=host._config,
-                sort_by=sort_by,
-                search=search,
+                sort_by=cmd.sort_by,
+                search=cmd.search,
             )
     else:
         list_sessions(
             host._console,
-            limit=limit,
+            limit=cmd.limit,
             config=host._config,
-            sort_by=sort_by,
-            search=search,
+            sort_by=cmd.sort_by,
+            search=cmd.search,
         )
     return True
+
+
+def cmd_sessions(host: Any, parsed: Any) -> bool:
+    args = list(parsed.args)
+    if args and args[0].lower() == 'list':
+        args.pop(0)
+
+    cmd = _parse_sessions_args(args, host)
+    if cmd is None:
+        return True
+
+    if cmd.delete_targets:
+        return _run_sessions_delete(host, cmd.delete_targets)
+    if cmd.preview_idx is not None:
+        return _run_sessions_preview(host, cmd.preview_idx)
+    return _run_sessions_list(host, cmd)
 
 
 def cmd_resume(host: Any, parsed: Any) -> bool:
