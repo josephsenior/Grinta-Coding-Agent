@@ -153,6 +153,63 @@ def insert_at_line_impl(self, content: str, new_text: str, line_num: int) -> str
     return ''.join(result_lines)
 
 
+def _validate_replace_range_bounds(
+    content: str, start_line: int, end_line: int
+) -> ToolResult | None:
+    lines = content.splitlines(keepends=True)
+
+    if not lines:
+        return ToolResult(
+            output='',
+            error=f'Cannot edit range {start_line}-{end_line} in an empty file.',
+            new_content=content,
+        ) if start_line != 1 else None
+
+    if start_line < 1:
+        return ToolResult(
+            output='',
+            error=f'Start line must be >= 1 (got {start_line})',
+            new_content=content,
+        )
+
+    if end_line < start_line:
+        return ToolResult(
+            output='',
+            error=f'end_line must be >= start_line (got start={start_line}, end={end_line})',
+            new_content=content,
+        )
+
+    start_idx = start_line - 1
+    if start_idx >= len(lines):
+        return ToolResult(
+            output='',
+            error=f'Start line {start_line} is beyond file length ({len(lines)} lines)',
+            new_content=content,
+        )
+
+    return None
+
+
+def _normalize_replace_range_text(
+    content: str, new_text: str, start_idx: int, end_idx: int
+) -> str:
+    lines = content.splitlines(keepends=True)
+    original_newline = '\r\n' if '\r\n' in content else '\n'
+    new_text_normalized = new_text.replace('\r\n', '\n').replace('\r', '\n')
+    if original_newline == '\r\n':
+        new_text_normalized = new_text_normalized.replace('\n', '\r\n')
+
+    is_eof_replacement = end_idx >= len(lines)
+    if (
+        not is_eof_replacement
+        and new_text_normalized
+        and not new_text_normalized.endswith(original_newline)
+    ):
+        new_text_normalized += original_newline
+
+    return new_text_normalized
+
+
 def replace_range_impl(
     self,
     content: str,
@@ -176,54 +233,19 @@ def replace_range_impl(
 
     lines = content.splitlines(keepends=True)
 
-    if not lines:
-        if start_line == 1:
-            return new_text
-        return ToolResult(
-            output='',
-            error=f'Cannot edit range {start_line}-{end_line} in an empty file.',
-            new_content=content,
-        )
+    if not lines and start_line == 1:
+        return new_text
 
-    if start_line < 1:
-        return ToolResult(
-            output='',
-            error=f'Start line must be >= 1 (got {start_line})',
-            new_content=content,
-        )
-
-    if end_line < start_line:
-        return ToolResult(
-            output='',
-            error=f'end_line must be >= start_line (got start={start_line}, end={end_line})',
-            new_content=content,
-        )
+    validation = _validate_replace_range_bounds(content, start_line, end_line)
+    if validation is not None:
+        return validation
 
     start_idx = start_line - 1
-    end_idx = end_line
+    end_idx = min(end_line, len(lines))
 
-    if start_idx >= len(lines):
-        return ToolResult(
-            output='',
-            error=f'Start line {start_line} is beyond file length ({len(lines)} lines)',
-            new_content=content,
-        )
-
-    end_idx = min(end_idx, len(lines))
-
-    original_newline = '\r\n' if '\r\n' in content else '\n'
-    new_text_normalized = new_text.replace('\r\n', '\n').replace('\r', '\n')
-    if original_newline == '\r\n':
-        new_text_normalized = new_text_normalized.replace('\n', '\r\n')
-
-    is_eof_replacement = end_idx >= len(lines)
-    if (
-        not is_eof_replacement
-        and new_text_normalized
-        and not new_text_normalized.endswith(original_newline)
-    ):
-        new_text_normalized += original_newline
-
+    new_text_normalized = _normalize_replace_range_text(
+        content, new_text, start_idx, end_idx
+    )
     new_lines_to_insert = new_text_normalized.splitlines(keepends=True)
 
     result_lines = lines[:start_idx] + new_lines_to_insert + lines[end_idx:]

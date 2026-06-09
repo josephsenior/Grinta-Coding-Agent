@@ -58,54 +58,54 @@ class _AppRendererTerminalMixin:
         """Format the session label used in terminal card secondary text."""
         return f'session {session_id}' if session_id else None
 
-    def _upsert_terminal_session_card(
-        self,
-        *,
-        session_id: str,
-        verb: str,
-        detail: str,
-        secondary: str | None = None,
-        secondary_kind: str = 'neutral',
-        extra_content: str | None = None,
-        processing: bool = True,
-        collapse_after_update: bool = False,
-    ) -> None:
-        session_key = session_id or 'terminal'
+    def _resolve_terminal_widget(self, session_key: str, session_id: str):
         widget = self._terminal_cards_by_session.get(session_key)
         if widget is None and session_id and self._pending_terminal_card is not None:
             widget = self._pending_terminal_card
             self._terminal_cards_by_session[session_key] = widget
             self._pending_terminal_card = None
-        if widget is None:
-            card = ActivityRenderer.terminal_action(
-                verb,
-                detail,
-                secondary=secondary,
-                secondary_kind=secondary_kind,
-                extra_content=extra_content,
-            )
-            widget = self._write_card(card, collapsed=True)
-            if session_id:
-                self._terminal_cards_by_session[session_key] = widget
-            else:
-                self._pending_terminal_card = widget
-            return
+        return widget
 
-        # Update existing widget for same session
-        widget.set_verb(verb, detail=detail)
-        widget.set_status(
-            'ok'
-            if secondary_kind == 'ok'
-            else 'err'
-            if secondary_kind == 'err'
-            else 'neutral',
-            outcome=secondary,
+    def _create_and_write_terminal_card(
+        self,
+        session_key: str,
+        session_id: str,
+        verb: str,
+        detail: str,
+        secondary: str | None,
+        secondary_kind: str,
+        extra_content: str | None,
+    ) -> None:
+        card = ActivityRenderer.terminal_action(
+            verb,
+            detail,
+            secondary=secondary,
+            secondary_kind=secondary_kind,
+            extra_content=extra_content,
         )
-        if extra_content:
-            widget.append_content(extra_content)
+        widget = self._write_card(card, collapsed=True)
+        if session_id:
+            self._terminal_cards_by_session[session_key] = widget
+        else:
+            self._pending_terminal_card = widget
 
-        del collapse_after_update
+    @staticmethod
+    def _terminal_status_from_kind(secondary_kind: str) -> str:
+        if secondary_kind == 'ok':
+            return 'ok'
+        if secondary_kind == 'err':
+            return 'err'
+        return 'neutral'
 
+    def _apply_terminal_processing(
+        self,
+        widget: Any,
+        processing: bool,
+        verb: str,
+        detail: str,
+        secondary: str | None,
+        session_key: str,
+    ) -> None:
         widget.set_processing(processing)
         if processing:
             self._clear_last_active_card_processing()
@@ -124,6 +124,56 @@ class _AppRendererTerminalMixin:
                 meta=secondary or f'session {session_key}',
                 active=False,
             )
+
+    def _upsert_terminal_session_card(
+        self,
+        *,
+        session_id: str,
+        verb: str,
+        detail: str,
+        secondary: str | None = None,
+        secondary_kind: str = 'neutral',
+        extra_content: str | None = None,
+        processing: bool = True,
+        collapse_after_update: bool = False,
+    ) -> None:
+        session_key = session_id or 'terminal'
+        widget = self._resolve_terminal_widget(session_key, session_id)
+        if widget is None:
+            self._create_and_write_terminal_card(
+                session_key, session_id, verb, detail,
+                secondary, secondary_kind, extra_content,
+            )
+            return
+
+        widget.set_verb(verb, detail=detail)
+        widget.set_status(
+            self._terminal_status_from_kind(secondary_kind),
+            outcome=secondary,
+        )
+        if extra_content:
+            widget.append_content(extra_content)
+
+        del collapse_after_update
+        self._apply_terminal_processing(
+            widget, processing, verb, detail, secondary, session_key,
+        )
+
+    @staticmethod
+    def _build_shell_meta_header(command: str, cwd: str | None, exit_code: int | None) -> list[str]:
+        meta_lines = [f'$ {command}']
+        if cwd:
+            meta_lines.append(f'cwd: {cwd}')
+        meta_lines.append(f'exit: {exit_code}')
+        meta_lines.append('─' * 50)
+        return meta_lines
+
+    @staticmethod
+    def _append_card_extra_lines(extra_parts: list[str], card: Any) -> None:
+        if card.extra_lines:
+            for extra in card.extra_lines:
+                indent = '  ' * extra.indent
+                extra_parts.append(f'{indent}{extra.text}')
 
     def _complete_shell_command_card(
         self,
@@ -151,18 +201,8 @@ class _AppRendererTerminalMixin:
         status = 'ok' if exit_code == 0 else 'err'
         widget.set_status(status, outcome=card.secondary)
 
-        # Build expanded content with metadata header per spec
-        meta_lines = [f'$ {command}']
-        if cwd:
-            meta_lines.append(f'cwd: {cwd}')
-        meta_lines.append(f'exit: {exit_code}')
-        meta_lines.append('─' * 50)
-
-        extra_parts = list(meta_lines)
-        if card.extra_lines:
-            for extra in card.extra_lines:
-                indent = '  ' * extra.indent
-                extra_parts.append(f'{indent}{extra.text}')
+        extra_parts = self._build_shell_meta_header(command, cwd, exit_code)
+        self._append_card_extra_lines(extra_parts, card)
         extra_content = '\n'.join(extra_parts)
 
         widget.update_content(extra_content)

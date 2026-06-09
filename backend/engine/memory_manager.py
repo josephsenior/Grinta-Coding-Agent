@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from backend.context import ContextMemory
+from backend.context.condensed_history import CondensedHistory
 from backend.context.compactor import Compactor
 from backend.context.compact_boundary import boundary_info, project_after_compact_boundary
-from backend.context.continuity_eval import compaction_passes_continuity_gate
 from backend.context.pre_condensation_snapshot import (
     commit_snapshot,
     delete_snapshot,
@@ -36,12 +36,6 @@ if TYPE_CHECKING:
     from backend.utils.prompt import PromptManager
 
 
-@dataclass
-class CondensedHistory:
-    events: list[Event]
-    pending_action: Action | None
-
-
 _MIN_HISTORY_EVENTS_FOR_FORCED_COMPACTION = 30
 
 
@@ -64,13 +58,35 @@ class ContextMemoryManager:
         self._llm_registry = llm_registry
         self.conversation_memory: ContextMemory | None = None
         self.compactor: Compactor | None = None
+        self._pipeline = None
         self._build_messages_cache: _BuildMessagesCache | None = None
+
+    @staticmethod
+    def _is_pipeline_config(compactor_config: object | None) -> bool:
+        from backend.core.config.compactor_config import ContextPipelineConfig
+
+        return isinstance(compactor_config, ContextPipelineConfig)
 
     def initialize(self, prompt_manager: PromptManager) -> None:
         """Initialize context memory with prompt manager."""
         self.conversation_memory = ContextMemory(self._config, prompt_manager)
-        # Initialize compactor from config if available
         compactor_config = getattr(self._config, 'compactor_config', None)
+        if self._is_pipeline_config(compactor_config):
+            try:
+                from backend.context.context_pipeline import ContextPipeline
+
+                self._pipeline = ContextPipeline.from_config(
+                    compactor_config,
+                    self._llm_registry,
+                )
+                self.compactor = None
+                logger.debug('Using context pipeline')
+            except Exception as exc:  # pragma: no cover - condensation optional
+                logger.warning('Failed to initialize context pipeline: %s', exc)
+                self._pipeline = None
+                self.compactor = None
+            return
+        self._pipeline = None
         self._init_compactor(compactor_config)
 
     def _init_compactor(self, compactor_config) -> None:
@@ -116,6 +132,8 @@ class ContextMemoryManager:
 
     def should_emit_compaction_status(self, state: State) -> bool:
         """Return True when foreground condensation is likely to emit an action."""
+        if self._pipeline is not None:
+            return self._pipeline.should_emit_compaction_status(state)
         if not self.compactor:
             return False
         history = list(getattr(state, 'history', []))
@@ -209,6 +227,9 @@ class ContextMemoryManager:
             return condensation_result
 
     async def condense_history(self, state: State) -> CondensedHistory:
+        if self._pipeline is not None:
+            return await self._pipeline.prepare_step(state)
+
         started = time.perf_counter()
         history = list(getattr(state, 'history', []))
         if not self.compactor:
@@ -307,18 +328,6 @@ class ContextMemoryManager:
             return CondensedHistory(condensation_result.events, None)
 
         action = condensation_result.action  # type: ignore[attr-defined]
-        if isinstance(action, CondensationAction) and not self._compaction_passes_continuity_gate(
-            history, action
-        ):
-            logger.warning(
-                'Rejecting compaction: continuity gate failed; keeping current View '
-                '(history_events=%d)',
-                len(history),
-            )
-            delete_staging_snapshot()
-            if memory_pressure:
-                state.ack_memory_pressure(source='ContextMemoryManager')
-            return CondensedHistory(list(state.view.events), None)
 
         # Compaction passed — promote the staged snapshot so it survives.
         commit_snapshot()
@@ -499,61 +508,54 @@ class ContextMemoryManager:
                 len(pruned_ids),
             )
 
-    @staticmethod
-    def _compaction_passes_continuity_gate(
-        history: list[Event],
-        action: CondensationAction,
-    ) -> bool:
-        if not action.summary:
-            return True
-        restored_parts = [action.summary]
-        try:
-            from backend.context.working_set import get_durable_context_block
-
-            durable = get_durable_context_block(history)
-            if durable:
-                restored_parts.append(durable)
-        except Exception:
-            logger.debug('Continuity gate durable context load failed', exc_info=True)
-        snapshot_text = ContextMemoryManager.get_restored_context()
-        if snapshot_text:
-            restored_parts.append(snapshot_text)
-        restored = '\n\n'.join(part for part in restored_parts if part.strip())
-        passed, result = compaction_passes_continuity_gate(history, restored)
-        if not passed:
-            missing = ', '.join(
-                f'{fact.category}:{fact.key[:40]}' for fact in result.missing[:8]
-            )
-            logger.warning(
-                'Compaction continuity gate failed score=%.2f matched=%d/%d missing=%s',
-                result.score,
-                result.matched,
-                result.total,
-                missing or 'none',
-            )
-        return passed
-
     def build_messages(
         self,
         condensed_history: Iterable[Event],
         initial_user_message: MessageAction,
         llm_config,
+        *,
+        state: State | None = None,
     ) -> list[Message]:
         if not self.conversation_memory:
             raise RuntimeError('Conversation memory is not initialized')
 
-        events = project_after_compact_boundary(list(condensed_history))
-        info = boundary_info(list(condensed_history))
-        if info is not None:
-            logger.debug(
-                'Prompt projection after compact boundary id=%d pruned=%d post_boundary=%d',
-                info.boundary_event_id,
-                info.pruned_event_count,
-                info.post_boundary_event_count,
-            )
+        condensed_list = list(condensed_history)
         window_started = time.perf_counter()
-        prompt_window = select_prompt_events(events, llm_config)
-        events_for_prompt = prompt_window.events
+        if self._pipeline is not None:
+            full_history = list(getattr(state, 'history', [])) if state is not None else condensed_list
+            events_for_prompt = self._pipeline.build_prompt_events(
+                condensed_list,
+                state=state,
+                llm_config=llm_config,
+                full_history=full_history,
+            )
+            from backend.context.prompt_window import PromptWindowResult, estimate_events_tokens
+
+            prompt_window = PromptWindowResult(
+                events=events_for_prompt,
+                original_events=len(full_history),
+                selected_events=len(events_for_prompt),
+                dropped_events=max(0, len(full_history) - len(events_for_prompt)),
+                estimated_tokens=estimate_events_tokens(full_history),
+                selected_estimated_tokens=estimate_events_tokens(events_for_prompt),
+                token_budget=None,
+                protected_events=0,
+                windowed=False,
+                reason='pipeline',
+                cache_fingerprint='',
+            )
+        else:
+            events = project_after_compact_boundary(condensed_list)
+            info = boundary_info(condensed_list)
+            if info is not None:
+                logger.debug(
+                    'Prompt projection after compact boundary id=%d pruned=%d post_boundary=%d',
+                    info.boundary_event_id,
+                    info.pruned_event_count,
+                    info.post_boundary_event_count,
+                )
+            prompt_window = select_prompt_events(events, llm_config)
+            events_for_prompt = prompt_window.events
         window_elapsed = time.perf_counter() - window_started
         config_key = self._llm_build_config_key(llm_config)
         fingerprints = tuple(event_fingerprint(event) for event in events_for_prompt)
@@ -611,7 +613,7 @@ class ContextMemoryManager:
                 'ContextMemoryManager.build_messages processed %d/%d events into %d '
                 'messages in %.3fs (window=%.3fs)',
                 len(events_for_prompt),
-                len(events),
+                prompt_window.original_events,
                 len(messages),
                 elapsed,
                 window_elapsed,

@@ -78,51 +78,93 @@ class _SessionsCommandArgs:
     error: str | None = None
 
 
+def _handle_sessions_search(args, i, result, host):
+    del host
+    result.search = args[i + 1]
+    return i + 2
+
+
+def _handle_sessions_sort(args, i, result, host):
+    allowed = ('updated', 'created', 'events', 'cost', 'model')
+    if args[i + 1] not in allowed:
+        host._warn(f'Sort must be one of: {", ".join(allowed)}')
+        return None
+    result.sort_by = args[i + 1]
+    return i + 2
+
+
+def _handle_sessions_delete(args, i, result, host):
+    del host
+    i += 1
+    while i < len(args) and not args[i].startswith('-'):
+        result.delete_targets.append(args[i])
+        i += 1
+    return i
+
+
+def _handle_sessions_limit(args, i, result, host):
+    try:
+        limit = int(args[i + 1])
+    except ValueError:
+        host._warn('Limit must be a number.')
+        return None
+    if limit < 1:
+        host._warn('Limit must be 1 or greater.')
+        return None
+    result.limit = limit
+    return i + 2
+
+
+def _handle_sessions_preview(args, i, result, host):
+    del host
+    result.preview_idx = args[i + 1]
+    return i + 2
+
+
+_SESSIONS_FLAG_HANDLERS = {
+    '--search': _handle_sessions_search,
+    '-s': _handle_sessions_search,
+    '--sort': _handle_sessions_sort,
+    '--delete': _handle_sessions_delete,
+    '-d': _handle_sessions_delete,
+    '--limit': _handle_sessions_limit,
+    '-l': _handle_sessions_limit,
+    '--preview': _handle_sessions_preview,
+}
+
+
+def _parse_sessions_positional(arg, result, host):
+    try:
+        parsed_limit = int(arg)
+    except ValueError:
+        host._warn(f'Unknown option: {arg}')
+        return False
+    if parsed_limit < 1:
+        host._warn('Limit must be 1 or greater.')
+        return False
+    result.limit = parsed_limit
+    return True
+
+
+def _dispatch_sessions_arg(a, args, i, result, host):
+    handler = _SESSIONS_FLAG_HANDLERS.get(a)
+    if handler is not None and i + 1 < len(args):
+        return handler(args, i, result, host)
+    if not a.startswith('-'):
+        if not _parse_sessions_positional(a, result, host):
+            return None
+        return i + 1
+    host._warn(f'Unknown option: {a}')
+    return None
+
+
 def _parse_sessions_args(args: list[str], host: Any) -> _SessionsCommandArgs | None:
     result = _SessionsCommandArgs()
     i = 0
     while i < len(args):
-        a = args[i]
-        if a in ('--search', '-s') and i + 1 < len(args):
-            result.search = args[i + 1]
-            i += 2
-        elif a in ('--sort',) and i + 1 < len(args):
-            allowed = ('updated', 'created', 'events', 'cost', 'model')
-            if args[i + 1] in allowed:
-                result.sort_by = args[i + 1]
-            else:
-                host._warn(f'Sort must be one of: {", ".join(allowed)}')
-                return None
-            i += 2
-        elif a in ('--delete', '-d') and i + 1 < len(args):
-            i += 1
-            while i < len(args) and not args[i].startswith('-'):
-                result.delete_targets.append(args[i])
-                i += 1
-        elif a in ('--limit', '-l') and i + 1 < len(args):
-            try:
-                result.limit = int(args[i + 1])
-            except ValueError:
-                host._warn('Limit must be a number.')
-                return None
-            if result.limit < 1:
-                host._warn('Limit must be 1 or greater.')
-                return None
-            i += 2
-        elif a == '--preview' and i + 1 < len(args):
-            result.preview_idx = args[i + 1]
-            i += 2
-        else:
-            try:
-                parsed_limit = int(a)
-            except ValueError:
-                host._warn(f'Unknown option: {a}')
-                return None
-            if parsed_limit < 1:
-                host._warn('Limit must be 1 or greater.')
-                return None
-            result.limit = parsed_limit
-            i += 1
+        i = _dispatch_sessions_arg(args[i], args, i, result, host)
+        if i is None:
+            return None
     return result
 
 

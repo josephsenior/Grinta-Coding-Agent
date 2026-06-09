@@ -91,28 +91,63 @@ class StatusFields:
     token_usage_pct: int = 0
 
 
+def _format_token_display_zero_state() -> str:
+    return '0'
+
+
+def _format_token_display_total_only(total: str) -> str:
+    return f'{total}'
+
+
+def _format_token_display_with_context(
+    total: str, ctx: str, lim_tok: str | None
+) -> str:
+    context_detail = f'{ctx}/{lim_tok}' if lim_tok else ctx
+    return f'{total} · {context_detail}'
+
+
+def _format_token_display_context_only(
+    ctx: str, lim_tok: str | None, context_limit: int
+) -> str:
+    if context_limit == 0:
+        return f'{ctx}'
+    return f'{ctx}/{lim_tok}' if lim_tok else f'{ctx}'
+
+
+def _format_token_display_dispatch(
+    total_tokens: int,
+    context_tokens: int,
+    context_limit: int,
+    total: str,
+    ctx: str,
+    lim_tok: str | None,
+) -> str:
+    if total_tokens == 0 and context_tokens == 0 and context_limit == 0:
+        return _format_token_display_zero_state()
+    if total_tokens > 0 and context_limit == 0:
+        return _format_token_display_total_only(total)
+    if total_tokens > 0:
+        return _format_token_display_with_context(total, ctx, lim_tok)
+    return _format_token_display_context_only(ctx, lim_tok, context_limit)
+
+
 def _format_token_display_compact(hud: Any) -> str:
     """Format the compact token display string."""
-    total = HUDBar._format_tokens(int(getattr(hud, 'total_tokens', 0) or 0))
+    total_tokens = int(getattr(hud, 'total_tokens', 0) or 0)
+    total = HUDBar._format_tokens(total_tokens)
     ctx = HUDBar._format_tokens(hud.context_tokens)
     lim_tok = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
-    is_estimated = getattr(hud, 'token_usage_estimated', False)
 
-    total_tokens = int(getattr(hud, 'total_tokens', 0) or 0)
+    result = _format_token_display_dispatch(
+        total_tokens,
+        hud.context_tokens,
+        hud.context_limit,
+        total,
+        ctx,
+        lim_tok,
+    )
 
-    if total_tokens == 0 and hud.context_tokens == 0 and hud.context_limit == 0:
-        result = '0'
-    elif total_tokens > 0 and hud.context_limit == 0:
-        result = f'{total}'
-    elif total_tokens > 0:
-        context_detail = f'{ctx}/{lim_tok}' if lim_tok else ctx
-        result = f'{total} · {context_detail}'
-    elif hud.context_limit == 0:
-        result = f'{ctx}'
-    else:
-        result = f'{ctx}/{lim_tok}' if lim_tok else f'{ctx}'
-
-    if is_estimated:
+    if getattr(hud, 'token_usage_estimated', False):
         result += '~'
     return result
 

@@ -42,6 +42,78 @@ def _preview_lines(
     return lines
 
 
+def _format_file_detail(
+    path: str,
+    *,
+    new_file: bool,
+    added: int,
+    line_range: str,
+) -> str:
+    if new_file and added:
+        return f'{path}  [{CLR_STATUS_OK}]+{added}[/{CLR_STATUS_OK}]'
+    if line_range:
+        return f'{path}  [{NAVY_TEXT_DIM}]·  {line_range}[/]'
+    return path
+
+
+def _format_delta_line(added: int, removed: int) -> str:
+    delta = format_activity_delta_secondary(added=added, removed=removed)
+    return f'  {delta}' if delta else ''
+
+
+def _needs_delta(new_file: bool, added: int, removed: int) -> bool:
+    return not new_file and (added or removed)
+
+
+def _needs_preview(new_file: bool, preview_content: str | None) -> bool:
+    return new_file and preview_content
+
+
+def _format_delta_or_preview(
+    *,
+    new_file: bool,
+    added: int,
+    removed: int,
+    preview_content: str | None,
+) -> list[Any]:
+    if _needs_delta(new_file, added, removed):
+        line = _format_delta_line(added, removed)
+        return [line] if line else []
+    if _needs_preview(new_file, preview_content):
+        return _preview_lines(preview_content)
+    return []
+
+
+def _is_added_line(stripped: str) -> bool:
+    return stripped.startswith('+') and not stripped.startswith('+++')
+
+
+def _is_removed_line(stripped: str) -> bool:
+    return stripped.startswith('-') and not stripped.startswith('---')
+
+
+def _format_single_diff_line(stripped: str) -> str:
+    if _is_added_line(stripped):
+        content = markup_escape(stripped[1:])
+        return f'[{CLR_STATUS_OK}]+{content}[/{CLR_STATUS_OK}]'
+    if _is_removed_line(stripped):
+        content = markup_escape(stripped[1:])
+        return f'[{CLR_DETAIL}]-{content}[/{CLR_DETAIL}]'
+    if stripped.startswith('@@'):
+        return f'[{CLR_SECONDARY}]{stripped}[/{CLR_SECONDARY}]'
+    escaped = markup_escape(stripped)
+    return f'[dim]{escaped}[/dim]'
+
+
+def _render_diff_block(diff_lines: list[str]) -> list[Any]:
+    result: list[Any] = []
+    for line in diff_lines[:20]:
+        result.append(_format_single_diff_line(line.rstrip()))
+    if len(diff_lines) > 20:
+        result.append(f'  [dim]... {len(diff_lines) - 20} more diff lines[/dim]')
+    return result
+
+
 def render_file_edit(
     verb: str,
     path: str,
@@ -58,44 +130,17 @@ def render_file_edit(
     """
     lines: list[Any] = []
 
-    # Build detail with inline stats for new files
-    detail = path
-    if new_file and added:
-        detail += f'  [{CLR_STATUS_OK}]+{added}[/{CLR_STATUS_OK}]'
-    elif line_range:
-        detail = f'{path}  [{NAVY_TEXT_DIM}]·  {line_range}[/]'
-
-    # For edits (not new files), show delta as secondary line
-
-    if not new_file and (added or removed):
-        delta = format_activity_delta_secondary(added=added, removed=removed)
-        if delta:
-            lines.append(f'  {delta}')
-    elif new_file and preview_content:
-        lines.extend(_preview_lines(preview_content))
-
+    detail = _format_file_detail(
+        path, new_file=new_file, added=added, line_range=line_range,
+    )
+    lines.extend(_format_delta_or_preview(
+        new_file=new_file, added=added, removed=removed,
+        preview_content=preview_content,
+    ))
     lines.append(format_activity_primary(verb, detail))
 
     if diff_lines:
-        for line in diff_lines[:20]:
-            stripped = line.rstrip()
-            if stripped.startswith('+') and not stripped.startswith('+++'):
-                # Escape content after the + sign to prevent MarkupError
-                content = markup_escape(stripped[1:])
-                lines.append(f'[{CLR_STATUS_OK}]+{content}[/{CLR_STATUS_OK}]')
-            elif stripped.startswith('-') and not stripped.startswith('---'):
-                # Escape content after the - sign to prevent MarkupError
-                content = markup_escape(stripped[1:])
-                lines.append(f'[{CLR_DETAIL}]-{content}[/{CLR_DETAIL}]')
-            elif stripped.startswith('@@'):
-                lines.append(f'[{CLR_SECONDARY}]{stripped}[/{CLR_SECONDARY}]')
-            else:
-                # Escape context lines to prevent MarkupError
-                escaped = markup_escape(stripped)
-                lines.append(f'[dim]{escaped}[/dim]')
-
-        if len(diff_lines) > 20:
-            lines.append(f'  [dim]... {len(diff_lines) - 20} more diff lines[/dim]')
+        lines.extend(_render_diff_block(diff_lines))
 
     return lines
 

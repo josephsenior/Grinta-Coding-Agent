@@ -24,6 +24,123 @@ from backend.core.logger import app_logger as logger
 from backend.ledger import EventStreamSubscriber
 
 
+def _parse_sessions_tui_args(args: list[str]) -> dict[str, Any]:
+    remaining = list(args)
+    if remaining and remaining[0].lower() == 'list':
+        remaining.pop(0)
+
+    result: dict[str, Any] = {
+        'search': None,
+        'sort_by': 'updated',
+        'limit': 20,
+        'preview_idx': None,
+        'delete_targets': [],
+        'error': None,
+    }
+
+    i = 0
+    while i < len(remaining):
+        i, done = _parse_one_sessions_arg(remaining, i, result)
+        if done:
+            break
+
+    return result
+
+
+def _parse_one_sessions_arg(
+    remaining: list[str], i: int, result: dict[str, Any]
+) -> tuple[int, bool]:
+    token = remaining[i]
+    handlers = [
+        _try_parse_search_arg,
+        _try_parse_sort_arg,
+        _try_parse_delete_arg,
+        _try_parse_limit_arg,
+        _try_parse_preview_arg,
+    ]
+    for handler in handlers:
+        new_i, handled, error = handler(remaining, i, result)
+        if error:
+            result['error'] = error
+            return i, True
+        if handled:
+            return new_i, False
+
+    return _parse_positional_limit_arg(remaining, i, result)
+
+
+def _try_parse_search_arg(
+    remaining: list[str], i: int, result: dict[str, Any]
+) -> tuple[int, bool, str | None]:
+    if remaining[i] in ('--search', '-s') and i + 1 < len(remaining):
+        result['search'] = remaining[i + 1]
+        return i + 2, True, None
+    return i, False, None
+
+
+def _try_parse_sort_arg(
+    remaining: list[str], i: int, result: dict[str, Any]
+) -> tuple[int, bool, str | None]:
+    if remaining[i] == '--sort' and i + 1 < len(remaining):
+        allowed = ('updated', 'created', 'events', 'cost', 'model')
+        if remaining[i + 1] not in allowed:
+            return i, False, f'Sort must be one of: {", ".join(allowed)}'
+        result['sort_by'] = remaining[i + 1]
+        return i + 2, True, None
+    return i, False, None
+
+
+def _try_parse_delete_arg(
+    remaining: list[str], i: int, result: dict[str, Any]
+) -> tuple[int, bool, str | None]:
+    if remaining[i] in ('--delete', '-d') and i + 1 < len(remaining):
+        i += 1
+        while i < len(remaining) and not remaining[i].startswith('-'):
+            result['delete_targets'].append(remaining[i])
+            i += 1
+        return i, True, None
+    return i, False, None
+
+
+def _try_parse_limit_arg(
+    remaining: list[str], i: int, result: dict[str, Any]
+) -> tuple[int, bool, str | None]:
+    if remaining[i] in ('--limit', '-l') and i + 1 < len(remaining):
+        try:
+            result['limit'] = int(remaining[i + 1])
+        except ValueError:
+            return i, False, 'Limit must be a number.'
+        if result['limit'] < 1:
+            return i, False, 'Limit must be 1 or greater.'
+        return i + 2, True, None
+    return i, False, None
+
+
+def _try_parse_preview_arg(
+    remaining: list[str], i: int, result: dict[str, Any]
+) -> tuple[int, bool, str | None]:
+    if remaining[i] == '--preview' and i + 1 < len(remaining):
+        result['preview_idx'] = remaining[i + 1]
+        return i + 2, True, None
+    return i, False, None
+
+
+def _parse_positional_limit_arg(
+    remaining: list[str], i: int, result: dict[str, Any]
+) -> tuple[int, bool]:
+    token = remaining[i]
+    try:
+        parsed_limit = int(token)
+    except ValueError:
+        result['error'] = f'Unknown option: {token}'
+        return i, True
+    if parsed_limit < 1:
+        result['error'] = 'Limit must be 1 or greater.'
+        return i, True
+    result['limit'] = parsed_limit
+    return i + 1, False
+
+
 class _AppScreenInputMixin:
     """Input-related methods of GrintaScreen."""
 
@@ -121,36 +238,21 @@ class _AppScreenInputMixin:
 
         self._complete_command_flag(ta, cmd, parts, raw)
 
-    def action_submit_input(self) -> None:
-        _tui_logger.debug(
-            f'action_submit_input: lock_locked={self._input_lock.locked()}'
-        )
-        if getattr(self, '_turn_in_flight', False):
-            _tui_logger.debug('action_submit_input: turn in flight, ignoring')
-            return
-        if self._input_lock.locked():
-            _tui_logger.debug('action_submit_input: lock held, ignoring')
-            return
-        ta = self.query_one('#input', TextArea)
-        clean_text = _strip_terminal_control_literals(ta.text)
-        if clean_text != ta.text:
-            ta.text = clean_text
-        text = _strip_ansi(clean_text).strip()
-        _tui_logger.debug(f'action_submit_input: text_len={len(text)}')
-        if not text:
-            if self._welcome_visible:
-                _tui_logger.debug('action_submit_input: routing to welcome select')
-                self.action_welcome_select()
-            elif self._active_communicate_card is not None and getattr(
-                self._active_communicate_card, 'has_options', False
-            ):
-                _tui_logger.debug(
-                    'action_submit_input: routing to communicate selection'
-                )
-                self._active_communicate_card.action_submit_option()
-            else:
-                _tui_logger.debug('action_submit_input: empty text, ignoring')
-            return
+    def _submit_handle_empty_text(self) -> None:
+        if self._welcome_visible:
+            _tui_logger.debug('action_submit_input: routing to welcome select')
+            self.action_welcome_select()
+        elif self._active_communicate_card is not None and getattr(
+            self._active_communicate_card, 'has_options', False
+        ):
+            _tui_logger.debug(
+                'action_submit_input: routing to communicate selection'
+            )
+            self._active_communicate_card.action_submit_option()
+        else:
+            _tui_logger.debug('action_submit_input: empty text, ignoring')
+
+    def _submit_clear_ui_state(self) -> None:
         if self._welcome_visible:
             self._hide_welcome()
         if self._active_communicate_card is not None:
@@ -159,10 +261,8 @@ class _AppScreenInputMixin:
             except Exception:
                 pass
             self._active_communicate_card = None
-        if not self._command_history or self._command_history[-1] != text:
-            self._command_history.append(text)
-        self._history_index = -1
-        _tui_logger.debug('action_submit_input: creating task for _handle_input')
+
+    def _submit_spawn_input_task(self, text: str) -> None:
         try:
             task = asyncio.create_task(self._handle_input(text))
             _tui_logger.debug(f'action_submit_input: task created {task}')
@@ -181,6 +281,32 @@ class _AppScreenInputMixin:
             _tui_logger.debug(
                 f'action_submit_input: create_task FAILED: {type(exc).__name__}: {exc}'
             )
+
+    def action_submit_input(self) -> None:
+        _tui_logger.debug(
+            f'action_submit_input: lock_locked={self._input_lock.locked()}'
+        )
+        if getattr(self, '_turn_in_flight', False):
+            _tui_logger.debug('action_submit_input: turn in flight, ignoring')
+            return
+        if self._input_lock.locked():
+            _tui_logger.debug('action_submit_input: lock held, ignoring')
+            return
+        ta = self.query_one('#input', TextArea)
+        clean_text = _strip_terminal_control_literals(ta.text)
+        if clean_text != ta.text:
+            ta.text = clean_text
+        text = _strip_ansi(clean_text).strip()
+        _tui_logger.debug(f'action_submit_input: text_len={len(text)}')
+        if not text:
+            self._submit_handle_empty_text()
+            return
+        self._submit_clear_ui_state()
+        if not self._command_history or self._command_history[-1] != text:
+            self._command_history.append(text)
+        self._history_index = -1
+        _tui_logger.debug('action_submit_input: creating task for _handle_input')
+        self._submit_spawn_input_task(text)
 
     async def _ensure_controller_ready(self) -> None:
         """Ensure controller is initialized, bootstrapping if needed."""
@@ -225,56 +351,18 @@ class _AppScreenInputMixin:
         self.query_one('#input-bar', InputBar).remove_class('processing')
         self._render_hud_bar()
 
-    async def _handle_input(self, text: str) -> None:
-        try:
-            _tui_logger.debug(f'_handle_input ENTER text={text[:80]}')
-        except Exception as exc:
-            _tui_logger.debug(
-                f'_handle_input: _trace FAILED: {type(exc).__name__}: {exc}'
-            )
+    async def _handle_input_prepare_ui(self) -> None:
+        if self._renderer:
+            await self._renderer.drain_events_async()
+        ta = self.query_one('#input', TextArea)
+        ta.clear()
+        lst = self.query_one('#suggestions-list', ListView)
+        lst.add_class('-hidden')
+        self._suggestion_matches = []
+        ta.focus()
+        self._scroll_to_bottom()
 
-        agent_text: str | None = None
-        async with self._input_lock:
-            if self._renderer:
-                await self._renderer.drain_events_async()
-
-            ta = self.query_one('#input', TextArea)
-            ta.clear()
-            lst = self.query_one('#suggestions-list', ListView)
-            lst.add_class('-hidden')
-            self._suggestion_matches = []
-            ta.focus()
-            self._scroll_to_bottom()
-
-            if text.startswith('/'):
-                await self._handle_slash_command(text)
-                return
-
-            if self._turn_in_flight:
-                _tui_logger.debug('_handle_input: turn already in flight, ignoring')
-                return
-
-            self.add_user_message(text)
-            self._render_hud_bar()
-            self.query_one('#input-bar', InputBar).add_class('processing')
-
-            try:
-                _tui_logger.debug(
-                    f'_handle_input: controller={self._controller is not None}'
-                )
-                await self._ensure_controller_ready()
-                assert self._controller is not None, (
-                    'Controller must be initialized after agent task setup'
-                )
-                agent_text = text
-                self._turn_in_flight = True
-            except Exception as exc:
-                self._handle_input_error(exc)
-                return
-
-        if agent_text is None:
-            return
-
+    async def _handle_input_dispatch(self, agent_text: str) -> None:
         try:
             _tui_logger.debug('_handle_input: calling _dispatch_to_agent()')
             logger.info('[TUI] _handle_input: dispatching to agent')
@@ -312,6 +400,49 @@ class _AppScreenInputMixin:
             self._hud.update_agent_state(actual_state or 'Ready')
             self._render_hud_bar()
             self._turn_in_flight = False
+
+    async def _handle_input(self, text: str) -> None:
+        try:
+            _tui_logger.debug(f'_handle_input ENTER text={text[:80]}')
+        except Exception as exc:
+            _tui_logger.debug(
+                f'_handle_input: _trace FAILED: {type(exc).__name__}: {exc}'
+            )
+
+        agent_text: str | None = None
+        async with self._input_lock:
+            await self._handle_input_prepare_ui()
+
+            if text.startswith('/'):
+                await self._handle_slash_command(text)
+                return
+
+            if self._turn_in_flight:
+                _tui_logger.debug('_handle_input: turn already in flight, ignoring')
+                return
+
+            self.add_user_message(text)
+            self._render_hud_bar()
+            self.query_one('#input-bar', InputBar).add_class('processing')
+
+            try:
+                _tui_logger.debug(
+                    f'_handle_input: controller={self._controller is not None}'
+                )
+                await self._ensure_controller_ready()
+                assert self._controller is not None, (
+                    'Controller must be initialized after agent task setup'
+                )
+                agent_text = text
+                self._turn_in_flight = True
+            except Exception as exc:
+                self._handle_input_error(exc)
+                return
+
+        if agent_text is None:
+            return
+
+        await self._handle_input_dispatch(agent_text)
 
     async def _handle_slash_command(self, text: str) -> None:
         raw = text.strip()
@@ -380,71 +511,19 @@ class _AppScreenInputMixin:
         self.add_success('Settings updated.')
 
     async def _run_sessions_tui(self, args: list[str]) -> None:
-        remaining = list(args)
-        if remaining and remaining[0].lower() == 'list':
-            remaining.pop(0)
-
-        search = None
-        sort_by = 'updated'
-        limit = 20
-        preview_idx = None
-        delete_targets: list[str] = []
-
-        i = 0
-        while i < len(remaining):
-            token = remaining[i]
-            if token in ('--search', '-s') and i + 1 < len(remaining):
-                search = remaining[i + 1]
-                i += 2
-                continue
-            if token == '--sort' and i + 1 < len(remaining):
-                allowed = ('updated', 'created', 'events', 'cost', 'model')
-                if remaining[i + 1] not in allowed:
-                    self.add_error(f'Sort must be one of: {", ".join(allowed)}')
-                    return
-                sort_by = remaining[i + 1]
-                i += 2
-                continue
-            if token in ('--delete', '-d') and i + 1 < len(remaining):
-                i += 1
-                while i < len(remaining) and not remaining[i].startswith('-'):
-                    delete_targets.append(remaining[i])
-                    i += 1
-                continue
-            if token in ('--limit', '-l') and i + 1 < len(remaining):
-                try:
-                    limit = int(remaining[i + 1])
-                except ValueError:
-                    self.add_error('Limit must be a number.')
-                    return
-                if limit < 1:
-                    self.add_error('Limit must be 1 or greater.')
-                    return
-                i += 2
-                continue
-            if token == '--preview' and i + 1 < len(remaining):
-                preview_idx = remaining[i + 1]
-                i += 2
-                continue
-            try:
-                parsed_limit = int(token)
-            except ValueError:
-                self.add_error(f'Unknown option: {token}')
-                return
-            if parsed_limit < 1:
-                self.add_error('Limit must be 1 or greater.')
-                return
-            limit = parsed_limit
-            i += 1
+        parsed = _parse_sessions_tui_args(args)
+        if parsed['error'] is not None:
+            self.add_error(parsed['error'])
+            return
 
         sid_to_resume = await self.app.push_screen_wait(
             GrintaSessionsDialog(
                 self._config,
-                search=search,
-                sort_by=sort_by,
-                limit=limit,
-                preview_target=preview_idx,
-                delete_targets=delete_targets,
+                search=parsed['search'],
+                sort_by=parsed['sort_by'],
+                limit=parsed['limit'],
+                preview_target=parsed['preview_idx'],
+                delete_targets=parsed['delete_targets'],
             )
         )
         if sid_to_resume:
@@ -455,6 +534,14 @@ class _AppScreenInputMixin:
             self.add_error('Usage: /resume <N|session_id>')
             return
         await self._resume_session_target(args[0])
+
+    async def _resume_wait_and_bootstrap(self, resolved_id: str) -> None:
+        if self._bootstrapping is not None and not self._bootstrapping.is_set():
+            await self._bootstrapping.wait()
+        await self._teardown_active_session()
+        await self._bootstrap(session_id=resolved_id)
+        if self._controller is None:
+            raise RuntimeError('Resume bootstrap did not initialize controller.')
 
     async def _resume_session_target(self, target: str) -> None:
         from backend.cli.session_manager import resolve_session_id
@@ -476,12 +563,7 @@ class _AppScreenInputMixin:
         input_bar = self.query_one('#input-bar', InputBar)
         input_bar.add_class('processing')
         try:
-            if self._bootstrapping is not None and not self._bootstrapping.is_set():
-                await self._bootstrapping.wait()
-            await self._teardown_active_session()
-            await self._bootstrap(session_id=resolved_id)
-            if self._controller is None:
-                raise RuntimeError('Resume bootstrap did not initialize controller.')
+            await self._resume_wait_and_bootstrap(resolved_id)
         except Exception as exc:
             logger.exception('[TUI] /resume failed')
             self.add_error(f'Resume failed: {type(exc).__name__}: {exc}')
@@ -494,7 +576,7 @@ class _AppScreenInputMixin:
             self.finalize_thinking()
             self._render_hud_bar()
 
-    async def _teardown_active_session(self) -> None:
+    async def _cancel_old_agent_task(self) -> None:
         old_task = self._agent_task
         self._agent_task = None
         if old_task is not None and not old_task.done():
@@ -504,6 +586,7 @@ class _AppScreenInputMixin:
             ):
                 await asyncio.wait_for(old_task, timeout=5.0)
 
+    async def _stop_old_controller(self) -> None:
         old_controller = self._controller
         self._controller = None
         if old_controller is not None:
@@ -516,6 +599,7 @@ class _AppScreenInputMixin:
                 with contextlib.suppress(asyncio.TimeoutError, Exception):
                     await asyncio.wait_for(stop_fn(), timeout=5.0)
 
+    async def _close_old_runtime(self) -> None:
         old_runtime = self._runtime_stub
         self._runtime_stub = None
         if old_runtime is not None:
@@ -528,6 +612,7 @@ class _AppScreenInputMixin:
                 with contextlib.suppress(Exception):
                     close_runtime()
 
+    async def _close_old_event_stream(self) -> None:
         old_stream = self._event_stream
         self._event_stream = None
         if old_stream is not None:
@@ -538,3 +623,9 @@ class _AppScreenInputMixin:
                 with contextlib.suppress(Exception):
                     close_fn()
         self._memory_stub = None
+
+    async def _teardown_active_session(self) -> None:
+        await self._cancel_old_agent_task()
+        await self._stop_old_controller()
+        await self._close_old_runtime()
+        await self._close_old_event_stream()

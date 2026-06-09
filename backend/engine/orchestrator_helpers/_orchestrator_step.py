@@ -300,6 +300,7 @@ def _execute_llm_step(orch: Orchestrator, state: State, condensed: Any) -> Actio
         condensed_history=condensed.events,
         initial_user_message=initial_user_message,
         llm_config=orch.llm.config,
+        state=state,
     )
     _prompt_role_debug.log_prompt_roles_after_build_messages(
         messages,
@@ -375,6 +376,7 @@ async def _execute_llm_step_async(
             condensed_history=condensed.events,
             initial_user_message=initial_user_message,
             llm_config=orch.llm.config,
+            state=state,
         )
         messages_elapsed = time.perf_counter() - messages_started
         _prompt_role_debug.log_prompt_roles_after_build_messages(

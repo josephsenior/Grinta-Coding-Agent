@@ -76,18 +76,17 @@ def _parse_retry_after(value: str | None) -> float | None:
         return None
 
 
-def _parse_reset_seconds(value: str | None) -> float | None:
-    """Parse OpenAI/Anthropic ``*-reset-*`` headers like ``"6.5s"`` or ``"1m30s"``."""
-    if not value:
+_DURATION_UNIT_MULTIPLIERS = {'h': 3600.0, 'm': 60.0, 's': 1.0}
+
+
+def _apply_duration_unit(total: float, unit: str, value: float) -> float | None:
+    multiplier = _DURATION_UNIT_MULTIPLIERS.get(unit)
+    if multiplier is None:
         return None
-    s = value.strip().lower()
-    if not s:
-        return None
-    # Plain number → seconds.
-    try:
-        return float(s)
-    except ValueError:
-        pass
+    return total + value * multiplier
+
+
+def _parse_duration_string(s: str) -> float | None:
     total = 0.0
     cur = ''
     matched = False
@@ -102,16 +101,26 @@ def _parse_reset_seconds(value: str | None) -> float | None:
         except ValueError:
             return None
         cur = ''
-        if ch == 'h':
-            total += n * 3600.0
-        elif ch == 'm':
-            total += n * 60.0
-        elif ch == 's':
-            total += n
-        else:
+        result = _apply_duration_unit(total, ch, n)
+        if result is None:
             return None
+        total = result
         matched = True
     return total if matched else None
+
+
+def _parse_reset_seconds(value: str | None) -> float | None:
+    """Parse OpenAI/Anthropic ``*-reset-*`` headers like ``"6.5s"`` or ``"1m30s"``."""
+    if not value:
+        return None
+    s = value.strip().lower()
+    if not s:
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        pass
+    return _parse_duration_string(s)
 
 
 def _classify_message(text: str) -> RateLimitKind:
@@ -131,6 +140,47 @@ def _classify_message(text: str) -> RateLimitKind:
     return RateLimitKind.UNKNOWN
 
 
+def _get_remaining_from_headers(headers: dict[str, str]) -> tuple[str | None, str | None]:
+    rem_tokens = headers.get('x-ratelimit-remaining-tokens') or headers.get(
+        'anthropic-ratelimit-tokens-remaining'
+    )
+    rem_requests = headers.get('x-ratelimit-remaining-requests') or headers.get(
+        'anthropic-ratelimit-requests-remaining'
+    )
+    return rem_tokens, rem_requests
+
+
+def _get_reset_from_headers(
+    headers: dict[str, str],
+) -> tuple[float | None, float | None]:
+    reset_tokens = _parse_reset_seconds(
+        headers.get('x-ratelimit-reset-tokens')
+        or headers.get('anthropic-ratelimit-tokens-reset')
+    )
+    reset_requests = _parse_reset_seconds(
+        headers.get('x-ratelimit-reset-requests')
+        or headers.get('anthropic-ratelimit-requests-reset')
+    )
+    return reset_tokens, reset_requests
+
+
+def _is_zero_remaining(v: str | None) -> bool:
+    if v is None:
+        return False
+    try:
+        return float(v) <= 0
+    except ValueError:
+        return False
+
+
+def _pick_reset_hint(
+    reset_tokens: float | None, reset_requests: float | None
+) -> float | None:
+    if reset_tokens is not None and reset_requests is not None:
+        return max(reset_tokens, reset_requests)
+    return reset_tokens if reset_tokens is not None else reset_requests
+
+
 def _classify_from_headers(
     headers: dict[str, str], message: str
 ) -> tuple[RateLimitKind, float | None]:
@@ -141,42 +191,15 @@ def _classify_from_headers(
     if not headers:
         return RateLimitKind.UNKNOWN, None
 
-    rem_tokens = headers.get('x-ratelimit-remaining-tokens') or headers.get(
-        'anthropic-ratelimit-tokens-remaining'
-    )
-    rem_requests = headers.get('x-ratelimit-remaining-requests') or headers.get(
-        'anthropic-ratelimit-requests-remaining'
-    )
-    reset_tokens = _parse_reset_seconds(
-        headers.get('x-ratelimit-reset-tokens')
-        or headers.get('anthropic-ratelimit-tokens-reset')
-    )
-    reset_requests = _parse_reset_seconds(
-        headers.get('x-ratelimit-reset-requests')
-        or headers.get('anthropic-ratelimit-requests-reset')
-    )
-
-    def _is_zero(v: str | None) -> bool:
-        if v is None:
-            return False
-        try:
-            return float(v) <= 0
-        except ValueError:
-            return False
+    rem_tokens, rem_requests = _get_remaining_from_headers(headers)
+    reset_tokens, reset_requests = _get_reset_from_headers(headers)
 
     msg_kind = _classify_message(message)
-    if _is_zero(rem_tokens) and not _is_zero(rem_requests):
+    if _is_zero_remaining(rem_tokens) and not _is_zero_remaining(rem_requests):
         return RateLimitKind.TPM, reset_tokens
-    if _is_zero(rem_requests) and not _is_zero(rem_tokens):
+    if _is_zero_remaining(rem_requests) and not _is_zero_remaining(rem_tokens):
         return RateLimitKind.RPM, reset_requests
-    # Both zero or unknown — defer to message-based classification, prefer the
-    # smaller of the two reset hints when available so we wait long enough.
-    reset_hint: float | None
-    if reset_tokens is not None and reset_requests is not None:
-        reset_hint = max(reset_tokens, reset_requests)
-    else:
-        reset_hint = reset_tokens if reset_tokens is not None else reset_requests
-    return msg_kind, reset_hint
+    return msg_kind, _pick_reset_hint(reset_tokens, reset_requests)
 
 
 def classify_rate_limit(

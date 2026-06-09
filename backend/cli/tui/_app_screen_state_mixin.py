@@ -81,35 +81,29 @@ class _AppScreenStateMixin:
             default=AGENT_MODE,
         )
 
-    def _render_hud_bar(self) -> None:
-        hud = self._hud
-        raw_state = hud.state.agent_state_label or 'Ready'
-        display_state, state_color = self._resolve_state_display(raw_state)
-
-        used = hud.state.context_tokens
-        limit = hud.state.context_limit
-        # Restore Model and Autonomy
-        _, model_short = HUDBar.describe_model(hud.state.model)
-        model_display = model_short if model_short != '(not set)' else '(not set)'
-        autonomy = hud.state.autonomy_level
-
-        # Top line info
-        workspace = str(hud.state.workspace_path or Path(os.getcwd()))
+    def _resolve_workspace_display(self, workspace_path) -> str:
+        workspace = str(workspace_path or Path(os.getcwd()))
         try:
             home = str(Path.home())
             if workspace.startswith(home):
                 workspace = workspace.replace(home, '~', 1)
         except Exception:
             pass
-        line1_parts = []
-        line1_parts.append('[#91abec bold]GRINTA[/]')
-        line1_parts.append(f'[{state_color}]● {display_state}[/]')
-        line1_parts.append(f'[{NAVY_TEXT_SECONDARY}]Model: {model_display}[/]')
-        ws_display = HUDBar.ellipsize_path(workspace, 35)
-        line1_parts.append(f'[{NAVY_TEXT_DIM}]Ws: {ws_display}[/]')
-        line1 = '  '.join(line1_parts)
+        return workspace
 
-        # Context-window pressure with saturation percentage.
+    def _build_hud_line1(
+        self, display_state: str, state_color: str, model_display: str, ws_display: str,
+    ) -> str:
+        parts = [
+            '[#91abec bold]GRINTA[/]',
+            f'[{state_color}]● {display_state}[/]',
+            f'[{NAVY_TEXT_SECONDARY}]Model: {model_display}[/]',
+            f'[{NAVY_TEXT_DIM}]Ws: {ws_display}[/]',
+        ]
+        return '  '.join(parts)
+
+    @staticmethod
+    def _build_context_display(used: int, limit: int) -> str:
         if limit > 0:
             pct = min(100, used * 100 // limit)
             ctx_color = (
@@ -119,22 +113,18 @@ class _AppScreenStateMixin:
                 if pct < 95
                 else NAVY_RED_ACCENT
             )
-            token_display = f'[{NAVY_TEXT_DIM}]Ctx: {used:,}/{limit:,} ({pct}%)  [{ctx_color}]●[/][/]'
-        else:
-            token_display = f'[{NAVY_TEXT_DIM}]Ctx: {used:,}[/]'
+            return f'[{NAVY_TEXT_DIM}]Ctx: {used:,}/{limit:,} ({pct}%)  [{ctx_color}]●[/][/]'
+        return f'[{NAVY_TEXT_DIM}]Ctx: {used:,}[/]'
 
-        help_hint = r'[#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
-        line2 = f'{token_display}   {help_hint}'
-
-        hud_bar = self.query_one('#hud-bar', HUD)
-        hud_bar.query_one('#hud-line-1', Label).update(line1)
-        hud_bar.query_one('#hud-line-2', Label).update(line2)
+    def _sync_hud_autonomy_select(self, hud_bar, autonomy: str) -> None:
         try:
             autonomy_select = hud_bar.query_one('#hud-autonomy', Select)
             if autonomy_select.value != autonomy:
                 autonomy_select.value = autonomy
         except Exception:
             pass
+
+    def _sync_hud_mode_select(self, hud_bar) -> None:
         try:
             mode_select = hud_bar.query_one('#hud-mode', Select)
             current_mode = self._active_interaction_mode()
@@ -144,6 +134,8 @@ class _AppScreenStateMixin:
                 mode_select.value = current_mode
         except Exception:
             pass
+
+    def _sync_hud_autonomy_visibility(self, hud_bar) -> None:
         try:
             current_mode = self._active_interaction_mode()
             is_agent = current_mode == AGENT_MODE
@@ -151,6 +143,32 @@ class _AppScreenStateMixin:
             hud_bar.query_one('#hud-label-autonomy').display = is_agent
         except Exception:
             pass
+
+    def _render_hud_bar(self) -> None:
+        hud = self._hud
+        raw_state = hud.state.agent_state_label or 'Ready'
+        display_state, state_color = self._resolve_state_display(raw_state)
+
+        used = hud.state.context_tokens
+        limit = hud.state.context_limit
+        _, model_short = HUDBar.describe_model(hud.state.model)
+        model_display = model_short if model_short != '(not set)' else '(not set)'
+        autonomy = hud.state.autonomy_level
+
+        workspace = self._resolve_workspace_display(hud.state.workspace_path)
+        ws_display = HUDBar.ellipsize_path(workspace, 35)
+        line1 = self._build_hud_line1(display_state, state_color, model_display, ws_display)
+
+        token_display = self._build_context_display(used, limit)
+        help_hint = r'[#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
+        line2 = f'{token_display}   {help_hint}'
+
+        hud_bar = self.query_one('#hud-bar', HUD)
+        hud_bar.query_one('#hud-line-1', Label).update(line1)
+        hud_bar.query_one('#hud-line-2', Label).update(line2)
+        self._sync_hud_autonomy_select(hud_bar, autonomy)
+        self._sync_hud_mode_select(hud_bar)
+        self._sync_hud_autonomy_visibility(hud_bar)
 
     def _update_input_identity(self, mode: str | None = None) -> None:
         """Update InputBar border title and hint based on mode."""
@@ -311,6 +329,46 @@ class _AppScreenStateMixin:
         self._worker_active = active
         self._worker_has_error = has_error
 
+    def _resolve_subcommand_hint(
+        self,
+        cmd: str,
+        parts: list[str],
+    ) -> str | None:
+        if (
+            cmd == '/sessions'
+            and len(parts) > 1
+            and parts[-1].startswith('--')
+        ):
+            return 'Sessions flags: --limit --search --sort --preview --delete'
+        if (
+            cmd == '/help'
+            and len(parts) > 1
+            and parts[-1].startswith('--')
+        ):
+            return 'Help flags: --all or --search <term>'
+        return None
+
+    def _resolve_slash_hint(self, parts: list[str]) -> str:
+        cmd = parts[0].lower()
+        if cmd not in self._SLASH_HINTS:
+            candidates = [c for c in self._SLASH_HINTS if c.startswith(cmd)]
+            if candidates:
+                return 'Commands: ' + ', '.join(candidates[:5])
+            return 'Commands: /help, /clear, /settings, /sessions, /resume, /quit'
+        sub_hint = self._resolve_subcommand_hint(cmd, parts)
+        if sub_hint is not None:
+            return sub_hint
+        return self._SLASH_HINTS[cmd]
+
+    def _parse_slash_command(self, stripped: str) -> str:
+        try:
+            parts = shlex.split(stripped)
+        except ValueError:
+            return 'Command syntax error: check quotes.'
+        if not parts:
+            return ''
+        return self._resolve_slash_hint(parts)
+
     def _update_command_hint(self, text: str) -> None:
         stripped = _strip_ansi(text).strip()
         if not stripped.startswith('/'):
@@ -319,37 +377,7 @@ class _AppScreenStateMixin:
                 self._render_hud_bar()
             return
 
-        try:
-            parts = shlex.split(stripped)
-        except ValueError:
-            hint = 'Command syntax error: check quotes.'
-        else:
-            if not parts:
-                hint = ''
-            else:
-                cmd = parts[0].lower()
-                if cmd in self._SLASH_HINTS:
-                    if (
-                        cmd == '/sessions'
-                        and len(parts) > 1
-                        and parts[-1].startswith('--')
-                    ):
-                        hint = (
-                            'Sessions flags: --limit --search --sort --preview --delete'
-                        )
-                    elif (
-                        cmd == '/help' and len(parts) > 1 and parts[-1].startswith('--')
-                    ):
-                        hint = 'Help flags: --all or --search <term>'
-                    else:
-                        hint = self._SLASH_HINTS[cmd]
-                else:
-                    candidates = [c for c in self._SLASH_HINTS if c.startswith(cmd)]
-                    hint = (
-                        'Commands: ' + ', '.join(candidates[:5])
-                        if candidates
-                        else 'Commands: /help, /clear, /settings, /sessions, /resume, /quit'
-                    )
+        hint = self._parse_slash_command(stripped)
 
         if hint != self._command_hint:
             self._command_hint = hint

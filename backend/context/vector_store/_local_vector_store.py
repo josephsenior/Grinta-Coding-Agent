@@ -328,6 +328,110 @@ class ChromaDBBackend(VectorBackend):
                 metadatas=child_metas,  # type: ignore[arg-type]
             )
 
+    @staticmethod
+    def _build_search_filter(filter_metadata):
+        search_filter = {'is_child': True}
+        if filter_metadata:
+            search_filter.update(filter_metadata)
+        return search_filter
+
+    @staticmethod
+    def _build_parent_filter(filter_metadata):
+        parent_filter = {'is_child': False}
+        if filter_metadata:
+            parent_filter.update(filter_metadata)
+        return parent_filter
+
+    @staticmethod
+    def _has_results(results):
+        return bool(results['ids'] and results['ids'][0])
+
+    def _query_children(self, query, k, search_filter):
+        n_results = min(k * 3, self.collection.count())
+        return self.collection.query(
+            query_texts=[query],
+            n_results=n_results,
+            where=search_filter,
+            include=['documents', 'metadatas', 'distances'],
+        )
+
+    def _query_parents(self, query, k, parent_filter):
+        return self.collection.query(
+            query_texts=[query],
+            n_results=min(k, self.collection.count()),
+            where=parent_filter,
+            include=['documents', 'metadatas', 'distances'],
+        )
+
+    def _query_with_fallback(self, query, k, search_filter, filter_metadata):
+        results = self._query_children(query, k, search_filter)
+        if self._has_results(results):
+            return results
+        parent_filter = self._build_parent_filter(filter_metadata)
+        results = self._query_parents(query, k, parent_filter)
+        if self._has_results(results):
+            return results
+        return None
+
+    @staticmethod
+    def _process_single_match(pid, meta, dist, doc, parent_ids, scores, parent_texts, parent_metas):
+        score = 1.0 - dist
+        if pid not in scores:
+            parent_ids.append(pid)
+            scores[pid] = score
+            if meta.get('is_child') is False:
+                parent_texts[pid] = doc
+                parent_metas[pid] = meta
+            else:
+                parent_metas[pid] = {k: v for k, v in meta.items() if k != 'parent_id'}
+                parent_metas[pid].pop('is_child', None)
+        else:
+            scores[pid] = max(scores[pid], score)
+
+    def _resolve_parent_matches(self, results):
+        parent_ids = []
+        scores = {}
+        parent_texts = {}
+        parent_metas = {}
+
+        ids_list = results['ids'][0]
+        metas_list = results['metadatas'][0]
+        dists_list = results['distances'][0]
+        docs_list = results['documents'][0]
+
+        for i, meta in enumerate(metas_list):
+            pid = meta.get('parent_id') or ids_list[i]
+            self._process_single_match(
+                pid, meta, dists_list[i], docs_list[i],
+                parent_ids, scores, parent_texts, parent_metas,
+            )
+
+        return parent_ids, scores, parent_texts, parent_metas
+
+    def _fetch_missing_parents(self, parent_ids, k, parent_texts, parent_metas):
+        needed_ids = [pid for pid in parent_ids[:k] if pid not in parent_texts]
+        if not needed_ids:
+            return
+        parent_results = self.collection.get(
+            ids=needed_ids,
+            include=['documents', 'metadatas'],
+        )
+        for i, pid in enumerate(parent_results['ids']):
+            parent_texts[pid] = parent_results['documents'][i]
+            parent_metas[pid] = dict(parent_results['metadatas'][i])
+
+    def _assemble_and_sort(self, parent_ids, k, scores, parent_texts, parent_metas):
+        final_results = []
+        for pid in parent_ids[:k]:
+            final_results.append({
+                'step_id': pid,
+                'score': scores.get(pid, 0.0),
+                'excerpt': parent_texts.get(pid, ''),
+                **parent_metas.get(pid, {}),
+            })
+        final_results.sort(key=lambda x: x['score'], reverse=True)
+        return final_results[:k]
+
     def search(
         self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
@@ -342,92 +446,14 @@ class ChromaDBBackend(VectorBackend):
 
         _ = self.model
 
-        # Search specifically for child chunks to get precise semantic matches
-        search_filter = {'is_child': True}
-        if filter_metadata:
-            search_filter.update(filter_metadata)
-
-        n_results = min(k * 3, self.collection.count())
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=n_results,
-            where=search_filter,  # type: ignore[arg-type]
-            include=['documents', 'metadatas', 'distances'],
-        )
-
-        if not results['ids'] or not results['ids'][0]:
-            # Fallback: search parents if no children found (e.g. old data or small docs)
-            parent_filter = {'is_child': False}
-            if filter_metadata:
-                parent_filter.update(filter_metadata)
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=min(k, self.collection.count()),
-                where=parent_filter,  # type: ignore[arg-type]
-                include=['documents', 'metadatas', 'distances'],
-            )
-
-        if not results['ids'] or not results['ids'][0]:
+        search_filter = self._build_search_filter(filter_metadata)
+        results = self._query_with_fallback(query, k, search_filter, filter_metadata)
+        if results is None:
             return []
 
-        # Map child matches back to their unique parents, keeping best score and document text
-        parent_ids: list[str] = []
-        scores: dict[str, float] = {}
-        parent_texts: dict[str, str] = {}
-        parent_metas: dict[str, dict[str, Any]] = {}
-
-        ids_list: list[str] = results['ids'][0]  # type: ignore[index]
-        metas_list: list[Any] = results['metadatas'][0]  # type: ignore[index]
-        dists_list: list[float] = results['distances'][0]  # type: ignore[index]
-        docs_list: list[str] = results['documents'][0]  # type: ignore[index]
-
-        for i, meta in enumerate(metas_list):
-            pid = meta.get('parent_id') or ids_list[i]
-            dist = dists_list[i]
-            score = 1.0 - dist
-
-            if pid not in scores:
-                parent_ids.append(pid)
-                scores[pid] = score
-                # For parent-path fallback results, the document IS the parent text
-                if meta.get('is_child') is False:
-                    parent_texts[pid] = docs_list[i]
-                    parent_metas[pid] = meta
-                else:
-                    # Capture parent_id metadata from the child match
-                    parent_metas[pid] = {
-                        k: v for k, v in meta.items() if k != 'parent_id'
-                    }
-                    parent_metas[pid].pop('is_child', None)
-            else:
-                scores[pid] = max(scores[pid], score)
-
-        # Determine which parents still need their text fetched
-        needed_ids = [pid for pid in parent_ids[:k] if pid not in parent_texts]
-
-        if needed_ids:
-            parent_results = self.collection.get(
-                ids=needed_ids,
-                include=['documents', 'metadatas'],
-            )
-            for i, pid in enumerate(parent_results['ids']):
-                parent_texts[pid] = parent_results['documents'][i]  # type: ignore[index]
-                parent_metas[pid] = dict(parent_results['metadatas'][i])  # type: ignore[index]
-
-        final_results = []
-        for pid in parent_ids[:k]:
-            final_results.append(
-                {
-                    'step_id': pid,
-                    'score': scores.get(pid, 0.0),
-                    'excerpt': parent_texts.get(pid, ''),
-                    **parent_metas.get(pid, {}),
-                }
-            )
-
-        # Sort by score since .get() doesn't preserve order or provide distances
-        final_results.sort(key=lambda x: x['score'], reverse=True)
-        return final_results[:k]
+        parent_ids, scores, parent_texts, parent_metas = self._resolve_parent_matches(results)
+        self._fetch_missing_parents(parent_ids, k, parent_texts, parent_metas)
+        return self._assemble_and_sort(parent_ids, k, scores, parent_texts, parent_metas)
 
     async def async_add(
         self,

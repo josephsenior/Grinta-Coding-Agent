@@ -243,6 +243,19 @@ class StateTracker:
 
         """
         if self.agent_history_filter.include(event):
+            try:
+                from backend.context.tool_result_storage import (
+                    persist_tool_result_on_observation,
+                )
+                from backend.ledger.observation import Observation
+
+                if isinstance(event, Observation):
+                    persist_tool_result_on_observation(event, self.state)
+            except Exception:
+                logger.debug(
+                    'Tool result persistence on history append failed',
+                    exc_info=True,
+                )
             self.state.history.append(event)
             self._history_bytes_estimate += self._estimate_single_event_bytes(event)
             self._maybe_trim_history()

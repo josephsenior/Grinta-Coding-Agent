@@ -130,6 +130,28 @@ def _handle_message_action(
     orch._handle_message_action(event)
 
 
+def _file_read_range_from_view_range(view_range: Any) -> str | None:
+    if view_range and len(view_range) == 2:
+        return f'{view_range[0]}:{view_range[1]}'
+    return None
+
+
+def _file_read_range_from_bounds(start: int, end: int) -> str:
+    if start not in (0, 1) or end != -1:
+        end_str = str(end) if end != -1 else 'end'
+        return f'{start}:{end_str}'
+    return ''
+
+
+def _resolve_file_read_line_range(
+    view_range: Any, start: int, end: int
+) -> str:
+    result = _file_read_range_from_view_range(view_range)
+    if result is not None:
+        return result
+    return _file_read_range_from_bounds(start, end)
+
+
 def _handle_file_read_action(
     orch: '_AppRendererEventProcessorMixin', event: FileReadAction
 ) -> None:
@@ -137,13 +159,7 @@ def _handle_file_read_action(
     view_range = getattr(event, 'view_range', None)
     start = getattr(event, 'start', 0)
     end = getattr(event, 'end', -1)
-    if view_range and len(view_range) == 2:
-        line_range = f'{view_range[0]}:{view_range[1]}'
-    elif start not in (0, 1) or end != -1:
-        end_str = str(end) if end != -1 else 'end'
-        line_range = f'{start}:{end_str}'
-    else:
-        line_range = ''
+    line_range = _resolve_file_read_line_range(view_range, start, end)
     card = ActivityRenderer.file_read(
         orch._compact_file_card_path(path),
         line_range,
@@ -151,6 +167,81 @@ def _handle_file_read_action(
     widget = orch._write_card(card)
     orch._remember_pending_file_card(
         '_pending_file_read_cards_by_path',
+        path,
+        widget,
+    )
+
+
+def _resolve_verb_from_registry(
+    orch: '_AppRendererEventProcessorMixin',
+    cmd: str,
+    insert_line: int | None,
+) -> tuple[str, str] | None:
+    verb_entry = orch._FILE_EDIT_VERBS.get(cmd)
+    if verb_entry is None:
+        return None
+    verb, include_stats = verb_entry
+    if include_stats and insert_line is not None:
+        return verb, f'line {insert_line}'
+    return verb, ''
+
+
+def _resolve_edit_mode_range(
+    event: FileEditAction,
+    start_line: int | None,
+    end_line: int | None,
+) -> tuple[str, str] | None:
+    edit_mode = getattr(event, 'edit_mode', '')
+    if edit_mode == 'range' and start_line is not None and end_line is not None:
+        return 'Edited', f'{start_line}:{end_line}'
+    return None
+
+
+def _resolve_no_cmd_line_range(start: int, end: int) -> tuple[str, str]:
+    end_str = str(end) if end != -1 else 'end'
+    return 'Edited', f'{start}:{end_str}'
+
+
+def _resolve_file_edit_verb_and_range(
+    orch: '_AppRendererEventProcessorMixin',
+    event: FileEditAction,
+    cmd: str,
+    insert_line: int | None,
+    start: int,
+    end: int,
+    start_line: int | None,
+    end_line: int | None,
+) -> tuple[str, str]:
+    result = _resolve_verb_from_registry(orch, cmd, insert_line)
+    if result is not None:
+        return result
+    if not cmd:
+        return _resolve_no_cmd_line_range(start, end)
+    if cmd == 'edit':
+        result = _resolve_edit_mode_range(event, start_line, end_line)
+        if result is not None:
+            return result
+    return 'Edited', ''
+
+
+def _handle_file_edit_create(
+    orch: '_AppRendererEventProcessorMixin',
+    event: FileEditAction,
+    path: str,
+) -> None:
+    file_text = getattr(event, 'file_text', '') or ''
+    if orch._has_pending_file_card(
+        '_pending_file_create_cards_by_path',
+        path,
+    ):
+        return
+    card = ActivityRenderer.file_create(
+        orch._compact_file_card_path(path),
+        line_count=_count_text_lines(file_text),
+    )
+    widget = orch._write_card(card)
+    orch._remember_pending_file_card(
+        '_pending_file_create_cards_by_path',
         path,
         widget,
     )
@@ -167,50 +258,12 @@ def _handle_file_edit_action(
     start_line = getattr(event, 'start_line', None)
     end_line = getattr(event, 'end_line', None)
 
-    verb_entry = orch._FILE_EDIT_VERBS.get(cmd)
-    if verb_entry is not None:
-        verb, include_stats = verb_entry
-        if include_stats and insert_line is not None:
-            line_range = f'line {insert_line}'
-        else:
-            line_range = ''
-    elif not cmd:
-        end_str = str(end) if end != -1 else 'end'
-        verb = 'Edited'
-        line_range = f'{start}:{end_str}'
-    elif cmd == 'edit':
-        edit_mode = getattr(event, 'edit_mode', '')
-        if (
-            edit_mode == 'range'
-            and start_line is not None
-            and end_line is not None
-        ):
-            verb = 'Edited'
-            line_range = f'{start_line}:{end_line}'
-        else:
-            verb = 'Edited'
-            line_range = ''
-    else:
-        verb = 'Edited'
-        line_range = ''
+    verb, line_range = _resolve_file_edit_verb_and_range(
+        orch, event, cmd, insert_line, start, end, start_line, end_line,
+    )
 
     if cmd == 'create_file':
-        file_text = getattr(event, 'file_text', '') or ''
-        if orch._has_pending_file_card(
-            '_pending_file_create_cards_by_path',
-            path,
-        ):
-            return
-        card = ActivityRenderer.file_create(
-            orch._compact_file_card_path(path),
-            line_count=_count_text_lines(file_text),
-        )
-        widget = orch._write_card(card)
-        orch._remember_pending_file_card(
-            '_pending_file_create_cards_by_path',
-            path,
-            widget,
-        )
+        _handle_file_edit_create(orch, event, path)
     else:
         op_detail = f'{path} · {line_range}' if line_range else path
         orch._tui.set_current_operation(
@@ -289,6 +342,31 @@ def _handle_file_edit_new_file(
     orch._write_card(card)
 
 
+def _write_multi_file_edit_card(
+    orch: '_AppRendererEventProcessorMixin',
+    fp: str,
+    file_diff: str,
+) -> None:
+    f_added, f_removed = _count_unified_diff_changes(file_diff)
+    encoded = _encode_unified_diff_text(file_diff)
+    if encoded:
+        orch._write_tui_file_card(
+            'Edited',
+            fp,
+            secondary=_format_diff_summary(f_added, f_removed),
+            secondary_kind='ok' if f_added or f_removed else 'neutral',
+            extra_content=encoded,
+        )
+
+
+def _write_multi_file_edit_cards(
+    orch: '_AppRendererEventProcessorMixin',
+    per_file: list,
+) -> None:
+    for fp, file_diff in per_file:
+        _write_multi_file_edit_card(orch, fp, file_diff)
+
+
 def _handle_file_edit_multi_file(
     orch: '_AppRendererEventProcessorMixin',
     event: FileEditObservation,
@@ -298,17 +376,7 @@ def _handle_file_edit_multi_file(
     if diff_text:
         per_file = _split_combined_diff(diff_text)
         if per_file:
-            for fp, file_diff in per_file:
-                f_added, f_removed = _count_unified_diff_changes(file_diff)
-                encoded = _encode_unified_diff_text(file_diff)
-                if encoded:
-                    orch._write_tui_file_card(
-                        'Edited',
-                        fp,
-                        secondary=_format_diff_summary(f_added, f_removed),
-                        secondary_kind='ok' if f_added or f_removed else 'neutral',
-                        extra_content=encoded,
-                    )
+            _write_multi_file_edit_cards(orch, per_file)
         else:
             orch._write_card(
                 ActivityRenderer.file_edit('Edited', path or '?')
@@ -317,21 +385,31 @@ def _handle_file_edit_multi_file(
         orch._write_card(ActivityRenderer.file_edit('Edited', path or '?'))
 
 
-def _handle_file_edit_existing(
+def _resolve_existing_file_edit_diff(
     orch: '_AppRendererEventProcessorMixin',
     event: FileEditObservation,
+    added: int,
+    removed: int,
+) -> tuple[str | None, int, int]:
+    encoded_diff = orch._extract_file_edit_group_rows(event)
+    if encoded_diff:
+        return encoded_diff, added, removed
+    diff_text = orch._extract_file_edit_diff(event)
+    if not (added or removed):
+        added, removed = _count_unified_diff_changes(diff_text)
+    encoded_diff = (
+        _encode_unified_diff_text(diff_text) if diff_text else None
+    )
+    return encoded_diff, added, removed
+
+
+def _write_file_edit_existing_card(
+    orch: '_AppRendererEventProcessorMixin',
     path: str,
+    encoded_diff: str | None,
     added: int,
     removed: int,
 ) -> None:
-    encoded_diff = orch._extract_file_edit_group_rows(event)
-    if not encoded_diff:
-        diff_text = orch._extract_file_edit_diff(event)
-        if not (added or removed):
-            added, removed = _count_unified_diff_changes(diff_text)
-        encoded_diff = (
-            _encode_unified_diff_text(diff_text) if diff_text else None
-        )
     if encoded_diff:
         orch._write_tui_file_card(
             'Edited',
@@ -350,27 +428,50 @@ def _handle_file_edit_existing(
         orch._write_card(card)
 
 
-def _handle_file_edit_observation(
-    orch: '_AppRendererEventProcessorMixin', event: FileEditObservation
+def _handle_file_edit_existing(
+    orch: '_AppRendererEventProcessorMixin',
+    event: FileEditObservation,
+    path: str,
+    added: int,
+    removed: int,
 ) -> None:
-    from backend.cli.transcript import strip_indentation_warnings
+    encoded_diff, added, removed = _resolve_existing_file_edit_diff(
+        orch, event, added, removed,
+    )
+    _write_file_edit_existing_card(orch, path, encoded_diff, added, removed)
 
+
+def _clean_file_edit_content(event: FileEditObservation) -> None:
     if hasattr(event, 'content') and event.content:
+        from backend.cli.transcript import strip_indentation_warnings
         event.content = strip_indentation_warnings(event.content)
 
-    path = (getattr(event, 'path', '') or '').strip()
-    added = event.added
-    removed = event.removed
 
-    if _resolve_file_edit_pending_create(orch, event, path, added):
-        return
-
+def _route_file_edit_observation(
+    orch: '_AppRendererEventProcessorMixin',
+    event: FileEditObservation,
+    path: str,
+    added: int,
+    removed: int,
+) -> None:
     if not getattr(event, 'prev_exist', True):
         _handle_file_edit_new_file(orch, event, path, added)
     elif not path or path == '.':
         _handle_file_edit_multi_file(orch, event, path)
     else:
         _handle_file_edit_existing(orch, event, path, added, removed)
+
+
+def _handle_file_edit_observation(
+    orch: '_AppRendererEventProcessorMixin', event: FileEditObservation
+) -> None:
+    _clean_file_edit_content(event)
+    path = (getattr(event, 'path', '') or '').strip()
+    added = event.added
+    removed = event.removed
+    if _resolve_file_edit_pending_create(orch, event, path, added):
+        return
+    _route_file_edit_observation(orch, event, path, added, removed)
 
 
 def _handle_file_write_observation(
@@ -434,21 +535,28 @@ def _handle_mcp_observation(
         orch._write_card(card)
 
 
+def _resolve_cmd_output_cwd(event: CmdOutputObservation) -> str | None:
+    if hasattr(event, 'metadata') and event.metadata:
+        return getattr(event.metadata, 'working_dir', None)
+    return None
+
+
+def _sanitize_cmd_output(output: str) -> str:
+    if not output:
+        return ''
+    return _sanitize_terminal_display_text(
+        strip_tool_result_validation_annotations(output)
+    ).strip()
+
+
 def _handle_cmd_output_observation(
     orch: '_AppRendererEventProcessorMixin', event: CmdOutputObservation
 ) -> None:
     output = (event.content or '').strip()
     exit_code = getattr(event, 'exit_code', None)
     cmd = getattr(event, 'command', '') or ''
-    cwd = (
-        getattr(event.metadata, 'working_dir', None)
-        if hasattr(event, 'metadata') and event.metadata
-        else None
-    )
-    if output:
-        output = _sanitize_terminal_display_text(
-            strip_tool_result_validation_annotations(output)
-        ).strip()
+    cwd = _resolve_cmd_output_cwd(event)
+    output = _sanitize_cmd_output(output)
     if output or exit_code is not None:
         orch._complete_shell_command_card(
             cmd,
@@ -485,6 +593,50 @@ def _handle_success_observation(
     orch._tui.add_success(event.content or 'Done')
 
 
+def _handle_status_retry(
+    orch: '_AppRendererEventProcessorMixin',
+    status_type: str,
+    extras: dict,
+) -> None:
+    label, last_status, message = orch._format_retry_status_message(
+        status_type, extras
+    )
+    orch._hud.update_ledger('Backoff')
+    orch._hud.update_agent_state(label)
+    orch._tui.set_agent_phase(label)
+    orch._update_retry_strip(label, message)
+
+
+def _handle_status_compaction(
+    orch: '_AppRendererEventProcessorMixin',
+) -> None:
+    orch._clear_retry_strip('Idle')
+    orch._hud.update_agent_state('Compacting')
+    orch._tui.set_agent_phase('Compacting context...')
+    orch._update_runtime_strip(
+        'Compacting context',
+        'Reducing context to continue the task',
+        active=True,
+    )
+    _show_compaction_started_card(orch)
+
+
+def _handle_status_notice(
+    orch: '_AppRendererEventProcessorMixin',
+    event: StatusObservation,
+    status_type: str,
+) -> None:
+    msg = (event.content or '').strip()
+    if not msg:
+        return
+    summary = (
+        status_type.replace('_', ' ').strip().title()
+        if status_type
+        else 'Runtime notice'
+    )
+    orch._update_runtime_strip(summary, msg, active=False)
+
+
 def _handle_status_observation(
     orch: '_AppRendererEventProcessorMixin', event: StatusObservation
 ) -> None:
@@ -496,33 +648,12 @@ def _handle_status_observation(
         'llm_retry_pending',
         'llm_retry_resuming',
     ):
-        label, last_status, message = orch._format_retry_status_message(
-            status_type, extras
-        )
-        orch._hud.update_ledger('Backoff')
-        orch._hud.update_agent_state(label)
-        orch._tui.set_agent_phase(label)
-        orch._update_retry_strip(label, message)
+        _handle_status_retry(orch, status_type, extras)
         return
     if status_type == 'compaction':
-        orch._clear_retry_strip('Idle')
-        orch._hud.update_agent_state('Compacting')
-        orch._tui.set_agent_phase('Compacting context...')
-        orch._update_runtime_strip(
-            'Compacting context',
-            'Reducing context to continue the task',
-            active=True,
-        )
-        _show_compaction_started_card(orch)
+        _handle_status_compaction(orch)
         return
-    msg = (event.content or '').strip()
-    if msg:
-        summary = (
-            status_type.replace('_', ' ').strip().title()
-            if status_type
-            else 'Runtime notice'
-        )
-        orch._update_runtime_strip(summary, msg, active=False)
+    _handle_status_notice(orch, event, status_type)
 
 
 def _handle_agent_think_action(
@@ -544,16 +675,30 @@ def _handle_agent_think_observation(
     orch._render_thinking_payload(thought, kind=kind)
 
 
+def _browser_navigate_url(event: BrowserToolAction) -> str:
+    return (getattr(event, 'params', {}) or {}).get('url', '')
+
+
+def _browser_click_url(event: BrowserToolAction) -> str:
+    selector = (getattr(event, 'params', {}) or {}).get('selector', '')
+    return selector[:80] if selector else ''
+
+
+def _resolve_browser_action_url(
+    action_name: str, event: BrowserToolAction
+) -> str:
+    if action_name == 'navigate':
+        return _browser_navigate_url(event)
+    if action_name == 'click':
+        return _browser_click_url(event)
+    return ''
+
+
 def _handle_browser_tool_action(
     orch: '_AppRendererEventProcessorMixin', event: BrowserToolAction
 ) -> None:
     action_name = getattr(event, 'command', 'browser') or 'browser'
-    url = ''
-    if action_name == 'navigate':
-        url = (getattr(event, 'params', {}) or {}).get('url', '')
-    elif action_name == 'click':
-        selector = (getattr(event, 'params', {}) or {}).get('selector', '')
-        url = selector[:80] if selector else ''
+    url = _resolve_browser_action_url(action_name, event)
     card = ActivityRenderer.browser_action(action_name, url)
     widget = orch._write_card(card)
     orch._last_browser_action_card = widget
@@ -573,31 +718,59 @@ def _handle_browse_interactive_action(
     orch._last_browser_cmd = 'browse'
 
 
+def _build_screenshot_preview(url: str, content: str) -> str | None:
+    extra_parts = []
+    if url:
+        extra_parts.append(f'URL: {url}')
+    if content:
+        extra_parts.append(content[:200])
+    return '\n'.join(extra_parts) if extra_parts else None
+
+
+def _update_browser_screenshot_card(
+    orch: '_AppRendererEventProcessorMixin',
+    prev: Any,
+    last_cmd: str,
+    url: str,
+    content: str,
+) -> None:
+    preview = _build_screenshot_preview(url, content)
+    orch._update_activity_card_outcome(
+        prev,
+        status='ok',
+        outcome='done',
+        extra_content=preview,
+        operation_label=f'Browser {last_cmd}'.strip(),
+    )
+    orch._last_browser_action_card = None
+
+
+def _should_update_browser_card(prev: Any, last_cmd: str) -> bool:
+    if prev is None:
+        return False
+    return last_cmd not in ('', 'screenshot')
+
+
+def _extract_screenshot_details(
+    orch: '_AppRendererEventProcessorMixin',
+    event: BrowserScreenshotObservation,
+) -> tuple[str, str, Any, str]:
+    url = getattr(event, 'image_path', '') or ''
+    content = (event.content or '').strip()
+    prev = getattr(orch, '_last_browser_action_card', None)
+    last_cmd = getattr(orch, '_last_browser_cmd', '') or ''
+    return url, content, prev, last_cmd
+
+
 def _handle_browser_screenshot_observation(
     orch: '_AppRendererEventProcessorMixin', event: BrowserScreenshotObservation
 ) -> None:
-    url = getattr(event, 'image_path', '') or ''
-    content = (event.content or '').strip()
+    url, content, prev, last_cmd = _extract_screenshot_details(orch, event)
     card = ActivityRenderer.browser_action(
         'screenshot', url, result=content or 'captured'
     )
-    prev = getattr(orch, '_last_browser_action_card', None)
-    last_cmd = getattr(orch, '_last_browser_cmd', '') or ''
-    if prev is not None and last_cmd not in ('', 'screenshot'):
-        extra_parts = []
-        if url:
-            extra_parts.append(f'URL: {url}')
-        if content:
-            extra_parts.append(content[:200])
-        preview = '\n'.join(extra_parts) if extra_parts else None
-        orch._update_activity_card_outcome(
-            prev,
-            status='ok',
-            outcome='done',
-            extra_content=preview,
-            operation_label=f'Browser {last_cmd}'.strip(),
-        )
-        orch._last_browser_action_card = None
+    if _should_update_browser_card(prev, last_cmd):
+        _update_browser_screenshot_card(orch, prev, last_cmd, url, content)
     else:
         orch._write_card(card)
 
@@ -611,19 +784,20 @@ def _handle_lsp_query_action(
     orch._pending_lsp_card = widget
 
 
-def _handle_lsp_query_observation(
-    orch: '_AppRendererEventProcessorMixin', event: LspQueryObservation
+def _build_lsp_preview(content: str) -> str | None:
+    if not content:
+        return None
+    truncated = content[:200] + ('...' if len(content) > 200 else '')
+    return f'  {truncated}'
+
+
+def _update_or_write_lsp_card(
+    orch: '_AppRendererEventProcessorMixin',
+    card: Any,
+    symbol: str,
+    available: bool,
+    preview: str | None,
 ) -> None:
-    content = (event.content or '').strip()
-    symbol = getattr(event, 'symbol', '') or ''
-    available = bool(getattr(event, 'available', True))
-    card = ActivityRenderer.lsp_query(
-        symbol, result=content, available=available
-    )
-    preview = None
-    if content:
-        truncated = content[:200] + ('...' if len(content) > 200 else '')
-        preview = f'  {truncated}'
     pending = orch._pending_lsp_card
     if pending is not None:
         status = 'ok' if available else 'err'
@@ -637,6 +811,19 @@ def _handle_lsp_query_observation(
         orch._pending_lsp_card = None
     else:
         orch._write_card(card)
+
+
+def _handle_lsp_query_observation(
+    orch: '_AppRendererEventProcessorMixin', event: LspQueryObservation
+) -> None:
+    content = (event.content or '').strip()
+    symbol = getattr(event, 'symbol', '') or ''
+    available = bool(getattr(event, 'available', True))
+    card = ActivityRenderer.lsp_query(
+        symbol, result=content, available=available
+    )
+    preview = _build_lsp_preview(content)
+    _update_or_write_lsp_card(orch, card, symbol, available, preview)
 
 
 def _handle_terminal_run_action(
@@ -697,6 +884,33 @@ def _handle_terminal_read_action(
     )
 
 
+def _sanitize_terminal_observation_content(content: str) -> str:
+    if not content:
+        return ''
+    return _sanitize_terminal_display_text(
+        strip_tool_result_validation_annotations(content)
+    ).strip()
+
+
+def _terminal_secondary_text(
+    orch: '_AppRendererEventProcessorMixin',
+    session_id: str,
+    exit_code: int | None,
+    state: str | None,
+) -> str:
+    label = orch._terminal_session_label(session_id)
+    status = f'exit {exit_code}' if exit_code is not None else (state or None)
+    return _join_secondary_parts(label, status)
+
+
+def _terminal_secondary_kind(exit_code: int | None) -> str:
+    if exit_code == 0:
+        return 'ok'
+    if exit_code is not None:
+        return 'err'
+    return 'neutral'
+
+
 def _handle_terminal_observation(
     orch: '_AppRendererEventProcessorMixin', event: TerminalObservation
 ) -> None:
@@ -704,19 +918,9 @@ def _handle_terminal_observation(
     session_id = getattr(event, 'session_id', '') or ''
     exit_code = getattr(event, 'exit_code', None)
     state = getattr(event, 'state', None)
-    secondary = _join_secondary_parts(
-        orch._terminal_session_label(session_id),
-        (f'exit {exit_code}' if exit_code is not None else (state or None)),
-    )
-    secondary_kind = (
-        'ok'
-        if exit_code == 0
-        else ('err' if exit_code is not None and exit_code != 0 else 'neutral')
-    )
-    if content:
-        content = _sanitize_terminal_display_text(
-            strip_tool_result_validation_annotations(content)
-        ).strip()
+    secondary = _terminal_secondary_text(orch, session_id, exit_code, state)
+    secondary_kind = _terminal_secondary_kind(exit_code)
+    content = _sanitize_terminal_observation_content(content)
     orch._upsert_terminal_session_card(
         session_id=session_id,
         verb='Output',
@@ -745,21 +949,35 @@ def _handle_agent_condensation_observation(
     orch._write_card(card)
 
 
-def _handle_delegate_task_action(
-    orch: '_AppRendererEventProcessorMixin', event: DelegateTaskAction
-) -> None:
+def _resolve_delegate_task_and_worker(
+    event: DelegateTaskAction,
+) -> tuple[str, str]:
     task = (
         getattr(event, 'task_description', '')
         or getattr(event, 'task', '')
         or ''
     )
     worker = getattr(event, 'worker', '') or ''
+    return task, worker
+
+
+def _register_parallel_worker_tasks(
+    orch: '_AppRendererEventProcessorMixin',
+    event: DelegateTaskAction,
+) -> None:
+    for item in list(getattr(event, 'parallel_tasks', []) or []):
+        task_desc = orch._summarize_worker_task(
+            str(item.get('task_description') or 'delegated task')
+        )
+        orch._active_worker_tasks.append(task_desc)
+
+
+def _handle_delegate_task_action(
+    orch: '_AppRendererEventProcessorMixin', event: DelegateTaskAction
+) -> None:
+    task, worker = _resolve_delegate_task_and_worker(event)
     if getattr(event, 'parallel_tasks', None):
-        for item in list(getattr(event, 'parallel_tasks', []) or []):
-            task_desc = orch._summarize_worker_task(
-                str(item.get('task_description') or 'delegated task')
-            )
-            orch._active_worker_tasks.append(task_desc)
+        _register_parallel_worker_tasks(orch, event)
     else:
         orch._active_worker_tasks.append(orch._summarize_worker_task(task))
     orch._sync_worker_strip()
@@ -768,48 +986,78 @@ def _handle_delegate_task_action(
     orch._pending_delegate_card = widget
 
 
-def _handle_delegate_task_observation(
-    orch: '_AppRendererEventProcessorMixin', event: DelegateTaskObservation
+def _record_delegate_result(
+    orch: '_AppRendererEventProcessorMixin',
+    resolved_task: str,
+    success: bool,
 ) -> None:
-    content = (event.content or '').strip()
-    success = bool(getattr(event, 'success', True))
-    error_message = (getattr(event, 'error_message', '') or '').strip()
-    resolved_task = (
-        orch._active_worker_tasks.pop(0)
-        if orch._active_worker_tasks
-        else 'delegated task'
-    )
     if success:
         orch._worker_completed += 1
-        if resolved_task:
-            orch._worker_recent_results.append(f'ok: {resolved_task}')
     else:
         orch._worker_failed += 1
-        if resolved_task:
-            orch._worker_recent_results.append(f'fail: {resolved_task}')
+    if resolved_task:
+        prefix = 'ok' if success else 'fail'
+        orch._worker_recent_results.append(f'{prefix}: {resolved_task}')
     orch._sync_worker_strip()
-    card = ActivityRenderer.delegation(
-        resolved_task,
-        result=error_message or content,
-        success=success,
-    )
-    preview = None
-    detail = error_message or content
-    if detail:
-        truncated = detail[:200] + ('...' if len(detail) > 200 else '')
-        preview = f'  {truncated}'
+
+
+def _build_delegate_preview(detail: str) -> str | None:
+    if not detail:
+        return None
+    truncated = detail[:200] + ('...' if len(detail) > 200 else '')
+    return f'  {truncated}'
+
+
+def _resolve_delegate_card_detail(
+    event: DelegateTaskObservation,
+) -> tuple[str, str]:
+    content = (event.content or '').strip()
+    error_message = (getattr(event, 'error_message', '') or '').strip()
+    return content, error_message
+
+
+def _update_or_write_delegate_card(
+    orch: '_AppRendererEventProcessorMixin',
+    card: Any,
+    resolved_task: str,
+    success: bool,
+    preview: str | None,
+) -> None:
     pending = orch._pending_delegate_card
     if pending is not None:
+        status = 'ok' if success else 'err'
+        outcome = 'completed' if success else 'failed'
         orch._update_activity_card_outcome(
             pending,
-            status='ok' if success else 'err',
-            outcome='completed' if success else 'failed',
+            status=status,
+            outcome=outcome,
             extra_content=preview,
             operation_label=f'Delegated {resolved_task}'.strip(),
         )
         orch._pending_delegate_card = None
     else:
         orch._write_card(card)
+
+
+def _handle_delegate_task_observation(
+    orch: '_AppRendererEventProcessorMixin', event: DelegateTaskObservation
+) -> None:
+    content, error_message = _resolve_delegate_card_detail(event)
+    success = bool(getattr(event, 'success', True))
+    resolved_task = (
+        orch._active_worker_tasks.pop(0)
+        if orch._active_worker_tasks
+        else 'delegated task'
+    )
+    _record_delegate_result(orch, resolved_task, success)
+    detail = error_message or content
+    card = ActivityRenderer.delegation(
+        resolved_task,
+        result=detail,
+        success=success,
+    )
+    preview = _build_delegate_preview(detail)
+    _update_or_write_delegate_card(orch, card, resolved_task, success, preview)
 
 
 def _handle_task_tracking_observation(
@@ -833,62 +1081,183 @@ def _handle_task_tracking_action(
 # ---------------------------------------------------------------------------
 
 
-def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
-    orch._update_metrics(event)
-    if isinstance(event, NullAction) or isinstance(event, NullObservation):
-        return
-    if isinstance(event, ChangeAgentStateAction):
-        return
+_TOOL_EXECUTION_TYPES = (
+    FileReadAction,
+    FileEditAction,
+    FileWriteAction,
+    CmdRunAction,
+    MCPAction,
+    BrowserToolAction,
+    BrowseInteractiveAction,
+    LspQueryAction,
+    TerminalRunAction,
+    TerminalInputAction,
+    TerminalReadAction,
+    RecallAction,
+    DelegateTaskAction,
+)
 
+
+def _process_event_is_noop(event: Any) -> bool:
+    if isinstance(event, NullAction) or isinstance(event, NullObservation):
+        return True
+    return isinstance(event, ChangeAgentStateAction)
+
+
+def _process_event_check_user_message(
+    orch: '_AppRendererEventProcessorMixin', event: Any
+) -> None:
     source = getattr(event, 'source', None)
     if isinstance(event, MessageAction) and orch._is_user_source(source):
         orch._last_thinking_text_hash = ''
         orch._last_thinking_artifact_hash = ''
 
-    if not orch._in_agent_turn and not isinstance(
-        event, (MessageAction, StreamingChunkAction, AgentStateChangedObservation)
-    ):
-        orch._in_agent_turn = True
-        orch._turn_count += 1
-        orch._tools_in_turn = 0
-        orch._turn_start_time = time.monotonic()
 
-    is_tool_execution_event = isinstance(
+def _process_event_maybe_start_turn(
+    orch: '_AppRendererEventProcessorMixin', event: Any
+) -> None:
+    if orch._in_agent_turn:
+        return
+    if isinstance(
         event,
-        (
-            FileReadAction,
-            FileEditAction,
-            FileWriteAction,
-            CmdRunAction,
-            MCPAction,
-            BrowserToolAction,
-            BrowseInteractiveAction,
-            LspQueryAction,
-            TerminalRunAction,
-            TerminalInputAction,
-            TerminalReadAction,
-            RecallAction,
-            DelegateTaskAction,
-        ),
-    )
-    if orch._in_agent_turn and is_tool_execution_event:
-        orch._tools_in_turn += 1
-
-    if not orch._is_live_thinking_event(event) and not getattr(
-        orch, '_streaming_active', False
+        (MessageAction, StreamingChunkAction, AgentStateChangedObservation),
     ):
-        orch._finalize_live_thinking()
+        return
+    orch._in_agent_turn = True
+    orch._turn_count += 1
+    orch._tools_in_turn = 0
+    orch._turn_start_time = time.monotonic()
 
-    if not isinstance(event, (MessageAction, StreamingChunkAction)):
-        if orch._live_response_dirty:
-            if is_tool_execution_event:
-                orch.clear_live_response()
-            else:
-                orch._commit_final_response(orch._live_response)
-        else:
+
+def _process_event_finalize_thinking(
+    orch: '_AppRendererEventProcessorMixin', event: Any
+) -> None:
+    if orch._is_live_thinking_event(event):
+        return
+    if getattr(orch, '_streaming_active', False):
+        return
+    orch._finalize_live_thinking()
+
+
+def _process_event_commit_response(
+    orch: '_AppRendererEventProcessorMixin', event: Any, is_tool: bool
+) -> None:
+    if isinstance(event, (MessageAction, StreamingChunkAction)):
+        return
+    if orch._live_response_dirty:
+        if is_tool:
             orch.clear_live_response()
+        else:
+            orch._commit_final_response(orch._live_response)
+    else:
+        orch.clear_live_response()
 
+
+def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
+    orch._update_metrics(event)
+    if _process_event_is_noop(event):
+        return
+    _process_event_check_user_message(orch, event)
+    _process_event_maybe_start_turn(orch, event)
+    is_tool = isinstance(event, _TOOL_EXECUTION_TYPES)
+    if orch._in_agent_turn and is_tool:
+        orch._tools_in_turn += 1
+    _process_event_finalize_thinking(orch, event)
+    _process_event_commit_response(orch, event, is_tool)
     _dispatch_event(orch, event)
+
+
+def _handle_noop_event(
+    orch: '_AppRendererEventProcessorMixin', event: Any
+) -> None:
+    pass
+
+
+def _handle_compaction_trigger(
+    orch: '_AppRendererEventProcessorMixin', event: Any
+) -> None:
+    _show_compaction_started_card(orch)
+
+
+def _handle_streaming_chunk_dispatch(
+    orch: '_AppRendererEventProcessorMixin', event: StreamingChunkAction
+) -> None:
+    orch._handle_streaming_chunk(event)
+
+
+def _handle_state_change_dispatch(
+    orch: '_AppRendererEventProcessorMixin', event: AgentStateChangedObservation
+) -> None:
+    orch._handle_state_change(event)
+
+
+def _handle_clarification_dispatch(
+    orch: '_AppRendererEventProcessorMixin', event: ClarificationRequestAction
+) -> None:
+    orch._tui.add_communicate_clarification(event)
+
+
+def _handle_confirm_dispatch(
+    orch: '_AppRendererEventProcessorMixin', event: ConfirmRequestAction
+) -> None:
+    if not _is_full_autonomy(orch):
+        orch._tui.add_communicate_confirm(event)
+
+
+def _handle_inform_dispatch(
+    orch: '_AppRendererEventProcessorMixin', event: InformAction
+) -> None:
+    orch._tui.add_communicate_inform(event)
+
+
+def _handle_uncertainty_dispatch(
+    orch: '_AppRendererEventProcessorMixin', event: UncertaintyAction
+) -> None:
+    orch._tui.add_communicate_uncertainty(event)
+
+
+def _handle_proposal_dispatch(
+    orch: '_AppRendererEventProcessorMixin', event: ProposalAction
+) -> None:
+    orch._tui.add_communicate_proposal(event)
+
+
+def _handle_escalate_dispatch(
+    orch: '_AppRendererEventProcessorMixin', event: EscalateToHumanAction
+) -> None:
+    orch._tui.add_communicate_escalate(event)
+
+
+def _handle_user_reject_dispatch(
+    orch: '_AppRendererEventProcessorMixin', event: UserRejectObservation
+) -> None:
+    card = ActivityRenderer.user_reject()
+    orch._write_card(card)
+
+
+def _handle_server_ready_dispatch(
+    orch: '_AppRendererEventProcessorMixin', event: ServerReadyObservation
+) -> None:
+    url = getattr(event, 'url', '')
+    port = getattr(event, 'port', '')
+    card = ActivityRenderer.server_ready(url, port)
+    orch._write_card(card)
+
+
+def _handle_file_download_dispatch(
+    orch: '_AppRendererEventProcessorMixin', event: FileDownloadObservation
+) -> None:
+    url = getattr(event, 'url', '') or ''
+    orch._tui._write_log(
+        Text(f'  [bold #91abec]Downloaded[/] {url}', style=NAVY_TEXT_PRIMARY)
+    )
+
+
+def _handle_unknown_event(
+    orch: '_AppRendererEventProcessorMixin', event: Any
+) -> None:
+    name = type(event).__name__
+    orch._tui._write_log(Text(f'  [{name}]', style=NAVY_TEXT_MUTED))
 
 
 def _dispatch_event(
@@ -899,50 +1268,11 @@ def _dispatch_event(
     if handler is not None:
         handler(orch, event)
         return
-
-    if isinstance(event, RecallAction):
-        pass
-    elif isinstance(event, CondensationRequestAction):
-        _show_compaction_started_card(orch)
-    elif isinstance(event, RecallObservation):
-        pass
-    elif isinstance(event, RecallFailureObservation):
-        pass
-    elif isinstance(event, CondensationAction):
-        _show_compaction_started_card(orch)
-    elif isinstance(event, StreamingChunkAction):
-        orch._handle_streaming_chunk(event)
-    elif isinstance(event, AgentStateChangedObservation):
-        orch._handle_state_change(event)
-    elif isinstance(event, ClarificationRequestAction):
-        orch._tui.add_communicate_clarification(event)
-    elif isinstance(event, ConfirmRequestAction):
-        if not _is_full_autonomy(orch):
-            orch._tui.add_communicate_confirm(event)
-    elif isinstance(event, InformAction):
-        orch._tui.add_communicate_inform(event)
-    elif isinstance(event, UncertaintyAction):
-        orch._tui.add_communicate_uncertainty(event)
-    elif isinstance(event, ProposalAction):
-        orch._tui.add_communicate_proposal(event)
-    elif isinstance(event, EscalateToHumanAction):
-        orch._tui.add_communicate_escalate(event)
-    elif isinstance(event, UserRejectObservation):
-        card = ActivityRenderer.user_reject()
-        orch._write_card(card)
-    elif isinstance(event, ServerReadyObservation):
-        url = getattr(event, 'url', '')
-        port = getattr(event, 'port', '')
-        card = ActivityRenderer.server_ready(url, port)
-        orch._write_card(card)
-    elif isinstance(event, FileDownloadObservation):
-        url = getattr(event, 'url', '') or ''
-        orch._tui._write_log(
-            Text(f'  [bold #91abec]Downloaded[/] {url}', style=NAVY_TEXT_PRIMARY)
-        )
-    else:
-        name = type(event).__name__
-        orch._tui._write_log(Text(f'  [{name}]', style=NAVY_TEXT_MUTED))
+    fallback = _FALLBACK_HANDLERS.get(event_type)
+    if fallback is not None:
+        fallback(orch, event)
+        return
+    _handle_unknown_event(orch, event)
 
 
 _EVENT_HANDLERS: dict[type, Any] = {
@@ -976,4 +1306,23 @@ _EVENT_HANDLERS: dict[type, Any] = {
     DelegateTaskObservation: _handle_delegate_task_observation,
     TaskTrackingObservation: _handle_task_tracking_observation,
     TaskTrackingAction: _handle_task_tracking_action,
+}
+
+_FALLBACK_HANDLERS: dict[type, Any] = {
+    RecallAction: _handle_noop_event,
+    CondensationRequestAction: _handle_compaction_trigger,
+    RecallObservation: _handle_noop_event,
+    RecallFailureObservation: _handle_noop_event,
+    CondensationAction: _handle_compaction_trigger,
+    StreamingChunkAction: _handle_streaming_chunk_dispatch,
+    AgentStateChangedObservation: _handle_state_change_dispatch,
+    ClarificationRequestAction: _handle_clarification_dispatch,
+    ConfirmRequestAction: _handle_confirm_dispatch,
+    InformAction: _handle_inform_dispatch,
+    UncertaintyAction: _handle_uncertainty_dispatch,
+    ProposalAction: _handle_proposal_dispatch,
+    EscalateToHumanAction: _handle_escalate_dispatch,
+    UserRejectObservation: _handle_user_reject_dispatch,
+    ServerReadyObservation: _handle_server_ready_dispatch,
+    FileDownloadObservation: _handle_file_download_dispatch,
 }

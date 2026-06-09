@@ -156,10 +156,8 @@ def _opt_int(v: object) -> int | None:
     return int(v)
 
 
-def handle_terminal_manager_tool(arguments: dict) -> Any:
-    """Route terminal manager intents back into the core backend actions."""
+def _validate_action(arguments: dict) -> str:
     action = arguments.get('action')
-
     if not action:
         raise FunctionCallValidationError(
             "terminal_manager requires an 'action' argument. "
@@ -167,86 +165,107 @@ def handle_terminal_manager_tool(arguments: dict) -> Any:
             "'read' (fetch output), 'input' (send more text). "
             'Example: {"action": "open", "command": "Get-ChildItem"}'
         )
-
     if action not in ('open', 'input', 'read'):
         raise FunctionCallValidationError(
             f'Unknown terminal_manager action: {action!r}. '
             f"Must be one of: 'open', 'input', 'read'. "
             f"To run a command use action='open' with a 'command' argument."
         )
+    return action
 
-    if action == 'open':
-        cmd = arguments.get('command')
-        if not cmd:
-            raise ValueError("Terminal 'open' action requires 'command'")
-        validate_security_risk(arguments, TERMINAL_MANAGER_TOOL_NAME)
-        return TerminalRunAction(
-            command=cmd,
-            cwd=arguments.get('cwd'),
-            rows=_opt_int(arguments.get('rows')),
-            cols=_opt_int(arguments.get('cols')),
-        )
 
-    elif action == 'input':
-        session_id = arguments.get('session_id')
-        input_val = arguments.get('input', '') or ''
-        control_val = arguments.get('control')
-        rows, cols = _opt_int(arguments.get('rows')), _opt_int(arguments.get('cols'))
-        if not session_id:
-            raise ValueError(
-                "Terminal 'input' action requires 'session_id'. "
-                "Call action='open' first to start a terminal session and obtain a session_id."
-            )
-        if (
-            not str(input_val).strip()
-            and not (control_val and str(control_val).strip())
-            and rows is None
-        ):
-            raise ValueError(
-                "Terminal 'input' action requires 'input' and/or 'control' and/or "
-                "'rows' + 'cols'"
-            )
-
-        is_control = arguments.get('is_control', False)
-        if isinstance(is_control, str):
-            is_control = is_control.lower() == 'true'
-
-        submit = arguments.get('submit', True)
-        if isinstance(submit, str):
-            submit = submit.strip().lower() not in ('false', '0', 'no')
-
-        return TerminalInputAction(
-            session_id=session_id,
-            input=str(input_val),
-            is_control=is_control,
-            control=str(control_val) if control_val is not None else None,
-            submit=bool(submit),
-            rows=rows,
-            cols=cols,
-        )
-
-    elif action == 'read':
-        session_id = arguments.get('session_id')
-        if not session_id:
-            raise ValueError(
-                "Terminal 'read' action requires 'session_id'. "
-                "Call action='open' first to start a terminal session and obtain a session_id."
-            )
-        mode = str(arguments.get('mode', 'delta') or 'delta').lower()
-        if mode not in {'delta', 'snapshot'}:
-            raise ValueError(
-                "Terminal 'read' action requires mode in {'delta','snapshot'}"
-            )
-        return TerminalReadAction(
-            session_id=session_id,
-            offset=_opt_int(arguments.get('offset')),
-            mode=mode,
-            rows=_opt_int(arguments.get('rows')),
-            cols=_opt_int(arguments.get('cols')),
-        )
-
-    # Unreachable — the enum guard above catches all invalid values.
-    raise FunctionCallValidationError(  # pragma: no cover
-        f'Unknown terminal_manager action: {action!r}. '
-        f"Must be one of: 'open', 'input', 'read'."
+def _handle_open_action(arguments: dict) -> TerminalRunAction:
+    cmd = arguments.get('command')
+    if not cmd:
+        raise ValueError("Terminal 'open' action requires 'command'")
+    validate_security_risk(arguments, TERMINAL_MANAGER_TOOL_NAME)
+    return TerminalRunAction(
+        command=cmd,
+        cwd=arguments.get('cwd'),
+        rows=_opt_int(arguments.get('rows')),
+        cols=_opt_int(arguments.get('cols')),
     )
+
+
+def _has_input_content(input_val: object, control_val: object, rows: int | None) -> bool:
+    if str(input_val).strip():
+        return True
+    if control_val and str(control_val).strip():
+        return True
+    return rows is not None
+
+
+def _validate_input_params(session_id: object, input_val: object, control_val: object, rows: int | None) -> None:
+    if not session_id:
+        raise ValueError(
+            "Terminal 'input' action requires 'session_id'. "
+            "Call action='open' first to start a terminal session and obtain a session_id."
+        )
+    if not _has_input_content(input_val, control_val, rows):
+        raise ValueError(
+            "Terminal 'input' action requires 'input' and/or 'control' and/or "
+            "'rows' + 'cols'"
+        )
+
+
+def _coerce_is_control(value: object) -> bool:
+    if isinstance(value, str):
+        return value.lower() == 'true'
+    return bool(value)
+
+
+def _coerce_submit(value: object) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() not in ('false', '0', 'no')
+    return bool(value)
+
+
+def _handle_input_action(arguments: dict) -> TerminalInputAction:
+    session_id = arguments.get('session_id')
+    input_val = arguments.get('input', '') or ''
+    control_val = arguments.get('control')
+    rows = _opt_int(arguments.get('rows'))
+    cols = _opt_int(arguments.get('cols'))
+    _validate_input_params(session_id, input_val, control_val, rows)
+    is_control = _coerce_is_control(arguments.get('is_control', False))
+    submit = _coerce_submit(arguments.get('submit', True))
+    return TerminalInputAction(
+        session_id=session_id,
+        input=str(input_val),
+        is_control=is_control,
+        control=str(control_val) if control_val is not None else None,
+        submit=submit,
+        rows=rows,
+        cols=cols,
+    )
+
+
+def _handle_read_action(arguments: dict) -> TerminalReadAction:
+    session_id = arguments.get('session_id')
+    if not session_id:
+        raise ValueError(
+            "Terminal 'read' action requires 'session_id'. "
+            "Call action='open' first to start a terminal session and obtain a session_id."
+        )
+    mode = str(arguments.get('mode', 'delta') or 'delta').lower()
+    if mode not in {'delta', 'snapshot'}:
+        raise ValueError(
+            "Terminal 'read' action requires mode in {'delta','snapshot'}"
+        )
+    return TerminalReadAction(
+        session_id=session_id,
+        offset=_opt_int(arguments.get('offset')),
+        mode=mode,
+        rows=_opt_int(arguments.get('rows')),
+        cols=_opt_int(arguments.get('cols')),
+    )
+
+
+def handle_terminal_manager_tool(arguments: dict) -> Any:
+    """Route terminal manager intents back into the core backend actions."""
+    action = _validate_action(arguments)
+    if action == 'open':
+        return _handle_open_action(arguments)
+    if action == 'input':
+        return _handle_input_action(arguments)
+    return _handle_read_action(arguments)

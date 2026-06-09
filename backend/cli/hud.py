@@ -118,28 +118,7 @@ class HUDBar:
         return '…' + path[-tail_len:]
 
     @staticmethod
-    def describe_model(model: str | None) -> tuple[str, str]:
-        """Return a user-facing provider/model pair from a routing model id."""
-        raw = (model or '').strip()
-        if not raw or raw == '(not set)':
-            return '(not set)', '(not set)'
-
-        parts = [part.strip() for part in raw.split('/') if part.strip()]
-        # Preserve explicit client/provider/model routing:
-        # - openai/provider/model -> provider + model
-        # - provider/model -> provider + model
-        # This keeps provider independent from transport client.
-        if len(parts) >= 3:
-            client = parts[0].lower()
-            provider = parts[1].lower()
-            display_model = '/'.join(parts[2:]) or '(not set)'
-            # If the provider segment is absent/invalid, treat the client as provider.
-            if provider in {'', '(not set)'}:
-                provider = client
-            return provider, display_model
-        if len(parts) == 2:
-            return parts[0].lower(), parts[1]
-
+    def _describe_model_via_resolver(raw: str) -> tuple[str, str]:
         try:
             from backend.inference.provider_resolver import get_resolver
 
@@ -153,6 +132,26 @@ class HUDBar:
                 provider, display_model = raw.split('/', 1)
                 return provider.lower(), display_model or '(not set)'
             return '(unknown)', raw
+
+    @staticmethod
+    def describe_model(model: str | None) -> tuple[str, str]:
+        """Return a user-facing provider/model pair from a routing model id."""
+        raw = (model or '').strip()
+        if not raw or raw == '(not set)':
+            return '(not set)', '(not set)'
+
+        parts = [part.strip() for part in raw.split('/') if part.strip()]
+        if len(parts) >= 3:
+            client = parts[0].lower()
+            provider = parts[1].lower()
+            display_model = '/'.join(parts[2:]) or '(not set)'
+            if provider in {'', '(not set)'}:
+                provider = client
+            return provider, display_model
+        if len(parts) == 2:
+            return parts[0].lower(), parts[1]
+
+        return HUDBar._describe_model_via_resolver(raw)
 
     # -- rich renderable protocol ------------------------------------------
 
@@ -434,6 +433,21 @@ class HUDBar:
     def _apply_object_latest_usage(self, latest: Any) -> None:
         self._apply_object_context_usages([latest])
 
+    def _update_from_dict_metrics_resolve_context(
+        self,
+        usages: Any,
+        accumulated_usage: Any,
+    ) -> None:
+        if not usages:
+            if isinstance(accumulated_usage, dict) and self._apply_dict_accumulated_usage(
+                accumulated_usage,
+            ):
+                return
+            return
+        latest = usages[-1] if isinstance(usages, list) else usages
+        if isinstance(latest, dict):
+            self._apply_dict_context_usages(usages)
+
     def _update_from_dict_metrics(self, metrics: dict[str, Any]) -> None:
         accumulated_cost = float(metrics.get('accumulated_cost') or 0.0)
         self.state.cost_usd = accumulated_cost
@@ -453,16 +467,7 @@ class HUDBar:
             accumulated_cost=accumulated_cost,
         )
         self.state.llm_calls = max(self.state.llm_calls, resolved_calls)
-
-        if usages:
-            latest = usages[-1] if isinstance(usages, list) else usages
-            if isinstance(latest, dict):
-                self._apply_dict_context_usages(usages)
-                return
-        if isinstance(accumulated_usage, dict) and self._apply_dict_accumulated_usage(
-            accumulated_usage,
-        ):
-            return
+        self._update_from_dict_metrics_resolve_context(usages, accumulated_usage)
 
     def _apply_dict_accumulated_usage(
         self,

@@ -65,6 +65,12 @@ def _count_events(session_dir: Path) -> int:
     return 0
 
 
+def _safe_str(value: Any) -> str:
+    if value is None:
+        return ''
+    return str(value)
+
+
 def _list_session_entries(
     root: Path,
     sort_by: str = 'updated',
@@ -99,6 +105,57 @@ def _list_session_entries(
     return sessions
 
 
+def _session_matches_fallback(
+    search_lower: str,
+    session: tuple[str, dict[str, Any], int],
+) -> bool:
+    sid, meta, _ = session
+    if search_lower in sid.lower():
+        return True
+    if search_lower in _safe_str(meta.get('title')).lower():
+        return True
+    if search_lower in _safe_str(meta.get('name')).lower():
+        return True
+    if search_lower in _safe_str(meta.get('llm_model')).lower():
+        return True
+    return False
+
+
+def _filter_sessions_fallback(
+    sessions: list[tuple[str, dict[str, Any], int]],
+    search_term: str,
+) -> list[tuple[str, dict[str, Any], int]]:
+    search_lower = search_term.lower()
+    return [s for s in sessions if _session_matches_fallback(search_lower, s)]
+
+
+def _fuzzy_score_session(
+    search_lower: str,
+    session: tuple[str, dict[str, Any], int],
+) -> int:
+    from rapidfuzz import fuzz
+    sid, meta, _ = session
+    title = _safe_str(meta.get('title') or meta.get('name')).lower()
+    model = _safe_str(meta.get('llm_model')).lower()
+    sid_score = fuzz.partial_ratio(search_lower, sid.lower())
+    title_score = fuzz.partial_ratio(search_lower, title)
+    model_score = fuzz.partial_ratio(search_lower, model)
+    return max(sid_score, title_score, model_score)
+
+
+def _filter_sessions_scored(
+    sessions: list[tuple[str, dict[str, Any], int]],
+    search_lower: str,
+) -> list[tuple[str, dict[str, Any], int]]:
+    scored: list[tuple[int, tuple[str, dict[str, Any], int]]] = []
+    for session in sessions:
+        max_score = _fuzzy_score_session(search_lower, session)
+        if max_score > 50:
+            scored.append((int(100 - max_score), session))
+    scored.sort()
+    return [s for _, s in scored]
+
+
 def _filter_sessions_fuzzy(
     sessions: list[tuple[str, dict[str, Any], int]],
     search_term: str,
@@ -107,35 +164,27 @@ def _filter_sessions_fuzzy(
     try:
         from rapidfuzz import fuzz
     except ImportError:
-        search_lower = search_term.lower()
-        return [
-            s
-            for s in sessions
-            if search_lower in s[0].lower()
-            or search_lower in str(s[1].get('title', '') or '').lower()
-            or search_lower in str(s[1].get('name', '') or '').lower()
-            or search_lower in str(s[1].get('llm_model', '') or '').lower()
-        ]
+        return _filter_sessions_fallback(sessions, search_term)
+    return _filter_sessions_scored(sessions, search_term.lower())
 
-    search_lower = search_term.lower()
-    scored: list[tuple[int, tuple[str, dict[str, Any], int]]] = []
 
-    for session in sessions:
-        sid, meta, count = session
-        sid_lower = sid.lower()
-        title = str(meta.get('title') or meta.get('name') or '').lower()
-        model = str(meta.get('llm_model') or '').lower()
-
-        sid_score = fuzz.partial_ratio(search_lower, sid_lower)
-        title_score = fuzz.partial_ratio(search_lower, title)
-        model_score = fuzz.partial_ratio(search_lower, model)
-        max_score = max(sid_score, title_score, model_score)
-
-        if max_score > 50:
-            scored.append((int(100 - max_score), session))
-
-    scored.sort()
-    return [s for _, s in scored]
+def _add_session_detail_rows(
+    detail: Table,
+    sid: str,
+    meta: dict[str, Any],
+    event_count: int,
+) -> None:
+    title = meta.get('title') or meta.get('name') or '—'
+    model = meta.get('llm_model') or '—'
+    cost = meta.get('accumulated_cost') or 0
+    cost_str = f'${float(cost):.4f}' if cost else '—'
+    detail.add_row('ID', sid)
+    detail.add_row('Title', str(title))
+    detail.add_row('Model', str(model))
+    detail.add_row('Events', str(event_count))
+    detail.add_row('Cost', cost_str)
+    detail.add_row('Created', str(meta.get('created_at', '—'))[:19])
+    detail.add_row('Updated', str(meta.get('last_updated_at', '—'))[:19])
 
 
 def show_session(
@@ -181,14 +230,7 @@ def show_session(
     detail.add_column(style=CLR_CARD_TITLE, no_wrap=True)
     detail.add_column(overflow='fold')
 
-    detail.add_row('ID', sid)
-    detail.add_row('Title', str(meta.get('title') or meta.get('name') or '—'))
-    detail.add_row('Model', str(meta.get('llm_model') or '—'))
-    detail.add_row('Events', str(event_count))
-    cost = meta.get('accumulated_cost') or 0
-    detail.add_row('Cost', f'${float(cost):.4f}' if cost else '—')
-    detail.add_row('Created', str(meta.get('created_at', '—'))[:19])
-    detail.add_row('Updated', str(meta.get('last_updated_at', '—'))[:19])
+    _add_session_detail_rows(detail, sid, meta, event_count)
 
     console.print()
     console.print(
@@ -206,26 +248,37 @@ def show_session(
     return True
 
 
+def _resolve_target_by_index(
+    sessions: list[tuple[str, dict[str, Any], int]],
+    target: str | int,
+) -> tuple[str, dict[str, Any], int] | None:
+    index = int(target)
+    if 1 <= index <= len(sessions):
+        return sessions[index - 1]
+    return None
+
+
+def _resolve_target_by_id(
+    sessions: list[tuple[str, dict[str, Any], int]],
+    cleaned: str,
+) -> tuple[str, dict[str, Any], int] | None:
+    exact = [s for s in sessions if s[0] == cleaned]
+    if exact:
+        return exact[0]
+    matches = [s for s in sessions if s[0].startswith(cleaned)]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
 def _resolve_target(
     sessions: list[tuple[str, dict[str, Any], int]],
     target: str | int,
 ) -> tuple[str, dict[str, Any], int] | None:
     """Resolve an index (int) or id prefix (str) to a session."""
     if isinstance(target, int) or (isinstance(target, str) and target.isdigit()):
-        index = int(target)
-        if 1 <= index <= len(sessions):
-            return sessions[index - 1]
-        return None
-
-    cleaned = str(target).strip()
-    exact = [s for s in sessions if s[0] == cleaned]
-    if exact:
-        return exact[0]
-
-    matches = [s for s in sessions if s[0].startswith(cleaned)]
-    if len(matches) == 1:
-        return matches[0]
-    return None
+        return _resolve_target_by_index(sessions, target)
+    return _resolve_target_by_id(sessions, str(target).strip())
 
 
 def _resolve_by_id(
@@ -255,6 +308,31 @@ def _format_session_row(
 
 
 _SORT_OPTIONS = {'updated', 'created', 'events', 'cost', 'model'}
+
+
+def _add_session_table_row(
+    table: Table,
+    index: int,
+    sid: str,
+    meta: dict[str, Any],
+    event_count: int,
+) -> None:
+    title = meta.get('title', meta.get('name', '—'))
+    model = meta.get('llm_model', '—')
+    cost = meta.get('accumulated_cost', 0)
+    cost_str = f'${float(cost):.4f}' if cost else '—'
+    updated = meta.get('last_updated_at', meta.get('created_at', '—'))
+    if isinstance(updated, str) and len(updated) > 19:
+        updated = updated[:19]
+    table.add_row(
+        str(index),
+        sid,
+        str(title) if title else '—',
+        str(model)[:20] if model else '—',
+        str(event_count),
+        cost_str,
+        str(updated),
+    )
 
 
 def list_sessions(
@@ -318,23 +396,7 @@ def list_sessions(
     table.add_column('Updated', style=STYLE_DIM)
 
     for i, (sid, meta, event_count) in enumerate(sessions, 1):
-        title = meta.get('title', meta.get('name', '—'))
-        model = meta.get('llm_model', '—')
-        cost = meta.get('accumulated_cost', 0)
-        cost_str = f'${float(cost):.4f}' if cost else '—'
-        updated = meta.get('last_updated_at', meta.get('created_at', '—'))
-        if isinstance(updated, str) and len(updated) > 19:
-            updated = updated[:19]
-
-        table.add_row(
-            str(i),
-            sid,
-            str(title) if title else '—',
-            str(model)[:20] if model else '—',
-            str(event_count),
-            cost_str,
-            str(updated),
-        )
+        _add_session_table_row(table, i, sid, meta, event_count)
 
     console.print(table)
     sort_hint = f' (sorted by {sort_field})' if sort_field != 'updated' else ''
@@ -369,6 +431,59 @@ def _resolve_delete_target(
     return None, f"No session matches '{target}'"
 
 
+def _resolve_delete_targets(
+    sessions: list[tuple[str, dict[str, Any], int]],
+    targets: list[str],
+) -> tuple[list[tuple[str, dict[str, Any], int]], list[str]]:
+    to_delete: list[tuple[str, dict[str, Any], int]] = []
+    errors: list[str] = []
+    for target in targets:
+        resolved, error = _resolve_delete_target(sessions, target)
+        if resolved is not None:
+            to_delete.append(resolved)
+        else:
+            errors.append(error)
+    return to_delete, errors
+
+
+def _print_messages(
+    console: Console,
+    messages: list[str],
+    style: str,
+) -> None:
+    for msg in messages:
+        console.print(f'[{style}]{msg}[/{style}]')
+
+
+def _print_delete_confirmation(
+    console: Console,
+    to_delete: list[tuple[str, dict[str, Any], int]],
+) -> bool:
+    from rich.prompt import Confirm
+    console.print(f'Will delete {len(to_delete)} session(s):')
+    for sid, meta, _count in to_delete:
+        title = str(meta.get('title') or meta.get('name') or sid)
+        console.print(f'  {sid[:12]}  {title[:40]}')
+    return Confirm.ask('Proceed?', default=False)
+
+
+def _perform_session_deletions(
+    console: Console,
+    root: Path,
+    to_delete: list[tuple[str, dict[str, Any], int]],
+) -> int:
+    deleted = 0
+    for sid, _meta, _count in to_delete:
+        path = root / sid
+        try:
+            shutil.rmtree(path, ignore_errors=True)
+            console.print(f'  [green]Deleted[/] {sid[:12]}')
+            deleted += 1
+        except Exception as e:
+            console.print(f'  [red]Failed[/] {sid[:12]}: {e}')
+    return deleted
+
+
 def delete_sessions(
     console: Console,
     targets: list[str],
@@ -390,44 +505,19 @@ def delete_sessions(
         console.print(f'[{STYLE_DIM}]No past sessions found.[/{STYLE_DIM}]')
         return 2
 
-    to_delete: list[tuple[str, dict[str, Any], int]] = []
-    errors: list[str] = []
-
-    for target in targets:
-        resolved, error = _resolve_delete_target(sessions, target)
-        if resolved is not None:
-            to_delete.append(resolved)
-        else:
-            errors.append(error)
+    to_delete, errors = _resolve_delete_targets(sessions, targets)
 
     if not to_delete:
-        for e in errors:
-            console.print(f'[red]{e}[/]')
+        _print_messages(console, errors, 'red')
         return 2
 
     if not yes:
-        from rich.prompt import Confirm
-
-        console.print(f'Will delete {len(to_delete)} session(s):')
-        for sid, meta, _count in to_delete:
-            title = str(meta.get('title') or meta.get('name') or sid)
-            console.print(f'  {sid[:12]}  {title[:40]}')
-        if not Confirm.ask('Proceed?', default=False):
+        if not _print_delete_confirmation(console, to_delete):
             console.print('Cancelled.')
             return 0
 
-    deleted = 0
-    for sid, _meta, _count in to_delete:
-        path = root / sid
-        try:
-            shutil.rmtree(path, ignore_errors=True)
-            console.print(f'  [green]Deleted[/] {sid[:12]}')
-            deleted += 1
-        except Exception as e:
-            console.print(f'  [red]Failed[/] {sid[:12]}: {e}')
-
-    for err in errors:
-        console.print(f'[yellow]{err}[/]')
+    deleted = _perform_session_deletions(console, root, to_delete)
+    _print_messages(console, errors, 'yellow')
 
     return 0 if deleted == len(to_delete) else 1
 

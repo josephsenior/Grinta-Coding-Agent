@@ -56,6 +56,48 @@ def _build_gemini_tool_response_parts(name: str, content: Any) -> list[dict[str,
     ]
 
 
+def _extract_text_from_list_content(
+    content: list,
+) -> tuple[str, bool]:
+    text_parts: list[str] = []
+    caching_requested = False
+    for item in content:
+        if isinstance(item, dict) and item.get('type') == 'text':
+            text_parts.append(item.get('text', ''))
+            if item.get('cache_prompt'):
+                caching_requested = True
+    return '\n'.join(text_parts), caching_requested
+
+
+def _resolve_content_text(
+    content: Any,
+) -> tuple[str, bool]:
+    if isinstance(content, list):
+        return _extract_text_from_list_content(content)
+    text = content if isinstance(content, str) else ''
+    return text, False
+
+
+def _accumulate_system_instruction(
+    current: str | None, text: str
+) -> str:
+    if current:
+        return current + '\n\n' + text
+    return text
+
+
+def _build_tool_result_message(
+    message: dict[str, Any], content: Any, content_text: str
+) -> dict[str, Any]:
+    return {
+        'role': 'user',
+        'parts': _build_gemini_tool_response_parts(
+            message.get('name', ''),
+            content if isinstance(content, list) else content_text,
+        ),
+    }
+
+
 def convert_messages(
     messages: list[dict[str, Any]],
 ) -> tuple[str | None, list[dict[str, Any]], bool]:
@@ -76,41 +118,22 @@ def convert_messages(
     for m in messages:
         content = m.get('content', '')
         role_name = m.get('role', 'user')
-
-        # Handle list-style content (from Grinta's message serialization)
-        text_parts = []
-        if isinstance(content, list):
-            for item in content:
-                if isinstance(item, dict) and item.get('type') == 'text':
-                    text_parts.append(item.get('text', ''))
-                    if item.get('cache_prompt'):
-                        caching_requested = True
-            content_text = '\n'.join(text_parts)
-        else:
-            content_text = content if isinstance(content, str) else ''
+        content_text, msg_caching = _resolve_content_text(content)
+        if msg_caching:
+            caching_requested = True
 
         if role_name == 'system':
-            if system_instruction:
-                system_instruction += '\n\n' + content_text
-            else:
-                system_instruction = content_text
-            continue
-
-        # Tool-result messages -> function_response part on a 'user' turn.
-        if role_name == 'tool':
-            gemini_messages.append(
-                {
-                    'role': 'user',
-                    'parts': _build_gemini_tool_response_parts(
-                        m.get('name', ''),
-                        content if isinstance(content, list) else content_text,
-                    ),
-                }
+            system_instruction = _accumulate_system_instruction(
+                system_instruction, content_text
             )
             continue
 
-        # Assistant messages with native tool_calls -> function_call parts on
-        # a 'model' turn (preserving any thought_signature blobs).
+        if role_name == 'tool':
+            gemini_messages.append(
+                _build_tool_result_message(m, content, content_text)
+            )
+            continue
+
         tool_calls = m.get('tool_calls') if role_name == 'assistant' else None
         if tool_calls:
             gemini_messages.append(
@@ -272,39 +295,54 @@ def gemini_response_to_dict(response: Any) -> dict[str, Any] | None:
     return None
 
 
-def iter_candidate_parts(response: Any) -> list[Any]:
-    """Return all candidate parts from a Gemini response across SDK shapes."""
+def _parts_from_dict_candidates(response_dict: dict) -> list[Any]:
     parts: list[Any] = []
-
-    response_dict = gemini_response_to_dict(response)
-    if response_dict:
-        for candidate in response_dict.get('candidates', []) or []:
-            if not isinstance(candidate, dict):
-                continue
-            content = candidate.get('content', {})
-            if not isinstance(content, dict):
-                continue
-            candidate_parts = content.get('parts')
-            if candidate_parts:
-                parts.extend(candidate_parts)
-
-    if parts:
-        return parts
-
-    for candidate in getattr(response, 'candidates', []) or []:
-        content = getattr(candidate, 'content', None)
-        if content is None and isinstance(candidate, dict):
-            content = candidate.get('content')
-
-        candidate_parts = None
-        if isinstance(content, dict):
-            candidate_parts = content.get('parts')
-        elif content is not None:
-            candidate_parts = getattr(content, 'parts', None)
-
+    for candidate in response_dict.get('candidates', []) or []:
+        if not isinstance(candidate, dict):
+            continue
+        content = candidate.get('content', {})
+        if not isinstance(content, dict):
+            continue
+        candidate_parts = content.get('parts')
         if candidate_parts:
             parts.extend(candidate_parts)
     return parts
+
+
+def _get_content_from_object_candidate(candidate: Any) -> Any:
+    content = getattr(candidate, 'content', None)
+    if content is None and isinstance(candidate, dict):
+        content = candidate.get('content')
+    return content
+
+
+def _get_parts_from_content(content: Any) -> Any:
+    if isinstance(content, dict):
+        return content.get('parts')
+    if content is not None:
+        return getattr(content, 'parts', None)
+    return None
+
+
+def _parts_from_object_candidates(response: Any) -> list[Any]:
+    parts: list[Any] = []
+    for candidate in getattr(response, 'candidates', []) or []:
+        content = _get_content_from_object_candidate(candidate)
+        candidate_parts = _get_parts_from_content(content)
+        if candidate_parts:
+            parts.extend(candidate_parts)
+    return parts
+
+
+def iter_candidate_parts(response: Any) -> list[Any]:
+    """Return all candidate parts from a Gemini response across SDK shapes."""
+    response_dict = gemini_response_to_dict(response)
+    if response_dict:
+        parts = _parts_from_dict_candidates(response_dict)
+        if parts:
+            return parts
+
+    return _parts_from_object_candidates(response)
 
 
 def coerce_fc_name_and_args(function_call: Any) -> tuple[str | None, Any]:
@@ -318,6 +356,31 @@ def coerce_fc_name_and_args(function_call: Any) -> tuple[str | None, Any]:
     return getattr(function_call, 'name', None), getattr(function_call, 'args', None)
 
 
+def _get_function_call_from_part(part: Any) -> Any:
+    fc = getattr(part, 'function_call', None)
+    if fc is None and isinstance(part, dict):
+        fc = part.get('function_call') or part.get('functionCall')
+    return fc
+
+
+def _normalize_tool_call_args(args: Any) -> dict[str, Any]:
+    if args is None:
+        return {}
+    if isinstance(args, dict):
+        return args
+    try:
+        return dict(args)
+    except Exception:
+        return {}
+
+
+def _get_thought_signature_from_part(part: Any) -> Any:
+    sig = getattr(part, 'thought_signature', None)
+    if sig is None and isinstance(part, dict):
+        sig = part.get('thought_signature') or part.get('thoughtSignature')
+    return sig
+
+
 def extract_tool_calls(response: Any) -> list[dict[str, Any]] | None:
     """Extract function call parts from a Gemini response.
 
@@ -328,33 +391,13 @@ def extract_tool_calls(response: Any) -> list[dict[str, Any]] | None:
     """
     tool_calls: list[dict[str, Any]] = []
     for part in iter_candidate_parts(response):
-        fc = getattr(part, 'function_call', None)
-        if fc is None and isinstance(part, dict):
-            fc = part.get('function_call') or part.get('functionCall')
-
+        fc = _get_function_call_from_part(part)
         name, args = coerce_fc_name_and_args(fc)
         if not name:
             continue
 
-        args_dict: dict[str, Any]
-        if args is None:
-            args_dict = {}
-        elif isinstance(args, dict):
-            args_dict = args
-        else:
-            try:
-                args_dict = dict(args)
-            except Exception:
-                args_dict = {}
-
-        # Gemini 2.5 thinking models attach an opaque thought_signature on
-        # function_call parts.  Capture it (object or dict shape) so the
-        # caller can replay it on later turns.
-        thought_signature = getattr(part, 'thought_signature', None)
-        if thought_signature is None and isinstance(part, dict):
-            thought_signature = part.get('thought_signature') or part.get(
-                'thoughtSignature'
-            )
+        args_dict = _normalize_tool_call_args(args)
+        thought_signature = _get_thought_signature_from_part(part)
 
         entry: dict[str, Any] = {
             'id': f'gemini-{len(tool_calls)}',
@@ -424,24 +467,41 @@ def extract_thinking(response: Any) -> str:
     return '\n'.join(thought_parts)
 
 
+def _finish_reason_from_dict_response(response_dict: dict) -> str:
+    candidates = response_dict.get('candidates') or []
+    if candidates and isinstance(candidates[0], dict):
+        reason = candidates[0].get('finishReason')
+        if isinstance(reason, str) and reason:
+            return reason
+    return ''
+
+
+def _finish_reason_from_object_candidate(candidate: Any) -> str:
+    reason = getattr(candidate, 'finish_reason', None)
+    if isinstance(reason, str) and reason:
+        return reason
+    if isinstance(candidate, dict):
+        reason = candidate.get('finish_reason') or candidate.get('finishReason')
+        if isinstance(reason, str) and reason:
+            return reason
+    return ''
+
+
+def _finish_reason_from_object_response(response: Any) -> str:
+    for candidate in getattr(response, 'candidates', []) or []:
+        reason = _finish_reason_from_object_candidate(candidate)
+        if reason:
+            return reason
+    return ''
+
+
 def extract_finish_reason(response: Any) -> str:
     response_dict = gemini_response_to_dict(response)
     if isinstance(response_dict, dict):
-        candidates = response_dict.get('candidates') or []
-        if candidates and isinstance(candidates[0], dict):
-            reason = candidates[0].get('finishReason')
-            if isinstance(reason, str) and reason:
-                return reason
-
-    for candidate in getattr(response, 'candidates', []) or []:
-        reason = getattr(candidate, 'finish_reason', None)
-        if isinstance(reason, str) and reason:
+        reason = _finish_reason_from_dict_response(response_dict)
+        if reason:
             return reason
-        if isinstance(candidate, dict):
-            reason = candidate.get('finish_reason') or candidate.get('finishReason')
-            if isinstance(reason, str) and reason:
-                return reason
-    return ''
+    return _finish_reason_from_object_response(response)
 
 
 def extract_block_reason(response: Any) -> str:

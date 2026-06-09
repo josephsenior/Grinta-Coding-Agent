@@ -589,6 +589,69 @@ class _SyntheticToolCall:
         self._mcp_tool_names: list[str] | None = None
 
 
+def _strip_param_newlines(pv: str) -> str:
+    if pv.startswith(chr(10)):
+        pv = pv[1:]
+    if pv.endswith(chr(10)):
+        pv = pv[:-1]
+    return pv
+
+
+def _build_params_from_matches(param_matches: list[Any]) -> dict[str, str]:
+    params: dict[str, str] = {}
+    for pm in param_matches:
+        params[pm.group(1)] = _strip_param_newlines(pm.group(2))
+    return params
+
+
+def _annotate_xml_syntax_errors(
+    params: dict[str, str], fn_body: str, is_unclosed: bool
+) -> None:
+    if is_unclosed:
+        params['__xml_syntax_error__'] = (
+            'Unclosed <function> tag. Use </function> to close.'
+        )
+    elif not params and fn_body.strip():
+        params['__xml_syntax_error__'] = (
+            'No <parameter=...> tags found. You must wrap arguments in parameter tags.'
+        )
+
+
+def _apply_xml_retry_guard(
+    params: dict[str, str], fn_name: str
+) -> dict[str, str]:
+    if '__xml_syntax_error__' not in params:
+        return params
+    serialized_args = json.dumps(params, sort_keys=True, ensure_ascii=False)
+    error_sig = f'xml_parsing:{params["__xml_syntax_error__"]}'
+    allowed, reason = _check_format_error_retry_guard(
+        fn_name, serialized_args, error_sig
+    )
+    if not allowed:
+        _LOGGER.error('XML parsing retry guard: %s', reason)
+        return {
+            '__xml_syntax_error__': f'Retry guard stopped repeated error: {params["__xml_syntax_error__"]}. Report as system error.'
+        }
+    return params
+
+
+def _extract_xml_params(
+    fn_body: str, fn_name: str, is_unclosed: bool, _iter_parameter_matches: Any
+) -> dict[str, str]:
+    try:
+        param_matches = list(_iter_parameter_matches(fn_body, fn_body))
+        params = _build_params_from_matches(param_matches)
+        _annotate_xml_syntax_errors(params, fn_body, is_unclosed)
+        return _apply_xml_retry_guard(params, fn_name)
+    except Exception as e:
+        logger.warning(
+            'Failed to parse parameters for <function=%s>: %s',
+            fn_name,
+            e,
+        )
+        return {'__xml_syntax_error__': f'Malformed parameters: {e!s}'}
+
+
 def _extract_xml_tool_calls_from_content(
     content_text: str, xml_tool_names: frozenset[str]
 ) -> list[Any]:
@@ -645,51 +708,7 @@ def _extract_xml_tool_calls_from_content(
             end_pos = close_m.end(0)
             is_unclosed = False
 
-        # Extract parameters with schema-aware type coercion and validation
-        try:
-            param_body = fn_body
-            param_matches = list(_iter_parameter_matches(fn_body, param_body))
-
-            # Fallback: raw string extraction for unknown tools
-            params = {}
-            for pm in param_matches:
-                pn = pm.group(1)
-                pv = pm.group(2)
-                if pv.startswith(chr(10)):
-                    pv = pv[1:]
-                if pv.endswith(chr(10)):
-                    pv = pv[:-1]
-                params[pn] = pv
-
-            if is_unclosed:
-                params['__xml_syntax_error__'] = (
-                    'Unclosed <function> tag. Use </function> to close.'
-                )
-            elif not params and fn_body.strip():
-                params['__xml_syntax_error__'] = (
-                    'No <parameter=...> tags found. You must wrap arguments in parameter tags.'
-                )
-
-            # Check retry guard for XML syntax errors
-            if '__xml_syntax_error__' in params:
-                serialized_args = json.dumps(params, sort_keys=True, ensure_ascii=False)
-                error_sig = f'xml_parsing:{params["__xml_syntax_error__"]}'
-                allowed, reason = _check_format_error_retry_guard(
-                    fn_name, serialized_args, error_sig
-                )
-                if not allowed:
-                    _LOGGER.error('XML parsing retry guard: %s', reason)
-                    params = {
-                        '__xml_syntax_error__': f'Retry guard stopped repeated error: {params["__xml_syntax_error__"]}. Report as system error.'
-                    }
-
-        except Exception as e:
-            logger.warning(
-                'Failed to parse parameters for <function=%s>: %s',
-                fn_name,
-                e,
-            )
-            params = {'__xml_syntax_error__': f'Malformed parameters: {str(e)}'}
+        params = _extract_xml_params(fn_body, fn_name, is_unclosed, _iter_parameter_matches)
 
         call_id = f'xml_toolu_{call_counter:02d}'
         call_counter += 1

@@ -16,7 +16,7 @@ from pydantic import (
 from backend._canonical import CanonicalModelMetaclass
 
 # Import CompactorConfig directly - needed for Pydantic validation
-from backend.core.config.compactor_config import AutoCompactorConfig, CompactorConfig
+from backend.core.config.compactor_config import ContextPipelineConfig, CompactorConfig
 from backend.core.config.config_telemetry import config_telemetry
 from backend.core.constants import (
     CURRENT_AGENT_CONFIG_SCHEMA_VERSION,
@@ -121,7 +121,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_MEMORY_ENABLED,
         description='Whether to enable conversation memory',
     )
-    compactor_config: CompactorConfig = Field(default_factory=AutoCompactorConfig)
+    compactor_config: CompactorConfig = Field(default_factory=ContextPipelineConfig)
     enable_prompt_extensions: bool = Field(
         default=DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED
     )

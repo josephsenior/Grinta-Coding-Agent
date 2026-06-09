@@ -45,33 +45,29 @@ class ContinuityEvalResult:
         return not self.missing
 
 
-def build_continuity_facts(events: list[Event]) -> tuple[ContinuityFact, ...]:
-    """Extract coding-agent facts that should remain visible after compaction."""
-    snapshot = extract_snapshot(events)
-    facts: list[ContinuityFact] = []
+def _extract_file_facts(files: object, facts: list[ContinuityFact]) -> None:
+    if not isinstance(files, dict):
+        return
+    for path, info in files.items():
+        if not isinstance(path, str) or not path:
+            continue
+        facts.append(ContinuityFact('file', path, path))
+        if isinstance(info, dict):
+            file_hash = info.get('sha256')
+            if isinstance(file_hash, str) and file_hash:
+                facts.append(
+                    ContinuityFact('file_hash', path, f'sha256:{file_hash[:16]}')
+                )
 
-    files = snapshot.get('files_touched', {})
-    if isinstance(files, dict):
-        for path, info in files.items():
-            if not isinstance(path, str) or not path:
-                continue
-            facts.append(ContinuityFact('file', path, path))
-            if isinstance(info, dict):
-                file_hash = info.get('sha256')
-                if isinstance(file_hash, str) and file_hash:
-                    facts.append(
-                        ContinuityFact('file_hash', path, f'sha256:{file_hash[:16]}')
-                    )
 
-    for item in _string_items(snapshot.get('invalidated_assumptions', [])):
-        facts.append(ContinuityFact('invalidated_assumption', item[:80], item[:200]))
+def _extract_string_fact_facts(
+    snapshot: dict, key: str, category: str, facts: list[ContinuityFact]
+) -> None:
+    for item in _string_items(snapshot.get(key, [])):
+        facts.append(ContinuityFact(category, item[:80], item[:200]))
 
-    for item in _string_items(snapshot.get('decisions', [])):
-        facts.append(ContinuityFact('decision', item[:80], item[:200]))
 
-    for item in _string_items(snapshot.get('recent_errors', [])):
-        facts.append(ContinuityFact('error', item[:80], item[:200]))
-
+def _extract_test_result_facts(snapshot: dict, facts: list[ContinuityFact]) -> None:
     for result in _dict_items(snapshot.get('test_results', [])):
         command = str(result.get('command', '')).strip()
         status = str(result.get('status', '')).upper()
@@ -85,12 +81,27 @@ def build_continuity_facts(events: list[Event]) -> tuple[ContinuityFact, ...]:
                 )
             )
 
+
+def _extract_failed_approach_facts(snapshot: dict, facts: list[ContinuityFact]) -> None:
     for approach in _dict_items(snapshot.get('attempted_approaches', [])):
         outcome = str(approach.get('outcome', '')).strip()
         detail = str(approach.get('detail', '')).strip()
         if detail and 'FAILED' in outcome:
             facts.append(ContinuityFact('failed_approach', detail[:80], detail))
             facts.append(ContinuityFact('failed_outcome', detail[:80], outcome))
+
+
+def build_continuity_facts(events: list[Event]) -> tuple[ContinuityFact, ...]:
+    """Extract coding-agent facts that should remain visible after compaction."""
+    snapshot = extract_snapshot(events)
+    facts: list[ContinuityFact] = []
+
+    _extract_file_facts(snapshot.get('files_touched', {}), facts)
+    _extract_string_fact_facts(snapshot, 'invalidated_assumptions', 'invalidated_assumption', facts)
+    _extract_string_fact_facts(snapshot, 'decisions', 'decision', facts)
+    _extract_string_fact_facts(snapshot, 'recent_errors', 'error', facts)
+    _extract_test_result_facts(snapshot, facts)
+    _extract_failed_approach_facts(snapshot, facts)
 
     return tuple(facts)
 

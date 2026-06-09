@@ -176,6 +176,40 @@ class ActivityRenderer:
     """Factory for creating activity cards from agent events."""
 
     @staticmethod
+    def _build_shell_secondary(exit_code: int | None) -> tuple[str | None, str]:
+        secondary_parts: list[str] = []
+        if exit_code is not None:
+            secondary_parts.append(f'exit {exit_code}')
+        secondary = ' · '.join(secondary_parts) if secondary_parts else None
+        kind = (
+            'ok'
+            if exit_code == 0
+            else ('err' if exit_code is not None and exit_code != 0 else 'neutral')
+        )
+        return secondary, kind
+
+    @staticmethod
+    def _build_shell_output_lines(output: str | None) -> list[ActivityLine]:
+        extra_lines: list[ActivityLine] = []
+        if not output:
+            return extra_lines
+        preview_lines = output.splitlines()[:8]
+        for line in preview_lines:
+            truncated = line[:120] + ('...' if len(line) > 120 else '')
+            extra_lines.append(
+                ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
+            )
+        if len(output.splitlines()) > 8:
+            extra_lines.append(
+                ActivityLine(
+                    f'... {len(output.splitlines()) - 8} more lines',
+                    style=NAVY_TEXT_DIM,
+                    indent=1,
+                )
+            )
+        return extra_lines
+
+    @staticmethod
     def shell_command(
         command: str,
         output: str | None = None,
@@ -183,9 +217,6 @@ class ActivityRenderer:
         duration: str = '',
     ) -> ActivityCard:
         """Create an activity card for a shell command."""
-        # Route shell-level grep/glob invocations to the dedicated tool
-        # cards so the UI doesn't lump them under the generic ``Shell``
-        # category.
         if ActivityRenderer._is_grep_shell_command(command):
             return ActivityRenderer._grep_shell_command(
                 command, output, exit_code
@@ -196,35 +227,8 @@ class ActivityRenderer:
             )
 
         cmd_preview = command[:80] + ('...' if len(command) > 80 else '')
-
-        secondary_parts: list[str] = []
-        if exit_code is not None:
-            secondary_parts.append(f'exit {exit_code}')
-
-        secondary = ' · '.join(secondary_parts) if secondary_parts else None
-        kind = (
-            'ok'
-            if exit_code == 0
-            else ('err' if exit_code is not None and exit_code != 0 else 'neutral')
-        )
-
-        extra_lines: list[ActivityLine] = []
-        if output:
-            preview_lines = output.splitlines()[:8]
-            for line in preview_lines:
-                truncated = line[:120] + ('...' if len(line) > 120 else '')
-                extra_lines.append(
-                    ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
-                )
-            if len(output.splitlines()) > 8:
-                extra_lines.append(
-                    ActivityLine(
-                        f'... {len(output.splitlines()) - 8} more lines',
-                        style=NAVY_TEXT_DIM,
-                        indent=1,
-                    )
-                )
-
+        secondary, kind = ActivityRenderer._build_shell_secondary(exit_code)
+        extra_lines = ActivityRenderer._build_shell_output_lines(output)
         should_collapse = (
             bool(output) and exit_code == 0 and not _looks_error_heavy(output)
         )
@@ -299,6 +303,60 @@ class ActivityRenderer:
         )
 
     @staticmethod
+    def _count_search_matches(result_lines: list[str]) -> tuple[int, int]:
+        match_count = 0
+        files: set[str] = set()
+        for line in result_lines:
+            if re.match(r'^[^:]+:\d+:', line):
+                match_count += 1
+            match = re.match(r'^([^:]+):\d+:', line)
+            if match:
+                files.add(match.group(1))
+        return match_count, len(files)
+
+    @staticmethod
+    def _build_search_secondary(
+        match_count: int, file_count: int, exit_code: int | None,
+    ) -> str | None:
+        if match_count and file_count:
+            return f'{match_count} matches · {file_count} files'
+        if match_count:
+            return f'{match_count} matches'
+        if exit_code == 1:
+            return 'no matches'
+        return None
+
+    @staticmethod
+    def _build_search_extra_lines(result_lines: list[str]) -> list[ActivityLine]:
+        extra_lines: list[ActivityLine] = []
+        if not result_lines:
+            return extra_lines
+        for line in result_lines[:8]:
+            truncated = line[:120] + ('...' if len(line) > 120 else '')
+            extra_lines.append(
+                ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
+            )
+        if len(result_lines) > 8:
+            extra_lines.append(
+                ActivityLine(
+                    f'... {len(result_lines) - 8} more lines',
+                    style=NAVY_TEXT_DIM,
+                    indent=1,
+                )
+            )
+        return extra_lines
+
+    @staticmethod
+    def _resolve_search_card_kind(
+        exit_code: int | None, output: str | None,
+    ) -> str:
+        if exit_code == 0 or (exit_code == 1 and not output):
+            return 'ok'
+        if exit_code is not None and exit_code > 1:
+            return 'err'
+        return 'neutral'
+
+    @staticmethod
     def _build_search_shell_card(
         *,
         command: str,
@@ -308,53 +366,11 @@ class ActivityRenderer:
     ) -> ActivityCard:
         """Shared rendering for shell-level grep/glob invocations."""
         query = _extract_search_query(command) or command[:50]
-
-        match_count = 0
-        file_count = 0
-        result_lines: list[str] = []
-
-        if output:
-            result_lines = output.splitlines()
-            for line in result_lines:
-                if re.match(r'^[^:]+:\d+:', line):
-                    match_count += 1
-            files: set[str] = set()
-            for line in result_lines:
-                match = re.match(r'^([^:]+):\d+:', line)
-                if match:
-                    files.add(match.group(1))
-            file_count = len(files)
-
-        if match_count and file_count:
-            secondary = f'{match_count} matches · {file_count} files'
-        elif match_count:
-            secondary = f'{match_count} matches'
-        elif exit_code == 1:  # grep returns 1 when no matches
-            secondary = 'no matches'
-        else:
-            secondary = None
-
-        extra_lines: list[ActivityLine] = []
-        if result_lines:
-            for line in result_lines[:8]:
-                truncated = line[:120] + ('...' if len(line) > 120 else '')
-                extra_lines.append(
-                    ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
-                )
-            if len(result_lines) > 8:
-                extra_lines.append(
-                    ActivityLine(
-                        f'... {len(result_lines) - 8} more lines',
-                        style=NAVY_TEXT_DIM,
-                        indent=1,
-                    )
-                )
-
-        kind = (
-            'ok'
-            if exit_code == 0 or (exit_code == 1 and not output)
-            else ('err' if exit_code is not None and exit_code > 1 else 'neutral')
-        )
+        result_lines: list[str] = output.splitlines() if output else []
+        match_count, file_count = ActivityRenderer._count_search_matches(result_lines)
+        secondary = ActivityRenderer._build_search_secondary(match_count, file_count, exit_code)
+        extra_lines = ActivityRenderer._build_search_extra_lines(result_lines)
+        kind = ActivityRenderer._resolve_search_card_kind(exit_code, output)
 
         badge_category, title, verb = _SEARCH_CARD_PRESETS[source_tool]
         return ActivityCard(
@@ -382,6 +398,35 @@ class ActivityRenderer:
         )
 
     @staticmethod
+    def _build_edit_secondary(added: int, removed: int) -> str | None:
+        if not (added or removed):
+            return None
+        parts = []
+        if added:
+            parts.append(f'+{added}')
+        if removed:
+            parts.append(f'-{removed}')
+        return ', '.join(parts)
+
+    @staticmethod
+    def _build_diff_extra_lines(diff_lines: list[str] | None) -> list[ActivityLine]:
+        extra_lines: list[ActivityLine] = []
+        if not diff_lines:
+            return extra_lines
+        for line in diff_lines[:20]:
+            stripped = line.rstrip()
+            extra_lines.append(ActivityLine(stripped, indent=0))
+        if len(diff_lines) > 20:
+            extra_lines.append(
+                ActivityLine(
+                    f'... {len(diff_lines) - 20} more diff lines',
+                    style=NAVY_TEXT_DIM,
+                    indent=1,
+                )
+            )
+        return extra_lines
+
+    @staticmethod
     def file_edit(
         verb: str,
         path: str,
@@ -393,34 +438,9 @@ class ActivityRenderer:
         preview_content: str | None = None,
     ) -> ActivityCard:
         """Create an activity card for a file edit."""
-        detail = path
-        if line_range:
-            detail = f'{path}  [dim]·  {line_range}[/dim]'
-
-        secondary = None
-        if added or removed:
-            parts = []
-            if added:
-                parts.append(f'+{added}')
-            if removed:
-                parts.append(f'-{removed}')
-            secondary = ', '.join(parts)
-
-        extra_lines: list[ActivityLine] = []
-        if diff_lines:
-            for line in diff_lines[:20]:
-                stripped = line.rstrip()
-                extra_lines.append(ActivityLine(stripped, indent=0))
-
-            if len(diff_lines) > 20:
-                extra_lines.append(
-                    ActivityLine(
-                        f'... {len(diff_lines) - 20} more diff lines',
-                        style=NAVY_TEXT_DIM,
-                        indent=1,
-                    )
-                )
-
+        detail = f'{path}  [dim]·  {line_range}[/dim]' if line_range else path
+        secondary = ActivityRenderer._build_edit_secondary(added, removed)
+        extra_lines = ActivityRenderer._build_diff_extra_lines(diff_lines)
         diff_text = '\n'.join(diff_lines or [])
         should_collapse = (
             bool(diff_lines)
@@ -634,11 +654,41 @@ class ActivityRenderer:
         )
 
     @staticmethod
+    def _build_terminal_content_lines(content: str | None) -> list[ActivityLine]:
+        extra_lines: list[ActivityLine] = []
+        if not content:
+            return extra_lines
+        lines = content.splitlines()[:15]
+        for line in lines:
+            truncated = line[:120] + ('...' if len(line) > 120 else '')
+            extra_lines.append(
+                ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
+            )
+        if len(content.splitlines()) > 15:
+            extra_lines.append(
+                ActivityLine(
+                    f'... {len(content.splitlines()) - 15} more lines',
+                    style=NAVY_TEXT_DIM,
+                    indent=1,
+                )
+            )
+        return extra_lines
+
+    @staticmethod
+    def _build_terminal_secondary(
+        exit_code: int | None, session_id: str,
+    ) -> tuple[str | None, str]:
+        if exit_code is not None:
+            return f'exit {exit_code}', 'ok' if exit_code == 0 else 'err'
+        if session_id:
+            return f'session {session_id}', 'neutral'
+        return None, 'neutral'
+
+    @staticmethod
     def terminal_output(
         content: str, session_id: str = '', exit_code: int | None = None
     ) -> ActivityCard:
         """Create an activity card for terminal output."""
-        # Strip ANSI escape sequences from PTY/interactive terminal output
         if content:
             content = _strip_ansi(content)
 
@@ -647,31 +697,8 @@ class ActivityRenderer:
             extra_lines.append(
                 ActivityLine(f'Session: {session_id}', style=NAVY_TEXT_DIM, indent=1)
             )
-
-        if content:
-            lines = content.splitlines()[:15]
-            for line in lines:
-                truncated = line[:120] + ('...' if len(line) > 120 else '')
-                extra_lines.append(
-                    ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
-                )
-            if len(content.splitlines()) > 15:
-                extra_lines.append(
-                    ActivityLine(
-                        f'... {len(content.splitlines()) - 15} more lines',
-                        style=NAVY_TEXT_DIM,
-                        indent=1,
-                    )
-                )
-
-        secondary = None
-        kind = 'neutral'
-        if exit_code is not None:
-            secondary = f'exit {exit_code}'
-            kind = 'ok' if exit_code == 0 else 'err'
-        elif session_id:
-            secondary = f'session {session_id}'
-
+        extra_lines.extend(ActivityRenderer._build_terminal_content_lines(content))
+        secondary, kind = ActivityRenderer._build_terminal_secondary(exit_code, session_id)
         should_collapse = (
             bool(content) and exit_code == 0 and not _looks_error_heavy(content)
         )
@@ -768,6 +795,59 @@ class ActivityRenderer:
         )
 
     @staticmethod
+    def _build_search_results_secondary(match_count: int, file_count: int) -> str:
+        if match_count and file_count:
+            return f'{match_count} matches · {file_count} files'
+        if match_count:
+            return f'{match_count} matches'
+        return 'no matches'
+
+    @staticmethod
+    def _build_search_results_extra_lines(
+        query: str,
+        result_lines: list[str] | None,
+        file_list: list[tuple[str, int]] | None,
+        file_count: int,
+        match_count: int,
+    ) -> list[ActivityLine]:
+        extra_lines: list[ActivityLine] = []
+        if result_lines:
+            from backend.cli._tool_display.renderers.search import (
+                render_search_results,
+            )
+            rich_lines = render_search_results(
+                '\n'.join(result_lines),
+                query=query,
+                max_files=10,
+                max_lines_per_file=4,
+            )
+            for rl in rich_lines:
+                extra_lines.append(ActivityLine(rl, indent=0))
+            return extra_lines
+        if not file_list:
+            return extra_lines
+        for filepath, count in file_list:
+            extra_lines.append(
+                ActivityLine(
+                    f'• {filepath} ({count} matches)',
+                    style=NAVY_TEXT_MUTED,
+                    indent=1,
+                )
+            )
+        total_displayed = len(file_list)
+        if file_count > total_displayed:
+            remaining_files = file_count - total_displayed
+            remaining_matches = match_count - sum(c for _, c in file_list)
+            extra_lines.append(
+                ActivityLine(
+                    f'... {remaining_files} more files, {remaining_matches} matches',
+                    style=NAVY_TEXT_DIM,
+                    indent=1,
+                )
+            )
+        return extra_lines
+
+    @staticmethod
     def search_results(
         query: str,
         match_count: int = 0,
@@ -794,54 +874,12 @@ class ActivityRenderer:
         badge_category, title, verb = _SEARCH_CARD_PRESETS.get(
             source_tool, _SEARCH_CARD_PRESETS['search']
         )
-        # Detail: quoted query, optionally with scope
         quoted = f'"{query}"'
         detail = f'{quoted} in {scope}' if scope else quoted
-
-        # Secondary: match count · file count
-        if match_count and file_count:
-            secondary = f'{match_count} matches · {file_count} files'
-        elif match_count:
-            secondary = f'{match_count} matches'
-        else:
-            secondary = 'no matches'
-
-        extra_lines: list[ActivityLine] = []
-
-        # Expanded view: grouped by file with line numbers and snippets
-        if result_lines:
-            from backend.cli._tool_display.renderers.search import (
-                render_search_results,
-            )
-
-            rich_lines = render_search_results(
-                '\n'.join(result_lines),
-                query=query,
-                max_files=10,
-                max_lines_per_file=4,
-            )
-            for rl in rich_lines:
-                extra_lines.append(ActivityLine(rl, indent=0))
-        elif file_list:
-            for filepath, count in file_list:
-                extra_lines.append(
-                    ActivityLine(
-                        f'• {filepath} ({count} matches)',
-                        style=NAVY_TEXT_MUTED,
-                        indent=1,
-                    )
-                )
-            total_displayed = len(file_list)
-            if file_count > total_displayed:
-                remaining_files = file_count - total_displayed
-                remaining_matches = match_count - sum(c for _, c in file_list)
-                extra_lines.append(
-                    ActivityLine(
-                        f'... {remaining_files} more files, {remaining_matches} matches',
-                        style=NAVY_TEXT_DIM,
-                        indent=1,
-                    )
-                )
+        secondary = ActivityRenderer._build_search_results_secondary(match_count, file_count)
+        extra_lines = ActivityRenderer._build_search_results_extra_lines(
+            query, result_lines, file_list, file_count, match_count,
+        )
 
         return ActivityCard(
             verb=verb,

@@ -191,31 +191,45 @@ class DAPClient:
         with self._event_condition:
             seen = 0
             while True:
-                for message in self._events[seen:]:
-                    if message.get('event') == event and (
-                        predicate is None or predicate(message)
-                    ):
-                        return message
+                matched = self._find_matching_event(event, predicate, seen)
+                if matched is not None:
+                    return matched
                 seen = len(self._events)
                 remaining = end_time - time.monotonic()
                 if remaining <= 0:
-                    ev_names = [str(m.get('event') or '?') for m in self._events]
-                    proc = self.process
-                    alive = proc is not None and proc.poll() is None
-                    poll = proc.poll() if proc is not None else None
-                    _dap_log(
-                        logging.WARNING,
-                        'DAP wait_for_event timed out',
-                        msg_type='DAP_EVENT_TIMEOUT',
-                        wanted_event=event,
-                        buffered_event_count=len(self._events),
-                        buffered_events_tail=ev_names[-15:],
-                        process_alive=alive,
-                        process_poll=poll,
-                        stderr_tail=self.stderr_tail(5),
-                    )
+                    self._log_event_timeout(event)
                     return None
                 self._event_condition.wait(timeout=remaining)
+
+    def _find_matching_event(
+        self,
+        event: str,
+        predicate: Callable[[dict[str, Any]], bool] | None,
+        seen: int,
+    ) -> dict[str, Any] | None:
+        for message in self._events[seen:]:
+            if message.get('event') == event and (
+                predicate is None or predicate(message)
+            ):
+                return message
+        return None
+
+    def _log_event_timeout(self, event: str) -> None:
+        ev_names = [str(m.get('event') or '?') for m in self._events]
+        proc = self.process
+        alive = proc is not None and proc.poll() is None
+        poll = proc.poll() if proc is not None else None
+        _dap_log(
+            logging.WARNING,
+            'DAP wait_for_event timed out',
+            msg_type='DAP_EVENT_TIMEOUT',
+            wanted_event=event,
+            buffered_event_count=len(self._events),
+            buffered_events_tail=ev_names[-15:],
+            process_alive=alive,
+            process_poll=poll,
+            stderr_tail=self.stderr_tail(5),
+        )
 
     def drain_events(self) -> list[dict[str, Any]]:
         """Return and clear buffered DAP events."""

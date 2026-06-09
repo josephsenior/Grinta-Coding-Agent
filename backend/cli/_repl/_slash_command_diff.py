@@ -119,8 +119,45 @@ def parse_diff_files(diff_body: str) -> list[dict]:
     return files
 
 
-def renderer_render_diff(host: Any, renderer: Any, diff_body: str) -> None:
-    """Render a patch diff with per-file foldable sections."""
+def _format_delta(added: int, removed: int) -> str:
+    parts = []
+    if added > 0:
+        parts.append(f'+{added}')
+    if removed > 0:
+        parts.append(f'-{removed}')
+    if not parts:
+        return ''
+    return f'  ({", ".join(parts)})'
+
+
+def _build_diff_summary(files: list[dict]) -> str:
+    file_count = len(files)
+    total_added = sum(f['added'] for f in files)
+    total_removed = sum(f['removed'] for f in files)
+    summary = f'{file_count} file{"s" if file_count != 1 else ""} changed'
+    if total_added > 0 or total_removed > 0:
+        summary += _format_delta(total_added, total_removed)
+    return summary
+
+
+def _render_single_file_diff(renderer: Any, diff_body: str, summary: str) -> None:
+    from rich.syntax import Syntax
+
+    from backend.cli.theme import NAVY_BG, get_grinta_pygments_style
+
+    syntax = Syntax(
+        diff_body,
+        lexer='diff',
+        theme=get_grinta_pygments_style(),  # type: ignore[arg-type]
+        word_wrap=True,
+        padding=(1, 2),
+        background_color=NAVY_BG,
+        line_numbers=True,
+    )
+    renderer.add_system_message(f'{summary}\n\n{syntax}', title='diff')
+
+
+def _render_file_panel(renderer: Any, f: dict) -> None:
     from rich import box
     from rich.panel import Panel
     from rich.syntax import Syntax
@@ -133,66 +170,50 @@ def renderer_render_diff(host: Any, renderer: Any, diff_body: str) -> None:
         get_grinta_pygments_style,
     )
 
-    files = parse_diff_files(diff_body)
+    file_diff = '\n'.join(f['lines'])
+    file_label = f['path']
+    delta = _format_delta(f['added'], f['removed'])
 
-    file_count = len(files)
-    total_added = sum(f['added'] for f in files)
-    total_removed = sum(f['removed'] for f in files)
-
-    summary = f'{file_count} file{"s" if file_count != 1 else ""} changed'
-    if total_added > 0 or total_removed > 0:
-        inserts = f'+{total_added}' if total_added > 0 else ''
-        deletes = f'-{total_removed}' if total_removed > 0 else ''
-        summary += f'  ({inserts}{", " if inserts and deletes else ""}{deletes})'
-
-    if file_count == 1:
-        syntax = Syntax(
-            diff_body,
-            lexer='diff',
-            theme=get_grinta_pygments_style(),  # type: ignore[arg-type]
-            word_wrap=True,
-            padding=(1, 2),
-            background_color=NAVY_BG,
-            line_numbers=True,
+    syntax = Syntax(
+        file_diff,
+        lexer='diff',
+        theme=get_grinta_pygments_style(),  # type: ignore[arg-type]
+        word_wrap=True,
+        padding=(1, 2),
+        background_color=NAVY_BG,
+        line_numbers=True,
+    )
+    panel = Panel(
+        syntax,
+        title=Text(f'{file_label}{delta}', style=CLR_CARD_TITLE),
+        title_align='left',
+        border_style=CLR_CARD_BORDER,
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+    if hasattr(renderer, 'add_renderable'):
+        renderer.add_renderable(panel)
+    else:
+        renderer.add_system_message(
+            f'[{file_label}]{delta}[/]\n\n{file_diff}',
+            title='diff',
         )
-        renderer.add_system_message(f'{summary}\n\n{syntax}', title='diff')
-        return
 
-    # Multi-file: render each file as its own panel
+
+def _render_multi_file_diff(renderer: Any, files: list[dict], summary: str) -> None:
     renderer.add_system_message(summary, title='diff')
     for f in files:
-        file_diff = '\n'.join(f['lines'])
-        file_label = f['path']
-        add_str = f'+{f["added"]}' if f['added'] > 0 else ''
-        rem_str = f'-{f["removed"]}' if f['removed'] > 0 else ''
-        delta = ''
-        if add_str or rem_str:
-            delta = f'  ({add_str}{", " if add_str and rem_str else ""}{rem_str})'
+        _render_file_panel(renderer, f)
 
-        syntax = Syntax(
-            file_diff,
-            lexer='diff',
-            theme=get_grinta_pygments_style(),  # type: ignore[arg-type]
-            word_wrap=True,
-            padding=(1, 2),
-            background_color=NAVY_BG,
-            line_numbers=True,
-        )
-        panel = Panel(
-            syntax,
-            title=Text(f'{file_label}{delta}', style=CLR_CARD_TITLE),
-            title_align='left',
-            border_style=CLR_CARD_BORDER,
-            box=box.ROUNDED,
-            padding=(0, 1),
-        )
-        if hasattr(renderer, 'add_renderable'):
-            renderer.add_renderable(panel)
-        else:
-            renderer.add_system_message(
-                f'[{file_label}]{delta}[/]\n\n{file_diff}',
-                title='diff',
-            )
+
+def renderer_render_diff(host: Any, renderer: Any, diff_body: str) -> None:
+    """Render a patch diff with per-file foldable sections."""
+    files = parse_diff_files(diff_body)
+    summary = _build_diff_summary(files)
+    if len(files) == 1:
+        _render_single_file_diff(renderer, diff_body, summary)
+        return
+    _render_multi_file_diff(renderer, files, summary)
 
 
 def cmd_diff(host: SlashCommandsHost, parsed: Any) -> bool:

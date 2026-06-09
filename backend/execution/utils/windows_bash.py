@@ -232,6 +232,64 @@ class WindowsPowershellSession(BaseShellSession):
         if not self._initialized:
             raise RuntimeError('PowerShell session failed to initialize in __init__')
 
+    def _run_backgroundable_path(
+        self,
+        process: subprocess.Popen,
+        timeout: int | None,
+        command: str,
+    ) -> tuple[str, str, int]:
+        pending_bg_id = self._pending_bg_id
+        if pending_bg_id is None:
+            return None  # type: ignore[return-value]
+        out, err, code = self._run_backgroundable(process, timeout, pending_bg_id)
+        if code != -2:
+            self._cancellation.unregister_process(process.pid)
+            if self._command_changes_cwd(command, powershell=True):
+                self._update_cwd_if_needed()
+        return out, err, code
+
+    def _handle_spawn_tracking_result(
+        self, process: subprocess.Popen, stdout: str
+    ) -> str:
+        stdout, new_pids = _extract_spawned_pids(stdout)
+        for pid in new_pids:
+            if pid == process.pid:
+                continue
+            self._cancellation.register_pid(pid)
+        if new_pids:
+            logger.info(
+                'Start-Process wrapper registered %d spawned pid(s) '
+                'for session cleanup: %s',
+                len(new_pids),
+                new_pids,
+            )
+        return stdout
+
+    def _run_standard_command(
+        self,
+        process: subprocess.Popen,
+        timeout: int | None,
+        input_text: str | None,
+        command: str,
+        wrapped_for_spawn_tracking: bool,
+    ) -> tuple[str, str, int]:
+        stdin_data = input_text.encode('utf-8') if input_text is not None else None
+        bounded = bounded_communicate(
+            process,
+            timeout=timeout,
+            stdin_data=stdin_data,
+            encoding='utf-8',
+        )
+        stdout, stderr, return_code = bounded.stdout, bounded.stderr, bounded.returncode
+
+        if self._command_changes_cwd(command, powershell=True):
+            self._update_cwd_if_needed()
+
+        if wrapped_for_spawn_tracking:
+            stdout = self._handle_spawn_tracking_result(process, stdout)
+
+        return stdout, stderr, return_code
+
     def _run_command(
         self,
         command: str,
@@ -257,10 +315,6 @@ class WindowsPowershellSession(BaseShellSession):
         if not os.path.isdir(work_dir):
             work_dir = self.work_dir
 
-        # If the command detaches a process tree via Start-Process, wrap it
-        # so we can register the orphaned children for later cleanup. The
-        # original command is preserved verbatim inside the wrapper so
-        # syntax / variable scoping behave identically.
         wrapped_for_spawn_tracking = _START_PROCESS_RE.search(command) is not None
         effective_command = (
             _wrap_command_for_spawn_tracking(command)
@@ -268,8 +322,6 @@ class WindowsPowershellSession(BaseShellSession):
             else command
         )
 
-        # Build PowerShell command
-        # Use -NoProfile for faster startup, -Command to execute
         ps_command = [
             self.powershell_exe,
             '-NoProfile',
@@ -281,14 +333,9 @@ class WindowsPowershellSession(BaseShellSession):
 
         process = None
         try:
-            # Child Python tools (uv/uvx/pip) often print UTF-8 symbols; without this,
-            # Windows defaults (cp1252) raise UnicodeEncodeError inside the child.
             child_env = os.environ.copy()
             child_env.setdefault('PYTHONIOENCODING', 'utf-8')
             child_env.setdefault('PYTHONUTF8', '1')
-            # Use Popen instead of run to capture PID for cancellation service.
-            # Keep pipes in binary mode so bounded_communicate can enforce byte
-            # caps before decoding.
             process = subprocess.Popen(
                 ps_command,
                 cwd=work_dir,
@@ -298,68 +345,15 @@ class WindowsPowershellSession(BaseShellSession):
                 stdin=subprocess.PIPE if input_text is not None else None,
             )
 
-            # Register for cancellation
             self._cancellation.register_process(process)
 
-            # If the action server armed a background-detach ID, use the
-            # idle-output–aware monitoring path (text-mode pipe).
-            pending_bg_id = self._pending_bg_id
-            if pending_bg_id is not None:
-                out, err, code = self._run_backgroundable(
-                    process, timeout, pending_bg_id
-                )
-                if code != -2:
-                    # Command completed normally — still do CWD tracking.
-                    self._cancellation.unregister_process(process.pid)
-                    if self._command_changes_cwd(command, powershell=True):
-                        self._update_cwd_from_output(  # type: ignore[attr-defined]
-                            [
-                                self.powershell_exe,
-                                '-NoProfile',
-                                '-Command',
-                                'Get-Location | Select-Object -ExpandProperty Path',
-                            ]
-                        )
-                return out, err, code
+            bg_result = self._run_backgroundable_path(process, timeout, command)
+            if bg_result is not None:
+                return bg_result
 
-            stdin_data = input_text.encode('utf-8') if input_text is not None else None
-            bounded = bounded_communicate(
-                process,
-                timeout=timeout,
-                stdin_data=stdin_data,
-                encoding='utf-8',
+            return self._run_standard_command(
+                process, timeout, input_text, command, wrapped_for_spawn_tracking
             )
-            stdout, stderr = bounded.stdout, bounded.stderr
-            return_code = bounded.returncode
-
-            # Update CWD if command changed directory
-            if self._command_changes_cwd(command, powershell=True):
-                self._update_cwd_from_output(  # type: ignore[attr-defined]
-                    [
-                        self.powershell_exe,
-                        '-NoProfile',
-                        '-Command',
-                        'Get-Location | Select-Object -ExpandProperty Path',
-                    ]
-                )
-
-            if wrapped_for_spawn_tracking:
-                stdout, new_pids = _extract_spawned_pids(stdout)
-                for pid in new_pids:
-                    # Skip the PowerShell host PID we already track via the
-                    # Popen handle — it's about to exit anyway.
-                    if pid == process.pid:
-                        continue
-                    self._cancellation.register_pid(pid)
-                if new_pids:
-                    logger.info(
-                        'Start-Process wrapper registered %d spawned pid(s) '
-                        'for session cleanup: %s',
-                        len(new_pids),
-                        new_pids,
-                    )
-
-            return (stdout, stderr, return_code)
         except subprocess.TimeoutExpired:
             return self._handle_timeout_exception(process, timeout, command)
         except Exception as e:

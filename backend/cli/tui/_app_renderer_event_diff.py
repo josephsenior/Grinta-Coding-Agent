@@ -24,6 +24,18 @@ if TYPE_CHECKING:
     )
 
 
+_EXPLICIT_CLEAR_MARKERS = (
+    'clearing the task list',
+    'plan updated with 0 tasks',
+    'cleared task list',
+    'cleared the task list',
+)
+
+
+def _text_contains_clear_marker(text: str) -> bool:
+    return any(marker in text for marker in _EXPLICIT_CLEAR_MARKERS)
+
+
 def _should_replace_task_list_from_event(
     orch: '_AppRendererEventProcessorMixin',
     event: Any,
@@ -40,15 +52,9 @@ def _should_replace_task_list_from_event(
 
     content = str(getattr(event, 'content', '') or '').strip().lower()
     thought = str(getattr(event, 'thought', '') or '').strip().lower()
-    explicit_clear_markers = (
-        'clearing the task list',
-        'plan updated with 0 tasks',
-        'cleared task list',
-        'cleared the task list',
-    )
-    if any(marker in content for marker in explicit_clear_markers):
+    if _text_contains_clear_marker(content):
         return True
-    if any(marker in thought for marker in explicit_clear_markers):
+    if _text_contains_clear_marker(thought):
         return True
     return not orch._task_list
 
@@ -74,6 +80,32 @@ def _extract_file_edit_group_rows(
     return _encode_split_diff_contents(old_content, new_content)
 
 
+def _extract_embedded_diff_from_content(content: str) -> str | None:
+    if not isinstance(content, str) or not content:
+        return None
+    marker = '[EDIT_DIFF]'
+    marker_index = content.find(marker)
+    if marker_index != -1:
+        embedded = content[marker_index + len(marker) :].strip()
+        if embedded:
+            return embedded
+    preview = _extract_tagged_block(content, '<DIFF_PREVIEW>', '</DIFF_PREVIEW>')
+    if preview:
+        return preview
+    return None
+
+
+def _try_compute_diff_from_old_new(event: Any) -> str | None:
+    from backend.execution.utils.diff import get_diff
+
+    old_content = getattr(event, 'old_content', None)
+    new_content = getattr(event, 'new_content', None)
+    if old_content is None or new_content is None:
+        return None
+    diff = get_diff(old_content, new_content, path=event.path)
+    return diff if diff else None
+
+
 def _extract_file_edit_diff(
     orch: '_AppRendererEventProcessorMixin',
     event: Any,
@@ -83,38 +115,57 @@ def _extract_file_edit_diff(
     if isinstance(explicit_diff, str) and explicit_diff.strip():
         return explicit_diff
 
-    content = getattr(event, 'content', None)
-    if isinstance(content, str) and content:
-        marker = '[EDIT_DIFF]'
-        marker_index = content.find(marker)
-        if marker_index != -1:
-            embedded = content[marker_index + len(marker) :].strip()
-            if embedded:
-                return embedded
-
-        preview = _extract_tagged_block(
-            content,
-            '<DIFF_PREVIEW>',
-            '</DIFF_PREVIEW>',
-        )
-        if preview:
-            return preview
+    embedded = _extract_embedded_diff_from_content(getattr(event, 'content', None))
+    if embedded:
+        return embedded
 
     try:
-        from backend.execution.utils.diff import get_diff
-
+        computed = _try_compute_diff_from_old_new(event)
+        if computed:
+            return computed
         old_content = getattr(event, 'old_content', None)
         new_content = getattr(event, 'new_content', None)
-        if old_content is None or new_content is None:
-            return _extract_git_file_diff(orch, getattr(event, 'path', ''))
-
-        diff = get_diff(old_content, new_content, path=event.path)
-        if diff:
-            return diff
-        return None
+        if old_content is not None and new_content is not None:
+            return None
     except Exception:
         pass
     return _extract_git_file_diff(orch, getattr(event, 'path', ''))
+
+
+def _resolve_git_diff_path(clean_path: str, workspace: Path) -> str | None:
+    path_obj = Path(clean_path)
+    if not path_obj.is_absolute():
+        return clean_path
+    try:
+        return str(path_obj.resolve().relative_to(workspace.resolve()))
+    except (OSError, ValueError):
+        return None
+
+
+def _try_git_diff_subprocess(workspace: Path, clean_path: str) -> str | None:
+    for args in (
+        ['git', '-C', str(workspace), '--no-pager', 'diff', '--', clean_path],
+        [
+            'git',
+            '-C',
+            str(workspace),
+            '--no-pager',
+            'diff',
+            '--cached',
+            '--',
+            clean_path,
+        ],
+    ):
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout
+    return None
 
 
 def _extract_git_file_diff(
@@ -132,37 +183,10 @@ def _extract_git_file_diff(
         if workspace is None:
             return None
 
-        path_obj = Path(clean_path)
-        if path_obj.is_absolute():
-            try:
-                clean_path = str(
-                    path_obj.resolve().relative_to(workspace.resolve())
-                )
-            except (OSError, ValueError):
-                return None
+        resolved = _resolve_git_diff_path(clean_path, workspace)
+        if resolved is None:
+            return None
 
-        for args in (
-            ['git', '-C', str(workspace), '--no-pager', 'diff', '--', clean_path],
-            [
-                'git',
-                '-C',
-                str(workspace),
-                '--no-pager',
-                'diff',
-                '--cached',
-                '--',
-                clean_path,
-            ],
-        ):
-            result = subprocess.run(
-                args,
-                capture_output=True,
-                text=True,
-                timeout=2,
-                check=False,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                return result.stdout
+        return _try_git_diff_subprocess(workspace, resolved)
     except Exception:
         return None
-    return None

@@ -375,7 +375,10 @@ class TestPreCondensationSnapshot(unittest.TestCase):
     def test_load_snapshot_returns_none_when_file_missing(self):
         missing = Path(self.id().replace('.', '_') + '_missing.json')
 
-        with patch.object(snapshot_module, '_snapshot_path', return_value=missing):
+        with (
+            patch.object(snapshot_module, '_snapshot_path', return_value=missing),
+            patch.object(snapshot_module, '_snapshot_staging_path', return_value=missing),
+        ):
             assert snapshot_module.load_snapshot() is None
 
     def test_delete_snapshot_swallows_oserror(self):

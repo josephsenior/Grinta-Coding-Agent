@@ -93,17 +93,11 @@ class _AppRendererThinkingMixin:
         cleaned = TOOL_RESULT_TAG_RE.sub('', cleaned).strip()
         return cleaned
 
-    def _classify_thinking_text(
+    def _classify_error_intent(
         self,
-        text: str,
-        *,
-        source_tool: str = '',
-        kind: str = '',
-    ) -> ThinkingRenderIntent:
-        thought = self._canonical_thinking_text(text)
-        if not self._is_visible_thinking_text(thought):
-            return ThinkingRenderIntent(kind='suppress')
-
+        thought: str,
+        kind: str,
+    ) -> ThinkingRenderIntent | None:
         if kind in (
             'recoverable_error',
             'recoverable_error_escalated',
@@ -116,7 +110,6 @@ class _AppRendererThinkingMixin:
                 tag='ERROR',
                 severity='warning',
             )
-
         if kind == 'truncated':
             detail_line = (
                 "Previous tool call arguments were stream-truncated "
@@ -129,38 +122,54 @@ class _AppRendererThinkingMixin:
                 tag='ERROR',
                 severity='warning',
             )
+        return None
 
+    def _classify_search_intent(
+        self,
+        thought: str,
+        source_tool: str,
+    ) -> ThinkingRenderIntent | None:
         if source_tool in ('grep', 'glob') or '[SEARCH_RESULTS]' in thought:
             return ThinkingRenderIntent(
                 kind='search',
                 text=thought,
                 source_tool=source_tool,
             )
+        return None
 
-        cleaned = self._strip_tool_payload_markup(thought)
-        tag_match = INTERNAL_THINK_TAG_RE.match(cleaned)
-        tag = (tag_match.group('tag') if tag_match else '').upper()
-        payload = (
-            (tag_match.group('payload') or '').strip() if tag_match else cleaned
-        )
-
-        if source_tool:
-            if source_tool == 'checkpoint':
-                return ThinkingRenderIntent(
-                    kind='checkpoint',
-                    text=thought,
-                    detail=payload or cleaned,
-                    tag=tag,
-                    source_tool=source_tool,
-                )
+    def _classify_by_source_tool(
+        self,
+        thought: str,
+        source_tool: str,
+        tag: str,
+        payload: str,
+        cleaned: str,
+    ) -> ThinkingRenderIntent | None:
+        if not source_tool:
+            return None
+        detail = payload or cleaned
+        if source_tool == 'checkpoint':
             return ThinkingRenderIntent(
-                kind='tool',
+                kind='checkpoint',
                 text=thought,
-                detail=payload or cleaned,
+                detail=detail,
                 tag=tag,
                 source_tool=source_tool,
             )
+        return ThinkingRenderIntent(
+            kind='tool',
+            text=thought,
+            detail=detail,
+            tag=tag,
+            source_tool=source_tool,
+        )
 
+    def _classify_by_tag(
+        self,
+        thought: str,
+        tag: str,
+        payload: str,
+    ) -> ThinkingRenderIntent:
         if tag in self._MEMORY_THINK_TAGS:
             return ThinkingRenderIntent(
                 kind='memory',
@@ -196,8 +205,45 @@ class _AppRendererThinkingMixin:
                 detail=payload,
                 tag=tag,
             )
-
         return ThinkingRenderIntent(kind='thinking', text=thought)
+
+    def _parse_think_tag(self, cleaned: str) -> tuple[str, str]:
+        tag_match = INTERNAL_THINK_TAG_RE.match(cleaned)
+        if tag_match is None:
+            return '', cleaned
+        tag = (tag_match.group('tag') or '').upper()
+        payload = (tag_match.group('payload') or '').strip()
+        return tag, payload
+
+    def _classify_thinking_text(
+        self,
+        text: str,
+        *,
+        source_tool: str = '',
+        kind: str = '',
+    ) -> ThinkingRenderIntent:
+        thought = self._canonical_thinking_text(text)
+        if not self._is_visible_thinking_text(thought):
+            return ThinkingRenderIntent(kind='suppress')
+
+        error_intent = self._classify_error_intent(thought, kind)
+        if error_intent is not None:
+            return error_intent
+
+        search_intent = self._classify_search_intent(thought, source_tool)
+        if search_intent is not None:
+            return search_intent
+
+        cleaned = self._strip_tool_payload_markup(thought)
+        tag, payload = self._parse_think_tag(cleaned)
+
+        tool_intent = self._classify_by_source_tool(
+            thought, source_tool, tag, payload, cleaned
+        )
+        if tool_intent is not None:
+            return tool_intent
+
+        return self._classify_by_tag(thought, tag, payload)
 
     @staticmethod
     def _first_meaningful_line(text: str) -> str:
@@ -228,6 +274,19 @@ class _AppRendererThinkingMixin:
         self._last_thinking_artifact_hash = digest
         return True
 
+    def _render_thinking_text_intent(self, intent: ThinkingRenderIntent, finalize: bool) -> None:
+        if self._should_render_thinking_text(intent.text):
+            self._tui.add_thinking(intent.text)
+        if finalize:
+            self._tui.finalize_thinking()
+
+    def _render_error_intent(self, intent: ThinkingRenderIntent) -> None:
+        message = intent.detail or intent.text
+        if intent.severity == 'warning':
+            self._tui.add_warning(message)
+        else:
+            self._tui.add_error(message)
+
     def _render_thinking_payload(
         self,
         text: str,
@@ -244,10 +303,7 @@ class _AppRendererThinkingMixin:
             return True
 
         if intent.kind == 'thinking':
-            if self._should_render_thinking_text(intent.text):
-                self._tui.add_thinking(intent.text)
-            if finalize:
-                self._tui.finalize_thinking()
+            self._render_thinking_text_intent(intent, finalize)
             return True
 
         if not self._should_render_thinking_artifact(intent):
@@ -260,11 +316,7 @@ class _AppRendererThinkingMixin:
             return True
 
         if intent.kind == 'error':
-            message = intent.detail or intent.text
-            if intent.severity == 'warning':
-                self._tui.add_warning(message)
-            else:
-                self._tui.add_error(message)
+            self._render_error_intent(intent)
             return True
 
         card = self._thinking_artifact_card(intent)
@@ -272,28 +324,82 @@ class _AppRendererThinkingMixin:
             self._write_card(card)
         return True
 
-    def _thinking_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard | None:
+    def _memory_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard:
         text = intent.text
         detail = intent.detail or text
         tag = intent.tag
+        if tag == 'WORKING_MEMORY':
+            verb = 'Memory'
+            card_detail = self._trim_card_detail(detail, fallback='working memory')
+        elif tag == 'SEMANTIC_RECALL_RESULT':
+            verb = 'Recalled'
+            card_detail = self._trim_card_detail(detail, fallback='semantic memory')
+        else:
+            verb = 'Scratchpad'
+            card_detail = self._trim_card_detail(detail, fallback='scratchpad')
+        return self._compact_activity_card(
+            verb=verb,
+            detail=card_detail,
+            badge_category='memory',
+            title='Memory',
+            body=text,
+        )
+
+    def _checkpoint_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard:
+        text = intent.text
+        detail = intent.detail or text
+        lowered = text.lower()
+        if 'rollback' in lowered or 'revert' in lowered:
+            verb = 'Rollback'
+            fallback = 'checkpoint rollback'
+        else:
+            verb = 'Checkpoint'
+            fallback = 'checkpoint'
+        return self._compact_activity_card(
+            verb=verb,
+            detail=self._trim_card_detail(detail, fallback=fallback),
+            badge_category='tool',
+            title='Tool',
+            body=text,
+        )
+
+    def _code_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard:
+        text = intent.text
+        detail = intent.detail or text
+        tag = intent.tag
+        verb = {
+            'FIND_SYMBOLS': 'Found',
+            'READ': 'Read',
+            'READ_SYMBOL_DEFINITION': 'Read',
+            'VERIFY_FILE_LINES': 'Verified',
+        }.get(tag, 'Analyzed')
+        return self._compact_activity_card(
+            verb=verb,
+            detail=self._trim_card_detail(detail, fallback='code context'),
+            badge_category='code',
+            title='Code',
+            body=text,
+        )
+
+    def _tool_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard:
+        text = intent.text
+        detail = intent.detail or text
+        tag = intent.tag
+        source = intent.source_tool or tag.replace('_', ' ').title() or 'tool'
+        return self._compact_activity_card(
+            verb=source.replace('_', ' ').title(),
+            detail=self._trim_card_detail(detail, fallback=source),
+            badge_category='tool',
+            title='Tool',
+            body=text,
+        )
+
+    def _thinking_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard | None:
+        text = intent.text
+        detail = intent.detail or text
 
         if intent.kind == 'memory':
-            if tag == 'WORKING_MEMORY':
-                verb = 'Memory'
-                card_detail = self._trim_card_detail(detail, fallback='working memory')
-            elif tag == 'SEMANTIC_RECALL_RESULT':
-                verb = 'Recalled'
-                card_detail = self._trim_card_detail(detail, fallback='semantic memory')
-            else:
-                verb = 'Scratchpad'
-                card_detail = self._trim_card_detail(detail, fallback='scratchpad')
-            return self._compact_activity_card(
-                verb=verb,
-                detail=card_detail,
-                badge_category='memory',
-                title='Memory',
-                body=text,
-            )
+            return self._memory_artifact_card(intent)
 
         if intent.kind == 'shared':
             return self._compact_activity_card(
@@ -305,45 +411,13 @@ class _AppRendererThinkingMixin:
             )
 
         if intent.kind == 'checkpoint':
-            lowered = text.lower()
-            if 'rollback' in lowered or 'revert' in lowered:
-                verb = 'Rollback'
-                fallback = 'checkpoint rollback'
-            else:
-                verb = 'Checkpoint'
-                fallback = 'checkpoint'
-            return self._compact_activity_card(
-                verb=verb,
-                detail=self._trim_card_detail(detail, fallback=fallback),
-                badge_category='tool',
-                title='Tool',
-                body=text,
-            )
+            return self._checkpoint_artifact_card(intent)
 
         if intent.kind == 'code':
-            verb = {
-                'FIND_SYMBOLS': 'Found',
-                'READ': 'Read',
-                'READ_SYMBOL_DEFINITION': 'Read',
-                'VERIFY_FILE_LINES': 'Verified',
-            }.get(tag, 'Analyzed')
-            return self._compact_activity_card(
-                verb=verb,
-                detail=self._trim_card_detail(detail, fallback='code context'),
-                badge_category='code',
-                title='Code',
-                body=text,
-            )
+            return self._code_artifact_card(intent)
 
         if intent.kind == 'tool':
-            source = intent.source_tool or tag.replace('_', ' ').title() or 'tool'
-            return self._compact_activity_card(
-                verb=source.replace('_', ' ').title(),
-                detail=self._trim_card_detail(detail, fallback=source),
-                badge_category='tool',
-                title='Tool',
-                body=text,
-            )
+            return self._tool_artifact_card(intent)
 
         return None
 

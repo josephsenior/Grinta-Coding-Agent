@@ -126,6 +126,51 @@ class _AuditAccumulator:
             self.on_event_types = Counter()
 
 
+def _update_timestamps(acc: _AuditAccumulator, obj: dict) -> None:
+    ts = parse_ts(obj.get('timestamp') or obj.get('asctime'))
+    if ts:
+        acc.first_ts = acc.first_ts or ts
+        acc.last_ts = ts
+
+
+def _extract_state_transition(msg: str, line_no: int, acc: _AuditAccumulator) -> None:
+    m = STATE_RE.search(msg)
+    if m:
+        acc.state_transitions.append((m.group(1), m.group(2), msg, line_no))
+        acc.end_state = m.group(2)
+
+
+def _extract_action(msg: str, line_no: int, acc: _AuditAccumulator) -> None:
+    m = ACTION_RE.search(msg)
+    if m:
+        acc.actions.append((m.group(1), msg, line_no))
+
+
+def _extract_llm_call(msg: str, line_no: int, acc: _AuditAccumulator) -> None:
+    m = LLM_DONE_RE.search(msg)
+    if m:
+        acc.llm_calls.append((float(m.group(1)), msg, line_no))
+
+
+def _extract_file_event(msg: str, line_no: int, acc: _AuditAccumulator) -> None:
+    m = FILE_EVENT_RE.search(msg)
+    if m:
+        acc.file_events.append((m.group(1) + m.group(2), msg[:120], line_no))
+
+
+def _extract_on_event_type(msg: str, acc: _AuditAccumulator) -> None:
+    if 'on_event received ' in msg and 'StreamingChunkAction' not in msg:
+        evt = msg.split('on_event received ', 1)[-1].split(' (id=', 1)[0]
+        acc.on_event_types[evt] += 1
+
+
+def _extract_health_signals(msg: str, acc: _AuditAccumulator) -> None:
+    if re.search(r'pending action timed out', msg, re.I):
+        acc.pending_timeouts += 1
+    if re.search(r'\bretry\b|\bbackoff\b|recover', msg, re.I):
+        acc.retries += 1
+
+
 def _process_log_line(
     line_no: int,
     line: str,
@@ -147,10 +192,7 @@ def _process_log_line(
     level = obj.get('level', 'INFO')
     acc.levels[level] += 1
 
-    ts = parse_ts(obj.get('timestamp') or obj.get('asctime'))
-    if ts:
-        acc.first_ts = acc.first_ts or ts
-        acc.last_ts = ts
+    _update_timestamps(acc, obj)
 
     if is_noise(msg):
         acc.stripped += 1
@@ -162,49 +204,35 @@ def _process_log_line(
     if is_issue(level, msg):
         acc.issue_lines.append(f'L{line_no}: {format_line(obj)}')
 
-    m = STATE_RE.search(msg)
-    if m:
-        acc.state_transitions.append((m.group(1), m.group(2), msg, line_no))
-        acc.end_state = m.group(2)
-
-    m = ACTION_RE.search(msg)
-    if m:
-        acc.actions.append((m.group(1), msg, line_no))
-
-    m = LLM_DONE_RE.search(msg)
-    if m:
-        acc.llm_calls.append((float(m.group(1)), msg, line_no))
-
-    m = FILE_EVENT_RE.search(msg)
-    if m:
-        acc.file_events.append((m.group(1) + m.group(2), msg[:120], line_no))
-
-    if 'on_event received ' in msg and 'StreamingChunkAction' not in msg:
-        evt = msg.split('on_event received ', 1)[-1].split(' (id=', 1)[0]
-        acc.on_event_types[evt] += 1
-
-    if re.search(r'pending action timed out', msg, re.I):
-        acc.pending_timeouts += 1
-    if re.search(r'\bretry\b|\bbackoff\b|recover', msg, re.I):
-        acc.retries += 1
+    _extract_state_transition(msg, line_no, acc)
+    _extract_action(msg, line_no, acc)
+    _extract_llm_call(msg, line_no, acc)
+    _extract_file_event(msg, line_no, acc)
+    _extract_on_event_type(msg, acc)
+    _extract_health_signals(msg, acc)
 
 
-def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
-    duration_min = 0.0
+def _compute_duration(acc: _AuditAccumulator) -> float:
     if acc.first_ts and acc.last_ts:
-        duration_min = (acc.last_ts - acc.first_ts).total_seconds() / 60.0
+        return (acc.last_ts - acc.first_ts).total_seconds() / 60.0
+    return 0.0
 
+
+def _extract_llm_stats(acc: _AuditAccumulator) -> tuple[list, list]:
     llm_times = [t for t, _, _ in acc.llm_calls]
     slow_llm = [(t, ln, m) for t, m, ln in acc.llm_calls if t >= 60.0]
+    return llm_times, slow_llm
 
-    suspicious_states = [
+
+def _find_suspicious_states(acc: _AuditAccumulator) -> list:
+    return [
         (a, b, m, ln)
         for a, b, m, ln in acc.state_transitions
         if b in {'ERROR', 'STOPPED'} or (a == 'ERROR' and b != 'AWAITING_USER_INPUT')
     ]
 
-    verdict = 'CLEAN'
-    notes: list[str] = []
+
+def _assess_end_state(acc: _AuditAccumulator, verdict: str, notes: list[str]) -> tuple[str, list[str]]:
     if acc.end_state == 'FINISHED':
         notes.append('Session ended in FINISHED (success).')
     elif acc.end_state == 'AWAITING_USER_INPUT':
@@ -212,14 +240,22 @@ def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
     elif acc.end_state in {'ERROR', 'STOPPED'}:
         verdict = 'ISSUES FOUND'
         notes.append(f'Session ended in {acc.end_state}.')
+    return verdict, notes
 
+
+def _assess_health_signals(
+    acc: _AuditAccumulator, suspicious_states: list, verdict: str, notes: list[str],
+) -> tuple[str, list[str]]:
     if acc.pending_timeouts:
         verdict = 'ISSUES FOUND'
         notes.append(f'{acc.pending_timeouts} pending-action timeout(s) detected.')
     if suspicious_states:
         verdict = 'ISSUES FOUND'
         notes.append(f'{len(suspicious_states)} error/stop state transition(s).')
+    return verdict, notes
 
+
+def _assess_log_levels(acc: _AuditAccumulator, verdict: str, notes: list[str]) -> tuple[str, list[str]]:
     warn_count = acc.levels.get('WARNING', 0)
     err_count = acc.levels.get('ERROR', 0) + acc.levels.get('CRITICAL', 0)
     if err_count:
@@ -229,8 +265,19 @@ def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
         notes.append(f'{warn_count} WARNING(s) — review below (may be benign).')
     elif warn_count:
         verdict = 'REVIEW'
-        notes.append(f'{warn_count} WARNING(s) — worth scanning.')
+        notes.append(f'{warn_count} WARNING(s) — worth scanned.')
+    return verdict, notes
 
+
+def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
+    duration_min = _compute_duration(acc)
+    llm_times, slow_llm = _extract_llm_stats(acc)
+    suspicious_states = _find_suspicious_states(acc)
+    verdict = 'CLEAN'
+    notes: list[str] = []
+    verdict, notes = _assess_end_state(acc, verdict, notes)
+    verdict, notes = _assess_health_signals(acc, suspicious_states, verdict, notes)
+    verdict, notes = _assess_log_levels(acc, verdict, notes)
     return verdict, notes, duration_min, llm_times, slow_llm, suspicious_states
 
 

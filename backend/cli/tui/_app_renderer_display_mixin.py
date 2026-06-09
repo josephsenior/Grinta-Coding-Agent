@@ -58,9 +58,47 @@ class _AppRendererDisplayMixin:
 
     def _refresh_display(self) -> None:
         """Refresh derived sidebar state; transcript writes are incremental."""
-        from backend.cli._event_renderer.sidebar import _load_playbook_skills
+        mcp_count = self._hud.state.mcp_servers
+        skill_count = self._hud.bundled_skill_count
+
+        mcp_servers = self._resolve_mcp_server_list(mcp_count)
+
+        task_signature = task_panel_signature(self._task_list)
+        current_state = (task_signature, mcp_servers, skill_count)
+        if current_state != self._last_sidebar_state:
+            task_items = self._build_task_sidebar_items(task_signature)
+            mcp_items = self._build_mcp_sidebar_items(mcp_servers)
+            skill_items = self._build_skills_sidebar_items()
+
+            self._update_sidebar_section(
+                '#sidebar-tasks',
+                f'Tasks ({len(task_signature)})',
+                task_items,
+            )
+            self._update_sidebar_section(
+                '#sidebar-mcp',
+                f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
+                mcp_items,
+            )
+            self._update_sidebar_section(
+                '#sidebar-skills',
+                f'Skills ({len(skill_items)})',
+                skill_items,
+            )
+
+            self._last_sidebar_state = current_state
+
+    def _update_sidebar_section(self, widget_id, title, items):
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
+        try:
+            widget = self._tui.query_one(widget_id, CollapsibleSection)
+            widget.set_title(title)
+            widget.set_items(items)
+        except Exception:
+            pass
+
+    def _build_task_sidebar_items(self, task_signature):
         _TASK_TO_SIDEBAR_STATUS = {
             'done': 'ok',
             'in_progress': 'running',
@@ -68,11 +106,39 @@ class _AppRendererDisplayMixin:
             'todo': 'neutral',
             'skipped': 'warn',
         }
+        task_items = []
+        for task_id, status, desc in task_signature:
+            item_status = _TASK_TO_SIDEBAR_STATUS.get(status, 'neutral')
+            meta = task_id if task_id and task_id != '?' else None
+            task_items.append(
+                (desc, f'task:{task_id}', False, item_status, meta)
+            )
+        return task_items
 
-        mcp_count = self._hud.state.mcp_servers
-        skill_count = self._hud.bundled_skill_count
+    def _build_mcp_sidebar_items(self, mcp_servers):
+        mcp_items = []
+        if mcp_servers:
+            for server in mcp_servers:
+                name = server.get('name', 'unknown')
+                server_type = server.get('type', 'stdio')
+                mcp_items.append(
+                    (name, f'mcp:{name}', True, 'info', server_type)
+                )
+        return mcp_items
 
-        # Build actual MCP server list from config
+    def _build_skills_sidebar_items(self):
+        from backend.cli._event_renderer.sidebar import _load_playbook_skills
+
+        skills_list = _load_playbook_skills()
+        skill_items = []
+        if skills_list:
+            for skill in sorted(skills_list):
+                skill_items.append(
+                    (skill, f'skill:{skill}', True, 'neutral', None)
+                )
+        return skill_items
+
+    def _resolve_mcp_server_list(self, mcp_count):
         mcp_servers = None
         if (
             self._tui._config
@@ -90,64 +156,7 @@ class _AppRendererDisplayMixin:
                 {'name': f'MCP Server {i + 1}', 'type': 'active'}
                 for i in range(mcp_count)
             ]
-
-        task_signature = task_panel_signature(self._task_list)
-        current_state = (task_signature, mcp_servers, skill_count)
-        if current_state != self._last_sidebar_state:
-            # 1. Update Tasks Section
-            try:
-                tasks_widget = self._tui.query_one('#sidebar-tasks', CollapsibleSection)
-                task_items = []
-                for task_id, status, desc in task_signature:
-                    item_status = _TASK_TO_SIDEBAR_STATUS.get(status, 'neutral')
-                    meta = task_id if task_id and task_id != '?' else None
-                    task_items.append(
-                        (desc, f'task:{task_id}', False, item_status, meta)
-                    )
-
-                tasks_widget.set_title(f'Tasks ({len(task_signature)})')
-                tasks_widget.set_items(task_items)
-            except Exception:
-                pass
-
-            # 2. Update MCP Servers Section
-            try:
-                mcp_widget = self._tui.query_one('#sidebar-mcp', CollapsibleSection)
-                mcp_items = []
-                if mcp_servers:
-                    for server in mcp_servers:
-                        name = server.get('name', 'unknown')
-                        server_type = server.get('type', 'stdio')
-                        mcp_items.append(
-                            (name, f'mcp:{name}', True, 'info', server_type)
-                        )
-
-                mcp_widget.set_title(
-                    f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})'
-                )
-                mcp_widget.set_items(mcp_items)
-            except Exception:
-                pass
-
-            # 3. Update Skills Section
-            try:
-                skills_widget = self._tui.query_one(
-                    '#sidebar-skills', CollapsibleSection
-                )
-                skills_list = _load_playbook_skills()
-                skill_items = []
-                if skills_list:
-                    for skill in sorted(skills_list):
-                        skill_items.append(
-                            (skill, f'skill:{skill}', True, 'neutral', None)
-                        )
-
-                skills_widget.set_title(f'Skills ({len(skills_list)})')
-                skills_widget.set_items(skill_items)
-            except Exception:
-                pass
-
-            self._last_sidebar_state = current_state
+        return mcp_servers
 
     def _write_lines(self, lines: list[Any]) -> None:
         items = []
@@ -309,27 +318,16 @@ class _AppRendererDisplayMixin:
         display.append_widget(widget)
         return widget
 
-    def _update_activity_card_outcome(
+    def _apply_card_final_state(
         self,
         widget: Any,
         *,
         status: str,
-        outcome: str | None = None,
-        extra_content: str | None = None,
-        collapse: bool = True,
-        operation_label: str | None = None,
-        syntax_language: str | None = None,
+        outcome: str | None,
+        extra_content: str | None,
+        collapse: bool,
+        syntax_language: str | None,
     ) -> None:
-        """Update an in-flight activity card to its final state in-place.
-
-        Used to merge an action card with its observation card so the user only
-        sees a single transition (e.g. ``• Analyzed`` → ``✓ Analyzed completed``)
-        instead of two separate cards.
-        """
-        if widget is None:
-            return
-        if self._last_active_card is widget:
-            self._last_active_card = None
         try:
             widget.set_processing(False)
         except Exception:
@@ -353,6 +351,36 @@ class _AppRendererDisplayMixin:
                 widget.collapse()
             except Exception:
                 pass
+
+    def _update_activity_card_outcome(
+        self,
+        widget: Any,
+        *,
+        status: str,
+        outcome: str | None = None,
+        extra_content: str | None = None,
+        collapse: bool = True,
+        operation_label: str | None = None,
+        syntax_language: str | None = None,
+    ) -> None:
+        """Update an in-flight activity card to its final state in-place.
+
+        Used to merge an action card with its observation card so the user only
+        sees a single transition (e.g. ``• Analyzed`` → ``✓ Analyzed completed``)
+        instead of two separate cards.
+        """
+        if widget is None:
+            return
+        if self._last_active_card is widget:
+            self._last_active_card = None
+        self._apply_card_final_state(
+            widget,
+            status=status,
+            outcome=outcome,
+            extra_content=extra_content,
+            collapse=collapse,
+            syntax_language=syntax_language,
+        )
         if operation_label is not None:
             self._tui.set_current_operation(
                 operation_label,

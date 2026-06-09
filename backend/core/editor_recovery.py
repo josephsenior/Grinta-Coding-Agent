@@ -38,19 +38,7 @@ def _python_comment_prefix_issue(
     )
 
 
-def classify_editor_recovery(
-    message: str,
-    *,
-    path: str | None = None,
-    tool_name: str | None = None,
-    content: str | None = None,
-) -> EditorRecoveryAdvice | None:
-    lower = (message or '').lower()
-
-    comment_issue = _python_comment_prefix_issue(content or '', path)
-    if comment_issue is not None:
-        return comment_issue
-
+def _check_symbol_not_found(lower: str) -> EditorRecoveryAdvice | None:
     if 'symbol ' in lower and 'not found' in lower:
         return EditorRecoveryAdvice(
             kind='symbol_not_found',
@@ -61,7 +49,10 @@ def classify_editor_recovery(
                 'symbol name and candidates before retrying the edit.'
             ),
         )
+    return None
 
+
+def _check_edit_verification_failed(lower: str) -> EditorRecoveryAdvice | None:
     if 'edit verification failed' in lower:
         return EditorRecoveryAdvice(
             kind='edit_verification_failed',
@@ -72,7 +63,10 @@ def classify_editor_recovery(
                 'Refresh the file state, then retry once with a smaller, more targeted edit.'
             ),
         )
+    return None
 
+
+def _check_full_file_overwrite_blocked(lower: str) -> EditorRecoveryAdvice | None:
     if 'large existing code file overwrite blocked' in lower:
         return EditorRecoveryAdvice(
             kind='full_file_overwrite_blocked',
@@ -83,14 +77,17 @@ def classify_editor_recovery(
                 'for code or replace_string for exact text changes.'
             ),
         )
+    return None
 
+
+def _check_syntax_validation_failure(lower: str) -> EditorRecoveryAdvice | None:
     if (
         'syntax validation failed' in lower
         or 'syntax error after edit' in lower
         or 'introduced_syntax_error' in lower
     ):
         return EditorRecoveryAdvice(
-            kind='syntax_validation_failed',
+            kind='syntax_validation_failure',
             preferred_tool='read',
             next_action='read',
             detail=(
@@ -98,7 +95,10 @@ def classify_editor_recovery(
                 'with edit_symbols or replace_string instead of repeating the same full write.'
             ),
         )
+    return None
 
+
+def _check_range_context_mismatch(lower: str) -> EditorRecoveryAdvice | None:
     if 'edit context mismatch' in lower or 'range edit context mismatch' in lower:
         return EditorRecoveryAdvice(
             kind='range_context_mismatch',
@@ -109,7 +109,10 @@ def classify_editor_recovery(
                 'edit_symbols or exact replace_string content.'
             ),
         )
+    return None
 
+
+def _check_range_edit_failed(lower: str) -> EditorRecoveryAdvice | None:
     if (
         'replace failed' in lower
         or 'start line' in lower
@@ -124,8 +127,11 @@ def classify_editor_recovery(
                 'then retry one smaller edit through edit_symbols or replace_string.'
             ),
         )
+    return None
 
-    if 'multi_edit transaction rolled back' in lower:
+
+def _check_atomic_batch_failed(lower: str) -> EditorRecoveryAdvice | None:
+    if 'multi-edit transaction rolled back' in lower:
         return EditorRecoveryAdvice(
             kind='atomic_batch_failed',
             preferred_tool='multiedit',
@@ -135,6 +141,34 @@ def classify_editor_recovery(
                 'then retry the whole batch as one transaction.'
             ),
         )
+    return None
+
+
+def classify_editor_recovery(
+    message: str,
+    *,
+    path: str | None = None,
+    tool_name: str | None = None,
+    content: str | None = None,
+) -> EditorRecoveryAdvice | None:
+    lower = (message or '').lower()
+
+    comment_issue = _python_comment_prefix_issue(content or '', path)
+    if comment_issue is not None:
+        return comment_issue
+
+    for checker in (
+        _check_symbol_not_found,
+        _check_edit_verification_failed,
+        _check_full_file_overwrite_blocked,
+        _check_syntax_validation_failure,
+        _check_range_context_mismatch,
+        _check_range_edit_failed,
+        _check_atomic_batch_failed,
+    ):
+        result = checker(lower)
+        if result is not None:
+            return result
 
     return None
 

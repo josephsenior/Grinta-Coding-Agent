@@ -59,6 +59,25 @@ def _classify_token(token: str) -> str:
     return 'arg'
 
 
+def _process_token_char(ch, current, in_string, string_char, parts):
+    if in_string:
+        if ch == string_char:
+            current += ch
+            parts.append(('string', current))
+            return '', False, ''
+        return current + ch, True, string_char
+    if ch in ('"', "'"):
+        if current:
+            parts.append((_classify_token(current), current))
+        return ch, True, ch
+    if ch == ' ':
+        if current:
+            parts.append((_classify_token(current), current))
+            parts.append(('space', ' '))
+        return '', False, ''
+    return current + ch, False, ''
+
+
 def _tokenize_command(cmd: str) -> list[tuple[str, str]]:
     parts: list[tuple[str, str]] = []
     current = ''
@@ -66,26 +85,9 @@ def _tokenize_command(cmd: str) -> list[tuple[str, str]]:
     string_char = ''
 
     for ch in cmd:
-        if not in_string and ch in ('"', "'"):
-            if current:
-                parts.append((_classify_token(current), current))
-                current = ''
-            in_string = True
-            string_char = ch
-            current = ch
-        elif in_string and ch == string_char:
-            current += ch
-            parts.append(('string', current))
-            current = ''
-            in_string = False
-        elif in_string:
-            current += ch
-        elif ch == ' ' and current:
-            parts.append((_classify_token(current), current))
-            current = ''
-            parts.append(('space', ' '))
-        else:
-            current += ch
+        current, in_string, string_char = _process_token_char(
+            ch, current, in_string, string_char, parts
+        )
 
     if current:
         parts.append((_classify_token(current), current))
@@ -108,6 +110,41 @@ def _build_command_text(command: str) -> Text:
     return text
 
 
+def _build_meta_line(duration: str, exit_code: int | None) -> Text | None:
+    meta_parts = []
+    if duration:
+        meta_parts.append(Text(duration, style=NAVY_TEXT_DIM))
+    if exit_code is not None:
+        style = CLR_STATUS_OK if exit_code == 0 else CLR_STATUS_ERR
+        meta_parts.append(Text(f'  exit {exit_code}', style=style))
+    if not meta_parts:
+        return None
+    meta_line = Text()
+    for i, part in enumerate(meta_parts):
+        if i > 0:
+            meta_line.append('  ')
+        meta_line.append(part)
+    return meta_line
+
+
+def _build_output_preview(output: str) -> list[Text]:
+    lines: list[Text] = []
+    raw_lines = [ln for ln in output.splitlines()]
+    preview = raw_lines[:8]
+    if not preview:
+        return lines
+    lines.append(Text(''))
+    for line in preview:
+        if len(line) > 120:
+            line = line[:117] + '\u2026'
+        lines.append(Text(line, style=NAVY_TEXT_MUTED))
+    if len(raw_lines) > 8:
+        lines.append(
+            Text(f'... {len(raw_lines) - 8} more lines', style=NAVY_TEXT_DIM)
+        )
+    return lines
+
+
 def render_shell_command(
     command: str,
     output: str | None = None,
@@ -122,46 +159,16 @@ def render_shell_command(
     """
     content_parts = []
 
-    # Command line with prompt
     cmd_text = _build_command_text(command)
     content_parts.append(cmd_text)
 
-    # Duration and exit code on same line
-    meta_parts = []
-    if duration:
-        meta_parts.append(Text(duration, style=NAVY_TEXT_DIM))
-    if exit_code is not None:
-        if exit_code == 0:
-            meta_parts.append(Text(f'  exit {exit_code}', style=CLR_STATUS_OK))
-        else:
-            meta_parts.append(Text(f'  exit {exit_code}', style=CLR_STATUS_ERR))
+    meta = _build_meta_line(duration, exit_code)
+    if meta:
+        content_parts.append(meta)
 
-    if meta_parts:
-        meta_line = Text()
-        for i, part in enumerate(meta_parts):
-            if i > 0:
-                meta_line.append('  ')
-            meta_line.append(part)
-        content_parts.append(meta_line)
-
-    # Output preview
     if output:
-        raw_lines = [ln for ln in output.splitlines()]
-        preview = raw_lines[:8]
+        content_parts.extend(_build_output_preview(output))
 
-        if preview:
-            content_parts.append(Text(''))  # spacer
-            for line in preview:
-                if len(line) > 120:
-                    line = line[:117] + '…'
-                content_parts.append(Text(line, style=NAVY_TEXT_MUTED))
-
-            if len(raw_lines) > 8:
-                content_parts.append(
-                    Text(f'... {len(raw_lines) - 8} more lines', style=NAVY_TEXT_DIM)
-                )
-
-    # Build panel
     panel_title = Text('Shell', style='bold #f6ff8f')
     panel = Panel(
         Group(*content_parts),

@@ -122,6 +122,56 @@ def _format_worker_result_line(
     return line
 
 
+def _worker_result_summary(
+    total: int, ok_count: int, failed_count: int
+) -> tuple[str, str]:
+    if failed_count == 0:
+        return (
+            f'✓ all {total} worker{"s" if total != 1 else ""} completed',
+            'ok',
+        )
+    return f'{ok_count}/{total} workers completed', 'err'
+
+
+def _rich_worker_lines(
+    sorted_workers: list[tuple[str, dict[str, Any]]],
+) -> list[Text]:
+    lines: list[Text] = []
+    for _wid, info in sorted_workers:
+        label = info.get('label', _wid)
+        w_status = 'OK' if info.get('status') == 'done' else 'FAILED'
+        action_count = info.get('action_count', 0)
+        elapsed = _worker_elapsed_str(
+            info.get('started_at'),
+            info.get('finished_at'),
+        )
+        lines.append(
+            _format_worker_result_line(label, w_status, action_count, elapsed)
+        )
+    return lines
+
+
+def _fallback_worker_lines(
+    worker_statuses: list[tuple[str, str]],
+) -> list[Text]:
+    lines: list[Text] = []
+    for status, label in worker_statuses[:3]:
+        lines.append(
+            format_activity_result_secondary(
+                truncate_activity_detail(label, 96),
+                kind='ok' if status == 'OK' else 'err',
+            )
+        )
+    total = len(worker_statuses)
+    if total > 3:
+        lines.append(
+            format_activity_result_secondary(
+                f'+{total - 3} more workers', kind='neutral'
+            )
+        )
+    return lines
+
+
 def _worker_summary_lines(
     worker_statuses: list[tuple[str, str]],
     error: str,
@@ -131,48 +181,14 @@ def _worker_summary_lines(
     total = len(worker_statuses)
     ok_count = sum(status == 'OK' for status, _label in worker_statuses)
     failed_count = total - ok_count
+    result_message, result_kind = _worker_result_summary(
+        total, ok_count, failed_count
+    )
 
-    if failed_count == 0:
-        result_message = f'✓ all {total} worker{"s" if total != 1 else ""} completed'
-        result_kind = 'ok'
-    else:
-        result_message = f'{ok_count}/{total} workers completed'
-        result_kind = 'err'
-
-    extra_lines: list[Text] = []
     if sorted_workers:
-        # Use rich per-worker data when available
-        for _wid, info in sorted_workers:
-            label = info.get('label', _wid)
-            w_status = 'OK' if info.get('status') == 'done' else 'FAILED'
-            action_count = info.get('action_count', 0)
-            elapsed = _worker_elapsed_str(
-                info.get('started_at'),
-                info.get('finished_at'),
-            )
-            extra_lines.append(
-                _format_worker_result_line(
-                    label,
-                    w_status,
-                    action_count,
-                    elapsed,
-                )
-            )
+        extra_lines = _rich_worker_lines(sorted_workers)
     else:
-        # Fallback to the old behavior when no worker data available
-        for status, label in worker_statuses[:3]:
-            extra_lines.append(
-                format_activity_result_secondary(
-                    truncate_activity_detail(label, 96),
-                    kind='ok' if status == 'OK' else 'err',
-                )
-            )
-        if total > 3:
-            extra_lines.append(
-                format_activity_result_secondary(
-                    f'+{total - 3} more workers', kind='neutral'
-                )
-            )
+        extra_lines = _fallback_worker_lines(worker_statuses)
 
     if failed_count and error:
         extra_lines.append(
@@ -182,6 +198,50 @@ def _worker_summary_lines(
             )
         )
     return result_message, result_kind, extra_lines
+
+
+def _build_sorted_workers(
+    workers_data: dict[str, Any] | None,
+) -> list[tuple[str, dict[str, Any]]] | None:
+    if not workers_data:
+        return None
+    return sorted(
+        workers_data.items(),
+        key=lambda item: (item[1].get('order', 9999), item[1].get('label', '')),
+    )
+
+
+def _content_lines(raw_content: str) -> list[str]:
+    content = raw_content.split('[SHARED BLACKBOARD SNAPSHOT]', 1)[0].strip()
+    return [line.strip() for line in content.splitlines() if line.strip()]
+
+
+def _worker_statuses_from_sorted(
+    sorted_workers: list[tuple[str, dict[str, Any]]],
+) -> list[tuple[str, str]]:
+    statuses: list[tuple[str, str]] = []
+    for _wid, info in sorted_workers:
+        w_status = 'OK' if info.get('status') == 'done' else 'FAILED'
+        statuses.append((w_status, info.get('label', _wid)))
+    return statuses
+
+
+def _try_sorted_workers_summary(
+    sorted_workers: list[tuple[str, dict[str, Any]]] | None,
+    error: str,
+    workers_data: dict[str, Any] | None,
+) -> tuple[str | None, str, list[Text]] | None:
+    if not sorted_workers:
+        return None
+    statuses = _worker_statuses_from_sorted(sorted_workers)
+    if not statuses:
+        return None
+    return _worker_summary_lines(
+        statuses,
+        error,
+        workers_data=workers_data,
+        sorted_workers=sorted_workers,
+    )
 
 
 def summarize_delegate_observation(
@@ -199,16 +259,8 @@ def summarize_delegate_observation(
     raw_content = strip_tool_result_validation_annotations(
         str(getattr(obs, 'content', '') or '').strip()
     )
-    content = raw_content.split('[SHARED BLACKBOARD SNAPSHOT]', 1)[0].strip()
-    lines = [line.strip() for line in content.splitlines() if line.strip()]
-
-    # Build sorted worker list if data available
-    sorted_workers = None
-    if workers_data:
-        sorted_workers = sorted(
-            workers_data.items(),
-            key=lambda item: (item[1].get('order', 9999), item[1].get('label', '')),
-        )
+    lines = _content_lines(raw_content)
+    sorted_workers = _build_sorted_workers(workers_data)
 
     worker_statuses = _parse_worker_statuses(lines)
     if worker_statuses:
@@ -222,20 +274,9 @@ def summarize_delegate_observation(
     if raw_content.startswith('Worker(s) started in background'):
         return truncate_activity_detail(raw_content, 140), 'neutral', []
 
-    # Even without [OK]/[FAILED] markers, use worker data for richer results
-    if sorted_workers:
-        statuses: list[tuple[str, str]] = []
-        for _wid, info in sorted_workers:
-            w_status = 'OK' if info.get('status') == 'done' else 'FAILED'
-            label = info.get('label', _wid)
-            statuses.append((w_status, label))
-        if statuses:
-            return _worker_summary_lines(
-                statuses,
-                error,
-                workers_data=workers_data,
-                sorted_workers=sorted_workers,
-            )
+    result = _try_sorted_workers_summary(sorted_workers, error, workers_data)
+    if result is not None:
+        return result
 
     if not success:
         return _delegation_failure_summary(error, lines)

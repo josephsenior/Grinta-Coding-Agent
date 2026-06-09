@@ -66,28 +66,32 @@ async def snapshot_formatted_impl(
         cap = BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE
         text = '\n'.join(lines) if lines else raw_text[:cap]
     elif mode == 'diff':
-        lines = _interactive_index_lines(raw_text)
-        cur_set = set(lines)
         cap = BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE
-        if self._last_diff_lines is None:
-            text = '\n'.join(lines) if lines else raw_text[:cap]
-        else:
-            prev_set = self._last_diff_lines
-            added = sorted(cur_set - prev_set)
-            removed = sorted(prev_set - cur_set)
-            parts: list[str] = []
-            if added:
-                parts.append('Added:\n' + '\n'.join(added))
-            if removed:
-                parts.append('Removed:\n' + '\n'.join(removed))
-            text = '\n\n'.join(parts) if parts else '(no indexed element changes)'
-        self._last_diff_lines = cur_set
+        text = self._snapshot_diff(raw_text, cap)
     else:
         cap = BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE
         text = raw_text[:cap]
 
     if len(text) > cap:
         text = text[:cap] + '\n… (truncated)'
+    return text
+
+def _snapshot_diff(self, raw_text: str, cap: int) -> str:
+    lines = _interactive_index_lines(raw_text)
+    cur_set = set(lines)
+    if self._last_diff_lines is None:
+        text = '\n'.join(lines) if lines else raw_text[:cap]
+    else:
+        prev_set = self._last_diff_lines
+        added = sorted(cur_set - prev_set)
+        removed = sorted(prev_set - cur_set)
+        parts: list[str] = []
+        if added:
+            parts.append('Added:\n' + '\n'.join(added))
+        if removed:
+            parts.append('Removed:\n' + '\n'.join(removed))
+        text = '\n\n'.join(parts) if parts else '(no indexed element changes)'
+    self._last_diff_lines = cur_set
     return text
 
 

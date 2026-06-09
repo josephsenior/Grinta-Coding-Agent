@@ -784,6 +784,102 @@ class LLM(RetryMixin, DebugMixin):
             pass
         listener(attempt, max_attempts)
 
+    def _notify_stream_retry(self, attempt: int, max_attempts: int) -> None:
+        if attempt > 1:
+            self._notify_retry_listener(
+                attempt,
+                max_attempts,
+                status_type='llm_retry_resuming',
+                reason='stream reconnect',
+                source='llm_stream',
+                streaming=True,
+            )
+
+    def _probe_inband_disconnect(self, prefix: str) -> None:
+        if len(prefix) > _INBAND_PREFIX_LIMIT:
+            return
+        lower = prefix.lower()
+        logger.debug(
+            'LLM in-band disconnect prefix probe',
+            extra={
+                'msg_type': 'LLM_INBAND_PROBE',
+                'prefix_preview': prefix[:120],
+                'prefix_repr': repr(prefix[:120]),
+                'lower_preview': lower[:120],
+                'matched_phrases': [
+                    p
+                    for p in _INBAND_DISCONNECT_PHRASES
+                    if p in lower
+                ][:5],
+            },
+        )
+        if any(p in lower for p in _INBAND_DISCONNECT_PHRASES):
+            raise APIConnectionError(
+                f'Provider sent in-band disconnect message: {prefix.strip()!r}',
+                model=(self.config.model or '').strip(),
+            )
+
+    async def _process_astream_chunk(
+        self,
+        chunk: dict[str, Any],
+        yielded_any: bool,
+        inband_prefix: list[str],
+    ) -> bool | None:
+        if await self._check_cancelled():
+            logger.debug('LLM stream cancelled by user.')
+            return None
+        if chunk.get('choices') and chunk['choices'][0].get('delta'):
+            content = chunk['choices'][0]['delta'].get('content', '')
+            if content:
+                self.log_response(content)
+                if not yielded_any:
+                    inband_prefix.append(content)
+                    prefix = ''.join(inband_prefix)
+                    self._probe_inband_disconnect(prefix)
+        return True
+
+    async def _handle_astream_error(
+        self,
+        e: Exception,
+        attempt: int,
+        max_attempts: int,
+        yielded_any: bool,
+        retry_min: float,
+        retry_max: float,
+    ) -> None:
+        import asyncio as _asyncio
+
+        is_retryable = isinstance(e, LLM_RETRY_EXCEPTIONS)
+        is_last = attempt >= max_attempts
+        if not self._should_retry_astream(
+            is_retryable, is_last, yielded_any, exc=e
+        ):
+            logger.error('LLM astream error: %s', e)
+            mapped = _map_provider_exception(
+                e, (self.config.model or '').strip()
+            )
+            if mapped is not e:
+                raise mapped from e
+            raise
+        wait = min(retry_max, retry_min * (2 ** (attempt - 1)))
+        logger.warning(
+            'LLM astream transient error (attempt %d/%d): %s — retrying in %.1fs',
+            attempt,
+            max_attempts,
+            e,
+            wait,
+        )
+        self._notify_retry_listener(
+            attempt,
+            max_attempts,
+            status_type='llm_retry_pending',
+            reason=type(e).__name__,
+            wait_seconds=wait,
+            source='llm_stream',
+            streaming=True,
+        )
+        await _asyncio.sleep(wait)
+
     async def astream(self, *args, **kwargs) -> AsyncIterator[dict[str, Any]]:
         """Asynchronous streaming call with cancellation support and retry.
 
@@ -793,101 +889,26 @@ class LLM(RetryMixin, DebugMixin):
         from scratch on transient failures (same exception set as
         ``acompletion``).
         """
-        import asyncio as _asyncio
-
         messages = self._extract_messages(args, kwargs)
         call_kwargs = self._get_call_kwargs(is_stream=True, **kwargs)
         max_attempts, retry_min, retry_max = self._get_astream_retry_params()
 
         for attempt in range(1, max_attempts + 1):
             yielded_any = False
-            _inband_prefix: list[
-                str
-            ] = []  # accumulate leading content for disconnect probe
+            _inband_prefix: list[str] = []
             try:
-                if attempt > 1:
-                    self._notify_retry_listener(
-                        attempt,
-                        max_attempts,
-                        status_type='llm_retry_resuming',
-                        reason='stream reconnect',
-                        source='llm_stream',
-                        streaming=True,
-                    )
+                self._notify_stream_retry(attempt, max_attempts)
                 self.log_prompt(messages)
                 stream_iter = self.client.astream(messages=messages, **call_kwargs)
                 async for chunk in _stream_with_chunk_timeout(stream_iter):
-                    if await self._check_cancelled():
-                        logger.debug('LLM stream cancelled by user.')
+                    result = await self._process_astream_chunk(chunk, yielded_any, _inband_prefix)
+                    if result is None:
                         return
-                    if chunk.get('choices') and chunk['choices'][0].get('delta'):
-                        content = chunk['choices'][0]['delta'].get('content', '')
-                        if content:
-                            self.log_response(content)
-                            # Before the first real yield, accumulate a small
-                            # prefix and probe for known in-band disconnect
-                            # messages injected by provider proxies.
-                            if not yielded_any:
-                                _inband_prefix.append(content)
-                                prefix = ''.join(_inband_prefix)
-                                if len(prefix) <= _INBAND_PREFIX_LIMIT:
-                                    lower = prefix.lower()
-                                    logger.debug(
-                                        'LLM in-band disconnect prefix probe',
-                                        extra={
-                                            'msg_type': 'LLM_INBAND_PROBE',
-                                            'prefix_preview': prefix[:120],
-                                            'prefix_repr': repr(prefix[:120]),
-                                            'lower_preview': lower[:120],
-                                            'matched_phrases': [
-                                                p
-                                                for p in _INBAND_DISCONNECT_PHRASES
-                                                if p in lower
-                                            ][:5],
-                                        },
-                                    )
-                                    if any(
-                                        p in lower for p in _INBAND_DISCONNECT_PHRASES
-                                    ):
-                                        raise APIConnectionError(
-                                            f'Provider sent in-band disconnect message: {prefix.strip()!r}',
-                                            model=(self.config.model or '').strip(),
-                                        )
                     yield chunk
                     yielded_any = True
                 return
-
             except Exception as e:
-                is_retryable = isinstance(e, LLM_RETRY_EXCEPTIONS)
-                is_last = attempt >= max_attempts
-                if not self._should_retry_astream(
-                    is_retryable, is_last, yielded_any, exc=e
-                ):
-                    logger.error('LLM astream error: %s', e)
-                    mapped = _map_provider_exception(
-                        e, (self.config.model or '').strip()
-                    )
-                    if mapped is not e:
-                        raise mapped from e
-                    raise
-                wait = min(retry_max, retry_min * (2 ** (attempt - 1)))
-                logger.warning(
-                    'LLM astream transient error (attempt %d/%d): %s — retrying in %.1fs',
-                    attempt,
-                    max_attempts,
-                    e,
-                    wait,
-                )
-                self._notify_retry_listener(
-                    attempt,
-                    max_attempts,
-                    status_type='llm_retry_pending',
-                    reason=type(e).__name__,
-                    wait_seconds=wait,
-                    source='llm_stream',
-                    streaming=True,
-                )
-                await _asyncio.sleep(wait)
+                await self._handle_astream_error(e, attempt, max_attempts, yielded_any, retry_min, retry_max)
 
     async def _check_cancelled(self) -> bool:
         """Check if the request has been cancelled."""
