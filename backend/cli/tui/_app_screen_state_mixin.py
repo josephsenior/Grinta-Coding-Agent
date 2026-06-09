@@ -189,6 +189,25 @@ class _AppScreenStateMixin:
     def _refresh_runtime_feedback(self) -> None:
         if not self._is_unmounted:
             self._render_hud_bar()
+            self._maybe_refresh_session_audit()
+
+    def _maybe_refresh_session_audit(self) -> None:
+        """Keep ``app.stripped.log`` / ``app.audit.txt`` current during long runs."""
+        if not getattr(self, '_agent_running', False):
+            return
+        from backend.core.constants import DEFAULT_SESSION_AUDIT_REFRESH_SECONDS
+
+        now = time.monotonic()
+        last = getattr(self, '_last_session_audit_refresh_at', 0.0)
+        if (now - last) < DEFAULT_SESSION_AUDIT_REFRESH_SECONDS:
+            return
+        self._last_session_audit_refresh_at = now
+        try:
+            from backend.core.logger import finalize_session_logging_audit
+
+            finalize_session_logging_audit()
+        except Exception:
+            pass
 
     def set_agent_phase(self, state_value: str) -> None:
         key = state_value.lower().strip()

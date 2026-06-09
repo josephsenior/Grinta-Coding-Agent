@@ -100,50 +100,60 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
         except Exception:
             logger.debug('Pre-exec diff skipped for FileEditAction', exc_info=True)
 
+    def _simulate_create_file(self, action) -> str:
+        return action.file_text or ''
+
+    def _simulate_insert_text(self, old_content: str, action) -> str:
+        lines = old_content.splitlines(keepends=True)
+        new_text = action.new_str or ''
+        line_ending = '\r\n' if '\r\n' in old_content else '\n'
+        if old_content and new_text and not new_text.endswith(('\n', '\r')):
+            new_text += line_ending
+        insert_idx = max(0, min(action.insert_line - 1, len(lines)))
+        new_lines = new_text.splitlines(keepends=True) or [new_text]
+        return ''.join(lines[:insert_idx] + new_lines + lines[insert_idx:])
+
+    def _normalize_line_endings(self, old_content: str, text: str) -> str:
+        newline = '\r\n' if '\r\n' in old_content else '\n'
+        normalized = text.replace('\r\n', '\n').replace('\r', '\n')
+        if newline == '\r\n':
+            normalized = normalized.replace('\n', '\r\n')
+        return normalized
+
+    def _simulate_replace_string(self, old_content: str, action) -> str | None:
+        old_string = getattr(action, 'old_string', None)
+        if not old_string:
+            return None
+        old_match = self._normalize_line_endings(old_content, old_string)
+        new_replacement = self._normalize_line_endings(old_content, action.new_str or '')
+        replace_all = getattr(action, 'replace_all', False)
+        replace_all = replace_all if isinstance(replace_all, bool) else False
+        match_count = old_content.count(old_match)
+        if match_count == 0 or (match_count > 1 and not replace_all):
+            return None
+        return old_content.replace(old_match, new_replacement, -1 if replace_all else 1)
+
+    def _simulate_range_edit(self, old_content: str, action) -> str | None:
+        start = getattr(action, 'start_line', None)
+        end = getattr(action, 'end_line', None)
+        if start is None or end is None:
+            return None
+        lines = old_content.splitlines(keepends=True)
+        start_idx = max(0, start - 1)
+        end_idx = min(len(lines), end)
+        new_lines = (action.new_str or '').splitlines(keepends=True)
+        return ''.join(lines[:start_idx] + new_lines + lines[end_idx:])
+
     def _simulate_edit(self, old_content: str, action) -> str | None:
         """Simulate the edit on old content based on action command."""
         if action.command == 'create_file':
-            return action.file_text or ''
+            return self._simulate_create_file(action)
         if action.command == 'insert_text' and action.insert_line is not None:
-            lines = old_content.splitlines(keepends=True)
-            new_text = action.new_str or ''
-            line_ending = '\r\n' if '\r\n' in old_content else '\n'
-            if old_content and new_text and not new_text.endswith(('\n', '\r')):
-                new_text += line_ending
-            insert_idx = max(0, min(action.insert_line - 1, len(lines)))
-            new_lines = new_text.splitlines(keepends=True) or [new_text]
-            return ''.join(lines[:insert_idx] + new_lines + lines[insert_idx:])
+            return self._simulate_insert_text(old_content, action)
         if action.command == 'replace_string':
-            old_string = getattr(action, 'old_string', None)
-            if not old_string:
-                return None
-            newline = '\r\n' if '\r\n' in old_content else '\n'
-            old_match = old_string.replace('\r\n', '\n').replace('\r', '\n')
-            new_replacement = (
-                (action.new_str or '').replace('\r\n', '\n').replace('\r', '\n')
-            )
-            if newline == '\r\n':
-                old_match = old_match.replace('\n', '\r\n')
-                new_replacement = new_replacement.replace('\n', '\r\n')
-            replace_all = getattr(action, 'replace_all', False)
-            replace_all = replace_all if isinstance(replace_all, bool) else False
-            match_count = old_content.count(old_match)
-            if match_count == 0 or (match_count > 1 and not replace_all):
-                return None
-            return old_content.replace(
-                old_match,
-                new_replacement,
-                -1 if replace_all else 1,
-            )
+            return self._simulate_replace_string(old_content, action)
         if action.command == 'edit' and getattr(action, 'edit_mode', None) == 'range':
-            start = getattr(action, 'start_line', None)
-            end = getattr(action, 'end_line', None)
-            if start is not None and end is not None:
-                lines = old_content.splitlines(keepends=True)
-                start_idx = max(0, start - 1)
-                end_idx = min(len(lines), end)
-                new_lines = (action.new_str or '').splitlines(keepends=True)
-                return ''.join(lines[:start_idx] + new_lines + lines[end_idx:])
+            return self._simulate_range_edit(old_content, action)
         return None  # view or unknown — nothing to diff
 
     async def _diff_for_write(self, ctx: ToolInvocationContext, action) -> None:

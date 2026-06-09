@@ -146,6 +146,46 @@ def _read_symbol_payload(
     }
 
 
+def _resolve_symbol_candidates_with_path(
+    path: str,
+    symbol_name: str,
+    symbol_kind: str | None,
+    parent_symbol: str | None,
+    occurrence: int | None,
+) -> tuple[Path, str, list[dict[str, Any]]]:
+    return _resolve_symbol_candidates(
+        path=path,
+        symbol_name=symbol_name,
+        symbol_kind=symbol_kind,
+        parent_symbol=parent_symbol,
+        occurrence=occurrence,
+    )
+
+
+def _resolve_symbol_candidates_without_path(
+    symbol_name: str,
+    symbol_kind: str | None,
+    parent_symbol: str | None,
+    occurrence: int | None,
+) -> tuple[Path, str, list[dict[str, Any]]]:
+    lookup_name = symbol_name.rsplit('.', 1)[-1]
+    if not parent_symbol and '.' in symbol_name:
+        maybe_parent, _, maybe_name = symbol_name.rpartition('.')
+        parent_symbol = maybe_parent or None
+        lookup_name = maybe_name
+    candidates = _filter_symbol_candidates(
+        _find_symbol_candidates(
+            lookup_name,
+            symbol_kind=symbol_kind,
+            include_private=True,
+        ),
+        symbol_name=lookup_name,
+        parent_symbol=parent_symbol,
+        occurrence=occurrence,
+    )
+    return Path(), '', candidates
+
+
 def _resolve_read_symbol_target(
     target: Mapping[str, Any],
     *,
@@ -180,31 +220,13 @@ def _resolve_read_symbol_target(
         }
 
     if path:
-        safe_path, content, candidates = _resolve_symbol_candidates(
-            path=path,
-            symbol_name=symbol_name,
-            symbol_kind=symbol_kind,
-            parent_symbol=parent_symbol,
-            occurrence=occurrence,
+        safe_path, content, candidates = _resolve_symbol_candidates_with_path(
+            path, symbol_name, symbol_kind, parent_symbol, occurrence,
         )
     else:
-        lookup_name = symbol_name.rsplit('.', 1)[-1]
-        if not parent_symbol and '.' in symbol_name:
-            maybe_parent, _, maybe_name = symbol_name.rpartition('.')
-            parent_symbol = maybe_parent or None
-            lookup_name = maybe_name
-        candidates = _filter_symbol_candidates(
-            _find_symbol_candidates(
-                lookup_name,
-                symbol_kind=symbol_kind,
-                include_private=True,
-            ),
-            symbol_name=lookup_name,
-            parent_symbol=parent_symbol,
-            occurrence=occurrence,
+        safe_path, content, candidates = _resolve_symbol_candidates_without_path(
+            symbol_name, symbol_kind, parent_symbol, occurrence,
         )
-        safe_path = Path()
-        content = ''
 
     if requested_start is not None:
         candidates = [

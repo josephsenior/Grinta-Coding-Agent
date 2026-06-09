@@ -204,83 +204,68 @@ class GeminiClient(DirectLLMClient):
             or 'api_key_invalid' in error_str
         )
 
-    def _map_gemini_api_error(self, exc: Any, error_str: str) -> Exception:
-        from backend.inference.exceptions import APIError as ProviderAPIError
+    def _map_gemini_rate_limit(self, exc: Any, error_str: str) -> Exception:
+        import re
+        from backend.inference.exceptions import RateLimitError, RateLimitKind
+
+        kind = RateLimitKind.TPM
+        retry_after = None
+        delay_match = re.search(
+            r'(?:retry in |retryDelay[\'\":\s]*)([0-9.]+)', error_str, re.IGNORECASE
+        )
+        if delay_match:
+            try:
+                retry_after = float(delay_match.group(1))
+            except (ValueError, TypeError):
+                pass
+        if 'rpm' in error_str or 'requests per minute' in error_str:
+            kind = RateLimitKind.RPM
+        elif 'rpd' in error_str or 'requests per day' in error_str:
+            kind = RateLimitKind.RPD
+        return RateLimitError(
+            str(exc), llm_provider='google', model=self.model_name,
+            kind=kind, retry_after=retry_after,
+        )
+
+    def _map_gemini_bad_request(self, exc: Any, error_str: str) -> Exception:
         from backend.inference.exceptions import (
             BadRequestError,
             ContextWindowExceededError,
+            is_context_window_error,
+        )
+        if is_context_window_error(error_str, exc):
+            return ContextWindowExceededError(
+                str(exc), llm_provider='google', model=self.model_name
+            )
+        return BadRequestError(str(exc), llm_provider='google', model=self.model_name)
+
+    def _map_gemini_api_error(self, exc: Any, error_str: str) -> Exception:
+        from backend.inference.exceptions import (
+            APIError as ProviderAPIError,
+            AuthenticationError,
             InternalServerError,
             NotFoundError,
-            RateLimitError,
             ServiceUnavailableError,
-            is_context_window_error,
         )
 
         if self._is_gemini_api_key_error(error_str):
-            from backend.inference.exceptions import AuthenticationError
-
             return AuthenticationError(
                 str(exc), llm_provider='google', model=self.model_name
             )
         if exc.code == 429 or 'quota' in error_str or 'rate limit' in error_str:
-            import re
-
-            from backend.inference.exceptions import RateLimitKind
-
-            # Default to TPM since streaming 429s from Gemini are often token quotas
-            kind = RateLimitKind.TPM
-            retry_after = None
-
-            # Look for "Please retry in 17.235s" or "'retryDelay': '17s'"
-            delay_match = re.search(
-                r'(?:retry in |retryDelay[\'\":\s]*)([0-9.]+)', error_str, re.IGNORECASE
-            )
-            if delay_match:
-                try:
-                    retry_after = float(delay_match.group(1))
-                except (ValueError, TypeError):
-                    pass
-
-            if 'rpm' in error_str or 'requests per minute' in error_str:
-                kind = RateLimitKind.RPM
-            elif 'rpd' in error_str or 'requests per day' in error_str:
-                kind = RateLimitKind.RPD
-
-            return RateLimitError(
-                str(exc),
-                llm_provider='google',
-                model=self.model_name,
-                kind=kind,
-                retry_after=retry_after,
-            )
-        if (
-            exc.code == 401
-            or 'unauthorized' in error_str
-            or 'invalid api key' in error_str
-        ):
-            from backend.inference.exceptions import AuthenticationError
-
+            return self._map_gemini_rate_limit(exc, error_str)
+        if exc.code == 401 or 'unauthorized' in error_str or 'invalid api key' in error_str:
             return AuthenticationError(
                 str(exc), llm_provider='google', model=self.model_name
             )
         if exc.code == 404 or 'not found' in error_str:
             return NotFoundError(str(exc), llm_provider='google', model=self.model_name)
-        if (
-            exc.code in (500, 502, 503, 504)
-            or 'unavailable' in error_str
-            or 'overloaded' in error_str
-        ):
+        if exc.code in (500, 502, 503, 504) or 'unavailable' in error_str or 'overloaded' in error_str:
             return ServiceUnavailableError(
                 str(exc), llm_provider='google', model=self.model_name
             )
         if exc.code == 400:
-            if is_context_window_error(error_str, exc):
-                return ContextWindowExceededError(
-                    str(exc), llm_provider='google', model=self.model_name
-                )
-            return BadRequestError(
-                str(exc), llm_provider='google', model=self.model_name
-            )
+            return self._map_gemini_bad_request(exc, error_str)
         if exc.code and exc.code >= 500:
             return InternalServerError(
                 str(exc), llm_provider='google', model=self.model_name

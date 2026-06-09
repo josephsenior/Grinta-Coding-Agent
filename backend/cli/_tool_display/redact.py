@@ -403,42 +403,69 @@ def _find_next_xml_tool_call_block(
     )
 
 
+_TAG_ATTR_RE = re.compile(
+    r'([a-zA-Z_][\w:.-]*)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))'
+)
+
+
 def _parse_tag_attrs(attrs_text: str) -> dict[str, str]:
     attrs: dict[str, str] = {}
-    i = 0
-    n = len(attrs_text)
-    while i < n:
-        while i < n and attrs_text[i].isspace():
-            i += 1
-        key_start = i
-        while i < n and (attrs_text[i].isalnum() or attrs_text[i] in '_:-'):
-            i += 1
-        key = attrs_text[key_start:i].strip().lower()
-        while i < n and attrs_text[i].isspace():
-            i += 1
-        if not key or i >= n or attrs_text[i] != '=':
-            while i < n and not attrs_text[i].isspace():
-                i += 1
-            continue
-        i += 1
-        while i < n and attrs_text[i].isspace():
-            i += 1
-        if i < n and attrs_text[i] in ('"', "'"):
-            quote = attrs_text[i]
-            i += 1
-            value_start = i
-            while i < n and attrs_text[i] != quote:
-                i += 1
-            value = attrs_text[value_start:i]
-            if i < n:
-                i += 1
-        else:
-            value_start = i
-            while i < n and not attrs_text[i].isspace():
-                i += 1
-            value = attrs_text[value_start:i]
-        attrs[key] = value
+    for match in _TAG_ATTR_RE.finditer(attrs_text):
+        key = match.group(1).strip().lower()
+        value = match.group(2) if match.group(2) is not None else (
+            match.group(3) if match.group(3) is not None else match.group(4) or ''
+        )
+        if key:
+            attrs[key] = value
     return attrs
+
+
+def _extract_name_from_payload(payload: dict[str, Any]) -> str | None:
+    return (
+        payload.get('name')
+        or payload.get('tool')
+        or payload.get('function_name')
+    )
+
+
+def _extract_arguments_from_payload(
+    payload: dict[str, Any], name: str | None
+) -> Any:
+    function_payload = payload.get('function')
+    if isinstance(function_payload, dict):
+        arguments = function_payload.get('arguments')
+        if arguments is not None:
+            return arguments
+
+    arguments = payload.get('arguments') or payload.get('input')
+    if arguments is not None:
+        return arguments
+
+    if name:
+        return {
+            k: v
+            for k, v in payload.items()
+            if k not in {'name', 'tool', 'function_name', 'function'}
+        }
+    return None
+
+
+def _parse_json_body(body_text: str) -> tuple[str | None, Any]:
+    try:
+        payload = json.loads(body_text)
+    except json.JSONDecodeError:
+        return None, None
+
+    if not isinstance(payload, dict):
+        return None, None
+
+    name = _extract_name_from_payload(payload)
+    function_payload = payload.get('function')
+    if isinstance(function_payload, dict):
+        name = name or function_payload.get('name')
+
+    arguments = _extract_arguments_from_payload(payload, name)
+    return name, arguments
 
 
 def _xml_tool_call_to_dict(
@@ -451,29 +478,11 @@ def _xml_tool_call_to_dict(
     arguments: Any = None
 
     if body_text.startswith('{'):
-        try:
-            payload = json.loads(body_text)
-        except json.JSONDecodeError:
-            payload = None
-        if isinstance(payload, dict):
-            if not name:
-                name = (
-                    payload.get('name')
-                    or payload.get('tool')
-                    or payload.get('function_name')
-                )
-            function_payload = payload.get('function')
-            if isinstance(function_payload, dict):
-                name = name or function_payload.get('name')
-                arguments = function_payload.get('arguments')
-            if arguments is None:
-                arguments = payload.get('arguments') or payload.get('input')
-            if arguments is None and name:
-                arguments = {
-                    k: v
-                    for k, v in payload.items()
-                    if k not in {'name', 'tool', 'function_name', 'function'}
-                }
+        json_name, json_args = _parse_json_body(body_text)
+        if json_name:
+            name = name or json_name
+        if json_args is not None:
+            arguments = json_args
 
     if not name:
         invoke = _parse_invoke_body(body_text)

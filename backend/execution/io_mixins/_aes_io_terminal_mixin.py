@@ -199,35 +199,102 @@ class _AesIoTerminalMixin:
         logger.warning('Recreated missing default shell session')
         return recreated, None
 
+    def _log_terminal_debug(self, hypothesis_id: str, location: str, message: str, data: dict) -> None:
+        """Log debug trace for terminal operations."""
+        try:
+            payload = {
+                'sessionId': 'fee086',
+                'runId': 'pre-fix',
+                'hypothesisId': hypothesis_id,
+                'location': location,
+                'message': message,
+                'data': data,
+                'timestamp': int(time.time() * 1000),
+            }
+            self._append_debug_trace(payload)
+        except Exception:
+            pass
+
+    def _resolve_terminal_cwd(self, action_cwd: str | None) -> str:
+        """Resolve effective working directory for terminal session."""
+        default_session = self.session_manager.get_session('default')
+        cwd = action_cwd
+        if not cwd and default_session:
+            cwd = default_session.cwd
+        if not cwd:
+            cwd = self._initial_cwd
+        return str(self._resolve_effective_cwd(action_cwd, cwd))
+
+    async def _poll_terminal_output(self, session: Any, offset: int, timeout: float) -> None:
+        """Poll for terminal output with early exit on first byte."""
+        poll_interval = PTY_READ_POLL_INTERVAL_SECONDS
+        waited = 0.0
+        while waited < timeout:
+            await asyncio.sleep(poll_interval)
+            waited += poll_interval
+            probe, *_ = self._read_terminal_with_mode(
+                session=session, mode='delta', offset=offset
+            )
+            if probe:
+                break
+
+    def _build_terminal_observation(
+        self,
+        session_id: str,
+        content: str,
+        next_offset: int,
+        has_new_output: bool,
+        dropped_chars: int,
+        state: str,
+        shell_kind: str,
+        mode: str = 'delta',
+    ) -> TerminalObservation:
+        """Build TerminalObservation with tool_result metadata."""
+        empty_hints = self._terminal_read_empty_hints(
+            mode=mode, has_new_output=has_new_output
+        )
+        obs = TerminalObservation(
+            session_id=session_id,
+            content=content,
+            next_offset=next_offset,
+            has_new_output=has_new_output,
+            dropped_chars=dropped_chars,
+            state=state,
+        )
+        obs.tool_result = {
+            'tool': 'terminal_manager',
+            'ok': True,
+            'error_code': None,
+            'retryable': False,
+            'state': state,
+            'next_actions': ['read', 'input'],
+            'payload': {
+                'session_id': session_id,
+                'shell_kind': shell_kind,
+                'mode': mode,
+                'next_offset': next_offset,
+                'has_new_output': has_new_output,
+                'dropped_chars': dropped_chars,
+                **empty_hints,
+            },
+            'progress': bool(has_new_output),
+        }
+        return obs
+
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         try:
             guard_err = self._terminal_open_guardrail_error(action.command or '')
             if guard_err is not None:
-                # #region agent log
-                try:
-                    payload = {
-                        'sessionId': 'fee086',
-                        'runId': 'pre-fix',
-                        'hypothesisId': 'H7_terminal_run_branch',
-                        'location': 'backend/execution/action_execution_server_io.py:terminal_run',
-                        'message': 'terminal-run-guard-error',
-                        'data': {'command': action.command or ''},
-                        'timestamp': int(time.time() * 1000),
-                    }
-                    self._append_debug_trace(payload)
-                except Exception:
-                    pass
-                # #endregion
+                self._log_terminal_debug(
+                    'H7_terminal_run_branch',
+                    'backend/execution/action_execution_server_io.py:terminal_run',
+                    'terminal-run-guard-error',
+                    {'command': action.command or ''},
+                )
                 return guard_err
 
             session_id = self._next_terminal_session_id()
-
-            default_session = self.session_manager.get_session('default')
-            cwd = action.cwd
-            if not cwd and default_session:
-                cwd = default_session.cwd
-            if not cwd:
-                cwd = self._initial_cwd
+            cwd = self._resolve_terminal_cwd(action.cwd)
 
             cwd_error = self._validate_workspace_scoped_cwd(
                 action.command or '<interactive terminal>',
@@ -235,24 +302,13 @@ class _AesIoTerminalMixin:
                 cwd,
             )
             if cwd_error is not None:
-                # #region agent log
-                try:
-                    payload = {
-                        'sessionId': 'fee086',
-                        'runId': 'pre-fix',
-                        'hypothesisId': 'H7_terminal_run_branch',
-                        'location': 'backend/execution/action_execution_server_io.py:terminal_run',
-                        'message': 'terminal-run-cwd-error',
-                        'data': {'command': action.command or '', 'cwd': cwd},
-                        'timestamp': int(time.time() * 1000),
-                    }
-                    self._append_debug_trace(payload)
-                except Exception:
-                    pass
-                # #endregion
+                self._log_terminal_debug(
+                    'H7_terminal_run_branch',
+                    'backend/execution/action_execution_server_io.py:terminal_run',
+                    'terminal-run-cwd-error',
+                    {'command': action.command or '', 'cwd': cwd},
+                )
                 return cwd_error
-
-            cwd = str(self._resolve_effective_cwd(action.cwd, cwd))
 
             session = self.session_manager.create_session(
                 session_id=session_id, cwd=cwd, interactive=True
@@ -265,21 +321,12 @@ class _AesIoTerminalMixin:
             if resize_err is not None:
                 self.session_manager.close_session(session_id)
                 self._clear_terminal_read_cursor(session_id)
-                # #region agent log
-                try:
-                    payload = {
-                        'sessionId': 'fee086',
-                        'runId': 'pre-fix',
-                        'hypothesisId': 'H8_terminal_resize_branch',
-                        'location': 'backend/execution/action_execution_server_io.py:terminal_run',
-                        'message': 'terminal-run-resize-error',
-                        'data': {'rows': action.rows, 'cols': action.cols},
-                        'timestamp': int(time.time() * 1000),
-                    }
-                    self._append_debug_trace(payload)
-                except Exception:
-                    pass
-                # #endregion
+                self._log_terminal_debug(
+                    'H8_terminal_resize_branch',
+                    'backend/execution/action_execution_server_io.py:terminal_run',
+                    'terminal-run-resize-error',
+                    {'rows': action.rows, 'cols': action.cols},
+                )
                 return resize_err
 
             if action.command:
@@ -324,24 +371,7 @@ class _AesIoTerminalMixin:
                 if predicted_cwd is not None and hasattr(session, '_cwd'):
                     session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
 
-                # Poll for initial output — the PTY shell needs processing time
-                # before any bytes appear in the buffer.  Without a settle delay
-                # the immediate read is always empty (particularly pronounced on
-                # Windows / PowerShell where startup latency can exceed 500 ms).
-                # We poll in 50 ms ticks for up to PTY_OPEN_READ_TIMEOUT_SECONDS
-                # and exit as soon as any output arrives; slow commands just need
-                # a follow-up read.
-                _open_poll_interval = PTY_READ_POLL_INTERVAL_SECONDS
-                _open_poll_timeout = PTY_OPEN_READ_TIMEOUT_SECONDS
-                _open_waited = 0.0
-                while _open_waited < _open_poll_timeout:
-                    await asyncio.sleep(_open_poll_interval)
-                    _open_waited += _open_poll_interval
-                    _probe, *_ = self._read_terminal_with_mode(
-                        session=session, mode='delta', offset=0
-                    )
-                    if _probe:
-                        break
+                await self._poll_terminal_output(session, 0, PTY_OPEN_READ_TIMEOUT_SECONDS)
 
             content, next_offset, has_new_output, dropped_chars = (
                 self._read_terminal_with_mode(
@@ -359,53 +389,19 @@ class _AesIoTerminalMixin:
             self._terminal_open_commands_no_interaction.append(
                 self._normalize_terminal_command(action.command or '')
             )
-            obs = TerminalObservation(
-                session_id=session_id,
-                content=content,
-                next_offset=next_offset,
-                has_new_output=has_new_output,
-                dropped_chars=dropped_chars,
-                state=state,
+            obs = self._build_terminal_observation(
+                session_id, content, next_offset, has_new_output, dropped_chars,
+                state, shell_kind,
             )
-            empty_hints = self._terminal_read_empty_hints(
-                mode='delta', has_new_output=has_new_output
-            )
-            obs.tool_result = {
-                'tool': 'terminal_manager',
-                'ok': True,
-                'error_code': None,
-                'retryable': False,
-                'state': state,
-                'next_actions': ['read', 'input'],
-                'payload': {
-                    'session_id': session_id,
-                    'shell_kind': shell_kind,
-                    'mode': 'delta',
-                    'next_offset': next_offset,
-                    'has_new_output': has_new_output,
-                    'dropped_chars': dropped_chars,
-                    **empty_hints,
-                },
-                'progress': bool(has_new_output),
-            }
             self._advance_terminal_read_cursor(session_id, next_offset, mode='delta')
             return obs
         except Exception as exc:
-            # #region agent log
-            try:
-                payload = {
-                    'sessionId': 'fee086',
-                    'runId': 'pre-fix',
-                    'hypothesisId': 'H9_terminal_run_exception',
-                    'location': 'backend/execution/action_execution_server_io.py:terminal_run',
-                    'message': 'terminal-run-exception',
-                    'data': {'error': str(exc), 'error_type': type(exc).__name__},
-                    'timestamp': int(time.time() * 1000),
-                }
-                self._append_debug_trace(payload)
-            except Exception:
-                pass
-            # #endregion
+            self._log_terminal_debug(
+                'H9_terminal_run_exception',
+                'backend/execution/action_execution_server_io.py:terminal_run',
+                'terminal-run-exception',
+                {'error': str(exc), 'error_type': type(exc).__name__},
+            )
             logger.error('Error starting terminal session: %s', exc, exc_info=True)
             return ErrorObservation(f'Failed to start terminal: {exc}')
 
@@ -485,33 +481,23 @@ class _AesIoTerminalMixin:
                 sent_input = True
             if predicted_cwd is not None and hasattr(session, '_cwd'):
                 session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
-            # Poll for new bytes after sending input instead of a flat sleep.
-            # The previous fixed 0.2 s wait was a workaround for the agent
-            # racing the PTY: it returned even when the shell hadn't echoed
-            # yet on slow startups (cold PowerShell, npm scripts, REPL
-            # prompts), forcing the agent to either spam empty reads or rely
-            # on a client-side delay. Polling in 50 ms ticks with an early
-            # exit on first byte gives the shell time to flush without
-            # blocking when output arrives quickly.
-            _input_poll_interval = PTY_READ_POLL_INTERVAL_SECONDS
-            _input_poll_timeout = PTY_INPUT_READ_TIMEOUT_SECONDS
-            _input_waited = 0.0
+
             read_offset = self._get_terminal_read_cursor(action.session_id)
-            _probe_reads = 0
-            # Probe-loop only for PTY-backed sessions, where delta reads are
-            # explicitly non-destructive. This closes the PowerShell/ConPTY race
-            # even after the cursor has advanced, while avoiding destructive
-            # polling on legacy shell backends.
+            probe_reads = 0
             if sent_input and self._should_poll_terminal_input_delta(session):
-                while _input_waited < _input_poll_timeout:
-                    await asyncio.sleep(_input_poll_interval)
-                    _input_waited += _input_poll_interval
-                    _probe_reads += 1
-                    _probe, *_ = self._read_terminal_with_mode(
+                poll_interval = PTY_READ_POLL_INTERVAL_SECONDS
+                poll_timeout = PTY_INPUT_READ_TIMEOUT_SECONDS
+                waited = 0.0
+                while waited < poll_timeout:
+                    await asyncio.sleep(poll_interval)
+                    waited += poll_interval
+                    probe_reads += 1
+                    probe, *_ = self._read_terminal_with_mode(
                         session=session, mode='delta', offset=read_offset
                     )
-                    if _probe:
+                    if probe:
                         break
+
             content, next_offset, has_new_output, dropped_chars = (
                 self._read_terminal_with_mode(
                     session=session,
@@ -524,60 +510,26 @@ class _AesIoTerminalMixin:
                 default='SESSION_INTERACTED',
                 shell_kind=shell_kind,
             )
-            # #region agent log
-            try:
-                payload = {
-                    'sessionId': 'fee086',
-                    'runId': 'pre-fix',
-                    'hypothesisId': 'H6_terminal_input_probe_loop',
-                    'location': 'backend/execution/action_execution_server_io.py:terminal_input',
-                    'message': 'terminal-input-read-stats',
-                    'data': {
-                        'session_id': action.session_id,
-                        'read_offset': read_offset,
-                        'probe_reads': _probe_reads,
-                        'next_offset': next_offset,
-                        'has_new_output': has_new_output,
-                    },
-                    'timestamp': int(time.time() * 1000),
-                }
-                self._append_debug_trace(payload)
-            except Exception:
-                pass
-            # #endregion
+            self._log_terminal_debug(
+                'H6_terminal_input_probe_loop',
+                'backend/execution/action_execution_server_io.py:terminal_input',
+                'terminal-input-read-stats',
+                {
+                    'session_id': action.session_id,
+                    'read_offset': read_offset,
+                    'probe_reads': probe_reads,
+                    'next_offset': next_offset,
+                    'has_new_output': has_new_output,
+                },
+            )
             self._advance_terminal_read_cursor(
                 action.session_id, next_offset, mode='delta'
             )
             self._mark_terminal_session_interaction(action.session_id)
-            empty_hints = self._terminal_read_empty_hints(
-                mode='delta', has_new_output=has_new_output
+            obs = self._build_terminal_observation(
+                action.session_id, content, next_offset, has_new_output,
+                dropped_chars, state, shell_kind,
             )
-            obs = TerminalObservation(
-                session_id=action.session_id,
-                content=content,
-                next_offset=next_offset,
-                has_new_output=has_new_output,
-                dropped_chars=dropped_chars,
-                state=state,
-            )
-            obs.tool_result = {
-                'tool': 'terminal_manager',
-                'ok': True,
-                'error_code': None,
-                'retryable': False,
-                'state': state,
-                'next_actions': ['read', 'input'],
-                'payload': {
-                    'session_id': action.session_id,
-                    'shell_kind': shell_kind,
-                    'mode': 'delta',
-                    'next_offset': next_offset,
-                    'has_new_output': has_new_output,
-                    'dropped_chars': dropped_chars,
-                    **empty_hints,
-                },
-                'progress': bool(has_new_output),
-            }
             return obs
         except Exception as exc:
             logger.error(

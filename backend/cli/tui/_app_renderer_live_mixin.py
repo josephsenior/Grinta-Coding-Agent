@@ -33,7 +33,11 @@ class _AppRendererLiveMixin:
         if (now - last_scroll) < _LIVE_SCROLL_PAINT_INTERVAL:
             return
         self._last_scroll_paint_at = now
-        display.scroll_end(animate=False)
+        follow_tail = getattr(display, 'follow_tail', None)
+        if callable(follow_tail):
+            follow_tail()
+        else:
+            display.scroll_end(animate=False)
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
         self._event_stream = event_stream
