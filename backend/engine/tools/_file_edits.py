@@ -792,14 +792,7 @@ def _apply_multi_edit_operation(
     )
 
 
-def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Action:
-    """Apply an atomic multi-file batch edit via :class:`AtomicRefactor`.
-
-    All edits commit together or all are rolled back from per-file backups.
-    Side effects run synchronously inside this handler (same pattern as
-    ``edit_symbols``); the returned ``MessageAction`` summarizes the outcome.
-    """
-    raw_edits = arguments.get('file_edits')
+def _validate_multi_edit_arguments(raw_edits: Any) -> None:
     if not isinstance(raw_edits, list) or not raw_edits:
         raise FunctionCallValidationError(
             "multi_edit requires a non-empty 'file_edits' array."
@@ -811,6 +804,8 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             f'(got {len(raw_edits)}). Split the batch.'
         )
 
+
+def _parse_multi_edit_items(raw_edits: list) -> list[tuple[str, str, str, dict[str, Any]]]:
     parsed: list[tuple[str, str, str, dict[str, Any]]] = []
     seen_paths: set[str] = set()
     for idx, item in enumerate(raw_edits):
@@ -828,6 +823,112 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
         seen_paths.add(canonical_path)
         operation, normalized_item = _parse_multi_edit_operation(item, idx)
         parsed.append((canonical_path, display_path, operation, normalized_item))
+    return parsed
+
+
+def _apply_multi_edit_to_temp_files(
+    parsed: list[tuple[str, str, str, dict[str, Any]]],
+    seen_paths: set[str],
+    workspace_root: str,
+    temp_root: Path,
+    temp_editor: Any,
+) -> tuple[dict[str, str | None], dict[str, str]]:
+    original_snapshots: dict[str, str | None] = {}
+    final_contents: dict[str, str] = {}
+    temp_paths: dict[str, Path] = {}
+
+    for item_path, _display_path, operation, item in parsed:
+        real_path = Path(item_path)
+        rel_path = _multi_edit_relative_path(item_path, workspace_root)
+        temp_path = temp_root / rel_path
+        if item_path not in temp_paths:
+            temp_paths[item_path] = temp_path
+            temp_path.parent.mkdir(parents=True, exist_ok=True)
+            if real_path.exists():
+                original_snapshots[item_path] = real_path.read_text(encoding='utf-8')
+                shutil.copyfile(real_path, temp_path)
+            else:
+                original_snapshots[item_path] = None
+        _apply_multi_edit_operation(
+            rel_path=rel_path,
+            temp_path=temp_path,
+            operation=operation,
+            item=item,
+            temp_editor=temp_editor,
+        )
+
+    for item_path, temp_path in temp_paths.items():
+        if not temp_path.exists():
+            _multi_edit_raise(
+                f'❌ multi_edit produced no output file for {_multi_edit_relative_path(item_path, workspace_root)}.',
+                path=_multi_edit_relative_path(item_path, workspace_root),
+            )
+        final_contents[item_path] = temp_path.read_text(encoding='utf-8')
+
+    return original_snapshots, final_contents
+
+
+def _verify_no_concurrent_modifications(
+    original_snapshots: dict[str, str | None],
+    workspace_root: str,
+) -> None:
+    for item_path, old_content in original_snapshots.items():
+        real_path = Path(item_path)
+        disk_now = (
+            real_path.read_text(encoding='utf-8')
+            if real_path.exists()
+            else None
+        )
+        if disk_now != old_content:
+            _multi_edit_raise(
+                '❌ multi_edit aborted because the file changed on disk during batch preparation. Re-read and retry.',
+                path=_multi_edit_relative_path(item_path, workspace_root),
+            )
+
+
+def _commit_multi_edit_transaction(
+    refactor: Any,
+    transaction: Any,
+    final_contents: dict[str, str],
+) -> Any:
+    for item_path, final_content in final_contents.items():
+        operation = 'modify' if Path(item_path).exists() else 'create'
+        refactor.add_file_edit(transaction, item_path, final_content, operation=operation)
+    return refactor.commit(transaction, validate=False)
+
+
+def _format_multi_edit_success(parsed: list, result: Any) -> MessageAction:
+    paths = sorted({display_path for _item_path, display_path, _operation, _item in parsed})
+    if len(paths) == 1:
+        file_lines = f'  • {paths[0]}'
+    else:
+        file_lines = '\n'.join(f'  • {p}' for p in paths)
+    return MessageAction(
+        content=(
+            f'✓ multi_edit committed {result.files_modified} file(s) atomically\n'
+            f'{file_lines}'
+        )
+    )
+
+
+def _format_multi_edit_failure(result: Any) -> None:
+    err_lines = '\n'.join(f'  - {e}' for e in (result.errors or [result.message]))
+    _multi_edit_raise(
+        f'❌ multi_edit transaction rolled back — no files modified.\n{err_lines}'
+    )
+
+
+def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Action:
+    """Apply an atomic multi-file batch edit via :class:`AtomicRefactor`.
+
+    All edits commit together or all are rolled back from per-file backups.
+    Side effects run synchronously inside this handler (same pattern as
+    ``edit_symbols``); the returned ``MessageAction`` summarizes the outcome.
+    """
+    raw_edits = arguments.get('file_edits')
+    _validate_multi_edit_arguments(raw_edits)
+    parsed = _parse_multi_edit_items(raw_edits)
+    seen_paths = {p for p, _, _, _ in parsed}
 
     try:
         from backend.core.workspace_resolution import require_effective_workspace_root
@@ -842,94 +943,26 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     refactor = AtomicRefactor()
     transaction = refactor.begin_transaction()
     try:
-        original_snapshots: dict[str, str | None] = {}
-        final_contents: dict[str, str] = {}
         with ExitStack() as stack:
             for item_path in sorted(seen_paths):
                 stack.enter_context(_file_lock_for_path(Path(item_path)))
-            with tempfile.TemporaryDirectory(
-                prefix='grinta-multi-edit-'
-            ) as temp_root_str:
+            with tempfile.TemporaryDirectory(prefix='grinta-multi-edit-') as temp_root_str:
                 temp_root = Path(temp_root_str)
                 temp_editor = FileEditor(workspace_root=str(temp_root))
-                temp_paths: dict[str, Path] = {}
-
-                for item_path, _display_path, operation, item in parsed:
-                    real_path = Path(item_path)
-                    rel_path = _multi_edit_relative_path(item_path, workspace_root)
-                    temp_path = temp_root / rel_path
-                    if item_path not in temp_paths:
-                        temp_paths[item_path] = temp_path
-                        temp_path.parent.mkdir(parents=True, exist_ok=True)
-                        if real_path.exists():
-                            original_snapshots[item_path] = real_path.read_text(
-                                encoding='utf-8'
-                            )
-                            shutil.copyfile(real_path, temp_path)
-                        else:
-                            original_snapshots[item_path] = None
-                    _apply_multi_edit_operation(
-                        rel_path=rel_path,
-                        temp_path=temp_path,
-                        operation=operation,
-                        item=item,
-                        temp_editor=temp_editor,
-                    )
-
-                for item_path, temp_path in temp_paths.items():
-                    if not temp_path.exists():
-                        _multi_edit_raise(
-                            f'❌ multi_edit produced no output file for {_multi_edit_relative_path(item_path, workspace_root)}.',
-                            path=_multi_edit_relative_path(item_path, workspace_root),
-                        )
-                    final_contents[item_path] = temp_path.read_text(encoding='utf-8')
-
-            for item_path, old_content in original_snapshots.items():
-                real_path = Path(item_path)
-                disk_now = (
-                    real_path.read_text(encoding='utf-8')
-                    if real_path.exists()
-                    else None
+                original_snapshots, final_contents = _apply_multi_edit_to_temp_files(
+                    parsed, seen_paths, workspace_root, temp_root, temp_editor,
                 )
-                if disk_now != old_content:
-                    _multi_edit_raise(
-                        '❌ multi_edit aborted because the file changed on disk during batch preparation. Re-read and retry.',
-                        path=_multi_edit_relative_path(item_path, workspace_root),
-                    )
-
-            for item_path, final_content in final_contents.items():
-                operation = 'modify' if Path(item_path).exists() else 'create'
-                refactor.add_file_edit(
-                    transaction, item_path, final_content, operation=operation
-                )
-            result = refactor.commit(transaction, validate=False)
+            _verify_no_concurrent_modifications(original_snapshots, workspace_root)
+            result = _commit_multi_edit_transaction(refactor, transaction, final_contents)
     except FunctionCallValidationError:
         raise
     except Exception as e:
-        # Best-effort rollback if commit raised before completion.
         try:
             refactor.rollback(transaction)
         except Exception:
             pass
-        _multi_edit_raise(
-            f'❌ multi_edit failed before commit: {e}. No files modified.'
-        )
+        _multi_edit_raise(f'❌ multi_edit failed before commit: {e}. No files modified.')
 
     if result.success:
-        paths = sorted(
-            {display_path for _item_path, display_path, _operation, _item in parsed}
-        )
-        if len(paths) == 1:
-            file_lines = f'  • {paths[0]}'
-        else:
-            file_lines = '\n'.join(f'  • {p}' for p in paths)
-        return MessageAction(
-            content=(
-                f'✓ multi_edit committed {result.files_modified} file(s) atomically\n'
-                f'{file_lines}'
-            )
-        )
-    err_lines = '\n'.join(f'  - {e}' for e in (result.errors or [result.message]))
-    _multi_edit_raise(
-        f'❌ multi_edit transaction rolled back — no files modified.\n{err_lines}'
-    )
+        return _format_multi_edit_success(parsed, result)
+    _format_multi_edit_failure(result)

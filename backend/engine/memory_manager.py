@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 
 from backend.context import ContextMemory
 from backend.context.compactor import Compactor
+from backend.context.compact_boundary import boundary_info, project_after_compact_boundary
+from backend.context.continuity_eval import compaction_passes_continuity_gate
 from backend.context.pre_condensation_snapshot import (
     commit_snapshot,
     delete_snapshot,
@@ -292,9 +294,8 @@ class ContextMemoryManager:
             # must NOT be deleted here: the AgentCondensationObservation from
             # that prior turn is rendered in build_messages on THIS turn, and
             # _load_restored_context_snapshot() needs the canonical file to
-            # still exist when it runs.  delete_snapshot() is called by the
-            # consumer (_load_restored_context_snapshot) after it reads the
-            # file, ensuring exactly-once delivery.
+            # still exist when it runs.  Snapshots remain durable on disk and
+            # are synced into working memory after compaction fires.
             delete_staging_snapshot()
             logger.info(
                 'ContextMemoryManager.condense_history finished with View '
@@ -305,10 +306,29 @@ class ContextMemoryManager:
             )
             return CondensedHistory(condensation_result.events, None)
 
-        # Compaction fired — promote the staged snapshot so it survives.
-        commit_snapshot()
-
         action = condensation_result.action  # type: ignore[attr-defined]
+        if isinstance(action, CondensationAction) and not self._compaction_passes_continuity_gate(
+            history, action
+        ):
+            logger.warning(
+                'Rejecting compaction: continuity gate failed; keeping current View '
+                '(history_events=%d)',
+                len(history),
+            )
+            delete_staging_snapshot()
+            if memory_pressure:
+                state.ack_memory_pressure(source='ContextMemoryManager')
+            return CondensedHistory(list(state.view.events), None)
+
+        # Compaction passed — promote the staged snapshot so it survives.
+        commit_snapshot()
+        try:
+            from backend.context.working_set import sync_snapshot_to_working_memory
+
+            sync_snapshot_to_working_memory(load_snapshot())
+        except Exception:
+            logger.debug('Post-compaction working memory sync failed', exc_info=True)
+
         if self._is_noop_condensation_action(
             action
         ) and not self._has_unhandled_condensation_request(state):
@@ -479,6 +499,40 @@ class ContextMemoryManager:
                 len(pruned_ids),
             )
 
+    @staticmethod
+    def _compaction_passes_continuity_gate(
+        history: list[Event],
+        action: CondensationAction,
+    ) -> bool:
+        if not action.summary:
+            return True
+        restored_parts = [action.summary]
+        try:
+            from backend.context.working_set import get_durable_context_block
+
+            durable = get_durable_context_block(history)
+            if durable:
+                restored_parts.append(durable)
+        except Exception:
+            logger.debug('Continuity gate durable context load failed', exc_info=True)
+        snapshot_text = ContextMemoryManager.get_restored_context()
+        if snapshot_text:
+            restored_parts.append(snapshot_text)
+        restored = '\n\n'.join(part for part in restored_parts if part.strip())
+        passed, result = compaction_passes_continuity_gate(history, restored)
+        if not passed:
+            missing = ', '.join(
+                f'{fact.category}:{fact.key[:40]}' for fact in result.missing[:8]
+            )
+            logger.warning(
+                'Compaction continuity gate failed score=%.2f matched=%d/%d missing=%s',
+                result.score,
+                result.matched,
+                result.total,
+                missing or 'none',
+            )
+        return passed
+
     def build_messages(
         self,
         condensed_history: Iterable[Event],
@@ -488,7 +542,15 @@ class ContextMemoryManager:
         if not self.conversation_memory:
             raise RuntimeError('Conversation memory is not initialized')
 
-        events = list(condensed_history)
+        events = project_after_compact_boundary(list(condensed_history))
+        info = boundary_info(list(condensed_history))
+        if info is not None:
+            logger.debug(
+                'Prompt projection after compact boundary id=%d pruned=%d post_boundary=%d',
+                info.boundary_event_id,
+                info.pruned_event_count,
+                info.post_boundary_event_count,
+            )
         window_started = time.perf_counter()
         prompt_window = select_prompt_events(events, llm_config)
         events_for_prompt = prompt_window.events

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Sequence
 from backend.core.config.compactor_config import (
     AmortizedPruningCompactorConfig,
     CompactorConfig,
+    MicrocompactCompactorConfig,
     NoOpCompactorConfig,
     ObservationMaskingCompactorConfig,
     RecentEventsCompactorConfig,
@@ -105,8 +106,8 @@ def compute_signals(events: Sequence[Event]) -> TaskSignals:
 
 # Thresholds (tunable via config in future)
 _SHORT_SESSION = 30
-_MEDIUM_SESSION = 150
-_LONG_SESSION = 400
+_MEDIUM_SESSION = 120
+_LONG_SESSION = 250
 _HIGH_ERROR_RATIO = 0.15
 
 
@@ -201,13 +202,13 @@ def select_compactor_config(
         )
         return AmortizedPruningCompactorConfig(max_size=150, keep_first=3)
 
-    # 5. Medium session → observation masking (light-weight)
+    # 5. Medium session → microcompact tool outputs (light-weight)
     if sig.total_events >= _MEDIUM_SESSION:
         logger.info(
-            'Auto-select compactor: observation_masking (medium session, %d events)',
+            'Auto-select compactor: microcompact (medium session, %d events)',
             sig.total_events,
         )
-        return ObservationMaskingCompactorConfig(attention_window=60)
+        return MicrocompactCompactorConfig(preserve_recent=80)
 
     # 6. Default — noop / fallback
     logger.info('Auto-select compactor: fallback/noop (%d events)', sig.total_events)

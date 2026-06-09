@@ -103,75 +103,105 @@ def _summarize_mcp_args(tool_name: str, args: dict[str, Any]) -> str:
     return f'[dim]{len(keys)} args[/dim]'
 
 
+def _format_mcp_result_string(result: str) -> list[str]:
+    lines = result.splitlines()[:10]
+    return [line.strip() for line in lines if line.strip()]
+
+
+def _format_mcp_result_dict_content(content: Any) -> list[str] | None:
+    if isinstance(content, list):
+        first_item = content[0] if content else None
+        if isinstance(first_item, dict):
+            text = first_item.get('text', str(first_item))
+            if text:
+                return text.splitlines()[:10]
+    elif isinstance(content, str):
+        return content.splitlines()[:10]
+    return None
+
+
+def _format_mcp_result_dict_files(files: list) -> list[str]:
+    output = [f'[{CLR_STATUS_OK}]Files ({len(files)}):[/]']
+    for f in files[:5]:
+        name = f.get('name', f.get('path', str(f)))
+        output.append(f'  [dim]· {name}[/dim]')
+    if len(files) > 5:
+        output.append(f'  [dim]... {len(files) - 5} more[/dim]')
+    return output
+
+
+def _format_mcp_result_dict_results(results: list) -> list[str]:
+    output = [f'[{CLR_STATUS_OK}]Results ({len(results)}):[/]']
+    for r in results[:5]:
+        preview = str(r).splitlines()[0] if str(r) else ''
+        if len(preview) > 60:
+            preview = preview[:57] + '…'
+        output.append(f'  [dim]· {preview}[/dim]')
+    return output
+
+
+def _format_mcp_result_dict_paths(paths: list) -> list[str]:
+    output = [f'[{CLR_STATUS_OK}]Paths ({len(paths)}):[/]']
+    for path in paths[:5]:
+        output.append(f'  [dim]· {path}[/dim]')
+    return output
+
+
+def _format_mcp_result_dict(result: dict) -> list[str]:
+    if 'content' in result:
+        formatted = _format_mcp_result_dict_content(result['content'])
+        if formatted is not None:
+            return formatted
+
+    if 'files' in result:
+        files = result['files']
+        if isinstance(files, list):
+            return _format_mcp_result_dict_files(files)
+
+    if 'results' in result:
+        results = result['results']
+        if isinstance(results, list):
+            return _format_mcp_result_dict_results(results)
+
+    if 'paths' in result:
+        paths = result['paths']
+        if isinstance(paths, list):
+            return _format_mcp_result_dict_paths(paths)
+
+    key_count = len(result)
+    return [f'[dim]{key_count} fields[/dim]']
+
+
+def _format_mcp_result_list(result: list) -> list[str]:
+    if len(result) == 0:
+        return [f'[{CLR_STATUS_OK}]✓ done[/]']
+
+    output = [f'[{CLR_STATUS_OK}]Items ({len(result)}):[/]']
+    for item in result[:5]:
+        if isinstance(item, dict):
+            name = item.get(
+                'name', item.get('title', item.get('path', str(item)[:40]))
+            )
+            output.append(f'  [dim]· {name}[/dim]')
+        elif isinstance(item, str):
+            output.append(f'  [dim]· {item[:60]}[/dim]')
+    if len(result) > 5:
+        output.append(f'  [dim]... {len(result) - 5} more[/dim]')
+    return output
+
+
 def _format_mcp_result(result: Any) -> list[Any]:
     """Format MCP result for display."""
     if result is None:
         return []
 
     if isinstance(result, str):
-        lines = result.splitlines()[:10]
-        return [line.strip() for line in lines if line.strip()]
+        return _format_mcp_result_string(result)
 
     if isinstance(result, dict):
-        if 'content' in result:
-            content = result['content']
-            if isinstance(content, list):
-                first_item = content[0] if content else None
-                if isinstance(first_item, dict):
-                    text = first_item.get('text', str(first_item))
-                    if text:
-                        return text.splitlines()[:10]
-            elif isinstance(content, str):
-                return content.splitlines()[:10]
-
-        if 'files' in result:
-            files = result['files']
-            if isinstance(files, list):
-                output = [f'[{CLR_STATUS_OK}]Files ({len(files)}):[/]']
-                for f in files[:5]:
-                    name = f.get('name', f.get('path', str(f)))
-                    output.append(f'  [dim]· {name}[/dim]')
-                if len(files) > 5:
-                    output.append(f'  [dim]... {len(files) - 5} more[/dim]')
-                return output
-
-        if 'results' in result:
-            results = result['results']
-            if isinstance(results, list):
-                output = [f'[{CLR_STATUS_OK}]Results ({len(results)}):[/]']
-                for r in results[:5]:
-                    preview = str(r).splitlines()[0] if str(r) else ''
-                    if len(preview) > 60:
-                        preview = preview[:57] + '…'
-                    output.append(f'  [dim]· {preview}[/dim]')
-                return output
-
-        if 'paths' in result:
-            paths = result['paths']
-            if isinstance(paths, list):
-                output = [f'[{CLR_STATUS_OK}]Paths ({len(paths)}):[/]']
-                for path in paths[:5]:
-                    output.append(f'  [dim]· {path}[/dim]')
-                return output
-
-        key_count = len(result)
-        return [f'[dim]{key_count} fields[/dim]']
+        return _format_mcp_result_dict(result)
 
     if isinstance(result, list):
-        if len(result) == 0:
-            return [f'[{CLR_STATUS_OK}]✓ done[/]']
-
-        output = [f'[{CLR_STATUS_OK}]Items ({len(result)}):[/]']
-        for item in result[:5]:
-            if isinstance(item, dict):
-                name = item.get(
-                    'name', item.get('title', item.get('path', str(item)[:40]))
-                )
-                output.append(f'  [dim]· {name}[/dim]')
-            elif isinstance(item, str):
-                output.append(f'  [dim]· {item[:60]}[/dim]')
-        if len(result) > 5:
-            output.append(f'  [dim]... {len(result) - 5} more[/dim]')
-        return output
+        return _format_mcp_result_list(result)
 
     return [f'[dim]{str(result)[:80]}[/dim]']

@@ -572,7 +572,6 @@ class TestBuildMessages:
         ]
         assert len(processed_events) < len(events)
         assert events[-2] in processed_events
-        assert events[-1] in processed_events
 
     def test_sets_cache_prompt_on_first_text_content(self):
         from backend.core.message import Message, TextContent

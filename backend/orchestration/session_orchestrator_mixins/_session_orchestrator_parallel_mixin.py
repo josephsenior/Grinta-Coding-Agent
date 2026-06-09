@@ -330,36 +330,89 @@ class _SessionOrchestratorParallelMixin:
 
         return bool(pending)
 
-    async def _handle_post_execution(self) -> None:
-        """Handle post-execution tasks like rate limits and memory pressure."""
-        # Memory-pressure → rate-governor feedback loop
-
+    def _apply_memory_pressure_feedback(self) -> None:
         ratio = self.memory_pressure.pressure_ratio()
-
         factor = 1.0 - (ratio * 0.75)
-
         self.rate_governor.set_memory_pressure_factor(factor)
 
-        # Check rate limits after action execution (which likely consumed tokens)
-
+    async def _check_rate_limits_post_execution(self) -> None:
         if hasattr(self.state, 'metrics'):
             await self.rate_governor.check_and_wait(
                 self.state.metrics.accumulated_token_usage
             )
-
-        # Feed LLM latency for adaptive backoff
-
         llm_lat = getattr(self.agent, '_last_llm_latency', None)
-
         if llm_lat and llm_lat > 0:
             self.rate_governor.record_llm_latency(llm_lat)
 
-        # Proactive condensation on memory pressure (deferred during batch drain)
+    def _maybe_start_memory_prewarm(self, history, history_events) -> None:
+        if (
+            not self.memory_pressure.should_prewarm(history_events=history_events)
+            or self.memory_pressure.is_prewarming
+            or self.memory_pressure.has_prewarmed
+        ):
+            return
 
-        history = getattr(self.state, 'history', None)
+        mm = getattr(self.agent, 'memory_manager', None)
+        if mm is None or getattr(mm, 'compactor', None) is None:
+            return
 
-        history_events = len(history) if history is not None else None
+        import asyncio
+        import copy as _copy_mod
 
+        compactor = mm.compactor
+        state_copy = _copy_mod.copy(self.state)
+        state_copy.history = list(history) if history else []
+        state_copy.turn_signals = _copy_mod.deepcopy(self.state.turn_signals)
+        state_copy.turn_signals.prewarm_history_len = len(state_copy.history)
+        latest = state_copy.history[-1] if state_copy.history else None
+        state_copy.turn_signals.prewarm_latest_event_id = getattr(latest, 'id', None)
+
+        async def _run_bg():
+            import inspect
+            background_compact = getattr(compactor, 'compacted_history_background', None)
+            if callable(background_compact):
+                background_result = background_compact(state_copy)
+                if inspect.isawaitable(background_result):
+                    return await background_result
+            return await compactor.compacted_history(state_copy)
+
+        self.memory_pressure.start_prewarm(_run_bg)
+        logger.debug('Kicked off background condensation pre-warm')
+
+    async def _await_prewarm_if_critical(self, level: str) -> None:
+        if level != 'CRITICAL' or not self.memory_pressure.is_prewarming:
+            return
+        logger.debug('Critical memory pressure: awaiting in-flight prewarm task...')
+        import asyncio
+        try:
+            from backend.ledger import EventSource
+            from backend.ledger.observation import StatusObservation
+            compaction_status = StatusObservation(
+                content='Compacting context...',
+                status_type='compaction',
+            )
+            self.event_stream.add_event(compaction_status, EventSource.AGENT)
+        except Exception:
+            pass
+        try:
+            if self.memory_pressure._prewarm_task:
+                await asyncio.shield(self.memory_pressure._prewarm_task)
+        except Exception as e:
+            logger.warning('Prewarm task failed during critical await: %s', e)
+
+    def _apply_prewarmed_compaction_signals(self) -> None:
+        if self.memory_pressure.has_prewarmed:
+            prewarmed = self.memory_pressure.consume_prewarmed()
+            self.state.turn_signals.prewarmed_compaction = prewarmed
+            current_history = getattr(self.state, 'history', None) or []
+            self.state.turn_signals.prewarm_history_len = len(current_history)
+            latest_event = current_history[-1] if current_history else None
+            self.state.turn_signals.prewarm_latest_event_id = getattr(latest_event, 'id', None)
+            logger.info('Injected prewarmed compaction into turn signals.')
+        else:
+            self.state.turn_signals.prewarmed_compaction = None
+
+    def _signal_memory_pressure(self, history, history_events) -> None:
         should_signal = (
             not self._draining_batch
             and self.memory_pressure.should_signal_pressure()
@@ -368,138 +421,43 @@ class _SessionOrchestratorParallelMixin:
                 or history_events >= self.memory_pressure._min_history_events
             )
         )
-        if should_signal:
-            level = 'CRITICAL' if self.memory_pressure.is_critical() else 'WARNING'
+        if not should_signal:
+            return
 
-            if (
-                self.memory_pressure.should_prewarm(history_events=history_events)
-                and not self.memory_pressure.is_prewarming
-                and not self.memory_pressure.has_prewarmed
-            ):
-                # Phase 3.11: Opportunistically pre-warm condensation in the background.
+        level = 'CRITICAL' if self.memory_pressure.is_critical() else 'WARNING'
+        self._maybe_start_memory_prewarm(history, history_events)
 
-                # Creates an isolated copy of state/history so the foreground agent
+        logger.warning(
+            'Memory pressure %s (RSS=%.0f MB) — signalling condensation',
+            level,
+            self.memory_pressure._last_rss_mb,
+        )
 
-                # can keep mutating the real state.
+        if (
+            level == 'CRITICAL'
+            and not self.memory_pressure.has_prewarmed
+            and not self.memory_pressure.is_prewarming
+        ):
+            self.memory_pressure.record_condensation()
 
-                mm = getattr(self.agent, 'memory_manager', None)
+        if hasattr(self.state, 'turn_signals'):
+            self.state.set_memory_pressure(level, source='SessionOrchestrator')
 
-                if mm is not None and getattr(mm, 'compactor', None) is not None:
-                    import asyncio
-                    import copy as _copy_mod
+    async def _handle_post_execution(self) -> None:
+        """Handle post-execution tasks like rate limits and memory pressure."""
+        self._apply_memory_pressure_feedback()
+        await self._check_rate_limits_post_execution()
 
-                    compactor = mm.compactor
+        history = getattr(self.state, 'history', None)
+        history_events = len(history) if history is not None else None
+        self._signal_memory_pressure(history, history_events)
 
-                    state_copy = _copy_mod.copy(self.state)
-
-                    state_copy.history = list(history) if history else []
-                    state_copy.turn_signals = _copy_mod.deepcopy(
-                        self.state.turn_signals
-                    )
-                    state_copy.turn_signals.prewarm_history_len = len(
-                        state_copy.history
-                    )
-                    latest = (
-                        state_copy.history[-1]
-                        if state_copy.history
-                        else None
-                    )
-                    state_copy.turn_signals.prewarm_latest_event_id = getattr(
-                        latest, 'id', None
-                    )
-
-                    async def _run_bg():
-                        import inspect
-
-                        background_compact = getattr(
-                            compactor, 'compacted_history_background', None
-                        )
-                        if callable(background_compact):
-                            background_result = background_compact(state_copy)
-                            if inspect.isawaitable(background_result):
-                                return await background_result
-                        return await compactor.compacted_history(state_copy)
-
-                    self.memory_pressure.start_prewarm(_run_bg)
-
-                    logger.debug('Kicked off background condensation pre-warm')
-
-            logger.warning(
-                'Memory pressure %s (RSS=%.0f MB) — signalling condensation',
-                level,
-                self.memory_pressure._last_rss_mb,
-            )
-
-            # Only record sync blocks as full condensations (Phase 3.14).
-
-            if (
-                level == 'CRITICAL'
-                and not self.memory_pressure.has_prewarmed
-                and not self.memory_pressure.is_prewarming
-            ):
-                self.memory_pressure.record_condensation()
-
-            # Set a metadata flag the orchestrator can check during next step()
-
-            if hasattr(self.state, 'turn_signals'):
-                # Wait for any active prewarm to finish if we hit critical
-
-                if level == 'CRITICAL' and self.memory_pressure.is_prewarming:
-                    logger.debug(
-                        'Critical memory pressure: awaiting in-flight prewarm task...'
-                    )
-
-                    import asyncio
-
-                    # Notify the TUI that compaction is blocking execution
-
-                    try:
-                        from backend.ledger import EventSource
-                        from backend.ledger.observation import StatusObservation
-
-                        compaction_status = StatusObservation(
-                            content='Compacting context...',
-                            status_type='compaction',
-                        )
-
-                        self.event_stream.add_event(
-                            compaction_status, EventSource.AGENT
-                        )
-
-                    except Exception:
-                        pass  # Never let UI notification crash the compaction path
-
-                    try:
-                        if self.memory_pressure._prewarm_task:
-                            await asyncio.shield(self.memory_pressure._prewarm_task)
-
-                    except Exception as e:
-                        logger.warning(
-                            'Prewarm task failed during critical await: %s', e
-                        )
-
-                self.state.set_memory_pressure(level, source='SessionOrchestrator')
-
-                if level == 'CRITICAL':
-                    if self.memory_pressure.has_prewarmed:
-                        prewarmed = self.memory_pressure.consume_prewarmed()
-
-                        self.state.turn_signals.prewarmed_compaction = prewarmed
-                        current_history = getattr(self.state, 'history', None) or []
-                        self.state.turn_signals.prewarm_history_len = len(
-                            current_history
-                        )
-                        latest_event = (
-                            current_history[-1] if current_history else None
-                        )
-                        self.state.turn_signals.prewarm_latest_event_id = getattr(
-                            latest_event, 'id', None
-                        )
-
-                        logger.info('Injected prewarmed compaction into turn signals.')
-
-                    else:
-                        self.state.turn_signals.prewarmed_compaction = None
+        if (
+            hasattr(self.state, 'turn_signals')
+            and self.memory_pressure.is_critical()
+        ):
+            await self._await_prewarm_if_critical('CRITICAL')
+            self._apply_prewarmed_compaction_signals()
 
     async def _run_control_flags_safely(self) -> bool:
         """Run control flags with exception handling."""

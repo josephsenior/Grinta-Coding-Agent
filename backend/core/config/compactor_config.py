@@ -14,6 +14,7 @@ from backend.core.constants import (
     DEFAULT_COMPACTOR_MAX_EVENT_LENGTH,
     DEFAULT_COMPACTOR_MAX_EVENTS,
     DEFAULT_COMPACTOR_MAX_SIZE,
+    DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
     DEFAULT_SMART_COMPACTOR_IMPORTANCE_THRESHOLD,
     DEFAULT_SMART_COMPACTOR_KEEP_FIRST,
     DEFAULT_SMART_COMPACTOR_MAX_SIZE,
@@ -40,6 +41,20 @@ class ObservationMaskingCompactorConfig(BaseModel, metaclass=CanonicalModelMetac
     attention_window: int = Field(
         default=DEFAULT_COMPACTOR_ATTENTION_WINDOW,
         description='The number of most-recent events where observations will not be masked.',
+        ge=1,
+    )
+    model_config = ConfigDict(extra='forbid')
+
+
+class MicrocompactCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
+    """Configuration for MicrocompactCompactor."""
+
+    type: Literal['microcompact'] = Field(default='microcompact')
+    preserve_recent: int = Field(
+        default=DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
+        description=(
+            'Number of most-recent events whose tool observation bodies stay intact.'
+        ),
         ge=1,
     )
     model_config = ConfigDict(extra='forbid')
@@ -143,11 +158,12 @@ class AutoCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         description='LLM config name made available to LLM-based strategies when auto-selected.',
     )
     allow_llm_hot_path: bool = Field(
-        default=False,
+        default=True,
         description=(
             'Allow normal-turn auto compaction to use LLM-backed strategies. '
-            'Disabled by default so long sessions do not add hidden LLM calls '
-            'before the main agent step; explicit condensation may still use LLM summaries.'
+            'Enabled by default for coding sessions so long runs get semantic '
+            'summaries instead of deterministic-only pruning; explicit condensation '
+            'may still use LLM summaries when this is disabled.'
         ),
     )
     model_config = ConfigDict(extra='forbid')
@@ -196,6 +212,7 @@ class SmartCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 CompactorConfig = (
     NoOpCompactorConfig
     | ObservationMaskingCompactorConfig
+    | MicrocompactCompactorConfig
     | RecentEventsCompactorConfig
     | AmortizedPruningCompactorConfig
     | StructuredSummaryCompactorConfig
@@ -277,6 +294,7 @@ def create_compactor_config(compactor_type: str, data: dict) -> CompactorConfig:
     compactor_classes = {
         'noop': NoOpCompactorConfig,
         'observation_masking': ObservationMaskingCompactorConfig,
+        'microcompact': MicrocompactCompactorConfig,
         'recent': RecentEventsCompactorConfig,
         'amortized': AmortizedPruningCompactorConfig,
         'structured': StructuredSummaryCompactorConfig,

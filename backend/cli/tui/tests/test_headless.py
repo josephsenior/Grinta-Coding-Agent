@@ -3416,7 +3416,7 @@ async def test_transcript_skips_mount_animation_during_streaming(mock_config):
         display._suppress_mount_animation = True
         widget = Static('quiet mount')
         display.append_widget(widget)
-        assert widget.styles.offset == (0, 0)
+        assert float(widget.styles.offset.y.value) == 0.0
 
 
 @pytest.mark.asyncio
@@ -3430,29 +3430,41 @@ async def test_handle_input_releases_lock_during_dispatch(mock_config, monkeypat
         def get_agent_state(self):
             return AgentState.RUNNING
 
-    async def fake_bootstrap(self, session_id=None):
-        self._controller = FakeController()
+    class FakeRenderer:
+        async def drain_events_async(self) -> None:
+            return None
 
-    async def slow_dispatch(self, text: str) -> None:
+        def flush_live_ui(self, *, terminal: bool = False) -> None:
+            return None
+
+    async def slow_dispatch(text: str) -> None:
         dispatch_started.set()
         await dispatch_continue.wait()
 
-    monkeypatch.setattr(GrintaScreen, '_bootstrap', fake_bootstrap)
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    monkeypatch.setattr(GrintaScreen, 'add_user_message', lambda self, text: None)
+    monkeypatch.setattr(GrintaScreen, '_scroll_to_bottom', lambda self: None)
+    monkeypatch.setattr(GrintaScreen, '_render_hud_bar', lambda self: None)
+    monkeypatch.setattr(GrintaScreen, 'finalize_thinking', lambda self: None)
+    monkeypatch.setattr(GrintaScreen, 'add_error', lambda self, text: None)
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
 
     async with app.run_test(size=(120, 36)) as pilot:
         await pilot.pause()
 
         s = _get_screen(app)
+        s._controller = FakeController()
+        s._renderer = FakeRenderer()
+        s._renderer._event_stream = None
         s._dispatch_to_agent = slow_dispatch  # type: ignore[method-assign]
 
         task = asyncio.create_task(s._handle_input('hello'))
-        await dispatch_started.wait()
+        await asyncio.wait_for(dispatch_started.wait(), timeout=10)
         assert s._turn_in_flight is True
         assert not s._input_lock.locked()
 
         dispatch_continue.set()
-        await task
+        await asyncio.wait_for(task, timeout=10)
         assert s._turn_in_flight is False
 
 

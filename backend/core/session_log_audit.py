@@ -91,119 +91,137 @@ def format_line(obj: dict) -> str:
     return f'{ts} [{level}] {msg}{suffix}'
 
 
-def analyze_session(
-    log_path: Path,
-    stripped_path: Path,
-    report_path: Path,
-) -> SessionAuditResult:
-    total = 0
-    kept = 0
-    stripped = 0
-    levels = Counter()
-    issue_lines: list[str] = []
-    state_transitions: list[tuple[str, str, str, int]] = []
-    actions: list[tuple[str, str, int]] = []
-    llm_calls: list[tuple[float, str, int]] = []
-    file_events: list[tuple[str, str, int]] = []
+@dataclass
+class _AuditAccumulator:
+    total: int = 0
+    kept: int = 0
+    stripped: int = 0
+    levels: Counter = None
+    issue_lines: list = None
+    state_transitions: list = None
+    actions: list = None
+    llm_calls: list = None
+    file_events: list = None
     end_state: str | None = None
     first_ts: datetime | None = None
     last_ts: datetime | None = None
-    pending_timeouts = 0
-    retries = 0
-    on_event_types = Counter()
+    pending_timeouts: int = 0
+    retries: int = 0
+    on_event_types: Counter = None
 
-    with log_path.open(encoding='utf-8', errors='replace') as src, stripped_path.open(
-        'w', encoding='utf-8'
-    ) as out:
-        for line_no, line in enumerate(src, 1):
-            total += 1
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                out.write(f'# L{line_no} (non-json) {line}\n')
-                kept += 1
-                continue
+    def __post_init__(self):
+        if self.levels is None:
+            self.levels = Counter()
+        if self.issue_lines is None:
+            self.issue_lines = []
+        if self.state_transitions is None:
+            self.state_transitions = []
+        if self.actions is None:
+            self.actions = []
+        if self.llm_calls is None:
+            self.llm_calls = []
+        if self.file_events is None:
+            self.file_events = []
+        if self.on_event_types is None:
+            self.on_event_types = Counter()
 
-            msg = obj.get('message', '')
-            level = obj.get('level', 'INFO')
-            levels[level] += 1
 
-            ts = parse_ts(obj.get('timestamp') or obj.get('asctime'))
-            if ts:
-                first_ts = first_ts or ts
-                last_ts = ts
+def _process_log_line(
+    line_no: int,
+    line: str,
+    acc: _AuditAccumulator,
+    out,
+) -> None:
+    acc.total += 1
+    line = line.strip()
+    if not line:
+        return
+    try:
+        obj = json.loads(line)
+    except json.JSONDecodeError:
+        out.write(f'# L{line_no} (non-json) {line}\n')
+        acc.kept += 1
+        return
 
-            if is_noise(msg):
-                stripped += 1
-                continue
+    msg = obj.get('message', '')
+    level = obj.get('level', 'INFO')
+    acc.levels[level] += 1
 
-            kept += 1
-            out.write(format_line(obj) + '\n')
+    ts = parse_ts(obj.get('timestamp') or obj.get('asctime'))
+    if ts:
+        acc.first_ts = acc.first_ts or ts
+        acc.last_ts = ts
 
-            if is_issue(level, msg):
-                issue_lines.append(f'L{line_no}: {format_line(obj)}')
+    if is_noise(msg):
+        acc.stripped += 1
+        return
 
-            m = STATE_RE.search(msg)
-            if m:
-                state_transitions.append((m.group(1), m.group(2), msg, line_no))
-                end_state = m.group(2)
+    acc.kept += 1
+    out.write(format_line(obj) + '\n')
 
-            m = ACTION_RE.search(msg)
-            if m:
-                actions.append((m.group(1), msg, line_no))
+    if is_issue(level, msg):
+        acc.issue_lines.append(f'L{line_no}: {format_line(obj)}')
 
-            m = LLM_DONE_RE.search(msg)
-            if m:
-                llm_calls.append((float(m.group(1)), msg, line_no))
+    m = STATE_RE.search(msg)
+    if m:
+        acc.state_transitions.append((m.group(1), m.group(2), msg, line_no))
+        acc.end_state = m.group(2)
 
-            m = FILE_EVENT_RE.search(msg)
-            if m:
-                file_events.append((m.group(1) + m.group(2), msg[:120], line_no))
+    m = ACTION_RE.search(msg)
+    if m:
+        acc.actions.append((m.group(1), msg, line_no))
 
-            if 'on_event received ' in msg and 'StreamingChunkAction' not in msg:
-                evt = msg.split('on_event received ', 1)[-1].split(' (id=', 1)[0]
-                on_event_types[evt] += 1
+    m = LLM_DONE_RE.search(msg)
+    if m:
+        acc.llm_calls.append((float(m.group(1)), msg, line_no))
 
-            if re.search(r'pending action timed out', msg, re.I):
-                pending_timeouts += 1
-            if re.search(r'\bretry\b|\bbackoff\b|recover', msg, re.I):
-                retries += 1
+    m = FILE_EVENT_RE.search(msg)
+    if m:
+        acc.file_events.append((m.group(1) + m.group(2), msg[:120], line_no))
 
+    if 'on_event received ' in msg and 'StreamingChunkAction' not in msg:
+        evt = msg.split('on_event received ', 1)[-1].split(' (id=', 1)[0]
+        acc.on_event_types[evt] += 1
+
+    if re.search(r'pending action timed out', msg, re.I):
+        acc.pending_timeouts += 1
+    if re.search(r'\bretry\b|\bbackoff\b|recover', msg, re.I):
+        acc.retries += 1
+
+
+def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
     duration_min = 0.0
-    if first_ts and last_ts:
-        duration_min = (last_ts - first_ts).total_seconds() / 60.0
+    if acc.first_ts and acc.last_ts:
+        duration_min = (acc.last_ts - acc.first_ts).total_seconds() / 60.0
 
-    llm_times = [t for t, _, _ in llm_calls]
-    slow_llm = [(t, ln, m) for t, m, ln in llm_calls if t >= 60.0]
+    llm_times = [t for t, _, _ in acc.llm_calls]
+    slow_llm = [(t, ln, m) for t, m, ln in acc.llm_calls if t >= 60.0]
 
     suspicious_states = [
         (a, b, m, ln)
-        for a, b, m, ln in state_transitions
+        for a, b, m, ln in acc.state_transitions
         if b in {'ERROR', 'STOPPED'} or (a == 'ERROR' and b != 'AWAITING_USER_INPUT')
     ]
 
     verdict = 'CLEAN'
     notes: list[str] = []
-    if end_state == 'FINISHED':
+    if acc.end_state == 'FINISHED':
         notes.append('Session ended in FINISHED (success).')
-    elif end_state == 'AWAITING_USER_INPUT':
+    elif acc.end_state == 'AWAITING_USER_INPUT':
         notes.append('Session ended awaiting user input (normal idle).')
-    elif end_state in {'ERROR', 'STOPPED'}:
+    elif acc.end_state in {'ERROR', 'STOPPED'}:
         verdict = 'ISSUES FOUND'
-        notes.append(f'Session ended in {end_state}.')
+        notes.append(f'Session ended in {acc.end_state}.')
 
-    if pending_timeouts:
+    if acc.pending_timeouts:
         verdict = 'ISSUES FOUND'
-        notes.append(f'{pending_timeouts} pending-action timeout(s) detected.')
+        notes.append(f'{acc.pending_timeouts} pending-action timeout(s) detected.')
     if suspicious_states:
         verdict = 'ISSUES FOUND'
         notes.append(f'{len(suspicious_states)} error/stop state transition(s).')
 
-    warn_count = levels.get('WARNING', 0)
-    err_count = levels.get('ERROR', 0) + levels.get('CRITICAL', 0)
+    warn_count = acc.levels.get('WARNING', 0)
+    err_count = acc.levels.get('ERROR', 0) + acc.levels.get('CRITICAL', 0)
     if err_count:
         verdict = 'ISSUES FOUND'
         notes.append(f'{err_count} ERROR/CRITICAL log line(s).')
@@ -213,110 +231,184 @@ def analyze_session(
         verdict = 'REVIEW'
         notes.append(f'{warn_count} WARNING(s) — worth scanning.')
 
-    with report_path.open('w', encoding='utf-8') as rep:
-        rep.write('SESSION LOG AUDIT\n')
-        rep.write('=' * 72 + '\n')
-        rep.write(f'Source: {log_path}\n')
-        rep.write(f'Stripped log: {stripped_path}\n')
-        rep.write(f'Total lines: {total:,}\n')
+    return verdict, notes, duration_min, llm_times, slow_llm, suspicious_states
+
+
+def _write_report_header(rep, acc: _AuditAccumulator, log_path: Path, stripped_path: Path) -> None:
+    rep.write('SESSION LOG AUDIT\n')
+    rep.write('=' * 72 + '\n')
+    rep.write(f'Source: {log_path}\n')
+    rep.write(f'Stripped log: {stripped_path}\n')
+    rep.write(f'Total lines: {acc.total:,}\n')
+    rep.write(
+        f'Stripped (noise): {acc.stripped:,} ({100 * acc.stripped / max(acc.total, 1):.1f}%)\n'
+    )
+    rep.write(f'Kept lines: {acc.kept:,}\n')
+    if acc.first_ts and acc.last_ts:
+        duration_min = (acc.last_ts - acc.first_ts).total_seconds() / 60.0
         rep.write(
-            f'Stripped (noise): {stripped:,} ({100 * stripped / max(total, 1):.1f}%)\n'
+            f'Duration: {duration_min:.1f} min '
+            f'({acc.first_ts.isoformat()} -> {acc.last_ts.isoformat()})\n'
         )
-        rep.write(f'Kept lines: {kept:,}\n')
-        if first_ts and last_ts:
-            rep.write(
-                f'Duration: {duration_min:.1f} min '
-                f'({first_ts.isoformat()} -> {last_ts.isoformat()})\n'
-            )
-        rep.write(f'Final agent state: {end_state or "unknown"}\n')
-        rep.write('\n')
+    rep.write(f'Final agent state: {acc.end_state or "unknown"}\n')
+    rep.write('\n')
 
-        rep.write('LEVEL COUNTS (all lines)\n')
-        rep.write('-' * 40 + '\n')
-        for lvl, cnt in levels.most_common():
-            rep.write(f'  {lvl}: {cnt:,}\n')
-        rep.write('\n')
 
-        rep.write('HEALTH SIGNALS\n')
-        rep.write('-' * 40 + '\n')
-        rep.write(f'  Pending action timeouts: {pending_timeouts}\n')
-        rep.write(f'  Retry/recovery mentions: {retries}\n')
-        rep.write(f'  LLM calls completed: {len(llm_calls)}\n')
-        if llm_times:
-            rep.write(
-                f'  LLM latency — min={min(llm_times):.1f}s '
-                f'median={sorted(llm_times)[len(llm_times) // 2]:.1f}s '
-                f'max={max(llm_times):.1f}s\n'
-            )
-        rep.write(f'  File operations logged: {len(file_events)}\n')
-        rep.write(f'  Agent actions obtained: {len(actions)}\n')
-        rep.write('\n')
+def _write_report_level_counts(rep, acc: _AuditAccumulator) -> None:
+    rep.write('LEVEL COUNTS (all lines)\n')
+    rep.write('-' * 40 + '\n')
+    for lvl, cnt in acc.levels.most_common():
+        rep.write(f'  {lvl}: {cnt:,}\n')
+    rep.write('\n')
 
-        rep.write(f'VERDICT: {verdict}\n')
-        for note in notes:
-            rep.write(f'  • {note}\n')
-        rep.write('\n')
 
-        if issue_lines:
-            rep.write(f'ISSUES / WARNINGS ({len(issue_lines)} lines)\n')
-            rep.write('-' * 40 + '\n')
-            for item in issue_lines[:200]:
-                rep.write(item + '\n')
-            if len(issue_lines) > 200:
-                rep.write(f'... and {len(issue_lines) - 200} more\n')
-            rep.write('\n')
+def _write_report_health_signals(rep, acc: _AuditAccumulator, llm_times: list) -> None:
+    rep.write('HEALTH SIGNALS\n')
+    rep.write('-' * 40 + '\n')
+    rep.write(f'  Pending action timeouts: {acc.pending_timeouts}\n')
+    rep.write(f'  Retry/recovery mentions: {acc.retries}\n')
+    rep.write(f'  LLM calls completed: {len(acc.llm_calls)}\n')
+    if llm_times:
+        rep.write(
+            f'  LLM latency — min={min(llm_times):.1f}s '
+            f'median={sorted(llm_times)[len(llm_times) // 2]:.1f}s '
+            f'max={max(llm_times):.1f}s\n'
+        )
+    rep.write(f'  File operations logged: {len(acc.file_events)}\n')
+    rep.write(f'  Agent actions obtained: {len(acc.actions)}\n')
+    rep.write('\n')
 
-        if suspicious_states:
-            rep.write('SUSPICIOUS STATE TRANSITIONS\n')
-            rep.write('-' * 40 + '\n')
-            for a, b, m, ln in suspicious_states:
-                rep.write(f'L{ln}: {a} -> {b}\n')
-            rep.write('\n')
 
-        if slow_llm:
-            rep.write(f'SLOW LLM CALLS (>=60s) — {len(slow_llm)}\n')
-            rep.write('-' * 40 + '\n')
-            for t, ln, m in sorted(slow_llm, reverse=True)[:30]:
-                rep.write(f'L{ln}: {t:.1f}s\n')
-            rep.write('\n')
+def _write_report_verdict(rep, verdict: str, notes: list[str]) -> None:
+    rep.write(f'VERDICT: {verdict}\n')
+    for note in notes:
+        rep.write(f'  • {note}\n')
+    rep.write('\n')
 
-        rep.write('STATE TRANSITION TIMELINE (deduped consecutive)\n')
-        rep.write('-' * 40 + '\n')
-        last_pair = None
-        for a, b, _, ln in state_transitions:
-            pair = (a, b)
-            if pair != last_pair:
-                rep.write(f'L{ln}: {a} -> {b}\n')
-                last_pair = pair
-        rep.write('\n')
 
-        rep.write('TOP NON-CHUNK EVENT TYPES\n')
-        rep.write('-' * 40 + '\n')
-        for evt, cnt in on_event_types.most_common(25):
-            rep.write(f'  {cnt:5d}  {evt}\n')
-        rep.write('\n')
+def _write_report_issues(rep, acc: _AuditAccumulator) -> None:
+    if not acc.issue_lines:
+        return
+    rep.write(f'ISSUES / WARNINGS ({len(acc.issue_lines)} lines)\n')
+    rep.write('-' * 40 + '\n')
+    for item in acc.issue_lines[:200]:
+        rep.write(item + '\n')
+    if len(acc.issue_lines) > 200:
+        rep.write(f'... and {len(acc.issue_lines) - 200} more\n')
+    rep.write('\n')
 
-        rep.write('ACTION TYPE BREAKDOWN\n')
-        rep.write('-' * 40 + '\n')
-        action_counts = Counter(a for a, _, _ in actions)
-        for act, cnt in action_counts.most_common():
-            rep.write(f'  {cnt:4d}  {act}\n')
-        rep.write('\n')
 
-        if file_events:
-            rep.write(f'FILE EVENTS (first 40 of {len(file_events)})\n')
-            rep.write('-' * 40 + '\n')
-            for kind, msg, ln in file_events[:40]:
-                rep.write(f'L{ln} [{kind}] {msg}\n')
-            rep.write('\n')
+def _write_report_suspicious_states(rep, suspicious_states: list) -> None:
+    if not suspicious_states:
+        return
+    rep.write('SUSPICIOUS STATE TRANSITIONS\n')
+    rep.write('-' * 40 + '\n')
+    for a, b, m, ln in suspicious_states:
+        rep.write(f'L{ln}: {a} -> {b}\n')
+    rep.write('\n')
+
+
+def _write_report_slow_llm(rep, slow_llm: list) -> None:
+    if not slow_llm:
+        return
+    rep.write(f'SLOW LLM CALLS (>=60s) — {len(slow_llm)}\n')
+    rep.write('-' * 40 + '\n')
+    for t, ln, m in sorted(slow_llm, reverse=True)[:30]:
+        rep.write(f'L{ln}: {t:.1f}s\n')
+    rep.write('\n')
+
+
+def _write_report_state_timeline(rep, acc: _AuditAccumulator) -> None:
+    rep.write('STATE TRANSITION TIMELINE (deduped consecutive)\n')
+    rep.write('-' * 40 + '\n')
+    last_pair = None
+    for a, b, _, ln in acc.state_transitions:
+        pair = (a, b)
+        if pair != last_pair:
+            rep.write(f'L{ln}: {a} -> {b}\n')
+            last_pair = pair
+    rep.write('\n')
+
+
+def _write_report_event_types(rep, acc: _AuditAccumulator) -> None:
+    rep.write('TOP NON-CHUNK EVENT TYPES\n')
+    rep.write('-' * 40 + '\n')
+    for evt, cnt in acc.on_event_types.most_common(25):
+        rep.write(f'  {cnt:5d}  {evt}\n')
+    rep.write('\n')
+
+
+def _write_report_action_breakdown(rep, acc: _AuditAccumulator) -> None:
+    rep.write('ACTION TYPE BREAKDOWN\n')
+    rep.write('-' * 40 + '\n')
+    action_counts = Counter(a for a, _, _ in acc.actions)
+    for act, cnt in action_counts.most_common():
+        rep.write(f'  {cnt:4d}  {act}\n')
+    rep.write('\n')
+
+
+def _write_report_file_events(rep, acc: _AuditAccumulator) -> None:
+    if not acc.file_events:
+        return
+    rep.write(f'FILE EVENTS (first 40 of {len(acc.file_events)})\n')
+    rep.write('-' * 40 + '\n')
+    for kind, msg, ln in acc.file_events[:40]:
+        rep.write(f'L{ln} [{kind}] {msg}\n')
+    rep.write('\n')
+
+
+def _write_report(
+    rep,
+    acc: _AuditAccumulator,
+    log_path: Path,
+    stripped_path: Path,
+    verdict: str,
+    notes: list[str],
+    llm_times: list,
+    slow_llm: list,
+    suspicious_states: list,
+) -> None:
+    _write_report_header(rep, acc, log_path, stripped_path)
+    _write_report_level_counts(rep, acc)
+    _write_report_health_signals(rep, acc, llm_times)
+    _write_report_verdict(rep, verdict, notes)
+    _write_report_issues(rep, acc)
+    _write_report_suspicious_states(rep, suspicious_states)
+    _write_report_slow_llm(rep, slow_llm)
+    _write_report_state_timeline(rep, acc)
+    _write_report_event_types(rep, acc)
+    _write_report_action_breakdown(rep, acc)
+    _write_report_file_events(rep, acc)
+
+
+def analyze_session(
+    log_path: Path,
+    stripped_path: Path,
+    report_path: Path,
+) -> SessionAuditResult:
+    acc = _AuditAccumulator()
+
+    with log_path.open(encoding='utf-8', errors='replace') as src, stripped_path.open(
+        'w', encoding='utf-8'
+    ) as out:
+        for line_no, line in enumerate(src, 1):
+            _process_log_line(line_no, line, acc, out)
+
+    verdict, notes, duration_min, llm_times, slow_llm, suspicious_states = _compute_verdict(acc)
+
+    with report_path.open('w', encoding='utf-8') as rep:
+        _write_report(
+            rep, acc, log_path, stripped_path, verdict, notes,
+            llm_times, slow_llm, suspicious_states,
+        )
 
     return SessionAuditResult(
         log_path=log_path,
         stripped_path=stripped_path,
         report_path=report_path,
-        total_lines=total,
-        kept_lines=kept,
-        stripped_lines=stripped,
+        total_lines=acc.total,
+        kept_lines=acc.kept,
+        stripped_lines=acc.stripped,
         verdict=verdict,
     )
 

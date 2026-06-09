@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from backend.context.continuity_eval import (
     build_continuity_facts,
+    compaction_passes_continuity_gate,
     evaluate_restored_context,
 )
 from backend.context.pre_condensation_snapshot import (
@@ -63,6 +64,27 @@ def test_continuity_eval_passes_for_formatted_snapshot():
         'failed_outcome',
         'error',
     } <= categories
+
+
+def test_compaction_continuity_gate_blocks_missing_test_result():
+    events = _coding_session_events()
+    restored = format_snapshot_for_injection(extract_snapshot(events))
+    restored = restored.replace('python -m pytest backend/tests/unit/context -q', '')
+
+    passed, result = compaction_passes_continuity_gate(events, restored)
+
+    assert not passed
+    assert any(f.category == 'test_result' for f in result.missing)
+
+
+def test_compaction_continuity_gate_passes_for_complete_snapshot():
+    events = _coding_session_events()
+    restored = format_snapshot_for_injection(extract_snapshot(events))
+
+    passed, result = compaction_passes_continuity_gate(events, restored)
+
+    assert passed
+    assert result.passed
 
 
 def test_continuity_eval_reports_missing_semantic_fact():
