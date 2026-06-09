@@ -421,44 +421,50 @@ _EXT_TO_LEXER: dict[str, str] = {
 }
 
 
-def _guess_lexer_from_content(content: str) -> str | None:
-    """Simple heuristic to guess lexer from file content."""
-    # Check for shebang
-    lines = content.split('\n')[:3]
+_SHEBANG_PATTERNS: list[tuple[str, str]] = [
+    ('python', 'python'),
+    ('node', 'javascript'),
+    ('bash', 'bash'),
+    ('sh', 'bash'),
+    ('ruby', 'ruby'),
+    ('perl', 'perl'),
+    ('php', 'php'),
+]
+
+_CONTENT_PATTERNS: list[tuple[tuple[str, ...], str]] = [
+    (('import ', 'from '), 'python'),
+    (('function ', '{'), 'javascript'),
+    (('def ', ':'), 'python'),
+    (('package ', 'func '), 'go'),
+    (('fn main',), 'rust'),
+    (('public class',), 'java'),
+    (('<html', '<div'), 'html'),
+    (('{', ':'), 'json'),
+]
+
+
+def _guess_lexer_from_shebang(lines: list[str]) -> str | None:
     for line in lines:
         if line.startswith('#!'):
-            if 'python' in line:
-                return 'python'
-            if 'node' in line:
-                return 'javascript'
-            if 'bash' in line or 'sh' in line:
-                return 'bash'
-            if 'ruby' in line:
-                return 'ruby'
-            if 'perl' in line:
-                return 'perl'
-            if 'php' in line:
-                return 'php'
-
-    # Check for common patterns
-    if 'import ' in content and 'from ' in content:
-        return 'python'
-    if 'function ' in content and '{' in content:
-        return 'javascript'
-    if 'def ' in content and ':' in content:
-        return 'python'
-    if 'package ' in content and 'func ' in content:
-        return 'go'
-    if 'fn main' in content:
-        return 'rust'
-    if 'public class' in content:
-        return 'java'
-    if '<html' in content or '<div' in content:
-        return 'html'
-    if '{' in content and ':' in content:
-        return 'json'
-
+            for pattern, lexer in _SHEBANG_PATTERNS:
+                if pattern in line:
+                    return lexer
     return None
+
+
+def _guess_lexer_from_content_patterns(content: str) -> str | None:
+    for patterns, lexer in _CONTENT_PATTERNS:
+        if all(p in content for p in patterns):
+            return lexer
+    return None
+
+
+def _guess_lexer_from_content(content: str) -> str | None:
+    """Simple heuristic to guess lexer from file content."""
+    lines = content.split('\n')[:3]
+    if lexer := _guess_lexer_from_shebang(lines):
+        return lexer
+    return _guess_lexer_from_content_patterns(content)
 
 
 def _coerce_tool_args(arguments: Any) -> dict[str, Any]:

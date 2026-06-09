@@ -507,6 +507,125 @@ class _AppScreenLifecycleMixin:
                 self._agent_task,
             )
 
+    async def _poll_for_agent_completion(
+        self,
+        end_states: set[AgentState],
+        started_at: float,
+    ) -> AgentState:
+        loop_count = 0
+        last_progress_at = started_at
+        last_event_count = 0
+        last_state = None
+        stale_poll_count = 0
+        STALE_POLL_THRESHOLD = 120
+
+        while True:
+            try:
+                if self._renderer is not None:
+                    await self._renderer.wait_for_activity(wait_timeout_sec=0.5)
+                else:
+                    await asyncio.sleep(0.5)
+                loop_count += 1
+                state = self._controller.get_agent_state()
+
+                current_event_count = 0
+                try:
+                    current_event_count = self._event_stream.get_latest_event_id()
+                except Exception:
+                    pass
+
+                progress_made = False
+                if current_event_count != last_event_count:
+                    progress_made = True
+                    stale_poll_count = 0
+                    last_event_count = current_event_count
+                else:
+                    stale_poll_count += 1
+
+                if state != last_state:
+                    progress_made = True
+                    last_state = state
+
+                if progress_made:
+                    last_progress_at = _time.monotonic()
+
+                if (
+                    stale_poll_count > 0
+                    and stale_poll_count % STALE_POLL_THRESHOLD == 0
+                    and state == AgentState.RUNNING
+                ):
+                    _tui_logger.debug(
+                        '_dispatch_to_agent: %d consecutive polls with no new events '
+                        'in RUNNING state (LLM may be thinking silently; '
+                        'no-step-progress watchdog will recover true stalls)',
+                        stale_poll_count,
+                    )
+
+                elapsed_since_progress = _time.monotonic() - last_progress_at
+                if (
+                    DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS > 0
+                    and elapsed_since_progress > DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS
+                ):
+                    total_elapsed = _time.monotonic() - started_at
+                    _tui_logger.error(
+                        '_dispatch_to_agent: TIMEOUT after %.0fs since last progress '
+                        '(%.0fs total, poll #%d, state=%s) — forcing ERROR to break stall',
+                        elapsed_since_progress,
+                        total_elapsed,
+                        loop_count,
+                        state,
+                    )
+                    logger.error(
+                        '[TUI] _dispatch_to_agent: STALL TIMEOUT after %.0fs since last progress '
+                        '(%.0fs total, poll #%d, state=%s). '
+                        'This usually indicates the _step_pending race condition. '
+                        'Forcing ERROR state.',
+                        elapsed_since_progress,
+                        total_elapsed,
+                        loop_count,
+                        state,
+                        extra={'msg_type': 'TUI_DISPATCH_STALL_TIMEOUT'},
+                    )
+                    try:
+                        await self._controller.set_agent_state_to(AgentState.ERROR)
+                    except Exception:
+                        pass
+                    state = AgentState.ERROR
+                    break
+
+                if loop_count == 1 or loop_count % 20 == 0:
+                    _tui_logger.debug(
+                        f'_dispatch_to_agent: poll #{loop_count}, state={state}'
+                    )
+                    logger.info(
+                        '[TUI] _dispatch_to_agent: poll #%d, state=%s',
+                        loop_count,
+                        state,
+                    )
+                if state in end_states:
+                    _tui_logger.debug(
+                        f'_dispatch_to_agent: reached end state {state}'
+                    )
+                    logger.info(
+                        '[TUI] _dispatch_to_agent: reached end state %s', state
+                    )
+                    break
+                if self._agent_task and self._agent_task.done():
+                    _tui_logger.debug(
+                        f'_dispatch_to_agent: agent task done, state={state}'
+                    )
+                    logger.info(
+                        '[TUI] _dispatch_to_agent: agent task done, state=%s', state
+                    )
+                    break
+            except Exception as exc:
+                _tui_logger.debug(
+                    f'_dispatch_to_agent: poll loop EXCEPTION {type(exc).__name__}: {exc}'
+                )
+                raise
+
+        return state
+
     async def _dispatch_to_agent(self, text: str) -> None:
         _tui_logger.debug('_dispatch_to_agent: ENTER')
         if self._controller is None or self._event_stream is None:
@@ -546,144 +665,15 @@ class _AppScreenLifecycleMixin:
                 f'_dispatch_to_agent: end_states FAILED: {type(exc).__name__}: {exc}'
             )
             raise
-        loop_count = 0
-        _started_at = _time.monotonic()
-        _last_progress_at = _started_at
-        _last_event_count = 0
-        _last_state = None
-        _stale_poll_count = 0
-        # True stalls are detected by the no-step-progress watchdog in
-        # SessionOrchestrator's circuit breaker (record_step_call), which
-        # fires after 120s of no step() calls.  The TUI's poll loop emits a
-        # less aggressive debug heartbeat every 60s so operators can see the
-        # agent is still being polled even when the LLM is thinking silently
-        # (10–60s of quiet is normal for big LLM responses).
-        _STALE_POLL_THRESHOLD = 120
+
+        started_at = _time.monotonic()
         while True:
-            _tui_logger.debug('_dispatch_to_agent: entering poll loop')
-            while True:
-                try:
-                    if self._renderer is not None:
-                        await self._renderer.wait_for_activity(wait_timeout_sec=0.5)
-                    else:
-                        await asyncio.sleep(0.5)
-                    loop_count += 1
-                    state = self._controller.get_agent_state()
-
-                    current_event_count = 0
-                    try:
-                        current_event_count = self._event_stream.get_latest_event_id()
-                    except Exception:
-                        pass
-
-                    # Track progress: new events or state changes reset the stall timer
-                    _progress_made = False
-                    if current_event_count != _last_event_count:
-                        _progress_made = True
-                        _stale_poll_count = 0
-                        _last_event_count = current_event_count
-                    else:
-                        _stale_poll_count += 1
-
-                    if state != _last_state:
-                        _progress_made = True
-                        _last_state = state
-
-                    if _progress_made:
-                        _last_progress_at = _time.monotonic()
-
-                    if (
-                        _stale_poll_count > 0
-                        and _stale_poll_count % _STALE_POLL_THRESHOLD == 0
-                        and state == AgentState.RUNNING
-                    ):
-                        # Demoted from WARNING to DEBUG: the no-step-progress
-                        # watchdog in the circuit breaker is the authoritative
-                        # stall detector.  Calling schedule_step_soon() here is
-                        # a no-op when the agent's _step_task is already alive
-                        # (which it is during a normal LLM call), so emitting a
-                        # WARNING every 10s was pure log spam during routine
-                        # long LLM thinking (10–60s of silent streaming).
-                        _tui_logger.debug(
-                            '_dispatch_to_agent: %d consecutive polls with no new events '
-                            'in RUNNING state (LLM may be thinking silently; '
-                            'no-step-progress watchdog will recover true stalls)',
-                            _stale_poll_count,
-                        )
-
-                    # Hard timeout: measures time since last PROGRESS, not total
-                    # elapsed time. This prevents false stalls when the agent is
-                    # actively working (streaming LLM, executing commands) for
-                    # extended periods.
-                    _elapsed_since_progress = _time.monotonic() - _last_progress_at
-                    if (
-                        DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS > 0
-                        and _elapsed_since_progress
-                        > DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS
-                    ):
-                        _total_elapsed = _time.monotonic() - _started_at
-                        _tui_logger.error(
-                            '_dispatch_to_agent: TIMEOUT after %.0fs since last progress '
-                            '(%.0fs total, poll #%d, state=%s) — forcing ERROR to break stall',
-                            _elapsed_since_progress,
-                            _total_elapsed,
-                            loop_count,
-                            state,
-                        )
-                        logger.error(
-                            '[TUI] _dispatch_to_agent: STALL TIMEOUT after %.0fs since last progress '
-                            '(%.0fs total, poll #%d, state=%s). '
-                            'This usually indicates the _step_pending race condition. '
-                            'Forcing ERROR state.',
-                            _elapsed_since_progress,
-                            _total_elapsed,
-                            loop_count,
-                            state,
-                            extra={'msg_type': 'TUI_DISPATCH_STALL_TIMEOUT'},
-                        )
-                        try:
-                            await self._controller.set_agent_state_to(
-                                AgentState.ERROR
-                            )
-                        except Exception:
-                            pass
-                        state = AgentState.ERROR
-                        break
-
-                    if loop_count == 1 or loop_count % 20 == 0:
-                        _tui_logger.debug(
-                            f'_dispatch_to_agent: poll #{loop_count}, state={state}'
-                        )
-                        logger.info(
-                            '[TUI] _dispatch_to_agent: poll #%d, state=%s',
-                            loop_count,
-                            state,
-                        )
-                    if state in end_states:
-                        _tui_logger.debug(
-                            f'_dispatch_to_agent: reached end state {state}'
-                        )
-                        logger.info(
-                            '[TUI] _dispatch_to_agent: reached end state %s', state
-                        )
-                        break
-                    if self._agent_task and self._agent_task.done():
-                        _tui_logger.debug(
-                            f'_dispatch_to_agent: agent task done, state={state}'
-                        )
-                        logger.info(
-                            '[TUI] _dispatch_to_agent: agent task done, state=%s', state
-                        )
-                        break
-                except Exception as exc:
-                    _tui_logger.debug(
-                        f'_dispatch_to_agent: poll loop EXCEPTION {type(exc).__name__}: {exc}'
-                    )
-                    raise
+            state = await self._poll_for_agent_completion(end_states, started_at)
             if state == AgentState.AWAITING_USER_CONFIRMATION:
                 await self._handle_confirmation_dialog()
                 continue
             break
+
         _tui_logger.debug('_dispatch_to_agent: poll loop exited')
         if self._renderer:
             await self._renderer.drain_events_async()

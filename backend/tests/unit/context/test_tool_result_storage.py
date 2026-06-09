@@ -12,6 +12,7 @@ from backend.context.tool_result_storage import (
 )
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation.commands import CmdOutputObservation
+from backend.ledger.observation.terminal import TerminalObservation
 
 
 def _cmd_output(event_id: int, content: str, *, exit_code: int = 0) -> CmdOutputObservation:
@@ -49,6 +50,20 @@ def test_apply_tool_result_budget_persists_large_observation(tmp_path: Path) -> 
     assert result[0] is events[0]
     assert result[1] is not events[1]
     assert 'persisted-output' in str(result[1].content)
+
+
+def test_apply_tool_result_budget_persists_terminal_observation(tmp_path: Path) -> None:
+    huge = 'terminal line\n' * 8_000
+    obs = TerminalObservation(session_id='term-1', content=huge)
+    obs.id = 5
+    with patch(
+        'backend.context.tool_result_storage._tool_results_dir',
+        return_value=tmp_path,
+    ):
+        result = apply_tool_result_budget([obs], persist_threshold=1000)
+
+    assert result[0] is not obs
+    assert 'persisted-output' in str(result[0].content)
 
 
 def test_extract_latest_pytest_summary() -> None:

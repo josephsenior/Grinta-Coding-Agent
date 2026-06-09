@@ -68,6 +68,33 @@ class _AppScreenInputMixin:
         content_rows = min(max(line_count, 2), max_content)
         bar.styles.height = non_content + content_rows
 
+    _COMMAND_FLAGS: dict[str, list[str]] = {
+        '/sessions': ['--limit', '--search', '--sort', '--preview', '--delete'],
+        '/help': ['--all', '--search'],
+    }
+
+    def _accept_suggestion(self, ta: Any, lst: Any) -> None:
+        selected = lst.index if lst.index is not None else 0
+        if 0 <= selected < len(self._suggestion_matches):
+            ta.text = self._suggestion_matches[selected] + ' '
+        lst.add_class('-hidden')
+        self._suggestion_matches = []
+        ta.focus()
+
+    def _complete_command_name(self, ta: Any, cmd: str) -> None:
+        matches = [name for name in self._SLASH_HINTS if name.startswith(cmd)]
+        if len(matches) == 1:
+            ta.text = matches[0] + ' '
+
+    def _complete_command_flag(self, ta: Any, cmd: str, parts: list[str], raw: str) -> None:
+        flags = self._COMMAND_FLAGS.get(cmd)
+        if not flags or not parts[-1].startswith('--'):
+            return
+        matches = [flag for flag in flags if flag.startswith(parts[-1])]
+        if len(matches) == 1:
+            prefix = raw.rstrip()
+            ta.text = prefix[: -len(parts[-1])] + matches[0] + ' '
+
     def action_complete_command(self) -> None:
         ta = self.query_one('#input', TextArea)
         raw = _strip_ansi(ta.text)
@@ -76,12 +103,7 @@ class _AppScreenInputMixin:
 
         lst = self.query_one('#suggestions-list', ListView)
         if not lst.has_class('-hidden') and self._suggestion_matches:
-            selected = lst.index if lst.index is not None else 0
-            if 0 <= selected < len(self._suggestion_matches):
-                ta.text = self._suggestion_matches[selected] + ' '
-            lst.add_class('-hidden')
-            self._suggestion_matches = []
-            ta.focus()
+            self._accept_suggestion(ta, lst)
             return
 
         try:
@@ -94,25 +116,10 @@ class _AppScreenInputMixin:
 
         cmd = parts[0].lower()
         if len(parts) == 1:
-            matches = [name for name in self._SLASH_HINTS if name.startswith(cmd)]
-            if not matches:
-                return
-            if len(matches) == 1:
-                ta.text = matches[0] + ' '
+            self._complete_command_name(ta, cmd)
             return
 
-        if cmd == '/sessions' and parts[-1].startswith('--'):
-            flags = ['--limit', '--search', '--sort', '--preview', '--delete']
-            matches = [flag for flag in flags if flag.startswith(parts[-1])]
-            if len(matches) == 1:
-                prefix = raw.rstrip()
-                ta.text = prefix[: -len(parts[-1])] + matches[0] + ' '
-        elif cmd == '/help' and parts[-1].startswith('--'):
-            flags = ['--all', '--search']
-            matches = [flag for flag in flags if flag.startswith(parts[-1])]
-            if len(matches) == 1:
-                prefix = raw.rstrip()
-                ta.text = prefix[: -len(parts[-1])] + matches[0] + ' '
+        self._complete_command_flag(ta, cmd, parts, raw)
 
     def action_submit_input(self) -> None:
         _tui_logger.debug(
@@ -175,6 +182,49 @@ class _AppScreenInputMixin:
                 f'action_submit_input: create_task FAILED: {type(exc).__name__}: {exc}'
             )
 
+    async def _ensure_controller_ready(self) -> None:
+        """Ensure controller is initialized, bootstrapping if needed."""
+        if self._controller is not None:
+            _tui_logger.debug('_handle_input: controller exists, dispatch will ensure task')
+            logger.info('[TUI] _handle_input: controller exists')
+            return
+
+        if self._bootstrapping is not None and not self._bootstrapping.is_set():
+            _tui_logger.debug('_handle_input: waiting for background bootstrap')
+            logger.info('[TUI] _handle_input: waiting for background bootstrap')
+            await self._bootstrapping.wait()
+
+        if self._controller is None:
+            _tui_logger.debug('_handle_input: calling _bootstrap()')
+            logger.info('[TUI] _handle_input: bootstrapping (no controller)')
+            await self._bootstrap()
+
+        if self._controller is None:
+            raise RuntimeError('Bootstrap failed to initialize controller')
+
+        _tui_logger.debug(
+            f'_handle_input: _bootstrap done, state={self._controller.get_agent_state()}'
+        )
+        logger.info(
+            '[TUI] _handle_input: bootstrap complete, state=%s',
+            self._controller.get_agent_state(),
+        )
+
+    def _handle_input_error(self, exc: Exception) -> None:
+        """Handle errors during input processing."""
+        _tui_logger.debug(f'_handle_input: EXCEPTION in setup: {exc}')
+        logger.exception('[TUI] _handle_input setup FAILED')
+        self.add_error(f'Agent error: {type(exc).__name__}: {exc}')
+        self._render_hud_bar()
+        if self._controller:
+            try:
+                actual = str(self._controller.get_agent_state())
+                self._hud.update_agent_state(actual or 'Error')
+            except Exception:
+                self._hud.update_agent_state('Error')
+        self.query_one('#input-bar', InputBar).remove_class('processing')
+        self._render_hud_bar()
+
     async def _handle_input(self, text: str) -> None:
         try:
             _tui_logger.debug(f'_handle_input ENTER text={text[:80]}')
@@ -185,7 +235,6 @@ class _AppScreenInputMixin:
 
         agent_text: str | None = None
         async with self._input_lock:
-            # Drain any stale events from previous turn before starting new one
             if self._renderer:
                 await self._renderer.drain_events_async()
 
@@ -213,56 +262,14 @@ class _AppScreenInputMixin:
                 _tui_logger.debug(
                     f'_handle_input: controller={self._controller is not None}'
                 )
-                if self._controller is None:
-                    if (
-                        self._bootstrapping is not None
-                        and not self._bootstrapping.is_set()
-                    ):
-                        _tui_logger.debug(
-                            '_handle_input: waiting for background bootstrap'
-                        )
-                        logger.info(
-                            '[TUI] _handle_input: waiting for background bootstrap'
-                        )
-                        await self._bootstrapping.wait()
-                    if self._controller is None:
-                        _tui_logger.debug('_handle_input: calling _bootstrap()')
-                        logger.info(
-                            '[TUI] _handle_input: bootstrapping (no controller)'
-                        )
-                        await self._bootstrap()
-                    if self._controller is None:
-                        raise RuntimeError('Bootstrap failed to initialize controller')
-                    _tui_logger.debug(  # type: ignore[unreachable]
-                        f'_handle_input: _bootstrap done, state={self._controller.get_agent_state()}'
-                    )
-                    logger.info(
-                        '[TUI] _handle_input: bootstrap complete, state=%s',
-                        self._controller.get_agent_state(),
-                    )
-                else:
-                    _tui_logger.debug(
-                        '_handle_input: controller exists, dispatch will ensure task'
-                    )
-                    logger.info('[TUI] _handle_input: controller exists')
+                await self._ensure_controller_ready()
                 assert self._controller is not None, (
                     'Controller must be initialized after agent task setup'
                 )
                 agent_text = text
                 self._turn_in_flight = True
             except Exception as exc:
-                _tui_logger.debug(f'_handle_input: EXCEPTION in setup: {exc}')
-                logger.exception('[TUI] _handle_input setup FAILED')
-                self.add_error(f'Agent error: {type(exc).__name__}: {exc}')
-                self._render_hud_bar()
-                if self._controller:
-                    try:
-                        actual = str(self._controller.get_agent_state())
-                        self._hud.update_agent_state(actual or 'Error')
-                    except Exception:
-                        self._hud.update_agent_state('Error')
-                self.query_one('#input-bar', InputBar).remove_class('processing')
-                self._render_hud_bar()
+                self._handle_input_error(exc)
                 return
 
         if agent_text is None:

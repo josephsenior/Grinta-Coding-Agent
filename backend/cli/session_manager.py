@@ -346,6 +346,29 @@ def list_sessions(
     )
 
 
+def _resolve_delete_target(
+    sessions: list[tuple[str, dict[str, Any], int]],
+    target: str,
+) -> tuple[tuple[str, dict[str, Any], int] | None, str | None]:
+    """Resolve a delete target to a session or error message."""
+    if target.isdigit():
+        idx = int(target)
+        if 1 <= idx <= len(sessions):
+            return sessions[idx - 1], None
+        return None, f"No session at index '{target}'"
+
+    match = [s for s in sessions if s[0] == target]
+    if match:
+        return match[0], None
+
+    prefix_matches = [s for s in sessions if s[0].startswith(target)]
+    if len(prefix_matches) == 1:
+        return prefix_matches[0], None
+    if len(prefix_matches) > 1:
+        return None, f"Prefix '{target}' is ambiguous ({len(prefix_matches)} matches)"
+    return None, f"No session matches '{target}'"
+
+
 def delete_sessions(
     console: Console,
     targets: list[str],
@@ -371,26 +394,11 @@ def delete_sessions(
     errors: list[str] = []
 
     for target in targets:
-        if target.isdigit():
-            idx = int(target)
-            if 1 <= idx <= len(sessions):
-                to_delete.append(sessions[idx - 1])
-            else:
-                errors.append(f"No session at index '{target}'")
+        resolved, error = _resolve_delete_target(sessions, target)
+        if resolved is not None:
+            to_delete.append(resolved)
         else:
-            match = [s for s in sessions if s[0] == target]
-            if match:
-                to_delete.append(match[0])
-            else:
-                prefix_matches = [s for s in sessions if s[0].startswith(target)]
-                if len(prefix_matches) == 1:
-                    to_delete.append(prefix_matches[0])
-                elif len(prefix_matches) > 1:
-                    errors.append(
-                        f"Prefix '{target}' is ambiguous ({len(prefix_matches)} matches)"
-                    )
-                else:
-                    errors.append(f"No session matches '{target}'")
+            errors.append(error)
 
     if not to_delete:
         for e in errors:

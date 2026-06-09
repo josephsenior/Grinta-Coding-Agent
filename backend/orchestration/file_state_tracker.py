@@ -207,82 +207,89 @@ class FileStateMiddleware(ToolInvocationMiddleware):
     async def execute(self, ctx: ToolInvocationContext) -> None:
         pass
 
-    async def observe(
-        self, ctx: ToolInvocationContext, observation: Observation | None
-    ) -> None:
-        action = ctx.action
-        action_cls = type(action).__name__
-        mutated_path: str = ''
-        observation_failed = False
-
-        if observation is None:
-            return
-
+    def _is_observation_error(self, observation: Observation) -> bool:
         try:
             from backend.ledger.observation import ErrorObservation
-
-            observation_failed = isinstance(observation, ErrorObservation)
+            return isinstance(observation, ErrorObservation)
         except Exception:
-            observation_failed = False
+            return False
 
+    def _record_file_action(self, action: Any, action_cls: str, observation_failed: bool) -> str:
+        """Record file action in tracker. Returns mutated_path if applicable."""
         try:
             if action_cls == 'FileEditAction':
                 path = getattr(action, 'path', '')
                 command = getattr(action, 'command', '') or 'write'
                 if observation_failed:
-                    return
+                    return ''
                 if command == 'create_file':
                     self._tracker.record(path, 'created')
-                    mutated_path = path
+                    return path
                 elif command == 'read_file':
                     self._tracker.record(path, 'read')
                 else:
                     self._tracker.record(path, 'modified')
-                    mutated_path = path
+                    return path
             elif action_cls == 'FileReadAction':
                 if observation_failed:
-                    return
+                    return ''
                 path = getattr(action, 'path', '')
                 self._tracker.record(path, 'read')
             elif action_cls == 'FileWriteAction':
                 if observation_failed:
-                    return
+                    return ''
                 path = getattr(action, 'path', '')
                 self._tracker.record(path, 'created')
-                mutated_path = path
+                return path
         except Exception:
             logger.debug('FileStateMiddleware: failed to record action', exc_info=True)
+        return ''
 
-        # Blast radius: when symbols are removed/renamed, report session files
-        # that still reference them so the agent knows what else needs fixing.
-        if mutated_path and observation is not None:
-            try:
-                diff = (
-                    ctx.metadata.get('pre_exec_diff', '')
-                    if hasattr(ctx, 'metadata') and isinstance(ctx.metadata, dict)
-                    else ''
+    def _apply_blast_radius(
+        self, ctx: ToolInvocationContext, observation: Observation, mutated_path: str
+    ) -> None:
+        """Append blast radius info to observation if symbols were removed."""
+        try:
+            diff = (
+                ctx.metadata.get('pre_exec_diff', '')
+                if hasattr(ctx, 'metadata') and isinstance(ctx.metadata, dict)
+                else ''
+            )
+            if not diff:
+                return
+            symbols = _extract_removed_symbols(diff)
+            if not symbols:
+                return
+            session_files = [e.path for e in self._tracker._files.values()]
+            refs = _find_symbol_references(symbols, session_files, exclude_path=mutated_path)
+            if not refs:
+                return
+            content = getattr(observation, 'content', None)
+            if isinstance(content, str):
+                observation.content = (
+                    content
+                    + '\n\n<BLAST_RADIUS>\n'
+                    + 'Symbols removed/renamed: '
+                    + ', '.join(symbols)
+                    + '\nSession files that reference them:\n'
+                    + refs
+                    + '\n'
+                    + '</BLAST_RADIUS>'
                 )
-                if diff:
-                    symbols = _extract_removed_symbols(diff)
-                    if symbols:
-                        session_files = [e.path for e in self._tracker._files.values()]
-                        refs = _find_symbol_references(
-                            symbols, session_files, exclude_path=mutated_path
-                        )
-                        if refs:
-                            content = getattr(observation, 'content', None)
-                            if isinstance(content, str):
-                                observation.content = (
-                                    content
-                                    + '\n\n<BLAST_RADIUS>\n'
-                                    + 'Symbols removed/renamed: '
-                                    + ', '.join(symbols)
-                                    + '\nSession files that reference them:\n'
-                                    + refs
-                                    + '\n'
-                                    + '</BLAST_RADIUS>'
-                                )
-            except Exception:
-                logger.debug(
-                    'FileStateMiddleware: blast radius check failed', exc_info=True
-                )
+        except Exception:
+            logger.debug('FileStateMiddleware: blast radius check failed', exc_info=True)
+
+    async def observe(
+        self, ctx: ToolInvocationContext, observation: Observation | None
+    ) -> None:
+        if observation is None:
+            return
+
+        action = ctx.action
+        action_cls = type(action).__name__
+        observation_failed = self._is_observation_error(observation)
+
+        mutated_path = self._record_file_action(action, action_cls, observation_failed)
+
+        if mutated_path:
+            self._apply_blast_radius(ctx, observation, mutated_path)

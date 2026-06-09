@@ -685,46 +685,66 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
             return None
         return self._visible_entries[row_index][0]
 
-    def _update_preview(self, row_index: int) -> None:
-        if row_index < 0 or row_index >= len(self._visible_entries):
-            self.query_one('#sessions-preview', Static).update('')
-            return
-        sid, meta, event_count = self._visible_entries[row_index]
+    _PREVIEW_FIELDS: list[tuple[str, str, str]] = [
+        ('title', 'title', 'Title'),
+        ('name', 'title', 'Title'),
+        ('llm_model', 'model', 'Model'),
+        ('selected_repository', 'repo', 'Repository'),
+        ('selected_branch', 'branch', 'Branch'),
+        ('trigger', 'trigger', 'Trigger'),
+    ]
+
+    def _build_preview_line(self, label: str, value: str) -> str | None:
+        if not value:
+            return None
+        return f'[bold]{label}:[/] {value}'
+
+    def _build_preview_tokens_line(self, meta: dict[str, Any]) -> str | None:
+        total_tokens = int(meta.get('total_tokens') or 0)
+        if not total_tokens:
+            return None
+        prompt_tokens = int(meta.get('prompt_tokens') or 0)
+        completion_tokens = int(meta.get('completion_tokens') or 0)
+        return (
+            f'[bold]Tokens:[/] {total_tokens:,} total'
+            f'  [{NAVY_TEXT_DIM}](p:{prompt_tokens:,} c:{completion_tokens:,})[/]'
+        )
+
+    def _build_preview_metadata_lines(self, meta: dict[str, Any]) -> list[str]:
         lines = []
-        lines.append(f'[bold]ID:[/] {sid}')
-        title = str(meta.get('title') or meta.get('name') or '')
-        if title:
-            lines.append(f'[bold]Title:[/] {title}')
-        model = str(meta.get('llm_model') or '')
-        if model:
-            lines.append(f'[bold]Model:[/] {model}')
-        repo = str(meta.get('selected_repository') or '')
-        if repo:
-            lines.append(f'[bold]Repository:[/] {repo}')
-        branch = str(meta.get('selected_branch') or '')
-        if branch:
-            lines.append(f'[bold]Branch:[/] {branch}')
-        trigger = str(meta.get('trigger') or '')
-        if trigger:
-            lines.append(f'[bold]Trigger:[/] {trigger}')
+        seen_labels = set()
+        for key, _, label in self._PREVIEW_FIELDS:
+            if label in seen_labels:
+                continue
+            value = str(meta.get(key) or '')
+            if line := self._build_preview_line(label, value):
+                lines.append(line)
+                seen_labels.add(label)
+        return lines
+
+    def _build_preview_lines(self, sid: str, meta: dict[str, Any], event_count: int) -> list[str]:
+        lines = [f'[bold]ID:[/] {sid}']
+        lines.extend(self._build_preview_metadata_lines(meta))
         lines.append(f'[bold]Events:[/] {event_count}')
         cost = float(meta.get('accumulated_cost') or 0)
         if cost:
             lines.append(f'[bold]Cost:[/] ${cost:.4f}')
-        total_tokens = int(meta.get('total_tokens') or 0)
-        if total_tokens:
-            prompt_tokens = int(meta.get('prompt_tokens') or 0)
-            completion_tokens = int(meta.get('completion_tokens') or 0)
-            lines.append(
-                f'[bold]Tokens:[/] {total_tokens:,} total'
-                f'  [{NAVY_TEXT_DIM}](p:{prompt_tokens:,} c:{completion_tokens:,})[/]'
-            )
+        if line := self._build_preview_tokens_line(meta):
+            lines.append(line)
         updated = str(meta.get('last_updated_at') or meta.get('created_at') or '')
         if updated:
             lines.append(f'[bold]Updated:[/] {updated[:19]}')
         created = str(meta.get('created_at') or '')
         if created and str(meta.get('last_updated_at') or '') != created:
             lines.append(f'[bold]Created:[/] {created[:19]}')
+        return lines
+
+    def _update_preview(self, row_index: int) -> None:
+        if row_index < 0 or row_index >= len(self._visible_entries):
+            self.query_one('#sessions-preview', Static).update('')
+            return
+        sid, meta, event_count = self._visible_entries[row_index]
+        lines = self._build_preview_lines(sid, meta, event_count)
         self.query_one('#sessions-preview', Static).update('\n'.join(lines))
 
     def _delete_sessions(self, targets: list[str]) -> tuple[int, list[str]]:

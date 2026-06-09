@@ -60,47 +60,73 @@ def render_mcp_tool(
     return lines
 
 
-def _summarize_mcp_args(tool_name: str, args: dict[str, Any]) -> str:
-    """Summarize MCP tool args into a one-line description."""
-    short_name = tool_name.split('::')[-1] if '::' in tool_name else tool_name
+def _try_match_path_args(short_name: str, args: dict[str, Any], keywords: tuple[str, ...]) -> str | None:
+    if any(kw in short_name.lower() for kw in keywords) and 'path' in args:
+        path = args.get('path', '')
+        if isinstance(path, str) and path:
+            return f'[dim]path: {path}[/dim]'
+    return None
 
-    if 'read' in short_name.lower() and 'path' in args:
-        path = args.get('path', '')
-        if isinstance(path, str) and path:
-            return f'[dim]path: {path}[/dim]'
-    if 'write' in short_name.lower() and 'path' in args:
-        path = args.get('path', '')
-        if isinstance(path, str) and path:
-            return f'[dim]path: {path}[/dim]'
+
+def _try_match_search_args(short_name: str, args: dict[str, Any]) -> str | None:
     if 'search' in short_name.lower():
         query = args.get('query', args.get('q', args.get('search', '')))
         if isinstance(query, str) and query:
             return f'[dim]query: "{query}"[/dim]'
-    if 'list' in short_name.lower() and 'path' in args:
-        path = args.get('path', '')
-        if isinstance(path, str) and path:
-            return f'[dim]path: {path}[/dim]'
-    if 'git' in short_name.lower() and 'command' in args:
+    return None
+
+
+def _try_match_command_args(short_name: str, args: dict[str, Any], keywords: tuple[str, ...]) -> str | None:
+    if any(kw in short_name.lower() for kw in keywords) and 'command' in args:
         cmd = args.get('command', '')
         if isinstance(cmd, str):
             return f'[dim]$ {cmd}[/dim]'
+    return None
+
+
+def _try_match_run_args(short_name: str, args: dict[str, Any]) -> str | None:
     if 'run' in short_name.lower() or 'execute' in short_name.lower():
         cmd = args.get('command', args.get('cmd', ''))
         if isinstance(cmd, str):
             return f'[dim]$ {cmd}[/dim]'
+    return None
 
+
+def _try_match_regex_path(args: dict[str, Any]) -> str | None:
     path_match = _PATH_RE.search(str(args))
     if path_match:
         return f'[dim]path: {path_match.group(1)}[/dim]'
+    return None
 
-    keys = list(args.keys())  # type: ignore[unreachable]
+
+def _try_match_first_arg(args: dict[str, Any]) -> str | None:
+    keys = list(args.keys())
     if keys:
         first_key = keys[0]
         first_val = args[first_key]
         if isinstance(first_val, str) and len(first_val) < 60:
             return f'[dim]{first_key}: {first_val}[/dim]'
+    return None
 
-    return f'[dim]{len(keys)} args[/dim]'
+
+def _summarize_mcp_args(tool_name: str, args: dict[str, Any]) -> str:
+    """Summarize MCP tool args into a one-line description."""
+    short_name = tool_name.split('::')[-1] if '::' in tool_name else tool_name
+
+    if result := _try_match_path_args(short_name, args, ('read', 'write', 'list')):
+        return result
+    if result := _try_match_search_args(short_name, args):
+        return result
+    if result := _try_match_command_args(short_name, args, ('git',)):
+        return result
+    if result := _try_match_run_args(short_name, args):
+        return result
+    if result := _try_match_regex_path(args):
+        return result
+    if result := _try_match_first_arg(args):
+        return result
+
+    return f'[dim]{len(args)} args[/dim]'
 
 
 def _format_mcp_result_string(result: str) -> list[str]:

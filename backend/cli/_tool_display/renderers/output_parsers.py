@@ -65,39 +65,40 @@ class ShellOutput:
     exit_code: int | None = None
 
 
+_OUTPUT_TYPE_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
+    ('pytest', ('pytest', 'python -m pytest')),
+    ('coverage', ('coverage',)),
+    ('git_status', ('git status',)),
+    ('git_diff', ('git diff',)),
+    ('git_log', ('git log',)),
+    ('git_branch', ('git branch',)),
+    ('npm_install', ('npm install', 'npm i')),
+    ('yarn_install', ('yarn install',)),
+    ('pip_install', ('pip install', 'pip3 install')),
+    ('curl', ('curl ',)),
+    ('ls', ('ls ', 'ls')),
+    ('find', ('find ',)),
+    ('ping', ('ping ',)),
+    ('linter', ('ruff', 'flake8', 'mypy')),
+]
+
+
+def _match_command_pattern(cmd_lower: str, patterns: tuple[str, ...]) -> bool:
+    for pattern in patterns:
+        if pattern in cmd_lower or cmd_lower.startswith(pattern):
+            return True
+    return False
+
+
 def detect_output_type(command: str, output: str) -> str:
     """Guess the output type from command + output patterns."""
     cmd_lower = command.lower()
     out_lower = output.lower()
 
-    if 'pytest' in cmd_lower or 'python -m pytest' in cmd_lower:
-        return 'pytest'
-    if 'coverage' in cmd_lower:
-        return 'coverage'
-    if cmd_lower.startswith('git status'):
-        return 'git_status'
-    if cmd_lower.startswith('git diff'):
-        return 'git_diff'
-    if cmd_lower.startswith('git log'):
-        return 'git_log'
-    if cmd_lower.startswith('git branch'):
-        return 'git_branch'
-    if cmd_lower.startswith('npm ') and ('install' in cmd_lower or 'i' in cmd_lower):
-        return 'npm_install'
-    if cmd_lower.startswith('yarn ') and 'install' in cmd_lower:
-        return 'yarn_install'
-    if cmd_lower.startswith('pip install') or cmd_lower.startswith('pip3 install'):
-        return 'pip_install'
-    if cmd_lower.startswith('curl '):
-        return 'curl'
-    if cmd_lower.startswith('ls ') or cmd_lower == 'ls':
-        return 'ls'
-    if cmd_lower.startswith('find '):
-        return 'find'
-    if cmd_lower.startswith('ping '):
-        return 'ping'
-    if 'ruff' in cmd_lower or 'flake8' in cmd_lower or 'mypy' in cmd_lower:
-        return 'linter'
+    for output_type, patterns in _OUTPUT_TYPE_PATTERNS:
+        if _match_command_pattern(cmd_lower, patterns):
+            return output_type
+
     if out_lower.startswith('usage:'):
         return 'help'
     return 'plain'

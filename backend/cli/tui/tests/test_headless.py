@@ -299,6 +299,33 @@ async def test_tui_renderer_writes_expandable_cards_collapsed_by_default(
 
 
 @pytest.mark.asyncio
+async def test_tui_transcript_autoscrolls_on_rapid_append(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(100, 24)) as pilot:
+        await pilot.pause()
+
+        display = _get_screen(app).query_one('#main-display')
+        display._suppress_mount_animation = True
+        for idx in range(80):
+            display.append_widget(Static(f'transcript line {idx}'))
+        await pilot.pause()
+        display.force_scroll_end()
+        await pilot.pause()
+        assert display.max_scroll_y > 0
+
+        for idx in range(30):
+            display.append_widget(Static(f'burst line {idx}'))
+        await pilot.pause()
+
+        assert display._user_scrolled_away is False
+        assert display._was_at_bottom()
+
+
+@pytest.mark.asyncio
 async def test_tui_live_response_follows_tail_when_not_user_scrolled(
     mock_config, monkeypatch
 ):

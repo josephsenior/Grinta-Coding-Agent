@@ -36,6 +36,7 @@ class Transcript(VerticalScroll):
         self._user_scrolled_away = False
         self._scroll_badge: Static | None = None
         self._suppress_mount_animation = False
+        self._suppress_scroll_sync = False
 
     def compose(self) -> ComposeResult:
         yield Static(id='scroll-badge', classes='-hidden')
@@ -83,6 +84,8 @@ class Transcript(VerticalScroll):
             self._set_user_scrolled_away(True)
 
     def on_scroll(self, _event: Widget.Scroll) -> None:
+        if self._suppress_scroll_sync:
+            return
         self._sync_scroll_state_from_position()
 
     def _on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
@@ -114,6 +117,27 @@ class Transcript(VerticalScroll):
     def user_scroll_end(self, *, animate: bool = False) -> None:
         self.force_scroll_end(animate=animate)
 
+    def follow_tail(self) -> None:
+        """Pin the transcript to the latest content when the user is following."""
+        if self._user_scrolled_away:
+            return
+        self._schedule_follow_tail()
+
+    def _schedule_follow_tail(self) -> None:
+        """Scroll after layout refresh so max_scroll_y reflects new children."""
+
+        def _scroll_after_layout() -> None:
+            if self._user_scrolled_away:
+                return
+            self._suppress_scroll_sync = True
+            self.scroll_end(animate=False)
+            self.call_after_refresh(self._release_programmatic_scroll)
+
+        self.call_after_refresh(_scroll_after_layout)
+
+    def _release_programmatic_scroll(self) -> None:
+        self._suppress_scroll_sync = False
+
     def append_widget(self, widget: Widget, *, animate: bool | None = None) -> None:
         """Mount a widget and auto-scroll unless user scrolled up."""
         should_follow = self.should_follow_tail()
@@ -131,7 +155,7 @@ class Transcript(VerticalScroll):
             except Exception:
                 widget.styles.offset = (0, 0)
         if should_follow:
-            self.scroll_end(animate=False)
+            self._schedule_follow_tail()
 
     def write(self, renderable: Any) -> None:
         """Compatibility method for RichLog interface."""
@@ -140,7 +164,9 @@ class Transcript(VerticalScroll):
     def force_scroll_end(self, *, animate: bool = False) -> None:
         """Scroll to bottom regardless of user scroll state."""
         self._set_user_scrolled_away(False)
+        self._suppress_scroll_sync = True
         self.scroll_end(animate=animate)
+        self.call_after_refresh(self._release_programmatic_scroll)
 
     def clear(self) -> None:
         """Compatibility method for RichLog interface."""

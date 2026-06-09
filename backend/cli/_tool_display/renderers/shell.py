@@ -24,26 +24,51 @@ if TYPE_CHECKING:
     from rich.console import Console
 
 
-def _build_command_text(command: str) -> Text:
-    """Build styled command text with syntax-aware highlighting."""
-    text = Text()
-    text.append('PS> ', style='bold #91abec')
+_KNOWN_COMMANDS: frozenset[str] = frozenset({
+    'cd', 'ls', 'dir', 'pwd', 'cat', 'echo', 'type', 'mkdir', 'rm', 'del',
+    'copy', 'move', 'ren', 'git', 'npm', 'pip', 'python', 'node', 'cargo',
+    'go', 'rustc', 'make', 'cmake', 'docker', 'kubectl', 'curl', 'wget',
+    'ssh', 'scp', 'rsync', 'tar', 'zip', 'unzip', 'grep', 'find', 'awk',
+    'sed', 'head', 'tail', 'sort', 'uniq', 'wc', 'tee', 'xargs', 'env',
+    'export', 'source', 'bash', 'sh', 'zsh', 'fish', 'pwsh', 'powershell',
+    'cmd', 'set', 'if', 'for', 'while', 'foreach', 'switch', 'function',
+    'param', 'return', 'exit', 'break', 'continue', 'throw', 'try', 'catch',
+    'finally', 'using', 'class', 'enum', 'workflow', 'configuration',
+    'inlinescript', 'parallel', 'sequence',
+})
 
-    cmd = command.strip()
-    if len(cmd) > 120:
-        cmd = cmd[:117] + '…'
+_STYLE_MAP: dict[str, str] = {
+    'keyword': 'bold #e9e9e9',
+    'string': '#54efae',
+    'flag': '#f6ff8f',
+    'assignment': '#91abec',
+    'arg': NAVY_TEXT_PRIMARY,
+    'space': '',
+    'cmd': NAVY_TEXT_PRIMARY,
+}
 
-    # Highlight common PowerShell/Shell patterns
-    parts = []
+
+def _classify_token(token: str) -> str:
+    lower = token.lower()
+    if lower in _KNOWN_COMMANDS:
+        return 'keyword'
+    if lower.startswith('-') or lower.startswith('/'):
+        return 'flag'
+    if '=' in token and not token.startswith('$'):
+        return 'assignment'
+    return 'arg'
+
+
+def _tokenize_command(cmd: str) -> list[tuple[str, str]]:
+    parts: list[tuple[str, str]] = []
     current = ''
     in_string = False
     string_char = ''
-    i = 0
-    while i < len(cmd):
-        ch = cmd[i]
+
+    for ch in cmd:
         if not in_string and ch in ('"', "'"):
             if current:
-                parts.append(('cmd', current))
+                parts.append((_classify_token(current), current))
                 current = ''
             in_string = True
             string_char = ch
@@ -56,203 +81,29 @@ def _build_command_text(command: str) -> Text:
         elif in_string:
             current += ch
         elif ch == ' ' and current:
-            # Check if it's a known command
-            lower = current.lower()
-            if lower in (
-                'cd',
-                'ls',
-                'dir',
-                'pwd',
-                'cat',
-                'echo',
-                'type',
-                'mkdir',
-                'rm',
-                'del',
-                'copy',
-                'move',
-                'ren',
-                'git',
-                'npm',
-                'pip',
-                'python',
-                'node',
-                'cargo',
-                'go',
-                'rustc',
-                'make',
-                'cmake',
-                'docker',
-                'kubectl',
-                'curl',
-                'wget',
-                'ssh',
-                'scp',
-                'rsync',
-                'tar',
-                'zip',
-                'unzip',
-                'grep',
-                'find',
-                'awk',
-                'sed',
-                'head',
-                'tail',
-                'sort',
-                'uniq',
-                'wc',
-                'tee',
-                'xargs',
-                'env',
-                'export',
-                'source',
-                'bash',
-                'sh',
-                'zsh',
-                'fish',
-                'pwsh',
-                'powershell',
-                'cmd',
-                'set',
-                'if',
-                'for',
-                'while',
-                'foreach',
-                'switch',
-                'function',
-                'param',
-                'return',
-                'exit',
-                'break',
-                'continue',
-                'throw',
-                'try',
-                'catch',
-                'finally',
-                'using',
-                'class',
-                'enum',
-                'workflow',
-                'configuration',
-                'inlinescript',
-                'parallel',
-                'sequence',
-            ):
-                parts.append(('keyword', current))
-            elif lower.startswith('-') or lower.startswith('/'):
-                parts.append(('flag', current))
-            elif '=' in current and not current.startswith('$'):
-                parts.append(('assignment', current))
-            else:
-                parts.append(('arg', current))
+            parts.append((_classify_token(current), current))
             current = ''
             parts.append(('space', ' '))
         else:
             current += ch
-        i += 1
 
     if current:
-        lower = current.lower()
-        if lower in (
-            'cd',
-            'ls',
-            'dir',
-            'pwd',
-            'cat',
-            'echo',
-            'type',
-            'mkdir',
-            'rm',
-            'del',
-            'copy',
-            'move',
-            'ren',
-            'git',
-            'npm',
-            'pip',
-            'python',
-            'node',
-            'cargo',
-            'go',
-            'rustc',
-            'make',
-            'cmake',
-            'docker',
-            'kubectl',
-            'curl',
-            'wget',
-            'ssh',
-            'scp',
-            'rsync',
-            'tar',
-            'zip',
-            'unzip',
-            'grep',
-            'find',
-            'awk',
-            'sed',
-            'head',
-            'tail',
-            'sort',
-            'uniq',
-            'wc',
-            'tee',
-            'xargs',
-            'env',
-            'export',
-            'source',
-            'bash',
-            'sh',
-            'zsh',
-            'fish',
-            'pwsh',
-            'powershell',
-            'cmd',
-            'set',
-            'if',
-            'for',
-            'while',
-            'foreach',
-            'switch',
-            'function',
-            'param',
-            'return',
-            'exit',
-            'break',
-            'continue',
-            'throw',
-            'try',
-            'catch',
-            'finally',
-            'using',
-            'class',
-            'enum',
-            'workflow',
-            'configuration',
-            'inlinescript',
-            'parallel',
-            'sequence',
-        ):
-            parts.append(('keyword', current))
-        elif lower.startswith('-') or lower.startswith('/'):
-            parts.append(('flag', current))
-        elif '=' in current and not current.startswith('$'):
-            parts.append(('assignment', current))
-        else:
-            parts.append(('arg', current))
+        parts.append((_classify_token(current), current))
 
-    style_map = {
-        'keyword': 'bold #e9e9e9',
-        'string': '#54efae',
-        'flag': '#f6ff8f',
-        'assignment': '#91abec',
-        'arg': NAVY_TEXT_PRIMARY,
-        'space': '',
-        'cmd': NAVY_TEXT_PRIMARY,
-    }
+    return parts
 
-    for kind, value in parts:
-        text.append(value, style=style_map.get(kind, ''))
+
+def _build_command_text(command: str) -> Text:
+    """Build styled command text with syntax-aware highlighting."""
+    text = Text()
+    text.append('PS> ', style='bold #91abec')
+
+    cmd = command.strip()
+    if len(cmd) > 120:
+        cmd = cmd[:117] + '\u2026'
+
+    for kind, value in _tokenize_command(cmd):
+        text.append(value, style=_STYLE_MAP.get(kind, ''))
 
     return text
 

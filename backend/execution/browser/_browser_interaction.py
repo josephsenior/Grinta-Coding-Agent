@@ -244,99 +244,105 @@ async def execute_send_keys_impl(
     )
 
 
+async def _wait_for_timeout(
+    browser: Any, params: dict[str, Any], timeout_sec: float
+) -> str:
+    from browser_use.browser.events import WaitEvent
+    sec = min(float(params.get('seconds') or timeout_sec), 10.0)
+    await browser.event_bus.dispatch(WaitEvent(seconds=sec))
+    return f'Waited {sec}s.'
+
+
+async def _wait_for_text(
+    browser: Any, params: dict[str, Any], timeout_sec: float, cmd: str
+) -> tuple[str | None, Observation | None]:
+    needle = str(params.get('value') or '').strip()
+    if not needle:
+        return None, _finalize_observation(
+            cmd,
+            ErrorObservation(content='ERROR: value required for text wait.'),
+        )
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        txt = await _snapshot_text_chain(browser)
+        if needle in txt:
+            return 'Text appeared.', None
+        await asyncio.sleep(0.4)
+    return None, _finalize_observation(
+        cmd,
+        ErrorObservation(
+            content=f'ERROR: Timeout waiting for text after {timeout_sec:.0f}s.'
+        ),
+    )
+
+
+async def _wait_for_selector(
+    browser: Any, params: dict[str, Any], timeout_sec: float, cmd: str
+) -> tuple[str | None, Observation | None]:
+    needle = str(params.get('value') or '').strip()
+    if not needle:
+        return None, _finalize_observation(
+            cmd,
+            ErrorObservation(content='ERROR: value required for selector wait.'),
+        )
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        txt = await _snapshot_text_chain(browser)
+        if needle in txt:
+            return 'Selector/text appeared in DOM dump.', None
+        await asyncio.sleep(0.4)
+    return None, _finalize_observation(
+        cmd,
+        ErrorObservation(
+            content=f'ERROR: Timeout waiting for selector substring after {timeout_sec:.0f}s.'
+        ),
+    )
+
+
+async def _wait_for_network_idle(
+    browser: Any, timeout_sec: float, cmd: str
+) -> tuple[str | None, Observation | None]:
+    prev: str | None = None
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        cur = await _snapshot_text_chain(browser)
+        if prev is not None and cur == prev:
+            return 'DOM stable (network_idle heuristic).', None
+        prev = cur
+        await asyncio.sleep(0.5)
+    return None, _finalize_observation(
+        cmd,
+        ErrorObservation(
+            content=f'ERROR: Timeout waiting for stable DOM after {timeout_sec:.0f}s.'
+        ),
+    )
+
+
 async def execute_wait_impl(
     self, cmd: str, params: dict[str, Any]
 ) -> Observation:
-    from browser_use.browser.events import WaitEvent
-
     wait_kind = (
         str(params.get('wait_kind') or params.get('wait_for') or 'timeout')
         .strip()
         .lower()
     )
-    timeout_sec = float(params.get('timeout_sec') or 10.0)
-    timeout_sec = min(timeout_sec, BROWSER_WAIT_TIMEOUT_SEC)
+    timeout_sec = min(float(params.get('timeout_sec') or 10.0), BROWSER_WAIT_TIMEOUT_SEC)
     browser = await self._ensure_session()
 
     if wait_kind == 'timeout':
-        sec = min(float(params.get('seconds') or timeout_sec), 10.0)
-        await self._dispatch_bus_event(browser, WaitEvent(seconds=sec))
-        base = f'Waited {sec}s.'
+        base = await _wait_for_timeout(browser, params, timeout_sec)
     elif wait_kind == 'text':
-        needle = str(params.get('value') or '').strip()
-        if not needle:
-            return _finalize_observation(
-                cmd,
-                ErrorObservation(content='ERROR: value required for text wait.'),
-            )
-        deadline = time.monotonic() + timeout_sec
-        found = False
-        while time.monotonic() < deadline:
-            txt = await _snapshot_text_chain(browser)
-            if needle in txt:
-                found = True
-                break
-            await asyncio.sleep(0.4)
-        if not found:
-            return _finalize_observation(
-                cmd,
-                ErrorObservation(
-                    content=(
-                        f'ERROR: Timeout waiting for text after {timeout_sec:.0f}s.'
-                    )
-                ),
-            )
-        base = 'Text appeared.'
+        base, err = await _wait_for_text(browser, params, timeout_sec, cmd)
+        if err is not None:
+            return err
     elif wait_kind in ('selector', 'css'):
-        needle = str(params.get('value') or '').strip()
-        if not needle:
-            return _finalize_observation(
-                cmd,
-                ErrorObservation(
-                    content='ERROR: value required for selector wait.'
-                ),
-            )
-        deadline = time.monotonic() + timeout_sec
-        found = False
-        while time.monotonic() < deadline:
-            txt = await _snapshot_text_chain(browser)
-            if needle in txt:
-                found = True
-                break
-            await asyncio.sleep(0.4)
-        if not found:
-            return _finalize_observation(
-                cmd,
-                ErrorObservation(
-                    content=(
-                        f'ERROR: Timeout waiting for selector substring after '
-                        f'{timeout_sec:.0f}s.'
-                    )
-                ),
-            )
-        base = 'Selector/text appeared in DOM dump.'
+        base, err = await _wait_for_selector(browser, params, timeout_sec, cmd)
+        if err is not None:
+            return err
     elif wait_kind == 'network_idle':
-        prev: str | None = None
-        deadline = time.monotonic() + timeout_sec
-        stable = False
-        while time.monotonic() < deadline:
-            cur = await _snapshot_text_chain(browser)
-            if prev is not None and cur == prev:
-                stable = True
-                break
-            prev = cur
-            await asyncio.sleep(0.5)
-        if not stable:
-            return _finalize_observation(
-                cmd,
-                ErrorObservation(
-                    content=(
-                        f'ERROR: Timeout waiting for stable DOM after '
-                        f'{timeout_sec:.0f}s.'
-                    )
-                ),
-            )
-        base = 'DOM stable (network_idle heuristic).'
+        base, err = await _wait_for_network_idle(browser, timeout_sec, cmd)
+        if err is not None:
+            return err
     else:
         return _finalize_observation(
             cmd,

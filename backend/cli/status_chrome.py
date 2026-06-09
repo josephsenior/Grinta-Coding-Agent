@@ -91,32 +91,38 @@ class StatusFields:
     token_usage_pct: int = 0
 
 
+def _format_token_display_compact(hud: Any) -> str:
+    """Format the compact token display string."""
+    total = HUDBar._format_tokens(int(getattr(hud, 'total_tokens', 0) or 0))
+    ctx = HUDBar._format_tokens(hud.context_tokens)
+    lim_tok = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
+    is_estimated = getattr(hud, 'token_usage_estimated', False)
+
+    total_tokens = int(getattr(hud, 'total_tokens', 0) or 0)
+
+    if total_tokens == 0 and hud.context_tokens == 0 and hud.context_limit == 0:
+        result = '0'
+    elif total_tokens > 0 and hud.context_limit == 0:
+        result = f'{total}'
+    elif total_tokens > 0:
+        context_detail = f'{ctx}/{lim_tok}' if lim_tok else ctx
+        result = f'{total} · {context_detail}'
+    elif hud.context_limit == 0:
+        result = f'{ctx}'
+    else:
+        result = f'{ctx}/{lim_tok}' if lim_tok else f'{ctx}'
+
+    if is_estimated:
+        result += '~'
+    return result
+
+
 def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
     """Build fields from :class:`~backend.cli.hud.HUDState` and bundled skill count."""
     provider, model = HUDBar.describe_model(hud.model)
     model_display = f'{provider}/{model}' if provider and model else model
 
-    total = HUDBar._format_tokens(int(getattr(hud, 'total_tokens', 0) or 0))
-    ctx = HUDBar._format_tokens(hud.context_tokens)
-    lim_tok = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
-    is_estimated = getattr(hud, 'token_usage_estimated', False)
-    if (
-        int(getattr(hud, 'total_tokens', 0) or 0) == 0
-        and hud.context_tokens == 0
-        and hud.context_limit == 0
-    ):
-        token_display_compact = '0'
-    elif int(getattr(hud, 'total_tokens', 0) or 0) > 0 and hud.context_limit == 0:
-        token_display_compact = f'{total}'
-    elif int(getattr(hud, 'total_tokens', 0) or 0) > 0:
-        context_detail = f'{ctx}/{lim_tok}' if lim_tok else ctx
-        token_display_compact = f'{total} · {context_detail}'
-    elif hud.context_limit == 0:
-        token_display_compact = f'{ctx}'
-    else:
-        token_display_compact = f'{ctx}/{lim_tok}' if lim_tok else f'{ctx}'
-    if is_estimated:
-        token_display_compact += '~'  # ~ indicates estimated (not exact count)
+    token_display_compact = _format_token_display_compact(hud)
 
     mcp_short = '?' if hud.mcp_servers is None else str(min(int(hud.mcp_servers), 99))
     skills_short = str(min(int(bundled_skill_count), 99))

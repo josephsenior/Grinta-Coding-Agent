@@ -21,6 +21,7 @@ from backend.ledger.event import Event
 from backend.ledger.observation import Observation
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.files import FileReadObservation
+from backend.ledger.observation.terminal import TerminalObservation
 from backend.ledger.serialization.event import event_from_dict, event_to_dict
 
 PERSISTED_OUTPUT_TAG = '<persisted-output>'
@@ -84,7 +85,7 @@ def _copy_event_with_content(event: Event, content: str) -> Event:
 def _should_persist_observation(event: Event, content: str, threshold: int) -> bool:
     if len(content) < threshold:
         return False
-    if isinstance(event, (CmdOutputObservation, FileReadObservation)):
+    if isinstance(event, (CmdOutputObservation, FileReadObservation, TerminalObservation)):
         return True
     if isinstance(event, Observation) and type(event).__name__ == 'MCPObservation':
         return True
