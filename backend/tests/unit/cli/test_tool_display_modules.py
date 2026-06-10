@@ -614,6 +614,10 @@ class TestRedactStreamedToolCallMarkers(unittest.TestCase):
         self.assertNotIn('minimax:tool_call', result)
         self.assertNotIn('update', result)
 
+    def test_redacts_orphan_minimax_tool_call_close_tag(self) -> None:
+        result = redact_streamed_tool_call_markers('</minimax:tool_call>')
+        self.assertEqual(result, '')
+
 
 class TestExtractToolCallsFromTextMarkers(unittest.TestCase):
     def test_no_markers(self) -> None:

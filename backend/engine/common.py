@@ -184,6 +184,49 @@ def build_tool_call_metadata(
     )
 
 
+def arguments_from_tool_call_metadata(metadata: Any) -> dict[str, Any]:
+    """Best-effort parse of tool-call arguments stored on event metadata."""
+    if metadata is None:
+        return {}
+    tool_call_id = str(getattr(metadata, 'tool_call_id', '') or '')
+    model_response = getattr(metadata, 'model_response', None)
+    if model_response is None:
+        return {}
+    choices = getattr(model_response, 'choices', None)
+    if choices is None and isinstance(model_response, dict):
+        choices = model_response.get('choices')
+    if not choices:
+        return {}
+    first = choices[0]
+    message = getattr(first, 'message', None)
+    if message is None and isinstance(first, dict):
+        message = first.get('message')
+    if message is None:
+        return {}
+    tool_calls = getattr(message, 'tool_calls', None)
+    if tool_calls is None and isinstance(message, dict):
+        tool_calls = message.get('tool_calls')
+    if not tool_calls:
+        return {}
+    for tc in tool_calls:
+        tc_id = getattr(tc, 'id', None)
+        if tc_id is None and isinstance(tc, dict):
+            tc_id = tc.get('id')
+        if tool_call_id and str(tc_id or '') != tool_call_id:
+            continue
+        function = getattr(tc, 'function', None)
+        if function is None and isinstance(tc, dict):
+            function = tc.get('function')
+        if not isinstance(function, dict):
+            continue
+        raw_args = function.get('arguments', '{}')
+        try:
+            return parse_tool_arguments_object(raw_args)
+        except (TypeError, ValueError):
+            return {}
+    return {}
+
+
 def extract_thought_from_message(assistant_msg: Any) -> str:
     """LLM thinking tokens only: inner ``<redacted_thinking>...</redacted_thinking>`` text.
 
@@ -312,8 +355,12 @@ def process_tool_calls(
         action = create_action_fn(tool_call, arguments)
 
         # Attach thinking tokens to first tool call only when the model emitted them.
+        # Search tools use a structured [SEARCH_RESULTS] envelope — assistant prose
+        # belongs in transcript_only MessageAction, not inside the payload.
         if i == 0 and thought:
-            action = combine_thought_fn(action, thought)
+            fn_name = _tool_call_function_name(tool_call)
+            if fn_name not in {'grep', 'glob'}:
+                action = combine_thought_fn(action, thought)
 
         # Add tool call metadata
         action.tool_call_metadata = build_tool_call_metadata(

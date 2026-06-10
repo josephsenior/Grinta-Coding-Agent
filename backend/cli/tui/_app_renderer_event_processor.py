@@ -659,11 +659,23 @@ def _handle_status_observation(
 def _handle_agent_think_action(
     orch: '_AppRendererEventProcessorMixin', event: AgentThinkAction
 ) -> None:
+    from backend.engine.common import arguments_from_tool_call_metadata
+
     source_tool = getattr(event, 'source_tool', '') or ''
     thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
     kind = getattr(event, 'kind', '') or ''
+    tool_args = (
+        arguments_from_tool_call_metadata(
+            getattr(event, 'tool_call_metadata', None)
+        )
+        if source_tool in ('grep', 'glob')
+        else None
+    )
     orch._render_thinking_payload(
-        thought, source_tool=source_tool, kind=kind
+        thought,
+        source_tool=source_tool,
+        kind=kind,
+        tool_args=tool_args,
     )
 
 

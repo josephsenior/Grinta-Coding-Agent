@@ -313,10 +313,14 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
     def _render_tool_sourced_think(self, source_tool: str, thought: str) -> None:
         """Render an ``AgentThinkAction`` that originated from a tool call."""
+        from backend.engine.tools._search_helpers import extract_search_results_payload
+
         cleaned = _THINK_RESULT_JSON_RE.sub('', thought).strip()
         tag_m = _INTERNAL_THINK_TAG_RE.match(cleaned)
         human_msg = (tag_m.group('payload') or '').strip() if tag_m else cleaned
         human_msg = _TOOL_RESULT_TAG_RE.sub('', human_msg).strip()
+        if source_tool in ('grep', 'glob'):
+            human_msg = extract_search_results_payload(human_msg)
 
         verb, title, detail = self._think_action_card_fields(source_tool, human_msg)
         self._emit_activity_turn_header()
@@ -337,16 +341,16 @@ class ActionRenderersMixin(_ActionRenderersBase):
         title: str,
         detail: str,
     ) -> bool:
-        if source_tool != 'grep':
-            return False
+        from backend.engine.tools._search_helpers import extract_search_results_payload
 
-        raw_lines = self._extract_search_lines(human_msg)
+        payload = extract_search_results_payload(human_msg)
+        raw_lines = self._extract_search_lines(payload)
         if not raw_lines:
             return False
-        if not self._has_grep_format_matches(raw_lines):
+        if source_tool == 'grep' and not self._has_grep_format_matches(raw_lines):
             return False
 
-        return self._render_search_result(human_msg, verb, title, detail)
+        return self._render_search_result(payload, verb, title, detail)
 
     @staticmethod
     def _extract_search_lines(human_msg: str) -> list[str]:

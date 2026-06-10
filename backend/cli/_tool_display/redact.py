@@ -237,13 +237,28 @@ def _scan_tool_call_close(text: str, end_json: int) -> int | None:
     return end
 
 
+_ORPHAN_TOOL_CALL_TAG_RE = re.compile(
+    r'^\s*</?\s*(?:minimax:)?tool_call[^>]*>\s*$',
+    re.MULTILINE | re.IGNORECASE,
+)
+
+
+def _strip_orphan_tool_call_tags(text: str) -> str:
+    """Drop standalone opening/closing tool-call transport tags."""
+    if not text or 'tool_call' not in text.lower():
+        return text
+    return _ORPHAN_TOOL_CALL_TAG_RE.sub('', text).strip()
+
+
 def redact_streamed_tool_call_markers(text: str) -> str:
     """Remove ``[Tool call] name({...})`` spans from assistant-visible text."""
     text = _normalize_minimax_split_tool_markup(text)
+    text = _strip_orphan_tool_call_tags(text)
     text = strip_bracket_tool_transport_blocks(
         strip_protocol_echo_blocks(strip_tool_call_marker_lines(text))
     )
     text = _redact_xml_tool_call_blocks(text)
+    text = _strip_orphan_tool_call_tags(text)
     if _TOOL_CALL_PREFIX not in text:
         return text
     out: list[str] = []

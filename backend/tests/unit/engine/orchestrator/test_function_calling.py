@@ -89,6 +89,42 @@ class TestCombineThought:
         result = combine_thought(action, 'prefix')
         assert cast(Any, result).thought == 'prefix\nexisting thought'
 
+    def test_grep_search_payload_not_prepended_with_assistant_prose(self):
+        from backend.engine.common import process_tool_calls
+        from backend.engine.tools._tool_handlers import _handle_grep_tool
+        from backend.ledger.action.agent import AgentThinkAction
+
+        assistant_msg = SimpleNamespace(
+            tool_calls=[
+                SimpleNamespace(
+                    id='call_1',
+                    function=SimpleNamespace(
+                        name='grep',
+                        arguments=json.dumps(
+                            {
+                                'pattern': '_start_election',
+                                'path': 'raftkv/node.py',
+                            }
+                        ),
+                    ),
+                )
+            ]
+        )
+        response = SimpleNamespace(id='resp_1')
+
+        actions = process_tool_calls(
+            assistant_msg,
+            response,
+            lambda _tc, args: _handle_grep_tool(args),
+            lambda _msg: "I can't read that file. Let me use grep.",
+            combine_thought,
+        )
+
+        assert len(actions) == 1
+        assert isinstance(actions[0], AgentThinkAction)
+        assert actions[0].thought.startswith('[SEARCH_RESULTS]\n')
+        assert "I can't read" not in actions[0].thought
+
     def test_empty_thought_no_change(self):
         action = CmdRunAction(command='ls')
         cast(Any, action).thought = 'existing'
