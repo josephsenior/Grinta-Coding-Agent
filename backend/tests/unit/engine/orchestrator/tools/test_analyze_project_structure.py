@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from backend.engine.tools.analyze_project_structure import (
     build_analyze_project_structure_action,
+    execute_analyze_project_structure,
 )
 
 
@@ -13,9 +14,11 @@ def test_analyze_project_structure_tree(tmp_path) -> None:
     action = build_analyze_project_structure_action(
         {'command': 'tree', 'path': str(tmp_path)}
     )
+    obs = execute_analyze_project_structure(action)
 
-    assert 'src/main.py' in action.thought
-    assert '<dir> src' in action.thought
+    assert action.command == 'tree'
+    assert 'src/main.py' in obs.content
+    assert '<dir> src' in obs.content
 
 
 def test_analyze_project_structure_imports(tmp_path) -> None:
@@ -25,9 +28,10 @@ def test_analyze_project_structure_imports(tmp_path) -> None:
     action = build_analyze_project_structure_action(
         {'command': 'imports', 'path': str(test_file)}
     )
+    obs = execute_analyze_project_structure(action)
 
-    assert 'import os' in action.thought
-    assert 'from pathlib import Path' in action.thought
+    assert 'import os' in obs.content
+    assert 'from pathlib import Path' in obs.content
 
 
 def test_analyze_project_structure_symbols(tmp_path) -> None:
@@ -40,10 +44,11 @@ def test_analyze_project_structure_symbols(tmp_path) -> None:
     action = build_analyze_project_structure_action(
         {'command': 'symbols', 'path': str(test_file)}
     )
+    obs = execute_analyze_project_structure(action)
 
-    assert 'class MyClass:' in action.thought
-    assert 'def my_func():' in action.thought
-    assert 'MY_VAR =' in action.thought
+    assert 'class MyClass:' in obs.content
+    assert 'def my_func():' in obs.content
+    assert 'MY_VAR =' in obs.content
 
 
 def test_analyze_project_structure_file_outline_python(tmp_path) -> None:
@@ -62,10 +67,11 @@ def test_analyze_project_structure_file_outline_python(tmp_path) -> None:
             'path': str(test_file),
         }
     )
-    assert 'FILE OUTLINE' in action.thought
-    assert 'class Foo' in action.thought
-    assert 'def bar' in action.thought
-    assert 'def top' in action.thought
+    obs = execute_analyze_project_structure(action)
+    assert 'FILE OUTLINE' in obs.content
+    assert 'class Foo' in obs.content
+    assert 'def bar' in obs.content
+    assert 'def top' in obs.content
 
 
 # --------------------------------------------------------------------------- #
@@ -77,17 +83,19 @@ def test_analyze_project_structure_file_outline_python(tmp_path) -> None:
 
 def test_analyze_project_structure_callers_missing_symbol_emits_diag() -> None:
     action = build_analyze_project_structure_action({'command': 'callers'})
-    assert '[ANALYZE_PROJECT_STRUCTURE] no_results' in action.thought
-    assert "missing required parameter 'symbol'" in action.thought
-    assert 'next_steps:' in action.thought
+    obs = execute_analyze_project_structure(action)
+    assert '[ANALYZE_PROJECT_STRUCTURE] no_results' in obs.content
+    assert "missing required parameter 'symbol'" in obs.content
+    assert 'next_steps:' in obs.content
 
 
 def test_analyze_project_structure_unknown_command_emits_diag() -> None:
     action = build_analyze_project_structure_action(
         {'command': 'definitely_not_a_real_command'}
     )
-    assert '[ANALYZE_PROJECT_STRUCTURE] no_results' in action.thought
-    assert 'unknown command' in action.thought
+    obs = execute_analyze_project_structure(action)
+    assert '[ANALYZE_PROJECT_STRUCTURE] no_results' in obs.content
+    assert 'unknown command' in obs.content
 
 
 # --------------------------------------------------------------------------- #
@@ -102,8 +110,9 @@ def test_analyze_project_structure_dependencies_missing_anchor(
     action = build_analyze_project_structure_action(
         {'command': 'dependencies', 'path': 'does_not_exist.py'}
     )
-    assert '[ANALYZE_PROJECT_STRUCTURE] no_results' in action.thought
-    assert 'anchor file not found' in action.thought
+    obs = execute_analyze_project_structure(action)
+    assert '[ANALYZE_PROJECT_STRUCTURE] no_results' in obs.content
+    assert 'anchor file not found' in obs.content
 
 
 def test_analyze_project_structure_dependencies_invalid_direction(
@@ -115,8 +124,9 @@ def test_analyze_project_structure_dependencies_invalid_direction(
     action = build_analyze_project_structure_action(
         {'command': 'dependencies', 'path': 'a.py', 'direction': 'sideways'}
     )
-    assert '[ANALYZE_PROJECT_STRUCTURE] no_results' in action.thought
-    assert 'invalid direction' in action.thought
+    obs = execute_analyze_project_structure(action)
+    assert '[ANALYZE_PROJECT_STRUCTURE] no_results' in obs.content
+    assert 'invalid direction' in obs.content
 
 
 def test_analyze_project_structure_dependencies_downstream(
@@ -138,12 +148,13 @@ def test_analyze_project_structure_dependencies_downstream(
             'depth': 3,
         }
     )
-    assert '=== DEPENDENCY TREE ===' in action.thought
-    assert 'pkg/root.py' in action.thought
-    assert 'pkg/mid.py' in action.thought
-    assert 'pkg/leaf.py' in action.thought
+    obs = execute_analyze_project_structure(action)
+    assert '=== DEPENDENCY TREE ===' in obs.content
+    assert 'pkg/root.py' in obs.content
+    assert 'pkg/mid.py' in obs.content
+    assert 'pkg/leaf.py' in obs.content
     # Sidecar JSON must be present.
-    assert '=== EDGES (json) ===' in action.thought
+    assert '=== EDGES (json) ===' in obs.content
 
 
 def test_analyze_project_structure_dependencies_cycle_safe(
@@ -165,9 +176,10 @@ def test_analyze_project_structure_dependencies_cycle_safe(
             'depth': 4,
         }
     )
+    obs = execute_analyze_project_structure(action)
     # Cycle marker must appear instead of recursing forever.
-    assert '(↺)' in action.thought
-    assert 'pkg/b.py' in action.thought
+    assert '(↺)' in obs.content
+    assert 'pkg/b.py' in obs.content
 
 
 def test_analyze_project_structure_dependencies_no_edges_emits_diag(
@@ -179,6 +191,7 @@ def test_analyze_project_structure_dependencies_no_edges_emits_diag(
     action = build_analyze_project_structure_action(
         {'command': 'dependencies', 'path': 'standalone.py', 'direction': 'downstream'}
     )
-    assert '=== DEPENDENCY TREE ===' in action.thought
-    assert '[ANALYZE_PROJECT_STRUCTURE] no_results' in action.thought
-    assert 'no dependency edges found' in action.thought
+    obs = execute_analyze_project_structure(action)
+    assert '=== DEPENDENCY TREE ===' in obs.content
+    assert '[ANALYZE_PROJECT_STRUCTURE] no_results' in obs.content
+    assert 'no dependency edges found' in obs.content

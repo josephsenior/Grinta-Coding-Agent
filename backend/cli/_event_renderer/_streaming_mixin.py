@@ -124,7 +124,11 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
     ) -> None:
         if not (action.thinking_accumulated and _show_reasoning_text()):
             return
-        cleaned_thinking = _sanitize_visible_transcript_text(
+        from backend.cli._event_renderer.text_utils import (
+            sanitize_streaming_thinking_text,
+        )
+
+        cleaned_thinking = sanitize_streaming_thinking_text(
             action.thinking_accumulated
         )
         if cleaned_thinking:

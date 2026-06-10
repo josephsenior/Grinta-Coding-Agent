@@ -172,8 +172,28 @@ MCP_PENDING_ACTION_TIMEOUT_FLOOR = 180.0
 # Foreground shell commands (env setup, installs, builds) often run far longer than
 # the default pending-action timeout while still progressing normally.
 CMD_PENDING_ACTION_TIMEOUT_FLOOR = 600.0
-# PTY / terminal_manager (Terminal* actions): same headroom as shell commands.
-TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR = CMD_PENDING_ACTION_TIMEOUT_FLOOR
+# ``terminal_run`` (session open) must return quickly; long hangs here wedge the
+# whole agent step.  ``terminal_input`` / ``terminal_read`` get more headroom.
+TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR = float(
+    os.getenv('GRINTA_TERMINAL_RUN_PENDING_TIMEOUT_FLOOR', '60.0')
+)
+TERMINAL_IO_PENDING_ACTION_TIMEOUT_FLOOR = float(
+    os.getenv('GRINTA_TERMINAL_IO_PENDING_TIMEOUT_FLOOR', '120.0')
+)
+# Legacy alias — highest interactive-terminal pending ceiling.
+TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR = TERMINAL_IO_PENDING_ACTION_TIMEOUT_FLOOR
+# Hard wall-clock cap on the ``terminal_run`` coroutine (session open path).
+TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS = float(
+    os.getenv('GRINTA_TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS', '45.0')
+)
+# How long to wait for an interactive shell prompt after PTY spawn (pwsh/bash).
+PTY_SHELL_READY_TIMEOUT_SECONDS = float(
+    os.getenv('GRINTA_PTY_SHELL_READY_TIMEOUT_SECONDS', '25.0')
+)
+# Consecutive empty ``terminal_read`` deltas before auto-closing a ghost session.
+TERMINAL_EMPTY_READ_CLOSE_THRESHOLD = int(
+    os.getenv('GRINTA_TERMINAL_EMPTY_READ_CLOSE_THRESHOLD', '3')
+)
 # Interactive PTY: how long the runtime polls the buffer for the *first* byte
 # of output after ``open`` / ``input`` before returning an empty result. The
 # loop exits as soon as any byte arrives — these caps only matter for slow
@@ -203,8 +223,8 @@ DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR = float(
 TOOL_BRIDGE_TIMEOUT_FILE_IO = 30.0
 TOOL_BRIDGE_TIMEOUT_LSP_QUERY = 30.0
 TOOL_BRIDGE_TIMEOUT_DEBUGGER = DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR
-TOOL_BRIDGE_TIMEOUT_TERMINAL_RUN = TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR
-TOOL_BRIDGE_TIMEOUT_TERMINAL_IO = 60.0
+TOOL_BRIDGE_TIMEOUT_TERMINAL_RUN = TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR
+TOOL_BRIDGE_TIMEOUT_TERMINAL_IO = TERMINAL_IO_PENDING_ACTION_TIMEOUT_FLOOR
 TOOL_BRIDGE_TIMEOUT_BUFFER = 10.0
 # Opt-in (default-on) debugpy import warmup at agent startup. Keeps the first
 # real ``debugger`` tool call snappy. Set GRINTA_DEBUGPY_WARMUP=0 to disable.

@@ -16,7 +16,14 @@ from backend.engine.function_calling import (
     _handle_read_tool,
     _handle_replace_string_tool,
 )
-from backend.ledger.action import AgentThinkAction, FileEditAction, FileReadAction
+from backend.engine.tools._file_edits import execute_find_symbols, execute_read_symbols
+from backend.ledger.action import (
+    AgentThinkAction,
+    FileEditAction,
+    FileReadAction,
+    FindSymbolsAction,
+    ReadSymbolsAction,
+)
 
 
 def _use_tmp_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -30,9 +37,12 @@ def _use_tmp_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     )
 
 
-def _payload(action: AgentThinkAction) -> dict:
-    _, _, raw = action.thought.partition('\n')
-    return json.loads(raw)
+def _payload(event: object) -> dict:
+    tool_result = getattr(event, 'tool_result', None)
+    if isinstance(tool_result, dict):
+        return dict(tool_result)
+    content = getattr(event, 'content', '')
+    return json.loads(str(content))
 
 
 def test_read_file_and_range_return_file_read_actions(monkeypatch, tmp_path):
@@ -116,7 +126,8 @@ def test_read_symbols_auto_resolves_unique_symbol(monkeypatch, tmp_path):
             'security_risk': 'LOW',
         }
     )
-    payload = _payload(action)
+    assert isinstance(action, ReadSymbolsAction)
+    payload = _payload(execute_read_symbols(action))
     result = payload['results'][0]
 
     assert payload['status'] == 'ok'
@@ -136,18 +147,20 @@ def test_find_symbols_discovers_candidates_and_read_symbols_reports_ambiguity(
         encoding='utf-8',
     )
 
+    find_action = _handle_find_symbols_tool({'query': 'run', 'security_risk': 'LOW'})
+    assert isinstance(find_action, FindSymbolsAction)
     candidates = _payload(
-        _handle_find_symbols_tool({'query': 'run', 'security_risk': 'LOW'})
+        execute_find_symbols(find_action)
     )
-    ambiguous = _payload(
-        _handle_read_tool(
-            {
-                'type': 'symbols',
-                'symbols': [{'symbol_name': 'run'}],
-                'security_risk': 'LOW',
-            }
-        )
+    read_action = _handle_read_tool(
+        {
+            'type': 'symbols',
+            'symbols': [{'symbol_name': 'run'}],
+            'security_risk': 'LOW',
+        }
     )
+    assert isinstance(read_action, ReadSymbolsAction)
+    ambiguous = _payload(execute_read_symbols(read_action))
 
     assert candidates['type'] == 'symbols'
     assert len(candidates['candidates']) == 2
@@ -173,19 +186,19 @@ def test_read_symbols_resolves_each_requested_symbol_independently(
         encoding='utf-8',
     )
 
-    payload = _payload(
-        _handle_read_tool(
-            {
-                'type': 'symbols',
-                'symbols': [
-                    {'symbol_name': 'authenticate_user'},
-                    {'symbol_name': 'validate'},
-                    {'symbol_name': 'MissingService'},
-                ],
-                'security_risk': 'LOW',
-            }
-        )
+    action = _handle_read_tool(
+        {
+            'type': 'symbols',
+            'symbols': [
+                {'symbol_name': 'authenticate_user'},
+                {'symbol_name': 'validate'},
+                {'symbol_name': 'MissingService'},
+            ],
+            'security_risk': 'LOW',
+        }
     )
+    assert isinstance(action, ReadSymbolsAction)
+    payload = _payload(execute_read_symbols(action))
 
     assert [item['status'] for item in payload['results']] == [
         'resolved',
@@ -212,15 +225,15 @@ def test_read_symbols_accepts_qualified_names_without_path(monkeypatch, tmp_path
         encoding='utf-8',
     )
 
-    payload = _payload(
-        _handle_read_tool(
-            {
-                'type': 'symbols',
-                'symbols': [{'qualified_name': 'UserService.login'}],
-                'security_risk': 'LOW',
-            }
-        )
+    action = _handle_read_tool(
+        {
+            'type': 'symbols',
+            'symbols': [{'qualified_name': 'UserService.login'}],
+            'security_risk': 'LOW',
+        }
     )
+    assert isinstance(action, ReadSymbolsAction)
+    payload = _payload(execute_read_symbols(action))
     result = payload['results'][0]
 
     assert result['status'] == 'resolved'

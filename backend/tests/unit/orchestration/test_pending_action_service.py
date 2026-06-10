@@ -9,7 +9,8 @@ from unittest.mock import MagicMock, patch
 
 from backend.core.constants import (
     DEFAULT_PENDING_ACTION_TIMEOUT,
-    TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR,
+    TERMINAL_IO_PENDING_ACTION_TIMEOUT_FLOOR,
+    TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR,
 )
 from backend.ledger.action.terminal import (
     TerminalInputAction,
@@ -45,15 +46,18 @@ class TestPendingActionServiceInit:
 
 
 class TestEffectiveTimeout:
-    def test_terminal_actions_use_terminal_floor(self) -> None:
+    def test_terminal_run_uses_run_floor(self) -> None:
         base = float(DEFAULT_PENDING_ACTION_TIMEOUT)
-        for action in (
-            TerminalRunAction(),
-            TerminalInputAction(),
-            TerminalReadAction(),
-        ):
+        eff = PendingActionService._effective_timeout_seconds(
+            base, TerminalRunAction()
+        )
+        assert eff == max(base, TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR)
+
+    def test_terminal_io_uses_io_floor(self) -> None:
+        base = float(DEFAULT_PENDING_ACTION_TIMEOUT)
+        for action in (TerminalInputAction(), TerminalReadAction()):
             eff = PendingActionService._effective_timeout_seconds(base, action)
-            assert eff == max(base, TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR)
+            assert eff == max(base, TERMINAL_IO_PENDING_ACTION_TIMEOUT_FLOOR)
 
     def test_terminal_action_respects_higher_base(self) -> None:
         high = 900.0

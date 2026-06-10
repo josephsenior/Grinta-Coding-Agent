@@ -12,7 +12,8 @@ from backend.core.constants import (
     BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR,
     MCP_PENDING_ACTION_TIMEOUT_FLOOR,
-    TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR,
+    TERMINAL_IO_PENDING_ACTION_TIMEOUT_FLOOR,
+    TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR,
 )
 from backend.core.logger import app_logger as logger
 from backend.core.timeout_policy import effective_cmd_run_pending_timeout_seconds
@@ -31,8 +32,12 @@ def _cmd_run_pending_timeout(base: float, action: Action) -> float:
     return effective_cmd_run_pending_timeout_seconds(base, action)
 
 
-def _terminal_pending_timeout(base: float, _action: Action) -> float:
-    return max(float(base), float(TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR))
+def _terminal_run_pending_timeout(base: float, _action: Action) -> float:
+    return max(float(base), float(TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR))
+
+
+def _terminal_io_pending_timeout(base: float, _action: Action) -> float:
+    return max(float(base), float(TERMINAL_IO_PENDING_ACTION_TIMEOUT_FLOOR))
 
 
 def _debugger_pending_timeout(base: float, action: Action) -> float:
@@ -95,9 +100,9 @@ _TIMEOUT_POLICY_BY_ACTION_NAME = {
     'BrowserToolAction': lambda base, _action: max(
         float(base), float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS)
     ),
-    'TerminalRunAction': _terminal_pending_timeout,
-    'TerminalInputAction': _terminal_pending_timeout,
-    'TerminalReadAction': _terminal_pending_timeout,
+    'TerminalRunAction': _terminal_run_pending_timeout,
+    'TerminalInputAction': _terminal_io_pending_timeout,
+    'TerminalReadAction': _terminal_io_pending_timeout,
     'DebuggerAction': _debugger_pending_timeout,
 }
 
@@ -360,6 +365,15 @@ class PendingActionService:
         if action_type in _SUBPROCESS_ACTION_TYPES:
             try:
                 self._context.kill_running_command()
+            except Exception:
+                pass
+        if action_type in {
+            'TerminalRunAction',
+            'TerminalInputAction',
+            'TerminalReadAction',
+        }:
+            try:
+                self._context.close_hung_terminal_sessions()
             except Exception:
                 pass
 

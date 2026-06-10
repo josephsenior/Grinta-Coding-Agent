@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import shutil
 
-from backend.engine.tools._search_helpers import extract_search_results_payload
-from backend.engine.tools.grep import build_grep_action
+from backend.engine.tools.grep import build_grep_action, execute_grep
+from backend.ledger.observation.search import GrepObservation
 
 
-class TestBuildGrepAction:
+class TestExecuteGrep:
     def test_text_search_with_python_fallback(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
 
@@ -25,9 +25,11 @@ class TestBuildGrepAction:
             path=str(tmp_path),
             output_mode='files_with_matches',
         )
+        obs = execute_grep(action)
 
-        assert 'test.py' in action.thought
-        assert '.mypy_cache' not in action.thought
+        assert isinstance(obs, GrepObservation)
+        assert 'test.py' in obs.content
+        assert '.mypy_cache' not in obs.content
 
     def test_content_mode_returns_matching_lines(
         self, tmp_path, monkeypatch
@@ -44,9 +46,10 @@ class TestBuildGrepAction:
             path=str(tmp_path),
             output_mode='content',
         )
+        obs = execute_grep(action)
 
-        assert 'hello world' in action.thought
-        assert 'test.py' in action.thought
+        assert 'hello world' in obs.content
+        assert 'test.py' in obs.content
 
     def test_count_mode_returns_per_file_counts(
         self, tmp_path, monkeypatch
@@ -62,8 +65,9 @@ class TestBuildGrepAction:
             output_mode='count',
             case_sensitive=False,
         )
+        obs = execute_grep(action)
 
-        assert 'test.py:' in action.thought
+        assert 'test.py:' in obs.content
 
     def test_head_limit_paginates_output(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
@@ -77,10 +81,11 @@ class TestBuildGrepAction:
             output_mode='files_with_matches',
             head_limit=2,
         )
+        obs = execute_grep(action)
 
-        assert 'file0.py' in action.thought
-        assert 'file1.py' in action.thought
-        assert 'file4.py' not in action.thought
+        assert 'file0.py' in obs.content
+        assert 'file1.py' in obs.content
+        assert 'file4.py' not in obs.content
 
     def test_invalid_regex_returns_friendly_error(
         self, tmp_path, monkeypatch
@@ -88,33 +93,28 @@ class TestBuildGrepAction:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
 
         action = build_grep_action(pattern='(unclosed', path=str(tmp_path))
+        obs = execute_grep(action)
 
-        assert 'Invalid regex' in action.thought
-        assert 'glob' in action.thought
+        assert 'Invalid regex' in obs.content
+        assert obs.error
+        assert 'glob' in obs.content
 
     def test_missing_path_returns_error(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
 
         action = build_grep_action(pattern='hello', path=str(tmp_path / 'nope'))
+        obs = execute_grep(action)
 
-        assert 'Path does not exist' in action.thought
+        assert 'Path does not exist' in obs.content
+        assert obs.error
 
     def test_empty_pattern_rejected(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
 
         action = build_grep_action(pattern='', path=str(tmp_path))
+        obs = execute_grep(action)
 
-        assert 'non-empty' in action.thought
-        assert 'glob' in action.thought
+        assert 'non-empty' in obs.content
+        assert obs.error
+        assert 'glob' in obs.content
 
-
-class TestExtractSearchResultsPayload:
-    def test_extracts_payload_after_tag_not_only_at_start(self) -> None:
-        thought = (
-            "I can't read that file. Let me use grep:\n"
-            '[SEARCH_RESULTS]\n'
-            'src/node.py:12:async def _start_election'
-        )
-        payload = extract_search_results_payload(thought)
-        assert payload.startswith('src/node.py:12:')
-        assert "I can't read" not in payload

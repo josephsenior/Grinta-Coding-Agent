@@ -39,6 +39,8 @@ def _is_microcompactable(event: Event) -> bool:
         'MCPObservation',
         'TerminalObservation',
         'LspQueryObservation',
+        'GrepObservation',
+        'GlobObservation',
         'BrowserScreenshotObservation',
         'DebuggerObservation',
     }

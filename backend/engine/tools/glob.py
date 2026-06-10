@@ -17,18 +17,17 @@ from backend.engine.tools._search_helpers import (
     collect_python_target_files,
     format_python_file_listing,
     has_ripgrep,
+    make_glob_observation,
     normalize_glob_pattern,
     paginate_line_output,
-    path_exists_or_error,
+    path_exists_error,
     resolve_search_pagination,
     run_ripgrep_command,
-    search_error_action,
-    search_results_action,
 )
 from backend.engine.tools.common import create_tool_definition
-from backend.ledger.action import AgentThinkAction
-
 from backend.inference.tool_names import GLOB_TOOL_NAME
+from backend.ledger.action.search import GlobAction
+from backend.ledger.observation.search import GlobObservation
 
 _GLOB_DESCRIPTION = """\
 List files under a directory whose name (or relative path) matches a glob.
@@ -86,25 +85,49 @@ def build_glob_action(
     path: str = '.',
     head_limit: int | None = None,
     offset: int = 0,
-) -> AgentThinkAction:
-    """List files that match ``pattern`` under ``path``."""
-    path = path or '.'
-    pattern = normalize_glob_pattern(pattern or '')
+) -> GlobAction:
+    """Build a runnable ``GlobAction`` from tool-call arguments."""
     resolved_offset, resolved_head_limit = resolve_search_pagination(
         head_limit,
         offset,
     )
+    return GlobAction(
+        pattern=normalize_glob_pattern(pattern or ''),
+        path=path or '.',
+        head_limit=resolved_head_limit,
+        offset=resolved_offset,
+    )
+
+
+def execute_glob(action: GlobAction) -> GlobObservation:
+    """List files matching ``action.pattern`` under ``action.path``."""
+    path = action.path or '.'
+    pattern = action.pattern or ''
+    empty_message = 'No matching files found.'
 
     if not pattern:
-        return _invalid_glob_arguments_action()
+        message = (
+            'glob requires a non-empty `pattern` argument. '
+            'Use the `grep` tool to search inside files.'
+        )
+        return make_glob_observation(
+            pattern=pattern,
+            path=path,
+            files=[],
+            content=message,
+            error=message,
+        )
 
-    missing_path_error = path_exists_or_error(
-        path, source_tool=GLOB_TOOL_NAME
-    )
+    missing_path_error = path_exists_error(path)
     if missing_path_error is not None:
-        return missing_path_error
+        return make_glob_observation(
+            pattern=pattern,
+            path=path,
+            files=[],
+            content=missing_path_error,
+            error=missing_path_error,
+        )
 
-    empty_message = 'No matching files found.'
     rg_path = has_ripgrep()
     if rg_path:
         try:
@@ -116,38 +139,46 @@ def build_glob_action(
                 )
             )
         except Exception as exc:
-            return search_error_action(
-                f'Error running ripgrep: {exc}', source_tool=GLOB_TOOL_NAME
+            message = f'Error running ripgrep: {exc}'
+            return make_glob_observation(
+                pattern=pattern,
+                path=path,
+                files=[],
+                content=message,
+                error=message,
             )
         if getattr(result, 'timed_out', False):
-            return search_error_action(
-                'Search timed out after 30s',
-                source_tool=GLOB_TOOL_NAME,
+            message = 'Search timed out after 30s'
+            return make_glob_observation(
+                pattern=pattern,
+                path=path,
+                files=[],
+                content=message,
+                error=message,
             )
-        lines = result.stdout.splitlines()
-        return search_results_action(
-            paginate_line_output(
-                lines,
-                offset=resolved_offset,
-                head_limit=resolved_head_limit,
-                empty_message=empty_message,
-            ),
-            source_tool=GLOB_TOOL_NAME,
+        files = [line for line in result.stdout.splitlines() if line]
+        content = paginate_line_output(
+            files,
+            offset=action.offset,
+            head_limit=action.head_limit,
+            empty_message=empty_message,
+        )
+        return make_glob_observation(
+            pattern=pattern,
+            path=path,
+            files=files,
+            content=content,
         )
 
     target_files = collect_python_target_files(path, pattern)
-    return search_results_action(
-        format_python_file_listing(
-            target_files,
-            offset=resolved_offset,
-            head_limit=resolved_head_limit,
-        ),
-        source_tool=GLOB_TOOL_NAME,
+    content = format_python_file_listing(
+        target_files,
+        offset=action.offset,
+        head_limit=action.head_limit,
     )
-
-
-def _invalid_glob_arguments_action() -> AgentThinkAction:
-    return search_error_action(
-        'glob requires a non-empty `pattern` argument. Use the `grep` tool to search inside files.',
-        source_tool=GLOB_TOOL_NAME,
+    return make_glob_observation(
+        pattern=pattern,
+        path=path,
+        files=target_files,
+        content=content,
     )

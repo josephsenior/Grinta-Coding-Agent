@@ -73,7 +73,7 @@ ToolHandler = Callable[[dict[str, Any]], Action]
 AgentThinkToolHandler = Callable[[dict[str, Any]], AgentThinkAction]
 
 build_analyze_project_structure_action = cast(
-    AgentThinkToolHandler,
+    ToolHandler,
     cast(Any, analyze_project_structure_tools).build_analyze_project_structure_action,
 )
 build_blackboard_action = cast(

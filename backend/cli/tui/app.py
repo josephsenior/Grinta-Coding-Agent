@@ -295,6 +295,11 @@ class TUIRenderer(
         self._last_browser_action_card: Any | None = None
         self._last_browser_cmd: str = ''
         self._pending_lsp_card: Any | None = None
+        self._pending_search_card: Any | None = None
+        self._pending_search_tool: str = ''
+        self._pending_find_symbols_card: Any | None = None
+        self._pending_read_symbols_card: Any | None = None
+        self._pending_analyze_project_structure_card: Any | None = None
         self._pending_mcp_card: Any | None = None
         self._pending_delegate_card: Any | None = None
 

@@ -75,6 +75,7 @@ from backend.cli.transcript import (
     strip_tool_result_validation_annotations,
 )
 from backend.ledger.observation import (
+    AnalyzeProjectStructureObservation,
     AgentCondensationObservation,
     AgentStateChangedObservation,
     AgentThinkObservation,
@@ -86,6 +87,9 @@ from backend.ledger.observation import (
     FileEditObservation,
     FileReadObservation,
     FileWriteObservation,
+    FindSymbolsObservation,
+    GlobObservation,
+    GrepObservation,
     LspQueryObservation,
     MCPObservation,
     Observation,
@@ -97,6 +101,7 @@ from backend.ledger.observation import (
     TaskTrackingObservation,
     TerminalObservation,
     UserRejectObservation,
+    ReadSymbolsObservation,
 )
 from backend.ledger.observation.error import (
     ERROR_CATEGORY_NETWORK,
@@ -201,6 +206,14 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         (MCPObservation, '_render_mcp_observation'),
         (TerminalObservation, '_render_terminal_observation'),
         (LspQueryObservation, '_render_lsp_query_observation'),
+        (GrepObservation, '_render_grep_observation'),
+        (GlobObservation, '_render_glob_observation'),
+        (FindSymbolsObservation, '_render_find_symbols_observation'),
+        (ReadSymbolsObservation, '_render_read_symbols_observation'),
+        (
+            AnalyzeProjectStructureObservation,
+            '_render_analyze_project_structure_observation',
+        ),
         (ServerReadyObservation, '_render_server_ready_observation'),
         (SuccessObservation, '_render_success_observation'),
         (RecallFailureObservation, '_render_recall_failure_observation'),
@@ -798,6 +811,128 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             self._append_history(
                 format_activity_result_secondary(result_message, kind='neutral')
             )
+
+    def _render_grep_observation(self, obs: GrepObservation) -> None:
+        self._stop_reasoning()
+        content = obs.error or obs.content or ''
+        pending = cast(Any, self._take_pending_activity_card('grep'))
+        result_message = self._search_result_message(
+            query=obs.pattern,
+            content=content,
+            match_count=obs.match_count,
+            file_count=obs.file_count,
+        )
+        if pending is not None:
+            self._render_pending_activity_card(
+                pending,
+                result_message=result_message,
+                result_kind='neutral' if obs.error else 'ok',
+            )
+        elif result_message:
+            self._append_history(
+                format_activity_result_secondary(result_message, kind='neutral')
+            )
+
+    def _render_glob_observation(self, obs: GlobObservation) -> None:
+        self._stop_reasoning()
+        content = obs.error or obs.content or ''
+        pending = cast(Any, self._take_pending_activity_card('glob'))
+        result_message = self._search_result_message(
+            query=obs.pattern,
+            content=content,
+            match_count=0,
+            file_count=obs.file_count,
+        )
+        if pending is not None:
+            self._render_pending_activity_card(
+                pending,
+                result_message=result_message,
+                result_kind='neutral' if obs.error else 'ok',
+            )
+        elif result_message:
+            self._append_history(
+                format_activity_result_secondary(result_message, kind='neutral')
+            )
+
+    def _render_find_symbols_observation(self, obs: FindSymbolsObservation) -> None:
+        self._stop_reasoning()
+        pending = cast(Any, self._take_pending_activity_card('find_symbols'))
+        result_message = self._search_result_message(
+            query=obs.query,
+            content=obs.error or obs.content or '',
+            match_count=len(obs.candidates),
+            file_count=len({str(item.get("path") or "") for item in obs.candidates if item.get("path")}),
+        )
+        if pending is not None:
+            self._render_pending_activity_card(
+                pending,
+                result_message=result_message,
+                result_kind='neutral' if obs.error else 'ok',
+            )
+        elif result_message:
+            self._append_history(
+                format_activity_result_secondary(result_message, kind='neutral')
+            )
+
+    def _render_read_symbols_observation(self, obs: ReadSymbolsObservation) -> None:
+        self._stop_reasoning()
+        pending = cast(Any, self._take_pending_activity_card('read_symbols'))
+        result_message = self._lsp_result_message(
+            available=not bool(obs.error),
+            content=obs.error or obs.content or '',
+        )
+        if pending is not None:
+            self._render_pending_activity_card(
+                pending,
+                result_message=result_message,
+                result_kind='neutral' if obs.error else 'ok',
+            )
+        elif result_message:
+            self._append_history(
+                format_activity_result_secondary(result_message, kind='neutral')
+            )
+
+    def _render_analyze_project_structure_observation(
+        self, obs: AnalyzeProjectStructureObservation
+    ) -> None:
+        self._stop_reasoning()
+        pending = cast(
+            Any,
+            self._take_pending_activity_card('analyze_project_structure'),
+        )
+        result_message = self._lsp_result_message(
+            available=not bool(obs.error),
+            content=obs.error or obs.content or '',
+        )
+        if pending is not None:
+            self._render_pending_activity_card(
+                pending,
+                result_message=result_message,
+                result_kind='neutral' if obs.error else 'ok',
+            )
+        elif result_message:
+            self._append_history(
+                format_activity_result_secondary(result_message, kind='neutral')
+            )
+
+    @staticmethod
+    def _search_result_message(
+        *,
+        query: str,
+        content: str,
+        match_count: int,
+        file_count: int,
+    ) -> str | None:
+        if not content.strip():
+            return None
+        if match_count or file_count:
+            return f'{query!r}: {match_count} matches in {file_count} files'
+        lines = [line for line in content.splitlines() if line.strip()]
+        if not lines:
+            return None
+        preview = lines[0][:80]
+        suffix = f' · {len(lines)} lines' if len(lines) > 1 else ''
+        return f'{preview}{suffix}'
 
     @staticmethod
     def _lsp_result_message(*, available: bool, content: str) -> str | None:

@@ -1,7 +1,7 @@
 # pyright: reportUnknownParameterType=false, reportMissingParameterType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
 from dataclasses import replace
 from pathlib import Path
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -1003,3 +1003,63 @@ def test_pty_output_transcript_caption_notes_no_new_bytes_when_flag_false() -> N
         has_new_output=False,
     )
     assert 'no new bytes since last read' in cap
+
+
+@pytest.mark.asyncio
+async def test_terminal_read_closes_session_after_empty_streak(
+    mock_executor, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        'backend.execution.io_mixins._aes_io_terminal_mixin.TERMINAL_EMPTY_READ_CLOSE_THRESHOLD',
+        3,
+    )
+    workspace = tmp_path / 'workspace'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+
+    session = MagicMock()
+    session.shell_kind = 'powershell'
+    mock_executor.session_manager.get_session.return_value = session
+    mock_executor._read_terminal_with_mode = MagicMock(
+        return_value=('', 0, False, 0)
+    )
+
+    action = TerminalReadAction(session_id='terminal_1')
+    for _ in range(2):
+        obs = await mock_executor.terminal_read(action)
+        assert obs.__class__.__name__ == 'TerminalObservation'
+        assert obs.has_new_output is False
+
+    obs = await mock_executor.terminal_read(action)
+    assert isinstance(obs, ErrorObservation)
+    assert 'TERMINAL_SESSION_CLOSED' in obs.content
+    mock_executor.session_manager.close_session.assert_called_once_with('terminal_1')
+
+
+@pytest.mark.asyncio
+async def test_terminal_run_returns_error_when_execution_cap_exceeded(
+    mock_executor, tmp_path: Path
+) -> None:
+    import asyncio
+
+    workspace = tmp_path / 'workspace'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+
+    async def slow_impl(
+        self, _action: TerminalRunAction
+    ) -> ErrorObservation:
+        await asyncio.sleep(1.0)
+        raise AssertionError('terminal_run should have timed out before slow_impl finished')
+
+    mock_executor._terminal_run_impl = MethodType(slow_impl, mock_executor)
+
+    with patch(
+        'backend.execution.io_mixins._aes_io_terminal_mixin.TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS',
+        0.2,
+    ):
+        obs = await mock_executor.terminal_run(TerminalRunAction(command=''))
+
+    assert isinstance(obs, ErrorObservation)
+    assert obs.error_id == 'TERMINAL_RUN_TIMEOUT'
+    assert 'TERMINAL_RUN_TIMEOUT' in obs.content

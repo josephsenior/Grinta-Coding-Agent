@@ -23,7 +23,6 @@ from backend.engine.tools._aps_shared import (
     _imports_reverse_via_rg,
     _imports_reverse_via_walk,
 )
-from backend.ledger.action import AgentThinkAction
 
 _DEPENDENCY_MAX_DEPTH = 4
 _DEPENDENCY_MAX_NODES = 200
@@ -177,7 +176,7 @@ def _build_dependencies_action(
     *,
     depth: int,
     direction: str,
-) -> AgentThinkAction:
+) -> str:
     """Render an on-demand transitive import-graph for ``path``.
 
     Resurrects the removed GraphRAG ``explore_tree_structure`` capability
@@ -187,28 +186,24 @@ def _build_dependencies_action(
     """
     direction = direction.lower().strip() or 'both'
     if direction not in ('upstream', 'downstream', 'both'):
-        return AgentThinkAction(
-            thought=_diag(
-                reason=f'invalid direction {direction!r}',
-                command='dependencies',
-                params={'path': path, 'direction': direction, 'depth': depth},
-                next_steps=["Use direction='upstream', 'downstream', or 'both'."],
-            )
+        return _diag(
+            reason=f'invalid direction {direction!r}',
+            command='dependencies',
+            params={'path': path, 'direction': direction, 'depth': depth},
+            next_steps=["Use direction='upstream', 'downstream', or 'both'."],
         )
 
     root = os.path.abspath('.')
     abs_path = path if os.path.isabs(path) else os.path.join(root, path)
     if not os.path.isfile(abs_path):
-        return AgentThinkAction(
-            thought=_diag(
-                reason='anchor file not found',
-                command='dependencies',
-                params={'path': path, 'direction': direction, 'depth': depth},
-                next_steps=[
-                    'Pass a file path relative to the workspace root.',
-                    'Run command=tree to discover the actual file location.',
-                ],
-            )
+        return _diag(
+            reason='anchor file not found',
+            command='dependencies',
+            params={'path': path, 'direction': direction, 'depth': depth},
+            next_steps=[
+                'Pass a file path relative to the workspace root.',
+                'Run command=tree to discover the actual file location.',
+            ],
         )
 
     effective_depth = max(1, min(int(depth or 2), _DEPENDENCY_MAX_DEPTH))
@@ -259,4 +254,4 @@ def _build_dependencies_action(
     out.append('=== EDGES (json) ===')
     out.append(json.dumps(edge_payload, indent=2, sort_keys=True))
 
-    return AgentThinkAction(thought='\n'.join(out))
+    return '\n'.join(out)

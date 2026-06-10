@@ -31,6 +31,7 @@ from backend.engine.tools.browser_native import (
 )
 from backend.engine.tools.grep import build_grep_action
 from backend.engine.tools.glob import build_glob_action
+from backend.ledger.action.search import GrepAction, GlobAction
 from backend.engine.tools.task_tracker import TaskTracker
 from backend.inference.tool_names import (
     TASK_TRACKER_TOOL_NAME,
@@ -40,23 +41,31 @@ from backend.inference.tool_names import (
 )
 from backend.ledger.action import (
     Action,
-    AgentThinkAction,
+    AnalyzeProjectStructureAction,
     BrowserToolAction,
+    CheckpointAction,
     CmdRunAction,
     FileEditAction,
+    MemoryPersistAction,
+    MemoryRecallAction,
     TaskTrackingAction,
+    WorkingMemoryAction,
+)
+from backend.ledger.observation.memory_tools import (
+    MemoryPersistObservation,
+    MemoryRecallObservation,
 )
 from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.action.mcp import MCPAction
 
-AgentThinkToolHandler = Callable[[dict[str, Any]], AgentThinkAction]
+ActionToolHandler = Callable[[dict[str, Any]], Action]
 
 build_analyze_project_structure_action = cast(
-    AgentThinkToolHandler,
+    ActionToolHandler,
     cast(Any, analyze_project_structure_tools).build_analyze_project_structure_action,
 )
 build_checkpoint_action = cast(
-    AgentThinkToolHandler, cast(Any, checkpoint_tools).build_checkpoint_action
+    ActionToolHandler, cast(Any, checkpoint_tools).build_checkpoint_action
 )
 
 # Callback for semantic recall — set by the orchestrator at init time.
@@ -135,7 +144,51 @@ def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
     return action
 
 
-def _handle_memory_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
+def execute_memory_persist(action: MemoryPersistAction) -> MemoryPersistObservation:
+    """Persist a workspace memory entry."""
+    from backend.engine.tools.workspace_memory import persist_entry
+
+    inserted, message = persist_entry(
+        kind=action.kind, key=action.key, value=action.value
+    )
+    return MemoryPersistObservation(
+        content=message,
+        key=action.key,
+        kind=action.kind,
+        inserted=inserted,
+    )
+
+
+def execute_memory_recall(action: MemoryRecallAction) -> MemoryRecallObservation:
+    """Semantic recall over indexed conversation history."""
+    query = action.query
+    recall_fn = _semantic_recall_registry.get('fn')
+    if recall_fn is None:
+        return MemoryRecallObservation(
+            content='Vector memory is not available in this session.',
+            query=query,
+        )
+    results = recall_fn(query, 5)
+    if not results:
+        return MemoryRecallObservation(
+            content=f'No indexed memory results found for query: {query!r}',
+            query=query,
+        )
+    parts = [f'{len(results)} results for query: {query!r}\n']
+    for i, item in enumerate(results, 1):
+        content = item.get('content_text', item.get('content', ''))
+        role = item.get('role', 'unknown')
+        score = item.get('score', '')
+        score_str = f' (score={score:.3f})' if isinstance(score, float) else ''
+        parts.append(f'  [{i}] ({role}{score_str}) {content[:500]}')
+    return MemoryRecallObservation(
+        content='\n'.join(parts),
+        query=query,
+        hits=list(results),
+    )
+
+
+def _handle_memory_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle unified memory ops: working, persist, recall."""
     action = str(arguments.get('action', '')).strip().lower()
     if not action:
@@ -147,29 +200,9 @@ def _handle_memory_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
             raise FunctionCallValidationError(
                 'Missing search phrase "key" in memory(recall)'
             )
-        k = 5
-        recall_fn = _semantic_recall_registry.get('fn')
-        if recall_fn is None:
-            return AgentThinkAction(
-                thought='[MEMORY_RECALL] Vector memory is not available in this session.'
-            )
-        results = recall_fn(query, k)
-        if not results:
-            return AgentThinkAction(
-                thought=f'[MEMORY_RECALL] No indexed memory results found for query: {query!r}'
-            )
-        parts = [f'[MEMORY_RECALL] {len(results)} results for query: {query!r}\n']
-        for i, item in enumerate(results, 1):
-            content = item.get('content_text', item.get('content', ''))
-            role = item.get('role', 'unknown')
-            score = item.get('score', '')
-            score_str = f' (score={score:.3f})' if isinstance(score, float) else ''
-            parts.append(f'  [{i}] ({role}{score_str}) {content[:500]}')
-        return AgentThinkAction(thought='\n'.join(parts))
+        return MemoryRecallAction(query=query)
 
     if action == 'persist':
-        from backend.engine.tools.workspace_memory import persist_entry
-
         key = cast(str, arguments.get('key', ''))
         value = cast(str, arguments.get('value', ''))
         kind = cast(str, arguments.get('kind', 'lesson'))
@@ -177,8 +210,7 @@ def _handle_memory_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
             raise FunctionCallValidationError('persist requires non-empty key.')
         if not value.strip():
             raise FunctionCallValidationError('persist requires non-empty value.')
-        _inserted, message = persist_entry(kind=kind, key=key, value=value)
-        return AgentThinkAction(thought=f'[MEMORY_PERSIST] {message}')
+        return MemoryPersistAction(key=key, value=value, kind=kind)
 
     if action == 'working':
         import backend.engine.tools.working_memory as working_memory_tools
@@ -188,11 +220,11 @@ def _handle_memory_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
             'section': cast(str, arguments.get('section', 'all')),
             'content': cast(str, arguments.get('content', '')),
         }
-        build_working_memory_action = cast(
-            AgentThinkToolHandler,
+        build_wm = cast(
+            ActionToolHandler,
             cast(Any, working_memory_tools).build_working_memory_action,
         )
-        return build_working_memory_action(wm_args)
+        return build_wm(wm_args)
 
     raise FunctionCallValidationError(
         f"Unknown memory action: {action!r}. Use working, persist, or recall."
@@ -202,7 +234,7 @@ def _handle_memory_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
 _handle_memory_manager_tool = _handle_memory_tool
 
 
-def _handle_grep_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
+def _handle_grep_tool(arguments: Mapping[str, Any]) -> GrepAction:
     """Handle GREP tool: regex text search across files via ripgrep/Python."""
     return build_grep_action(
         pattern=cast(str, arguments.get('pattern', '')),
@@ -216,7 +248,7 @@ def _handle_grep_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     )
 
 
-def _handle_glob_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
+def _handle_glob_tool(arguments: Mapping[str, Any]) -> GlobAction:
     """Handle GLOB tool: list files matching a glob pattern."""
     return build_glob_action(
         pattern=cast(str, arguments.get('pattern', '')),
@@ -242,14 +274,14 @@ def _handle_undo_last_edit_tool(arguments: Mapping[str, Any]) -> Action:
     )
 
 
-def _handle_checkpoint_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
+def _handle_checkpoint_tool(arguments: Mapping[str, Any]) -> CheckpointAction:
     """Handle checkpoint tool: save/view/revert/clear progress checkpoints."""
-    return build_checkpoint_action(dict(arguments))
+    return cast(CheckpointAction, build_checkpoint_action(dict(arguments)))
 
 
 def _handle_analyze_project_structure_tool(
     arguments: Mapping[str, Any],
-) -> AgentThinkAction:
+) -> AnalyzeProjectStructureAction:
     """Handle analyze_project_structure tool: structural overview of the workspace."""
     return build_analyze_project_structure_action(dict(arguments))
 

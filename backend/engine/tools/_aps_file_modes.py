@@ -23,7 +23,6 @@ from backend.engine.tools._aps_shared import (
     _imports_reverse_via_walk,
     _run_command,
 )
-from backend.ledger.action import AgentThinkAction
 
 
 def _imports_forward_block(path: str) -> list[str]:
@@ -42,7 +41,7 @@ def _imports_forward_block(path: str) -> list[str]:
     return out
 
 
-def _build_imports_action(path: str) -> AgentThinkAction:
+def _build_imports_action(path: str) -> str:
     """Show what a file imports AND what other files import it."""
     out = [f'=== IMPORTS IN {os.path.basename(path)} ===']
     out.extend(_imports_forward_block(path))
@@ -53,7 +52,7 @@ def _build_imports_action(path: str) -> AgentThinkAction:
     rg_hits = _imports_reverse_via_rg(basename)
     if rg_hits is not None:
         out.extend(rg_hits)
-        return AgentThinkAction(thought='\n'.join(out))
+        return '\n'.join(out)
 
     walk_hits = _imports_reverse_via_walk(basename)
     if walk_hits:
@@ -71,7 +70,7 @@ def _build_imports_action(path: str) -> AgentThinkAction:
                 ],
             )
         )
-    return AgentThinkAction(thought='\n'.join(out))
+    return '\n'.join(out)
 
 
 def _ast_func_outline_signature(
@@ -175,7 +174,7 @@ def _file_outline_fallback_lines(path: str) -> list[str]:
     return lines_out
 
 
-def _build_file_outline_action(path: str) -> AgentThinkAction:
+def _build_file_outline_action(path: str) -> str:
     """Compact API-style outline: Python AST signatures, else line-based heads."""
     base = os.path.basename(path)
     out: list[str] = [f'=== FILE OUTLINE: {base} ===']
@@ -191,7 +190,7 @@ def _build_file_outline_action(path: str) -> AgentThinkAction:
                 ],
             )
         )
-        return AgentThinkAction(thought='\n'.join(out))
+        return '\n'.join(out)
 
     if path.endswith('.py'):
         try:
@@ -199,9 +198,7 @@ def _build_file_outline_action(path: str) -> AgentThinkAction:
             tree = ast.parse(src)
         except (OSError, SyntaxError, ValueError) as e:
             out.append(f'(could not parse Python AST: {e}; falling back to line heads)')
-            return AgentThinkAction(
-                thought='\n'.join(out + _file_outline_fallback_lines(path))
-            )
+            return '\n'.join(out + _file_outline_fallback_lines(path))
 
         out.extend(_python_outline_lines_from_ast(tree))
         if len(out) <= 1:
@@ -216,13 +213,13 @@ def _build_file_outline_action(path: str) -> AgentThinkAction:
                     ],
                 )
             )
-        return AgentThinkAction(thought='\n'.join(out))
+        return '\n'.join(out)
 
     out.extend(_file_outline_fallback_lines(path))
-    return AgentThinkAction(thought='\n'.join(out))
+    return '\n'.join(out)
 
 
-def _build_recent_action() -> AgentThinkAction:
+def _build_recent_action() -> str:
     """Recently modified files via git log."""
     out = ['=== RECENTLY MODIFIED FILES (last 20 commits) ===']
     try:
@@ -246,10 +243,10 @@ def _build_recent_action() -> AgentThinkAction:
             )
     except Exception:
         out.append('(git not available or error running git)')
-    return AgentThinkAction(thought='\n'.join(out))
+    return '\n'.join(out)
 
 
-def _build_semantic_search_action(symbol: str, path: str) -> AgentThinkAction:
+def _build_semantic_search_action(symbol: str, path: str) -> str:
     """Robust AST-based reference search using the semantic_analyzer script."""
     import sys
 
@@ -261,18 +258,14 @@ def _build_semantic_search_action(symbol: str, path: str) -> AgentThinkAction:
             [sys.executable, script_path, 'find_references', symbol, path],
             process_timeout=30.0,
         )
-        return AgentThinkAction(
-            thought=res.stdout
-            if res.stdout.strip()
-            else _diag(
-                reason='AST search returned no output',
-                command='semantic_search',
-                params={'symbol': symbol, 'path': path},
-                next_steps=[
-                    'Confirm path points to a parseable source file.',
-                    'Try command=callers for a faster regex-based scan.',
-                ],
-            )
+        return res.stdout if res.stdout.strip() else _diag(
+            reason='AST search returned no output',
+            command='semantic_search',
+            params={'symbol': symbol, 'path': path},
+            next_steps=[
+                'Confirm path points to a parseable source file.',
+                'Try command=callers for a faster regex-based scan.',
+            ],
         )
     except Exception as e:
-        return AgentThinkAction(thought=f'(error running semantic search: {e})')
+        return f'(error running semantic search: {e})'

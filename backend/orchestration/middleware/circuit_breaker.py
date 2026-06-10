@@ -22,6 +22,8 @@ _PROGRESS_OBSERVATION_TYPES: tuple[str, ...] = (
     'FileWriteObservation',
     'AgentDelegateObservation',
     'LspQueryObservation',
+    'GrepObservation',
+    'GlobObservation',
     # Updating the structured task plan counts as real progress so long
     # multi-step tasks do not trip stuck detection while they are still
     # advancing through tracked work.

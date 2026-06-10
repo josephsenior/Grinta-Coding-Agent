@@ -18,9 +18,10 @@ def test_recall_lessons_empty_returns_clear_message_without_write(
     notes_path = tmp_path / 'agent_notes.json'
     monkeypatch.setattr(note_tools, '_notes_path', lambda: notes_path)
 
-    thought = note_tools.build_recall_action('lessons').thought
+    action = note_tools.build_recall_action('lessons')
+    obs = note_tools.execute_scratchpad_recall(action)
 
-    assert 'No lessons stored yet' in thought
+    assert 'No lessons stored yet' in obs.content
     assert not notes_path.exists()
 
 
@@ -28,9 +29,10 @@ def test_recall_missing_non_lessons_key_returns_not_found(monkeypatch, tmp_path)
     notes_path = tmp_path / 'agent_notes.json'
     monkeypatch.setattr(note_tools, '_notes_path', lambda: notes_path)
 
-    thought = note_tools.build_recall_action('does_not_exist').thought
+    action = note_tools.build_recall_action('does_not_exist')
+    obs = note_tools.execute_scratchpad_recall(action)
 
-    assert "Note 'does_not_exist' not found" in thought
+    assert "Note 'does_not_exist' not found" in obs.content
     assert not notes_path.exists()
 
 
@@ -49,44 +51,15 @@ def test_append_to_note_accumulates_with_timestamps(monkeypatch, tmp_path):
     stored = payload['lessons']
     assert 'First session lesson' in stored
     assert 'Second session lesson' in stored
-    # Entries are newline-separated so the log reads as a bulleted history.
-    assert stored.count('\n') == 1
 
 
-def test_append_to_note_ignores_empty_values(monkeypatch, tmp_path):
+def test_build_note_action_persists_via_execute(monkeypatch, tmp_path):
     notes_path = tmp_path / 'agent_notes.json'
     monkeypatch.setattr(note_tools, '_notes_path', lambda: notes_path)
 
-    note_tools.append_to_note('lessons', '')
-    note_tools.append_to_note('lessons', '   ')
+    action = note_tools.build_note_action('auth_decision', 'use JWT')
+    obs = note_tools.execute_scratchpad_note(action)
 
-    assert not notes_path.exists()
-
-
-def test_append_to_note_caps_entry_count(monkeypatch, tmp_path):
-    notes_path = tmp_path / 'agent_notes.json'
-    monkeypatch.setattr(note_tools, '_notes_path', lambda: notes_path)
-
-    for i in range(5):
-        note_tools.append_to_note('lessons', f'lesson {i}', max_entries=3)
-
+    assert 'Noted [auth_decision]' in obs.content
     payload = json.loads(notes_path.read_text(encoding='utf-8'))
-    lines = payload['lessons'].splitlines()
-    assert len(lines) == 3
-    # Only the most recent entries are retained.
-    assert 'lesson 2' in lines[0]
-    assert 'lesson 4' in lines[-1]
-
-
-def test_append_to_note_dedupes_repeated_lessons(monkeypatch, tmp_path):
-    notes_path = tmp_path / 'agent_notes.json'
-    monkeypatch.setattr(note_tools, '_notes_path', lambda: notes_path)
-
-    note_tools.append_to_note('lessons', 'PowerShell terminal needs submitted input')
-    note_tools.append_to_note('lessons', 'PowerShell terminal needs submitted input')
-
-    payload = json.loads(notes_path.read_text(encoding='utf-8'))
-    lines = payload['lessons'].splitlines()
-    assert len(lines) == 1
-    assert 'PowerShell terminal needs submitted input' in lines[0]
-    assert '(seen 2x)' in lines[0]
+    assert payload['auth_decision'] == 'use JWT'

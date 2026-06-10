@@ -25,7 +25,6 @@ from backend.cli.tool_call_display import (
     redact_streamed_tool_call_markers,
     redact_task_list_json_blobs,
 )
-from backend.cli.transcript import strip_pseudo_xml_function_calls
 from backend.engine import prompt_role_debug as _prompt_role_debug
 
 
@@ -104,13 +103,22 @@ _TASK_TRACKING_BLOCK_PREFIXES: tuple[str, ...] = (
 )
 
 
+def sanitize_streaming_thinking_text(text: str) -> str:
+    """Sanitize model reasoning for display — same rules as assistant prose.
+
+    Use on ``StreamingChunkAction.thinking_accumulated`` and on pure-reasoning
+    blocks after artifact classification.  Do **not** run this before
+    :meth:`_classify_thinking_text` on ``AgentThinkAction`` payloads that may
+    route to activity cards (``[WORKING_MEMORY]``, …).
+    """
+    return sanitize_visible_transcript_text(text)
+
+
 def sanitize_visible_transcript_text(text: str) -> str:
     """Remove internal prompt scaffolding and protocol chatter."""
     stripped = redact_internal_result_markers(
         redact_task_list_json_blobs(
-            strip_pseudo_xml_function_calls(
-                redact_streamed_tool_call_markers((text or '').strip())
-            )
+            redact_streamed_tool_call_markers((text or '').strip())
         )
     )
     if not stripped:

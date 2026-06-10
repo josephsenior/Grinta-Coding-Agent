@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from backend.core.config.security_config import SecurityConfig
 from backend.core.constants import (
     BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
+    TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS,
     TOOL_BRIDGE_TIMEOUT_BUFFER,
     TOOL_BRIDGE_TIMEOUT_FILE_IO,
     TOOL_BRIDGE_TIMEOUT_LSP_QUERY,
@@ -45,6 +46,13 @@ from backend.ledger.action import (
     MCPAction,
 )
 from backend.ledger.action.code_nav import LspQueryAction
+from backend.ledger.action.search import (
+    AnalyzeProjectStructureAction,
+    FindSymbolsAction,
+    GlobAction,
+    GrepAction,
+    ReadSymbolsAction,
+)
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
@@ -376,7 +384,11 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         """Start an interactive terminal session via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_TERMINAL_RUN)
+        # Do not inherit inflated action.timeout (e.g. 900s runtime cap) for open.
+        timeout = min(
+            TOOL_BRIDGE_TIMEOUT_TERMINAL_RUN,
+            TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS + TOOL_BRIDGE_TIMEOUT_BUFFER,
+        )
         return call_async_from_sync(self._executor.terminal_run, timeout, action)
 
     def terminal_input(self, action: TerminalInputAction) -> Observation:
@@ -426,6 +438,87 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
         timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_LSP_QUERY)
         return call_async_from_sync(self._executor.lsp_query, timeout, action)
+
+    def grep(self, action: GrepAction) -> Observation:
+        """Execute grep search via RuntimeExecutor."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_LSP_QUERY)
+        return call_async_from_sync(self._executor.grep, timeout, action)
+
+    def glob(self, action: GlobAction) -> Observation:
+        """Execute glob listing via RuntimeExecutor."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_LSP_QUERY)
+        return call_async_from_sync(self._executor.glob, timeout, action)
+
+    def find_symbols(self, action: FindSymbolsAction) -> Observation:
+        """Execute symbol discovery via RuntimeExecutor."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_LSP_QUERY)
+        return call_async_from_sync(self._executor.find_symbols, timeout, action)
+
+    def read_symbols(self, action: ReadSymbolsAction) -> Observation:
+        """Execute symbol reads via RuntimeExecutor."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_LSP_QUERY)
+        return call_async_from_sync(self._executor.read_symbols, timeout, action)
+
+    def analyze_project_structure(
+        self, action: AnalyzeProjectStructureAction
+    ) -> Observation:
+        """Execute APS analysis via RuntimeExecutor."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_LSP_QUERY)
+        return call_async_from_sync(
+            self._executor.analyze_project_structure, timeout, action
+        )
+
+    def checkpoint(self, action: Any) -> Observation:
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        return call_async_from_sync(
+            self._executor.checkpoint, TOOL_BRIDGE_TIMEOUT_FILE_IO, action
+        )
+
+    def working_memory(self, action: Any) -> Observation:
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        return call_async_from_sync(
+            self._executor.working_memory, TOOL_BRIDGE_TIMEOUT_FILE_IO, action
+        )
+
+    def memory_persist(self, action: Any) -> Observation:
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        return call_async_from_sync(
+            self._executor.memory_persist, TOOL_BRIDGE_TIMEOUT_FILE_IO, action
+        )
+
+    def memory_recall(self, action: Any) -> Observation:
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        return call_async_from_sync(
+            self._executor.memory_recall, TOOL_BRIDGE_TIMEOUT_LSP_QUERY, action
+        )
+
+    def scratchpad_note(self, action: Any) -> Observation:
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        return call_async_from_sync(
+            self._executor.scratchpad_note, TOOL_BRIDGE_TIMEOUT_FILE_IO, action
+        )
+
+    def scratchpad_recall(self, action: Any) -> Observation:
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        return call_async_from_sync(
+            self._executor.scratchpad_recall, TOOL_BRIDGE_TIMEOUT_FILE_IO, action
+        )
 
     @staticmethod
     def _bridge_timeout(action: Any, fallback_ceiling: float) -> float:

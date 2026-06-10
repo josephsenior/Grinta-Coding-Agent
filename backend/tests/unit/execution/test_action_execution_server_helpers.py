@@ -57,6 +57,26 @@ def test_uses_powershell_shell_contract_windows_and_session_fallback() -> None:
         assert h.uses_powershell_shell_contract(ex) is True
 
 
+def test_close_interactive_terminal_sessions_closes_terminal_prefix_only() -> None:
+    ex = MagicMock()
+    ex.session_manager.sessions = {
+        'default': MagicMock(),
+        'terminal_1': MagicMock(),
+        'terminal_2': MagicMock(),
+        'bg-abc': MagicMock(),
+    }
+    ex._terminal_sessions_awaiting_interaction = ['terminal_1']
+    ex._terminal_read_cursor = {'terminal_1': 5}
+    ex._terminal_empty_read_streak = {'terminal_1': 2}
+
+    closed = h.close_interactive_terminal_sessions(ex)
+
+    assert set(closed) == {'terminal_1', 'terminal_2'}
+    assert ex.session_manager.close_session.call_count == 2
+    assert 'terminal_1' not in ex._terminal_read_cursor
+    assert 'terminal_1' not in ex._terminal_empty_read_streak
+
+
 def test_strip_and_failure_signature_and_terminal_mode_hints() -> None:
     assert h.strip_ansi_obs_text('\x1b[31mred\x1b[0m') == 'red'
     assert h.extract_failure_signature('a\nb\nc\nd') == 'b | c | d'

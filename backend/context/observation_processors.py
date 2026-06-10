@@ -6,17 +6,29 @@ from typing import TYPE_CHECKING
 
 from backend.core.message import ImageContent, Message, TextContent
 from backend.ledger.observation import (
+    AnalyzeProjectStructureObservation,
     BrowserScreenshotObservation,
     CmdOutputObservation,
     ErrorObservation,
     FileDownloadObservation,
     FileEditObservation,
     FileReadObservation,
+    FindSymbolsObservation,
     MCPObservation,
     Observation,
+    ReadSymbolsObservation,
     UserRejectObservation,
 )
 from backend.ledger.observation.agent import AgentCondensationObservation
+from backend.ledger.observation.memory_tools import (
+    CheckpointObservation,
+    MemoryPersistObservation,
+    MemoryRecallObservation,
+    ScratchpadNoteObservation,
+    ScratchpadRecallObservation,
+    WorkingMemoryObservation,
+)
+from backend.ledger.observation.search import GlobObservation, GrepObservation
 from backend.ledger.serialization.event import truncate_content
 
 if TYPE_CHECKING:
@@ -70,6 +82,119 @@ def _handle_file_read_observation(
     path = getattr(obs, 'path', 'unknown')
     text = truncate_content(obs.content, max_message_chars, strategy='head_heavy')
     text = f'[FILE_READ path={path}]\n{text}'
+    return Message(role='user', content=[TextContent(text=text)])
+
+
+@_register_observation_handler(GrepObservation)
+def _handle_grep_observation(
+    obs: GrepObservation, max_message_chars: int | None
+) -> Message:
+    header = (
+        f'[GREP pattern={obs.pattern!r} path={obs.path!r} '
+        f'mode={obs.output_mode!r}]'
+    )
+    body = obs.error or obs.content
+    text = truncate_content(f'{header}\n{body}', max_message_chars, strategy='head_heavy')
+    return Message(role='user', content=[TextContent(text=text)])
+
+
+@_register_observation_handler(GlobObservation)
+def _handle_glob_observation(
+    obs: GlobObservation, max_message_chars: int | None
+) -> Message:
+    header = f'[GLOB pattern={obs.pattern!r} path={obs.path!r}]'
+    body = obs.error or obs.content
+    text = truncate_content(f'{header}\n{body}', max_message_chars, strategy='head_heavy')
+    return Message(role='user', content=[TextContent(text=text)])
+
+
+@_register_observation_handler(FindSymbolsObservation)
+def _handle_find_symbols_observation(
+    obs: FindSymbolsObservation, max_message_chars: int | None
+) -> Message:
+    header = (
+        f'[FIND_SYMBOLS query={obs.query!r} path={obs.path!r} '
+        f'symbol_kind={obs.symbol_kind!r}]'
+    )
+    body = obs.error or obs.content
+    text = truncate_content(f'{header}\n{body}', max_message_chars, strategy='head_heavy')
+    return Message(role='user', content=[TextContent(text=text)])
+
+
+@_register_observation_handler(ReadSymbolsObservation)
+def _handle_read_symbols_observation(
+    obs: ReadSymbolsObservation, max_message_chars: int | None
+) -> Message:
+    header = f'[READ_SYMBOLS path={obs.path!r} symbol_kind={obs.symbol_kind!r}]'
+    body = obs.error or obs.content
+    text = truncate_content(f'{header}\n{body}', max_message_chars, strategy='head_heavy')
+    return Message(role='user', content=[TextContent(text=text)])
+
+
+@_register_observation_handler(AnalyzeProjectStructureObservation)
+def _handle_analyze_project_structure_observation(
+    obs: AnalyzeProjectStructureObservation, max_message_chars: int | None
+) -> Message:
+    header = (
+        f'[ANALYZE_PROJECT_STRUCTURE command={obs.command!r} path={obs.path!r} '
+        f'symbol={obs.symbol!r} depth={obs.depth!r} direction={obs.direction!r}]'
+    )
+    body = obs.error or obs.content
+    text = truncate_content(f'{header}\n{body}', max_message_chars, strategy='head_heavy')
+    return Message(role='user', content=[TextContent(text=text)])
+
+
+@_register_observation_handler(CheckpointObservation)
+def _handle_checkpoint_observation(
+    obs: CheckpointObservation, max_message_chars: int | None
+) -> Message:
+    header = f'[CHECKPOINT command={obs.command!r} status={obs.status!r} ok={obs.ok}]'
+    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
+    return Message(role='user', content=[TextContent(text=text)])
+
+
+@_register_observation_handler(WorkingMemoryObservation)
+def _handle_working_memory_observation(
+    obs: WorkingMemoryObservation, max_message_chars: int | None
+) -> Message:
+    header = f'[WORKING_MEMORY command={obs.command!r} section={obs.section!r}]'
+    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
+    return Message(role='user', content=[TextContent(text=text)])
+
+
+@_register_observation_handler(MemoryPersistObservation)
+def _handle_memory_persist_observation(
+    obs: MemoryPersistObservation, max_message_chars: int | None
+) -> Message:
+    header = f'[MEMORY_PERSIST key={obs.key!r} kind={obs.kind!r}]'
+    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
+    return Message(role='user', content=[TextContent(text=text)])
+
+
+@_register_observation_handler(MemoryRecallObservation)
+def _handle_memory_recall_observation(
+    obs: MemoryRecallObservation, max_message_chars: int | None
+) -> Message:
+    header = f'[MEMORY_RECALL query={obs.query!r}]'
+    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
+    return Message(role='user', content=[TextContent(text=text)])
+
+
+@_register_observation_handler(ScratchpadNoteObservation)
+def _handle_scratchpad_note_observation(
+    obs: ScratchpadNoteObservation, max_message_chars: int | None
+) -> Message:
+    header = f'[SCRATCHPAD_NOTE key={obs.key!r}]'
+    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
+    return Message(role='user', content=[TextContent(text=text)])
+
+
+@_register_observation_handler(ScratchpadRecallObservation)
+def _handle_scratchpad_recall_observation(
+    obs: ScratchpadRecallObservation, max_message_chars: int | None
+) -> Message:
+    header = f'[SCRATCHPAD_RECALL key={obs.key!r} found={obs.found}]'
+    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
     return Message(role='user', content=[TextContent(text=text)])
 
 

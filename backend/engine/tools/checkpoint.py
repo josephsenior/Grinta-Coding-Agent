@@ -17,7 +17,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from backend.ledger.action.agent import AgentThinkAction
+from backend.ledger.action.memory_tools import CheckpointAction
+from backend.ledger.observation.memory_tools import CheckpointObservation
 
 from backend.inference.tool_names import CHECKPOINT_TOOL_NAME
 
@@ -95,21 +96,26 @@ def create_checkpoint_tool() -> dict:
     }
 
 
-def build_checkpoint_action(arguments: dict) -> AgentThinkAction:
-    """Execute a checkpoint command and return a think action with results."""
-    command = arguments.get('command', 'view')
+def build_checkpoint_action(arguments: dict) -> CheckpointAction:
+    """Build a runnable checkpoint action from tool arguments."""
+    return CheckpointAction(
+        command=str(arguments.get('command', 'view') or 'view'),
+        label=str(arguments.get('label', '') or ''),
+        files_modified=str(arguments.get('files_modified', '') or ''),
+        checkpoint_id=str(arguments.get('checkpoint_id', '') or ''),
+    )
 
+
+def execute_checkpoint(action: CheckpointAction) -> CheckpointObservation:
+    """Execute a checkpoint command and return a structured observation."""
+    command = (action.command or 'view').strip().lower()
     if command == 'save':
-        return _save_checkpoint(
-            arguments.get('label', ''),
-            arguments.get('files_modified', ''),
-        )
-    elif command == 'revert':
-        return _revert_checkpoint(arguments.get('checkpoint_id', ''))
-    elif command == 'clear':
+        return _save_checkpoint(action.label, action.files_modified)
+    if command == 'revert':
+        return _revert_checkpoint(action.checkpoint_id)
+    if command == 'clear':
         return _clear_checkpoints()
-    else:
-        return _view_checkpoints()
+    return _view_checkpoints()
 
 
 def _normalized_checkpoint_files(files_modified: str) -> list[str]:
@@ -120,7 +126,7 @@ def _duplicate_checkpoint_save_result(
     checkpoints: list[dict],
     *,
     label: str,
-) -> AgentThinkAction | None:
+) -> CheckpointObservation | None:
     if not checkpoints:
         return None
 
@@ -195,7 +201,7 @@ def _attach_rollback_snapshot(
         pass
 
 
-def _save_checkpoint(label: str, files_modified: str) -> AgentThinkAction:
+def _save_checkpoint(label: str, files_modified: str) -> CheckpointObservation:
     if not label:
         return _checkpoint_result(
             command='save',
@@ -266,7 +272,7 @@ def _save_checkpoint(label: str, files_modified: str) -> AgentThinkAction:
     )
 
 
-def _revert_checkpoint(checkpoint_id: str) -> AgentThinkAction:
+def _revert_checkpoint(checkpoint_id: str) -> CheckpointObservation:
     checkpoint_id = (checkpoint_id or '').strip()
 
     from backend.core.rollback.rollback_manager import RollbackManager
@@ -371,7 +377,7 @@ def _resolve_rollback_id(checkpoint_id: str, manager: Any) -> str | None:
     return checkpoint_id if manager.get_checkpoint(checkpoint_id) else None
 
 
-def _view_checkpoints() -> AgentThinkAction:
+def _view_checkpoints() -> CheckpointObservation:
     checkpoints = _load_checkpoints()
     if not checkpoints:
         return _checkpoint_result(
@@ -428,7 +434,7 @@ def _view_checkpoints() -> AgentThinkAction:
     )
 
 
-def _clear_checkpoints() -> AgentThinkAction:
+def _clear_checkpoints() -> CheckpointObservation:
     checkpoints = _load_checkpoints()
     if not checkpoints:
         return _checkpoint_result(
@@ -484,7 +490,7 @@ def _checkpoint_result(
     next_best_action: str,
     human_message: str,
     data: dict[str, Any] | None = None,
-) -> AgentThinkAction:
+) -> CheckpointObservation:
     """Return a human + structured checkpoint result for stronger tool feedback."""
     payload: dict[str, Any] = {
         'tool': CHECKPOINT_TOOL_NAME,
@@ -500,9 +506,15 @@ def _checkpoint_result(
     if data is not None:
         payload['data'] = data
 
-    action = AgentThinkAction(
-        thought=f'{human_message}\n[CHECKPOINT_RESULT] {json.dumps(payload, ensure_ascii=False)}',
-        source_tool='checkpoint',
+    return CheckpointObservation(
+        content=human_message,
+        command=command,
+        ok=ok,
+        status=status,
+        reason_code=reason_code,
+        reason=reason,
+        retryable=retryable,
+        changed_state=changed_state,
+        next_best_action=next_best_action,
+        data=data or {},
     )
-    action.tool_result = payload
-    return action
