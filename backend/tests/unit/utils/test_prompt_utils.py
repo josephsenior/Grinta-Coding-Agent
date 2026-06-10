@@ -648,7 +648,8 @@ def _base_config(**overrides: object) -> SimpleNamespace:
         enable_checkpoints=bool(overrides.get('enable_checkpoints', False)),
         enable_lsp_query=bool(overrides.get('enable_lsp_query', False)),
         enable_task_tracker_tool=bool(overrides.get('enable_task_tracker_tool', False)),
-        enable_permissions=False,
+        enable_permissions=bool(overrides.get('enable_permissions', False)),
+        permissions=overrides.get('permissions'),
         enable_meta_cognition=bool(overrides.get('enable_meta_cognition', False)),
         enable_working_memory=bool(overrides.get('enable_working_memory', True)),
         enable_condensation_request=bool(
@@ -656,6 +657,7 @@ def _base_config(**overrides: object) -> SimpleNamespace:
         ),
         enable_terminal=bool(overrides.get('enable_terminal', True)),
         enable_web=bool(overrides.get('enable_web', True)),
+        enable_browsing=bool(overrides.get('enable_browsing', True)),
     )
 
 
@@ -1148,6 +1150,77 @@ class TestBuildSystemPromptRenders:
         assert '→ `web_search`' not in result
         assert '→ `web_fetch`' not in result
         assert 'Web (`web_search` / `web_fetch`)' not in result
+
+    def test_plan_mode_uses_plan_protocol_not_agent_protocol(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(mode='plan'),
+            function_calling_mode='native',
+        )
+        assert 'You are in Plan mode' in result
+        assert 'write the plan as your final response' in result
+        assert 'Do **not** edit files' in result
+        assert 'You are an autonomous coding agent' not in result
+
+    def test_chat_mode_uses_chat_protocol(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(mode='chat'),
+            function_calling_mode='native',
+        )
+        assert 'You are in Chat mode' in result
+        assert 'web_search' in result
+        assert 'You are an autonomous coding agent' not in result
+
+    def test_security_policy_lists_read_only_observation_tools(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(),
+            function_calling_mode='native',
+        )
+        assert 'web_search' in result
+        assert 'web_fetch' in result
+        assert 'analyze_project_structure' in result
+
+    def test_permissions_not_duplicated_in_mcp_addendum(self) -> None:
+        from backend.engine.prompts.prompt_builder import build_mcp_user_addendum
+
+        perm = SimpleNamespace(
+            file_write_enabled=True,
+            file_operations_max_size_mb=10,
+            git_enabled=True,
+            git_allow_commit=False,
+            git_allow_push=False,
+            git_allow_force_push=False,
+            git_allow_branch_delete=False,
+            git_protected_branches=['main'],
+            shell_enabled=True,
+            shell_allow_sudo=False,
+            shell_blocked_commands=[],
+            network_enabled=True,
+            network_max_requests_per_minute=60,
+            network_allowed_domains=[],
+            max_file_writes_per_task=50,
+            max_shell_commands_per_task=100,
+            max_cost_per_task=None,
+        )
+        cfg = _base_config(enable_permissions=True, permissions=perm)
+        addendum = build_mcp_user_addendum(
+            mcp_tool_names=['search_github'],
+            mcp_tool_descriptions={'search_github': 'Search GitHub'},
+            config=cfg,
+        )
+        system = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=cfg,
+            function_calling_mode='native',
+        )
+        assert '<PERMISSIONS>' in system
+        assert '<PERMISSIONS>' not in addendum
 
     def test_checkpoints_document_clear(self) -> None:
         result = self._assert_renders_cleanly(

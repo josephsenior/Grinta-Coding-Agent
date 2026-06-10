@@ -19,6 +19,8 @@ from backend.inference.tool_names import (
     REPLACE_STRING_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
+    WEB_FETCH_TOOL_NAME,
+    WEB_SEARCH_TOOL_NAME,
 )
 
 
@@ -50,6 +52,7 @@ def _build_available_tools_summary(
     lsp_available: bool,
     tracker_on: bool,
     working_memory_on: bool,
+    web_on: bool,
 ) -> str:
     core = [
         GREP_TOOL_NAME,
@@ -65,6 +68,8 @@ def _build_available_tools_summary(
         terminal_command_tool,
         ASK_USER_TOOL_NAME,
     ]
+    if web_on:
+        core.extend([WEB_SEARCH_TOOL_NAME, WEB_FETCH_TOOL_NAME])
     if working_memory_on:
         core.append(MEMORY_TOOL_NAME)
     if lsp_available:
@@ -83,6 +88,7 @@ def _render_examples(
     meta_cognition_on: bool,
     lsp_available: bool,
     checkpoints_on: bool,
+    web_on: bool = True,
 ) -> str:
     """Render the worked-examples partial with capability-aware tool references."""
     _ = meta_cognition_on
@@ -93,6 +99,7 @@ def _render_examples(
         lsp_available=lsp_available,
         tracker_on=tracker_on,
         working_memory_on=working_memory_on,
+        web_on=web_on,
     )
 
     if tracker_on:
