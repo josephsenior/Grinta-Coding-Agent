@@ -23,6 +23,14 @@ from backend.ledger.action import (
     FileWriteAction,
     LspQueryAction,
 )
+from backend.ledger.action.memory_tools import (
+    CheckpointAction,
+    MemoryPersistAction,
+    MemoryRecallAction,
+    ScratchpadNoteAction,
+    ScratchpadRecallAction,
+    WorkingMemoryAction,
+)
 from backend.ledger.action.search import (
     AnalyzeProjectStructureAction,
     FindSymbolsAction,
@@ -100,6 +108,20 @@ class RuntimeExecutorProtocol(Protocol):
 
     async def analyze_project_structure(
         self, action: AnalyzeProjectStructureAction
+    ) -> Observation: ...
+
+    async def checkpoint(self, action: CheckpointAction) -> Observation: ...
+
+    async def working_memory(self, action: WorkingMemoryAction) -> Observation: ...
+
+    async def memory_persist(self, action: MemoryPersistAction) -> Observation: ...
+
+    async def memory_recall(self, action: MemoryRecallAction) -> Observation: ...
+
+    async def scratchpad_note(self, action: ScratchpadNoteAction) -> Observation: ...
+
+    async def scratchpad_recall(
+        self, action: ScratchpadRecallAction
     ) -> Observation: ...
 
     async def terminal_run(self, action: TerminalRunAction) -> Observation: ...
