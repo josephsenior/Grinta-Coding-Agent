@@ -2325,6 +2325,50 @@ async def test_tui_grep_results_in_thinking_payload_render_as_grep_card(
 
 
 @pytest.mark.asyncio
+async def test_tui_grep_card_shows_pattern_not_assistant_prose(mock_config):
+    """Polluted grep thoughts must not use assistant prose as the card query."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        polluted = (
+            "I can't read that file. Let me use grep to find methods:\n"
+            '[SEARCH_RESULTS]\n'
+            'raftkv/node.py:194:async def _start_election'
+        )
+        renderer._handle_search_action(
+            polluted,
+            source_tool='grep',
+            tool_args={'pattern': '_start_election', 'path': 'raftkv/node.py'},
+        )
+        await pilot.pause()
+
+        grep_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-grep' in card.classes
+        ]
+        assert len(grep_cards) == 1
+        collapsed = grep_cards[0].query_one('#collapsed-row')
+        rendered = str(collapsed.renderable)
+        assert '_start_election' in rendered
+        assert "I can't read that file" not in rendered
+
+
+@pytest.mark.asyncio
 async def test_tui_glob_results_in_thinking_payload_render_as_glob_card(
     mock_config,
 ):

@@ -8,6 +8,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from backend.engine.tools._search_helpers import extract_search_results_payload
+
 from rich.markup import escape as markup_escape
 
 from backend.cli.theme import (
@@ -162,6 +164,27 @@ def render_search_summary(
         lines.append(f'  [dim]{duration}[/dim]')
 
     return lines
+
+
+def resolve_search_card_query(
+    *,
+    thought: str,
+    source_tool: str,
+    tool_args: dict[str, Any] | None = None,
+) -> str:
+    """Resolve the pattern/query label for a grep/glob activity card."""
+    args = tool_args or {}
+    for key in ('pattern', 'query'):
+        value = args.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    payload = extract_search_results_payload(thought)
+    if source_tool == 'glob':
+        return 'file listing'
+    first = next((line.strip() for line in payload.splitlines() if line.strip()), '')
+    if first and not re.match(r'^.*:\d+:', first):
+        return first.strip().strip('"\'')
+    return 'code search'
 
 
 def extract_file_summary(

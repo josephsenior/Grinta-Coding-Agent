@@ -58,7 +58,13 @@ class _AppRendererActionHandlersMixin:
             else:
                 self.clear_live_response()
 
-    def _handle_search_action(self, thought: str, source_tool: str = 'search') -> None:
+    def _handle_search_action(
+        self,
+        thought: str,
+        source_tool: str = 'search',
+        *,
+        tool_args: dict | None = None,
+    ) -> None:
         """Handle grep/glob action and render as a card.
 
         ``source_tool`` is forwarded by :meth:`_render_thinking_payload`
@@ -66,19 +72,24 @@ class _AppRendererActionHandlersMixin:
         or ``'glob'``) so the renderer can pick the dedicated Grep/Glob
         card instead of the generic Search card.
         """
-        import re
+        from backend.cli._tool_display.renderers.search import (
+            extract_file_summary,
+            extract_search_results_payload,
+            resolve_search_card_query,
+        )
 
-        content = re.sub(r'^\[SEARCH_RESULTS\]\s*', '', thought).strip()
+        content = extract_search_results_payload(thought)
         if not content:
             return
 
-        from backend.cli._tool_display.renderers.search import extract_file_summary
-
         match_count, file_count, file_list = extract_file_summary(content)
         lines = content.splitlines()
-        query, result_lines = self._parse_search_query_and_results(lines)
-        if not query:
-            query = 'code search'
+        query = resolve_search_card_query(
+            thought=thought,
+            source_tool=source_tool,
+            tool_args=tool_args,
+        )
+        _query_ignored, result_lines = self._parse_search_query_and_results(lines)
 
         card = ActivityRenderer.search_results(
             query=query,
@@ -235,7 +246,11 @@ class _AppRendererActionHandlersMixin:
         self._streaming_active = not action.is_final
         self._sync_streaming_mount_mode()
 
-        thinking = (action.thinking_accumulated or '').strip()
+        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+
+        thinking = redact_streamed_tool_call_markers(
+            (action.thinking_accumulated or '').strip()
+        ).strip()
         content = self._normalize_final_response_text(action.accumulated or '')
 
         self._debug_log_thinking_chunk(thinking)

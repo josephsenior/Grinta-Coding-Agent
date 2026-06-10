@@ -53,6 +53,21 @@ SEARCH_RG_EXCLUDED_DIRS: tuple[str, ...] = (
 
 SEARCH_RESULTS_TAG = '[SEARCH_RESULTS]'
 
+_SEARCH_RESULTS_PAYLOAD_RE = re.compile(
+    r'\[SEARCH_RESULTS\]\s*(?P<payload>.*)',
+    re.DOTALL,
+)
+
+
+def extract_search_results_payload(thought: str) -> str:
+    """Return the payload after ``[SEARCH_RESULTS]`` anywhere in *thought*."""
+    text = thought or ''
+    match = _SEARCH_RESULTS_PAYLOAD_RE.search(text)
+    if match is not None:
+        return match.group('payload').strip()
+    return text.strip()
+
+
 DEFAULT_SEARCH_HEAD_LIMIT = 200
 MAX_SEARCH_HEAD_LIMIT = 1000
 GREP_OUTPUT_MODES = frozenset({'content', 'files_with_matches', 'count'})

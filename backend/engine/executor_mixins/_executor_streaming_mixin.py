@@ -341,12 +341,16 @@ class _ExecutorStreamingMixin:
         from backend.ledger.event import EventSource
 
         draft_reply_accum = '' if has_tools else visible_accum
+        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+
         ev = StreamingChunkAction(
             chunk='',
             accumulated=draft_reply_accum,
             is_final=True,
             suppress_live_response=has_tools,
-            thinking_accumulated=thinking_accumulate,
+            thinking_accumulated=redact_streamed_tool_call_markers(
+                thinking_accumulate
+            ),
         )
         ev.source = EventSource.AGENT
         event_stream.add_event(ev, EventSource.AGENT)
@@ -409,12 +413,15 @@ class _ExecutorStreamingMixin:
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
+        thinking_display = redact_streamed_tool_call_markers(
+            state.thinking_accumulate
+        )
         ev = StreamingChunkAction(
             chunk='',
             accumulated=redact_streamed_tool_call_markers(state.content_accumulate),
             is_final=False,
             thinking_chunk=text_piece,
-            thinking_accumulated=state.thinking_accumulate,
+            thinking_accumulated=thinking_display,
         )
         ev.source = EventSource.AGENT
         event_stream.add_event(ev, EventSource.AGENT)

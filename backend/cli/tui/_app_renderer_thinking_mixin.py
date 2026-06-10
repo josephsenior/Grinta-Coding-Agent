@@ -294,6 +294,7 @@ class _AppRendererThinkingMixin:
         source_tool: str = '',
         finalize: bool = False,
         kind: str = '',
+        tool_args: dict | None = None,
     ) -> bool:
         """Render a thinking-like payload according to its normalized intent."""
         intent = self._classify_thinking_text(
@@ -311,7 +312,9 @@ class _AppRendererThinkingMixin:
 
         if intent.kind == 'search':
             self._handle_search_action(
-                intent.text, source_tool=intent.source_tool or 'search'
+                intent.text,
+                source_tool=intent.source_tool or 'search',
+                tool_args=tool_args,
             )
             return True
 

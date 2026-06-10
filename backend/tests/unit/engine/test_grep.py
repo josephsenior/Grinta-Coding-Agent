@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 
+from backend.engine.tools._search_helpers import extract_search_results_payload
 from backend.engine.tools.grep import build_grep_action
 
 
@@ -105,3 +106,15 @@ class TestBuildGrepAction:
 
         assert 'non-empty' in action.thought
         assert 'glob' in action.thought
+
+
+class TestExtractSearchResultsPayload:
+    def test_extracts_payload_after_tag_not_only_at_start(self) -> None:
+        thought = (
+            "I can't read that file. Let me use grep:\n"
+            '[SEARCH_RESULTS]\n'
+            'src/node.py:12:async def _start_election'
+        )
+        payload = extract_search_results_payload(thought)
+        assert payload.startswith('src/node.py:12:')
+        assert "I can't read" not in payload
