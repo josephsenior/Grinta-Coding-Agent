@@ -8,9 +8,6 @@ from typing import Any
 from backend.engine.prompts.section_renderers._interaction import (
     _render_interaction_tail,
 )
-from backend.engine.prompts.section_renderers._permissions import (
-    _render_permissions,
-)
 
 
 def _append_mcp_connected_catalog_sections(
@@ -118,10 +115,5 @@ def _render_mcp_and_permissions(
     else:
         parts.append('No external MCP tools connected.')
     parts.append('</MCP_TOOLS>')
-
-    if getattr(config, 'enable_permissions', False):
-        perm = getattr(config, 'permissions', None)
-        if perm is not None:
-            parts.extend(('', _render_permissions(config, perm)))
 
     return '\n'.join(parts)

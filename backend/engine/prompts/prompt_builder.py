@@ -57,9 +57,6 @@ from backend.engine.prompts.section_renderers import (
 # Model-class fingerprints live in ``backend.inference.provider_capabilities``;
 # adding a new model is a one-line entry there — no edits needed in this file.
 from backend.inference.provider_capabilities import (
-    model_has_inherent_reasoning as _model_has_inherent_reasoning,
-)
-from backend.inference.provider_capabilities import (
     model_is_small as _model_is_small,
 )
 
@@ -216,6 +213,7 @@ def _render_examples(
     meta_cognition_on: bool,
     lsp_available: bool,
     checkpoints_on: bool,
+    web_on: bool = True,
 ) -> str:
     return _render_examples_impl(
         _render_partial,
@@ -225,6 +223,7 @@ def _render_examples(
         meta_cognition_on=meta_cognition_on,
         lsp_available=lsp_available,
         checkpoints_on=checkpoints_on,
+        web_on=web_on,
     )
 
 
@@ -360,7 +359,6 @@ def _collect_system_prompt_sections(
     """
     model_id = active_llm_model or 'unknown'
     is_small_model = _model_is_small(model_id)
-    _model_has_inherent_reasoning(model_id)
 
     resolved_terminal_tool = _resolve_terminal_command_tool(
         is_windows=is_windows,
@@ -384,10 +382,44 @@ def _collect_system_prompt_sections(
             f'Configured model id: `{model_id}`',
         ),
     ]
-    from backend.core.interaction_modes import is_chat_mode, normalize_interaction_mode
+    from backend.core.interaction_modes import (
+        is_chat_mode,
+        is_plan_mode,
+        normalize_interaction_mode,
+    )
 
     mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
-    if not is_chat_mode(mode):
+    web_on = bool(getattr(config, 'enable_web', True))
+    web_discovery_hint = (
+        ' (including `web_search` / `web_fetch` when external context helps)'
+        if web_on
+        else ''
+    )
+    if is_plan_mode(mode):
+        sections.append(
+            (
+                'simplified_plan_protocol',
+                f'You are in Plan mode. Use discovery tools{web_discovery_hint} '
+                'to inspect the codebase.\n\n'
+                'Use `task_tracker` when committing to structured multi-step planning.\n'
+                'Do **not** edit files or run shell commands in Plan mode.\n\n'
+                'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
+                'When planning is complete, write the plan as your final response. '
+                'Plain text ends the run — no completion tool is required.',
+            )
+        )
+    elif is_chat_mode(mode):
+        sections.append(
+            (
+                'simplified_chat_protocol',
+                f'You are in Chat mode. Use discovery tools{web_discovery_hint} '
+                'to investigate when grounding helps.\n\n'
+                'Do **not** edit files or run shell commands in Chat mode.\n\n'
+                'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
+                'Respond naturally in prose. Plain text ends the turn unless you used `ask_user`.',
+            )
+        )
+    else:
         sections.append(
             (
                 'simplified_agent_protocol',
@@ -420,7 +452,10 @@ def _collect_system_prompt_sections(
                 shell_is_powershell=shell_is_powershell,
             ),
         ),
-        ('security_risk_policy', _render_security(cli_mode)),
+        (
+            'security_risk_policy',
+            _render_security(cli_mode, enable_web=web_on),
+        ),
         (
             'system_partial_01_autonomy',
             _render_autonomy(
@@ -462,9 +497,8 @@ def _collect_system_prompt_sections(
     )
     sections.append(('system_partial_03_tail', _render_interaction_tail(config)))
 
-    # Worked-examples partial — capability-adapted: omit on small/local models
-    # where prompt budget is tight, and where examples can crowd out tool docs.
-    if not is_small_model:
+    # Worked-examples partial — agent mode only; edit-heavy examples mislead Chat/Plan.
+    if not is_small_model and not (is_chat_mode(mode) or is_plan_mode(mode)):
         sections.append(
             (
                 'system_partial_05_examples',
@@ -479,6 +513,7 @@ def _collect_system_prompt_sections(
                     ),
                     lsp_available=lsp_available,
                     checkpoints_on=bool(getattr(config, 'enable_checkpoints', False)),
+                    web_on=bool(getattr(config, 'enable_web', True)),
                 ),
             )
         )

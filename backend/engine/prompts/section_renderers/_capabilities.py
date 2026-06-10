@@ -84,10 +84,16 @@ def _render_system_capabilities(
     automatically on the next prompt assembly.
     """
     parallel_enabled = bool(getattr(config, 'enable_parallel_tool_scheduling', False))
+    web_on = bool(getattr(config, 'enable_web', True))
+    parallel_read_only_tools = (
+        '`read`, `grep`, `glob`, `find_symbols`, `analyze_project_structure`, `lsp`'
+    )
+    if web_on:
+        parallel_read_only_tools += ', `web_search`, `web_fetch`'
     parallel_line = (
         (
             '- **Parallel tool scheduling**: ENABLED for read-only batches '
-            '(`read`, `grep`, `glob`, `find_symbols`, `lsp`).\n'
+            f'({parallel_read_only_tools}).\n'
             '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
             'Emit independent reads in a single assistant turn to run them concurrently.\n'
             '  - **Constraint**: Only read-only observation tools may run concurrently. Mutating tools, file edits, shell commands, task tracking, and ask_user actions are executed sequentially in model order.'

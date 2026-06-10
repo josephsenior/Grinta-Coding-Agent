@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 
-def _render_security(cli_mode: bool = True) -> str:
+def _render_security(cli_mode: bool = True, *, enable_web: bool = True) -> str:
+    read_only_tools = (
+        '`read`, `grep`, `glob`, `find_symbols`, `analyze_project_structure`, `lsp`'
+    )
+    if enable_web:
+        read_only_tools += ', `web_search`, `web_fetch`'
     risk_block = (
         '- **LOW**: Safe, read-only actions.\n'
         '  - Viewing/summarizing content, reading project files, simple in-memory calculations.\n'
@@ -17,7 +22,7 @@ def _render_security(cli_mode: bool = True) -> str:
         '# 🔐 Security Risk Policy\n'
         '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
         'and the file write tools `create`, `replace_string`, `edit_symbols`, and `multiedit`. '
-        'Read-only tools (`read`, `find_symbols`) do **not** require it. '
+        f'Read-only observation tools ({read_only_tools}) do **not** require it. '
         'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
         'The server may escalate your risk label; it never lowers it. Missing or invalid values '
         'fail the call.\n\n'
