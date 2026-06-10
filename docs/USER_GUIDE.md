@@ -201,14 +201,13 @@ Use Grinta in trusted repositories and environments.
 
 ### Modes (`/mode`)
 
-Grinta has four interaction modes that change the conversational contract:
+Grinta has three interaction modes that change the conversational contract:
 
-- **Chat** — talk freely, ask questions, discuss architecture. No execution pressure. Use this when you want to think out loud or explore without triggering tool calls.
-- **Ask** — like Chat but explicitly signals a standalone question or clarification request. Uses the same read-only tool set as Chat.
-- **Plan** — the agent thinks, clarifies requirements, and produces an actionable plan before any tool executes. Use this for complex or ambiguous tasks where you want to review the approach first.
+- **Chat** — grounded Q&A and discussion. Use discovery tools (`grep`, `glob`, `find_symbols`, `read`, `lsp`, `analyze_project_structure`) and `ask_user` when needed. No edits or shell execution.
+- **Plan** — read-only investigation plus structured planning. The agent clarifies requirements and produces an actionable plan before any execution. Use this for complex or ambiguous tasks where you want to review the approach first.
 - **Agent** — full task execution. The agent plans, runs tools, validates results, and finishes. This is the default mode when you give a direct task.
 
-Switch between them at any time with `/mode chat`, `/mode ask`, `/mode plan`, or `/mode agent`. The current mode is visible in the HUD bar.
+Switch between them at any time with `/mode chat`, `/mode plan`, or `/mode agent`. The current mode is visible in the HUD bar.
 
 ### Autonomy levels (`/autonomy`)
 

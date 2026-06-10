@@ -210,14 +210,18 @@ def _render_critical(
 
 def _render_examples(
     *,
+    terminal_command_tool: str,
     tracker_on: bool,
+    working_memory_on: bool,
     meta_cognition_on: bool,
     lsp_available: bool,
     checkpoints_on: bool,
 ) -> str:
     return _render_examples_impl(
         _render_partial,
+        terminal_command_tool=terminal_command_tool,
         tracker_on=tracker_on,
+        working_memory_on=working_memory_on,
         meta_cognition_on=meta_cognition_on,
         lsp_available=lsp_available,
         checkpoints_on=checkpoints_on,
@@ -314,7 +318,12 @@ def _mcp_or_permissions_sections_for_collect(
     mcp_tool_descriptions: dict[str, str] | None,
     mcp_server_hints: list[dict[str, str]] | None,
 ) -> list[tuple[str, str]]:
-    """Return permissions guidance only; MCP is not model-facing."""
+    """Return permissions guidance only.
+
+    MCP tools are never inlined into the system prompt. When connected they are
+    delivered via :func:`build_mcp_user_addendum` as a per-turn user message.
+    The ``render_mcp_inline`` flag is retained for API compatibility only.
+    """
     _ = (render_mcp_inline, mcp_tool_names, mcp_tool_descriptions, mcp_server_hints)
     if getattr(config, 'enable_permissions', False):
         perm = getattr(config, 'permissions', None)
@@ -345,11 +354,9 @@ def _collect_system_prompt_sections(
 ) -> list[tuple[str, str]]:
     """Ordered (name, body) sections before joining with blank lines.
 
-    When ``render_mcp_inline=False`` the MCP tool block is omitted from the
-    system prompt so it can be delivered as a per-turn user-role addendum
-    (see :func:`build_mcp_user_addendum`). This preserves provider prefix
-    caches because the system prompt no longer mutates when MCP servers
-    connect or disconnect mid-session.
+    MCP tools are never part of the system prompt. Connected MCP catalogues are
+    delivered as a per-turn user-role addendum via :func:`build_mcp_user_addendum`
+    so the system prefix stays stable when MCP servers connect or disconnect.
     """
     model_id = active_llm_model or 'unknown'
     is_small_model = _model_is_small(model_id)
@@ -385,7 +392,7 @@ def _collect_system_prompt_sections(
             (
                 'simplified_agent_protocol',
                 'You are an autonomous coding agent. Work through tasks using your tools.\n\n'
-                'When you need input from the user to continue, call ask_user with your questions as a list.\n\n'
+                'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
                 'When your work is complete, write a comprehensive final summary covering:\n'
                 '- What you did\n'
                 '- What changed\n'
@@ -462,7 +469,11 @@ def _collect_system_prompt_sections(
             (
                 'system_partial_05_examples',
                 _render_examples(
+                    terminal_command_tool=resolved_terminal_tool,
                     tracker_on=bool(getattr(config, 'enable_task_tracker_tool', False)),
+                    working_memory_on=bool(
+                        getattr(config, 'enable_working_memory', True)
+                    ),
                     meta_cognition_on=bool(
                         getattr(config, 'enable_meta_cognition', False)
                     ),
@@ -495,9 +506,18 @@ def build_mcp_user_addendum(
     mcp_server_hints: list[dict[str, str]] | None = None,
     config: Any = None,
 ) -> str:
-    """MCP tools are not part of the simplified model-facing toolset."""
-    _ = (mcp_tool_names, mcp_tool_descriptions, mcp_server_hints, config)
-    return ''
+    """Render the MCP tool catalogue as a per-turn user-role addendum.
+
+    Returns an empty string when no MCP tools are connected. The system prompt
+    intentionally omits MCP so this addendum can be injected without invalidating
+    provider prefix caches.
+    """
+    names = list(mcp_tool_names or [])
+    if not names:
+        return ''
+    descriptions = dict(mcp_tool_descriptions or {})
+    hints = list(mcp_server_hints or [])
+    return _render_mcp_and_permissions(names, descriptions, hints, config)
 
 
 def measure_system_prompt_sections(
@@ -565,9 +585,8 @@ def build_system_prompt(
 
     Drop-in replacement for the old ``system_prompt`` rendering.
 
-    Pass ``render_mcp_inline=False`` to omit the MCP catalogue from the system
-    prompt; deliver it separately via :func:`build_mcp_user_addendum` so the
-    system prompt stays stable across MCP connect/disconnect events.
+    MCP tools are not included in the system prompt. Deliver connected MCP
+    catalogues separately via :func:`build_mcp_user_addendum`.
     """
     sections = _collect_system_prompt_sections(
         active_llm_model=active_llm_model,

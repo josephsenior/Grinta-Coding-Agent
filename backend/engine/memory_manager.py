@@ -240,6 +240,9 @@ class ContextMemoryManager:
         if self._pipeline is not None:
             return await self._pipeline.prepare_step(state)
 
+        from backend.context.session_context import bind_session_context
+
+        bind_session_context(state=state)
         started = time.perf_counter()
         history = list(getattr(state, 'history', []))
         if not self.compactor:
@@ -258,7 +261,7 @@ class ContextMemoryManager:
         memory_pressure = self._memory_pressure_signal(state)
 
         if isinstance(condensation_result, View):
-            delete_staging_snapshot()
+            delete_staging_snapshot(state=state)
             logger.info('ContextMemoryManager.condense_history finished with View (events=%d postprocess=%.3fs elapsed=%.3fs)',
                         len(condensation_result.events), time.perf_counter() - postprocess_started, time.perf_counter() - started)
             return CondensedHistory(condensation_result.events, None)
@@ -298,10 +301,10 @@ class ContextMemoryManager:
 
     async def _finalize_compaction(self, state: State, condensation_result: Any, history: list, memory_pressure: bool, started: float, postprocess_started: float) -> CondensedHistory:
         action = condensation_result.action
-        commit_snapshot()
+        commit_snapshot(state=state)
         try:
             from backend.context.working_set import sync_snapshot_to_working_memory
-            sync_snapshot_to_working_memory(load_snapshot())
+            sync_snapshot_to_working_memory(load_snapshot(state=state))
         except Exception:
             logger.debug('Post-compaction working memory sync failed', exc_info=True)
 
@@ -336,7 +339,7 @@ class ContextMemoryManager:
                 or snapshot.get('decisions')
                 or snapshot.get('runtime')
             ):
-                save_snapshot(snapshot)
+                save_snapshot(snapshot, state=state)
         except Exception:
             logger.debug('Pre-condensation snapshot extraction failed', exc_info=True)
 
@@ -362,12 +365,15 @@ class ContextMemoryManager:
             snapshot['runtime'] = runtime
 
     @staticmethod
-    def get_restored_context() -> str:
+    def get_restored_context(*, state: State | None = None) -> str:
         """Load and format the pre-condensation snapshot for injection into recovery.
 
         Returns an empty string if no snapshot is available.
         """
-        snapshot = load_snapshot()
+        from backend.context.session_context import bind_session_context
+
+        bind_session_context(state=state)
+        snapshot = load_snapshot(state=state)
         if not snapshot:
             return ''
         return format_snapshot_for_injection(snapshot)

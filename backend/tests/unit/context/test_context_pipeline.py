@@ -8,8 +8,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.context.compactor.compactor import Compaction
-from backend.context.context_pipeline import ContextPipeline
+from backend.context.context_pipeline import (
+    ContextPipeline,
+    apply_ineffective_compaction_backoff,
+    _shrink_tail_for_token_reduction,
+)
 from backend.core.config.compactor_config import ContextPipelineConfig
+from backend.core.constants import (
+    DEFAULT_COMPACT_MIN_TOKEN_REDUCTION,
+    DEFAULT_INEFFECTIVE_COMPACT_SKIP_EVENTS,
+)
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import EventSource
@@ -59,15 +67,15 @@ def pipeline() -> ContextPipeline:
 def _isolate_snapshot_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(
         'backend.context.pre_condensation_snapshot._snapshot_path',
-        lambda: tmp_path / 'pre_condensation_snapshot.json',
+        lambda state=None: tmp_path / 'pre_condensation_snapshot.json',
     )
     monkeypatch.setattr(
         'backend.context.pre_condensation_snapshot._snapshot_staging_path',
-        lambda: tmp_path / '.pre_condensation_snapshot.staging.json',
+        lambda state=None: tmp_path / '.pre_condensation_snapshot.staging.json',
     )
     monkeypatch.setattr(
         'backend.context.session_memory._session_memory_path',
-        lambda: tmp_path / 'session_memory.md',
+        lambda state=None: tmp_path / 'session_memory.md',
     )
 
 
@@ -187,6 +195,20 @@ async def test_prepare_step_rejects_micro_prune_and_respects_cooldown(pipeline):
         assert second.pending_action is None
 
 
+def test_configure_structured_compactor_size_forces_material_prune():
+    """Regression: fixed max_size=100 left ~49 post-boundary events with zero pruned (5b no-op)."""
+    events = [_cmd_output(f'line {i}', i) for i in range(1, 50)]
+    compactor = SimpleNamespace(max_size=100, keep_first=0)
+    ContextPipeline._configure_structured_compactor_size(compactor, events, SimpleNamespace())
+
+    target_size = compactor.max_size // 2
+    events_from_tail = target_size - compactor.keep_first - 1
+    tail_count = max(0, events_from_tail)
+    stop = len(events) - tail_count if tail_count else len(events)
+    pruned_count = stop - compactor.keep_first
+    assert pruned_count >= 20
+
+
 def test_build_prompt_events_injects_working_set(pipeline):
     events = [_user('implement feature X', 1)]
     state = _make_state(events)
@@ -196,3 +218,124 @@ def test_build_prompt_events_injects_working_set(pipeline):
     ):
         prompt_events = pipeline.build_prompt_events(events, state=state, llm_config=None)
     assert len(prompt_events) >= 1
+
+
+def test_build_prompt_events_skips_working_set_on_fresh_session(pipeline, monkeypatch, tmp_path):
+    events = [_user('Build a raft kv store', 1)]
+    state = _make_state(events)
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.workspace_agent_state_dir',
+        lambda project_root=None: tmp_path,
+    )
+    from backend.engine.tools.working_memory import set_current_session_id
+
+    set_current_session_id('fresh-session-1')
+
+    prompt_events = pipeline.build_prompt_events(events, state=state, llm_config=None)
+
+    from backend.ledger.observation.agent import AgentCondensationObservation
+
+    assert not any(isinstance(event, AgentCondensationObservation) for event in prompt_events)
+
+
+def test_note_llm_step_does_not_clear_ineffective_compaction_backoff(pipeline):
+    events = [_user('fix tests', 1), _cmd_output('ok', 2)]
+    state = _make_state(events)
+    apply_ineffective_compaction_backoff(state)
+    pipe = state.extra_data['context_pipeline_state']
+    skip_until = pipe['skip_compaction_until_event_id']
+    streak = pipe['ineffective_compact_streak']
+
+    pipeline.note_llm_step(state)
+
+    after = state.extra_data['context_pipeline_state']
+    assert after['skip_compaction_until_event_id'] == skip_until
+    assert after['ineffective_compact_streak'] == streak
+    assert after['consecutive_condensation_steps'] == 0
+
+
+def test_ineffective_compaction_backoff_blocks_until_event_threshold(pipeline):
+    events = [_user('fix tests', 1)]
+    for i in range(2, 12):
+        events.append(_cmd_output(f'line {i}', i))
+    state = _make_state(events)
+    latest_id = events[-1].id
+    apply_ineffective_compaction_backoff(state)
+    skip_until = state.extra_data['context_pipeline_state']['skip_compaction_until_event_id']
+    assert skip_until == latest_id + DEFAULT_INEFFECTIVE_COMPACT_SKIP_EVENTS
+    assert pipeline._should_skip_compaction(state, force=False) is True
+
+    # Still blocked before threshold.
+    state.history.append(_cmd_output('mid', skip_until - 1))
+    assert pipeline._should_skip_compaction(state, force=False) is True
+
+    # Unblocked once latest id reaches skip_until (and time backoff expired).
+    state.history.append(_cmd_output('past threshold', skip_until))
+    pipe = state.extra_data['context_pipeline_state']
+    pipe['ineffective_compact_until'] = 0
+    state.extra_data['context_pipeline_state'] = pipe
+    assert pipeline._should_skip_compaction(state, force=False) is False
+
+
+def test_ineffective_compaction_backoff_escalates_streak(pipeline):
+    events = [_user('fix tests', 1)]
+    state = _make_state(events)
+    apply_ineffective_compaction_backoff(state)
+    first = state.extra_data['context_pipeline_state']['skip_compaction_until_event_id']
+    apply_ineffective_compaction_backoff(state)
+    second = state.extra_data['context_pipeline_state']['skip_compaction_until_event_id']
+    assert second > first
+
+
+def test_shrink_tail_for_token_reduction_drops_oldest_events():
+    events = [_user('task', 1)]
+    for i in range(2, 52):
+        events.append(_cmd_output(f'line {i}', i))
+    llm_config = SimpleNamespace(max_input_tokens=200_000, model='test-model')
+    state = _make_state(events)
+    budget = SimpleNamespace(estimated_tokens=200_000)
+    tail = list(events[-25:])
+    summary = 'summary'
+
+    reductions = [2_000, 4_000, 6_000, 12_000]
+    calls: list[int] = []
+
+    def fake_reduction(*_args, **_kwargs) -> int:
+        value = reductions[min(len(calls), len(reductions) - 1)]
+        calls.append(value)
+        return value
+
+    with patch(
+        'backend.context.context_pipeline._projected_compaction_token_reduction',
+        side_effect=fake_reduction,
+    ):
+        shrunk = _shrink_tail_for_token_reduction(
+            events,
+            tail,
+            history=events,
+            budget=budget,
+            state=state,
+            llm_config=llm_config,
+            summary=summary,
+        )
+
+    assert len(shrunk) < len(tail)
+    assert calls[-1] >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
+    assert len(calls) >= 3
+
+
+def test_successful_boundary_compact_clears_ineffective_backoff(pipeline):
+    events = [_user('fix tests', 1), _cmd_output('ok', 2)]
+    state = _make_state(events)
+    apply_ineffective_compaction_backoff(state)
+    action = CondensationAction(
+        pruned_event_ids=[1],
+        summary='summary',
+        summary_offset=0,
+    )
+    pipeline._record_boundary_compact(state, events, action)
+    pipe = state.extra_data['context_pipeline_state']
+    assert 'skip_compaction_until_event_id' not in pipe
+    assert 'ineffective_compact_streak' not in pipe
+    assert 'ineffective_compact_until' not in pipe
+    assert 'last_boundary_compact_at' in pipe

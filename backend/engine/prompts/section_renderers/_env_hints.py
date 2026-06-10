@@ -22,17 +22,58 @@ def _lsp_available(config: Any = None) -> bool:
         return False
 
 
+def _discovery_decision_table(*, lsp_available: bool, web_on: bool = True) -> str:
+    """Canonical routing table for overlapping search/discovery tools."""
+    lines = [
+        '<DISCOVERY_ROUTING>',
+        'Pick the first matching row:',
+        '- Text/regex in file contents → `grep` (default output_mode=files_with_matches; use content when you need lines)',
+        '- File paths by name/pattern → `glob`',
+        '- Symbol name, file unknown → `find_symbols`',
+        '- Symbol bodies after candidates → `read(type="symbols", symbols=[...])`',
+        '- File body or line range (one file) → `read(type="file", path=..., start_line=..., end_line=...)`',
+        '- File signatures only (one file) → `analyze_project_structure` command=file_outline',
+        '- File symbol list (one file) → `analyze_project_structure` command=symbols',
+        '- Project tree / recent changes → `analyze_project_structure` command=tree or recent',
+        '- Imports/deps before multi-file refactor → `analyze_project_structure` command=imports or dependencies',
+        '- Workspace-wide references (fast regex) → `analyze_project_structure` command=callers',
+        '- Workspace-wide references (AST fallback) → `analyze_project_structure` command=semantic_search',
+        '- Test files for a module → `glob` (`**/*test*`, `**/*_test.*`) then `grep` for imports/references',
+    ]
+    if web_on:
+        lines.extend(
+            [
+                '- External/current info (errors, release notes, unknown APIs) → `web_search`',
+                '- Known URL, static page content → `web_fetch`',
+            ]
+        )
+    lines.extend(
+        [
+            '- Interactive/JS-heavy pages → `browser`',
+            '- Directed exploration (1–3 targeted searches): use `grep`, `glob`, or `find_symbols` directly',
+            '- Broader multi-location exploration: batch parallel searches in one turn before widening scope',
+        ]
+    )
+    if lsp_available:
+        lines.append(
+            '- Known file + line/column (definition/refs/hover/diagnostics) → `lsp`'
+        )
+    lines.append('</DISCOVERY_ROUTING>')
+    return '\n'.join(lines)
+
+
 def _explore_hint(_config: Any = None) -> str:
     """Return the canonical layout-discovery tool hint."""
     if _lsp_available(_config):
         return (
-            '`grep` for text search, `glob` for file discovery, `find_symbols` for symbol candidates, '
-            '`read` to fetch a specific symbol/file body, `lsp` for definitions/references '
-            '(LSP), `analyze_project_structure` for tree layout'
+            '`grep` (files_with_matches first, then content; head_limit/offset), `glob` for file discovery, '
+            '`find_symbols` for symbol candidates, `read` for symbol/file bodies, `lsp` for precise '
+            'definitions/references, `analyze_project_structure` for tree/imports/deps/references'
         )
     return (
-        '`grep` for text search, `glob` for file discovery, `find_symbols` for symbol candidates, `read` to fetch a '
-        'specific symbol/file body, `analyze_project_structure` for tree layout'
+        '`grep` (files_with_matches first, then content; head_limit/offset), `glob` for file discovery, '
+        '`find_symbols` for symbol candidates, `read` for symbol/file bodies, '
+        '`analyze_project_structure` for tree/imports/deps/references'
     )
 
 
@@ -86,9 +127,12 @@ def _path_uncertainty_hint(
 
 
 def _routing_tool_batching_paragraph(function_calling_mode: str | None) -> str:
+    _ = function_calling_mode
     return (
         'You may batch independent code search or read operations in one turn '
-        'when they improve latency. Dependent edits and runs must remain sequential.'
+        'when they improve latency. Dependent edits and runs must remain sequential. '
+        'Use `grep` with output_mode=files_with_matches first, then `content` only for '
+        'files that matter; paginate with head_limit/offset instead of unbounded scans.'
     )
 
 
@@ -96,29 +140,32 @@ def _routing_memory_tool_placeholders(
     *,
     working_memory_on: bool,
     tracker_on: bool,
-    condensation_on: bool,
-    meta_cognition_on: bool,
 ) -> dict[str, str]:
-    _ = meta_cognition_on
     ambiguous_intent_instruction = (
-        'Use `ask_user` with a short question rather than guessing.'
+        'If intent is still ambiguous after inspection, see `<ASK_USER_TOOL>` rather than guessing.'
     )
-    _ = working_memory_on
-    memory_and_context_section = ''
+    if working_memory_on:
+        memory_and_context_section = (
+            '<MEMORY_AND_CONTEXT>\n'
+            '**memory** tool — three actions only:\n'
+            '- `memory(action="working", update_type=update, section=..., content=...)`: '
+            'session reasoning (hypothesis, findings, blockers, plan). '
+            'Auto-restored after condensation; do not re-fetch at session start.\n'
+            '- `memory(action="persist", key=..., kind=..., value=...)`: rare workspace facts '
+            '(conventions, commands, architecture, lessons). '
+            'Ranked workspace memory may appear at session start.\n'
+            '- `memory(action="recall", key=...)`: fuzzy search when prior turns fell out of '
+            'the visible window.\n'
+            'Do not store task progress in memory — use `task_tracker`.\n'
+            '</MEMORY_AND_CONTEXT>'
+        )
+    else:
+        memory_and_context_section = ''
     post_condensation_retrieval = (
         'Resume from the summary and your most recent verified observations.'
     )
     surviving_state_facts = (
         'Only the visible conversation, current files, and tool observations are available.'
-    )
-    context_budget_sync_clause = ', sync `task_tracker`' if tracker_on else ''
-    context_budget_next_step = (
-        'write the final summary or continue after automatic condensation'
-        if condensation_on
-        else 'write the final summary or close the current sub-task before doing any broader exploration'
-    )
-    repetition_recovery_options = (
-        'switch tools, use `ask_user` for required input, or write a partial final result.'
     )
     remaining_work_source_of_truth = (
         'Trust your `task_tracker` plan as the source of truth for what remains.'
@@ -130,8 +177,5 @@ def _routing_memory_tool_placeholders(
         'memory_and_context_section': memory_and_context_section,
         'post_condensation_retrieval': post_condensation_retrieval,
         'surviving_state_facts': surviving_state_facts,
-        'context_budget_sync_clause': context_budget_sync_clause,
-        'context_budget_next_step': context_budget_next_step,
-        'repetition_recovery_options': repetition_recovery_options,
         'remaining_work_source_of_truth': remaining_work_source_of_truth,
     }

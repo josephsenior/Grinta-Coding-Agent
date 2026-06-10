@@ -27,6 +27,7 @@ from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event
+    from backend.orchestration.state.state import State
 
 # Limits to prevent the snapshot from becoming too large
 _MAX_ERRORS = 10
@@ -51,19 +52,20 @@ def _agent_debug_log(
     )
 
 
-def _snapshot_path() -> Path:
-    from backend.core.workspace_resolution import workspace_agent_state_dir
+def _snapshot_path(*, state: State | None = None) -> Path:
+    from backend.context.session_context import scoped_agent_path
 
-    return workspace_agent_state_dir() / 'pre_condensation_snapshot.json'
-
-
-def _snapshot_staging_path() -> Path:
-    from backend.core.workspace_resolution import workspace_agent_state_dir
-
-    return workspace_agent_state_dir() / '.pre_condensation_snapshot.staging.json'
+    return scoped_agent_path('pre_condensation_snapshot', '.json', state=state)
 
 
-def save_snapshot(snapshot: dict[str, Any]) -> None:
+def _snapshot_staging_path(*, state: State | None = None) -> Path:
+    from backend.context.session_context import scoped_agent_path
+
+    canonical = scoped_agent_path('pre_condensation_snapshot', '.json', state=state)
+    return canonical.parent / f'.{canonical.name}.staging'
+
+
+def save_snapshot(snapshot: dict[str, Any], *, state: State | None = None) -> None:
     """Persist the snapshot to a staging location.
 
     The staging file is promoted to the canonical path via
@@ -73,7 +75,7 @@ def save_snapshot(snapshot: dict[str, Any]) -> None:
 
     See ``commit_snapshot`` and ``delete_snapshot``.
     """
-    p = _snapshot_staging_path()
+    p = _snapshot_staging_path(state=state)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding='utf-8')
     logger.debug(
@@ -102,7 +104,7 @@ def _file_edit_observation_indicates_failure(content: str) -> bool:
     return False
 
 
-def commit_snapshot() -> None:
+def commit_snapshot(*, state: State | None = None) -> None:
     """Promote the staging snapshot to the canonical path atomically.
 
     Only call after compaction successfully fires.  If this is never
@@ -111,10 +113,10 @@ def commit_snapshot() -> None:
     """
     import os as _os
 
-    staging = _snapshot_staging_path()
+    staging = _snapshot_staging_path(state=state)
     if not staging.exists():
         return
-    final = _snapshot_path()
+    final = _snapshot_path(state=state)
     try:
         _os.replace(staging, final)
         logger.debug('Pre-condensation snapshot committed to %s', final)
@@ -573,14 +575,17 @@ def _handle_file_edit_observation(
     return None
 
 
-def load_snapshot() -> dict[str, Any] | None:
+def load_snapshot(*, state: State | None = None) -> dict[str, Any] | None:
     """Load the most recent committed snapshot from disk.
 
     Falls back to the staging path (written during a prior run that
     crashed before commit).  Snapshots are durable across turns and are
     also synced into working memory after compaction.
     """
-    for getter in (_snapshot_path, _snapshot_staging_path):
+    for getter in (
+        lambda: _snapshot_path(state=state),
+        lambda: _snapshot_staging_path(state=state),
+    ):
         p = getter()
         if not p.exists():
             continue
@@ -591,14 +596,17 @@ def load_snapshot() -> dict[str, Any] | None:
     return None
 
 
-def delete_snapshot() -> None:
+def delete_snapshot(*, state: State | None = None) -> None:
     """Delete the on-disk snapshot and staging file if they exist.
 
     Called **after** the canonical snapshot has been consumed via
     ``load_snapshot()``, so it cannot be injected a second time.
     Deletes both the canonical and staging paths.
     """
-    for getter in (_snapshot_path, _snapshot_staging_path):
+    for getter in (
+        lambda: _snapshot_path(state=state),
+        lambda: _snapshot_staging_path(state=state),
+    ):
         try:
             p = getter()
             if p.exists():
@@ -607,7 +615,7 @@ def delete_snapshot() -> None:
             pass
 
 
-def delete_staging_snapshot() -> None:
+def delete_staging_snapshot(*, state: State | None = None) -> None:
     """Delete only the staging snapshot file.
 
     Called when compaction did NOT fire (the ``View`` branch of
@@ -618,7 +626,7 @@ def delete_staging_snapshot() -> None:
     the current turn.
     """
     try:
-        p = _snapshot_staging_path()
+        p = _snapshot_staging_path(state=state)
         if p.exists():
             p.unlink()
     except OSError:

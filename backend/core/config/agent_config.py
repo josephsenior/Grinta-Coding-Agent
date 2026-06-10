@@ -25,6 +25,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_AUTO_RETRY_ON_ERROR,
     DEFAULT_AGENT_AUTONOMY_LEVEL,
     DEFAULT_AGENT_BROWSING_ENABLED,
+    DEFAULT_AGENT_WEB_ENABLED,
     DEFAULT_AGENT_CLI_MODE,
     DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
     DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
@@ -47,7 +48,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_MIN_ITERATIONS,
     DEFAULT_AGENT_MODE,
     DEFAULT_AGENT_NAME,
-    DEFAULT_AGENT_NATIVE_BROWSER_ENABLED,
     DEFAULT_AGENT_PARALLEL_TOOL_SCHEDULING_ENABLED,
     DEFAULT_AGENT_PLAN_MODE_ENABLED,
     DEFAULT_AGENT_PLANNING_COMPLEXITY_THRESHOLD,
@@ -88,7 +88,8 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         memory_enabled: Whether to enable conversation memory
         compactor_config: Configuration for conversation memory compactor
         enable_prompt_extensions: Whether to allow agent-specific prompt extensions (agent suffix)
-        enable_browsing: Whether to enable browser environment
+        enable_browsing: Whether to expose the native browser tool
+        enable_web: Whether to expose native web_search and web_fetch tools
         enable_auto_lint: Whether to enable automatic linting after edits
         confirm_actions: Whether to require user confirmation before executing actions
         llm_draft_config: LLM configuration for draft operations
@@ -105,7 +106,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     mode: str = Field(
         default=DEFAULT_AGENT_MODE,
         description=(
-            "Run mode: 'chat'/'ask' (discussion), 'plan' (planning), "
+            "Run mode: 'chat' (discussion/Q&A), 'plan' (planning), "
             "or 'agent' (execution/editing)."
         ),
     )
@@ -125,10 +126,18 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_prompt_extensions: bool = Field(
         default=DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED
     )
-    enable_browsing: bool = Field(default=DEFAULT_AGENT_BROWSING_ENABLED)
-    enable_native_browser: bool = Field(
-        default=DEFAULT_AGENT_NATIVE_BROWSER_ENABLED,
-        description='Expose native browser-use tools (requires optional `browser` dependency group)',
+    enable_browsing: bool = Field(
+        default=DEFAULT_AGENT_BROWSING_ENABLED,
+        description=(
+            'Expose the native browser tool (requires optional `browser` dependency group)'
+        ),
+    )
+    enable_web: bool = Field(
+        default=DEFAULT_AGENT_WEB_ENABLED,
+        description=(
+            'Expose native web_search and web_fetch tools (backed by bundled Exa/fetch MCP). '
+            'When false, web tools are omitted from the tool list and discovery routing.'
+        ),
     )
     enable_vector_memory: bool = Field(
         default=DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
@@ -381,6 +390,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             data = dict(data)
             data.pop('enable_prompt_caching', None)
             data.pop('enable_web_search', None)
+            data.pop('enable_native_browser', None)
             data.pop('system_prompt_filename', None)
         return data
 

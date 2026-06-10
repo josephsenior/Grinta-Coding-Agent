@@ -219,7 +219,9 @@ class SQLiteEventStore:
                         payload_id,
                     )
                     return False
-                if verify_checksums and not verify_event_integrity(data, event_id):
+                if verify_checksums and not verify_event_integrity(
+                    data, event_id, log_mismatch=False
+                ):
                     logger.error(
                         'SQLite event checksum mismatch for %s event id=%s',
                         self._db_path,
@@ -282,7 +284,7 @@ class SQLiteEventStore:
             for row in rows:
                 event_id = int(row['id'])
                 data = json.loads(row['payload'])
-                if verify_event_integrity(data, event_id):
+                if verify_event_integrity(data, event_id, log_mismatch=False):
                     continue
                 repaired = repair_payload_checksum(data, event_id=event_id)
                 updates.append(
@@ -311,6 +313,22 @@ class SQLiteEventStore:
                 self._db_path,
             )
         return fixed
+
+    def _rewrite_payload(self, event_id: int, payload: dict[str, Any]) -> None:
+        """Update a single row's JSON payload (checksum repair / self-heal)."""
+        blob = json.dumps(payload, ensure_ascii=False, default=str)
+        with self._write_lock:
+            conn = self._get_conn()
+            conn.execute('BEGIN IMMEDIATE')
+            try:
+                conn.execute(
+                    'UPDATE events SET payload = ? WHERE id = ?',
+                    (blob, event_id),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
 
     def write_event(self, event_id: int, event_dict: dict[str, Any]) -> None:
         """Persist a single event.
@@ -430,9 +448,13 @@ class SQLiteEventStore:
         payload_id = data.get('id')
         if payload_id is not None and payload_id != event_id:
             raise ValueError(f'Event {event_id}: payload id mismatch ({payload_id!r})')
-        if not verify_event_integrity(data, event_id):
-            raise ValueError(
-                f'Event {event_id}: integrity checksum mismatch in SQLite ledger'
+        if not verify_event_integrity(data, event_id, log_mismatch=False):
+            data = repair_payload_checksum(data, event_id=event_id)
+            self._rewrite_payload(event_id, data)
+            logger.info(
+                'Self-healed SQLite event checksum for id=%s in %s',
+                event_id,
+                self._db_path,
             )
         return data
 
@@ -490,13 +512,9 @@ class SQLiteEventStore:
             event_id = data.get('id')
             if event_id is not None and event_id != row_id:
                 raise ValueError(f'Event {row_id}: payload id mismatch ({event_id!r})')
-            if not verify_event_integrity(data, row_id):
-                logger.warning(
-                    'Skipping SQLite event id=%s with checksum mismatch in %s',
-                    row_id,
-                    self._db_path,
-                )
-                continue
+            if not verify_event_integrity(data, row_id, log_mismatch=False):
+                data = repair_payload_checksum(data, event_id=row_id)
+                self._rewrite_payload(row_id, data)
             results.append(data)
         return results
 

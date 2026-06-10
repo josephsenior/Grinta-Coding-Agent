@@ -230,7 +230,13 @@ class OrchestratorExecutor(
         await self._flush_stream_paint_events(state, event_stream)
         tool_calls_list = self._finalize_stream_tool_calls(state)
         visible_accum = self._visible_stream_content(state.content_accumulate)
-        self._emit_final_stream_event(event_stream, state.content_accumulate, visible_accum, tool_calls_list)
+        self._emit_final_stream_event(
+            event_stream,
+            state.content_accumulate,
+            visible_accum,
+            tool_calls_list,
+            thinking_accumulate=state.thinking_accumulate,
+        )
         response = self._build_streaming_response(call_params, visible_accum, state.thinking_accumulate, tool_calls_list, state.streamed_usage)
         self._record_streaming_metrics(response, time.time())
         return response

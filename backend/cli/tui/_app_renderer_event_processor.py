@@ -1154,16 +1154,19 @@ def _process_event_commit_response(
 
 
 def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
-    orch._update_metrics(event)
+    replay_mode = getattr(orch, '_replay_mode', False)
+    if not replay_mode:
+        orch._update_metrics(event)
     if _process_event_is_noop(event):
         return
-    _process_event_check_user_message(orch, event)
-    _process_event_maybe_start_turn(orch, event)
-    is_tool = isinstance(event, _TOOL_EXECUTION_TYPES)
-    if orch._in_agent_turn and is_tool:
-        orch._tools_in_turn += 1
-    _process_event_finalize_thinking(orch, event)
-    _process_event_commit_response(orch, event, is_tool)
+    if not replay_mode:
+        _process_event_check_user_message(orch, event)
+        _process_event_maybe_start_turn(orch, event)
+        is_tool = isinstance(event, _TOOL_EXECUTION_TYPES)
+        if orch._in_agent_turn and is_tool:
+            orch._tools_in_turn += 1
+        _process_event_finalize_thinking(orch, event)
+        _process_event_commit_response(orch, event, is_tool)
     _dispatch_event(orch, event)
 
 

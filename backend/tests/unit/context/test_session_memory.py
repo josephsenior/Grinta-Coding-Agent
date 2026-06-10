@@ -24,9 +24,10 @@ def test_maybe_update_writes_session_memory_when_threshold_crossed(tmp_path, mon
     memory_path = tmp_path / 'session_memory.md'
     monkeypatch.setattr(
         'backend.context.session_memory._session_memory_path',
-        lambda: memory_path,
+        lambda state=None: memory_path,
     )
     state = MagicMock()
+    state.session_id = 'mem-test-session'
     state.extra_data = {}
 
     def _set_extra(key, value, source='test'):

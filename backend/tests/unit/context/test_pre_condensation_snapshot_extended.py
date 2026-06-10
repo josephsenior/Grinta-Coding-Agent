@@ -41,14 +41,22 @@ class TestPreCondensationSnapshot(unittest.TestCase):
     def test_snapshot_path_uses_agent_state_dir(self):
         from unittest.mock import patch
 
+        from backend.engine.tools.working_memory import set_current_session_id
+
         agent = Path('C:/tmp/agent')
         with patch(
             'backend.core.workspace_resolution.workspace_agent_state_dir',
             return_value=agent,
         ):
+            set_current_session_id(None)
             self.assertEqual(
                 snapshot_module._snapshot_path(),
-                agent / 'pre_condensation_snapshot.json',
+                agent / '.session_context_unbound' / 'pre_condensation_snapshot.json',
+            )
+            set_current_session_id('sess-42')
+            self.assertEqual(
+                snapshot_module._snapshot_path(),
+                agent / 'pre_condensation_snapshot_sess-42.json',
             )
 
     def test_extract_snapshot_attempted_approaches(self):

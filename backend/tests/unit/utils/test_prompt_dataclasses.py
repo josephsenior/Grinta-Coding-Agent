@@ -209,46 +209,37 @@ class TestOrchestratorPromptManager:
             assert 'You are Grinta' in result
             assert 'You are App' not in result
 
-    def test_inject_scratchpad_success(self, pm):
-        """Test scratchpad injection when notes exist."""
-        with (
-            patch(
-                'backend.engine.tools.note.scratchpad_entries_for_prompt',
-                return_value=[('todo', 'buy milk')],
-            ),
-            patch(
-                'backend.engine.tools.working_memory.get_working_memory_prompt_block',
-                return_value='',
-            ),
+    def test_inject_workspace_memory_success(self, pm):
+        """Test workspace memory injection when entries exist."""
+        with patch(
+            'backend.engine.tools.workspace_memory.format_prompt_block',
+            return_value='<WORKSPACE_MEMORY>\n- [lesson] todo: buy milk\n</WORKSPACE_MEMORY>',
         ):
             content = 'Original content'
-            result = pm._inject_scratchpad(content)
+            result = pm._inject_workspace_memory(content)
             assert 'Original content' in result
-            assert '<WORKING_SCRATCHPAD>' in result
-            assert '[todo]: buy milk' in result
+            assert '<WORKSPACE_MEMORY>' in result
+            assert 'buy milk' in result
 
-    def test_inject_scratchpad_no_notes(self, pm):
-        """Test scratchpad injection when no notes exist."""
+    def test_inject_workspace_memory_empty(self, pm):
+        """Test workspace memory injection when store is empty."""
         with (
             patch(
-                'backend.engine.tools.note.scratchpad_entries_for_prompt',
-                return_value=[],
-            ),
-            patch(
-                'backend.engine.tools.working_memory.get_working_memory_prompt_block',
+                'backend.engine.tools.workspace_memory.format_prompt_block',
                 return_value='',
             ),
+            patch.object(pm, '_lessons_markdown_block', return_value=''),
         ):
             content = 'Original content'
-            result = pm._inject_scratchpad(content)
+            result = pm._inject_workspace_memory(content)
             assert result == content
 
-    def test_inject_scratchpad_exception(self, pm):
-        """Test scratchpad injection handles exceptions."""
+    def test_inject_workspace_memory_exception(self, pm):
+        """Test workspace memory injection handles exceptions."""
         with patch(
-            'backend.engine.tools.note.scratchpad_entries_for_prompt',
+            'backend.engine.tools.workspace_memory.format_prompt_block',
             side_effect=Exception('Crash'),
         ):
             content = 'Original content'
-            result = pm._inject_scratchpad(content)
+            result = pm._inject_workspace_memory(content)
             assert result == content

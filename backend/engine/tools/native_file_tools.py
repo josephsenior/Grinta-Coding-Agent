@@ -28,55 +28,40 @@ def create_read_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=READ_TOOL_NAME,
         description=(
-            'Read a file, line range, or one or more symbol bodies. Symbol reads are '
-            'read-only: path is optional, unique symbols may be auto-resolved, and '
-            'ambiguous symbols return candidates instead of guessed content.'
+            'Read a file, a line range within a file, or one or more symbol bodies. '
+            'For files: use type=file with path; add start_line and end_line for a range. '
+            'For symbols: use type=symbols with symbols[] (one or more targets). Unique '
+            'symbols auto-resolve; ambiguous symbols return candidates, not guessed bodies.'
         ),
         properties={
             'type': {
                 'type': 'string',
-                'enum': ['file', 'range', 'symbols'],
-                'description': 'Read kind: complete file, line range, or one/more symbol bodies.',
+                'enum': ['file', 'symbols'],
+                'description': 'Read kind: file (optionally a line range) or symbol bodies.',
             },
             'path': get_path_param(
-                'Optional project-relative path. Required for file/range reads.'
+                'Project-relative path. Required for type=file; optional default for all symbols[].'
             ),
             'start_line': {
                 'type': 'integer',
-                'description': '1-based inclusive start line for type=range.',
+                'description': '1-based inclusive start line for type=file line-range reads.',
             },
             'end_line': {
                 'type': 'integer',
-                'description': '1-based inclusive end line for type=range. Use -1 for EOF.',
-            },
-            'symbol_id': {
-                'type': 'string',
-                'description': 'Optional internal precision target returned by symbol discovery.',
-            },
-            'qualified_name': {
-                'type': 'string',
-                'description': 'Human-readable symbol target such as AuthService.login.',
-            },
-            'symbol_name': {
-                'type': 'string',
-                'description': 'Single unqualified symbol name for type=symbols when symbols[] is omitted.',
-            },
-            'query': {
-                'type': 'string',
-                'description': 'Alias for symbol_name when type=symbols.',
+                'description': '1-based inclusive end line for type=file line-range reads. Use -1 for EOF.',
             },
             'symbols': {
                 'type': 'array',
                 'description': (
-                    'One or more symbol targets for type=symbols. Each item may be an object '
-                    'with qualified_name or symbol_name plus optional path/kind/parent/occurrence.'
+                    'Required for type=symbols. Each item needs qualified_name or symbol_name; '
+                    'optional per-item path, symbol_kind, parent_symbol, occurrence, or symbol_id.'
                 ),
                 'items': {
                     'type': 'object',
                     'properties': {
-                        'symbol_id': {'type': 'string'},
                         'qualified_name': {'type': 'string'},
                         'symbol_name': {'type': 'string'},
+                        'symbol_id': {'type': 'string'},
                         'path': {'type': 'string'},
                         'symbol_kind': {'type': 'string'},
                         'parent_symbol': {'type': 'string'},
@@ -86,19 +71,7 @@ def create_read_tool() -> ChatCompletionToolParam:
             },
             'symbol_kind': {
                 'type': 'string',
-                'description': 'Optional kind filter: function, class, or method.',
-            },
-            'parent_symbol': {
-                'type': 'string',
-                'description': 'Optional parent/container symbol for disambiguation.',
-            },
-            'occurrence': {
-                'type': 'integer',
-                'description': 'Optional 1-based occurrence index after candidate discovery.',
-            },
-            'include_private': {
-                'type': 'boolean',
-                'description': 'Whether type=symbols includes private/underscore-prefixed symbols.',
+                'description': 'Default symbol kind for all symbols[] items (function, class, method).',
             },
         },
         required=['type'],
@@ -264,8 +237,11 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=MULTIEDIT_TOOL_NAME,
         description=(
-            'Atomic multi-file refactoring. Operations use replace_string and '
-            'edit_symbols. Not for casual single-file edits.'
+            'Atomic multi-file refactoring across one or more files in a single call. '
+            'Use when implementation + tests, or multiple related symbols/files, must '
+            'change together. Each operation is either replace_string (path, old_string, '
+            'new_string) or edit_symbols (path, qualified_name/symbol_name, new_content). '
+            'Not for casual single-file edits — use replace_string or edit_symbols instead.'
         ),
         properties={
             'operations': {

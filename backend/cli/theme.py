@@ -414,6 +414,8 @@ CLR_WARN_BODY = '#f6ff8f'  # warning body text
 CLR_WARN_ICON = 'bold #f6ff8f'  # warning icon / accent
 CLR_INFO_BODY = '#91abec'  # info body text
 CLR_INFO_ICON = 'bold #91abec'  # info icon / accent
+CLR_NOTICE_BG = '#12161f'  # soft transcript notice background
+CLR_NOTICE_TEXT = '#7a8299'  # dim transcript notice body text
 
 # ── Shell output chrome ────────────────────────────────────────────────────────
 CLR_SHELL_OUTPUT = '#6b7280'  # shell command output text (dim gray)

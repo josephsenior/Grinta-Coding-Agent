@@ -117,7 +117,7 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
     if not streaming_only or any(
         getattr(event, 'is_final', False) for event in events
     ):
-        orch._refresh_display()
+        orch._refresh_display(skip_sidebar=streaming_only)
 
 
 def _cancel_drain_debounce(orch: '_AppRendererEventProcessorMixin') -> None:
@@ -167,7 +167,7 @@ def _flush_and_refresh(
     if not streaming_only or any(
         getattr(event, 'is_final', False) for event in events
     ):
-        orch._refresh_display()
+        orch._refresh_display(skip_sidebar=streaming_only)
 
 
 async def _process_events_in_batches(
@@ -227,6 +227,58 @@ async def wait_for_activity(
     return orch._current_state
 
 
+_LOAD_EARLIER_BATCH_SIZE = 100
+
+
+async def load_earlier_messages(
+    orch: '_AppRendererEventProcessorMixin',
+    batch_size: int = _LOAD_EARLIER_BATCH_SIZE,
+) -> int:
+    """Fetch and render earlier events from the ledger.
+
+    Returns the number of events loaded, or 0 if no earlier events exist.
+    """
+    min_id = orch._min_rendered_event_id
+    if min_id <= 0:
+        return 0
+    event_stream = getattr(orch, '_event_stream', None)
+    if event_stream is None:
+        return 0
+
+    start_id = max(0, min_id - batch_size)
+    try:
+        events = list(event_stream.search_events(
+            start_id=start_id,
+            end_id=min_id,
+            reverse=False,
+        ))
+    except Exception:
+        return 0
+
+    if not events:
+        return 0
+
+    orch._replay_mode = True
+    orch._prepend_mode = True
+    try:
+        for event in events:
+            orch._process_event(event)
+        flush = getattr(orch, 'flush_live_ui', None)
+        if callable(flush):
+            flush()
+        orch._refresh_display()
+    finally:
+        orch._replay_mode = False
+        orch._prepend_mode = False
+
+    if events:
+        first_id = getattr(events[0], 'id', -1)
+        if first_id >= 0:
+            orch._min_rendered_event_id = first_id
+
+    return len(events)
+
+
 def _on_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
     # Deferred import: the test suite monkey-patches this constant on the
     # mixin module (``monkeypatch.setattr(_ep_mod, '_TUI_PENDING_EVENT_LIMIT', N)``).
@@ -234,8 +286,14 @@ def _on_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
         _TUI_PENDING_EVENT_LIMIT,
     )
 
+    event_id = getattr(event, 'id', -1)
     should_schedule_drain = False
     with orch._pending_lock:
+        if event_id >= 0:
+            if orch._min_rendered_event_id < 0 or event_id < orch._min_rendered_event_id:
+                orch._min_rendered_event_id = event_id
+            if event_id > orch._max_rendered_event_id:
+                orch._max_rendered_event_id = event_id
         coalesced = _try_coalesce_streaming_enqueue(orch._pending_events, event)
         if not coalesced:
             if len(orch._pending_events) >= _TUI_PENDING_EVENT_LIMIT:

@@ -62,10 +62,15 @@ class _AppRendererLiveMixin:
             from textual.widget import Widget
 
             if isinstance(renderable, Widget):
-                display.append_widget(renderable)
+                widget = renderable
             else:
-                display.append_widget(Static(renderable))
+                widget = Static(renderable)
+            if getattr(self, '_prepend_mode', False):
+                display.prepend_widget(widget)
+            else:
+                display.append_widget(widget)
         self._refresh_display()
+        self._maybe_prune_transcript()
 
     def update_live_thinking(self, text: str) -> None:
         """Update the real-time reasoning preview in-place."""

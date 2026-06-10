@@ -104,6 +104,43 @@ def _render_system_capabilities(
         'Do not describe condensation as "lossy" or as something you must invoke manually.'
     )
 
+    web_line = ''
+    if bool(getattr(config, 'enable_web', True)):
+        web_line = (
+            '- **Web (`web_search` / `web_fetch`)**: native tools backed by bundled Exa MCP '
+            '(search + markdown fetch). `EXA_API_KEY` is optional — preferred for higher limits, '
+            'not required. `web_fetch` falls back to fetch MCP when Exa cannot read a URL.'
+        )
+
+    browser_line = ''
+    if bool(getattr(config, 'enable_browsing', True)):
+        web_fetch_hint = (
+            'Use `web_fetch` for static URLs; `browser` when interaction is required.'
+            if bool(getattr(config, 'enable_web', True))
+            else 'Use when pages need interaction (forms, logins, JS SPAs).'
+        )
+        browser_line = (
+            '- **Browser (`browser`)**: in-process Chromium for interactive pages — forms, '
+            f'logins, JS SPAs. {web_fetch_hint}'
+        )
+
+    memory_line = ''
+    if bool(getattr(config, 'enable_working_memory', True)):
+        memory_line = (
+            '- **Memory (`memory`)**: `working` for session reasoning, `persist` for rare workspace '
+            'facts, `recall` for semantic search over indexed history. Task progress belongs in '
+            '`task_tracker`, not memory.'
+        )
+
+    checkpoint_line = ''
+    if bool(getattr(config, 'enable_checkpoints', False)):
+        checkpoint_line = (
+            '- **Checkpoints (`checkpoint`)**: risky edits/commands get automatic pre-action snapshots '
+            '(rollback middleware). Use `save` for named phase milestones, `view` to list checkpoints, '
+            '`revert` after a bad edit or failed command, `clear` when the milestone list is stale or '
+            'a fresh phase starts. Prefer `undo_last_edit` for the last file write.'
+        )
+
     # Runtime-detected language servers / debug adapters — only when those tools
     # are enabled in config (omit bullets entirely when gated off).
     lsp_line, dap_line = _render_runtime_detection_lines(config)
@@ -125,6 +162,14 @@ def _render_system_capabilities(
     ]
     if parallel_line:
         parts.append(f'{parallel_line}\n')
+    if web_line:
+        parts.append(f'{web_line}\n')
+    if browser_line:
+        parts.append(f'{browser_line}\n')
+    if memory_line:
+        parts.append(f'{memory_line}\n')
+    if checkpoint_line:
+        parts.append(f'{checkpoint_line}\n')
     if detection_block:
         parts.append(detection_block)
 

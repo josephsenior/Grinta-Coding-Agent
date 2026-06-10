@@ -4,6 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from backend.core.errors import FunctionCallValidationError
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import (
@@ -524,24 +525,24 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             {
                 'pattern': 'PLAN_MODE',
                 'path': 'backend/core',
-                'max_results': 1,
+                'head_limit': 1,
             },
             mode='plan',
         )
         self.assertIsInstance(search_action, AgentThinkAction)
 
         create_call = SimpleNamespace(function=SimpleNamespace(name=CREATE_TOOL_NAME))
-        create_action = _process_single_tool_call(
-            create_call,
-            {
-                'type': 'file',
-                'path': 'demo.txt',
-                'content': 'x',
-                'security_risk': 'LOW',
-            },
-            mode='plan',
-        )
-        self.assertIsInstance(create_action, FileEditAction)
+        with self.assertRaises(FunctionCallValidationError):
+            _process_single_tool_call(
+                create_call,
+                {
+                    'type': 'file',
+                    'path': 'demo.txt',
+                    'content': 'x',
+                    'security_risk': 'LOW',
+                },
+                mode='plan',
+            )
 
         self.mock_controller.set_agent_state_to.reset_mock()
         ask_action = MessageAction(content='1. Which module?', wait_for_response=True)

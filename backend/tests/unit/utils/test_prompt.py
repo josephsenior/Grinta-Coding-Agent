@@ -206,52 +206,51 @@ class TestOrchestratorPromptManager:
         assert opm._prompt_tier == 'debug'
 
         with patch.object(
-            opm, '_inject_lessons_learned', return_value='lessons-injected'
+            opm, '_inject_workspace_memory', return_value='lessons-injected'
         ):
             msg = opm.get_system_message()
             assert 'lessons-injected' in msg
 
-    def test_inject_scratchpad_exception(self, prompt_dir):
-        # Line 303-304: except Exception: return content
+    def test_inject_workspace_memory_exception(self, prompt_dir):
         opm = OrchestratorPromptManager(prompt_dir)
         with patch(
-            'backend.engine.tools.note.scratchpad_entries_for_prompt',
+            'backend.engine.tools.workspace_memory.format_prompt_block',
             side_effect=Exception('failed'),
         ):
-            result = opm._inject_scratchpad('content')
+            result = opm._inject_workspace_memory('content')
             assert result == 'content'
 
-    def test_inject_scratchpad_success(self, prompt_dir):
+    def test_inject_workspace_memory_success(self, prompt_dir):
         opm = OrchestratorPromptManager(prompt_dir)
+        with patch(
+            'backend.engine.tools.workspace_memory.format_prompt_block',
+            return_value='<WORKSPACE_MEMORY>\n- [lesson] key: note value\n</WORKSPACE_MEMORY>',
+        ):
+            result = opm._inject_workspace_memory('content')
+            assert 'note value' in result
+            assert '<WORKSPACE_MEMORY>' in result
+
+    def test_inject_workspace_memory_falls_back_to_lessons_md(self, prompt_dir, tmp_path):
+        opm = OrchestratorPromptManager(prompt_dir)
+        lessons = tmp_path / 'lessons.md'
+        lessons.write_text('verified fix for auth', encoding='utf-8')
         with (
             patch(
-                'backend.engine.tools.note.scratchpad_entries_for_prompt',
-                return_value=[('key', 'note value')],
-            ),
-            patch(
-                'backend.engine.tools.working_memory.get_working_memory_prompt_block',
+                'backend.engine.tools.workspace_memory.format_prompt_block',
                 return_value='',
             ),
-        ):
-            result = opm._inject_scratchpad('content')
-            assert '[key]: note value' in result
-            assert '<WORKING_SCRATCHPAD>' in result
-
-    def test_inject_scratchpad_includes_working_memory_block(self, prompt_dir):
-        opm = OrchestratorPromptManager(prompt_dir)
-        with (
             patch(
-                'backend.engine.tools.note.scratchpad_entries_for_prompt',
-                return_value=[],
+                'backend.core.workspace_resolution.get_effective_workspace_root',
+                return_value=tmp_path,
             ),
             patch(
-                'backend.engine.tools.working_memory.get_working_memory_prompt_block',
-                return_value='<WORKING_MEMORY>\n[PLAN] test\n</WORKING_MEMORY>',
+                'backend.core.workspace_resolution.workspace_agent_state_dir',
+                return_value=tmp_path,
             ),
         ):
-            result = opm._inject_scratchpad('content')
-            assert '<WORKING_MEMORY>' in result
-            assert '[PLAN] test' in result
+            result = opm._inject_workspace_memory('content')
+            assert '<WORKSPACE_MEMORY>' in result
+            assert 'verified fix for auth' in result
 
 
 def test_sentinels():

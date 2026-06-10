@@ -3,33 +3,42 @@
 from __future__ import annotations
 
 AGENT_MODE = 'agent'
-ASK_MODE = 'ask'
 CHAT_MODE = 'chat'
 PLAN_MODE = 'plan'
 
-CHAT_MODE_NAMES = frozenset({CHAT_MODE, ASK_MODE})
 VISIBLE_INTERACTION_MODES = (CHAT_MODE, PLAN_MODE, AGENT_MODE)
-VALID_INTERACTION_MODES = frozenset({*VISIBLE_INTERACTION_MODES, ASK_MODE})
+VALID_INTERACTION_MODES = frozenset(VISIBLE_INTERACTION_MODES)
 
-CHAT_MODE_ALLOWED_TOOLS = frozenset()
+from backend.inference.tool_names import (
+    ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
+    ASK_USER_TOOL_NAME,
+    FIND_SYMBOLS_TOOL_NAME,
+    GLOB_TOOL_NAME,
+    GREP_TOOL_NAME,
+    LSP_TOOL_NAME,
+    READ_TOOL_NAME,
+    TASK_TRACKER_TOOL_NAME,
+    WEB_FETCH_TOOL_NAME,
+    WEB_SEARCH_TOOL_NAME,
+)
 
-PLAN_MODE_ALLOWED_TOOLS = frozenset(
+_DISCOVERY_TOOLS = frozenset(
     {
-        'analyze_project_structure',
-        'ask_user',
-        'create',
-        'edit_symbols',
-        'execute_bash',
-        'execute_powershell',
-        'find_symbols',
-        'glob',
-        'grep',
-        'lsp',
-        'multiedit',
-        'read',
-        'replace_string',
-        'task_tracker',
+        ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
+        FIND_SYMBOLS_TOOL_NAME,
+        GLOB_TOOL_NAME,
+        GREP_TOOL_NAME,
+        LSP_TOOL_NAME,
+        READ_TOOL_NAME,
+        WEB_FETCH_TOOL_NAME,
+        WEB_SEARCH_TOOL_NAME,
     }
+)
+
+CHAT_MODE_ALLOWED_TOOLS = _DISCOVERY_TOOLS | frozenset({ASK_USER_TOOL_NAME})
+
+PLAN_MODE_ALLOWED_TOOLS = CHAT_MODE_ALLOWED_TOOLS | frozenset(
+    {TASK_TRACKER_TOOL_NAME}
 )
 
 
@@ -42,8 +51,8 @@ def normalize_interaction_mode(value: object, default: str = AGENT_MODE) -> str:
 
 
 def is_chat_mode(value: object) -> bool:
-    """Return True for chat-like modes where plain prose is allowed."""
-    return normalize_interaction_mode(value) in CHAT_MODE_NAMES
+    """Return True for chat mode where prose and grounded Q&A are allowed."""
+    return normalize_interaction_mode(value) == CHAT_MODE
 
 
 def is_plan_mode(value: object) -> bool:

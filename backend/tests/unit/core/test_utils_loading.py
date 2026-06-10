@@ -168,7 +168,6 @@ class TestFinalization:
         # Native browser follows active agent flags; bundled MCPs are always extended
         assert cfg.enable_browser is bool(
             cfg.get_agent_config(cfg.default_agent).enable_browsing
-            and cfg.get_agent_config(cfg.default_agent).enable_native_browser
         )
 
     def test_finalize_config_creates_missing_auto_compactor(self, tmp_path):

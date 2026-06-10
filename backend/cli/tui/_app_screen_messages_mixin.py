@@ -13,13 +13,10 @@ from textual.widgets import (
 
 from backend.cli._event_renderer.text_utils import sanitize_visible_transcript_text
 from backend.cli.theme import (
-    MARK_WARN,
     NAVY_BORDER,
-    NAVY_ERROR,
     NAVY_READY,
     NAVY_TEXT_MUTED,
     NAVY_TEXT_PRIMARY,
-    NAVY_WAITING,
 )
 from backend.cli.tui._app_constants import _tui_logger
 from backend.cli.tui._app_helpers import (
@@ -96,22 +93,27 @@ class _AppScreenMessagesMixin:
         body.stylize(NAVY_TEXT_MUTED)
         self._write_log(body)
 
+    def _emit_transcript_notice(self, text: str) -> None:
+        """Render a unified soft notice for recoverable issues and tool feedback."""
+        from backend.cli.tui.widgets.transcript_notice import TranscriptNotice
+
+        widget = TranscriptNotice(text)
+        try:
+            display = self._get_display()
+        except Exception:
+            self._write_log(widget)
+            return
+        if type(display).__name__ == 'MagicMock':
+            display.write(text)
+            return
+        self._write_log(widget)
+
     def add_error(self, text: str) -> None:
-        result = Text()
-        result.append(Text('✗ ', style=f'bold {NAVY_ERROR}'))
-        body = _rich_text(text)
-        body.stylize(f'bold {NAVY_ERROR}')
-        result.append_text(body)
-        self._write_log(result)
+        self._emit_transcript_notice(text)
 
     def add_warning(self, text: str) -> None:
-        """Recoverable issue — softer than ``add_error`` (yellow ⚠, wraps to width)."""
-        result = Text()
-        result.append(Text(f'{MARK_WARN} ', style=f'bold {NAVY_WAITING}'))
-        body = _rich_text(text)
-        body.stylize(NAVY_WAITING)
-        result.append_text(body)
-        self._write_log(result)
+        """Recoverable issue — same soft notice styling as ``add_error``."""
+        self._emit_transcript_notice(text)
 
     def add_success(self, text: str) -> None:
         icon = Text('✓ ', style=f'bold {NAVY_READY}')

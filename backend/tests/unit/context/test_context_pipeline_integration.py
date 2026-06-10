@@ -80,15 +80,15 @@ async def test_six_hundred_event_pytest_session_commits_boundary_and_preserves_p
 ):
     monkeypatch.setattr(
         'backend.context.pre_condensation_snapshot._snapshot_path',
-        lambda: tmp_path / 'pre_condensation_snapshot.json',
+        lambda state=None: tmp_path / 'pre_condensation_snapshot.json',
     )
     monkeypatch.setattr(
         'backend.context.pre_condensation_snapshot._snapshot_staging_path',
-        lambda: tmp_path / '.pre_condensation_snapshot.staging.json',
+        lambda state=None: tmp_path / '.pre_condensation_snapshot.staging.json',
     )
     monkeypatch.setattr(
         'backend.context.session_memory._session_memory_path',
-        lambda: tmp_path / 'session_memory.md',
+        lambda state=None: tmp_path / 'session_memory.md',
     )
     events = _build_pytest_session_events(600)
     state = _make_state(events)

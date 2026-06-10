@@ -9,7 +9,7 @@ from __future__ import annotations
 from backend.core.constants import MAX_DELEGATION_DEPTH
 from backend.ledger.action.agent import DelegateTaskAction
 
-DELEGATE_TASK_TOOL_NAME = 'delegate_task'
+from backend.inference.tool_names import DELEGATE_TASK_TOOL_NAME
 
 
 def create_delegate_task_tool() -> dict:

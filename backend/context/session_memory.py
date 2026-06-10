@@ -28,10 +28,10 @@ SESSION_MEMORY_FILENAME = 'session_memory.md'
 _PIPELINE_STATE_KEY = 'context_pipeline_state'
 
 
-def _session_memory_path() -> Path:
-    from backend.core.workspace_resolution import workspace_agent_state_dir
+def _session_memory_path(state: State | None = None) -> Path:
+    from backend.context.session_context import scoped_agent_path
 
-    return workspace_agent_state_dir() / SESSION_MEMORY_FILENAME
+    return scoped_agent_path('session_memory', '.md', state=state)
 
 
 def _pipeline_state(state: State | None) -> dict[str, Any]:
@@ -83,9 +83,9 @@ def _format_session_memory(snapshot: dict[str, Any], *, last_event_id: int | Non
     return '\n'.join(meta_lines) + '\n\n# Session Memory\n\n' + body
 
 
-def load_session_memory() -> str:
+def load_session_memory(*, state: State | None = None) -> str:
     """Return the current session memory markdown, or empty string."""
-    path = _session_memory_path()
+    path = _session_memory_path(state)
     if not path.is_file():
         return ''
     try:
@@ -95,9 +95,9 @@ def load_session_memory() -> str:
         return ''
 
 
-def get_content_for_compaction() -> str:
+def get_content_for_compaction(*, state: State | None = None) -> str:
     """Return session memory body suitable for compaction summaries."""
-    content = load_session_memory()
+    content = load_session_memory(state=state)
     if not content:
         return ''
     if content.startswith('---\n'):
@@ -107,8 +107,8 @@ def get_content_for_compaction() -> str:
     return content.strip()
 
 
-def session_memory_exists() -> bool:
-    path = _session_memory_path()
+def session_memory_exists(*, state: State | None = None) -> bool:
+    path = _session_memory_path(state)
     return path.is_file() and path.stat().st_size > 0
 
 
@@ -140,6 +140,9 @@ def maybe_update(
     llm_config: object | None = None,
 ) -> bool:
     """Update session_memory.md when token or tool-call thresholds are crossed."""
+    from backend.context.session_context import bind_session_context
+
+    bind_session_context(state=state)
     if not events:
         return False
     if _should_skip_during_condensation_loop(state):
@@ -155,8 +158,10 @@ def maybe_update(
     tool_calls = _count_tool_calls_since(events, last_event_id)
     tokens_delta = max(0, estimated - last_tokens)
 
-    should_init = not session_memory_exists() and estimated >= DEFAULT_SESSION_MEMORY_INIT_TOKENS
-    should_update = session_memory_exists() and (
+    should_init = (
+        not session_memory_exists(state=state) and estimated >= DEFAULT_SESSION_MEMORY_INIT_TOKENS
+    )
+    should_update = session_memory_exists(state=state) and (
         tokens_delta >= DEFAULT_SESSION_MEMORY_UPDATE_TOKENS
         or tool_calls >= DEFAULT_SESSION_MEMORY_UPDATE_TOOL_CALLS
     )
@@ -167,7 +172,7 @@ def maybe_update(
     latest_id = getattr(events[-1], 'id', None)
     last_summarized = latest_id if isinstance(latest_id, int) else last_event_id
     markdown = _format_session_memory(snapshot, last_event_id=last_summarized)
-    path = _session_memory_path()
+    path = _session_memory_path(state)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(markdown, encoding='utf-8')
@@ -199,17 +204,21 @@ def maybe_update(
     return True
 
 
-def build_compaction_summary(*, include_snapshot: bool = True) -> str:
+def build_compaction_summary(
+    *,
+    include_snapshot: bool = True,
+    state: State | None = None,
+) -> str:
     """Build a summary from session memory and optional live snapshot."""
     parts: list[str] = []
-    memory = get_content_for_compaction()
+    memory = get_content_for_compaction(state=state)
     if memory:
         parts.append(memory)
     if include_snapshot:
         try:
             from backend.context.pre_condensation_snapshot import load_snapshot
 
-            snapshot = load_snapshot()
+            snapshot = load_snapshot(state=state)
             if snapshot:
                 block = format_snapshot_for_injection(snapshot)
                 if block and block not in memory:
@@ -219,12 +228,12 @@ def build_compaction_summary(*, include_snapshot: bool = True) -> str:
     return '\n\n'.join(part for part in parts if part.strip())
 
 
-def metadata() -> dict[str, Any]:
-    content = load_session_memory()
+def metadata(*, state: State | None = None) -> dict[str, Any]:
+    content = load_session_memory(state=state)
     if not content:
         return {}
     meta = _read_metadata(content)
-    path = _session_memory_path()
+    path = _session_memory_path(state)
     if path.is_file():
         meta['path'] = str(path)
         meta['size_bytes'] = path.stat().st_size

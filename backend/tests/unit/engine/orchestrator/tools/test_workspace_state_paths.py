@@ -14,13 +14,14 @@ def test_working_memory_writes_under_app_dir(tmp_path, monkeypatch) -> None:
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,
     )
+    wm.set_current_session_id('test-session')
 
     action = wm.build_working_memory_action(
         {'command': 'update', 'section': 'plan', 'content': 'next step'}
     )
 
     assert "Updated 'plan'" in action.thought
-    memory_file = tmp_path / 'working_memory.json'
+    memory_file = tmp_path / 'working_memory_test-session.json'
     assert memory_file.exists()
     assert json.loads(memory_file.read_text(encoding='utf-8'))['plan'] == 'next step'
 
@@ -32,6 +33,7 @@ def test_working_memory_update_all_sections_parses_markdown_headers(
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,
     )
+    wm.set_current_session_id('test-session')
 
     content = '## HYPOTHESIS\ntry X\n\n## FINDINGS\nit worked\n'
     action = wm.build_working_memory_action(
@@ -39,7 +41,9 @@ def test_working_memory_update_all_sections_parses_markdown_headers(
     )
 
     assert 'Updated sections: hypothesis, findings' in action.thought
-    payload = json.loads((tmp_path / 'working_memory.json').read_text(encoding='utf-8'))
+    payload = json.loads(
+        (tmp_path / 'working_memory_test-session.json').read_text(encoding='utf-8')
+    )
     assert payload['hypothesis'].strip() == 'try X'
     assert payload['findings'].strip() == 'it worked'
 
@@ -51,8 +55,9 @@ def test_working_memory_clear_section_all_clears_all_sections(
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,
     )
+    wm.set_current_session_id('test-session')
 
-    memory_file = tmp_path / 'working_memory.json'
+    memory_file = tmp_path / 'working_memory_test-session.json'
     memory_file.write_text(
         json.dumps(
             {
@@ -80,12 +85,15 @@ def test_scratchpad_sync_is_idempotent(tmp_path, monkeypatch) -> None:
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,
     )
+    wm.set_current_session_id('test-session')
     notes = {'plan': 'keep the hot path deterministic'}
 
     assert wm.sync_scratchpad_to_working_memory(notes) == ['plan']
     assert wm.sync_scratchpad_to_working_memory(notes) == []
 
-    payload = json.loads((tmp_path / 'working_memory.json').read_text(encoding='utf-8'))
+    payload = json.loads(
+        (tmp_path / 'working_memory_test-session.json').read_text(encoding='utf-8')
+    )
     assert payload['plan'].count('keep the hot path deterministic') == 1
 
 

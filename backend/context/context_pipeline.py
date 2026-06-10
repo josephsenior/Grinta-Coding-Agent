@@ -29,11 +29,16 @@ from backend.context.tool_result_storage import (
     apply_frozen_tool_replacements,
     apply_tool_result_budget,
 )
+from backend.context.session_context import bind_session_context
 from backend.context.working_set import build_working_set_observation, sync_snapshot_to_working_memory
 from backend.core.constants import (
     DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_COMPACT_MIN_PRUNED_EVENTS,
     DEFAULT_COMPACT_MIN_TOKEN_REDUCTION,
+    DEFAULT_DEGRADED_COMPACT_TAIL_RATIO,
+    DEFAULT_INEFFECTIVE_COMPACT_BACKOFF_SECONDS,
+    DEFAULT_INEFFECTIVE_COMPACT_MAX_SKIP_EVENTS,
+    DEFAULT_INEFFECTIVE_COMPACT_SKIP_EVENTS,
     DEFAULT_LLM_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
     DEFAULT_PROMPT_MIN_TAIL_TOKENS,
@@ -54,6 +59,8 @@ _LAST_LLM_COMPACT_KEY = 'last_llm_compact_attempt'
 _LAST_BOUNDARY_COMPACT_KEY = 'last_boundary_compact_at'
 _JUST_COMPACTED_KEY = 'just_compacted'
 _SKIP_COMPACTION_UNTIL_KEY = 'skip_compaction_until_event_id'
+_INEFFECTIVE_COMPACT_STREAK_KEY = 'ineffective_compact_streak'
+_INEFFECTIVE_COMPACT_UNTIL_KEY = 'ineffective_compact_until'
 _CONSECUTIVE_CONDENSATION_KEY = 'consecutive_condensation_steps'
 _COMPACTION_TARGET_RATIO = 0.7
 
@@ -126,8 +133,14 @@ class ContextPipeline:
         events = apply_microcompact(events, preserve_recent=self._preserve_recent)
         return events
 
-    def _inject_working_set(self, events: list[Event], history: list[Event]) -> list[Event]:
-        working_set = build_working_set_observation(history)
+    def _inject_working_set(
+        self,
+        events: list[Event],
+        history: list[Event],
+        *,
+        state: State | None = None,
+    ) -> list[Event]:
+        working_set = build_working_set_observation(history, state=state)
         if working_set is None:
             return events
         return [working_set, *events]
@@ -152,6 +165,7 @@ class ContextPipeline:
     async def prepare_step(self, state: State) -> CondensedHistory:
         """Run compaction layers; always commit a boundary when over threshold."""
         started = time.perf_counter()
+        bind_session_context(state=state)
         history = list(getattr(state, 'history', []))
         llm_config = self._llm_config(state)
 
@@ -179,9 +193,9 @@ class ContextPipeline:
                     )
                     self._set_skip_compaction(state)
                 else:
-                    self._log_continuity_metric(history, action)
-                    commit_snapshot()
-                    sync_snapshot_to_working_memory(load_snapshot())
+                    self._log_continuity_metric(state, history, action)
+                    commit_snapshot(state=state)
+                    sync_snapshot_to_working_memory(load_snapshot(state=state))
                     self._mark_just_compacted(state)
                     self._record_boundary_compact(state, history, action)
                     self._increment_condensation_counter(state)
@@ -201,11 +215,11 @@ class ContextPipeline:
         force = explicit or critical_pressure
 
         if not (budget.should_autocompact or explicit or pressure_active):
-            delete_staging_snapshot()
+            delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
         if self._should_skip_compaction(state, force=force):
-            delete_staging_snapshot()
+            delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
         action = await self._run_compaction(
@@ -218,7 +232,7 @@ class ContextPipeline:
             critical=critical_pressure,
         )
         if action is None:
-            delete_staging_snapshot()
+            delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
         if not self._passes_effectiveness_gate(history, events, action, budget, state, llm_config):
@@ -227,12 +241,12 @@ class ContextPipeline:
                 len(action.pruned),
             )
             self._set_skip_compaction(state)
-            delete_staging_snapshot()
+            delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
-        self._log_continuity_metric(history, action)
-        commit_snapshot()
-        sync_snapshot_to_working_memory(load_snapshot())
+        self._log_continuity_metric(state, history, action)
+        commit_snapshot(state=state)
+        sync_snapshot_to_working_memory(load_snapshot(state=state))
         self._mark_just_compacted(state)
         self._record_boundary_compact(state, history, action)
         self._increment_condensation_counter(state)
@@ -264,7 +278,7 @@ class ContextPipeline:
         """Assemble LLM-facing events through layers 1–7."""
         history = full_history if full_history is not None else list(condensed_history)
         events = self._project_layers_1_to_3(history, state or _EmptyState(), apply_tool_budget=True)
-        events = self._inject_working_set(events, history)
+        events = self._inject_working_set(events, history, state=state)
 
         just_compacted = False
         if state is not None:
@@ -275,7 +289,9 @@ class ContextPipeline:
                 pipe[_JUST_COMPACTED_KEY] = False
                 state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
 
-        events = inject_post_compact_restore(events, history, just_compacted=just_compacted)
+        events = inject_post_compact_restore(
+            events, history, just_compacted=just_compacted, state=state
+        )
 
         window = select_prompt_events(
             events,
@@ -289,11 +305,16 @@ class ContextPipeline:
         """Run 5b compaction off the hot path for foreground reuse."""
         if not self._config.allow_llm_hot_path:
             return None
+        bind_session_context(state=state)
         history = list(getattr(state, 'history', []))
         events = self._project_layers_1_to_3(history, state, apply_tool_budget=False)
         if not events:
             return None
-        action = await self._llm_structured_compaction(events, state)
+        llm_config = self._llm_config(state)
+        budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
+        action = await self._llm_structured_compaction(
+            events, state, budget=budget, llm_config=llm_config
+        )
         if action is None or not action.summary:
             return None
         return Compaction(action=action)
@@ -302,7 +323,6 @@ class ContextPipeline:
         """Reset condensation-loop counters after a real LLM step."""
         pipe = dict(state.extra_data.get('context_pipeline_state', {}))
         pipe[_CONSECUTIVE_CONDENSATION_KEY] = 0
-        pipe.pop(_SKIP_COMPACTION_UNTIL_KEY, None)
         state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
 
     async def _run_compaction(
@@ -319,9 +339,9 @@ class ContextPipeline:
         if not events:
             return None
 
-        if session_memory_exists():
+        if session_memory_exists(state=state):
             action = self._session_memory_compaction(
-                events, budget=budget, llm_config=llm_config
+                state, events, budget=budget, llm_config=llm_config
             )
             if action is not None and self._action_meets_effectiveness(events, action, budget, state, llm_config):
                 logger.info('ContextPipeline: session-memory compaction (5a)')
@@ -331,30 +351,55 @@ class ContextPipeline:
             critical or self._llm_cooldown_elapsed(state)
         )
         if llm_allowed:
-            action = await self._llm_structured_compaction(events, state)
+            action = await self._llm_structured_compaction(
+                events, state, budget=budget, llm_config=llm_config
+            )
             if action is not None and action.summary:
                 logger.info('ContextPipeline: LLM structured compaction (5b)')
                 self._record_llm_compact_attempt(state)
                 return action
+        elif not self._config.allow_llm_hot_path:
+            logger.debug('ContextPipeline: 5b skipped (allow_llm_hot_path=False)')
+        else:
+            logger.info('ContextPipeline: 5b skipped (llm compact cooldown)')
 
         logger.warning(
             'ContextPipeline: degraded boundary compaction (5c) — mandatory fallback'
         )
         return self._degraded_compaction(
-            events, budget=budget, llm_config=llm_config
+            state,
+            history,
+            events,
+            budget=budget,
+            llm_config=llm_config,
         )
 
     def _session_memory_compaction(
         self,
+        state: State,
         events: list[Event],
         *,
         budget: ContextBudget,
         llm_config: object | None,
     ) -> CondensationAction | None:
-        summary = build_compaction_summary()
+        summary = build_compaction_summary(state=state)
         if not summary.strip():
             return None
-        tail = _select_compaction_tail(events, budget, llm_config=llm_config)
+        tail = _select_compaction_tail(
+            events,
+            budget,
+            llm_config=llm_config,
+            tail_ratio=_COMPACTION_TARGET_RATIO,
+        )
+        tail = _shrink_tail_for_token_reduction(
+            events,
+            tail,
+            history=events,
+            budget=budget,
+            state=state,
+            llm_config=llm_config,
+            summary=summary,
+        )
         pruned = _pruned_ids(events, tail)
         if not pruned:
             return None
@@ -368,10 +413,16 @@ class ContextPipeline:
         self,
         events: list[Event],
         state: State,
+        *,
+        budget: ContextBudget | None = None,
+        llm_config: object | None = None,
     ) -> CondensationAction | None:
         compactor = self._get_structured_compactor(state)
         if compactor is None:
+            logger.info('ContextPipeline: 5b skipped (no structured compactor / llm_config)')
             return None
+        if budget is not None:
+            self._configure_structured_compactor_size(compactor, events, budget)
         from backend.context.view import View
 
         view = View(events=events)
@@ -381,31 +432,86 @@ class ContextPipeline:
             logger.warning('LLM structured compaction failed: %s', exc)
             return None
         if isinstance(result, Compaction):
-            return result.action
+            action = result.action
+            if action is not None and action.summary:
+                return action
+            logger.info(
+                'ContextPipeline: 5b produced no summary (pruned=%d events=%d max_size=%d)',
+                len(action.pruned) if action is not None else 0,
+                len(events),
+                getattr(compactor, 'max_size', 0),
+            )
         return None
 
     def _degraded_compaction(
         self,
+        state: State,
+        history: list[Event],
         events: list[Event],
         *,
         budget: ContextBudget,
         llm_config: object | None,
     ) -> CondensationAction:
-        tail = _select_compaction_tail(events, budget, llm_config=llm_config)
-        pruned = _pruned_ids(events, tail)
-        summary = build_compaction_summary()
+        tail = _select_compaction_tail(
+            events,
+            budget,
+            llm_config=llm_config,
+            tail_ratio=DEFAULT_DEGRADED_COMPACT_TAIL_RATIO,
+        )
+        summary = build_compaction_summary(state=state)
         if not summary.strip():
+            pruned_preview = _pruned_ids(events, tail)
             from backend.context.compactor.strategies.amortized_pruning_compactor import (
                 AmortizedPruningCompactor,
             )
 
-            pruned_events = [event for event in events if getattr(event, 'id', None) in pruned]
+            pruned_events = [
+                event for event in events if getattr(event, 'id', None) in pruned_preview
+            ]
             summary = AmortizedPruningCompactor._build_recovery_summary(pruned_events)
+        tail = _shrink_tail_for_token_reduction(
+            events,
+            tail,
+            history=history,
+            budget=budget,
+            state=state,
+            llm_config=llm_config,
+            summary=summary,
+        )
+        pruned = _pruned_ids(events, tail)
         return CondensationAction(
             pruned_event_ids=sorted(pruned),
             summary=summary,
             summary_offset=0,
         )
+
+    @staticmethod
+    def _configure_structured_compactor_size(
+        compactor: object,
+        events: list[Event],
+        budget: ContextBudget,
+    ) -> None:
+        """Align structured compactor sizing with pipeline budget targets."""
+        event_count = len(events)
+        if event_count < 2:
+            compactor.max_size = 2  # type: ignore[attr-defined]
+            compactor.keep_first = 0  # type: ignore[attr-defined]
+            return
+        target_tail = max(
+            int(event_count * _COMPACTION_TARGET_RATIO),
+            DEFAULT_PROMPT_MIN_TOOL_LOOPS * 2,
+            8,
+        )
+        min_prune = DEFAULT_COMPACT_MIN_PRUNED_EVENTS
+        desired_tail = min(target_tail, max(1, event_count - min_prune))
+        # StructuredSummaryCompactor retains roughly max_size // 2 tail events.
+        compactor.max_size = max(  # type: ignore[attr-defined]
+            2 * desired_tail + 2,
+            event_count - min_prune + 1,
+            16,
+        )
+        compactor.max_size = min(compactor.max_size, event_count)  # type: ignore[attr-defined]
+        compactor.keep_first = 0  # type: ignore[attr-defined]
 
     def _get_structured_compactor(self, state: State):
         if self._structured_compactor is not None:
@@ -425,12 +531,16 @@ class ContextPipeline:
             llm_cfg = self._llm_registry.config.get_llm_config(llm_config)
         cfg = StructuredSummaryCompactorConfig(
             llm_config=llm_cfg,
-            max_size=max(100, len(getattr(state, 'history', [])) // 2),
+            max_size=40,
             keep_first=0,
         )
-        self._structured_compactor = StructuredSummaryCompactor.from_config(
-            cfg, self._llm_registry
-        )
+        try:
+            self._structured_compactor = StructuredSummaryCompactor.from_config(
+                cfg, self._llm_registry
+            )
+        except ValueError as exc:
+            logger.warning('ContextPipeline: structured compactor unavailable: %s', exc)
+            return None
         if self._structured_compactor.token_budget is None:
             agent_llm = getattr(getattr(state, 'agent', None), 'llm', None)
             max_input = getattr(
@@ -475,16 +585,21 @@ class ContextPipeline:
         if isinstance(skip_until, int):
             history = list(getattr(state, 'history', []))
             latest_id = getattr(history[-1], 'id', None) if history else None
-            if isinstance(latest_id, int) and latest_id <= skip_until:
+            if isinstance(latest_id, int) and latest_id < skip_until:
                 return True
+        ineffective_until = pipe.get(_INEFFECTIVE_COMPACT_UNTIL_KEY)
+        if isinstance(ineffective_until, (int, float)) and time.time() < ineffective_until:
+            return True
         return False
 
     def _set_skip_compaction(self, state: State) -> None:
+        apply_ineffective_compaction_backoff(state)
+
+    def _clear_ineffective_compaction_backoff(self, state: State) -> None:
         pipe = self._pipeline_state(state)
-        history = list(getattr(state, 'history', []))
-        latest_id = getattr(history[-1], 'id', None) if history else None
-        if isinstance(latest_id, int):
-            pipe[_SKIP_COMPACTION_UNTIL_KEY] = latest_id
+        pipe.pop(_SKIP_COMPACTION_UNTIL_KEY, None)
+        pipe.pop(_INEFFECTIVE_COMPACT_STREAK_KEY, None)
+        pipe.pop(_INEFFECTIVE_COMPACT_UNTIL_KEY, None)
         state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
 
     def _increment_condensation_counter(self, state: State) -> None:
@@ -501,6 +616,7 @@ class ContextPipeline:
         history: list[Event],
         action: CondensationAction,
     ) -> None:
+        self._clear_ineffective_compaction_backoff(state)
         pipe = self._pipeline_state(state)
         pipe[_LAST_BOUNDARY_COMPACT_KEY] = time.time()
         state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
@@ -552,7 +668,7 @@ class ContextPipeline:
         return token_reduction >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
 
     def _log_continuity_metric(
-        self, history: list[Event], action: CondensationAction
+        self, state: State, history: list[Event], action: CondensationAction
     ) -> None:
         if not action.summary:
             return
@@ -560,12 +676,12 @@ class ContextPipeline:
         try:
             from backend.context.working_set import get_durable_context_block
 
-            durable = get_durable_context_block(history)
+            durable = get_durable_context_block(history, state=state)
             if durable:
                 restored_parts.append(durable)
         except Exception:
             pass
-        snapshot_text = build_compaction_summary()
+        snapshot_text = build_compaction_summary(state=state)
         if snapshot_text:
             restored_parts.append(snapshot_text)
         restored = '\n\n'.join(part for part in restored_parts if part.strip())
@@ -585,6 +701,7 @@ class ContextPipeline:
 
     @staticmethod
     def _extract_pre_condensation_snapshot(state: State, history: list[Event]) -> None:
+        bind_session_context(state=state)
         try:
             snapshot = extract_snapshot(history)
             runtime: dict[str, object] = {}
@@ -602,7 +719,7 @@ class ContextPipeline:
                 or snapshot.get('recent_errors')
                 or snapshot.get('decisions')
             ):
-                save_snapshot(snapshot)
+                save_snapshot(snapshot, state=state)
         except Exception:
             logger.debug('Pre-condensation snapshot extraction failed', exc_info=True)
 
@@ -614,11 +731,112 @@ class _EmptyState:
         pass
 
 
+def apply_ineffective_compaction_backoff(state: State) -> None:
+    """Backoff compaction after an ineffective prune (shared with orchestrator)."""
+    pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
+    history = list(getattr(state, 'history', []))
+    latest_id = getattr(history[-1], 'id', None) if history else None
+    if not isinstance(latest_id, int):
+        return
+    streak = pipe.get(_INEFFECTIVE_COMPACT_STREAK_KEY, 0)
+    if not isinstance(streak, int):
+        streak = 0
+    streak += 1
+    skip_events = min(
+        DEFAULT_INEFFECTIVE_COMPACT_SKIP_EVENTS * streak,
+        DEFAULT_INEFFECTIVE_COMPACT_MAX_SKIP_EVENTS,
+    )
+    pipe[_SKIP_COMPACTION_UNTIL_KEY] = latest_id + skip_events
+    pipe[_INEFFECTIVE_COMPACT_STREAK_KEY] = streak
+    pipe[_INEFFECTIVE_COMPACT_UNTIL_KEY] = (
+        time.time() + DEFAULT_INEFFECTIVE_COMPACT_BACKOFF_SECONDS * min(streak, 4)
+    )
+    state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
+    logger.info(
+        'Compaction backoff: skip until event id>=%d (%d new events) for %.0fs (streak=%d)',
+        pipe[_SKIP_COMPACTION_UNTIL_KEY],
+        skip_events,
+        pipe[_INEFFECTIVE_COMPACT_UNTIL_KEY] - time.time(),
+        streak,
+    )
+
+
+def _projected_compaction_token_reduction(
+    events: list[Event],
+    tail: list[Event],
+    *,
+    history: list[Event],
+    budget: ContextBudget,
+    state: State,
+    llm_config: object | None,
+    summary: str,
+) -> int:
+    pruned = _pruned_ids(events, tail)
+    if len(pruned) < DEFAULT_COMPACT_MIN_PRUNED_EVENTS:
+        return 0
+    action = CondensationAction(
+        pruned_event_ids=sorted(pruned),
+        summary=summary or 'summary',
+        summary_offset=0,
+    )
+    post_events = project_after_compact_boundary(
+        _synthetic_history_after_action(history, action)
+    )
+    post_budget = ContextBudget.from_events(
+        post_events, llm_config=llm_config, state=state
+    )
+    return budget.estimated_tokens - post_budget.estimated_tokens
+
+
+def _shrink_tail_for_token_reduction(
+    events: list[Event],
+    tail: list[Event],
+    *,
+    history: list[Event],
+    budget: ContextBudget,
+    state: State,
+    llm_config: object | None,
+    summary: str,
+    min_reduction: int = DEFAULT_COMPACT_MIN_TOKEN_REDUCTION,
+) -> list[Event]:
+    """Drop oldest non-protected tail events until projected token savings meet the gate."""
+    from backend.context.prompt_window import _protected_summary_events
+
+    protected = _protected_summary_events(events)
+    protected_ids = {id(event) for event in protected}
+    current = list(tail)
+    summary_text = summary.strip() or 'summary'
+
+    while len(current) > len(protected):
+        reduction = _projected_compaction_token_reduction(
+            events,
+            current,
+            history=history,
+            budget=budget,
+            state=state,
+            llm_config=llm_config,
+            summary=summary_text,
+        )
+        if reduction >= min_reduction:
+            break
+        removed = False
+        for index, event in enumerate(current):
+            if id(event) in protected_ids:
+                continue
+            current.pop(index)
+            removed = True
+            break
+        if not removed:
+            break
+    return current
+
+
 def _select_compaction_tail(
     events: list[Event],
     budget: ContextBudget,
     *,
     llm_config: object | None,
+    tail_ratio: float = _COMPACTION_TARGET_RATIO,
 ) -> list[Event]:
     from backend.context.prompt_window import (
         _enforce_min_tool_loops,
@@ -628,7 +846,7 @@ def _select_compaction_tail(
 
     protected = _protected_summary_events(events)
     protected_ids = {id(event) for event in protected}
-    target_tokens = int(budget.autocompact_threshold * _COMPACTION_TARGET_RATIO)
+    target_tokens = int(budget.autocompact_threshold * tail_ratio)
     min_tail_floor = min(DEFAULT_PROMPT_MIN_TAIL_TOKENS, target_tokens)
     tail: list[Event] = list(protected)
     tail_ids = set(protected_ids)
@@ -686,4 +904,8 @@ def _synthetic_history_after_action(
     return [*history, action]
 
 
-__all__ = ['ContextPipeline', 'PipelineStepResult']
+__all__ = [
+    'ContextPipeline',
+    'PipelineStepResult',
+    'apply_ineffective_compaction_backoff',
+]

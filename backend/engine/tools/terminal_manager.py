@@ -8,7 +8,7 @@ from backend.ledger.action.terminal import (
     TerminalRunAction,
 )
 
-TERMINAL_MANAGER_TOOL_NAME = 'terminal_manager'
+from backend.inference.tool_names import TERMINAL_MANAGER_TOOL_NAME
 
 
 def create_terminal_manager_tool() -> dict[str, Any]:

@@ -96,7 +96,11 @@ class PromptManager:
         return system_message
 
     def get_mcp_user_addendum(self, **context: object) -> str:
-        """Return any per-turn MCP addendum that should accompany the system prompt."""
+        """Return any per-turn MCP addendum that should accompany the system prompt.
+
+        Base :class:`PromptManager` has no MCP catalogue; subclasses such as
+        :class:`OrchestratorPromptManager` override this to render connected tools.
+        """
         return ''
 
     def set_prompt_tier(self, tier: str) -> None:
@@ -287,10 +291,8 @@ class OrchestratorPromptManager(PromptManager):
         )
         context.setdefault('render_mcp_inline', False)
         content = super().get_system_message(**context)
-        content = self._inject_scratchpad(content)
-        tier = getattr(self, '_prompt_tier', 'base')
-        if tier == 'debug':
-            content = self._inject_lessons_learned(content)
+        memory_query = cast(str | None, context.get('memory_query'))
+        content = self._inject_workspace_memory(content, query=memory_query)
         return content
 
     def get_mcp_user_addendum(self, **context: object) -> str:
@@ -354,39 +356,53 @@ class OrchestratorPromptManager(PromptManager):
         except Exception:
             return content
 
-    def _inject_scratchpad(self, content: str) -> str:
-        """Append persistent scratchpad and working memory so they survive condensation."""
+    def _inject_workspace_memory(
+        self, content: str, *, query: str | None = None
+    ) -> str:
+        """Inject ranked workspace memory at session start (not session working state)."""
         try:
-            from backend.engine.tools.note import (
-                scratchpad_entries_for_prompt,
-            )
-            from backend.engine.tools.working_memory import (
-                get_working_memory_prompt_block,
-            )
+            from backend.engine.tools.workspace_memory import format_prompt_block
 
-            entries = scratchpad_entries_for_prompt()
-            memory_blocks: list[str] = []
-            if entries:
-                lines: list[str] = []
-                char_budget = 2000
-                for key, value in entries:
-                    line = f'  [{key}]: {value}'
-                    if len('\n'.join(lines + [line])) > char_budget:
-                        lines.append('  ... (additional notes truncated)')
-                        break
-                    lines.append(line)
-                scratchpad_block = '\n'.join(lines)
-                memory_blocks.append(
-                    '<WORKING_SCRATCHPAD>\n'
-                    'Your persistent notes (survive context condensation):\n'
-                    f'{scratchpad_block}\n'
-                    '</WORKING_SCRATCHPAD>'
-                )
-            working_memory_block = get_working_memory_prompt_block()
-            if working_memory_block:
-                memory_blocks.append(working_memory_block)
-            if not memory_blocks:
+            block = format_prompt_block(query)
+            if not block:
+                block = self._lessons_markdown_block()
+            if not block:
                 return content
-            return f'{content}\n\n' + '\n\n'.join(memory_blocks)
+            return f'{content}\n\n{block}'
         except Exception:
             return content
+
+    def _lessons_markdown_block(self) -> str:
+        """Fallback workspace memory from lessons.md when JSON store is empty."""
+        try:
+            from backend.core.workspace_resolution import (
+                get_effective_workspace_root,
+                workspace_agent_state_dir,
+            )
+
+            root = get_effective_workspace_root()
+            if root is None:
+                return ''
+            lessons_path = workspace_agent_state_dir(root) / 'lessons.md'
+            if not lessons_path.is_file():
+                lessons_path = root / 'memories' / 'repo' / 'lessons.md'
+                if not lessons_path.is_file():
+                    return ''
+
+            lessons = lessons_path.read_text(encoding='utf-8').strip()
+            if not lessons:
+                return ''
+            if len(lessons) > 800:
+                lessons = '... (earlier lessons truncated)\n' + lessons[-800:]
+            return (
+                '<WORKSPACE_MEMORY>\n'
+                'Durable workspace facts (from lessons.md):\n'
+                f'{lessons}\n'
+                '</WORKSPACE_MEMORY>'
+            )
+        except Exception:
+            return ''
+
+    def _inject_scratchpad(self, content: str) -> str:
+        """Deprecated: session scratchpad injection removed; use workspace memory."""
+        return self._inject_workspace_memory(content)

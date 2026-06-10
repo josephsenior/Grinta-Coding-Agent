@@ -133,6 +133,9 @@ def _build_windowing_context(
 def _inject_working_set(ctx: _WindowingContext, raw_events: list[Event]) -> None:
     from backend.context.working_set import build_working_set_observation
 
+    if any(getattr(event, 'is_working_set', False) for event in ctx.event_list):
+        return
+
     working_set = build_working_set_observation(raw_events)
     if working_set is not None:
         ctx.event_list = [working_set, *ctx.event_list]

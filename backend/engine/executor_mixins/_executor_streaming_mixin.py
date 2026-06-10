@@ -32,16 +32,16 @@ class _ExecutorStreamingMixin:
 
     @staticmethod
     def _stream_emit_limits() -> tuple[float, int]:
-        raw_interval = os.getenv('APP_STREAM_EMIT_INTERVAL_MS', '40').strip()
-        raw_min_chars = os.getenv('APP_STREAM_EMIT_MIN_CHARS', '32').strip()
+        raw_interval = os.getenv('APP_STREAM_EMIT_INTERVAL_MS', '120').strip()
+        raw_min_chars = os.getenv('APP_STREAM_EMIT_MIN_CHARS', '96').strip()
         try:
             interval_ms = float(raw_interval)
         except ValueError:
-            interval_ms = 40.0
+            interval_ms = 120.0
         try:
             min_chars = int(raw_min_chars)
         except ValueError:
-            min_chars = 32
+            min_chars = 96
         return max(0.016, interval_ms / 1000.0), max(1, min_chars)
 
     def _should_emit_stream_snapshot(
@@ -326,19 +326,27 @@ class _ExecutorStreamingMixin:
         content_accumulate: str,
         visible_accum: str,
         tool_calls_list: list[dict[str, Any]] | None,
+        *,
+        thinking_accumulate: str = '',
     ) -> None:
-        if not event_stream or not content_accumulate:
+        if not event_stream:
+            return
+        has_tools = bool(tool_calls_list)
+        has_visible = bool(visible_accum.strip())
+        has_thinking = bool(thinking_accumulate.strip())
+        if not content_accumulate and not has_visible and not has_thinking:
             return
 
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
-        draft_reply_accum = '' if tool_calls_list else visible_accum
+        draft_reply_accum = '' if has_tools else visible_accum
         ev = StreamingChunkAction(
             chunk='',
             accumulated=draft_reply_accum,
             is_final=True,
-            suppress_live_response=bool(tool_calls_list),
+            suppress_live_response=has_tools,
+            thinking_accumulated=thinking_accumulate,
         )
         ev.source = EventSource.AGENT
         event_stream.add_event(ev, EventSource.AGENT)

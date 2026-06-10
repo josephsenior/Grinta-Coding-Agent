@@ -17,7 +17,7 @@ from typing import Any
 
 from backend.ledger.action.code_nav import LspQueryAction
 
-CODE_INTELLIGENCE_TOOL_NAME = 'lsp'
+from backend.inference.tool_names import CODE_INTELLIGENCE_TOOL_NAME, LSP_TOOL_NAME
 
 
 def create_lsp_query_tool() -> dict[str, Any]:
@@ -25,7 +25,7 @@ def create_lsp_query_tool() -> dict[str, Any]:
     return {
         'type': 'function',
         'function': {
-            'name': CODE_INTELLIGENCE_TOOL_NAME,
+            'name': LSP_TOOL_NAME,
             'description': (
                 'Read-only semantic code navigation via the locally-installed '
                 'language server (LSP). Auto-detects servers on PATH (pylsp, '

@@ -337,7 +337,7 @@ class ContextMemory:
     ) -> list[Event]:
         """Create a defensively-copied history with required system/user roots."""
         events = list(condensed_history)
-        self._ensure_system_message(events)
+        self._ensure_system_message(events, initial_user_action=initial_user_action)
         self._ensure_initial_user_message(events, initial_user_action)
         return events
 
@@ -702,6 +702,40 @@ class ContextMemory:
         """Release pending tool-call responses once all tool outputs arrive."""
         return flush_resolved_tool_calls(tool_state)
 
+    def _memory_query_for_prompt(
+        self,
+        *,
+        events: list[Event] | None = None,
+        initial_user_action: MessageAction | None = None,
+        messages: list[Message] | None = None,
+    ) -> str | None:
+        from backend.engine.tools.workspace_memory import (
+            memory_query_from_events,
+            memory_query_from_text,
+        )
+
+        if initial_user_action is not None:
+            query = memory_query_from_text(getattr(initial_user_action, 'content', ''))
+            if query:
+                return query
+        if events:
+            query = memory_query_from_events(
+                events,
+                initial_user_action=initial_user_action,
+            )
+            if query:
+                return query
+        if messages:
+            for msg in messages:
+                if msg.role != 'user':
+                    continue
+                for block in msg.content:
+                    if is_text_content(block):
+                        query = memory_query_from_text(block.text)
+                        if query:
+                            return query
+        return None
+
     def _ensure_leading_system_message(self, messages: list[Message]) -> list[Message]:
         """Ensure messages have a single leading system prompt. Mutates list in place."""
         first_idx = next((i for i, m in enumerate(messages) if m.role == 'system'), -1)
@@ -710,6 +744,7 @@ class ContextMemory:
                 system_prompt = self.prompt_manager.get_system_message(
                     cli_mode=True,
                     config=self.agent_config,
+                    memory_query=self._memory_query_for_prompt(messages=messages),
                 )
             except Exception as e:
                 logger.error(
@@ -956,7 +991,12 @@ class ContextMemory:
             enable_som_visual_browsing=enable_som_visual_browsing,
         )
 
-    def _ensure_system_message(self, events: list[Event]) -> None:
+    def _ensure_system_message(
+        self,
+        events: list[Event],
+        *,
+        initial_user_action: MessageAction | None = None,
+    ) -> None:
         """Checks if a system message exists and adds one if not.
 
         If a system message already exists, it is replaced with a new one containing
@@ -967,7 +1007,12 @@ class ContextMemory:
         when tests or alternate imports provide compatible event stubs.
         """
         system_prompt = self.prompt_manager.get_system_message(
-            cli_mode=True, config=self.agent_config
+            cli_mode=True,
+            config=self.agent_config,
+            memory_query=self._memory_query_for_prompt(
+                events=events,
+                initial_user_action=initial_user_action,
+            ),
         )
         if not system_prompt:
             return

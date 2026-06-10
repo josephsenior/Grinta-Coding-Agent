@@ -240,28 +240,25 @@ def _load_restored_context_snapshot() -> str:
         return ''
 
 
+def _is_working_set_observation(obs: AgentCondensationObservation) -> bool:
+    if getattr(obs, 'is_working_set', False):
+        return True
+    content = (obs.content or '').lstrip()
+    return content.startswith('<DURABLE_WORKING_SET>')
+
+
 @_register_observation_handler(AgentCondensationObservation)
 def _handle_condensation_observation(
     obs: AgentCondensationObservation, max_message_chars: int | None
 ) -> Message:
     """Handle AgentCondensationObservation with an explicit visibility banner."""
+    if _is_working_set_observation(obs):
+        text = truncate_content(obs.content or '', max_message_chars)
+        return Message(role='user', content=[TextContent(text=text)])
+
     summary = obs.content or '(no summary provided)'
     restored_context = _load_restored_context_snapshot()
-    scratchpad = _load_scratchpad_snapshot()
     working_memory = _load_working_memory_snapshot()
-
-    # Auto-sync scratchpad to working_memory after condensation
-    try:
-        from backend.engine.tools.note import _load_notes
-        from backend.engine.tools.working_memory import (
-            sync_scratchpad_to_working_memory,
-        )
-
-        notes = _load_notes()
-        if notes:
-            sync_scratchpad_to_working_memory(notes)
-    except Exception:
-        pass
 
     banner = _CONDENSATION_BANNER if not getattr(obs, 'is_prewarmed', False) else ''
 
@@ -269,7 +266,6 @@ def _handle_condensation_observation(
         banner
         + summary
         + restored_context
-        + scratchpad
         + working_memory
         + _POST_CONDENSATION_RECOVERY,
         max_message_chars,

@@ -389,23 +389,22 @@ class TestProcessSingleToolCall:
         with pytest.raises(FunctionCallNotExistsError):
             _process_single_tool_call(tc, {'summary': 'done'})
 
-    def test_plan_mode_allows_file_tool_call(self):
+    def test_plan_mode_rejects_mutating_file_tool_call(self):
         from backend.engine.tools.native_file_tools import create_create_tool
 
         tool_name = create_create_tool()['function']['name']
         tc = self._make_tool_call(tool_name)
-        action = _process_single_tool_call(
-            tc,
-            {
-                'type': 'file',
-                'path': 'new.py',
-                'content': 'print(1)',
-                'security_risk': 'LOW',
-            },
-            mode='plan',
-        )
-
-        assert isinstance(action, FileEditAction)
+        with pytest.raises(FunctionCallValidationError, match='Plan Mode'):
+            _process_single_tool_call(
+                tc,
+                {
+                    'type': 'file',
+                    'path': 'new.py',
+                    'content': 'print(1)',
+                    'security_risk': 'LOW',
+                },
+                mode='plan',
+            )
 
     def test_dispatches_mcp_tool(self):
         tc = self._make_tool_call('some_mcp_tool', mcp_names=['some_mcp_tool'])

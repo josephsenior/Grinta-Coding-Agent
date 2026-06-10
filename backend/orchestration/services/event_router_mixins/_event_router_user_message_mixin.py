@@ -15,7 +15,7 @@ import os as _os
 from typing import TYPE_CHECKING
 
 from backend.core.interaction_modes import (
-    CHAT_MODE_NAMES,
+    is_chat_mode,
     normalize_interaction_mode,
 )
 from backend.core.schemas import AgentState
@@ -102,7 +102,7 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
         agent = getattr(self._ctrl, 'agent', None)
         config = getattr(agent, 'config', None)
         mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
-        if mode in CHAT_MODE_NAMES:
+        if is_chat_mode(mode):
             self._ctrl.state.extra_data.pop('active_run_mode', None)
         else:
             self._ctrl.state.set_extra(

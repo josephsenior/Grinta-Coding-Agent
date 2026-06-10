@@ -51,6 +51,8 @@ def _read_file_preview(path: str, *, max_chars: int) -> str | None:
 def _build_restore_block(
     history: list[Event],
     preserved_tail: list[Event],
+    *,
+    state: object | None = None,
 ) -> str:
     parts: list[str] = ['<POST_COMPACT_RESTORE>']
 
@@ -58,7 +60,7 @@ def _build_restore_block(
     if pytest_summary:
         parts.append(f'Latest pytest: {pytest_summary}')
 
-    snapshot = load_snapshot()
+    snapshot = load_snapshot(state=state)  # type: ignore[arg-type]
     parts.extend(_extract_snapshot_sections(snapshot))
     parts.extend(_extract_restored_files(snapshot, preserved_tail))
 
@@ -128,11 +130,12 @@ def inject_post_compact_restore(
     history: list[Event],
     *,
     just_compacted: bool = False,
+    state: object | None = None,
 ) -> list[Event]:
     """Re-inject pytest, file, and task context after compaction."""
     if not just_compacted or not events:
         return events
-    block = _build_restore_block(history, events)
+    block = _build_restore_block(history, events, state=state)
     if not block.strip() or block == '<POST_COMPACT_RESTORE>\n\n</POST_COMPACT_RESTORE>':
         return events
     if estimate_events_tokens(events) + len(block) // 4 > DEFAULT_POST_COMPACT_TOKEN_BUDGET * 2:

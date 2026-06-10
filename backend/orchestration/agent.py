@@ -82,7 +82,9 @@ class Agent(ABC):
             raise ValueError(msg)
         return self._prompt_manager
 
-    def get_system_message(self) -> SystemMessageAction | None:
+    def get_system_message(
+        self, *, memory_query: str | None = None
+    ) -> SystemMessageAction | None:
         """Return a `SystemMessageAction` containing the system message and tools.
 
         This will be added to the event stream as the first message.
@@ -102,7 +104,9 @@ class Agent(ABC):
                 )
                 return None
             system_message = self.prompt_manager.get_system_message(
-                cli_mode=True, config=self.config
+                cli_mode=True,
+                config=self.config,
+                memory_query=memory_query,
             )
             tools = getattr(self, 'tools', None)
             # Construct using the canonical class reference imported above. Some

@@ -24,7 +24,6 @@ import backend.engine.tools.debugger as debugger_tools
 import backend.engine.tools.delegate_task as delegate_task_tools
 import backend.engine.tools.lsp_query as lsp_query_tools
 import backend.engine.tools.terminal_manager as terminal_manager_tools
-from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
 from backend.core.errors import FunctionCallNotExistsError, FunctionCallValidationError
 from backend.core.interaction_modes import (
     CHAT_MODE_ALLOWED_TOOLS,
@@ -46,25 +45,24 @@ from backend.engine.tools import (
     create_replace_string_tool,
     create_summarize_context_tool,
 )
-from backend.engine.tools.analyze_project_structure import (
-    ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
-)
-from backend.engine.tools.blackboard import BLACKBOARD_TOOL_NAME
-from backend.engine.tools.browser_native import BROWSER_TOOL_NAME
-from backend.engine.tools.checkpoint import CHECKPOINT_TOOL_NAME
-from backend.engine.tools.debugger import DEBUGGER_TOOL_NAME
-from backend.engine.tools.delegate_task import DELEGATE_TASK_TOOL_NAME
-from backend.engine.tools.execute_mcp_tool import EXECUTE_MCP_TOOL_TOOL_NAME
-from backend.engine.tools.lsp_query import CODE_INTELLIGENCE_TOOL_NAME
-from backend.engine.tools.memory_manager import MEMORY_MANAGER_TOOL_NAME
-from backend.engine.tools.meta_cognition import ASK_USER_TOOL_NAME
-from backend.engine.tools.note import build_note_action, build_recall_action
-from backend.engine.tools.grep import GREP_TOOL_NAME
-from backend.engine.tools.glob import GLOB_TOOL_NAME
-from backend.engine.tools.terminal_manager import TERMINAL_MANAGER_TOOL_NAME
 from backend.inference.tool_names import (
+    ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
+    ASK_USER_TOOL_NAME,
+    BLACKBOARD_TOOL_NAME,
+    BROWSER_TOOL_NAME,
+    CALL_MCP_TOOL_NAME,
+    CHECKPOINT_TOOL_NAME,
+    CODE_INTELLIGENCE_TOOL_NAME,
+    DEBUGGER_TOOL_NAME,
+    DELEGATE_TASK_TOOL_NAME,
+    GLOB_TOOL_NAME,
+    GREP_TOOL_NAME,
+    MEMORY_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
+    TERMINAL_MANAGER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
+    WEB_FETCH_TOOL_NAME,
+    WEB_SEARCH_TOOL_NAME,
 )
 from backend.ledger.action import Action, AgentThinkAction
 
@@ -124,11 +122,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             str, create_summarize_context_tool().get('function', {}).get('name', '')
         ): _handle_summarize_context_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
-        MEMORY_MANAGER_TOOL_NAME: _handle_memory_manager_tool,
-        NOTE_TOOL_NAME: lambda args: build_note_action(
-            cast(str, args['key']), cast(str, args['value'])
-        ),
-        RECALL_TOOL_NAME: lambda args: build_recall_action(cast(str, args['key'])),
+        MEMORY_TOOL_NAME: _handle_memory_tool,
         GREP_TOOL_NAME: _handle_grep_tool,
         GLOB_TOOL_NAME: _handle_glob_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
@@ -140,10 +134,12 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             dict(args)
         ),
         ASK_USER_TOOL_NAME: _handle_ask_user_tool,
-        EXECUTE_MCP_TOOL_TOOL_NAME: _handle_execute_mcp_tool_tool,
+        CALL_MCP_TOOL_NAME: _handle_execute_mcp_tool_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
         UNDO_LAST_EDIT_TOOL_NAME: _handle_undo_last_edit_tool,
         BROWSER_TOOL_NAME: _handle_browser_tool,
+        WEB_SEARCH_TOOL_NAME: _handle_web_search_tool,
+        WEB_FETCH_TOOL_NAME: _handle_web_fetch_tool,
     }
 
 
@@ -210,9 +206,15 @@ def _process_single_tool_call(
 def _validate_tool_mode(tool_name: str, normalized_mode: str, mcp_tool_names: list[str] | None) -> None:
     if is_chat_mode(normalized_mode):
         if tool_name not in CHAT_MODE_ALLOWED_TOOLS or (mcp_tool_names and tool_name in mcp_tool_names):
-            raise FunctionCallValidationError(f'Tool `{tool_name}` is not available in Chat Mode. Chat Mode is pure conversation; use plain text only.')
+            raise FunctionCallValidationError(
+                f'Tool `{tool_name}` is not available in Chat Mode. '
+                'Use discovery tools (read, grep, glob, find_symbols, lsp, analyze_project_structure) or ask_user only.'
+            )
     if normalized_mode == PLAN_MODE and tool_name not in PLAN_MODE_ALLOWED_TOOLS:
-        raise FunctionCallValidationError(f'Tool `{tool_name}` is not available in Plan Mode. Use file, shell, search, task tracking, or ask_user tools.')
+        raise FunctionCallValidationError(
+            f'Tool `{tool_name}` is not available in Plan Mode. '
+            'Use discovery tools, ask_user, or task_tracker only.'
+        )
 
 
 def _validate_tool_exists(tool_name: str) -> None:
@@ -309,12 +311,15 @@ from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E
     _handle_ask_user_tool,
     _handle_execute_mcp_tool_tool,
     _handle_mcp_tool,
+    _handle_memory_tool,
     _handle_memory_manager_tool,
     _handle_grep_tool,
     _handle_glob_tool,
     _handle_summarize_context_tool,
     _handle_task_tracker_tool,
     _handle_undo_last_edit_tool,
+    _handle_web_fetch_tool,
+    _handle_web_search_tool,
     _maybe_noop_task_tracker_action,
     _merge_mcp_gateway_inner_arguments,
     _normalize_task_tracker_list,

@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from backend.ledger.action.debugger import DebuggerAction
 
-DEBUGGER_TOOL_NAME = 'debugger'
+from backend.inference.tool_names import DEBUGGER_TOOL_NAME
 
 
 def create_debugger_tool() -> dict[str, Any]:

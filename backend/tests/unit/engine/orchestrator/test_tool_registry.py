@@ -16,6 +16,7 @@ def _make_config(**kwargs):
     cfg.enable_checkpoints = True
     cfg.enable_working_memory = True
     cfg.enable_browsing = True
+    cfg.enable_web = True
     cfg.enable_debugger = True
     cfg.mode = 'agent'
     cfg.mcp.servers = []
@@ -98,7 +99,7 @@ class TestFeatureFlagToolPresence:
     def test_terminal_enabled(self):
         names = _build_toolset(enable_terminal=True)
         assert {'execute_bash', 'execute_powershell'} & names
-        assert 'terminal_manager' not in names
+        assert 'terminal_manager' in names
         self._assert_dispatch_covered(names)
 
     def test_terminal_disabled(self):
@@ -107,7 +108,7 @@ class TestFeatureFlagToolPresence:
 
     def test_debugger_enabled(self):
         names = _build_toolset(enable_debugger=True)
-        assert 'debugger' not in names
+        assert 'debugger' in names
         self._assert_dispatch_covered(names)
 
     def test_debugger_disabled(self):
@@ -151,7 +152,7 @@ class TestFeatureFlagToolPresence:
 
     def test_checkpoints_enabled(self):
         names = _build_toolset(enable_checkpoints=True)
-        assert 'checkpoint' not in names
+        assert 'checkpoint' in names
         self._assert_dispatch_covered(names)
 
     def test_checkpoints_disabled(self):
@@ -160,12 +161,12 @@ class TestFeatureFlagToolPresence:
 
     def test_mcp_enabled(self):
         names = _build_toolset(enable_mcp=True)
-        assert 'call_mcp_tool' not in names
+        assert 'call_mcp_tool' in names
         self._assert_dispatch_covered(names)
 
     def test_mcp_disabled(self):
         names = _build_toolset(enable_mcp=False)
-        assert 'call_mcp_tool' not in names
+        assert 'call_mcp_tool' in names
 
     def test_meta_cognition_enabled(self):
         names = _build_toolset(enable_meta_cognition=True)
@@ -179,13 +180,11 @@ class TestFeatureFlagToolPresence:
 
     def test_task_tracker_enabled(self):
         names = _build_toolset(enable_task_tracker_tool=True)
-        assert 'create_task_tracker' in names
         assert 'task_tracker' in names
         self._assert_dispatch_covered(names)
 
     def test_task_tracker_disabled(self):
         names = _build_toolset(enable_task_tracker_tool=False)
-        assert 'create_task_tracker' not in names
         assert 'task_tracker' not in names
 
     def test_condensation_request_enabled(self):
@@ -199,12 +198,16 @@ class TestFeatureFlagToolPresence:
 
     def test_working_memory_enabled(self):
         names = _build_toolset(enable_working_memory=True)
-        assert 'memory_manager' not in names
+        assert 'memory' in names
+        assert 'note' not in names
+        assert 'recall' not in names
         self._assert_dispatch_covered(names)
 
     def test_working_memory_disabled(self):
         names = _build_toolset(enable_working_memory=False)
-        assert 'memory_manager' not in names
+        assert 'memory' not in names
+        assert 'note' not in names
+        assert 'recall' not in names
 
     def test_swarming_enabled(self):
         names = _build_toolset(enable_swarming=True)
@@ -276,7 +279,7 @@ class TestFeatureFlagToolPresence:
 
 
 class TestModeToolVisibility:
-    def test_plan_mode_exposes_simplified_agent_tool_categories(self):
+    def test_plan_mode_exposes_read_only_planning_tools(self):
         from unittest.mock import patch
 
         with patch(
@@ -295,23 +298,25 @@ class TestModeToolVisibility:
                 enable_working_memory=True,
             )
 
-        assert {
+        assert names == {
             'read',
             'find_symbols',
             'grep',
             'glob',
             'analyze_project_structure',
             'lsp',
+            'web_search',
+            'web_fetch',
             'ask_user',
-            'create_task_tracker',
             'task_tracker',
+        }
+        assert {
             'create',
             'replace_string',
             'edit_symbols',
             'multiedit',
-        } <= names
-        assert {'execute_bash', 'execute_powershell'} & names
-        assert {
+            'execute_bash',
+            'execute_powershell',
             'terminal_manager',
             'debugger',
             'call_mcp_tool',
@@ -319,9 +324,7 @@ class TestModeToolVisibility:
             'checkpoint',
             'finish',
             'communicate_with_user',
-            'recall',
-            'note',
-            'memory_manager',
+            'memory',
             'delegate_task',
             'blackboard',
         }.isdisjoint(names)
@@ -332,23 +335,26 @@ class TestModeToolVisibility:
             enable_terminal=True,
             enable_editor=True,
             enable_meta_cognition=True,
+            enable_checkpoints=False,
+            enable_working_memory=False,
+            enable_debugger=False,
         )
         assert {'create', 'edit_symbols', 'replace_string', 'multiedit'} <= names
         assert {'execute_bash', 'execute_powershell'} & names
         assert 'ask_user' in names
+        assert 'terminal_manager' in names
+        assert 'call_mcp_tool' in names
         assert {
-            'terminal_manager',
             'communicate_with_user',
             'finish',
             'debugger',
-            'call_mcp_tool',
             'checkpoint',
-            'memory_manager',
+            'memory',
             'delegate_task',
             'blackboard',
         }.isdisjoint(names)
 
-    def test_chat_mode_exposes_no_tools(self):
+    def test_chat_mode_exposes_discovery_and_ask_user_only(self):
         from unittest.mock import patch
 
         with patch(
@@ -367,4 +373,25 @@ class TestModeToolVisibility:
                 enable_working_memory=True,
             )
 
-        assert names == set()
+        assert names == {
+            'read',
+            'find_symbols',
+            'grep',
+            'glob',
+            'analyze_project_structure',
+            'lsp',
+            'web_search',
+            'web_fetch',
+            'ask_user',
+        }
+        assert {
+            'task_tracker',
+            'create',
+            'replace_string',
+            'edit_symbols',
+            'multiedit',
+            'execute_bash',
+            'execute_powershell',
+            'terminal_manager',
+            'call_mcp_tool',
+        }.isdisjoint(names)

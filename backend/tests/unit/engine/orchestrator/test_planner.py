@@ -20,7 +20,6 @@ def _make_config(**kwargs):
     cfg = MagicMock()
     cfg.enable_condensation_request = False
     cfg.enable_browsing = False
-    cfg.enable_native_browser = False
     cfg.enable_editor = True
     cfg.enable_debugger = True
     cfg.enable_first_turn_orientation_prompt = False
@@ -250,13 +249,13 @@ class TestBuildToolset:
 
 
 class TestAddBrowsingTool:
-    def test_windows_uses_web_reader_tool(self):
-        # NOTE: Browsing implementation moved to MCP in recent versions.
+    def test_browsing_enabled_adds_browser_tool(self):
         cfg = _make_config(enable_browsing=True)
         p = _make_planner(config=cfg)
         tools: list[Any] = []
         p._add_browsing_tool(tools)
-        assert len(tools) == 0
+        assert len(tools) == 1
+        assert tools[0]['function']['name'] == 'browser'
 
     def test_browsing_disabled_adds_nothing(self):
         cfg = _make_config(enable_browsing=False)
@@ -265,12 +264,20 @@ class TestAddBrowsingTool:
         p._add_browsing_tool(tools)
         assert len(tools) == 0
 
-    def test_native_browser_adds_nothing(self):
-        cfg = _make_config(enable_browsing=True, enable_native_browser=True)
-        p = _make_planner(config=cfg)
+
+class TestAddWebTools:
+    def test_adds_web_search_and_web_fetch(self):
+        p = _make_planner()
         tools: list[Any] = []
-        p._add_browsing_tool(tools)
-        assert len(tools) == 0
+        p._add_web_tools(tools)
+        names = {t['function']['name'] for t in tools}
+        assert names == {'web_search', 'web_fetch'}
+
+    def test_web_disabled_adds_nothing(self):
+        p = _make_planner(config=_make_config(enable_web=False))
+        tools: list[Any] = []
+        p._add_web_tools(tools)
+        assert tools == []
 
 
 # ---------------------------------------------------------------------------
@@ -538,6 +545,7 @@ class TestBuildLlmParams:
         assert 'Current mode: PLAN' in joined
         assert joined.count('Current mode:') == 1
         assert 'Use `ask_user` only when user input is required to continue.' in joined
+        assert 'Do not edit files or run shell commands.' in joined
         assert 'Write the final plan in plain text when complete' in joined
         assert 'Read-only mode' not in joined
         assert 'communicate_with_user' not in joined
