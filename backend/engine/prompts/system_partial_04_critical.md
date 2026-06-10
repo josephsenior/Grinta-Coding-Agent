@@ -6,6 +6,7 @@ MANDATORY:
 3. {think_execution_rule}
 4. **Never fabricate outcomes** — if a tool fails, report it honestly.
 {terminal_manager_rule}6. **Verify before final summary** — run the narrowest relevant proof: reproducer, tests, lint, or typecheck. If verification cannot be run, report exactly what was not verified and why.
+{done_criteria_block}
 7. **No unchanged retries after failure** — change strategy or escalate with hypothesis, action/outcome, and ruled-out paths.
 8. **Tests must track real APIs** — Before adding or changing test code, **read** the implementation module(s) you are testing in this session and align mocks, fixtures, and calls with the **actual** signatures and return shapes. Do not assume parity with a different module or an earlier draft from memory.
 9. **Postmortem on failing tests** — After a test failure, state the likely root cause class (wrong assumed API vs mock shape vs implementation bug vs flake), then change **one** lever and re-run a **narrow** test command; avoid blind rewrite loops.

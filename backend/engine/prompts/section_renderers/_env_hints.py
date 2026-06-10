@@ -44,12 +44,16 @@ def _discovery_decision_table(*, lsp_available: bool, web_on: bool = True) -> st
         lines.extend(
             [
                 '- External/current info (errors, release notes, unknown APIs) → `web_search`',
-                '- Known URL, static page content → `web_fetch`',
+                '- Known URL, static/markdown page → `web_fetch` (default for URLs)',
+                '- Login, forms, JS SPA, or interaction required → `browser` (not `web_fetch`)',
             ]
+        )
+    else:
+        lines.append(
+            '- Interactive/JS-heavy pages → `browser`'
         )
     lines.extend(
         [
-            '- Interactive/JS-heavy pages → `browser`',
             '- Directed exploration (1–3 targeted searches): use `grep`, `glob`, or `find_symbols` directly',
             '- Broader multi-location exploration: batch parallel searches in one turn before widening scope',
         ]
@@ -129,10 +133,11 @@ def _path_uncertainty_hint(
 def _routing_tool_batching_paragraph(function_calling_mode: str | None) -> str:
     _ = function_calling_mode
     return (
-        'You may batch independent code search or read operations in one turn '
-        'when they improve latency. Dependent edits and runs must remain sequential. '
-        'Use `grep` with output_mode=files_with_matches first, then `content` only for '
-        'files that matter; paginate with head_limit/offset instead of unbounded scans.'
+        'You may batch independent read-only discovery (`grep`, `glob`, `find_symbols`, '
+        '`read` line ranges, `analyze_project_structure`, `lsp`) in one turn when they '
+        'improve latency. Dependent edits and runs must remain sequential. '
+        'Start bounded: files_with_matches before content, line ranges before whole files; '
+        'paginate with head_limit/offset instead of unbounded scans.'
     )
 
 

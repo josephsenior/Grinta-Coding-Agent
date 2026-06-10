@@ -1241,3 +1241,36 @@ class TestBuildSystemPromptRenders:
         assert 'checkpoint(save)' in result
         assert 'checkpoint(view)' in result
         assert 'checkpoint(revert)' in result
+
+    def test_prompt_includes_bounded_discovery_guidance(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(),
+            function_calling_mode='native',
+        )
+        assert 'Output bounds' in result
+        assert 'start_line' in result
+        assert 'files_with_matches' in result
+
+    def test_prompt_web_fetch_vs_browser_routing(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_web=True),
+            function_calling_mode='native',
+        )
+        assert 'web_fetch` (default for URLs)' in result
+        assert 'browser` (not `web_fetch`)' in result
+
+    def test_prompt_done_criteria_by_task_type(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(),
+            function_calling_mode='native',
+        )
+        assert 'Done criteria by task type' in result
+        assert 'Bugfix:' in result
+        assert 'Implementation:' in result
+        assert 'Refactor:' in result

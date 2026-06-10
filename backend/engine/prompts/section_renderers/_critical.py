@@ -44,6 +44,13 @@ def _render_critical(
     user_question_antipattern = (
         '**Asking the user a question in plain prose mid-turn.** See `<ASK_USER_TOOL>`.'
     )
+    done_criteria_block = (
+        '   **Done criteria by task type:**\n'
+        '   - **Bugfix:** reproduce or capture the failing test, fix, then re-run the narrowest test/reproducer.\n'
+        '   - **Implementation:** run lint/typecheck when the project uses them; smoke-test the changed path.\n'
+        '   - **Refactor:** run affected tests or a narrow smoke check on touched modules.\n'
+        '   - **Blocked verification:** state exactly what was not verified and why before the final summary.'
+    )
     return render_partial(
         'system_partial_04_critical.md',
         terminal_command_tool=terminal_command_tool,
@@ -53,4 +60,5 @@ def _render_critical(
         destructive_ops_antipattern=destructive_ops_antipattern,
         planning_tool_list=planning_tool_list,
         user_question_antipattern=user_question_antipattern,
+        done_criteria_block=done_criteria_block,
     )
