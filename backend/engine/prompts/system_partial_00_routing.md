@@ -14,6 +14,7 @@
 - **Search & Explore:** Follow `<DISCOVERY_ROUTING>`. Use native `grep`/`glob`/`find_symbols`/`read`/`analyze_project_structure` — never shell `grep`/`find`/`rg` for repo intelligence.
 - **`grep`:** default `output_mode=files_with_matches`; switch to `content` only for files that matter; paginate with `head_limit`/`offset` (default 200).
 - **`glob`:** paginate file lists with `head_limit`/`offset` (default 200).
+- **`read`:** use `start_line`/`end_line` on large files; prefer `read(type="symbols")` over whole-file reads when symbols are known; widen ranges only after a bounded first pass.
 {lsp_routing}
 {discovery_decision_table}
 {read_and_edit_ladder}
@@ -24,6 +25,7 @@
 
 <EXECUTION_DISCIPLINE>
 Loop: reason clearly → use tools → advance.
+**Output bounds:** Start narrow — `files_with_matches` before `content`, line ranges before whole files, targeted `glob`/`find_symbols` before repo-wide scans. Paginate with `head_limit`/`offset`; do not pull unbounded output into context.
 **Re-read policy:** Do not re-read a file you just wrote in the same turn **except** when grounding **tests or public API contracts** against that same file (see rule 8 in `<CRITICAL_TOOL_EXECUTION_RULES>`).
 **Priorities:** SECURITY > CORRECTNESS > EFFICIENCY > SIMPLICITY.
 **Batching:** {batch_commands}
