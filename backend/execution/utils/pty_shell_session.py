@@ -25,6 +25,10 @@ import shutil
 import time
 from typing import TYPE_CHECKING
 
+from backend.core.constants import (
+    PTY_OPEN_READ_TIMEOUT_SECONDS,
+    PTY_SHELL_READY_TIMEOUT_SECONDS,
+)
 from backend.core.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 from backend.execution.utils.pty_session import (
@@ -62,6 +66,7 @@ _PTY_PS1_WAIT_CEIL = 3600.0
 # Used to parse the current working directory from PTY delta output on Windows
 # where PS1 JSON metadata tracking is not available.
 _PS_PROMPT_RE = re.compile(r'^PS\s+(.+?)>\s*$')
+_PS_READY_PROMPT_RE = re.compile(r'(?:^|\n)PS\s+.+?>\s*$')
 
 
 def _remove_command_prefix(command_output: str, command: str) -> str:
@@ -218,6 +223,7 @@ class PtyInteractiveShellSession(BaseShellSession):
         self._pty: InteractiveSession | None = None
         self._enable_ps1_param = enable_ps1_metadata
         self._ps1_ready = False
+        self._shell_ready = False
 
     def _want_ps1_metadata(self) -> bool:
         """Return True if we should use JSON PS1 tracking for this shell process."""
@@ -243,6 +249,11 @@ class PtyInteractiveShellSession(BaseShellSession):
     def shell_kind(self) -> str:
         """Human-readable shell dialect for terminal input preflight."""
         return _argv_shell_kind(self._shell_argv)
+
+    @property
+    def shell_ready(self) -> bool:
+        """True when the interactive shell has emitted a recognizable prompt."""
+        return bool(self._shell_ready or self._ps1_ready)
 
     def _ps1_wait_timeout(self) -> float:
         t = 2.0 * float(self.NO_CHANGE_TIMEOUT_SECONDS)
@@ -283,6 +294,38 @@ class PtyInteractiveShellSession(BaseShellSession):
             logger.warning('Failed to install JSON PS1 in PTY bash: %s', exc)
             self._ps1_ready = False
 
+    def _pwsh_prompt_ready(self, text: str) -> bool:
+        return bool(_PS_READY_PROMPT_RE.search(_norm_tty_text(text)))
+
+    def _wait_for_pwsh_prompt(self) -> None:
+        """Wait for a PowerShell prompt so ``terminal_run`` can return promptly."""
+        pty = self._pty
+        if pty is None or _argv_shell_kind(self._shell_argv) != 'powershell':
+            return
+        open_wait = min(PTY_OPEN_READ_TIMEOUT_SECONDS, PTY_SHELL_READY_TIMEOUT_SECONDS)
+        if pty.wait_for_output(
+            predicate=self._pwsh_prompt_ready,
+            timeout=open_wait,
+        ):
+            self._shell_ready = True
+            logger.info(
+                'Pty pwsh session prompt ready (execute/read can proceed).'
+            )
+            return
+        # Best-effort: any buffered output means the shell is alive; proceed so
+        # terminal_run can return within the open budget instead of blocking writes.
+        if pty.peek().strip():
+            self._shell_ready = True
+            logger.info(
+                'Pty pwsh session has startup output (prompt not matched); proceeding.'
+            )
+            return
+        self._shell_ready = False
+        logger.warning(
+            'PowerShell prompt not detected within %.1fs; continuing best-effort.',
+            open_wait,
+        )
+
     def initialize(self) -> None:
         """Spawn the interactive shell under a PTY."""
         if self._pty is not None:
@@ -311,13 +354,18 @@ class PtyInteractiveShellSession(BaseShellSession):
         self._pty = session
         self._initialized = True
         self._install_bash_json_ps1()
+        if self._ps1_ready:
+            self._shell_ready = True
+        else:
+            self._wait_for_pwsh_prompt()
         logger.info(
             'PtyInteractiveShellSession initialized (pid=%s, argv=%s, cwd=%s, '
-            'ps1_ready=%s)',
+            'ps1_ready=%s, shell_ready=%s)',
             session.pid,
             self._shell_argv,
             cwd,
             self._ps1_ready,
+            self._shell_ready,
         )
 
     def _execute_with_ps1_after_send(

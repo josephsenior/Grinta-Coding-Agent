@@ -10,6 +10,8 @@ contents) use the ``glob`` tool instead.
 
 from __future__ import annotations
 
+import os
+
 from backend.engine.tools._search_helpers import (
     DEFAULT_GREP_OUTPUT_MODE,
     DEFAULT_SEARCH_HEAD_LIMIT,
@@ -22,17 +24,16 @@ from backend.engine.tools._search_helpers import (
     collect_python_match_results,
     collect_python_target_files,
     compile_search_regex,
-    format_ripgrep_output,
     has_ripgrep,
+    make_grep_observation,
     paginate_line_output,
     resolve_search_pagination,
     run_ripgrep_command,
-    search_error_action,
-    search_results_action,
 )
 from backend.engine.tools.common import create_tool_definition
 from backend.inference.tool_names import GREP_TOOL_NAME
-from backend.ledger.action import AgentThinkAction
+from backend.ledger.action.search import GrepAction
+from backend.ledger.observation.search import GrepObservation
 
 _GREP_DESCRIPTION = """\
 Search the project for a regex pattern inside file contents.
@@ -123,11 +124,8 @@ def build_grep_action(
     case_sensitive: bool | str = False,
     head_limit: int | None = None,
     offset: int = 0,
-) -> AgentThinkAction:
-    """Execute a regex text search."""
-    path = path or '.'
-    context_lines = max(0, min(int(context_lines), 10))
-    is_case_sensitive = case_sensitive is True or str(case_sensitive).lower() == 'true'
+) -> GrepAction:
+    """Build a runnable ``GrepAction`` from tool-call arguments."""
     resolved_offset, resolved_head_limit = resolve_search_pagination(
         head_limit,
         offset,
@@ -135,51 +133,88 @@ def build_grep_action(
     mode = (output_mode or DEFAULT_GREP_OUTPUT_MODE).strip().lower()
     if mode not in GREP_OUTPUT_MODES:
         mode = DEFAULT_GREP_OUTPUT_MODE
+    is_case_sensitive = case_sensitive is True or str(case_sensitive).lower() == 'true'
+    return GrepAction(
+        pattern=pattern or '',
+        path=path or '.',
+        file_pattern=file_pattern or '',
+        output_mode=mode,
+        context_lines=max(0, min(int(context_lines), 10)),
+        case_sensitive=is_case_sensitive,
+        head_limit=resolved_head_limit,
+        offset=resolved_offset,
+    )
+
+
+def execute_grep(action: GrepAction) -> GrepObservation:
+    """Execute a regex text search and return a structured observation."""
+    pattern = action.pattern
+    path = action.path or '.'
+    file_pattern = action.file_pattern or ''
+    mode = action.output_mode or DEFAULT_GREP_OUTPUT_MODE
+    empty_message = 'No matches found.'
 
     if not pattern:
-        return _invalid_grep_arguments_action()
+        message = (
+            'grep requires a non-empty `pattern` argument. '
+            'Use the `glob` tool to list files.'
+        )
+        return make_grep_observation(
+            pattern=pattern,
+            path=path,
+            output_mode=mode,
+            lines=[],
+            content=message,
+            error=message,
+        )
 
     regex, regex_error = compile_search_regex(
         pattern,
-        is_case_sensitive=is_case_sensitive,
-        source_tool=GREP_TOOL_NAME,
+        is_case_sensitive=action.case_sensitive,
         invalid_hint=(
-            f"Invalid regex in 'pattern' for grep: {{exc}}. "
+            "Invalid regex in 'pattern' for grep: {exc}. "
             'Note: glob patterns (e.g. *.ts) belong to the `glob` tool, not `grep`.'
         ),
     )
     if regex_error is not None:
-        return regex_error
-
-    if not _path_exists(path):
-        return search_results_action(
-            f'Path does not exist: {path}', source_tool=GREP_TOOL_NAME
+        return make_grep_observation(
+            pattern=pattern,
+            path=path,
+            output_mode=mode,
+            lines=[],
+            content=regex_error,
+            error=regex_error,
         )
 
-    empty_message = 'No matches found.'
+    if not os.path.exists(path):
+        message = f'Path does not exist: {path}'
+        return make_grep_observation(
+            pattern=pattern,
+            path=path,
+            output_mode=mode,
+            lines=[],
+            content=message,
+            error=message,
+        )
+
     rg_path = has_ripgrep()
     if rg_path:
         return _run_ripgrep_mode(
             rg_path,
+            action=action,
             pattern=pattern,
             path=path,
             file_pattern=file_pattern,
-            context_lines=context_lines,
-            is_case_sensitive=is_case_sensitive,
             output_mode=mode,
-            offset=resolved_offset,
-            head_limit=resolved_head_limit,
             regex=regex,
             empty_message=empty_message,
         )
 
     return _run_python_mode(
+        action=action,
         path=path,
         file_pattern=file_pattern,
-        context_lines=context_lines,
         output_mode=mode,
-        offset=resolved_offset,
-        head_limit=resolved_head_limit,
         regex=regex,
         empty_message=empty_message,
     )
@@ -188,24 +223,21 @@ def build_grep_action(
 def _run_ripgrep_mode(
     rg_path: str,
     *,
+    action: GrepAction,
     pattern: str,
     path: str,
     file_pattern: str,
-    context_lines: int,
-    is_case_sensitive: bool,
     output_mode: str,
-    offset: int,
-    head_limit: int | None,
     regex: object,
     empty_message: str,
-) -> AgentThinkAction:
+) -> GrepObservation:
     if output_mode == 'files_with_matches':
         args = build_ripgrep_files_with_matches_args(
             rg_path,
             pattern=pattern,
             path=path,
             file_pattern=file_pattern,
-            is_case_sensitive=is_case_sensitive,
+            is_case_sensitive=action.case_sensitive,
         )
     elif output_mode == 'count':
         args = build_ripgrep_count_args(
@@ -213,7 +245,7 @@ def _run_ripgrep_mode(
             pattern=pattern,
             path=path,
             file_pattern=file_pattern,
-            is_case_sensitive=is_case_sensitive,
+            is_case_sensitive=action.case_sensitive,
         )
     else:
         args = build_ripgrep_text_search_args(
@@ -221,48 +253,64 @@ def _run_ripgrep_mode(
             pattern=pattern,
             path=path,
             file_pattern=file_pattern,
-            context_lines=context_lines,
-            is_case_sensitive=is_case_sensitive,
+            context_lines=action.context_lines,
+            is_case_sensitive=action.case_sensitive,
         )
     try:
         result = run_ripgrep_command(args)
     except Exception as exc:
-        return search_error_action(
-            f'Error running ripgrep: {exc}', source_tool=GREP_TOOL_NAME
+        message = f'Error running ripgrep: {exc}'
+        return make_grep_observation(
+            pattern=pattern,
+            path=path,
+            output_mode=output_mode,
+            lines=[],
+            content=message,
+            error=message,
         )
     if getattr(result, 'timed_out', False):
-        return search_error_action(
-            'Search timed out after 30s',
-            source_tool=GREP_TOOL_NAME,
+        message = 'Search timed out after 30s'
+        return make_grep_observation(
+            pattern=pattern,
+            path=path,
+            output_mode=output_mode,
+            lines=[],
+            content=message,
+            error=message,
         )
-    lines = result.stdout.splitlines()
-    return search_results_action(
-        paginate_line_output(
-            lines,
-            offset=offset,
-            head_limit=head_limit,
-            empty_message=empty_message,
-        ),
-        source_tool=GREP_TOOL_NAME,
+    lines = [line for line in result.stdout.splitlines() if line]
+    content = paginate_line_output(
+        lines,
+        offset=action.offset,
+        head_limit=action.head_limit,
+        empty_message=empty_message,
+    )
+    return make_grep_observation(
+        pattern=pattern,
+        path=path,
+        output_mode=output_mode,
+        lines=lines,
+        content=content,
     )
 
 
 def _run_python_mode(
     *,
+    action: GrepAction,
     path: str,
     file_pattern: str,
-    context_lines: int,
     output_mode: str,
-    offset: int,
-    head_limit: int | None,
     regex: object,
     empty_message: str,
-) -> AgentThinkAction:
+) -> GrepObservation:
     target_files = collect_python_target_files(path, file_pattern)
     if not target_files:
-        return search_results_action(
-            format_ripgrep_output('', max_lines=1, empty_message=empty_message),
-            source_tool=GREP_TOOL_NAME,
+        return make_grep_observation(
+            pattern=action.pattern,
+            path=path,
+            output_mode=output_mode,
+            lines=[],
+            content=empty_message,
         )
 
     if output_mode == 'files_with_matches':
@@ -273,28 +321,19 @@ def _run_python_mode(
         lines = collect_python_match_results(
             target_files,
             regex=regex,  # type: ignore[arg-type]
-            context_lines=context_lines,
+            context_lines=action.context_lines,
         )
 
-    return search_results_action(
-        paginate_line_output(
-            lines,
-            offset=offset,
-            head_limit=head_limit,
-            empty_message=empty_message,
-        ),
-        source_tool=GREP_TOOL_NAME,
+    content = paginate_line_output(
+        lines,
+        offset=action.offset,
+        head_limit=action.head_limit,
+        empty_message=empty_message,
     )
-
-
-def _invalid_grep_arguments_action() -> AgentThinkAction:
-    return search_results_action(
-        'grep requires a non-empty `pattern` argument. Use the `glob` tool to list files.',
-        source_tool=GREP_TOOL_NAME,
+    return make_grep_observation(
+        pattern=action.pattern,
+        path=path,
+        output_mode=output_mode,
+        lines=lines,
+        content=content,
     )
-
-
-def _path_exists(path: str) -> bool:
-    import os
-
-    return os.path.exists(path)

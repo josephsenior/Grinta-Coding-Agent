@@ -341,14 +341,16 @@ class _ExecutorStreamingMixin:
         from backend.ledger.event import EventSource
 
         draft_reply_accum = '' if has_tools else visible_accum
-        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+        from backend.cli._event_renderer.text_utils import (
+            sanitize_streaming_thinking_text,
+        )
 
         ev = StreamingChunkAction(
             chunk='',
             accumulated=draft_reply_accum,
             is_final=True,
             suppress_live_response=has_tools,
-            thinking_accumulated=redact_streamed_tool_call_markers(
+            thinking_accumulated=sanitize_streaming_thinking_text(
                 thinking_accumulate
             ),
         )
@@ -373,6 +375,9 @@ class _ExecutorStreamingMixin:
         if not self._should_emit_stream_snapshot(state, channel='text', force=force):
             return
 
+        from backend.cli._event_renderer.text_utils import (
+            sanitize_streaming_thinking_text,
+        )
         from backend.cli.tool_call_display import redact_streamed_tool_call_markers
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
@@ -382,7 +387,9 @@ class _ExecutorStreamingMixin:
             chunk=text_piece,
             accumulated=display_acc,
             is_final=False,
-            thinking_accumulated=state.thinking_accumulate,
+            thinking_accumulated=sanitize_streaming_thinking_text(
+                state.thinking_accumulate
+            ),
         )
         ev.source = EventSource.AGENT
         event_stream.add_event(ev, EventSource.AGENT)
@@ -409,11 +416,14 @@ class _ExecutorStreamingMixin:
         ):
             return
 
+        from backend.cli._event_renderer.text_utils import (
+            sanitize_streaming_thinking_text,
+        )
         from backend.cli.tool_call_display import redact_streamed_tool_call_markers
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
-        thinking_display = redact_streamed_tool_call_markers(
+        thinking_display = sanitize_streaming_thinking_text(
             state.thinking_accumulate
         )
         ev = StreamingChunkAction(

@@ -75,6 +75,7 @@ from backend.cli.transcript import (
 )
 from backend.ledger.action import (
     Action,
+    AnalyzeProjectStructureAction,
     AgentThinkAction,
     BrowseInteractiveAction,
     BrowserToolAction,
@@ -86,6 +87,9 @@ from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
     FileWriteAction,
+    FindSymbolsAction,
+    GlobAction,
+    GrepAction,
     LspQueryAction,
     MCPAction,
     MessageAction,
@@ -97,6 +101,7 @@ from backend.ledger.action import (
     TerminalReadAction,
     TerminalRunAction,
     UncertaintyAction,
+    ReadSymbolsAction,
 )
 
 
@@ -124,6 +129,11 @@ class ActionRenderersMixin(_ActionRenderersBase):
         (MCPAction, '_render_mcp_action'),
         (BrowserToolAction, '_render_browser_tool_action'),
         (BrowseInteractiveAction, '_render_browse_interactive_action'),
+        (GrepAction, '_render_grep_action'),
+        (GlobAction, '_render_glob_action'),
+        (FindSymbolsAction, '_render_find_symbols_action'),
+        (ReadSymbolsAction, '_render_read_symbols_action'),
+        (AnalyzeProjectStructureAction, '_render_analyze_project_structure_action'),
         (LspQueryAction, '_render_lsp_query_action'),
         (TaskTrackingAction, '_render_task_tracking_action'),
         (CondensationAction, '_render_condensation_action'),
@@ -313,90 +323,14 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
     def _render_tool_sourced_think(self, source_tool: str, thought: str) -> None:
         """Render an ``AgentThinkAction`` that originated from a tool call."""
-        from backend.engine.tools._search_helpers import extract_search_results_payload
-
         cleaned = _THINK_RESULT_JSON_RE.sub('', thought).strip()
         tag_m = _INTERNAL_THINK_TAG_RE.match(cleaned)
         human_msg = (tag_m.group('payload') or '').strip() if tag_m else cleaned
         human_msg = _TOOL_RESULT_TAG_RE.sub('', human_msg).strip()
-        if source_tool in ('grep', 'glob'):
-            human_msg = extract_search_results_payload(human_msg)
 
         verb, title, detail = self._think_action_card_fields(source_tool, human_msg)
         self._emit_activity_turn_header()
-
-        if source_tool in ('grep', 'glob'):
-            if self._try_render_search_think(
-                source_tool, human_msg, verb, title, detail
-            ):
-                return
-
         self._render_generic_tool_think(verb, title, detail, human_msg)
-
-    def _try_render_search_think(
-        self,
-        source_tool: str,
-        human_msg: str,
-        verb: str,
-        title: str,
-        detail: str,
-    ) -> bool:
-        from backend.engine.tools._search_helpers import extract_search_results_payload
-
-        payload = extract_search_results_payload(human_msg)
-        raw_lines = self._extract_search_lines(payload)
-        if not raw_lines:
-            return False
-        if source_tool == 'grep' and not self._has_grep_format_matches(raw_lines):
-            return False
-
-        return self._render_search_result(payload, verb, title, detail)
-
-    @staticmethod
-    def _extract_search_lines(human_msg: str) -> list[str]:
-        return [
-            ln
-            for ln in human_msg.splitlines()
-            if ln.strip() and not ln.startswith('Error running')
-        ]
-
-    @staticmethod
-    def _has_grep_format_matches(raw_lines: list[str]) -> bool:
-        return any(re.match(r'^.*:\d+:', ln) for ln in raw_lines[:5])
-
-    def _render_search_result(
-        self, human_msg: str, verb: str, title: str, detail: str
-    ) -> bool:
-        from backend.cli._tool_display.renderers.search import (
-            extract_file_summary,
-            render_file_list,
-        )
-
-        match_count, file_count, file_list = extract_file_summary(human_msg)
-        extra_lines = render_file_list(file_list, file_count, match_count)
-        kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
-        secondary = self._build_search_secondary(match_count, file_count)
-
-        inner = format_activity_block(
-            verb,
-            detail,
-            secondary=secondary,
-            secondary_kind=kind,
-            extra_lines=extra_lines,
-            title=title,
-        )
-        self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
-        self.refresh()
-        return True
-
-    @staticmethod
-    def _build_search_secondary(match_count: int, file_count: int) -> str | None:
-        secondary_parts = []
-        if match_count:
-            secondary_parts.append(f'{match_count} matches')
-        if file_count:
-            secondary_parts.append(f'in {file_count} files')
-        return ' '.join(secondary_parts) if secondary_parts else None
 
     def _render_generic_tool_think(
         self, verb: str, title: str, detail: str, human_msg: str
@@ -422,24 +356,8 @@ class ActionRenderersMixin(_ActionRenderersBase):
     ) -> tuple[str, str, str]:
         if source_tool == 'checkpoint':
             return 'Saved', ACTIVITY_CARD_TITLE_CHECKPOINT, human_msg or 'checkpoint'
-        if source_tool in ('grep', 'glob'):
-            detail = cls._search_detail(human_msg or '')
-            return 'Search Code', ACTIVITY_CARD_TITLE_SEARCH, detail
         verb = source_tool.replace('_', ' ').title()
         return verb, ACTIVITY_CARD_TITLE_TOOL, str(human_msg)[:150] or source_tool
-
-    @classmethod
-    def _search_detail(cls, human_msg: str) -> str:
-        from backend.cli._tool_display.renderers.search import extract_file_summary
-
-        match_count, file_count, _ = extract_file_summary(human_msg)
-        if not match_count:
-            return 'No matches found.'
-
-        parts = [f'{match_count} matches']
-        if file_count:
-            parts.append(f'in {file_count} files')
-        return ' '.join(parts)
 
     def _render_cmd_run_action(self, action: CmdRunAction) -> None:
         self._flush_pending_activity_card()
@@ -650,6 +568,71 @@ class ActionRenderersMixin(_ActionRenderersBase):
             secondary=stats,
             kind='lsp',
             badge_label='lsp',
+        )
+        self.refresh()
+
+    def _render_grep_action(self, action: GrepAction) -> None:
+        self._flush_pending_tool_cards()
+        self._buffer_pending_activity(
+            title='Grep',
+            verb='Grepped',
+            detail=action.pattern or 'code search',
+            secondary=action.path or None,
+            kind='grep',
+            badge_label='grep',
+        )
+        self.refresh()
+
+    def _render_glob_action(self, action: GlobAction) -> None:
+        self._flush_pending_tool_cards()
+        self._buffer_pending_activity(
+            title='Glob',
+            verb='Globbed',
+            detail=action.pattern or 'file listing',
+            secondary=action.path or None,
+            kind='glob',
+            badge_label='glob',
+        )
+        self.refresh()
+
+    def _render_find_symbols_action(self, action: FindSymbolsAction) -> None:
+        self._flush_pending_tool_cards()
+        self._buffer_pending_activity(
+            title=ACTIVITY_CARD_TITLE_CODE,
+            verb='Found',
+            detail=action.query or 'symbol search',
+            secondary=action.path or None,
+            kind='find_symbols',
+            badge_label='code',
+        )
+        self.refresh()
+
+    def _render_read_symbols_action(self, action: ReadSymbolsAction) -> None:
+        self._flush_pending_tool_cards()
+        target_count = len(getattr(action, 'targets', []) or [])
+        detail = f'{target_count} symbol{"s" if target_count != 1 else ""}'
+        self._buffer_pending_activity(
+            title=ACTIVITY_CARD_TITLE_CODE,
+            verb='Read',
+            detail=detail,
+            secondary=action.path or None,
+            kind='read_symbols',
+            badge_label='code',
+        )
+        self.refresh()
+
+    def _render_analyze_project_structure_action(
+        self, action: AnalyzeProjectStructureAction
+    ) -> None:
+        self._flush_pending_tool_cards()
+        detail = f'{action.command} {action.path}'.strip()
+        self._buffer_pending_activity(
+            title=ACTIVITY_CARD_TITLE_TOOL,
+            verb='Analyzed',
+            detail=detail or 'project structure',
+            secondary=action.symbol or None,
+            kind='analyze_project_structure',
+            badge_label='tool',
         )
         self.refresh()
 

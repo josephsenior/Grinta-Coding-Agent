@@ -24,7 +24,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from backend.ledger.action.agent import AgentThinkAction
+from backend.ledger.action.memory_tools import WorkingMemoryAction
+from backend.ledger.observation.memory_tools import WorkingMemoryObservation
 
 _VALID_SECTIONS = (
     'hypothesis',
@@ -84,39 +85,74 @@ def _save_memory(data: dict[str, str]) -> None:
 # --- Action builders ---
 
 
-def build_working_memory_action(arguments: dict[str, Any]) -> AgentThinkAction:
-    """Execute a working_memory command and return a think action with results."""
-    command = arguments.get('command', 'get')
-    section = arguments.get('section', 'all')
-    content = arguments.get('content', '')
+def build_working_memory_action(arguments: dict[str, Any]) -> WorkingMemoryAction:
+    """Build a runnable working-memory action from tool arguments."""
+    return WorkingMemoryAction(
+        command=str(arguments.get('command', 'get') or 'get'),
+        section=str(arguments.get('section', 'all') or 'all'),
+        content=str(arguments.get('content', '') or ''),
+    )
 
+
+def execute_working_memory(action: WorkingMemoryAction) -> WorkingMemoryObservation:
+    """Execute a working-memory command and return a structured observation."""
+    command = (action.command or 'get').strip().lower()
     if command == 'update':
-        return _update_section(section, content)
-    elif command == 'clear_section':
-        return _clear_section(section)
-    else:
-        return _get_section(section)
+        return _update_section(action.section, action.content)
+    if command == 'clear_section':
+        return _clear_section(action.section)
+    return _get_section(action.section)
 
 
-def _update_section(section: str, content: str) -> AgentThinkAction:
+def _wm_obs(
+    *,
+    content: str,
+    command: str,
+    section: str = 'all',
+    updated_sections: list[str] | None = None,
+    ok: bool = True,
+) -> WorkingMemoryObservation:
+    snapshot = _load_memory() if command == 'get' else {}
+    return WorkingMemoryObservation(
+        content=content,
+        command=command,
+        section=section,
+        updated_sections=list(updated_sections or []),
+        memory_snapshot=dict(snapshot),
+        ok=ok,
+    )
+
+
+def _update_section(section: str, content: str) -> WorkingMemoryObservation:
     if section == 'all':
         return _update_all_sections(content)
     if section not in _VALID_SECTIONS:
-        return AgentThinkAction(
-            thought=f'[WORKING_MEMORY] Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}'
+        return _wm_obs(
+            content=f'Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}',
+            command='update',
+            section=section,
+            ok=False,
         )
     if not content:
-        return AgentThinkAction(
-            thought="[WORKING_MEMORY] 'content' is required for update."
+        return _wm_obs(
+            content="'content' is required for update.",
+            command='update',
+            section=section,
+            ok=False,
         )
     memory = _load_memory()
     memory[section] = content
     memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
     _save_memory(memory)
-    return AgentThinkAction(thought=f"[WORKING_MEMORY] Updated '{section}' section.")
+    return _wm_obs(
+        content=f"Updated '{section}' section.",
+        command='update',
+        section=section,
+        updated_sections=[section],
+    )
 
 
-def _update_all_sections(content: str) -> AgentThinkAction:
+def _update_all_sections(content: str) -> WorkingMemoryObservation:
     """Update multiple working-memory sections in one call.
 
     Accepts either:
@@ -125,8 +161,11 @@ def _update_all_sections(content: str) -> AgentThinkAction:
     - Otherwise, stores the entire content into the 'findings' section.
     """
     if not content:
-        return AgentThinkAction(
-            thought="[WORKING_MEMORY] 'content' is required for update."
+        return _wm_obs(
+            content="'content' is required for update.",
+            command='update',
+            section='all',
+            ok=False,
         )
 
     memory = _load_memory()
@@ -142,8 +181,11 @@ def _update_all_sections(content: str) -> AgentThinkAction:
     memory['findings'] = content
     memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
     _save_memory(memory)
-    return AgentThinkAction(
-        thought="[WORKING_MEMORY] Updated 'findings' section (fallback from section='all')."
+    return _wm_obs(
+        content="Updated 'findings' section (fallback from section='all').",
+        command='update',
+        section='all',
+        updated_sections=['findings'],
     )
 
 
@@ -195,41 +237,47 @@ def _apply_text_sections(content: str, memory: dict[str, str]) -> list[str]:
 
 def _save_and_respond(
     memory: dict[str, str], updated: list[str]
-) -> AgentThinkAction:
+) -> WorkingMemoryObservation:
     memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
     _save_memory(memory)
-    return AgentThinkAction(
-        thought=f'[WORKING_MEMORY] Updated sections: {", ".join(updated)}.'
+    return _wm_obs(
+        content=f'Updated sections: {", ".join(updated)}.',
+        command='update',
+        section='all',
+        updated_sections=updated,
     )
 
 
-def _get_section(section: str) -> AgentThinkAction:
+def _get_section(section: str) -> WorkingMemoryObservation:
     memory = _load_memory()
     if not memory:
-        return AgentThinkAction(thought='[WORKING_MEMORY] Working memory is empty.')
+        return _wm_obs(content='Working memory is empty.', command='get', section=section)
     if section == 'all':
-        parts = ['[WORKING_MEMORY] Full cognitive workspace:']
+        parts = ['Full cognitive workspace:']
         for sec in _VALID_SECTIONS:
             val = memory.get(sec, '')
             if val:
                 parts.append(f'\n## {sec.upper()}\n{val}')
         if len(parts) == 1:
-            return AgentThinkAction(thought='[WORKING_MEMORY] All sections are empty.')
+            return _wm_obs(content='All sections are empty.', command='get', section='all')
         last = memory.get('_last_updated', '?')
         parts.append(f'\n(last updated: {last})')
-        return AgentThinkAction(thought='\n'.join(parts))
+        return _wm_obs(content='\n'.join(parts), command='get', section='all')
 
     if section not in _VALID_SECTIONS:
-        return AgentThinkAction(
-            thought=f'[WORKING_MEMORY] Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}'
+        return _wm_obs(
+            content=f'Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}',
+            command='get',
+            section=section,
+            ok=False,
         )
     val = memory.get(section, '')
     if not val:
-        return AgentThinkAction(thought=f"[WORKING_MEMORY] '{section}' is empty.")
-    return AgentThinkAction(thought=f'[WORKING_MEMORY] {section}:\n{val}')
+        return _wm_obs(content=f"'{section}' is empty.", command='get', section=section)
+    return _wm_obs(content=f'{section}:\n{val}', command='get', section=section)
 
 
-def _clear_section(section: str) -> AgentThinkAction:
+def _clear_section(section: str) -> WorkingMemoryObservation:
     if section == 'all':
         memory = _load_memory()
         any_cleared = False
@@ -239,16 +287,19 @@ def _clear_section(section: str) -> AgentThinkAction:
                 any_cleared = True
         if any_cleared:
             _save_memory(memory)
-        return AgentThinkAction(thought='[WORKING_MEMORY] Cleared all sections.')
+        return _wm_obs(content='Cleared all sections.', command='clear_section', section='all')
     if section not in _VALID_SECTIONS:
-        return AgentThinkAction(
-            thought=f'[WORKING_MEMORY] Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}'
+        return _wm_obs(
+            content=f'Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}',
+            command='clear_section',
+            section=section,
+            ok=False,
         )
     memory = _load_memory()
     if section in memory:
         del memory[section]
         _save_memory(memory)
-    return AgentThinkAction(thought=f"[WORKING_MEMORY] Cleared '{section}' section.")
+    return _wm_obs(content=f"Cleared '{section}' section.", command='clear_section', section=section)
 
 
 def get_full_working_memory() -> str:

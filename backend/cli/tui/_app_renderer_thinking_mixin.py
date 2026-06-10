@@ -21,7 +21,6 @@ from backend.cli.theme import (
 
 ThinkingIntentKind = Literal[
     'thinking',
-    'search',
     'memory',
     'shared',
     'checkpoint',
@@ -124,19 +123,6 @@ class _AppRendererThinkingMixin:
             )
         return None
 
-    def _classify_search_intent(
-        self,
-        thought: str,
-        source_tool: str,
-    ) -> ThinkingRenderIntent | None:
-        if source_tool in ('grep', 'glob') or '[SEARCH_RESULTS]' in thought:
-            return ThinkingRenderIntent(
-                kind='search',
-                text=thought,
-                source_tool=source_tool,
-            )
-        return None
-
     def _classify_by_source_tool(
         self,
         thought: str,
@@ -230,10 +216,6 @@ class _AppRendererThinkingMixin:
         if error_intent is not None:
             return error_intent
 
-        search_intent = self._classify_search_intent(thought, source_tool)
-        if search_intent is not None:
-            return search_intent
-
         cleaned = self._strip_tool_payload_markup(thought)
         tag, payload = self._parse_think_tag(cleaned)
 
@@ -275,8 +257,13 @@ class _AppRendererThinkingMixin:
         return True
 
     def _render_thinking_text_intent(self, intent: ThinkingRenderIntent, finalize: bool) -> None:
-        if self._should_render_thinking_text(intent.text):
-            self._tui.add_thinking(intent.text)
+        from backend.cli._event_renderer.text_utils import (
+            sanitize_streaming_thinking_text,
+        )
+
+        display_text = sanitize_streaming_thinking_text(intent.text)
+        if self._should_render_thinking_text(display_text):
+            self._tui.add_thinking(display_text)
         if finalize:
             self._tui.finalize_thinking()
 
@@ -308,14 +295,6 @@ class _AppRendererThinkingMixin:
             return True
 
         if not self._should_render_thinking_artifact(intent):
-            return True
-
-        if intent.kind == 'search':
-            self._handle_search_action(
-                intent.text,
-                source_tool=intent.source_tool or 'search',
-                tool_args=tool_args,
-            )
             return True
 
         if intent.kind == 'error':

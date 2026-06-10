@@ -6,10 +6,19 @@ import pytest
 
 from backend.ledger.action import AgentThinkAction, MessageAction, NullAction
 from backend.ledger.event import EventSource
+from backend.ledger.action.search import (
+    AnalyzeProjectStructureAction,
+    GrepAction,
+    ReadSymbolsAction,
+)
 from backend.ledger.observation import (
+    AnalyzeProjectStructureObservation,
     AgentThinkObservation,
     ErrorObservation,
+    GlobObservation,
+    GrepObservation,
     LspQueryObservation,
+    ReadSymbolsObservation,
     TerminalObservation,
 )
 from backend.ledger.serialization.event import (
@@ -115,6 +124,93 @@ class TestEventToDict:
         assert d['observation'] == 'lsp_query_result'
         assert 'LSP unavailable' in d['message']
         assert d['extras']['available'] is False
+
+    def test_grep_action_and_observation_roundtrip(self):
+        action = GrepAction(pattern='foo', path='src', output_mode='content')
+        action._source = EventSource.AGENT
+        action_data = event_to_dict(action)
+        assert action_data['action'] == 'grep'
+        assert action_data['args']['pattern'] == 'foo'
+
+        obs = GrepObservation(
+            content='src/a.py:1:foo',
+            pattern='foo',
+            path='src',
+            lines=['src/a.py:1:foo'],
+            match_count=1,
+            file_count=1,
+        )
+        obs._source = EventSource.ENVIRONMENT
+        obs_data = event_to_dict(obs)
+        assert obs_data['observation'] == 'grep_result'
+        assert obs_data['extras']['pattern'] == 'foo'
+        assert event_from_dict(obs_data).pattern == 'foo'
+
+    def test_glob_observation_roundtrip(self):
+        obs = GlobObservation(
+            content='a.py\nb.py',
+            pattern='*.py',
+            path='.',
+            files=['a.py', 'b.py'],
+            file_count=2,
+        )
+        obs._source = EventSource.ENVIRONMENT
+        obs_data = event_to_dict(obs)
+        assert obs_data['observation'] == 'glob_result'
+        assert obs_data['extras']['file_count'] == 2
+        restored = event_from_dict(obs_data)
+        assert isinstance(restored, GlobObservation)
+        assert restored.files == ['a.py', 'b.py']
+
+    def test_read_symbols_action_and_observation_roundtrip(self):
+        action = ReadSymbolsAction(
+            targets=[{'symbol_name': 'login'}],
+            path='auth.py',
+            symbol_kind='function',
+        )
+        action._source = EventSource.AGENT
+        action_data = event_to_dict(action)
+        assert action_data['action'] == 'read_symbols'
+        assert action_data['args']['path'] == 'auth.py'
+
+        obs = ReadSymbolsObservation(
+            content='{"status":"ok"}',
+            path='auth.py',
+            symbol_kind='function',
+            results=[{'status': 'resolved', 'symbol_name': 'login'}],
+        )
+        obs._source = EventSource.ENVIRONMENT
+        obs_data = event_to_dict(obs)
+        assert obs_data['observation'] == 'read_symbols_result'
+        restored = event_from_dict(obs_data)
+        assert isinstance(restored, ReadSymbolsObservation)
+        assert restored.results[0]['status'] == 'resolved'
+
+    def test_analyze_project_structure_action_and_observation_roundtrip(self):
+        action = AnalyzeProjectStructureAction(
+            command='dependencies',
+            path='pkg/root.py',
+            depth=3,
+            direction='downstream',
+        )
+        action._source = EventSource.AGENT
+        action_data = event_to_dict(action)
+        assert action_data['action'] == 'analyze_project_structure'
+        assert action_data['args']['command'] == 'dependencies'
+
+        obs = AnalyzeProjectStructureObservation(
+            content='=== DEPENDENCY TREE ===',
+            command='dependencies',
+            path='pkg/root.py',
+            depth=3,
+            direction='downstream',
+        )
+        obs._source = EventSource.ENVIRONMENT
+        obs_data = event_to_dict(obs)
+        assert obs_data['observation'] == 'analyze_project_structure_result'
+        restored = event_from_dict(obs_data)
+        assert isinstance(restored, AnalyzeProjectStructureObservation)
+        assert restored.command == 'dependencies'
 
     def test_terminal_observation_roundtrip_preserves_cause(self):
         """Stream add_event round-trips observations; cause must survive for pending clear."""

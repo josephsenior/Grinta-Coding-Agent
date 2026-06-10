@@ -13,7 +13,14 @@ from pathlib import Path
 from backend.inference.tool_names import NOTE_TOOL_NAME, RECALL_TOOL_NAME
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
-from backend.ledger.action import AgentThinkAction
+from backend.ledger.action.memory_tools import (
+    ScratchpadNoteAction,
+    ScratchpadRecallAction,
+)
+from backend.ledger.observation.memory_tools import (
+    ScratchpadNoteObservation,
+    ScratchpadRecallObservation,
+)
 
 _NOTE_DESCRIPTION = (
     'Store a persistent note in your scratchpad. '
@@ -146,13 +153,21 @@ def scratchpad_entries_for_prompt() -> list[tuple[str, str]]:
     return [(r[0], r[1]) for r in rows]
 
 
-def build_note_action(key: str, value: str) -> AgentThinkAction:
+def build_note_action(key: str, value: str) -> ScratchpadNoteAction:
+    """Build a runnable scratchpad note action."""
+    return ScratchpadNoteAction(key=key, value=value)
+
+
+def execute_scratchpad_note(action: ScratchpadNoteAction) -> ScratchpadNoteObservation:
     """Persist key->value to the scratchpad."""
     notes, updated = _parse_notes_blob(_read_notes_blob())
-    notes[key] = value
-    updated[key] = time.time()
+    notes[action.key] = action.value
+    updated[action.key] = time.time()
     _write_notes_blob(notes, updated)
-    return AgentThinkAction(thought=f'[SCRATCHPAD] Noted [{key}]')
+    return ScratchpadNoteObservation(
+        content=f'Noted [{action.key}]',
+        key=action.key,
+    )
 
 
 def append_to_note(key: str, value: str, max_entries: int = 50) -> None:
@@ -178,23 +193,40 @@ def append_to_note(key: str, value: str, max_entries: int = 50) -> None:
     _write_notes_blob(notes, updated)
 
 
-def build_recall_action(key: str) -> AgentThinkAction:
+def build_recall_action(key: str) -> ScratchpadRecallAction:
+    """Build a runnable scratchpad recall action."""
+    return ScratchpadRecallAction(key=key)
+
+
+def execute_scratchpad_recall(
+    action: ScratchpadRecallAction,
+) -> ScratchpadRecallObservation:
     """Retrieve a specific key from the scratchpad."""
+    key = action.key
     notes = _load_notes()
     if key in notes:
-        return AgentThinkAction(thought=f'[SCRATCHPAD] [{key}] = {notes[key]!r}')
-    if key == 'lessons':
-        # No lessons persisted yet — return a clear empty-state message without
-        # writing an empty key. This avoids the previous bootstrap hack that masked
-        # the genuine empty state and made `recall` look like a side-effect tool.
-        return AgentThinkAction(
-            thought=(
-                "[SCRATCHPAD] No lessons stored yet. Do not recall 'lessons' again this "
-                'session; it will be populated only if a future tool stores lessons.'
-            )
+        value = notes[key]
+        return ScratchpadRecallObservation(
+            content=f'[{key}] = {value!r}',
+            key=key,
+            value=value,
+            found=True,
         )
-    return AgentThinkAction(
-        thought=f'[SCRATCHPAD] Note {key!r} not found. Stop trying to recall it unless you create it first.'
+    if key == 'lessons':
+        return ScratchpadRecallObservation(
+            content=(
+                "No lessons stored yet. Do not recall 'lessons' again this "
+                'session; it will be populated only if a future tool stores lessons.'
+            ),
+            key=key,
+            found=False,
+        )
+    return ScratchpadRecallObservation(
+        content=(
+            f'Note {key!r} not found. Stop trying to recall it unless you create it first.'
+        ),
+        key=key,
+        found=False,
     )
 
 

@@ -16,10 +16,18 @@ from backend.core.constants import (
     PTY_INPUT_READ_TIMEOUT_SECONDS,
     PTY_OPEN_READ_TIMEOUT_SECONDS,
     PTY_READ_POLL_INTERVAL_SECONDS,
+    TERMINAL_EMPTY_READ_CLOSE_THRESHOLD,
+    TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS,
 )
 from backend.core.logger import app_logger as logger
 from backend.execution.action_execution_server_helpers import (
     advance_terminal_read_cursor as _advance_terminal_read_cursor_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    bump_terminal_empty_read_streak as _bump_terminal_empty_read_streak_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    reset_terminal_empty_read_streak as _reset_terminal_empty_read_streak_impl,
 )
 from backend.execution.action_execution_server_helpers import (
     clear_terminal_read_cursor as _clear_terminal_read_cursor_impl,
@@ -283,31 +291,24 @@ class _AesIoTerminalMixin:
 
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         try:
-            validation_error = self._terminal_run_validate(action)
-            if validation_error is not None:
-                return validation_error
-
-            session_id = self._next_terminal_session_id()
-            cwd = self._resolve_terminal_cwd(action.cwd)
-            session = self.session_manager.create_session(
-                session_id=session_id, cwd=cwd, interactive=True
+            return await asyncio.wait_for(
+                self._terminal_run_impl(action),
+                timeout=TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS,
             )
-            shell_kind = self._terminal_shell_kind(session)
-
-            resize_err = self._apply_terminal_resize_if_requested(
-                session, action.rows, action.cols
+        except asyncio.TimeoutError:
+            logger.warning(
+                'terminal_run exceeded %.0fs execution cap; closing partial session',
+                TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS,
             )
-            if resize_err is not None:
-                return self._terminal_run_resize_error(session_id, resize_err, action)
-
-            if action.command:
-                preflight_result = self._terminal_run_preflight_and_execute(
-                    session, session_id, action, shell_kind, cwd
-                )
-                if preflight_result is not None:
-                    return preflight_result
-
-            return self._terminal_run_build_observation(session, session_id, action, shell_kind)
+            return ErrorObservation(
+                content=(
+                    f'TERMINAL_RUN_TIMEOUT: opening the interactive terminal exceeded '
+                    f'{TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS:.0f}s. '
+                    'The session was not opened successfully. Use execute_powershell '
+                    'for one-shot commands, or retry terminal_manager action=open.'
+                ),
+                error_id='TERMINAL_RUN_TIMEOUT',
+            )
         except Exception as exc:
             self._log_terminal_debug(
                 'H9_terminal_run_exception',
@@ -317,6 +318,38 @@ class _AesIoTerminalMixin:
             )
             logger.error('Error starting terminal session: %s', exc, exc_info=True)
             return ErrorObservation(f'Failed to start terminal: {exc}')
+
+    async def _terminal_run_impl(self, action: TerminalRunAction) -> Observation:
+        validation_error = self._terminal_run_validate(action)
+        if validation_error is not None:
+            return validation_error
+
+        session_id = self._next_terminal_session_id()
+        cwd = self._resolve_terminal_cwd(action.cwd)
+        session = await asyncio.to_thread(
+            self.session_manager.create_session,
+            session_id=session_id,
+            cwd=cwd,
+            interactive=True,
+        )
+        shell_kind = self._terminal_shell_kind(session)
+
+        resize_err = self._apply_terminal_resize_if_requested(
+            session, action.rows, action.cols
+        )
+        if resize_err is not None:
+            return self._terminal_run_resize_error(session_id, resize_err, action)
+
+        if action.command:
+            preflight_result = await self._terminal_run_preflight_and_execute(
+                session, session_id, action, shell_kind, cwd
+            )
+            if preflight_result is not None:
+                return preflight_result
+
+        return self._terminal_run_build_observation(
+            session, session_id, action, shell_kind
+        )
 
     def _terminal_run_validate(self, action: TerminalRunAction) -> ErrorObservation | None:
         guard_err = self._terminal_open_guardrail_error(action.command or '')
@@ -403,7 +436,7 @@ class _AesIoTerminalMixin:
             session_id,
             action.command,
         )
-        session.write_input(action.command + '\n')
+        await asyncio.to_thread(session.write_input, action.command + '\n')
         if predicted_cwd is not None and hasattr(session, '_cwd'):
             session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
 
@@ -674,6 +707,29 @@ class _AesIoTerminalMixin:
                 action.session_id, next_offset, mode=mode
             )
             self._mark_terminal_session_interaction(action.session_id)
+            if has_new_output:
+                _reset_terminal_empty_read_streak_impl(self, action.session_id)
+            elif (
+                mode == 'delta'
+                and TERMINAL_EMPTY_READ_CLOSE_THRESHOLD > 0
+            ):
+                streak = _bump_terminal_empty_read_streak_impl(
+                    self, action.session_id
+                )
+                if streak >= TERMINAL_EMPTY_READ_CLOSE_THRESHOLD:
+                    self.session_manager.close_session(action.session_id)
+                    self._clear_terminal_read_cursor(action.session_id)
+                    _reset_terminal_empty_read_streak_impl(self, action.session_id)
+                    return ErrorObservation(
+                        content=(
+                            f'TERMINAL_SESSION_CLOSED: session "{action.session_id}" '
+                            f'produced no new output for {streak} consecutive '
+                            'terminal_read calls and was closed to prevent a ghost '
+                            'session loop. Open a new terminal session or use '
+                            'execute_powershell for one-shot commands.'
+                        ),
+                        error_id='TERMINAL_EMPTY_READ_STREAK',
+                    )
             empty_hints = self._terminal_read_empty_hints(
                 mode=mode, has_new_output=has_new_output
             )

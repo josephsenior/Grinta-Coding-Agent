@@ -21,7 +21,7 @@ from backend.engine.tools.ignore_filter import (
     is_ignored_file,
     prune_ignored_dirs,
 )
-from backend.ledger.action import AgentThinkAction
+from backend.ledger.observation.search import GlobObservation, GrepObservation
 from backend.utils.subprocess_bridge import run_bounded_subprocess_sync
 
 # Directories excluded from the file walker / ripgrep discovery.  Shared by
@@ -51,40 +51,10 @@ SEARCH_RG_EXCLUDED_DIRS: tuple[str, ...] = (
     '.git',
 )
 
-SEARCH_RESULTS_TAG = '[SEARCH_RESULTS]'
-
-_SEARCH_RESULTS_PAYLOAD_RE = re.compile(
-    r'\[SEARCH_RESULTS\]\s*(?P<payload>.*)',
-    re.DOTALL,
-)
-
-
-def extract_search_results_payload(thought: str) -> str:
-    """Return the payload after ``[SEARCH_RESULTS]`` anywhere in *thought*."""
-    text = thought or ''
-    match = _SEARCH_RESULTS_PAYLOAD_RE.search(text)
-    if match is not None:
-        return match.group('payload').strip()
-    return text.strip()
-
-
 DEFAULT_SEARCH_HEAD_LIMIT = 200
 MAX_SEARCH_HEAD_LIMIT = 1000
 GREP_OUTPUT_MODES = frozenset({'content', 'files_with_matches', 'count'})
 DEFAULT_GREP_OUTPUT_MODE = 'files_with_matches'
-
-
-def search_results_action(content: str, *, source_tool: str) -> AgentThinkAction:
-    """Wrap ``content`` in the standard search payload envelope."""
-    return AgentThinkAction(
-        source_tool=source_tool,
-        thought=f'{SEARCH_RESULTS_TAG}\n{content}',
-    )
-
-
-def search_error_action(message: str, *, source_tool: str) -> AgentThinkAction:
-    """Return an error message in the same envelope so renderers treat it uniformly."""
-    return search_results_action(message, source_tool=source_tool)
 
 
 def should_prefix_hidden_file_pattern(file_pattern: str) -> bool:
@@ -112,21 +82,91 @@ def compile_search_regex(
     pattern: str,
     *,
     is_case_sensitive: bool,
-    source_tool: str,
+    source_tool: str = '',
     invalid_hint: str | None = None,
-) -> tuple[re.Pattern[str] | None, AgentThinkAction | None]:
+) -> tuple[re.Pattern[str] | None, str | None]:
     if not pattern:
         return None, None
     flags = 0 if is_case_sensitive else re.IGNORECASE
     try:
         return re.compile(pattern, flags), None
     except re.error as exc:
-        hint = (
-            invalid_hint
-            if invalid_hint is not None
-            else f'Invalid regex in "pattern": {exc}.'
-        )
-        return None, search_error_action(hint, source_tool=source_tool)
+        if invalid_hint is not None:
+            hint = invalid_hint.replace('{exc}', str(exc))
+        else:
+            hint = f'Invalid regex in "pattern": {exc}.'
+        return None, hint
+
+
+def _count_grep_stats(lines: list[str], output_mode: str) -> tuple[int, int]:
+    """Return ``(match_count, file_count)`` from raw result lines."""
+    if not lines:
+        return 0, 0
+    if output_mode == 'files_with_matches':
+        count = len(lines)
+        return count, count
+    if output_mode == 'count':
+        total = 0
+        for line in lines:
+            if ':' in line:
+                try:
+                    total += int(line.rsplit(':', 1)[-1])
+                except ValueError:
+                    total += 1
+            else:
+                total += 1
+        return total, len(lines)
+    grouped: dict[str, int] = {}
+    for line in lines:
+        if ':' in line:
+            filepath = line.split(':', 1)[0]
+            grouped[filepath] = grouped.get(filepath, 0) + 1
+    if grouped:
+        return sum(grouped.values()), len(grouped)
+    return len(lines), 1
+
+
+def make_grep_observation(
+    *,
+    pattern: str,
+    path: str,
+    output_mode: str,
+    lines: list[str],
+    content: str,
+    error: str = '',
+) -> GrepObservation:
+    """Build a structured grep observation from execution output."""
+    match_count, file_count = _count_grep_stats(lines, output_mode)
+    return GrepObservation(
+        content=content,
+        pattern=pattern,
+        path=path,
+        output_mode=output_mode,
+        lines=lines,
+        match_count=match_count,
+        file_count=file_count,
+        error=error,
+    )
+
+
+def make_glob_observation(
+    *,
+    pattern: str,
+    path: str,
+    files: list[str],
+    content: str,
+    error: str = '',
+) -> GlobObservation:
+    """Build a structured glob observation from execution output."""
+    file_count = len(files)
+    return GlobObservation(
+        content=content,
+        pattern=pattern,
+        path=path,
+        files=files,
+        file_count=file_count,
+        error=error,
+    )
 
 
 def matches_search_file_pattern(
@@ -308,32 +348,6 @@ def build_ripgrep_count_args(
     return args
 
 
-def run_ripgrep_with_handler(
-    args_builder: Callable[[], list[str]],
-    *,
-    max_lines: int,
-    empty_message: str,
-    source_tool: str,
-) -> AgentThinkAction:
-    try:
-        result = run_ripgrep_command(args_builder())
-    except Exception as exc:
-        return search_error_action(f'Error running ripgrep: {exc}', source_tool=source_tool)
-    if getattr(result, 'timed_out', False):
-        return search_error_action(
-            'Search timed out after 30s',
-            source_tool=source_tool,
-        )
-    return search_results_action(
-        format_ripgrep_output(
-            result.stdout,
-            max_lines=max_lines,
-            empty_message=empty_message,
-        ),
-        source_tool=source_tool,
-    )
-
-
 def build_ripgrep_text_search_args(
     rg_path: str,
     *,
@@ -482,9 +496,7 @@ def has_ripgrep() -> str | None:
     return shutil.which('rg')
 
 
-def path_exists_or_error(path: str, *, source_tool: str) -> AgentThinkAction | None:
+def path_exists_error(path: str) -> str | None:
     if not os.path.exists(path):
-        return search_error_action(
-            f'Path does not exist: {path}', source_tool=source_tool
-        )
+        return f'Path does not exist: {path}'
     return None

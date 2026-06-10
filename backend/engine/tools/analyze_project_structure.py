@@ -30,7 +30,8 @@ from backend.engine.tools._aps_file_modes import (
 )
 from backend.engine.tools._aps_shared import _analyze_depth, _diag
 from backend.engine.tools._aps_tree import _build_symbols_action, _build_tree_action
-from backend.ledger.action import AgentThinkAction
+from backend.ledger.action.search import AnalyzeProjectStructureAction
+from backend.ledger.observation.search import AnalyzeProjectStructureObservation
 
 from backend.inference.tool_names import ANALYZE_PROJECT_STRUCTURE_TOOL_NAME
 
@@ -118,16 +119,30 @@ def create_analyze_project_structure_tool() -> dict:
 
 def build_analyze_project_structure_action(
     arguments: dict,
-) -> AgentThinkAction:
+) -> AnalyzeProjectStructureAction:
     """Build the action for the analyze_project_structure tool call."""
-    command = arguments.get('command', 'tree')
-    path = arguments.get('path', '.')
-    depth = _analyze_depth(arguments)
+    return AnalyzeProjectStructureAction(
+        command=str(arguments.get('command', 'tree') or 'tree'),
+        path=str(arguments.get('path', '.') or '.'),
+        symbol=str(arguments.get('symbol', '') or ''),
+        depth=_analyze_depth(arguments),
+        direction=str(arguments.get('direction', 'both') or 'both'),
+    )
+
+
+def execute_analyze_project_structure(
+    action: AnalyzeProjectStructureAction,
+) -> AnalyzeProjectStructureObservation:
+    """Execute an APS request and return a structured observation."""
+    command = action.command
+    path = action.path
+    depth = action.depth
 
     if command == 'callers':
-        if not (symbol := arguments.get('symbol', '')):
-            return AgentThinkAction(
-                thought=_diag(
+        if not action.symbol:
+            return _make_aps_observation(
+                action,
+                _diag(
                     reason="missing required parameter 'symbol'",
                     command='callers',
                     params={'path': path},
@@ -135,25 +150,29 @@ def build_analyze_project_structure_action(
                         "Re-call with symbol='<name>' (function or class to find references for).",
                         'Tip: pair with command=imports to first see what a file exports.',
                     ],
-                )
+                ),
             )
-        return _build_callers_action(symbol, path)
+        return _make_aps_observation(action, _build_callers_action(action.symbol, path))
 
     if command == 'semantic_search':
-        if not (symbol := arguments.get('symbol', '')):
-            return AgentThinkAction(
-                thought=_diag(
+        if not action.symbol:
+            return _make_aps_observation(
+                action,
+                _diag(
                     reason="missing required parameter 'symbol'",
                     command='semantic_search',
                     params={'path': path},
                     next_steps=[
                         "Re-call with symbol='<name>' to AST-search for references.",
                     ],
-                )
+                ),
             )
-        return _build_semantic_search_action(symbol, path)
+        return _make_aps_observation(
+            action,
+            _build_semantic_search_action(action.symbol, path),
+        )
 
-    handlers: dict[str, Callable[[], AgentThinkAction]] = {
+    handlers: dict[str, Callable[[], str]] = {
         'tree': lambda: _build_tree_action(path, depth),
         'imports': lambda: _build_imports_action(path),
         'symbols': lambda: _build_symbols_action(path),
@@ -162,15 +181,16 @@ def build_analyze_project_structure_action(
         'dependencies': lambda: _build_dependencies_action(
             path,
             depth=depth,
-            direction=str(arguments.get('direction', 'both') or 'both'),
+            direction=action.direction,
         ),
     }
 
     if command in handlers:
-        return handlers[command]()
+        return _make_aps_observation(action, handlers[command]())
 
-    return AgentThinkAction(
-        thought=_diag(
+    return _make_aps_observation(
+        action,
+        _diag(
             reason=f'unknown command {command!r}',
             command=command,
             params={'path': path, 'depth': depth},
@@ -180,3 +200,25 @@ def build_analyze_project_structure_action(
             ],
         )
     )
+
+
+def _make_aps_observation(
+    action: AnalyzeProjectStructureAction, content: str
+) -> AnalyzeProjectStructureObservation:
+    observation = AnalyzeProjectStructureObservation(
+        content=content,
+        command=action.command,
+        path=action.path,
+        symbol=action.symbol,
+        depth=action.depth,
+        direction=action.direction,
+    )
+    observation.tool_result = {
+        'tool': ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
+        'command': action.command,
+        'path': action.path,
+        'symbol': action.symbol,
+        'depth': action.depth,
+        'direction': action.direction,
+    }
+    return observation

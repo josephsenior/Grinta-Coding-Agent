@@ -73,6 +73,17 @@ def _ps1_block(payload: dict[str, str | int]) -> str:
 # ---------------------------------------------------------------------------
 
 
+class TestPwshPromptReady:
+    def test_detects_trailing_powershell_prompt(self) -> None:
+        session = PtyInteractiveShellSession(work_dir='.')
+        text = 'Windows PowerShell\r\nPS C:\\Users\\test>'
+        assert session._pwsh_prompt_ready(text)
+
+    def test_rejects_plain_command_output(self) -> None:
+        session = PtyInteractiveShellSession(work_dir='.')
+        assert not session._pwsh_prompt_ready('running tests...\n')
+
+
 class TestDefaultShellArgv:
     def test_returns_non_empty_list(self) -> None:
         argv = _default_shell_argv()

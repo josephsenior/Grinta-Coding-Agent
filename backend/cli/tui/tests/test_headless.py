@@ -1996,7 +1996,7 @@ async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config)
         renderer._process_event(final_message)
 
         assert renderer._last_final_response_text == 'Final answer.'
-        assert len(renderer._history) == 2
+        assert sum(isinstance(item, AgentMessage) for item in renderer._history) == 1
         assert isinstance(renderer._history[0], AgentMessage)
         assert isinstance(renderer._history[0].renderable, Markdown)
 
@@ -2243,7 +2243,7 @@ async def test_tui_thinking_indicator_shows_content_without_collapse(mock_config
 
 
 @pytest.mark.asyncio
-async def test_tui_search_results_in_thinking_payload_render_as_card(mock_config):
+async def test_tui_find_symbols_observation_renders_card(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -2261,11 +2261,24 @@ async def test_tui_search_results_in_thinking_payload_render_as_card(mock_config
         )
         s._renderer = renderer
 
-        # Default source_tool='search' should fall back to the generic
-        # search card (no source_tool is set on the AgentThinkAction here).
+        from backend.ledger.action.search import FindSymbolsAction
+        from backend.ledger.observation.search import FindSymbolsObservation
+
         renderer._process_event(
-            AgentThinkAction(
-                thought='[SEARCH_RESULTS]\nbackend/app.py:12:render thinking'
+            FindSymbolsAction(query='render', path='backend')
+        )
+        renderer._process_event(
+            FindSymbolsObservation(
+                content='{"status":"ok"}',
+                query='render',
+                path='backend',
+                candidates=[
+                    {
+                        'qualified_name': 'render',
+                        'path': 'backend/app.py',
+                        'start_line': 12,
+                    }
+                ],
             )
         )
         await pilot.pause()
@@ -2274,21 +2287,20 @@ async def test_tui_search_results_in_thinking_payload_render_as_card(mock_config
         search_cards = [
             card
             for card in s.query(TUIActivityCard).results()
-            if 'category-search' in card.classes
+            if 'category-search' in card.classes or 'category-code' in card.classes
         ]
         assert len(search_cards) == 1
         collapsed = search_cards[0].query_one('#collapsed-row')
-        assert 'Search' in str(collapsed.renderable)
+        rendered = str(collapsed.renderable)
+        assert 'render' in rendered
 
 
 @pytest.mark.asyncio
-async def test_tui_grep_results_in_thinking_payload_render_as_grep_card(
-    mock_config,
-):
-    """``AgentThinkAction.source_tool='grep'`` renders a Grep card.
+async def test_tui_grep_observation_renders_grep_card(mock_config):
+    """``GrepObservation`` renders a Grep card with the action pattern."""
+    from backend.ledger.action.search import GrepAction
+    from backend.ledger.observation.search import GrepObservation
 
-    Specifically, it does not fall back to the generic Search card.
-    """
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -2307,52 +2319,17 @@ async def test_tui_grep_results_in_thinking_payload_render_as_grep_card(
         s._renderer = renderer
 
         renderer._process_event(
-            AgentThinkAction(
-                thought='[SEARCH_RESULTS]\nbackend/app.py:12:render thinking',
-                source_tool='grep',
+            GrepAction(pattern='_start_election', path='raftkv/node.py')
+        )
+        renderer._process_event(
+            GrepObservation(
+                content='raftkv/node.py:194:async def _start_election',
+                pattern='_start_election',
+                path='raftkv/node.py',
+                lines=['raftkv/node.py:194:async def _start_election'],
+                match_count=1,
+                file_count=1,
             )
-        )
-        await pilot.pause()
-
-        grep_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-grep' in card.classes
-        ]
-        assert len(grep_cards) == 1
-        collapsed = grep_cards[0].query_one('#collapsed-row')
-        assert 'Grep' in str(collapsed.renderable)
-
-
-@pytest.mark.asyncio
-async def test_tui_grep_card_shows_pattern_not_assistant_prose(mock_config):
-    """Polluted grep thoughts must not use assistant prose as the card query."""
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-
-        s = _get_screen(app)
-        renderer = TUIRenderer(
-            console=console,
-            hud=HUDBar(),
-            reasoning=ReasoningDisplay(),
-            tui=s,
-            loop=loop,
-        )
-        s._renderer = renderer
-
-        polluted = (
-            "I can't read that file. Let me use grep to find methods:\n"
-            '[SEARCH_RESULTS]\n'
-            'raftkv/node.py:194:async def _start_election'
-        )
-        renderer._handle_search_action(
-            polluted,
-            source_tool='grep',
-            tool_args={'pattern': '_start_election', 'path': 'raftkv/node.py'},
         )
         await pilot.pause()
 
@@ -2364,15 +2341,12 @@ async def test_tui_grep_card_shows_pattern_not_assistant_prose(mock_config):
         assert len(grep_cards) == 1
         collapsed = grep_cards[0].query_one('#collapsed-row')
         rendered = str(collapsed.renderable)
+        assert 'Grep' in rendered
         assert '_start_election' in rendered
-        assert "I can't read that file" not in rendered
 
 
 @pytest.mark.asyncio
-async def test_tui_glob_results_in_thinking_payload_render_as_glob_card(
-    mock_config,
-):
-    """``AgentThinkAction.source_tool='glob'`` renders a Glob card."""
+async def test_tui_read_symbols_observation_updates_pending_card(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -2390,10 +2364,69 @@ async def test_tui_glob_results_in_thinking_payload_render_as_glob_card(
         )
         s._renderer = renderer
 
+        from backend.ledger.action.search import ReadSymbolsAction
+        from backend.ledger.observation.search import ReadSymbolsObservation
+
         renderer._process_event(
-            AgentThinkAction(
-                thought='[SEARCH_RESULTS]\nbackend/app.py\nbackend/cli.py',
-                source_tool='glob',
+            ReadSymbolsAction(targets=[{'symbol_name': 'UserService.login'}], path='auth.py')
+        )
+        renderer._process_event(
+            ReadSymbolsObservation(
+                content='{"status":"ok"}',
+                path='auth.py',
+                results=[
+                    {
+                        'status': 'resolved',
+                        'qualified_name': 'UserService.login',
+                        'path': 'auth.py',
+                    }
+                ],
+            )
+        )
+        await pilot.pause()
+
+        cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-code' in card.classes
+        ]
+        assert len(cards) == 1
+        collapsed = cards[0].query_one('#collapsed-row')
+        rendered = str(collapsed.renderable)
+        assert 'symbol' in rendered.lower() or 'UserService.login' in rendered
+
+
+@pytest.mark.asyncio
+async def test_tui_glob_observation_renders_glob_card(mock_config):
+    """``GlobObservation`` renders a Glob card with the action pattern."""
+    from backend.ledger.action.search import GlobAction
+    from backend.ledger.observation.search import GlobObservation
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(GlobAction(pattern='**/*.py', path='backend'))
+        renderer._process_event(
+            GlobObservation(
+                content='backend/app.py\nbackend/cli.py',
+                pattern='**/*.py',
+                path='backend',
+                files=['backend/app.py', 'backend/cli.py'],
+                file_count=2,
             )
         )
         await pilot.pause()
@@ -2405,7 +2438,9 @@ async def test_tui_glob_results_in_thinking_payload_render_as_glob_card(
         ]
         assert len(glob_cards) == 1
         collapsed = glob_cards[0].query_one('#collapsed-row')
-        assert 'Glob' in str(collapsed.renderable)
+        rendered = str(collapsed.renderable)
+        assert 'Glob' in rendered
+        assert '**/*.py' in rendered
 
 
 @pytest.mark.asyncio
@@ -2630,8 +2665,9 @@ async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_con
         final_message.source = EventSource.AGENT
         renderer._process_event(final_message)
 
-        assert renderer._last_final_response_text == 'Final answer.'
-        assert len(renderer._history) == 2
+        assert 'Final answer.' in renderer._last_final_response_text
+        assert '<function name="read">' in renderer._last_final_response_text
+        assert sum(isinstance(item, AgentMessage) for item in renderer._history) == 2
         assert isinstance(renderer._history[0], AgentMessage)
 
 

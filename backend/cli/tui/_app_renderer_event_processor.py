@@ -45,6 +45,7 @@ from backend.cli.tui._app_helpers import (
 )
 from backend.cli.tui._app_renderer_event_classify import _is_full_autonomy
 from backend.ledger.action import (
+    AnalyzeProjectStructureAction,
     AgentThinkAction,
     BrowseInteractiveAction,
     BrowserToolAction,
@@ -59,7 +60,10 @@ from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
     FileWriteAction,
+    FindSymbolsAction,
     InformAction,
+    GlobAction,
+    GrepAction,
     LspQueryAction,
     MCPAction,
     MessageAction,
@@ -72,8 +76,10 @@ from backend.ledger.action import (
     TerminalReadAction,
     TerminalRunAction,
     UncertaintyAction,
+    ReadSymbolsAction,
 )
 from backend.ledger.observation import (
+    AnalyzeProjectStructureObservation,
     AgentCondensationObservation,
     AgentStateChangedObservation,
     AgentThinkObservation,
@@ -85,6 +91,9 @@ from backend.ledger.observation import (
     FileEditObservation,
     FileReadObservation,
     FileWriteObservation,
+    FindSymbolsObservation,
+    GlobObservation,
+    GrepObservation,
     LspQueryObservation,
     MCPObservation,
     NullObservation,
@@ -96,6 +105,7 @@ from backend.ledger.observation import (
     TaskTrackingObservation,
     TerminalObservation,
     UserRejectObservation,
+    ReadSymbolsObservation,
 )
 
 if TYPE_CHECKING:
@@ -787,6 +797,32 @@ def _handle_browser_screenshot_observation(
         orch._write_card(card)
 
 
+def _handle_grep_action(
+    orch: '_AppRendererEventProcessorMixin', event: GrepAction
+) -> None:
+    card = ActivityRenderer.search_results(
+        query=event.pattern or 'code search',
+        scope=event.path or '',
+        source_tool='grep',
+    )
+    widget = orch._write_card(card)
+    orch._pending_search_card = widget
+    orch._pending_search_tool = 'grep'
+
+
+def _handle_glob_action(
+    orch: '_AppRendererEventProcessorMixin', event: GlobAction
+) -> None:
+    card = ActivityRenderer.search_results(
+        query=event.pattern or 'file listing',
+        scope=event.path or '',
+        source_tool='glob',
+    )
+    widget = orch._write_card(card)
+    orch._pending_search_card = widget
+    orch._pending_search_tool = 'glob'
+
+
 def _handle_lsp_query_action(
     orch: '_AppRendererEventProcessorMixin', event: LspQueryAction
 ) -> None:
@@ -825,6 +861,47 @@ def _update_or_write_lsp_card(
         orch._write_card(card)
 
 
+def _handle_grep_observation(
+    orch: '_AppRendererEventProcessorMixin', event: GrepObservation
+) -> None:
+    from backend.cli._tool_display.renderers.search import extract_file_summary
+
+    content = event.error or event.content or ''
+    match_count, file_count, file_list = extract_file_summary(content)
+    result_lines = [line for line in event.lines if line.strip()]
+    if not result_lines and content:
+        result_lines = [line for line in content.splitlines() if line.strip()]
+    orch._render_search_card(
+        query=event.pattern or 'code search',
+        content=content,
+        match_count=match_count or event.match_count,
+        file_count=file_count or event.file_count,
+        file_list=file_list,
+        result_lines=result_lines,
+        source_tool='grep',
+        scope=event.path or '',
+        pending_attr='_pending_search_card' if orch._pending_search_tool == 'grep' else None,
+    )
+
+
+def _handle_glob_observation(
+    orch: '_AppRendererEventProcessorMixin', event: GlobObservation
+) -> None:
+    content = event.error or event.content or ''
+    files = event.files or [line for line in content.splitlines() if line.strip()]
+    orch._render_search_card(
+        query=event.pattern or 'file listing',
+        content=content,
+        match_count=0,
+        file_count=event.file_count or len(files),
+        file_list=[(path, 1) for path in files[:5]],
+        result_lines=files,
+        source_tool='glob',
+        scope=event.path or '',
+        pending_attr='_pending_search_card' if orch._pending_search_tool == 'glob' else None,
+    )
+
+
 def _handle_lsp_query_observation(
     orch: '_AppRendererEventProcessorMixin', event: LspQueryObservation
 ) -> None:
@@ -836,6 +913,161 @@ def _handle_lsp_query_observation(
     )
     preview = _build_lsp_preview(content)
     _update_or_write_lsp_card(orch, card, symbol, available, preview)
+
+
+def _search_file_list_from_paths(paths: list[str]) -> list[tuple[str, int]]:
+    counts: dict[str, int] = {}
+    for path in paths:
+        if path:
+            counts[path] = counts.get(path, 0) + 1
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:5]
+
+
+def _find_symbols_result_lines(
+    event: FindSymbolsObservation,
+) -> tuple[list[str], list[tuple[str, int]]]:
+    result_lines: list[str] = []
+    paths: list[str] = []
+    for candidate in event.candidates:
+        path = str(candidate.get('path') or '').strip()
+        start_line = candidate.get('start_line')
+        qualified_name = str(
+            candidate.get('qualified_name') or candidate.get('name') or ''
+        ).strip()
+        if path and start_line:
+            result_lines.append(f'{path}:{start_line}:{qualified_name}')
+            paths.append(path)
+        elif qualified_name:
+            result_lines.append(qualified_name)
+    return result_lines, _search_file_list_from_paths(paths)
+
+
+def _handle_find_symbols_action(
+    orch: '_AppRendererEventProcessorMixin', event: FindSymbolsAction
+) -> None:
+    card = ActivityRenderer.search_results(
+        query=event.query or 'symbol search',
+        scope=event.path or '',
+        source_tool='search',
+    )
+    widget = orch._write_card(card)
+    orch._pending_find_symbols_card = widget
+
+
+def _handle_find_symbols_observation(
+    orch: '_AppRendererEventProcessorMixin', event: FindSymbolsObservation
+) -> None:
+    content = event.error or event.content or ''
+    result_lines, file_list = _find_symbols_result_lines(event)
+    all_paths = {
+        str(candidate.get('path') or '').strip()
+        for candidate in event.candidates
+        if str(candidate.get('path') or '').strip()
+    }
+    orch._render_search_card(
+        query=event.query or 'symbol search',
+        content=content,
+        match_count=len(event.candidates),
+        file_count=len(all_paths),
+        file_list=file_list,
+        result_lines=result_lines,
+        source_tool='search',
+        scope=event.path or '',
+        pending_attr='_pending_find_symbols_card',
+    )
+
+
+def _handle_read_symbols_action(
+    orch: '_AppRendererEventProcessorMixin', event: ReadSymbolsAction
+) -> None:
+    label = f'{len(event.targets)} symbol{"s" if len(event.targets) != 1 else ""}'
+    card = ActivityRenderer.lsp_query(label)
+    widget = orch._write_card(card)
+    orch._pending_read_symbols_card = widget
+
+
+def _read_symbols_preview(event: ReadSymbolsObservation) -> str:
+    statuses: dict[str, int] = {}
+    lines: list[str] = []
+    for item in event.results:
+        status = str(item.get('status') or 'unknown')
+        statuses[status] = statuses.get(status, 0) + 1
+        target = str(
+            item.get('qualified_name')
+            or item.get('symbol_name')
+            or item.get('target')
+            or item.get('name')
+            or ''
+        ).strip()
+        path = str(item.get('path') or '').strip()
+        if target and path:
+            lines.append(f'{status}: {target} ({path})')
+        elif target:
+            lines.append(f'{status}: {target}')
+    summary = ', '.join(
+        f'{count} {status}' for status, count in sorted(statuses.items())
+    )
+    if lines:
+        return '\n'.join(([summary] if summary else []) + lines[:4])
+    return summary or (event.error or event.content or '')
+
+
+def _handle_read_symbols_observation(
+    orch: '_AppRendererEventProcessorMixin', event: ReadSymbolsObservation
+) -> None:
+    preview = _read_symbols_preview(event)
+    card = ActivityRenderer.lsp_query(
+        f'{len(event.results)} symbol{"s" if len(event.results) != 1 else ""}',
+        result=preview,
+        available=not bool(event.error),
+    )
+    pending = orch._pending_read_symbols_card
+    if pending is not None:
+        orch._update_activity_card_outcome(
+            pending,
+            status='err' if event.error else 'ok',
+            outcome=card.secondary or 'completed',
+            extra_content=_build_lsp_preview(preview),
+            operation_label=f'Read {len(event.results)} symbol{"s" if len(event.results) != 1 else ""}',
+        )
+        orch._pending_read_symbols_card = None
+    else:
+        orch._write_card(card)
+
+
+def _handle_analyze_project_structure_action(
+    orch: '_AppRendererEventProcessorMixin', event: AnalyzeProjectStructureAction
+) -> None:
+    card = ActivityRenderer.lsp_query(
+        f'{event.command} {event.path}'.strip() or 'project structure'
+    )
+    widget = orch._write_card(card)
+    orch._pending_analyze_project_structure_card = widget
+
+
+def _handle_analyze_project_structure_observation(
+    orch: '_AppRendererEventProcessorMixin',
+    event: AnalyzeProjectStructureObservation,
+) -> None:
+    content = (event.error or event.content or '').strip()
+    preview = _build_lsp_preview(content)
+    card = ActivityRenderer.lsp_query(
+        f'{event.command} {event.path}'.strip() or 'project structure',
+        result=content,
+        available=not bool(event.error),
+    )
+    pending = orch._pending_analyze_project_structure_card
+    if pending is not None:
+        orch._update_activity_card_outcome(
+            pending,
+            status='err' if event.error else 'ok',
+            outcome=card.secondary or 'completed',
+            extra_content=preview,
+            operation_label=f'Analyzed {event.command}'.strip(),
+        )
+        orch._pending_analyze_project_structure_card = None
+    else:
+        orch._write_card(card)
 
 
 def _handle_terminal_run_action(
@@ -1101,6 +1333,11 @@ _TOOL_EXECUTION_TYPES = (
     MCPAction,
     BrowserToolAction,
     BrowseInteractiveAction,
+    GrepAction,
+    GlobAction,
+    FindSymbolsAction,
+    ReadSymbolsAction,
+    AnalyzeProjectStructureAction,
     LspQueryAction,
     TerminalRunAction,
     TerminalInputAction,
@@ -1310,7 +1547,17 @@ _EVENT_HANDLERS: dict[type, Any] = {
     BrowserToolAction: _handle_browser_tool_action,
     BrowseInteractiveAction: _handle_browse_interactive_action,
     BrowserScreenshotObservation: _handle_browser_screenshot_observation,
+    GrepAction: _handle_grep_action,
+    GlobAction: _handle_glob_action,
+    FindSymbolsAction: _handle_find_symbols_action,
+    ReadSymbolsAction: _handle_read_symbols_action,
+    AnalyzeProjectStructureAction: _handle_analyze_project_structure_action,
     LspQueryAction: _handle_lsp_query_action,
+    GrepObservation: _handle_grep_observation,
+    GlobObservation: _handle_glob_observation,
+    FindSymbolsObservation: _handle_find_symbols_observation,
+    ReadSymbolsObservation: _handle_read_symbols_observation,
+    AnalyzeProjectStructureObservation: _handle_analyze_project_structure_observation,
     LspQueryObservation: _handle_lsp_query_observation,
     TerminalRunAction: _handle_terminal_run_action,
     TerminalInputAction: _handle_terminal_input_action,

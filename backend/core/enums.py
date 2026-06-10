@@ -96,6 +96,17 @@ class ActionType(str, Enum):
     DELEGATE_TASK = 'delegate_task'
     BLACKBOARD = 'blackboard'
     LSP_QUERY = 'lsp_query'
+    GREP = 'grep'
+    GLOB = 'glob'
+    FIND_SYMBOLS = 'find_symbols'
+    READ_SYMBOLS = 'read_symbols'
+    ANALYZE_PROJECT_STRUCTURE = 'analyze_project_structure'
+    CHECKPOINT = 'checkpoint'
+    WORKING_MEMORY = 'working_memory'
+    MEMORY_PERSIST = 'memory_persist'
+    MEMORY_RECALL = 'memory_recall'
+    SCRATCHPAD_NOTE = 'scratchpad_note'
+    SCRATCHPAD_RECALL = 'scratchpad_recall'
 
 
 class LifecyclePhase(str, Enum):
@@ -159,6 +170,17 @@ class ObservationType(str, Enum):
     DEBUGGER = 'debugger'
     DELEGATE_TASK_RESULT = 'delegate_task_result'
     LSP_QUERY_RESULT = 'lsp_query_result'
+    GREP_RESULT = 'grep_result'
+    GLOB_RESULT = 'glob_result'
+    FIND_SYMBOLS_RESULT = 'find_symbols_result'
+    READ_SYMBOLS_RESULT = 'read_symbols_result'
+    ANALYZE_PROJECT_STRUCTURE_RESULT = 'analyze_project_structure_result'
+    CHECKPOINT_RESULT = 'checkpoint_result'
+    WORKING_MEMORY_RESULT = 'working_memory_result'
+    MEMORY_PERSIST_RESULT = 'memory_persist_result'
+    MEMORY_RECALL_RESULT = 'memory_recall_result'
+    SCRATCHPAD_NOTE_RESULT = 'scratchpad_note_result'
+    SCRATCHPAD_RECALL_RESULT = 'scratchpad_recall_result'
 
 
 class ExitReason(str, Enum):

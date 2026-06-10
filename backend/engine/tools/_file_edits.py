@@ -50,8 +50,11 @@ from backend.ledger.action import (
     AgentThinkAction,
     FileEditAction,
     FileReadAction,
+    FindSymbolsAction,
     MessageAction,
+    ReadSymbolsAction,
 )
+from backend.ledger.observation import FindSymbolsObservation, ReadSymbolsObservation
 
 
 def _build_create_file_action(path: str, arguments: Mapping[str, Any]) -> Action:
@@ -359,27 +362,73 @@ def _coerce_read_symbol_targets(
     )
 
 
-def _handle_read_symbols_public(arguments: Mapping[str, Any]) -> AgentThinkAction:
-    raw_path = str(arguments.get('path') or '').strip()
-    symbol_kind = cast(str | None, arguments.get('symbol_kind'))
-    targets = _coerce_read_symbol_targets(arguments)
+def _build_read_symbols_payload(action: ReadSymbolsAction) -> dict[str, Any]:
+    raw_path = action.path.strip()
+    symbol_kind = action.symbol_kind or None
     results = [
         _resolve_read_symbol_target(
             target,
             default_path=raw_path or None,
             default_symbol_kind=symbol_kind,
         )
-        for target in targets
+        for target in action.targets
     ]
-    payload = {
+    return {
         'type': 'symbols',
         'status': 'ok',
         'results': results,
     }
-    return AgentThinkAction(thought='[READ]\n' + json.dumps(payload, indent=2))
 
 
-def _handle_find_symbols_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
+def execute_read_symbols(action: ReadSymbolsAction) -> ReadSymbolsObservation:
+    payload = _build_read_symbols_payload(action)
+    observation = ReadSymbolsObservation(
+        content=json.dumps(payload, indent=2),
+        path=action.path,
+        symbol_kind=action.symbol_kind,
+        results=payload['results'],
+    )
+    observation.tool_result = dict(payload)
+    return observation
+
+
+def _handle_read_symbols_public(arguments: Mapping[str, Any]) -> ReadSymbolsAction:
+    raw_path = str(arguments.get('path') or '').strip()
+    symbol_kind = cast(str | None, arguments.get('symbol_kind'))
+    targets = _coerce_read_symbol_targets(arguments)
+    return ReadSymbolsAction(
+        targets=[dict(target) for target in targets],
+        path=raw_path,
+        symbol_kind=symbol_kind or '',
+    )
+
+
+def execute_find_symbols(action: FindSymbolsAction) -> FindSymbolsObservation:
+    candidates = _find_symbol_candidates(
+        action.query,
+        path=action.path or None,
+        symbol_kind=action.symbol_kind or None,
+        include_private=action.include_private,
+    )
+    payload = {
+        'type': 'symbols',
+        'status': 'ok',
+        'query': action.query,
+        'candidates': candidates,
+    }
+    observation = FindSymbolsObservation(
+        content=json.dumps(payload, indent=2),
+        query=action.query,
+        path=action.path,
+        symbol_kind=action.symbol_kind,
+        include_private=action.include_private,
+        candidates=candidates,
+    )
+    observation.tool_result = dict(payload)
+    return observation
+
+
+def _handle_find_symbols_tool(arguments: Mapping[str, Any]) -> FindSymbolsAction:
     query = str(
         require_tool_argument(arguments, 'query', FIND_SYMBOLS_TOOL_NAME)
     ).strip()
@@ -388,20 +437,12 @@ def _handle_find_symbols_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     raw_path = str(arguments.get('path') or '').strip()
     symbol_kind = cast(str | None, arguments.get('symbol_kind'))
     include_private = parse_bool_argument(arguments.get('include_private', False))
-
-    candidates = _find_symbol_candidates(
-        query,
-        path=raw_path or None,
-        symbol_kind=symbol_kind,
+    return FindSymbolsAction(
+        query=query,
+        path=raw_path,
+        symbol_kind=symbol_kind or '',
         include_private=include_private,
     )
-    payload = {
-        'type': 'symbols',
-        'status': 'ok',
-        'query': query,
-        'candidates': candidates,
-    }
-    return AgentThinkAction(thought='[FIND_SYMBOLS]\n' + json.dumps(payload, indent=2))
 
 
 def _handle_read_tool(arguments: Mapping[str, Any]) -> Action:

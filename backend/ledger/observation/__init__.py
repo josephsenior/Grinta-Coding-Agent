@@ -11,6 +11,13 @@ from backend.ledger.observation.agent import (
 )
 from backend.ledger.observation.browser_screenshot import BrowserScreenshotObservation
 from backend.ledger.observation.code_nav import LspQueryObservation
+from backend.ledger.observation.search import (
+    AnalyzeProjectStructureObservation,
+    FindSymbolsObservation,
+    GlobObservation,
+    GrepObservation,
+    ReadSymbolsObservation,
+)
 from backend.ledger.observation.commands import (
     CmdOutputMetadata,
     CmdOutputObservation,
@@ -40,6 +47,14 @@ from backend.ledger.observation.server import ServerReadyObservation
 from backend.ledger.observation.status import StatusObservation
 from backend.ledger.observation.success import SuccessObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
+from backend.ledger.observation.memory_tools import (
+    CheckpointObservation,
+    MemoryPersistObservation,
+    MemoryRecallObservation,
+    ScratchpadNoteObservation,
+    ScratchpadRecallObservation,
+    WorkingMemoryObservation,
+)
 from backend.ledger.observation.terminal import TerminalObservation
 
 __all__ = [
@@ -48,10 +63,16 @@ __all__ = [
     'AgentThinkObservation',
     'BrowserScreenshotObservation',
     'CmdOutputMetadata',
+    'CheckpointObservation',
     'CmdOutputObservation',
     'DebuggerObservation',
     'DelegateTaskObservation',
     'LspQueryObservation',
+    'GrepObservation',
+    'GlobObservation',
+    'FindSymbolsObservation',
+    'ReadSymbolsObservation',
+    'AnalyzeProjectStructureObservation',
     'ERROR_CATEGORY_AUTH',
     'ERROR_CATEGORY_CONTEXT_WINDOW',
     'ERROR_CATEGORY_MODEL_NOT_FOUND',
@@ -64,11 +85,15 @@ __all__ = [
     'FileEditObservation',
     'FileReadObservation',
     'FileWriteObservation',
+    'MemoryPersistObservation',
+    'MemoryRecallObservation',
     'MCPObservation',
     'NullObservation',
     'Observation',
     'RecallFailureObservation',
     'RecallObservation',
+    'ScratchpadNoteObservation',
+    'ScratchpadRecallObservation',
     'RecallType',
     'ServerReadyObservation',
     'StatusObservation',
@@ -76,4 +101,5 @@ __all__ = [
     'TaskTrackingObservation',
     'TerminalObservation',
     'UserRejectObservation',
+    'WorkingMemoryObservation',
 ]

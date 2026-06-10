@@ -24,6 +24,13 @@ from backend.ledger.action.agent import (
 from backend.ledger.action.browse import BrowseInteractiveAction
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
+from backend.ledger.action.search import (
+    AnalyzeProjectStructureAction,
+    FindSymbolsAction,
+    GlobAction,
+    GrepAction,
+    ReadSymbolsAction,
+)
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.debugger import DebuggerAction, is_debugger_action
 from backend.ledger.action.empty import NullAction
@@ -37,6 +44,14 @@ from backend.ledger.action.message import (
     MessageAction,
     StreamingChunkAction,
     SystemMessageAction,
+)
+from backend.ledger.action.memory_tools import (
+    CheckpointAction,
+    MemoryPersistAction,
+    MemoryRecallAction,
+    ScratchpadNoteAction,
+    ScratchpadRecallAction,
+    WorkingMemoryAction,
 )
 from backend.ledger.action.terminal import (
     TerminalInputAction,
@@ -52,6 +67,7 @@ __all__ = [
     'AgentThinkAction',
     'BlackboardAction',
     'ChangeAgentStateAction',
+    'CheckpointAction',
     'ClarificationRequestAction',
     'CmdRunAction',
     'CondensationAction',
@@ -68,11 +84,20 @@ __all__ = [
     'FileWriteAction',
     'InformAction',
     'LspQueryAction',
+    'GrepAction',
+    'GlobAction',
+    'FindSymbolsAction',
+    'ReadSymbolsAction',
+    'AnalyzeProjectStructureAction',
+    'MemoryPersistAction',
+    'MemoryRecallAction',
     'MCPAction',
     'MessageAction',
     'NullAction',
     'ProposalAction',
     'RecallAction',
+    'ScratchpadNoteAction',
+    'ScratchpadRecallAction',
     'StreamingChunkAction',
     'SystemMessageAction',
     'TaskTrackingAction',
@@ -80,4 +105,5 @@ __all__ = [
     'TerminalReadAction',
     'TerminalRunAction',
     'UncertaintyAction',
+    'WorkingMemoryAction',
 ]

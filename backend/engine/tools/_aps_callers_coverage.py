@@ -18,7 +18,6 @@ from backend.engine.tools.ignore_filter import (
     is_ignored_file,
     prune_ignored_dirs,
 )
-from backend.ledger.action import AgentThinkAction
 
 
 def _callers_lines_via_rg(symbol: str, safe_scope: str) -> list[str] | None:
@@ -106,7 +105,7 @@ def _callers_lines_via_walk(
     return lines, count
 
 
-def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
+def _build_callers_action(symbol: str, scope: str) -> str:
     """Find all files that reference a given symbol (function, class, variable)."""
     trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
     out = [f'=== CALLERS OF {trunc_sym} ===']
@@ -115,7 +114,7 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
     rg_lines = _callers_lines_via_rg(symbol, safe_scope)
     if rg_lines is not None:
         out.extend(rg_lines)
-        return AgentThinkAction(thought='\n'.join(out))
+        return '\n'.join(out)
 
     walk_lines, count = _callers_lines_via_walk(
         symbol=symbol,
@@ -135,4 +134,4 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
                 ],
             )
         )
-    return AgentThinkAction(thought='\n'.join(out))
+    return '\n'.join(out)

@@ -242,3 +242,22 @@ class OrchestrationContext:
             cancellation_service.cancel_last_registered()
         except Exception:
             pass
+
+    def close_hung_terminal_sessions(self) -> None:
+        """Close interactive ``terminal_*`` PTY sessions after a terminal timeout."""
+        try:
+            runtime = getattr(self._controller, 'runtime', None)
+            if runtime is None:
+                return
+            executor = getattr(runtime, '_executor', None)
+            if executor is None:
+                executor = runtime
+            if executor is None:
+                return
+            from backend.execution.action_execution_server_helpers import (
+                close_interactive_terminal_sessions,
+            )
+
+            close_interactive_terminal_sessions(executor)
+        except Exception:
+            pass

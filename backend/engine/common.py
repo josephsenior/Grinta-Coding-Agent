@@ -355,11 +355,17 @@ def process_tool_calls(
         action = create_action_fn(tool_call, arguments)
 
         # Attach thinking tokens to first tool call only when the model emitted them.
-        # Search tools use a structured [SEARCH_RESULTS] envelope — assistant prose
-        # belongs in transcript_only MessageAction, not inside the payload.
+        # Runnable discovery tools carry structured fields on their Action type;
+        # assistant prose belongs in transcript_only MessageAction, not action.thought.
         if i == 0 and thought:
             fn_name = _tool_call_function_name(tool_call)
-            if fn_name not in {'grep', 'glob'}:
+            if fn_name not in {
+                'grep',
+                'glob',
+                'find_symbols',
+                'read',
+                'analyze_project_structure',
+            }:
                 action = combine_thought_fn(action, thought)
 
         # Add tool call metadata

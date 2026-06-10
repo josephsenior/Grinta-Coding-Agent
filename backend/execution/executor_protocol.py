@@ -23,6 +23,13 @@ from backend.ledger.action import (
     FileWriteAction,
     LspQueryAction,
 )
+from backend.ledger.action.search import (
+    AnalyzeProjectStructureAction,
+    FindSymbolsAction,
+    GlobAction,
+    GrepAction,
+    ReadSymbolsAction,
+)
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
@@ -82,6 +89,18 @@ class RuntimeExecutorProtocol(Protocol):
     async def edit(self, action: FileEditAction) -> Observation: ...
 
     async def lsp_query(self, action: LspQueryAction) -> Observation: ...
+
+    async def grep(self, action: GrepAction) -> Observation: ...
+
+    async def glob(self, action: GlobAction) -> Observation: ...
+
+    async def find_symbols(self, action: FindSymbolsAction) -> Observation: ...
+
+    async def read_symbols(self, action: ReadSymbolsAction) -> Observation: ...
+
+    async def analyze_project_structure(
+        self, action: AnalyzeProjectStructureAction
+    ) -> Observation: ...
 
     async def terminal_run(self, action: TerminalRunAction) -> Observation: ...
 

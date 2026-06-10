@@ -712,6 +712,46 @@ def clear_terminal_read_cursor(executor: Any, session_id: str) -> None:
     executor._terminal_read_cursor.pop(session_id, None)
 
 
+def reset_terminal_empty_read_streak(executor: Any, session_id: str) -> None:
+    executor._terminal_empty_read_streak.pop(session_id, None)
+
+
+def bump_terminal_empty_read_streak(executor: Any, session_id: str) -> int:
+    streak = int(executor._terminal_empty_read_streak.get(session_id, 0)) + 1
+    executor._terminal_empty_read_streak[session_id] = streak
+    return streak
+
+
+def close_interactive_terminal_sessions(executor: Any) -> list[str]:
+    """Close non-default interactive terminal sessions (best-effort)."""
+    session_manager = getattr(executor, 'session_manager', None)
+    if session_manager is None:
+        return []
+    closed: list[str] = []
+    for session_id in list(getattr(session_manager, 'sessions', {}).keys()):
+        if session_id == 'default':
+            continue
+        if not (
+            session_id.startswith('terminal_')
+            or session_id
+            in getattr(executor, '_terminal_sessions_awaiting_interaction', [])
+        ):
+            continue
+        try:
+            session_manager.close_session(session_id)
+        except Exception:
+            pass
+        clear_terminal_read_cursor(executor, session_id)
+        reset_terminal_empty_read_streak(executor, session_id)
+        pending = getattr(executor, '_terminal_sessions_awaiting_interaction', None)
+        if isinstance(pending, list) and session_id in pending:
+            executor._terminal_sessions_awaiting_interaction = [
+                sid for sid in pending if sid != session_id
+            ]
+        closed.append(session_id)
+    return closed
+
+
 def resolve_path(executor: Any, path: str, working_dir: str) -> str:
     return executor._resolve_workspace_file_path(path, working_dir)
 

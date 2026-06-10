@@ -22,7 +22,6 @@ from backend.engine.tools.ignore_filter import (
     is_ignored_file,
     prune_ignored_dirs,
 )
-from backend.ledger.action import AgentThinkAction
 
 _TREE_FILE_PRIORITY = {
     'README.md': 0,
@@ -157,16 +156,14 @@ def _append_tree_file_lines(
         )
 
 
-def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
+def _build_tree_action(path: str, depth: int) -> str:
     """Directory tree with file sizes, respecting .gitignore."""
     depth = max(1, min(depth, 5))
     root = os.path.abspath(path)
     spec = get_ignore_spec(root)
 
     if not os.path.exists(root):
-        return AgentThinkAction(
-            thought=f'[ANALYZE_PROJECT_STRUCTURE] Path not found: {path}'
-        )
+        return f'[ANALYZE_PROJECT_STRUCTURE] Path not found: {path}'
 
     git_files = _git_files_for_tree(root)
     use_git = len(git_files) > 0
@@ -229,10 +226,10 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
             max_files_per_dir=max_files_per_dir,
         )
 
-    return AgentThinkAction(thought='\n'.join(lines))
+    return '\n'.join(lines)
 
 
-def _build_symbols_action(path: str) -> AgentThinkAction:
+def _build_symbols_action(path: str) -> str:
     """List classes, functions, and top-level assignments in a file."""
     out = [f'=== SYMBOLS IN {os.path.basename(path)} ===']
     if os.path.isfile(path):
@@ -272,4 +269,4 @@ def _build_symbols_action(path: str) -> AgentThinkAction:
                 ],
             )
         )
-    return AgentThinkAction(thought='\n'.join(out))
+    return '\n'.join(out)

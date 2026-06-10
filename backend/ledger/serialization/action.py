@@ -27,6 +27,21 @@ from backend.ledger.action.agent import (
 )
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
+from backend.ledger.action.memory_tools import (
+    CheckpointAction,
+    MemoryPersistAction,
+    MemoryRecallAction,
+    ScratchpadNoteAction,
+    ScratchpadRecallAction,
+    WorkingMemoryAction,
+)
+from backend.ledger.action.search import (
+    AnalyzeProjectStructureAction,
+    FindSymbolsAction,
+    GlobAction,
+    GrepAction,
+    ReadSymbolsAction,
+)
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.action.empty import NullAction
@@ -73,6 +88,17 @@ actions = (
     DelegateTaskAction,
     BlackboardAction,
     LspQueryAction,
+    GrepAction,
+    GlobAction,
+    FindSymbolsAction,
+    ReadSymbolsAction,
+    AnalyzeProjectStructureAction,
+    CheckpointAction,
+    WorkingMemoryAction,
+    MemoryPersistAction,
+    MemoryRecallAction,
+    ScratchpadNoteAction,
+    ScratchpadRecallAction,
     BrowserToolAction,
     TerminalRunAction,
     TerminalInputAction,

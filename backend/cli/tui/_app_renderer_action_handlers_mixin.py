@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 from backend.cli._event_renderer.text_utils import (
+    sanitize_streaming_thinking_text,
     sanitize_visible_transcript_text,
 )
 from backend.cli._event_renderer.unified_renderer import (
@@ -58,74 +59,43 @@ class _AppRendererActionHandlersMixin:
             else:
                 self.clear_live_response()
 
-    def _handle_search_action(
+    def _render_search_card(
         self,
-        thought: str,
-        source_tool: str = 'search',
         *,
-        tool_args: dict | None = None,
+        query: str,
+        content: str,
+        match_count: int = 0,
+        file_count: int = 0,
+        file_list: list[tuple[str, int]] | None = None,
+        result_lines: list[str] | None = None,
+        source_tool: str = 'search',
+        scope: str = '',
+        pending_attr: str | None = None,
     ) -> None:
-        """Handle grep/glob action and render as a card.
-
-        ``source_tool`` is forwarded by :meth:`_render_thinking_payload`
-        from the originating ``AgentThinkAction.source_tool`` (``'grep'``
-        or ``'glob'``) so the renderer can pick the dedicated Grep/Glob
-        card instead of the generic Search card.
-        """
-        from backend.cli._tool_display.renderers.search import (
-            extract_file_summary,
-            extract_search_results_payload,
-            resolve_search_card_query,
-        )
-
-        content = extract_search_results_payload(thought)
-        if not content:
-            return
-
-        match_count, file_count, file_list = extract_file_summary(content)
-        lines = content.splitlines()
-        query = resolve_search_card_query(
-            thought=thought,
-            source_tool=source_tool,
-            tool_args=tool_args,
-        )
-        _query_ignored, result_lines = self._parse_search_query_and_results(lines)
-
+        """Render a grep/glob/search activity card from structured fields."""
         card = ActivityRenderer.search_results(
             query=query,
             match_count=match_count,
             file_count=file_count,
             file_list=file_list,
             result_lines=result_lines,
-            scope='',
+            scope=scope,
             source_tool=source_tool,
         )
+        if pending_attr is not None:
+            pending = getattr(self, pending_attr, None)
+            if pending is not None:
+                status = 'err' if content.startswith('Error') or 'does not exist' in content else 'ok'
+                self._update_activity_card_outcome(
+                    pending,
+                    status=status,
+                    outcome=card.secondary or 'completed',
+                    extra_content=content[:200] if content else None,
+                    operation_label=query,
+                )
+                setattr(self, pending_attr, None)
+                return
         self._write_card(card)
-
-    @staticmethod
-    def _parse_search_query_and_results(lines: list[str]) -> tuple[str, list[str]]:
-        import re
-        query = ''
-        result_lines: list[str] = []
-        if not lines:
-            return query, result_lines
-        first = lines[0].strip()
-        query_match = re.match(
-            r'^(?:query|pattern|searching for):\s*(.+?)$', first, re.I
-        )
-        if query_match:
-            query = query_match.group(1).strip().strip('"\'')
-            result_lines = _AppRendererActionHandlersMixin._filter_colon_result_lines(lines[1:])
-        elif re.match(r'^.*:\d+:', first):
-            result_lines = [line for line in lines if line.strip()]
-        else:
-            query = first.strip().strip('"\'')
-            result_lines = _AppRendererActionHandlersMixin._filter_colon_result_lines(lines[1:])
-        return query, result_lines
-
-    @staticmethod
-    def _filter_colon_result_lines(lines: list[str]) -> list[str]:
-        return [line for line in lines if line.strip() and ':' in line.split(None, 1)[0]]
 
     @staticmethod
     def _is_user_source(source: Any) -> bool:
@@ -135,6 +105,10 @@ class _AppRendererActionHandlersMixin:
     @staticmethod
     def _normalize_final_response_text(text: str) -> str:
         return sanitize_visible_transcript_text(text or '').strip()
+
+    @staticmethod
+    def _normalize_thinking_text(text: str) -> str:
+        return sanitize_streaming_thinking_text(text or '').strip()
 
     def _commit_final_response(self, text: str) -> None:
         """Commit a final assistant response once, regardless of event shape."""
@@ -246,11 +220,7 @@ class _AppRendererActionHandlersMixin:
         self._streaming_active = not action.is_final
         self._sync_streaming_mount_mode()
 
-        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
-
-        thinking = redact_streamed_tool_call_markers(
-            (action.thinking_accumulated or '').strip()
-        ).strip()
+        thinking = self._normalize_thinking_text(action.thinking_accumulated or '')
         content = self._normalize_final_response_text(action.accumulated or '')
 
         self._debug_log_thinking_chunk(thinking)

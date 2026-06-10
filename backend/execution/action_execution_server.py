@@ -48,6 +48,21 @@ from backend.execution.utils.memory_monitor import MemoryMonitor
 from backend.execution.utils.session_manager import SessionManager
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
+from backend.ledger.action.search import (
+    AnalyzeProjectStructureAction,
+    FindSymbolsAction,
+    GlobAction,
+    GrepAction,
+    ReadSymbolsAction,
+)
+from backend.ledger.action.memory_tools import (
+    CheckpointAction,
+    MemoryPersistAction,
+    MemoryRecallAction,
+    ScratchpadNoteAction,
+    ScratchpadRecallAction,
+    WorkingMemoryAction,
+)
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.observation import (
     ErrorObservation,
@@ -178,6 +193,8 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         # Keeps ``terminal_input`` post-write reads from using offset=0, which would
         # re-fetch the whole retained buffer and falsely signal progress every time.
         self._terminal_read_cursor: dict[str, int] = {}
+        # Consecutive delta reads with no new bytes — used to retire ghost sessions.
+        self._terminal_empty_read_streak: dict[str, int] = {}
 
         # MCP clients are created lazily on first use.
         self._mcp_config = mcp_config
@@ -358,6 +375,70 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
                 'has_error': True,
             }
             return err
+
+    async def grep(self, action: GrepAction) -> Observation:
+        """Execute a workspace grep search."""
+        from backend.engine.tools.grep import execute_grep
+
+        return await asyncio.to_thread(execute_grep, action)
+
+    async def glob(self, action: GlobAction) -> Observation:
+        """List files matching a glob pattern."""
+        from backend.engine.tools.glob import execute_glob
+
+        return await asyncio.to_thread(execute_glob, action)
+
+    async def find_symbols(self, action: FindSymbolsAction) -> Observation:
+        """Resolve symbol candidates across the workspace."""
+        from backend.engine.tools._file_edits import execute_find_symbols
+
+        return await asyncio.to_thread(execute_find_symbols, action)
+
+    async def read_symbols(self, action: ReadSymbolsAction) -> Observation:
+        """Read one or more symbol definitions."""
+        from backend.engine.tools._file_edits import execute_read_symbols
+
+        return await asyncio.to_thread(execute_read_symbols, action)
+
+    async def analyze_project_structure(
+        self, action: AnalyzeProjectStructureAction
+    ) -> Observation:
+        """Inspect repository structure for the requested APS mode."""
+        from backend.engine.tools.analyze_project_structure import (
+            execute_analyze_project_structure,
+        )
+
+        return await asyncio.to_thread(execute_analyze_project_structure, action)
+
+    async def checkpoint(self, action: CheckpointAction) -> Observation:
+        from backend.engine.tools.checkpoint import execute_checkpoint
+
+        return await asyncio.to_thread(execute_checkpoint, action)
+
+    async def working_memory(self, action: WorkingMemoryAction) -> Observation:
+        from backend.engine.tools.working_memory import execute_working_memory
+
+        return await asyncio.to_thread(execute_working_memory, action)
+
+    async def memory_persist(self, action: MemoryPersistAction) -> Observation:
+        from backend.engine.tools._tool_handlers import execute_memory_persist
+
+        return await asyncio.to_thread(execute_memory_persist, action)
+
+    async def memory_recall(self, action: MemoryRecallAction) -> Observation:
+        from backend.engine.tools._tool_handlers import execute_memory_recall
+
+        return await asyncio.to_thread(execute_memory_recall, action)
+
+    async def scratchpad_note(self, action: ScratchpadNoteAction) -> Observation:
+        from backend.engine.tools.note import execute_scratchpad_note
+
+        return await asyncio.to_thread(execute_scratchpad_note, action)
+
+    async def scratchpad_recall(self, action: ScratchpadRecallAction) -> Observation:
+        from backend.engine.tools.note import execute_scratchpad_recall
+
+        return await asyncio.to_thread(execute_scratchpad_recall, action)
 
     async def browser_tool(self, action: BrowserToolAction) -> Observation:
         """Run native browser-use commands (in-process; optional dependency)."""

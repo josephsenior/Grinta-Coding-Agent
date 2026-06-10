@@ -8,12 +8,6 @@ from pathlib import Path
 from backend.engine.tools import checkpoint
 
 
-def _extract_payload(thought: str) -> dict:
-    marker = '[CHECKPOINT_RESULT] '
-    assert marker in thought
-    return json.loads(thought.split(marker, 1)[1])
-
-
 def test_save_checkpoint_success_and_structured_payload(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -23,37 +17,36 @@ def test_save_checkpoint_success_and_structured_payload(
     action = checkpoint.build_checkpoint_action(
         {'command': 'save', 'label': 'phase 1', 'files_modified': 'a.txt,b.txt'}
     )
+    obs = checkpoint.execute_checkpoint(action)
 
-    assert '[CHECKPOINT] Saved #1: phase 1' in action.thought
-    payload = _extract_payload(action.thought)
-    assert payload['ok'] is True
-    assert payload['status'] == 'saved'
-    assert payload['reason_code'] == 'CHECKPOINT_SAVED'
-    assert payload['changed_state'] is True
-    assert payload['data']['checkpoint_id'] == 1
-    assert payload['data']['files'] == ['a.txt', 'b.txt']
-    assert action.tool_result == payload
+    assert 'Saved #1: phase 1' in obs.content
+    assert obs.ok is True
+    assert obs.status == 'saved'
+    assert obs.reason_code == 'CHECKPOINT_SAVED'
+    assert obs.changed_state is True
+    assert obs.data['checkpoint_id'] == 1
+    assert obs.data['files'] == ['a.txt', 'b.txt']
 
 
 def test_save_checkpoint_duplicate_is_noop(monkeypatch, tmp_path: Path) -> None:
     cp_file = tmp_path / 'checkpoints.json'
     monkeypatch.setattr(checkpoint, '_checkpoints_path', lambda: cp_file)
 
-    first = checkpoint.build_checkpoint_action(
+    first_action = checkpoint.build_checkpoint_action(
         {'command': 'save', 'label': 'same', 'files_modified': 'x.py'}
     )
-    second = checkpoint.build_checkpoint_action(
+    second_action = checkpoint.build_checkpoint_action(
         {'command': 'save', 'label': 'same', 'files_modified': 'x.py'}
     )
 
-    first_payload = _extract_payload(first.thought)
-    second_payload = _extract_payload(second.thought)
+    first = checkpoint.execute_checkpoint(first_action)
+    second = checkpoint.execute_checkpoint(second_action)
 
-    assert first_payload['status'] == 'saved'
-    assert second_payload['ok'] is True
-    assert second_payload['status'] == 'noop'
-    assert second_payload['reason_code'] == 'DUPLICATE_CHECKPOINT'
-    assert second_payload['changed_state'] is False
+    assert first.status == 'saved'
+    assert second.ok is True
+    assert second.status == 'noop'
+    assert second.reason_code == 'DUPLICATE_CHECKPOINT'
+    assert second.changed_state is False
 
     checkpoints = json.loads(cp_file.read_text(encoding='utf-8'))
     assert len(checkpoints) == 1
@@ -61,13 +54,12 @@ def test_save_checkpoint_duplicate_is_noop(monkeypatch, tmp_path: Path) -> None:
 
 def test_save_checkpoint_missing_label_returns_failed_payload() -> None:
     action = checkpoint.build_checkpoint_action({'command': 'save'})
+    obs = checkpoint.execute_checkpoint(action)
 
-    payload = _extract_payload(action.thought)
-    assert payload['ok'] is False
-    assert payload['status'] == 'failed'
-    assert payload['reason_code'] == 'MISSING_LABEL'
-    assert payload['retryable'] is True
-    assert action.tool_result == payload
+    assert obs.ok is False
+    assert obs.status == 'failed'
+    assert obs.reason_code == 'MISSING_LABEL'
+    assert obs.retryable is True
 
 
 def test_clear_when_empty_returns_noop(monkeypatch, tmp_path: Path) -> None:
@@ -75,10 +67,9 @@ def test_clear_when_empty_returns_noop(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(checkpoint, '_checkpoints_path', lambda: cp_file)
 
     action = checkpoint.build_checkpoint_action({'command': 'clear'})
+    obs = checkpoint.execute_checkpoint(action)
 
-    payload = _extract_payload(action.thought)
-    assert payload['ok'] is True
-    assert payload['status'] == 'noop'
-    assert payload['reason_code'] == 'ALREADY_EMPTY'
-    assert payload['changed_state'] is False
-    assert action.tool_result == payload
+    assert obs.ok is True
+    assert obs.status == 'noop'
+    assert obs.reason_code == 'ALREADY_EMPTY'
+    assert obs.changed_state is False
