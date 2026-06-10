@@ -370,6 +370,9 @@ async def _execute_llm_step_async(
     )
 
     def _prepare_params() -> dict[str, Any]:
+        from backend.context.session_context import bind_session_context
+
+        bind_session_context(state=state)
         prepare_started = time.perf_counter()
         messages_started = time.perf_counter()
         messages = orch.memory_manager.build_messages(

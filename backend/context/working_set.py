@@ -105,15 +105,36 @@ def sync_snapshot_to_working_memory(snapshot: dict[str, Any] | None) -> list[str
     return updated
 
 
+def _session_has_durable_artifacts(*, state: object | None = None) -> bool:
+    """True when this session has persisted snapshot or working-memory data on disk."""
+    try:
+        from backend.context.pre_condensation_snapshot import load_snapshot
+        from backend.engine.tools.working_memory import _load_memory
+
+        if load_snapshot(state=state):  # type: ignore[arg-type]
+            return True
+        memory = _load_memory()
+        return any(
+            isinstance(value, str) and value.strip()
+            for key, value in memory.items()
+            if not str(key).startswith('_')
+        )
+    except Exception:
+        logger.debug('Durable artifact probe failed', exc_info=True)
+        return False
+
+
 def get_durable_context_block(
     events: list[Event] | None = None,
     *,
     char_budget: int = DEFAULT_DURABLE_CONTEXT_CHAR_BUDGET,
+    state: object | None = None,
+    include_task_from_history: bool = False,
 ) -> str:
     """Build a compact durable context block for prompt protection."""
     parts: list[str] = [_WORKING_SET_MARKER]
 
-    if events:
+    if events and include_task_from_history:
         from backend.context.tool_result_storage import extract_latest_pytest_summary
         from backend.ledger.action import MessageAction
 
@@ -134,7 +155,7 @@ def get_durable_context_block(
         )
         from backend.engine.tools.working_memory import get_working_memory_prompt_block
 
-        snapshot = load_snapshot()
+        snapshot = load_snapshot(state=state)  # type: ignore[arg-type]
         if snapshot:
             snapshot_block = format_snapshot_for_injection(snapshot)
             if snapshot_block:
@@ -154,12 +175,31 @@ def get_durable_context_block(
     return block
 
 
-def build_working_set_observation(events: list[Event]) -> AgentCondensationObservation | None:
-    """Create a synthetic condensation observation carrying durable context."""
-    content = get_durable_context_block(events)
+def build_working_set_observation(
+    events: list[Event],
+    *,
+    state: object | None = None,
+) -> AgentCondensationObservation | None:
+    """Create a durable working-set observation after compaction or restore.
+
+    Fresh sessions with no compaction history and no persisted artifacts must
+    not inject this — it is rendered through the condensation observation path
+    and would falsely tell the model that context was already condensed.
+    """
+    from backend.context.compact_boundary import find_last_condensation_action
+
+    has_compacted = find_last_condensation_action(events) is not None
+    if not has_compacted and not _session_has_durable_artifacts(state=state):
+        return None
+
+    content = get_durable_context_block(
+        events,
+        state=state,
+        include_task_from_history=has_compacted,
+    )
     if not content:
         return None
-    return AgentCondensationObservation(content=content)
+    return AgentCondensationObservation(content=content, is_working_set=True)
 
 
 def _first_user_message(events: list[Event]) -> str | None:

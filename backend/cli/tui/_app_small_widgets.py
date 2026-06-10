@@ -31,12 +31,15 @@ class InfoSidebar(VerticalScroll):
 class Transcript(VerticalScroll):
     """Scrollable conversation transcript container with auto-scroll awareness."""
 
+    _PRUNE_THRESHOLD = 500
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._user_scrolled_away = False
         self._scroll_badge: Static | None = None
         self._suppress_mount_animation = False
         self._suppress_scroll_sync = False
+        self._load_earlier_button: Static | None = None
 
     def compose(self) -> ComposeResult:
         yield Static(id='scroll-badge', classes='-hidden')
@@ -173,8 +176,59 @@ class Transcript(VerticalScroll):
         self.remove_children()
         self._scroll_badge = None
         self._user_scrolled_away = False
+        self._load_earlier_button = None
         self.mount(Static('', id='scroll-badge', classes='-hidden'))
         self._scroll_badge = self.query_one('#scroll-badge', Static)
+
+    @property
+    def child_widget_count(self) -> int:
+        """Count of content widgets (excludes system widgets like scroll-badge)."""
+        count = 0
+        for child in self.children:
+            if child is self._scroll_badge:
+                continue
+            if child is self._load_earlier_button:
+                continue
+            count += 1
+        return count
+
+    def prune_oldest(self, count: int) -> int:
+        """Unmount the N oldest content widgets. Returns count of widgets removed."""
+        removed = 0
+        for child in list(self.children):
+            if removed >= count:
+                break
+            if child is self._scroll_badge:
+                continue
+            if child is self._load_earlier_button:
+                continue
+            try:
+                child.remove()
+                removed += 1
+            except Exception:
+                pass
+        return removed
+
+    def set_load_earlier_button(self, button: Static | None) -> None:
+        """Set or clear the 'load earlier messages' button reference."""
+        self._load_earlier_button = button
+
+    def prepend_widget(self, widget: Widget) -> None:
+        """Mount a widget at the top of the transcript (after system widgets)."""
+        button = self._load_earlier_button
+        if button is not None and button in self.children:
+            try:
+                self.mount(widget, after=button)
+                return
+            except Exception:
+                pass
+        if self._scroll_badge is not None and self._scroll_badge in self.children:
+            try:
+                self.mount(widget, after=self._scroll_badge)
+                return
+            except Exception:
+                pass
+        self.mount(widget)
 
 
 class InputBar(Horizontal):
@@ -264,3 +318,39 @@ class HUD(Vertical):
 
 class RendererDrainRequested(Message):
     """Message requesting the screen to drain queued renderer events."""
+
+
+class LoadEarlierRequested(Message):
+    """Message requesting the screen to load earlier messages from the ledger."""
+
+
+class LoadEarlierButton(Static):
+    """Button that appears at the top of the transcript when older messages exist."""
+
+    DEFAULT_CSS = """
+    LoadEarlierButton {
+        width: 100%;
+        height: 1;
+        content-align: center middle;
+        color: #54597b;
+        background: #0a1323;
+        margin: 0 0 1 0;
+    }
+    LoadEarlierButton:hover {
+        color: #91abec;
+        background: #0d162a;
+    }
+    """
+
+    def __init__(self) -> None:
+        super().__init__('Load earlier messages...')
+        self.can_focus = True
+
+    def on_click(self, event: events.Click) -> None:
+        event.stop()
+        self.post_message(LoadEarlierRequested())
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key in ('enter', 'space'):
+            event.stop()
+            self.post_message(LoadEarlierRequested())

@@ -2438,15 +2438,22 @@ async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config)
         await asyncio.sleep(0.3)
 
         assert list(s.query(ThinkingIndicator).results()) == []
-        # Recoverable errors now render as a plain bold red message — same path
-        # as the "no tools detected" ErrorObservation — not as an ActivityCard.
+        # Recoverable errors render as a soft TranscriptNotice — not ActivityCards.
         cards = list(s.query(TUIActivityCard).results())
         error_cards = [card for card in cards if 'category-error' in card.classes]
         assert error_cards == []
 
         # The error must be in the renderer's history (the source of truth).
+        from backend.cli.tui.widgets.transcript_notice import TranscriptNotice
+
+        def _history_plain(item: object) -> str:
+            if isinstance(item, TranscriptNotice):
+                renderable = getattr(item, 'renderable', item)
+                return str(getattr(renderable, 'plain', renderable))
+            return str(getattr(item, 'plain', item))
+
         history_text = '\n'.join(
-            str(r) for r in renderer._history if r is not None
+            _history_plain(r) for r in renderer._history if r is not None
         )
         assert "Invalid task status 'doing'" in history_text
 
@@ -3259,6 +3266,7 @@ async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
     from backend.cli.tui._app_screen_messages_mixin import (
         _AppScreenMessagesMixin,
     )
+    from backend.cli.tui.widgets.transcript_notice import TranscriptNotice
 
     long_text = 'recoverable ' + ('x' * 200)
     # Use a stub class to exercise the helper without spinning up Textual.
@@ -3268,9 +3276,15 @@ async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
 
     stub.add_error('boom')
     stub.add_warning(long_text)
-    plain = '\n'.join(
-        str(getattr(item, 'plain', item)) for item in captured
-    )
+
+    def _notice_plain(item: object) -> str:
+        if isinstance(item, TranscriptNotice):
+            renderable = getattr(item, 'renderable', item)
+            return str(getattr(renderable, 'plain', renderable))
+        return str(getattr(item, 'plain', item))
+
+    plain = '\n'.join(_notice_plain(item) for item in captured)
+    assert all(isinstance(item, TranscriptNotice) for item in captured)
     # The 200-char run must remain on a single line — no width=80 pre-wrap.
     assert 'x' * 200 in plain
 

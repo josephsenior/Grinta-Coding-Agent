@@ -10,7 +10,7 @@ from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
 from backend.ledger.action.agent import BlackboardAction
 
-BLACKBOARD_TOOL_NAME = 'shared_task_board'
+from backend.inference.tool_names import BLACKBOARD_TOOL_NAME, SHARED_TASK_BOARD_TOOL_NAME
 
 _DESCRIPTION = (
     'Read or write the shared blackboard. When running sub-agents (via delegate_task) in the background, '
@@ -23,7 +23,7 @@ _DESCRIPTION = (
 def create_blackboard_tool() -> ChatCompletionToolParam:
     """Create the blackboard tool definition."""
     return create_tool_definition(
-        name=BLACKBOARD_TOOL_NAME,
+        name=SHARED_TASK_BOARD_TOOL_NAME,
         description=_DESCRIPTION,
         properties={
             'command': {

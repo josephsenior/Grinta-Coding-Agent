@@ -132,9 +132,22 @@ def _acquire_event_stream(
     user_id: str | None = None,
 ) -> tuple[EventStream, bool, str]:
     if event_stream is not None:
-        return event_stream, False, sid or event_stream.sid
+        session_id = sid or event_stream.sid
+        try:
+            from backend.context.session_context import bind_session_context
+
+            bind_session_context(session_id=session_id)
+        except Exception:
+            pass
+        return event_stream, False, session_id
 
     session_id = sid or generate_sid(config)
+    try:
+        from backend.context.session_context import bind_session_context
+
+        bind_session_context(session_id=session_id)
+    except Exception:
+        pass
     file_store = get_file_store(config.file_store, get_local_data_root(config))
     created_event_stream = EventStream(
         session_id,

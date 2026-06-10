@@ -13,7 +13,6 @@ def _build_response_style_block(
     return (
         'Use the output form required for this turn:\n'
         '- use tools for investigation or implementation when the protocol calls for action\n'
-        '- use `ask_user` when you need input from the user to continue\n'
         '- use plain prose only for conversation, explanation, or the final summary'
     )
 
@@ -43,6 +42,6 @@ def _render_interaction_tail(
         response_style_body=response_style_body,
         communicate_tool_section=communicate_tool_section,
         interaction_guidance=(
-            'If a request is vague, inspect nearby docs/config first; use `ask_user` only if you are still blocked or the scope is still ambiguous.'
+            'If a request is vague, inspect nearby docs/config first; see `<ASK_USER_TOOL>` only if you are still blocked or the scope is still ambiguous.'
         ),
     )

@@ -57,13 +57,9 @@ def get_current_session_id() -> str | None:
 
 
 def _memory_path() -> Path:
-    from backend.core.workspace_resolution import workspace_agent_state_dir
+    from backend.context.session_context import scoped_agent_path
 
-    agent_dir = workspace_agent_state_dir()
-    session_id = get_current_session_id()
-    if session_id:
-        return agent_dir / f'working_memory_{session_id}.json'
-    return agent_dir / 'working_memory.json'
+    return scoped_agent_path('working_memory', '.json')
 
 
 def _load_memory() -> dict[str, str]:

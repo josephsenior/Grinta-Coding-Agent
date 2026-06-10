@@ -1,9 +1,12 @@
 <COMMON_PATTERNS>
-1. **Bug fix**: `grep`/`find_symbols` -> `read` -> `edit_symbols` or `replace_string` -> Verify -> final summary.
-2. **Feature**: `analyze_project_structure` -> `create` / `replace_string` / `edit_symbols` / `multiedit` -> Run Linters/Tests -> final summary.
-3. **Batch symbol edits**: `find_symbols` or `read` -> `edit_symbols` -> Verify -> final summary.
-4. **Atomic multi-file edit**: inspect targets -> `multiedit` -> Verify -> final summary.
-5. **Docs/config addition**: `read` -> `replace_string` with anchor plus inserted content -> Verify if applicable -> final summary.
-6. **Investigation**: `grep` / `glob` -> `analyze_project_structure` -> read code -> Answer plain text.
-7. **Tool Failed (example only)**: Follow `<ERROR_RECOVERY>`.
+Runtime tools: {available_tools_summary}
+
+1. **Bug fix**: {search_tools} -> {read_tool} -> {edit_tools} -> Verify -> final summary.
+2. **Feature**: {planning_hint} -> {analyze_tool} -> {edit_tools} -> {terminal_tool} (tests/lint) -> final summary.
+3. **Batch symbol edits**: {search_tools} -> {read_tool} -> {edit_symbols_tool} -> Verify -> final summary.
+4. **Atomic multi-file edit**: inspect targets -> {multiedit_tool} -> Verify -> final summary.
+5. **Docs/config addition**: {read_tool} -> {replace_string_tool} with anchor plus inserted content -> Verify if applicable -> final summary.
+6. **Investigation**: {search_tools} -> {analyze_tool} -> {read_tool} -> Answer plain text.
+7. **Destructive/risky change**: {destructive_confirmation_step} -> {checkpoint_step} -> Verify -> final summary.
+8. **Tool failed**: Follow `<ERROR_RECOVERY>`. Fallbacks: {adjacent_tool_fallback}. {failure_escalation_step}.
 </COMMON_PATTERNS>

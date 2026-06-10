@@ -111,6 +111,7 @@ class OrchestratorPlanner:
 
         self._add_core_tools(tools)
         self._add_browsing_tool(tools)
+        self._add_web_tools(tools)
         self._add_editor_tools(tools)
         self._add_execute_mcp_tool_tool(tools)
 
@@ -201,8 +202,7 @@ class OrchestratorPlanner:
         )
 
         tools.append(create_cmd_run_tool())
-        if not is_chat_mode(self._current_mode()):
-            tools.append(create_ask_user_tool())
+        tools.append(create_ask_user_tool())
         tools.append(create_read_tool())
         tools.append(create_find_symbols_tool())
 
@@ -224,7 +224,6 @@ class OrchestratorPlanner:
         self._add_optional_feature_tools(tools)
         self._add_terminal_tools(tools)
         self._add_memory_and_checkpoint_tools(tools)
-        self._add_scratchpad_tools(tools)
 
     def _add_terminal_tools(self, tools: list) -> None:
         """Add terminal manager tool when terminal support is enabled."""
@@ -276,7 +275,22 @@ class OrchestratorPlanner:
         return
 
     def _add_browsing_tool(self, tools: list) -> None:
-        return
+        if not getattr(self._config, 'enable_browsing', True):
+            return
+        from backend.engine.tools.browser_native import create_browser_tool
+
+        tools.append(create_browser_tool())
+
+    def _add_web_tools(self, tools: list) -> None:
+        if not getattr(self._config, 'enable_web', True):
+            return
+        from backend.engine.tools.web_tools import (
+            create_web_fetch_tool,
+            create_web_search_tool,
+        )
+
+        tools.append(create_web_search_tool())
+        tools.append(create_web_fetch_tool())
 
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):
@@ -302,17 +316,14 @@ class OrchestratorPlanner:
         tools.append(create_execute_mcp_tool_tool())
 
     def _add_memory_and_checkpoint_tools(self, tools: list) -> None:
-        from backend.engine.tools.checkpoint import create_checkpoint_tool
-        from backend.engine.tools.memory_manager import create_memory_manager_tool
+        if getattr(self._config, 'enable_checkpoints', False):
+            from backend.engine.tools.checkpoint import create_checkpoint_tool
 
-        tools.append(create_checkpoint_tool())
-        tools.append(create_memory_manager_tool())
+            tools.append(create_checkpoint_tool())
+        if getattr(self._config, 'enable_working_memory', True):
+            from backend.engine.tools.memory import create_memory_tool
 
-    def _add_scratchpad_tools(self, tools: list) -> None:
-        from backend.engine.tools.note import create_note_tool, create_recall_tool
-
-        tools.append(create_note_tool())
-        tools.append(create_recall_tool())
+            tools.append(create_memory_tool())
 
     def _refresh_checked_tools_cache(
         self, tools: list[ChatCompletionToolParam]
@@ -417,7 +428,7 @@ class OrchestratorPlanner:
             f'{formatted}\n'
             'RULES:\n'
             '- find_symbols discovers symbol candidates without reading full bodies.\n'
-            '- read inspects file, range, or one/more symbol bodies.\n'
+            '- read inspects a file (optional line range) or one/more symbol bodies via symbols[].\n'
             '- create creates a new file or a new code symbol.\n'
             '- edit_symbols modifies or deletes existing symbols.\n'
             '- replace_string performs exact one-file text replacement, insertion, or deletion.\n'
@@ -579,8 +590,10 @@ class OrchestratorPlanner:
             '\n\n=== CURRENT MODE: PLAN ===\n'
             'This is the authoritative current-mode instruction for this turn.\n'
             'Current mode: PLAN\n\n'
-            '- Use tools to inspect, search, or execute safe planning checks.\n'
+            '- Use discovery tools to inspect and search the codebase.\n'
             '- Use `ask_user` only when user input is required to continue.\n'
+            '- Use `task_tracker` to structure the plan when committing to multi-step work.\n'
+            '- Do not edit files or run shell commands.\n'
             '- Write the final plan in plain text when complete; that ends the run.\n'
             '==========================\n'
         )
@@ -597,8 +610,10 @@ class OrchestratorPlanner:
             '\n\n=== CURRENT MODE: CHAT ===\n'
             'This is the authoritative current-mode instruction for this turn.\n'
             'Current mode: CHAT\n\n'
-            '- Respond naturally in prose.\n'
-            '- Do not use tools; plain text ends the turn.\n'
+            '- Use discovery tools to investigate the codebase when grounding helps.\n'
+            '- Use `ask_user` only when user input is required to continue.\n'
+            '- Do not edit files or run shell commands.\n'
+            '- Respond naturally in prose; plain text ends the turn unless you used `ask_user`.\n'
             '==========================\n'
         )
         return self._apply_control_message(messages, instruction)

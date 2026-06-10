@@ -11,7 +11,11 @@
 </DECISION_FRAMEWORK>
 
 <TOOL_ROUTING_LADDER>
-- **Search & Explore:** Prefer `grep`, `glob`, `find_symbols`, `read`, or `analyze_project_structure`.
+- **Search & Explore:** Follow `<DISCOVERY_ROUTING>`. Use native `grep`/`glob`/`find_symbols`/`read`/`analyze_project_structure` — never shell `grep`/`find`/`rg` for repo intelligence.
+- **`grep`:** default `output_mode=files_with_matches`; switch to `content` only for files that matter; paginate with `head_limit`/`offset` (default 200).
+- **`glob`:** paginate file lists with `head_limit`/`offset` (default 200).
+{lsp_routing}
+{discovery_decision_table}
 {read_and_edit_ladder}
 {shell_and_execution_ladder}
 </TOOL_ROUTING_LADDER>

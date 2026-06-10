@@ -354,10 +354,14 @@ def _grinta_install_tree_root() -> str:
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def _workspace_logs_segment() -> str:
-    root = os.environ.get('PROJECT_ROOT', '').strip()
-    if not root:
-        return 'no_project'
+def _workspace_logs_segment() -> str | None:
+    """Filesystem segment for the active workspace, or ``None`` if unresolved."""
+    from backend.core.workspace_resolution import resolve_cli_workspace_directory
+
+    root_path = resolve_cli_workspace_directory()
+    if root_path is None:
+        return None
+    root = str(root_path)
     key = os.path.normcase(os.path.normpath(root))
     digest = hashlib.sha256(key.encode('utf-8')).hexdigest()[:12]
     base = os.path.basename(root.rstrip('/\\')) or 'workspace'
@@ -365,14 +369,24 @@ def _workspace_logs_segment() -> str:
     return f'{safe}__{digest}'
 
 
-def _workspace_logs_dir() -> str:
+def _workspace_logs_dir() -> str | None:
     """Workspace-level log directory (shared by all sessions of a workspace)."""
+    segment = _workspace_logs_segment()
+    if segment is None:
+        return None
     return os.path.join(
         _grinta_install_tree_root(),
         'logs',
         'workspaces',
-        _workspace_logs_segment(),
+        segment,
     )
+
+
+def _unbound_log_dir() -> str:
+    """Ephemeral fallback when no workspace directory can be resolved."""
+    import tempfile
+
+    return os.path.join(tempfile.gettempdir(), 'grinta', 'unbound_logs')
 
 
 def get_log_dir() -> str:
@@ -388,6 +402,8 @@ def get_log_dir() -> str:
     if isinstance(override, (str, os.PathLike)):
         return os.fspath(override)
     base = _workspace_logs_dir()
+    if base is None:
+        return _unbound_log_dir()
     sid = globals().get('_LOG_SESSION_ID')
     if isinstance(sid, str) and sid:
         return os.path.join(base, 'sessions', sid)
@@ -516,6 +532,10 @@ def configure_file_logging() -> None:
     global _file_logging_configured, _SHARED_FILE_HANDLER
     if _file_logging_configured or not LOG_TO_FILE:
         return
+    workspace_dir = _workspace_logs_dir()
+    if workspace_dir is None:
+        app_logger.debug('File logging skipped: no workspace directory resolved')
+        return
     log_dir = get_log_dir()
     os.makedirs(log_dir, exist_ok=True)
     shared_handler = get_file_handler(log_dir, current_log_level)
@@ -570,7 +590,10 @@ def finalize_session_logging_audit(log_dir: str | None = None) -> None:
 def _audit_previous_session_log(previous_segment: str | None) -> None:
     if not previous_segment:
         return
-    previous_dir = os.path.join(_workspace_logs_dir(), 'sessions', previous_segment)
+    workspace_dir = _workspace_logs_dir()
+    if workspace_dir is None:
+        return
+    previous_dir = os.path.join(workspace_dir, 'sessions', previous_segment)
     finalize_session_logging_audit(previous_dir)
 
 
@@ -599,14 +622,24 @@ def bind_session_logging(session_id: str | None) -> None:
     global _LOG_SESSION_ID, _ACTIVE_SESSION_LOG_DIR, _SHARED_FILE_HANDLER
     if not LOG_TO_FILE or not session_id:
         return
+    workspace_dir = _workspace_logs_dir()
+    if workspace_dir is None:
+        app_logger.debug('Session logging skipped: no workspace directory resolved')
+        return
     segment = _safe_session_segment(str(session_id))
     if _LOG_SESSION_ID == segment:
         return
     previous_segment = _LOG_SESSION_ID
     _flush_shared_file_handler()
+    try:
+        from backend.core.agent_transcript import close_agent_transcript
+
+        close_agent_transcript()
+    except Exception:
+        app_logger.debug('Agent transcript close failed', exc_info=True)
     _audit_previous_session_log(previous_segment)
     _LOG_SESSION_ID = segment
-    log_dir = os.path.join(_workspace_logs_dir(), 'sessions', segment)
+    log_dir = os.path.join(workspace_dir, 'sessions', segment)
     _ACTIVE_SESSION_LOG_DIR = log_dir
     os.makedirs(log_dir, exist_ok=True)
     new_handler = get_file_handler(log_dir, current_log_level)
@@ -621,6 +654,12 @@ def bind_session_logging(session_id: str | None) -> None:
     if old_handler is not None and old_handler is not new_handler:
         with contextlib.suppress(Exception):
             old_handler.close()
+    try:
+        from backend.core.agent_transcript import bind_agent_transcript
+
+        bind_agent_transcript(log_dir)
+    except Exception:
+        app_logger.debug('Agent transcript logging bind failed', exc_info=True)
     app_logger.info('Session logging bound to %s', log_dir)
 
 

@@ -624,7 +624,7 @@ class TestErrorHandling:
         assert result is not None
         assert result['args']['token'] == 'alpha'
 
-    def test_repair_event_checksums_fixes_stale_rows(
+    def test_read_event_self_heals_stale_checksum(
         self, store: SQLiteEventStore
     ) -> None:
         store.write_event(0, {'action': 'message', 'args': {'n': 1}})
@@ -642,8 +642,29 @@ class TestErrorHandling:
         )
         store._get_conn().commit()
 
-        with pytest.raises(ValueError):
-            store.read_event(0)
+        healed = store.read_event(0)
+        assert healed is not None
+        assert healed['args']['n'] == 1
+        reread = store.read_event(0)
+        assert reread is not None
+
+    def test_repair_event_checksums_fixes_stale_rows(
+        self, store: SQLiteEventStore
+    ) -> None:
+        store.write_event(0, {'action': 'message', 'args': {'n': 1}})
+        row = store._get_read_conn().execute(
+            'SELECT payload FROM events WHERE id = 0'
+        ).fetchone()
+        assert row is not None
+        import json
+
+        data = json.loads(row['payload'])
+        data['_grinta_checksum'] = 'deadbeef'
+        store._get_conn().execute(
+            'UPDATE events SET payload = ? WHERE id = 0',
+            (json.dumps(data),),
+        )
+        store._get_conn().commit()
 
         fixed = store.repair_event_checksums()
         assert fixed == 1

@@ -17,6 +17,19 @@ for a single source of truth.
 
 import os
 
+from backend.inference.tool_names import (
+    CREATE_TOOL_NAME,
+    EDIT_SYMBOLS_TOOL_NAME,
+    FIND_SYMBOLS_TOOL_NAME,
+    MULTIEDIT_TOOL_NAME,
+    NOTE_TOOL_NAME,
+    READ_TOOL_NAME,
+    RECALL_TOOL_NAME,
+    REPLACE_STRING_TOOL_NAME,
+    TASK_TRACKER_TOOL_NAME,
+    UNDO_LAST_EDIT_TOOL_NAME,
+)
+
 
 # ── Helpers ──────────────────────────────────────────────────────────
 def _parse_bool_env(var: str, default: str = 'false') -> bool:
@@ -298,8 +311,7 @@ CURRENT_AGENT_CONFIG_SCHEMA_VERSION = '2025-11-14'
 DEFAULT_AGENT_MEMORY_ENABLED = True
 DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED = True
 DEFAULT_AGENT_BROWSING_ENABLED = True
-# In-process browser-use tools (optional dependency group `browser`)
-DEFAULT_AGENT_NATIVE_BROWSER_ENABLED = True
+DEFAULT_AGENT_WEB_ENABLED = True
 # Vector memory & hybrid retrieval require the optional `[rag]` extra
 # (chromadb + bundled ONNX MiniLM). Off by default to keep the base install
 # lean (~150 MB vs ~400 MB). Enable via `--rag` CLI flag, agent config, or
@@ -461,17 +473,6 @@ LOG_COLORS = {
 
 DISABLE_COLOR_PRINTING = False
 
-
-READ_TOOL_NAME = 'read'
-FIND_SYMBOLS_TOOL_NAME = 'find_symbols'
-CREATE_TOOL_NAME = 'create'
-REPLACE_STRING_TOOL_NAME = 'replace_string'
-EDIT_SYMBOLS_TOOL_NAME = 'edit_symbols'
-MULTIEDIT_TOOL_NAME = 'multiedit'
-TASK_TRACKER_TOOL_NAME = 'task_tracker'
-UNDO_LAST_EDIT_TOOL_NAME = 'undo_last_edit'
-NOTE_TOOL_NAME = 'note'
-RECALL_TOOL_NAME = 'recall'
 # ── Security Risk ───────────────────────────────────────────────────
 SECURITY_RISK_DESC = (
     "Required. Your assessment of this action's safety risk (LOW/MEDIUM/HIGH). "
@@ -536,6 +537,12 @@ DEFAULT_LLM_COMPACT_COOLDOWN_SECONDS = 300
 DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS = 60
 DEFAULT_COMPACT_MIN_PRUNED_EVENTS = 20
 DEFAULT_COMPACT_MIN_TOKEN_REDUCTION = 10_000
+# After ineffective compaction, skip retries until N new events land (and time backoff).
+DEFAULT_INEFFECTIVE_COMPACT_SKIP_EVENTS = 30
+DEFAULT_INEFFECTIVE_COMPACT_MAX_SKIP_EVENTS = 120
+DEFAULT_INEFFECTIVE_COMPACT_BACKOFF_SECONDS = 90
+# 5c tail target: fraction of autocompact threshold to keep post-prune.
+DEFAULT_DEGRADED_COMPACT_TAIL_RATIO = 0.55
 DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS = 15
 DEFAULT_POST_COMPACT_TOKEN_BUDGET = 50_000
 DEFAULT_POST_COMPACT_MAX_FILES = 5

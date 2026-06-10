@@ -50,43 +50,46 @@ class _AppRendererDisplayMixin:
         self._live_response_dirty = False
         self._last_thinking_text_hash = ''
         self._last_thinking_artifact_hash = ''
+        self._min_rendered_event_id = -1
+        self._max_rendered_event_id = -1
         try:
             self._tui._get_display().clear()
         except (AttributeError, NoMatches):
             pass
         self._refresh_display()
 
-    def _refresh_display(self) -> None:
+    def _refresh_display(self, *, skip_sidebar: bool = False) -> None:
         """Refresh derived sidebar state; transcript writes are incremental."""
-        mcp_count = self._hud.state.mcp_servers
-        skill_count = self._hud.bundled_skill_count
+        if not skip_sidebar:
+            mcp_count = self._hud.state.mcp_servers
+            skill_count = self._hud.bundled_skill_count
 
-        mcp_servers = self._resolve_mcp_server_list(mcp_count)
+            mcp_servers = self._resolve_mcp_server_list(mcp_count)
 
-        task_signature = task_panel_signature(self._task_list)
-        current_state = (task_signature, mcp_servers, skill_count)
-        if current_state != self._last_sidebar_state:
-            task_items = self._build_task_sidebar_items(task_signature)
-            mcp_items = self._build_mcp_sidebar_items(mcp_servers)
-            skill_items = self._build_skills_sidebar_items()
+            task_signature = task_panel_signature(self._task_list)
+            current_state = (task_signature, mcp_servers, skill_count)
+            if current_state != self._last_sidebar_state:
+                task_items = self._build_task_sidebar_items(task_signature)
+                mcp_items = self._build_mcp_sidebar_items(mcp_servers)
+                skill_items = self._build_skills_sidebar_items()
 
-            self._update_sidebar_section(
-                '#sidebar-tasks',
-                f'Tasks ({len(task_signature)})',
-                task_items,
-            )
-            self._update_sidebar_section(
-                '#sidebar-mcp',
-                f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
-                mcp_items,
-            )
-            self._update_sidebar_section(
-                '#sidebar-skills',
-                f'Skills ({len(skill_items)})',
-                skill_items,
-            )
+                self._update_sidebar_section(
+                    '#sidebar-tasks',
+                    f'Tasks ({len(task_signature)})',
+                    task_items,
+                )
+                self._update_sidebar_section(
+                    '#sidebar-mcp',
+                    f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
+                    mcp_items,
+                )
+                self._update_sidebar_section(
+                    '#sidebar-skills',
+                    f'Skills ({len(skill_items)})',
+                    skill_items,
+                )
 
-            self._last_sidebar_state = current_state
+                self._last_sidebar_state = current_state
 
     def _update_sidebar_section(self, widget_id, title, items):
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
@@ -315,7 +318,11 @@ class _AppRendererDisplayMixin:
             )
 
         display = self._tui._get_display()
-        display.append_widget(widget)
+        if getattr(self, '_prepend_mode', False):
+            display.prepend_widget(widget)
+        else:
+            display.append_widget(widget)
+        self._maybe_prune_transcript()
         return widget
 
     def _apply_card_final_state(
@@ -424,3 +431,39 @@ class _AppRendererDisplayMixin:
         )
         display = self._tui._get_display()
         display.append_widget(widget)
+        self._maybe_prune_transcript()
+
+    def _maybe_prune_transcript(self) -> None:
+        """Prune oldest widgets if transcript exceeds threshold, insert load-earlier button."""
+        try:
+            display = self._tui._get_display()
+        except (AttributeError, NoMatches):
+            return
+        if type(display).__name__ == 'MagicMock':
+            return
+
+        from backend.cli.tui._app_small_widgets import LoadEarlierButton
+
+        if not hasattr(display, 'child_widget_count'):
+            return
+        if not hasattr(display, '_PRUNE_THRESHOLD'):
+            return
+
+        threshold = display._PRUNE_THRESHOLD
+        if display.child_widget_count <= threshold:
+            return
+
+        overflow = display.child_widget_count - threshold
+        display.prune_oldest(overflow)
+
+        has_earlier_events = (
+            self._min_rendered_event_id > 0
+            and self._event_stream is not None
+        )
+        if has_earlier_events and display._load_earlier_button is None:
+            button = LoadEarlierButton()
+            display.set_load_earlier_button(button)
+            try:
+                display.mount(button, before=display.children[0] if display.children else None)
+            except Exception:
+                display.mount(button)

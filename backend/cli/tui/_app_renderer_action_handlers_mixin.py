@@ -282,14 +282,19 @@ class _AppRendererActionHandlersMixin:
             self.clear_live_response()
 
     def _update_metrics(self, event: Any) -> None:
+        changed = False
         if hasattr(event, 'model') and event.model:
             self._hud.update_model(event.model)
+            changed = True
         if hasattr(event, 'llm_metrics') and event.llm_metrics:
             self._hud.update_from_llm_metrics(event.llm_metrics)
+            changed = True
         cost = getattr(event, 'cost_usd', None)
         if cost is not None and cost > 0:
             self._hud.update_cost(self._hud.state.cost_usd + cost)
-        self._tui._render_hud_bar()
+            changed = True
+        if changed:
+            self._tui._render_hud_bar()
 
     def _handle_state_change(self, obs: Any) -> None:
         state = obs.agent_state

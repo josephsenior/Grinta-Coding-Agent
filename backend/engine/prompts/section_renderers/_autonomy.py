@@ -29,23 +29,29 @@ def _build_context_discipline_section(
         'Use the visible conversation, current files, and fresh tool observations as context. '
         'After condensation, resume from the summary without restarting broad exploration.'
     )
-    _ = (working_memory_on, checkpoints_on)
+    if working_memory_on:
+        parts.extend(
+            [
+                '',
+                '**memory** — see `<MEMORY_AND_CONTEXT>` for working/persist/recall; '
+                'do not duplicate task progress here.',
+            ]
+        )
+    if checkpoints_on:
+        parts.append(
+            '**checkpoint** — auto snapshots precede risky edits; use `save` for named milestones, '
+            '`revert` when recovery is needed, `clear` when ending a task or resetting the list.'
+        )
 
     if tracker_on:
         parts.extend(
             [
                 '',
-                '**task_tracker** — your structural anchor:',
-                '- In Agent or Plan mode, use task_tracker(update) with a task_list when you decide a request requires structured work.',
-                '- Use task_tracker for viewing and status updates.',
-                '- For small/local tasks, do not create tracker overhead; act, verify, and write the final summary.',
-                '- If task_tracker was used for this run, keep it synced before the final summary.',
-                "- Update status \u2192 'in_progress' when starting, 'done' after proof, 'blocked' with reason.",
-                '- For multi-step tasks: task_tracker(view) at turn start to re-anchor.',
+                '**task_tracker** — see `<TASK_TRACKING>` for planning, sync, and completion rules.',
             ]
         )
         if condensation_on:
-            parts.append('  Post-condensation: task_tracker(view) first.')
+            parts.append('Post-condensation: `task_tracker(view)` first.')
 
     parts.append('</CONTEXT_DISCIPLINE>')
     return '\n'.join(parts)
@@ -58,11 +64,20 @@ def _build_when_to_use_context(
     checkpoints_on: bool,
 ) -> str:
     parts = ['<WHEN_TO_USE_CONTEXT>']
-    _ = (working_memory_on, checkpoints_on)
-    if tracker_on:
+    if working_memory_on:
         parts.append(
-            '- **task_tracker**: Engineering work planning and progress tracking — update before multi-step tasks, view at turn start.'
+            '- **memory(action="working")**: hypothesis, findings, blockers, and plan during long work.'
         )
+        parts.append(
+            '- **memory(action="recall", key=...)**: when the visible window no longer shows a prior decision.'
+        )
+    if checkpoints_on:
+        parts.append(
+            '- **checkpoint**: `view` before choosing a revert target; `revert` after a bad edit '
+            'or failed command; `clear` when the saved milestone list is stale.'
+        )
+    if tracker_on:
+        parts.append('- **task_tracker**: See `<TASK_TRACKING>`.')
     if not tracker_on:
         parts.append('- Use fresh reads/searches and recent observations to stay grounded.')
     parts.append('</WHEN_TO_USE_CONTEXT>')
@@ -76,20 +91,20 @@ def _build_mandatory_discipline_checkpoints(
     checkpoints_on: bool,
 ) -> str:
     parts = ['<MANDATORY_DISCIPLINE_CHECKPOINTS>']
-    _ = (working_memory_on, checkpoints_on)
     items: list[str] = []
-    idx = 1
     if tracker_on:
-        items.append(
-            f'{idx}. For multi-step tasks \u2192 task_tracker(update) with full plan'
-        )
-        idx += 1
-        items.append(
-            f'{idx}. At turn start during multi-step work \u2192 task_tracker(view)'
-        )
-        idx += 1
-    if not items:
+        items.append('1. For multi-step work, follow `<TASK_TRACKING>` checkpoints')
+    else:
         items.append('1. For complex work, inspect first and verify before final summary')
+    if working_memory_on:
+        items.append(
+            '2. After major findings or pivots, update `memory(action="working")` — not task progress'
+        )
+    if checkpoints_on:
+        step = 3 if working_memory_on else 2
+        items.append(
+            f'{step}. After completing a logical phase, consider `checkpoint(save)` with a short label'
+        )
     parts.extend(items)
     parts.append('</MANDATORY_DISCIPLINE_CHECKPOINTS>')
     return '\n'.join(parts)
@@ -191,7 +206,7 @@ def _render_autonomy(
             base_workflow
             + '\n\nWith **task_tracker** enabled, treat **sync** as part of the loop: after verify, update the plan when progress changed.'
         )
-        task_sync_instruction = '**Task synchronization:** Update `task_tracker` to `done`, `skipped`, or `blocked` before writing the final summary.'
+        task_sync_instruction = '**Task synchronization:** See `<TASK_TRACKING>` before the final summary.'
     else:
         problem_solving_workflow_body = base_workflow
         task_sync_instruction = '**Plan synchronization:** Keep your final response aligned with what was actually completed.'

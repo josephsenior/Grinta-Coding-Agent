@@ -9,7 +9,7 @@ from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
 from backend.ledger.action import MessageAction
 
-ASK_USER_TOOL_NAME = 'ask_user'
+from backend.inference.tool_names import ASK_USER_TOOL_NAME
 
 
 def create_ask_user_tool() -> ChatCompletionToolParam:

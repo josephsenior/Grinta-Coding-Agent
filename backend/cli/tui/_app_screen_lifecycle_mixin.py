@@ -22,6 +22,7 @@ from backend.cli.tui._app_small_widgets import (
     HUD,
     InfoSidebar,
     InputBar,
+    LoadEarlierRequested,
     PromptTextArea,
     RendererDrainRequested,
     Transcript,
@@ -116,6 +117,28 @@ class _AppScreenLifecycleMixin:
         if self._transcript_has_real_content():
             self._hide_welcome()
 
+    async def on_load_earlier_requested(self, _message: LoadEarlierRequested) -> None:
+        if self._renderer is None:
+            return
+        try:
+            display = self._get_display()
+            button = display._load_earlier_button
+            if button is not None:
+                button.update('Loading...')
+        except Exception:
+            pass
+        loaded = await self._renderer.load_earlier_messages()
+        try:
+            display = self._get_display()
+            if loaded == 0 or self._renderer._min_rendered_event_id <= 0:
+                if display._load_earlier_button is not None:
+                    display._load_earlier_button.remove()
+                    display.set_load_earlier_button(None)
+            else:
+                display._load_earlier_button.update('Load earlier messages...')
+        except Exception:
+            pass
+
     def _start_background_bootstrap(self) -> None:
         async def _bg():
             try:
@@ -184,6 +207,12 @@ class _AppScreenLifecycleMixin:
                 local_data_root=get_local_data_root(config),
             )
             sid = session_id.strip() if session_id else generate_sid(config)
+            try:
+                from backend.context.session_context import bind_session_context
+
+                bind_session_context(session_id=sid)
+            except Exception:
+                logger.debug('Failed to bind session context at bootstrap', exc_info=True)
             event_stream = EventStream(sid=sid, file_store=file_store, user_id='tui')
             self._event_stream = event_stream
             try:

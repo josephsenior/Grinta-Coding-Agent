@@ -16,8 +16,13 @@ def _render_critical(
 ) -> str:
     """Render last-mile critical execution rules with dynamic terminal tool naming."""
     think_execution_rule = '**Reasoning alone does not execute** — after reasoning, you must still call tools.'
-    _ = terminal_manager_available
-    terminal_manager_rule = ''
+    if terminal_manager_available:
+        terminal_manager_rule = (
+            '5. **Interactive sessions use `terminal_manager`** — call `open` once per session, '
+            'then use `read`/`input` with the same `session_id`; do not call `open` again for follow-up commands.\n'
+        )
+    else:
+        terminal_manager_rule = ''
 
     task_tracker_antipattern = (
         '- **Writing the final summary with `task_tracker` items still `todo` or `in_progress`.** Sync the tracker first.'
@@ -31,13 +36,13 @@ def _render_critical(
     _ = checkpoints_on
 
     planning_tool_list = (
-        '`task_tracker`, `{terminal_command_tool}`, and the public file API tools'
+        f'`task_tracker`, `{terminal_command_tool}`, and the public file API tools'
         if tracker_on
-        else '`{terminal_command_tool}` and the public file API tools'
+        else f'`{terminal_command_tool}` and the public file API tools'
     )
 
     user_question_antipattern = (
-        '**Asking the user a question in plain prose mid-turn.** Plain text ends the run; use `ask_user` when input is required.'
+        '**Asking the user a question in plain prose mid-turn.** See `<ASK_USER_TOOL>`.'
     )
     return render_partial(
         'system_partial_04_critical.md',

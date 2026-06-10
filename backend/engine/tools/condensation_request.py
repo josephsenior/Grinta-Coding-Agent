@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
+from backend.inference.tool_names import SUMMARIZE_CONTEXT_TOOL_NAME
 
 _CONDENSATION_REQUEST_DESCRIPTION = 'Request a condensation of the conversation history when the context becomes too long or when you need to focus on the most relevant information.'
 
@@ -11,7 +12,7 @@ _CONDENSATION_REQUEST_DESCRIPTION = 'Request a condensation of the conversation 
 def create_summarize_context_tool() -> ChatCompletionToolParam:
     """Create the summarize context tool for the Orchestrator agent."""
     return create_tool_definition(
-        name='summarize_context',
+        name=SUMMARIZE_CONTEXT_TOOL_NAME,
         description=_CONDENSATION_REQUEST_DESCRIPTION,
         properties={},
         required=[],

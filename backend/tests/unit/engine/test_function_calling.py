@@ -171,3 +171,16 @@ class TestModeToolValidation:
                 {'type': 'file', 'path': 'demo.txt', 'content': 'x'},
                 mode='chat',
             )
+
+    def test_chat_mode_allows_read_tool_call(self):
+        tool_call = SimpleNamespace(function=SimpleNamespace(name='read'))
+
+        action = _process_single_tool_call(
+            tool_call,
+            {'type': 'file', 'path': 'demo.txt', 'security_risk': 'LOW'},
+            mode='chat',
+        )
+
+        from backend.ledger.action import FileReadAction
+
+        assert isinstance(action, FileReadAction)

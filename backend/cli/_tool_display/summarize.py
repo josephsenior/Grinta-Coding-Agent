@@ -365,6 +365,7 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'find_symbols': _summary_find_symbol,
     'think': _summary_think,
     'agent_think': _summary_think,
+    'memory': _summary_memory,
     'memory_manager': _summary_memory,
     'task_tracker': _summary_task_tracker,
     'grep': _summary_grep,

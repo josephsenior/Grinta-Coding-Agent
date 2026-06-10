@@ -35,6 +35,8 @@ from backend.engine.tools.task_tracker import TaskTracker
 from backend.inference.tool_names import (
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
+    WEB_FETCH_TOOL_NAME,
+    WEB_SEARCH_TOOL_NAME,
 )
 from backend.ledger.action import (
     Action,
@@ -80,6 +82,20 @@ def _handle_browser_tool(arguments: Mapping[str, Any]) -> BrowserToolAction:
     return action
 
 
+def _handle_web_search_tool(arguments: Mapping[str, Any]) -> MCPAction:
+    """Handle native web_search — delegates to Exa MCP web_search_exa."""
+    from backend.engine.tools.web_tools import build_web_search_action
+
+    return build_web_search_action(dict(arguments))
+
+
+def _handle_web_fetch_tool(arguments: Mapping[str, Any]) -> MCPAction:
+    """Handle native web_fetch — Exa first, fetch MCP fallback (internal router)."""
+    from backend.engine.tools.web_tools import build_web_fetch_action
+
+    return build_web_fetch_action(dict(arguments))
+
+
 def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
     """Handle CmdRunTool (Bash) tool call."""
     from backend.engine.tools.bash import (
@@ -119,32 +135,30 @@ def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
     return action
 
 
-def _handle_memory_manager_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
-    """Handle unified memory ops: note, recall, semantic_recall, working_memory."""
-    action = arguments.get('action')
+def _handle_memory_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
+    """Handle unified memory ops: working, persist, recall."""
+    action = str(arguments.get('action', '')).strip().lower()
     if not action:
-        raise FunctionCallValidationError("Missing 'action' in memory_manager tool.")
+        raise FunctionCallValidationError("Missing 'action' in memory tool.")
 
-    if action == 'semantic_recall':
+    if action == 'recall':
         query = cast(str, arguments.get('key', ''))
         if not query:
             raise FunctionCallValidationError(
-                'Missing search phrase "key" in memory_manager (semantic_recall)'
+                'Missing search phrase "key" in memory(recall)'
             )
         k = 5
         recall_fn = _semantic_recall_registry.get('fn')
         if recall_fn is None:
             return AgentThinkAction(
-                thought='[SEMANTIC_RECALL_RESULT] Vector memory is not available in this session.'
+                thought='[MEMORY_RECALL] Vector memory is not available in this session.'
             )
         results = recall_fn(query, k)
         if not results:
             return AgentThinkAction(
-                thought=f'[SEMANTIC_RECALL_RESULT] No indexed memory results found for query: {query!r}'
+                thought=f'[MEMORY_RECALL] No indexed memory results found for query: {query!r}'
             )
-        parts = [
-            f'[SEMANTIC_RECALL_RESULT] {len(results)} results for query: {query!r}\n'
-        ]
+        parts = [f'[MEMORY_RECALL] {len(results)} results for query: {query!r}\n']
         for i, item in enumerate(results, 1):
             content = item.get('content_text', item.get('content', ''))
             role = item.get('role', 'unknown')
@@ -153,10 +167,22 @@ def _handle_memory_manager_tool(arguments: Mapping[str, Any]) -> AgentThinkActio
             parts.append(f'  [{i}] ({role}{score_str}) {content[:500]}')
         return AgentThinkAction(thought='\n'.join(parts))
 
-    elif action == 'working_memory':
+    if action == 'persist':
+        from backend.engine.tools.workspace_memory import persist_entry
+
+        key = cast(str, arguments.get('key', ''))
+        value = cast(str, arguments.get('value', ''))
+        kind = cast(str, arguments.get('kind', 'lesson'))
+        if not key.strip():
+            raise FunctionCallValidationError('persist requires non-empty key.')
+        if not value.strip():
+            raise FunctionCallValidationError('persist requires non-empty value.')
+        _inserted, message = persist_entry(kind=kind, key=key, value=value)
+        return AgentThinkAction(thought=f'[MEMORY_PERSIST] {message}')
+
+    if action == 'working':
         import backend.engine.tools.working_memory as working_memory_tools
 
-        # Map arguments back to what build_working_memory_action expects
         wm_args = {
             'command': cast(str, arguments.get('update_type', 'get')),
             'section': cast(str, arguments.get('section', 'all')),
@@ -168,8 +194,12 @@ def _handle_memory_manager_tool(arguments: Mapping[str, Any]) -> AgentThinkActio
         )
         return build_working_memory_action(wm_args)
 
-    else:
-        raise FunctionCallValidationError(f'Unknown memory_manager action: {action}')
+    raise FunctionCallValidationError(
+        f"Unknown memory action: {action!r}. Use working, persist, or recall."
+    )
+
+
+_handle_memory_manager_tool = _handle_memory_tool
 
 
 def _handle_grep_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
@@ -178,9 +208,11 @@ def _handle_grep_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
         pattern=cast(str, arguments.get('pattern', '')),
         path=cast(str, arguments.get('path', '.')),
         file_pattern=cast(str, arguments.get('file_pattern', '')),
+        output_mode=cast(str, arguments.get('output_mode', 'files_with_matches')),
         context_lines=cast(int, arguments.get('context_lines', 2)),
         case_sensitive=cast(bool, arguments.get('case_sensitive', False)),
-        max_results=cast(int, arguments.get('max_results', 50)),
+        head_limit=cast(int | None, arguments.get('head_limit')),
+        offset=cast(int, arguments.get('offset', 0)),
     )
 
 
@@ -189,7 +221,8 @@ def _handle_glob_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     return build_glob_action(
         pattern=cast(str, arguments.get('pattern', '')),
         path=cast(str, arguments.get('path', '.')),
-        max_results=cast(int, arguments.get('max_results', 100)),
+        head_limit=cast(int | None, arguments.get('head_limit')),
+        offset=cast(int, arguments.get('offset', 0)),
     )
 
 

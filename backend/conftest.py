@@ -40,6 +40,8 @@ def _has_pkg(name: str) -> bool:
 
 
 def pytest_configure(config):
+    # Tests must not write session logs under logs/workspaces/ (no PROJECT_ROOT).
+    os.environ['LOG_TO_FILE'] = 'false'
     markers = [
         'windows',
         'optional',
@@ -166,6 +168,12 @@ def _skip_reasons(item, context: '_CollectionContext') -> Iterator[str]:
 
 def _is_runtime_test(item) -> bool:
     return 'runtime' in pathlib.Path(item.fspath).parts
+
+
+@pytest.fixture(autouse=True)
+def _disable_file_logging_during_tests(monkeypatch):
+    """Keep pytest runs from creating logs/workspaces/*/sessions/* directories."""
+    monkeypatch.setattr('backend.core.logger.LOG_TO_FILE', False)
 
 
 @pytest.fixture(autouse=True)

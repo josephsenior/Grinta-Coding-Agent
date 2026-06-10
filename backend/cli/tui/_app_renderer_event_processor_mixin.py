@@ -22,6 +22,7 @@ from backend.cli.tui._app_renderer_event_drain import (
     _signal_activity,
     drain_events,
     drain_events_async,
+    load_earlier_messages,
     wait_for_activity,
 )
 from backend.cli.tui._app_renderer_event_helpers import (
@@ -69,6 +70,9 @@ class _AppRendererEventProcessorMixin:
 
     async def wait_for_activity(self, wait_timeout_sec: float = 0.5):
         return await wait_for_activity(self, wait_timeout_sec)
+
+    async def load_earlier_messages(self, batch_size: int = 100) -> int:
+        return await load_earlier_messages(self, batch_size)
 
     def _on_event(self, event) -> None:
         _on_event(self, event)

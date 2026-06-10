@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from backend.engine.prompts.section_renderers._env_hints import (
-    _explore_hint,
+    _discovery_decision_table,
     _lsp_available,
     _repo_discovery_contract,
     _routing_memory_tool_placeholders,
@@ -32,11 +32,8 @@ def _render_routing(
     mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
     can_edit = not (is_chat_mode(mode) or is_plan_mode(mode))
 
-    explore = _explore_hint(config)
     lsp_available = _lsp_available(config)
-    meta_cognition_on = getattr(config, 'enable_meta_cognition', False)
     working_memory_on = getattr(config, 'enable_working_memory', True)
-    condensation_on = getattr(config, 'enable_condensation_request', False)
     tracker_on = getattr(config, 'enable_task_tracker_tool', False)
     if not is_windows:
         env_line = 'Use **bash** for environment actions (install, build, test, git, processes). '
@@ -62,8 +59,12 @@ def _render_routing(
     memory_kw = _routing_memory_tool_placeholders(
         working_memory_on=working_memory_on,
         tracker_on=tracker_on,
-        condensation_on=condensation_on,
-        meta_cognition_on=meta_cognition_on,
+    )
+
+    web_on = bool(getattr(config, 'enable_web', True))
+    discovery_decision_table = _discovery_decision_table(
+        lsp_available=lsp_available,
+        web_on=web_on,
     )
 
     if not can_edit:
@@ -71,9 +72,8 @@ def _render_routing(
         shell_and_execution_ladder = ''
     else:
         read_and_edit_ladder = (
-            '- **Read & Edit:** Use the registered file tools only. `find_symbols` discovers symbol candidates; `read` inspects file/range/symbol content; `create` creates new files/symbols; `edit_symbols` modifies/deletes existing symbols; `replace_string` performs exact one-file text replacement/addition/deletion; `multiedit` performs atomic multi-file refactors with `replace_string` and `edit_symbols` operations; `undo_last_edit` reverts the most recent file-write on an existing file.\n'
-            '- **Edit scope:** Prefer the smallest intent-level operation that solves the problem. Do not use shell commands to write source files.\n'
-            '- **Edit discipline:** Do not invent alternate file-edit formats or serialized code payloads.'
+            '- **Read & Edit:** Follow `<EDITOR_AND_FILE_OPERATIONS>` — '
+            'do not use shell commands to write source files.'
         )
         shell_and_execution_ladder = '- **Shell & Execution:** Use the terminal strictly for build/test/git/processes.'
 
@@ -82,13 +82,10 @@ def _render_routing(
         ambiguous_intent_instruction=memory_kw['ambiguous_intent_instruction'],
         batch_commands=batch_cmds,
         lsp_routing=lsp_routing,
-        context_budget_sync_clause=memory_kw['context_budget_sync_clause'],
-        context_budget_next_step=memory_kw['context_budget_next_step'],
-        explore_layout_hint=explore,
+        discovery_decision_table=discovery_decision_table,
         memory_and_context_section=memory_kw['memory_and_context_section'],
         post_condensation_retrieval=memory_kw['post_condensation_retrieval'],
         remaining_work_source_of_truth=memory_kw['remaining_work_source_of_truth'],
-        repetition_recovery_options=memory_kw['repetition_recovery_options'],
         surviving_state_facts=memory_kw['surviving_state_facts'],
         tool_call_batching_mode=tool_call_batching_mode,
         read_and_edit_ladder=read_and_edit_ladder,

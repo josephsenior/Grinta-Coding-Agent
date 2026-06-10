@@ -23,10 +23,20 @@ def _wrap_simple_passthrough(tool_name: str):
     return _inner
 
 
-WRAPPER_TOOL_REGISTRY: dict[str, Callable] = {
-    'get_component_cached': _wrap_simple_passthrough('get_component'),
-    'get_block_cached': _wrap_simple_passthrough('get_block'),
-}
+def _register_wrapper_tools() -> dict[str, Callable]:
+    from backend.engine.tools.web_tools import (
+        NATIVE_WEB_FETCH_ROUTER,
+        native_web_fetch_wrapper,
+    )
+
+    return {
+        'get_component_cached': _wrap_simple_passthrough('get_component'),
+        'get_block_cached': _wrap_simple_passthrough('get_block'),
+        NATIVE_WEB_FETCH_ROUTER: native_web_fetch_wrapper,
+    }
+
+
+WRAPPER_TOOL_REGISTRY: dict[str, Callable] = _register_wrapper_tools()
 
 
 def wrapper_tool_params(available_server_tools: list[str]) -> list[dict]:

@@ -298,6 +298,14 @@ class TUIRenderer(
         self._pending_mcp_card: Any | None = None
         self._pending_delegate_card: Any | None = None
 
+        # Event ID tracking for virtual scrolling (prune + replay)
+        self._min_rendered_event_id: int = -1
+        self._max_rendered_event_id: int = -1
+
+        # Replay mode flags
+        self._replay_mode: bool = False
+        self._prepend_mode: bool = False
+
 
 # ── Re-exports for backward compatibility ──
 from backend.cli.tui._app_constants import (  # noqa: F401
@@ -344,6 +352,8 @@ from backend.cli.tui._app_small_widgets import (  # noqa: F401
     HUD,
     InfoSidebar,
     InputBar,
+    LoadEarlierButton,
+    LoadEarlierRequested,
     PromptTextArea,
     RendererDrainRequested,
     Transcript,

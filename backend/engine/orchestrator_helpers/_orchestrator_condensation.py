@@ -53,11 +53,10 @@ def _emit_compaction_status_if_needed(orch: Orchestrator, state: State) -> bool:
 
 def _set_skip_compaction_flag(state: State) -> None:
     """Mark pipeline state so ineffective compactions are skipped on the next turn."""
-    history = list(getattr(state, 'history', []))
-    latest_id = getattr(history[-1], 'id', None) if history else None
+    from backend.context.context_pipeline import apply_ineffective_compaction_backoff
+
+    apply_ineffective_compaction_backoff(state)
     pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
-    if isinstance(latest_id, int):
-        pipe['skip_compaction_until_event_id'] = latest_id
     count = pipe.get('consecutive_condensation_steps', 0)
     if not isinstance(count, int):
         count = 0

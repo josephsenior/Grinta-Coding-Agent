@@ -52,7 +52,12 @@ def _event_file_has_checksum(payload: dict) -> bool:
     return isinstance(payload.get(_CHECKSUM_KEY), str)
 
 
-def verify_event_integrity(payload: dict, event_id: int) -> bool:
+def verify_event_integrity(
+    payload: dict,
+    event_id: int,
+    *,
+    log_mismatch: bool = True,
+) -> bool:
     """Verify the integrity checksum of a loaded event payload.
 
     Events persisted before checksum support (missing ``_grinta_checksum``)
@@ -67,12 +72,13 @@ def verify_event_integrity(payload: dict, event_id: int) -> bool:
     computed = compute_event_checksum(payload)
     if computed == stored:
         return True
-    logger.warning(
-        'Checksum mismatch at event id=%d: stored=%s... computed=%s...',
-        event_id,
-        stored[:16],
-        computed[:16],
-    )
+    if log_mismatch:
+        logger.warning(
+            'Checksum mismatch at event id=%d: stored=%s... computed=%s...',
+            event_id,
+            stored[:16],
+            computed[:16],
+        )
     return False
 
 

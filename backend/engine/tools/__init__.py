@@ -10,6 +10,7 @@ from .delegate_task import create_delegate_task_tool
 from .glob import create_glob_tool
 from .grep import create_grep_tool
 from .lsp_query import create_lsp_query_tool
+from .memory import create_memory_tool
 from .memory_manager import create_memory_manager_tool
 from .meta_cognition import (
     create_ask_user_tool,
@@ -38,6 +39,7 @@ __all__ = [
     'create_read_tool',
     'create_replace_string_tool',
     'create_undo_last_edit_tool',
+    'create_memory_tool',
     'create_memory_manager_tool',
     'create_debugger_tool',
     'create_analyze_project_structure_tool',

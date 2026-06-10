@@ -12,21 +12,23 @@ For searching the *contents* of files (text/regex matches) use the
 from __future__ import annotations
 
 from backend.engine.tools._search_helpers import (
+    DEFAULT_SEARCH_HEAD_LIMIT,
     build_ripgrep_file_discovery_args,
     collect_python_target_files,
     format_python_file_listing,
-    format_ripgrep_output,
     has_ripgrep,
     normalize_glob_pattern,
+    paginate_line_output,
     path_exists_or_error,
-    run_ripgrep_with_handler,
+    resolve_search_pagination,
+    run_ripgrep_command,
     search_error_action,
     search_results_action,
 )
 from backend.engine.tools.common import create_tool_definition
 from backend.ledger.action import AgentThinkAction
 
-GLOB_TOOL_NAME = 'glob'
+from backend.inference.tool_names import GLOB_TOOL_NAME
 
 _GLOB_DESCRIPTION = """\
 List files under a directory whose name (or relative path) matches a glob.
@@ -60,11 +62,18 @@ def create_glob_tool() -> dict:
                     'Defaults to the current workspace directory.'
                 ),
             },
-            'max_results': {
+            'head_limit': {
                 'type': 'integer',
                 'description': (
-                    'Maximum number of files to return '
-                    '(default: 100, max: 1000).'
+                    'Limit output to the first N file paths after offset '
+                    f'(default: {DEFAULT_SEARCH_HEAD_LIMIT}). Pass 0 for unlimited.'
+                ),
+            },
+            'offset': {
+                'type': 'integer',
+                'description': (
+                    'Skip the first N file paths before applying head_limit '
+                    '(default: 0).'
                 ),
             },
         },
@@ -75,12 +84,16 @@ def create_glob_tool() -> dict:
 def build_glob_action(
     pattern: str = '',
     path: str = '.',
-    max_results: int = 100,
+    head_limit: int | None = None,
+    offset: int = 0,
 ) -> AgentThinkAction:
     """List files that match ``pattern`` under ``path``."""
     path = path or '.'
-    max_results = max(1, min(int(max_results), 1000))
     pattern = normalize_glob_pattern(pattern or '')
+    resolved_offset, resolved_head_limit = resolve_search_pagination(
+        head_limit,
+        offset,
+    )
 
     if not pattern:
         return _invalid_glob_arguments_action()
@@ -91,22 +104,44 @@ def build_glob_action(
     if missing_path_error is not None:
         return missing_path_error
 
+    empty_message = 'No matching files found.'
     rg_path = has_ripgrep()
     if rg_path:
-        return run_ripgrep_with_handler(
-            lambda: build_ripgrep_file_discovery_args(
-                rg_path,
-                file_pattern=pattern,
-                path=path,
+        try:
+            result = run_ripgrep_command(
+                build_ripgrep_file_discovery_args(
+                    rg_path,
+                    file_pattern=pattern,
+                    path=path,
+                )
+            )
+        except Exception as exc:
+            return search_error_action(
+                f'Error running ripgrep: {exc}', source_tool=GLOB_TOOL_NAME
+            )
+        if getattr(result, 'timed_out', False):
+            return search_error_action(
+                'Search timed out after 30s',
+                source_tool=GLOB_TOOL_NAME,
+            )
+        lines = result.stdout.splitlines()
+        return search_results_action(
+            paginate_line_output(
+                lines,
+                offset=resolved_offset,
+                head_limit=resolved_head_limit,
+                empty_message=empty_message,
             ),
-            max_lines=max_results,
-            empty_message='No matching files found.',
             source_tool=GLOB_TOOL_NAME,
         )
 
     target_files = collect_python_target_files(path, pattern)
     return search_results_action(
-        format_python_file_listing(target_files, max_results=max_results),
+        format_python_file_listing(
+            target_files,
+            offset=resolved_offset,
+            head_limit=resolved_head_limit,
+        ),
         source_tool=GLOB_TOOL_NAME,
     )
 

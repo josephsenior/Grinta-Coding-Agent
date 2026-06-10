@@ -156,18 +156,12 @@ class TestConvertObservation:
         )
         assert all(isinstance(c, TextContent) for c in msg.content)
 
-    def test_condensation_observation_restores_scratchpad_and_working_memory(
-        self, monkeypatch
-    ):
-        monkeypatch.setattr(
-            'backend.context.observation_processors._load_scratchpad_snapshot',
-            lambda: '\nSCRATCHPAD\n',
-        )
+    def test_condensation_observation_restores_working_memory(self, monkeypatch):
         monkeypatch.setattr(
             'backend.context.observation_processors._load_working_memory_snapshot',
             lambda: '\nWORKING_MEMORY\n',
         )
-        obs = AgentCondensationObservation(content='summary')
+        obs = AgentCondensationObservation(content='summary', is_working_set=False)
 
         msg = convert_observation_to_message(obs, max_message_chars=None)
 
@@ -175,8 +169,8 @@ class TestConvertObservation:
         assert isinstance(content, TextContent)
         text = content.text
         assert 'summary' in text
-        assert 'SCRATCHPAD' in text
         assert 'WORKING_MEMORY' in text
+        assert 'Context was condensed' in text
 
     def test_condensation_observation_restores_snapshot_once(
         self, monkeypatch, tmp_path

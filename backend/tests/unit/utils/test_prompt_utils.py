@@ -204,7 +204,7 @@ class TestOrchestratorPromptManager:
         result = opm.get_system_message()
 
         assert '`communicate_with_user`' not in result
-        assert 'call ask_user with your questions as a list' in result
+        assert '<ASK_USER_TOOL>' in result
 
     def test_get_system_message_omits_summarize_context_when_disabled(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -243,8 +243,8 @@ class TestOrchestratorPromptManager:
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
         result = opm.get_system_message()
 
-        assert '`memory_manager(action="working_memory")`' not in result
-        assert '`memory_manager(action="semantic_recall", key=...)`' not in result
+        assert '`memory(action="working")`' not in result
+        assert '`memory(action="recall", key=...)`' not in result
 
     def test_get_system_message_uses_lsp_when_lsp_is_available(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -370,27 +370,36 @@ class TestOrchestratorPromptManager:
             lessons_file.write_text('Always test your code.', encoding='utf-8')
 
             result = opm.get_system_message()
-            assert 'REPOSITORY_LESSONS_LEARNED' in result
+            assert 'WORKSPACE_MEMORY' in result
             assert 'Always test your code.' in result
 
-    def test_inject_scratchpad(self, tmp_path):
+    def test_inject_workspace_memory(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
 
-        with (
-            patch(
-                'backend.engine.tools.note.scratchpad_entries_for_prompt',
-                return_value=[('key', 'val')],
-            ),
-            patch(
-                'backend.engine.tools.working_memory.get_working_memory_prompt_block',
-                return_value='',
-            ),
-        ):
-            result = opm.get_system_message()
-            assert 'WORKING_SCRATCHPAD' in result
-            assert '[key]: val' in result
+        with patch(
+            'backend.engine.tools.workspace_memory.format_prompt_block',
+            return_value='<WORKSPACE_MEMORY>\n- [command] test_cmd: uv run pytest\n</WORKSPACE_MEMORY>',
+        ) as mock_format:
+            result = opm.get_system_message(
+                memory_query='fix failing pytest in backend'
+            )
+            assert 'WORKSPACE_MEMORY' in result
+            assert 'test_cmd' in result
+            mock_format.assert_called_once_with('fix failing pytest in backend')
+
+    def test_inject_workspace_memory_without_query(self, tmp_path):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
+
+        with patch(
+            'backend.engine.tools.workspace_memory.format_prompt_block',
+            return_value='',
+        ) as mock_format:
+            opm.get_system_message()
+            mock_format.assert_called_once_with(None)
 
     def test_function_calling_mode_native_guidance(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -495,7 +504,9 @@ class TestOrchestratorPromptManager:
         assert '`github_search`' not in result
         assert 'Configured MCP servers' not in result
 
-        assert addendum == ''
+        assert '<MCP_TOOLS>' in addendum
+        assert '`github_search`' in addendum
+        assert 'Configured MCP servers' in addendum
 
 
 class TestPromptBuilderSectionTokens:
@@ -644,6 +655,7 @@ def _base_config(**overrides: object) -> SimpleNamespace:
             overrides.get('enable_condensation_request', False)
         ),
         enable_terminal=bool(overrides.get('enable_terminal', True)),
+        enable_web=bool(overrides.get('enable_web', True)),
     )
 
 
@@ -903,7 +915,8 @@ class TestBuildSystemPromptRenders:
             mcp_tool_names=['search_github'],
             mcp_tool_descriptions={'search_github': 'Search GitHub repositories'},
         )
-        assert addendum == ''
+        assert '<MCP_TOOLS>' in addendum
+        assert '`search_github`' in addendum
 
     @pytest.mark.parametrize('mode', ['chat', 'plan', 'agent'])
     def test_system_prompt_does_not_embed_current_mode_block(self, mode: str) -> None:
@@ -950,7 +963,19 @@ class TestBuildSystemPromptRenders:
             config=_base_config(enable_working_memory=False),
             function_calling_mode='native',
         )
-        assert 'memory_manager(action="working_memory")' not in result
+        assert 'memory(action="working")' not in result
+
+    def test_working_memory_enabled_documents_actions(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_working_memory=True),
+            function_calling_mode='native',
+        )
+        assert '<MEMORY_AND_CONTEXT>' in result
+        assert 'memory(action="working")' in result
+        assert 'memory(action="persist"' in result
+        assert 'memory(action="recall", key=...)' in result
 
     def test_condensation_request_enabled(self) -> None:
         result = self._assert_renders_cleanly(
@@ -1048,9 +1073,18 @@ class TestBuildSystemPromptRenders:
             'task_tracker mentioned when tool is disabled'
         )
         assert 'checkpoint' not in result, 'checkpoint mentioned when tool is disabled'
-        assert 'memory_manager' not in result, (
-            'memory_manager mentioned when tool is disabled'
+        assert '`memory`' not in result, 'memory tool mentioned when disabled'
+        assert 'memory(action=' not in result, 'memory tool mentioned when disabled'
+
+    def test_no_web_tools_when_disabled(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_web=False),
+            function_calling_mode='native',
         )
+        assert '`web_search`' not in result
+        assert '`web_fetch`' not in result
 
     def test_plan_mode_omits_mutation_tools(self) -> None:
         result = self._assert_renders_cleanly(
@@ -1071,3 +1105,66 @@ class TestBuildSystemPromptRenders:
         )
         assert '<AUTONOMY>' in result
         assert 'mutate files' in result or 'investigation' in result
+
+    def test_discovery_routing_documents_grep_modes_and_pagination(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(mode='agent'),
+            function_calling_mode='native',
+        )
+        assert '<DISCOVERY_ROUTING>' in result
+        assert 'output_mode=files_with_matches' in result
+        assert 'head_limit' in result
+        assert 'command=callers' in result
+        assert 'command=semantic_search' in result
+        assert 'read(type="symbols", symbols=[...])' in result
+        assert 'read(type="file", path=..., start_line=..., end_line=...)' in result
+        assert 'test_coverage' not in result
+        assert 'glob' in result and 'grep' in result
+        assert 'Test files for a module' in result
+        assert 'web_search' in result
+        assert 'web_fetch' in result
+
+    def test_capabilities_documents_web_and_optional_exa_key(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_browsing=True, enable_web=True),
+            function_calling_mode='native',
+        )
+        assert 'web_search' in result
+        assert 'web_fetch' in result
+        assert 'EXA_API_KEY' in result
+        assert 'optional' in result.lower() or 'not required' in result.lower()
+
+    def test_web_disabled_omits_web_from_discovery_and_capabilities(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_web=False),
+            function_calling_mode='native',
+        )
+        assert '→ `web_search`' not in result
+        assert '→ `web_fetch`' not in result
+        assert 'Web (`web_search` / `web_fetch`)' not in result
+
+    def test_checkpoints_document_clear(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_checkpoints=True),
+            function_calling_mode='native',
+        )
+        assert 'checkpoint(clear)' in result
+
+    def test_checkpoints_enabled_documents_save_view_revert(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_checkpoints=True),
+            function_calling_mode='native',
+        )
+        assert 'checkpoint(save)' in result
+        assert 'checkpoint(view)' in result
+        assert 'checkpoint(revert)' in result

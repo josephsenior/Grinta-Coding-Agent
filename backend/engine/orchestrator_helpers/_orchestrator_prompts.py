@@ -97,9 +97,21 @@ def _apply_mcp_tools(orch: Orchestrator, mcp_tools: list[dict]) -> None:
     )
     pm = getattr(orch, '_prompt_manager', None)
     if pm and hasattr(pm, 'mcp_tool_names'):
-        pm.mcp_tool_names = list(orch.mcp_tools.keys())
+        from backend.engine.tools.web_tools import MCP_TOOLS_HIDDEN_BY_NATIVE_WEB
+
+        native_web_on = bool(getattr(orch.config, 'enable_web', True))
+        visible_names = list(orch.mcp_tools.keys())
+        if native_web_on:
+            visible_names = [
+                name for name in visible_names if name not in MCP_TOOLS_HIDDEN_BY_NATIVE_WEB
+            ]
+        pm.mcp_tool_names = visible_names
         descriptions = _mcp_tool_descriptions_from_specs(mcp_tools)
         if hasattr(pm, 'mcp_tool_descriptions'):
-            pm.mcp_tool_descriptions = descriptions
+            pm.mcp_tool_descriptions = {
+                name: descriptions[name]
+                for name in visible_names
+                if name in descriptions
+            }
         if hasattr(pm, 'mcp_server_hints'):
             pm.mcp_server_hints = _mcp_server_prompt_hints(orch)

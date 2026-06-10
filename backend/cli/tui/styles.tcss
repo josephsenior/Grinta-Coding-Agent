@@ -652,6 +652,16 @@ AgentMessage {
     color: #cbd5e1;
 }
 
+TranscriptNotice {
+    width: 100%;
+    height: auto;
+    margin: 0 0 1 0;
+    padding: 0 1;
+    background: #12161f;
+    border: none;
+    color: #7a8299;
+}
+
 /* ── Scroll badge ──────────────────────────────────── */
 #scroll-badge {
     display: none;

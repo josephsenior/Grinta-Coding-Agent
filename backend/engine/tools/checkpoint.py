@@ -19,7 +19,7 @@ from typing import Any
 
 from backend.ledger.action.agent import AgentThinkAction
 
-CHECKPOINT_TOOL_NAME = 'checkpoint'
+from backend.inference.tool_names import CHECKPOINT_TOOL_NAME
 
 _CHECKPOINTS_FILE = 'checkpoints.json'
 

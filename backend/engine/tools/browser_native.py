@@ -9,7 +9,7 @@ from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition, get_security_risk_param
 from backend.ledger.action.browser_tool import BrowserToolAction
 
-BROWSER_TOOL_NAME = 'browser'
+from backend.inference.tool_names import BROWSER_TOOL_NAME
 
 _BROWSER_COMMANDS = (
     'start',

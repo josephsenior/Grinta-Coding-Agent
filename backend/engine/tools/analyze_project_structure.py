@@ -10,7 +10,7 @@ top-level dispatcher. The per-mode helpers live in sibling modules:
   - backend.engine.tools._aps_shared             (run_command, _diag, imports-reverse)
   - backend.engine.tools._aps_tree               (tree + symbols modes)
   - backend.engine.tools._aps_file_modes         (imports + outline + recent + semantic)
-  - backend.engine.tools._aps_callers_coverage   (callers + test_coverage modes)
+  - backend.engine.tools._aps_callers_coverage   (callers mode)
   - backend.engine.tools._aps_dependencies       (dependencies mode)
 
 Pure code motion: no logic changes.
@@ -20,10 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from backend.engine.tools._aps_callers_coverage import (
-    _build_callers_action,
-    _build_test_coverage_action,
-)
+from backend.engine.tools._aps_callers_coverage import _build_callers_action
 from backend.engine.tools._aps_dependencies import _build_dependencies_action
 from backend.engine.tools._aps_file_modes import (
     _build_file_outline_action,
@@ -35,7 +32,7 @@ from backend.engine.tools._aps_shared import _analyze_depth, _diag
 from backend.engine.tools._aps_tree import _build_symbols_action, _build_tree_action
 from backend.ledger.action import AgentThinkAction
 
-ANALYZE_PROJECT_STRUCTURE_TOOL_NAME = 'analyze_project_structure'
+from backend.inference.tool_names import ANALYZE_PROJECT_STRUCTURE_TOOL_NAME
 
 
 def create_analyze_project_structure_tool() -> dict:
@@ -45,16 +42,14 @@ def create_analyze_project_structure_tool() -> dict:
         'function': {
             'name': ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
             'description': (
-                'Get a structural overview of the project. '
-                "Modes: 'tree' (directory tree with file sizes), "
-                "'imports' (import/dependency graph for a file), "
-                "'symbols' (classes, functions, top-level names in a file), "
-                "'recent' (recently modified files in the repo), "
-                "'callers' (find all files that reference a symbol/function), "
-                "'test_coverage' (find test files that cover a given source file), "
-                "'dependencies' (transitive upstream/downstream dependency tree for a file), "
-                "'file_outline' (compact signatures for a source file — less context than a full read). "
-                'Use this BEFORE multi-file edits to understand dependencies.'
+                'Structural project overview — use when grep/glob/find_symbols are not enough. '
+                "tree: directory tree; recent: git-modified files; "
+                "imports/dependencies: import graph for a known file; "
+                "symbols: per-file symbol list; file_outline: compact signatures only; "
+                "callers: fast regex reference scan (prefer over semantic_search first); "
+                "semantic_search: AST reference scan fallback. "
+                'To find test files: use glob + grep (not this tool). '
+                'Use BEFORE multi-file edits to understand dependencies.'
             ),
             'parameters': {
                 'type': 'object',
@@ -68,29 +63,25 @@ def create_analyze_project_structure_tool() -> dict:
                             'file_outline',
                             'recent',
                             'callers',
-                            'test_coverage',
                             'semantic_search',
                             'dependencies',
                         ],
                         'description': (
                             'tree: directory tree (depth-limited). '
-                            'imports: show what a file imports and what imports it (1 hop). '
-                            'symbols: list classes/functions/top-level names in a file. '
-                            'file_outline: AST signatures only (Python) or line-based heads (fallback) — '
-                            'for large files before read. '
-                            'recent: git log of recently modified files. '
-                            'callers: find all files referencing a given symbol name. '
-                            'test_coverage: find test files that likely test a given source file. '
-                            'semantic_search: robust AST-based search for symbol references. '
-                            'dependencies: transitive upstream/downstream dependency tree '
-                            'for a file (multi-hop import graph, on-demand, no index).'
+                            'imports: 1-hop import graph for a file. '
+                            'symbols: per-file symbol list (file must be known). '
+                            'file_outline: compact signatures only — large files before read. '
+                            'recent: recently modified files via git. '
+                            'callers: workspace-wide regex reference scan (default for references). '
+                            'semantic_search: AST reference scan — use when callers misses or is ambiguous. '
+                            'dependencies: transitive import graph for a file.'
                         ),
                     },
                     'path': {
                         'type': 'string',
                         'description': (
                             "For 'tree': root directory to scan (default '.'). "
-                            "For 'imports'/'symbols'/'file_outline'/'test_coverage'/'dependencies': "
+                            "For 'imports'/'symbols'/'file_outline'/'dependencies': "
                             'path to the file to analyze.'
                         ),
                         'default': '.',
@@ -168,7 +159,6 @@ def build_analyze_project_structure_action(
         'symbols': lambda: _build_symbols_action(path),
         'file_outline': lambda: _build_file_outline_action(path),
         'recent': lambda: _build_recent_action(),
-        'test_coverage': lambda: _build_test_coverage_action(path),
         'dependencies': lambda: _build_dependencies_action(
             path,
             depth=depth,
@@ -186,7 +176,7 @@ def build_analyze_project_structure_action(
             params={'path': path, 'depth': depth},
             next_steps=[
                 'Use one of: tree, imports, symbols, file_outline, recent, '
-                'callers, test_coverage, semantic_search, dependencies.',
+                'callers, semantic_search, dependencies.',
             ],
         )
     )

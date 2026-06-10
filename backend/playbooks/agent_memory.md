@@ -9,7 +9,7 @@ triggers:
 
 # Long-lived project memory
 
-**Tool choice** (note / working_memory / semantic_recall) is defined in the system prompt — use that; this playbook only covers **file-based lessons**.
+**Tool choice** (`memory` actions: working / persist / recall) is defined in the system prompt — use that; this playbook covers **file-based lessons** and `/remember`.
 
 ## `lessons.md` (project lessons)
 
@@ -21,7 +21,7 @@ triggers:
 
 ## Vector / semantic recall
 
-Past turns and fuzzy “what did we decide about X?” → use **`memory_manager`(semantic_recall)** per system prompt. No manual indexing step.
+Past turns and fuzzy “what did we decide about X?” → use **`memory(action=recall, key="...")`** per system prompt. No manual indexing step.
 
 ## `/remember` workflow
 

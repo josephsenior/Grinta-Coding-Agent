@@ -1,9 +1,7 @@
-"""Callers and test-coverage modes for the analyze_project_structure tool.
+"""Callers mode for the analyze_project_structure tool.
 
-Contains helpers and builders for the ``callers`` (find all files
-referencing a symbol) and ``test_coverage`` (find test files that
-likely cover a given source file) modes. Both walk the repository
-to locate matching files.
+Contains helpers and builders for the ``callers`` mode (find all files
+referencing a symbol). Walks the repository to locate matching files.
 
 Extracted from ``backend.engine.tools.analyze_project_structure`` to
 keep that module focused on the public tool API.
@@ -14,9 +12,6 @@ from __future__ import annotations
 import os
 import re
 import shutil
-from collections.abc import Callable
-from typing import Any
-
 from backend.engine.tools._aps_shared import _diag, _run_command
 from backend.engine.tools.ignore_filter import (
     get_ignore_spec,
@@ -140,111 +135,4 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
                 ],
             )
         )
-    return AgentThinkAction(thought='\n'.join(out))
-
-
-def _collect_matching_files(
-    start_dir: str,
-    *,
-    root: str,
-    spec: Any,
-    limit: int,
-    predicate: Callable[[str, str, str], bool],
-) -> list[str]:
-    matches: list[str] = []
-    for root_dir, dirs, files in os.walk(start_dir):
-        prune_ignored_dirs(root, root_dir, dirs, spec)
-        for filename in files:
-            if is_ignored_file(root, root_dir, filename, spec):
-                continue
-            fpath = os.path.join(root_dir, filename)
-            if not predicate(root_dir, filename, fpath):
-                continue
-            matches.append(fpath)
-            if len(matches) >= limit:
-                return matches
-    return matches
-
-
-def _file_contains_pattern(fpath: str, pattern: re.Pattern[str]) -> bool:
-    try:
-        with open(fpath, encoding='utf-8', errors='ignore') as file_handle:
-            return bool(pattern.search(file_handle.read()))
-    except Exception:
-        return False
-
-
-def _extend_named_section(
-    out: list[str],
-    *,
-    title: str,
-    items: list[str],
-    empty_message: str,
-) -> None:
-    out.append(title)
-    out.extend(items)
-    if not items:
-        out.append(empty_message)
-    out.append('')
-
-
-def _build_test_coverage_action(path: str) -> AgentThinkAction:
-    """Find test files that likely cover a given source file."""
-    basename = os.path.splitext(os.path.basename(path))[0]
-    dirname = os.path.dirname(path) or '.'
-    out = [f'=== TEST COVERAGE FOR {os.path.basename(path)} ===']
-
-    root = os.path.abspath('.')
-    spec = get_ignore_spec(root)
-
-    name_re = re.compile(
-        rf'^(test_{re.escape(basename)}\.py|{re.escape(basename)}_test\.py)$'
-    )
-    test_files = _collect_matching_files(
-        '.',
-        root=root,
-        spec=spec,
-        limit=20,
-        predicate=lambda _root_dir, filename, _fpath: bool(name_re.match(filename)),
-    )
-    _extend_named_section(
-        out,
-        title='--- Tests by naming convention ---',
-        items=test_files,
-        empty_message='(none)',
-    )
-
-    import_re = re.compile(rf'(import|from).*{re.escape(basename)}')
-    import_test_files = _collect_matching_files(
-        '.',
-        root=root,
-        spec=spec,
-        limit=20,
-        predicate=lambda _root_dir, filename, fpath: (
-            (filename.startswith('test_') or filename.endswith('_test.py'))
-            and fpath not in test_files
-            and _file_contains_pattern(fpath, import_re)
-        ),
-    )
-    _extend_named_section(
-        out,
-        title='--- Tests that import this module ---',
-        items=import_test_files,
-        empty_message='(no importing test files found)',
-    )
-
-    conftest_files = _collect_matching_files(
-        dirname,
-        root=root,
-        spec=spec,
-        limit=10,
-        predicate=lambda _root_dir, filename, _fpath: filename == 'conftest.py',
-    )
-    _extend_named_section(
-        out,
-        title='--- Conftest files in scope ---',
-        items=conftest_files,
-        empty_message='(none)',
-    )
-
     return AgentThinkAction(thought='\n'.join(out))

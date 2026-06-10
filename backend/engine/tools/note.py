@@ -10,7 +10,7 @@ import json
 import time
 from pathlib import Path
 
-from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
+from backend.inference.tool_names import NOTE_TOOL_NAME, RECALL_TOOL_NAME
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
 from backend.ledger.action import AgentThinkAction
@@ -74,10 +74,10 @@ def create_recall_tool() -> ChatCompletionToolParam:
 
 
 def _notes_path() -> Path:
-    """Return the absolute path to the scratchpad JSON file."""
-    from backend.core.workspace_resolution import workspace_agent_state_dir
+    """Return the absolute path to the session-scoped scratchpad JSON file."""
+    from backend.context.session_context import scoped_agent_path
 
-    return workspace_agent_state_dir() / _AGENT_NOTES_NAME
+    return scoped_agent_path('agent_notes', '.json')
 
 
 def _read_notes_blob() -> dict:

@@ -108,13 +108,13 @@ def _handle_read_range_public(arguments: Mapping[str, Any]) -> Action:
         end_i = int(end_line)
     except (TypeError, ValueError) as exc:
         raise FunctionCallValidationError(
-            'read type=range requires integer start_line and end_line.'
+            'read type=file line range requires integer start_line and end_line.'
         ) from exc
     if start_i < 1:
-        raise FunctionCallValidationError('read type=range start_line must be >= 1.')
+        raise FunctionCallValidationError('read start_line must be >= 1.')
     if end_i != -1 and end_i < start_i:
         raise FunctionCallValidationError(
-            'read type=range end_line must be >= start_line, or -1 for EOF.'
+            'read end_line must be >= start_line, or -1 for EOF.'
         )
     action = _build_read_file_action(
         str(path),
@@ -347,31 +347,6 @@ def _coerce_symbols_list_argument(
     return targets if targets else None
 
 
-def _build_single_symbol_target_from_scalars(
-    arguments: Mapping[str, Any],
-) -> list[Mapping[str, Any]]:
-    symbol_id = _str_or_empty(arguments.get('symbol_id'))
-    qualified_name = _str_or_empty(arguments.get('qualified_name'))
-    symbol_name = _str_or_empty(
-        arguments.get('symbol_name') or arguments.get('query')
-    )
-    if symbol_id or qualified_name or symbol_name:
-        return [
-            {
-                'symbol_id': symbol_id,
-                'qualified_name': qualified_name,
-                'symbol_name': symbol_name,
-                'path': arguments.get('path'),
-                'symbol_kind': arguments.get('symbol_kind'),
-                'parent_symbol': arguments.get('parent_symbol'),
-                'occurrence': arguments.get('occurrence'),
-            }
-        ]
-    raise FunctionCallValidationError(
-        'read type=symbols requires symbols[], qualified_name, symbol_id, or symbol_name.'
-    )
-
-
 def _coerce_read_symbol_targets(
     arguments: Mapping[str, Any],
 ) -> list[Mapping[str, Any]]:
@@ -379,7 +354,9 @@ def _coerce_read_symbol_targets(
     result = _coerce_symbols_list_argument(raw_symbols)
     if result is not None:
         return result
-    return _build_single_symbol_target_from_scalars(arguments)
+    raise FunctionCallValidationError(
+        'read type=symbols requires a non-empty symbols[] array.'
+    )
 
 
 def _handle_read_symbols_public(arguments: Mapping[str, Any]) -> AgentThinkAction:
@@ -431,16 +408,25 @@ def _handle_read_tool(arguments: Mapping[str, Any]) -> Action:
     read_type = (
         str(require_tool_argument(arguments, 'type', READ_TOOL_NAME)).strip().lower()
     )
+    if read_type == 'range':
+        raise FunctionCallValidationError(
+            'read type=range was removed. Use type=file with path, start_line, and end_line.'
+        )
     if read_type == 'file':
         path = require_tool_argument(arguments, 'path', READ_TOOL_NAME)
-        action = _build_read_file_action(str(path), {})
-        return action
-    if read_type == 'range':
-        return _handle_read_range_public(arguments)
+        has_start = arguments.get('start_line') is not None
+        has_end = arguments.get('end_line') is not None
+        if has_start or has_end:
+            if not (has_start and has_end):
+                raise FunctionCallValidationError(
+                    'read type=file line range requires both start_line and end_line.'
+                )
+            return _handle_read_range_public(arguments)
+        return _build_read_file_action(str(path), {})
     if read_type == 'symbols':
         return _handle_read_symbols_public(arguments)
     raise FunctionCallValidationError(
-        "read type must be one of 'file', 'range', or 'symbols'."
+        "read type must be one of 'file' or 'symbols'."
     )
 
 

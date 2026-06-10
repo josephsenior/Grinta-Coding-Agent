@@ -44,7 +44,7 @@ def test_read_file_and_range_return_file_read_actions(monkeypatch, tmp_path):
     )
     range_action = _handle_read_tool(
         {
-            'type': 'range',
+            'type': 'file',
             'path': 'a.txt',
             'start_line': 2,
             'end_line': 3,
@@ -57,6 +57,50 @@ def test_read_file_and_range_return_file_read_actions(monkeypatch, tmp_path):
     assert isinstance(range_action, FileReadAction)
     assert range_action.path == 'a.txt'
     assert range_action.view_range == [2, 3]
+
+
+def test_read_rejects_legacy_range_type(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+    (tmp_path / 'a.txt').write_text('one\n', encoding='utf-8')
+
+    with pytest.raises(FunctionCallValidationError, match='type=range was removed'):
+        _handle_read_tool(
+            {
+                'type': 'range',
+                'path': 'a.txt',
+                'start_line': 1,
+                'end_line': 1,
+                'security_risk': 'LOW',
+            }
+        )
+
+
+def test_read_symbols_requires_symbols_array(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+
+    with pytest.raises(FunctionCallValidationError, match='symbols\\[\\]'):
+        _handle_read_tool(
+            {
+                'type': 'symbols',
+                'qualified_name': 'login',
+                'security_risk': 'LOW',
+            }
+        )
+
+
+def test_read_file_range_requires_both_line_bounds(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+    (tmp_path / 'a.txt').write_text('one\ntwo\n', encoding='utf-8')
+
+    with pytest.raises(FunctionCallValidationError, match='both start_line and end_line'):
+        _handle_read_tool(
+            {
+                'type': 'file',
+                'path': 'a.txt',
+                'start_line': 1,
+                'security_risk': 'LOW',
+            }
+        )
 
 
 def test_read_symbols_auto_resolves_unique_symbol(monkeypatch, tmp_path):

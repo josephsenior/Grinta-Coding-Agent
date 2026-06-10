@@ -53,6 +53,11 @@ SEARCH_RG_EXCLUDED_DIRS: tuple[str, ...] = (
 
 SEARCH_RESULTS_TAG = '[SEARCH_RESULTS]'
 
+DEFAULT_SEARCH_HEAD_LIMIT = 200
+MAX_SEARCH_HEAD_LIMIT = 1000
+GREP_OUTPUT_MODES = frozenset({'content', 'files_with_matches', 'count'})
+DEFAULT_GREP_OUTPUT_MODE = 'files_with_matches'
+
 
 def search_results_action(content: str, *, source_tool: str) -> AgentThinkAction:
     """Wrap ``content`` in the standard search payload envelope."""
@@ -166,11 +171,61 @@ def collect_python_target_files(
     return target_files
 
 
-def format_python_file_listing(
-    target_files: list[str], *, max_results: int
+def resolve_search_pagination(
+    raw_head_limit: object = None,
+    raw_offset: object = None,
+    *,
+    default_head_limit: int = DEFAULT_SEARCH_HEAD_LIMIT,
+    max_head_limit: int = MAX_SEARCH_HEAD_LIMIT,
+) -> tuple[int, int | None]:
+    """Return ``(offset, head_limit)``; ``head_limit=None`` means unlimited."""
+    try:
+        head_limit = int(
+            raw_head_limit if raw_head_limit is not None else default_head_limit
+        )
+    except (TypeError, ValueError):
+        head_limit = default_head_limit
+    try:
+        offset = max(0, int(raw_offset or 0))
+    except (TypeError, ValueError):
+        offset = 0
+    if head_limit == 0:
+        return offset, None
+    return offset, max(1, min(head_limit, max_head_limit))
+
+
+def paginate_line_output(
+    lines: list[str],
+    *,
+    offset: int,
+    head_limit: int | None,
+    empty_message: str,
 ) -> str:
-    output = '\n'.join(target_files[:max_results])
-    return output or 'No matching files found.'
+    if head_limit is None:
+        sliced = lines[offset:]
+    else:
+        sliced = lines[offset : offset + head_limit]
+    output = '\n'.join(line for line in sliced if line)
+    if not output:
+        return empty_message
+    if head_limit is not None and len(lines) > offset + head_limit:
+        remaining = len(lines) - offset - head_limit
+        output += f'\n... ({remaining} more; increase head_limit or use offset)'
+    return output
+
+
+def format_python_file_listing(
+    target_files: list[str],
+    *,
+    offset: int = 0,
+    head_limit: int | None = DEFAULT_SEARCH_HEAD_LIMIT,
+) -> str:
+    return paginate_line_output(
+        target_files,
+        offset=offset,
+        head_limit=head_limit,
+        empty_message='No matching files found.',
+    )
 
 
 def run_ripgrep_command(args: list[str]) -> Any:
@@ -187,6 +242,13 @@ def format_ripgrep_output(stdout: str, *, max_lines: int, empty_message: str) ->
     return output or empty_message
 
 
+def _append_ripgrep_glob_filters(args: list[str], file_pattern: str) -> None:
+    for directory in SEARCH_EXCLUDED_DIRS:
+        args.extend(['--glob', f'!**/{directory}/**'])
+    if file_pattern:
+        args.extend(['--glob', file_pattern])
+
+
 def build_ripgrep_file_discovery_args(
     rg_path: str,
     *,
@@ -194,11 +256,40 @@ def build_ripgrep_file_discovery_args(
     path: str,
 ) -> list[str]:
     args = [rg_path, '--files']
-    for directory in SEARCH_EXCLUDED_DIRS:
-        args.extend(['--glob', f'!**/{directory}/**'])
-    if file_pattern:
-        args.extend(['--glob', file_pattern])
+    _append_ripgrep_glob_filters(args, file_pattern)
     args.append(path)
+    return args
+
+
+def build_ripgrep_files_with_matches_args(
+    rg_path: str,
+    *,
+    pattern: str,
+    path: str,
+    file_pattern: str,
+    is_case_sensitive: bool,
+) -> list[str]:
+    args = [rg_path, '-l']
+    if not is_case_sensitive:
+        args.append('--ignore-case')
+    _append_ripgrep_glob_filters(args, file_pattern)
+    args.extend([pattern, path])
+    return args
+
+
+def build_ripgrep_count_args(
+    rg_path: str,
+    *,
+    pattern: str,
+    path: str,
+    file_pattern: str,
+    is_case_sensitive: bool,
+) -> list[str]:
+    args = [rg_path, '-c', '--no-heading']
+    if not is_case_sensitive:
+        args.append('--ignore-case')
+    _append_ripgrep_glob_filters(args, file_pattern)
+    args.extend([pattern, path])
     return args
 
 
@@ -236,12 +327,10 @@ def build_ripgrep_text_search_args(
     file_pattern: str,
     context_lines: int,
     is_case_sensitive: bool,
-    max_results: int,
 ) -> list[str]:
     args = [
         rg_path,
         f'--context={context_lines}',
-        f'--max-count={max_results}',
         '--line-number',
         '--no-heading',
     ]
@@ -303,32 +392,74 @@ def python_search_file_matches(
     return file_matches
 
 
+def _python_file_has_match(fpath: str, *, regex: re.Pattern[str]) -> bool:
+    try:
+        with open(fpath, 'r', encoding='utf-8', errors='ignore') as file_handle:
+            for line in file_handle:
+                if regex.search(line):
+                    return True
+    except OSError:
+        return False
+    return False
+
+
+def _python_file_match_count(fpath: str, *, regex: re.Pattern[str]) -> int:
+    count = 0
+    try:
+        with open(fpath, 'r', encoding='utf-8', errors='ignore') as file_handle:
+            for line in file_handle:
+                if regex.search(line):
+                    count += 1
+    except OSError:
+        return 0
+    return count
+
+
+def collect_python_files_with_matches(
+    target_files: list[str],
+    *,
+    regex: re.Pattern[str],
+) -> list[str]:
+    return [
+        file_path
+        for file_path in target_files
+        if _python_file_has_match(file_path, regex=regex)
+    ]
+
+
+def collect_python_match_counts(
+    target_files: list[str],
+    *,
+    regex: re.Pattern[str],
+) -> list[str]:
+    lines: list[str] = []
+    for file_path in target_files:
+        count = _python_file_match_count(file_path, regex=regex)
+        if count:
+            lines.append(f'{file_path}:{count}')
+    return lines
+
+
 def collect_python_match_results(
     target_files: list[str],
     *,
     regex: re.Pattern[str],
     context_lines: int,
-    max_results: int,
-) -> str:
+) -> list[str]:
     results: list[str] = []
-    match_count = 0
     for file_path in target_files:
-        if match_count >= max_results:
-            break
-
         file_matches = python_search_file_matches(
             file_path,
             regex=regex,
             context_lines=context_lines,
-            remaining_results=max_results - match_count,
+            remaining_results=10_000,
         )
-        match_count += len(file_matches)
-
         if file_matches:
             results.extend(file_matches)
             results.append('--')
-
-    return '\n'.join(results) or 'No matches found.'
+    if results and results[-1] == '--':
+        results.pop()
+    return results
 
 
 def has_ripgrep() -> str | None:

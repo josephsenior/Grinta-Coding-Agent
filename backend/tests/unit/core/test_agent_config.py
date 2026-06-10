@@ -96,9 +96,9 @@ class TestAgentConfigValidation:
         cfg = AgentConfig(mode=mode)
         assert cfg.mode == mode
 
-    def test_legacy_ask_mode_remains_valid_chat_alias(self):
-        cfg = AgentConfig(mode='ASK')
-        assert cfg.mode == 'ask'
+    def test_ask_mode_is_rejected(self):
+        with pytest.raises(ValidationError, match='mode must be one of'):
+            AgentConfig(mode='ask')
 
     def test_invalid_mode_rejected(self):
         with pytest.raises(ValidationError, match='mode must be one of'):
