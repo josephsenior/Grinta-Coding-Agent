@@ -27,9 +27,6 @@ from backend.execution.action_execution_server_helpers import (
     bump_terminal_empty_read_streak as _bump_terminal_empty_read_streak_impl,
 )
 from backend.execution.action_execution_server_helpers import (
-    reset_terminal_empty_read_streak as _reset_terminal_empty_read_streak_impl,
-)
-from backend.execution.action_execution_server_helpers import (
     clear_terminal_read_cursor as _clear_terminal_read_cursor_impl,
 )
 from backend.execution.action_execution_server_helpers import (
@@ -49,6 +46,9 @@ from backend.execution.action_execution_server_helpers import (
 )
 from backend.execution.action_execution_server_helpers import (
     read_terminal_with_mode as _read_terminal_with_mode_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    reset_terminal_empty_read_streak as _reset_terminal_empty_read_streak_impl,
 )
 from backend.execution.action_execution_server_helpers import (
     should_poll_terminal_input_delta as _should_poll_terminal_input_delta_impl,
@@ -207,7 +207,9 @@ class _AesIoTerminalMixin:
         logger.warning('Recreated missing default shell session')
         return recreated, None
 
-    def _log_terminal_debug(self, hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    def _log_terminal_debug(
+        self, hypothesis_id: str, location: str, message: str, data: dict
+    ) -> None:
         """Log debug trace for terminal operations."""
         try:
             payload = {
@@ -233,7 +235,9 @@ class _AesIoTerminalMixin:
             cwd = self._initial_cwd
         return str(self._resolve_effective_cwd(action_cwd, cwd))
 
-    async def _poll_terminal_output(self, session: Any, offset: int, timeout: float) -> None:
+    async def _poll_terminal_output(
+        self, session: Any, offset: int, timeout: float
+    ) -> None:
         """Poll for terminal output with early exit on first byte."""
         poll_interval = PTY_READ_POLL_INTERVAL_SECONDS
         waited = 0.0
@@ -351,7 +355,9 @@ class _AesIoTerminalMixin:
             session, session_id, action, shell_kind
         )
 
-    def _terminal_run_validate(self, action: TerminalRunAction) -> ErrorObservation | None:
+    def _terminal_run_validate(
+        self, action: TerminalRunAction
+    ) -> ErrorObservation | None:
         guard_err = self._terminal_open_guardrail_error(action.command or '')
         if guard_err is not None:
             self._log_terminal_debug(
@@ -421,11 +427,9 @@ class _AesIoTerminalMixin:
             }
             return preflight_err
 
-        predicted_cwd, policy_error = (
-            self._evaluate_interactive_terminal_command(
-                action.command,
-                Path(cwd).resolve(),
-            )
+        predicted_cwd, policy_error = self._evaluate_interactive_terminal_command(
+            action.command,
+            Path(cwd).resolve(),
         )
         if policy_error is not None:
             self.session_manager.close_session(session_id)
@@ -463,8 +467,13 @@ class _AesIoTerminalMixin:
             self._normalize_terminal_command(action.command or '')
         )
         obs = self._build_terminal_observation(
-            session_id, content, next_offset, has_new_output, dropped_chars,
-            state, shell_kind,
+            session_id,
+            content,
+            next_offset,
+            has_new_output,
+            dropped_chars,
+            state,
+            shell_kind,
         )
         self._advance_terminal_read_cursor(session_id, next_offset, mode='delta')
         return obs
@@ -497,8 +506,8 @@ class _AesIoTerminalMixin:
             if preflight_err is not None:
                 return preflight_err
 
-            sent_input, predicted_cwd, policy_error = (
-                self._terminal_input_write(session, action, shell_kind)
+            sent_input, predicted_cwd, policy_error = self._terminal_input_write(
+                session, action, shell_kind
             )
             if policy_error is not None:
                 return policy_error
@@ -582,11 +591,9 @@ class _AesIoTerminalMixin:
         predicted_cwd: Path | None = None
         if not action.is_control:
             policy_line = write_content.rstrip('\r\n')
-            predicted_cwd, policy_error = (
-                self._evaluate_interactive_terminal_command(
-                    policy_line,
-                    Path(getattr(session, 'cwd', self._initial_cwd)).resolve(),
-                )
+            predicted_cwd, policy_error = self._evaluate_interactive_terminal_command(
+                policy_line,
+                Path(getattr(session, 'cwd', self._initial_cwd)).resolve(),
             )
             if policy_error is not None:
                 return False, predicted_cwd, policy_error
@@ -657,13 +664,16 @@ class _AesIoTerminalMixin:
                 'has_new_output': has_new_output,
             },
         )
-        self._advance_terminal_read_cursor(
-            action.session_id, next_offset, mode='delta'
-        )
+        self._advance_terminal_read_cursor(action.session_id, next_offset, mode='delta')
         self._mark_terminal_session_interaction(action.session_id)
         return self._build_terminal_observation(
-            action.session_id, content, next_offset, has_new_output,
-            dropped_chars, state, shell_kind,
+            action.session_id,
+            content,
+            next_offset,
+            has_new_output,
+            dropped_chars,
+            state,
+            shell_kind,
         )
 
     async def terminal_read(self, action: TerminalReadAction) -> Observation:
@@ -709,13 +719,8 @@ class _AesIoTerminalMixin:
             self._mark_terminal_session_interaction(action.session_id)
             if has_new_output:
                 _reset_terminal_empty_read_streak_impl(self, action.session_id)
-            elif (
-                mode == 'delta'
-                and TERMINAL_EMPTY_READ_CLOSE_THRESHOLD > 0
-            ):
-                streak = _bump_terminal_empty_read_streak_impl(
-                    self, action.session_id
-                )
+            elif mode == 'delta' and TERMINAL_EMPTY_READ_CLOSE_THRESHOLD > 0:
+                streak = _bump_terminal_empty_read_streak_impl(self, action.session_id)
                 if streak >= TERMINAL_EMPTY_READ_CLOSE_THRESHOLD:
                     self.session_manager.close_session(action.session_id)
                     self._clear_terminal_read_cursor(action.session_id)

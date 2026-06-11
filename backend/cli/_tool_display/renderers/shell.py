@@ -24,18 +24,88 @@ if TYPE_CHECKING:
     from rich.console import Console
 
 
-_KNOWN_COMMANDS: frozenset[str] = frozenset({
-    'cd', 'ls', 'dir', 'pwd', 'cat', 'echo', 'type', 'mkdir', 'rm', 'del',
-    'copy', 'move', 'ren', 'git', 'npm', 'pip', 'python', 'node', 'cargo',
-    'go', 'rustc', 'make', 'cmake', 'docker', 'kubectl', 'curl', 'wget',
-    'ssh', 'scp', 'rsync', 'tar', 'zip', 'unzip', 'grep', 'find', 'awk',
-    'sed', 'head', 'tail', 'sort', 'uniq', 'wc', 'tee', 'xargs', 'env',
-    'export', 'source', 'bash', 'sh', 'zsh', 'fish', 'pwsh', 'powershell',
-    'cmd', 'set', 'if', 'for', 'while', 'foreach', 'switch', 'function',
-    'param', 'return', 'exit', 'break', 'continue', 'throw', 'try', 'catch',
-    'finally', 'using', 'class', 'enum', 'workflow', 'configuration',
-    'inlinescript', 'parallel', 'sequence',
-})
+_KNOWN_COMMANDS: frozenset[str] = frozenset(
+    {
+        'cd',
+        'ls',
+        'dir',
+        'pwd',
+        'cat',
+        'echo',
+        'type',
+        'mkdir',
+        'rm',
+        'del',
+        'copy',
+        'move',
+        'ren',
+        'git',
+        'npm',
+        'pip',
+        'python',
+        'node',
+        'cargo',
+        'go',
+        'rustc',
+        'make',
+        'cmake',
+        'docker',
+        'kubectl',
+        'curl',
+        'wget',
+        'ssh',
+        'scp',
+        'rsync',
+        'tar',
+        'zip',
+        'unzip',
+        'grep',
+        'find',
+        'awk',
+        'sed',
+        'head',
+        'tail',
+        'sort',
+        'uniq',
+        'wc',
+        'tee',
+        'xargs',
+        'env',
+        'export',
+        'source',
+        'bash',
+        'sh',
+        'zsh',
+        'fish',
+        'pwsh',
+        'powershell',
+        'cmd',
+        'set',
+        'if',
+        'for',
+        'while',
+        'foreach',
+        'switch',
+        'function',
+        'param',
+        'return',
+        'exit',
+        'break',
+        'continue',
+        'throw',
+        'try',
+        'catch',
+        'finally',
+        'using',
+        'class',
+        'enum',
+        'workflow',
+        'configuration',
+        'inlinescript',
+        'parallel',
+        'sequence',
+    }
+)
 
 _STYLE_MAP: dict[str, str] = {
     'keyword': 'bold #e9e9e9',
@@ -139,9 +209,7 @@ def _build_output_preview(output: str) -> list[Text]:
             line = line[:117] + '\u2026'
         lines.append(Text(line, style=NAVY_TEXT_MUTED))
     if len(raw_lines) > 8:
-        lines.append(
-            Text(f'... {len(raw_lines) - 8} more lines', style=NAVY_TEXT_DIM)
-        )
+        lines.append(Text(f'... {len(raw_lines) - 8} more lines', style=NAVY_TEXT_DIM))
     return lines
 
 

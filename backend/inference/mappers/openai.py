@@ -14,9 +14,7 @@ def _extract_new_style_tool_calls(
             'type': getattr(tc, 'type', None) or 'function',
             'function': {
                 'name': getattr(getattr(tc, 'function', None), 'name', ''),
-                'arguments': getattr(
-                    getattr(tc, 'function', None), 'arguments', '{}'
-                ),
+                'arguments': getattr(getattr(tc, 'function', None), 'arguments', '{}'),
             },
         }
         result.append(entry)

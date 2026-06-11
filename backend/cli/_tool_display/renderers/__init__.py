@@ -23,7 +23,6 @@ from backend.cli._tool_display.renderers.file_editor import (
     render_file_edit,
     render_file_read,
 )
-
 from backend.cli._tool_display.renderers.lsp import (
     render_lsp_query,
 )
@@ -68,7 +67,6 @@ __all__ = [
     'render_shell_command',
     'render_search_results',
     'render_search_summary',
-    
     'render_mcp_tool',
     'render_lsp_query',
     'render_browser_navigation',

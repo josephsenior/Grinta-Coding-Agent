@@ -100,9 +100,7 @@ def _mcp_github_repo_extract_names(items: list[Any]) -> list[str]:
     return names
 
 
-def _mcp_github_repo_format_message(
-    total: int, names: list[str]
-) -> str:
+def _mcp_github_repo_format_message(total: int, names: list[str]) -> str:
     head = ', '.join(names)
     rest = max(0, total - len(names))
     msg = f'{total} repos'

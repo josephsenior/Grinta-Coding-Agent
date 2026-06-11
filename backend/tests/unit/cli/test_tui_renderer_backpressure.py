@@ -7,14 +7,10 @@ from unittest.mock import MagicMock
 import pytest
 from rich.text import Text
 
-from backend.cli.tui import app as tui_app
-from backend.cli.tui._app_constants import (
-    _TUI_HISTORY_RENDER_LIMIT as _ORIG_HISTORY_LIMIT,
-    _TUI_PENDING_EVENT_LIMIT as _ORIG_PENDING_LIMIT,
-)
-from backend.cli.tui import _app_renderer_event_processor_mixin as _ep_mod
 from backend.cli.tui import _app_renderer_event_drain as _drain_mod
+from backend.cli.tui import _app_renderer_event_processor_mixin as _ep_mod
 from backend.cli.tui import _app_renderer_live_mixin as _live_mod
+from backend.cli.tui import app as tui_app
 from backend.ledger.action import StreamingChunkAction
 
 
@@ -151,9 +147,7 @@ async def test_tui_renderer_coalesces_interim_streaming_chunks():
         loop=loop,
     )
 
-    renderer._on_event(
-        StreamingChunkAction(chunk='a', accumulated='a', is_final=False)
-    )
+    renderer._on_event(StreamingChunkAction(chunk='a', accumulated='a', is_final=False))
     renderer._on_event(
         StreamingChunkAction(chunk='b', accumulated='ab', is_final=False)
     )

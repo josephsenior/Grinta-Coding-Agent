@@ -22,7 +22,6 @@ from backend.core.config.compactor_config import (
     AmortizedPruningCompactorConfig,
     AutoCompactorConfig,
     NoOpCompactorConfig,
-    ObservationMaskingCompactorConfig,
     RecentEventsCompactorConfig,
     SmartCompactorConfig,
     StructuredSummaryCompactorConfig,

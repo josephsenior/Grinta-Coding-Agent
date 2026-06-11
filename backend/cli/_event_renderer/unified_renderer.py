@@ -196,9 +196,7 @@ class ActivityRenderer:
         preview_lines = output.splitlines()[:8]
         for line in preview_lines:
             truncated = line[:120] + ('...' if len(line) > 120 else '')
-            extra_lines.append(
-                ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
-            )
+            extra_lines.append(ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1))
         if len(output.splitlines()) > 8:
             extra_lines.append(
                 ActivityLine(
@@ -218,13 +216,9 @@ class ActivityRenderer:
     ) -> ActivityCard:
         """Create an activity card for a shell command."""
         if ActivityRenderer._is_grep_shell_command(command):
-            return ActivityRenderer._grep_shell_command(
-                command, output, exit_code
-            )
+            return ActivityRenderer._grep_shell_command(command, output, exit_code)
         if ActivityRenderer._is_glob_shell_command(command):
-            return ActivityRenderer._glob_shell_command(
-                command, output, exit_code
-            )
+            return ActivityRenderer._glob_shell_command(command, output, exit_code)
 
         cmd_preview = command[:80] + ('...' if len(command) > 80 else '')
         secondary, kind = ActivityRenderer._build_shell_secondary(exit_code)
@@ -316,7 +310,9 @@ class ActivityRenderer:
 
     @staticmethod
     def _build_search_secondary(
-        match_count: int, file_count: int, exit_code: int | None,
+        match_count: int,
+        file_count: int,
+        exit_code: int | None,
     ) -> str | None:
         if match_count and file_count:
             return f'{match_count} matches · {file_count} files'
@@ -333,9 +329,7 @@ class ActivityRenderer:
             return extra_lines
         for line in result_lines[:8]:
             truncated = line[:120] + ('...' if len(line) > 120 else '')
-            extra_lines.append(
-                ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
-            )
+            extra_lines.append(ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1))
         if len(result_lines) > 8:
             extra_lines.append(
                 ActivityLine(
@@ -348,7 +342,8 @@ class ActivityRenderer:
 
     @staticmethod
     def _resolve_search_card_kind(
-        exit_code: int | None, output: str | None,
+        exit_code: int | None,
+        output: str | None,
     ) -> str:
         if exit_code == 0 or (exit_code == 1 and not output):
             return 'ok'
@@ -368,7 +363,9 @@ class ActivityRenderer:
         query = _extract_search_query(command) or command[:50]
         result_lines: list[str] = output.splitlines() if output else []
         match_count, file_count = ActivityRenderer._count_search_matches(result_lines)
-        secondary = ActivityRenderer._build_search_secondary(match_count, file_count, exit_code)
+        secondary = ActivityRenderer._build_search_secondary(
+            match_count, file_count, exit_code
+        )
         extra_lines = ActivityRenderer._build_search_extra_lines(result_lines)
         kind = ActivityRenderer._resolve_search_card_kind(exit_code, output)
 
@@ -661,9 +658,7 @@ class ActivityRenderer:
         lines = content.splitlines()[:15]
         for line in lines:
             truncated = line[:120] + ('...' if len(line) > 120 else '')
-            extra_lines.append(
-                ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1)
-            )
+            extra_lines.append(ActivityLine(truncated, style=NAVY_TEXT_MUTED, indent=1))
         if len(content.splitlines()) > 15:
             extra_lines.append(
                 ActivityLine(
@@ -676,7 +671,8 @@ class ActivityRenderer:
 
     @staticmethod
     def _build_terminal_secondary(
-        exit_code: int | None, session_id: str,
+        exit_code: int | None,
+        session_id: str,
     ) -> tuple[str | None, str]:
         if exit_code is not None:
             return f'exit {exit_code}', 'ok' if exit_code == 0 else 'err'
@@ -698,7 +694,9 @@ class ActivityRenderer:
                 ActivityLine(f'Session: {session_id}', style=NAVY_TEXT_DIM, indent=1)
             )
         extra_lines.extend(ActivityRenderer._build_terminal_content_lines(content))
-        secondary, kind = ActivityRenderer._build_terminal_secondary(exit_code, session_id)
+        secondary, kind = ActivityRenderer._build_terminal_secondary(
+            exit_code, session_id
+        )
         should_collapse = (
             bool(content) and exit_code == 0 and not _looks_error_heavy(content)
         )
@@ -815,6 +813,7 @@ class ActivityRenderer:
             from backend.cli._tool_display.renderers.search import (
                 render_search_results,
             )
+
             rich_lines = render_search_results(
                 '\n'.join(result_lines),
                 query=query,
@@ -876,9 +875,15 @@ class ActivityRenderer:
         )
         quoted = f'"{query}"'
         detail = f'{quoted} in {scope}' if scope else quoted
-        secondary = ActivityRenderer._build_search_results_secondary(match_count, file_count)
+        secondary = ActivityRenderer._build_search_results_secondary(
+            match_count, file_count
+        )
         extra_lines = ActivityRenderer._build_search_results_extra_lines(
-            query, result_lines, file_list, file_count, match_count,
+            query,
+            result_lines,
+            file_list,
+            file_count,
+            match_count,
         )
 
         return ActivityCard(

@@ -707,9 +707,7 @@ def mcp_log_stream(server_name: str) -> Any:
             return existing
         read_fd, write_fd = os.pipe()
         read_stream = os.fdopen(read_fd, 'r', encoding='utf-8', errors='replace')
-        write_stream = os.fdopen(
-            write_fd, 'w', encoding='utf-8', errors='replace'
-        )
+        write_stream = os.fdopen(write_fd, 'w', encoding='utf-8', errors='replace')
         mcp_logger = logging.getLogger(f'app.mcp.{safe}')
         if not getattr(mcp_logger, '_grinta_mcp_configured', False):
             mcp_logger.setLevel(logging.INFO)

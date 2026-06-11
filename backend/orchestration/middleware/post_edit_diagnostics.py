@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from backend.core.logger import app_logger as logger
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
@@ -80,10 +80,16 @@ class PostEditDiagnosticsMiddleware(ToolInvocationMiddleware):
                 if receipt is not None:
                     receipts.append(receipt)
 
-            if not receipts:
+            actionable = [
+                receipt
+                for receipt in receipts
+                if receipt.status != 'skipped'
+                or receipt.reason != 'not a known LSP file type'
+            ]
+            if not actionable:
                 return
 
-            _append_lsp_diagnostics(observation, receipts)
+            _append_lsp_diagnostics(observation, actionable)
         except Exception:
             logger.debug('PostEditDiagnosticsMiddleware skipped', exc_info=True)
 
@@ -107,8 +113,6 @@ def _auto_lsp_diagnostics_enabled(ctx: ToolInvocationContext) -> bool:
 def _extract_post_edit_paths(
     ctx: ToolInvocationContext, observation: Observation
 ) -> list[str]:
-    from backend.ledger.action import FileEditAction, FileWriteAction
-
     action = ctx.action
     paths: list[str] = []
     paths.extend(_extract_paths_from_tool_result(observation))
@@ -184,7 +188,9 @@ def _run_lsp_diagnostics(
 ) -> LspDiagnosticReceipt | None:
     skip_reason = _check_skip_conditions(path, max_file_bytes)
     if skip_reason:
-        return LspDiagnosticReceipt(path=str(path), status='skipped', reason=skip_reason)
+        return LspDiagnosticReceipt(
+            path=str(path), status='skipped', reason=skip_reason
+        )
 
     command = _installed_lsp_command(path)
     if command is None:
@@ -216,6 +222,7 @@ def _check_skip_conditions(path: Path, max_file_bytes: int) -> str | None:
 def _query_lsp(path: Path, timeout_seconds: float):
     try:
         from backend.utils.lsp_client import get_lsp_client
+
         return get_lsp_client().query(
             'diagnostics',
             str(path),
@@ -223,12 +230,14 @@ def _query_lsp(path: Path, timeout_seconds: float):
         )
     except TypeError:
         return LspDiagnosticReceipt(
-            path=str(path), status='skipped',
+            path=str(path),
+            status='skipped',
             reason='LSP client does not support bounded diagnostics',
         )
     except Exception as exc:
         return LspDiagnosticReceipt(
-            path=str(path), status='skipped',
+            path=str(path),
+            status='skipped',
             reason=f'LSP diagnostics error: {exc}',
         )
 
@@ -237,10 +246,13 @@ def _evaluate_lsp_result(
     result: Any, path: Path, max_diagnostics: int
 ) -> LspDiagnosticReceipt:
     if not getattr(result, 'available', True):
-        return LspDiagnosticReceipt(path=str(path), status='skipped', reason='LSP unavailable')
+        return LspDiagnosticReceipt(
+            path=str(path), status='skipped', reason='LSP unavailable'
+        )
     if getattr(result, 'error', ''):
         return LspDiagnosticReceipt(
-            path=str(path), status='skipped',
+            path=str(path),
+            status='skipped',
             reason=f'LSP error: {str(result.error)[:300]}',
         )
 

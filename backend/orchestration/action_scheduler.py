@@ -142,29 +142,52 @@ class ActionScheduler:
 
     def decide_parallel_batch(self, actions: list[Any]) -> ParallelBatchDecision:
         if not self.enabled:
-            return ParallelBatchDecision(should_execute_parallel=False, actions=(), reason='parallel_disabled')
+            return ParallelBatchDecision(
+                should_execute_parallel=False, actions=(), reason='parallel_disabled'
+            )
         if len(actions) < 2:
-            return ParallelBatchDecision(should_execute_parallel=False, actions=(), reason='insufficient_actions')
+            return ParallelBatchDecision(
+                should_execute_parallel=False, actions=(), reason='insufficient_actions'
+            )
 
         classified = [(self._classify(a), self._resource_key(a)) for a in actions]
         categories = {c for c, _ in classified}
 
         if None in categories:
-            return ParallelBatchDecision(should_execute_parallel=False, actions=(), reason='mixed_batch_sequential')
+            return ParallelBatchDecision(
+                should_execute_parallel=False,
+                actions=(),
+                reason='mixed_batch_sequential',
+            )
         if categories == {'read_only'}:
             return self._make_parallel_decision(actions)
-        if len(categories) == 1 and self._no_resource_conflicts(classified):
-            return self._make_parallel_decision(actions)
+        if len(categories) == 1:
+            if self._no_resource_conflicts(classified):
+                return self._make_parallel_decision(actions)
+            return ParallelBatchDecision(
+                should_execute_parallel=False,
+                actions=(),
+                reason='same_resource_conflict',
+            )
 
-        return ParallelBatchDecision(should_execute_parallel=False, actions=(), reason='mixed_batch_sequential')
+        return ParallelBatchDecision(
+            should_execute_parallel=False, actions=(), reason='mixed_batch_sequential'
+        )
 
     def _make_parallel_decision(self, actions: list[Any]) -> ParallelBatchDecision:
         capped = tuple(actions[: self.max_parallel_batch_size])
-        overflow = tuple(actions[self.max_parallel_batch_size:])
+        overflow = tuple(actions[self.max_parallel_batch_size :])
         reason = 'parallel_safe_batch' if not overflow else 'parallel_safe_batch_capped'
-        return ParallelBatchDecision(should_execute_parallel=True, actions=capped, reason=reason, overflow=overflow)
+        return ParallelBatchDecision(
+            should_execute_parallel=True,
+            actions=capped,
+            reason=reason,
+            overflow=overflow,
+        )
 
-    def _no_resource_conflicts(self, classified: list[tuple[str | None, str | None]]) -> bool:
+    def _no_resource_conflicts(
+        self, classified: list[tuple[str | None, str | None]]
+    ) -> bool:
         seen: set[str] = set()
         for _, rk in classified:
             if rk is not None and rk in seen:

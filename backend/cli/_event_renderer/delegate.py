@@ -145,9 +145,7 @@ def _rich_worker_lines(
             info.get('started_at'),
             info.get('finished_at'),
         )
-        lines.append(
-            _format_worker_result_line(label, w_status, action_count, elapsed)
-        )
+        lines.append(_format_worker_result_line(label, w_status, action_count, elapsed))
     return lines
 
 
@@ -181,9 +179,7 @@ def _worker_summary_lines(
     total = len(worker_statuses)
     ok_count = sum(status == 'OK' for status, _label in worker_statuses)
     failed_count = total - ok_count
-    result_message, result_kind = _worker_result_summary(
-        total, ok_count, failed_count
-    )
+    result_message, result_kind = _worker_result_summary(total, ok_count, failed_count)
 
     if sorted_workers:
         extra_lines = _rich_worker_lines(sorted_workers)

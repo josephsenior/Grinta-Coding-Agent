@@ -11,6 +11,7 @@ from backend.inference.catalog_loader import (
     apply_model_param_overrides,
     get_all_model_names,
     get_catalog,
+    get_context_window_tokens,
     get_featured_models,
     get_pricing,
     get_token_limits,
@@ -269,6 +270,18 @@ class TestGetTokenLimits:
                 input_limit, output_limit = get_token_limits(key)
                 assert input_limit == entry.max_input_tokens
                 break
+
+    def test_openai_long_context_limits_use_native_windows(self):
+        input_limit, output_limit = get_token_limits('openai/gpt-4.1')
+
+        assert get_context_window_tokens('openai/gpt-4.1') == 1_047_576
+        assert input_limit == 1_010_712
+        assert output_limit == 32_768
+
+        input_limit, output_limit = get_token_limits('openai/gpt-5')
+        assert get_context_window_tokens('openai/gpt-5') == 400_000
+        assert input_limit == 331_904
+        assert output_limit == 64_000
 
     def test_minimax_m2_7_output_limit_from_catalog(self):
         """OpenCode Go MiniMax should expose its configured output token limit."""

@@ -17,19 +17,6 @@ for a single source of truth.
 
 import os
 
-from backend.inference.tool_names import (
-    CREATE_TOOL_NAME,
-    EDIT_SYMBOLS_TOOL_NAME,
-    FIND_SYMBOLS_TOOL_NAME,
-    MULTIEDIT_TOOL_NAME,
-    NOTE_TOOL_NAME,
-    READ_TOOL_NAME,
-    RECALL_TOOL_NAME,
-    REPLACE_STRING_TOOL_NAME,
-    TASK_TRACKER_TOOL_NAME,
-    UNDO_LAST_EDIT_TOOL_NAME,
-)
-
 
 # ── Helpers ──────────────────────────────────────────────────────────
 def _parse_bool_env(var: str, default: str = 'false') -> bool:
@@ -584,7 +571,7 @@ DEFAULT_FILE_OPERATIONS_BLOCKED_PATHS = [
 ]
 DEFAULT_GIT_PROTECTED_BRANCHES = ['main', 'master', 'production', 'prod']
 DEFAULT_NETWORK_MAX_REQUESTS_PER_MINUTE = 60
-DEFAULT_PACKAGE_ALLOWED_MANAGERS = ['pip', 'npm', 'yarn', 'pnpm', 'uv', 'cargo','bun']
+DEFAULT_PACKAGE_ALLOWED_MANAGERS = ['pip', 'npm', 'yarn', 'pnpm', 'uv', 'cargo', 'bun']
 DEFAULT_SHELL_BLOCKED_COMMANDS = [
     'rm -rf /',
     'mkfs',

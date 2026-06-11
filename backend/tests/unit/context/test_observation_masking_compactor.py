@@ -15,9 +15,7 @@ async def test_masked_observations_are_not_condensation_observations() -> None:
     old_observation = CmdOutputObservation('old output', command='pytest')
     recent_observation = CmdOutputObservation('recent output', command='pytest')
 
-    result = await compactor.compact(
-        View(events=[old_observation, recent_observation])
-    )
+    result = await compactor.compact(View(events=[old_observation, recent_observation]))
 
     assert isinstance(result, View)
     masked = result.events[0]

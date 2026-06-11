@@ -300,7 +300,9 @@ class BashSession(BaseShellSession):
         metadata: CmdOutputMetadata,
         continue_prefix: str = '',
     ) -> str:
-        return _get_command_output(self, command, raw_command_output, metadata, continue_prefix)
+        return _get_command_output(
+            self, command, raw_command_output, metadata, continue_prefix
+        )
 
     def _handle_completed_command(
         self,
@@ -310,7 +312,9 @@ class BashSession(BaseShellSession):
         hidden: bool,
         is_input: bool = False,
     ) -> CmdOutputObservation:
-        return _handle_completed_command(self, command, pane_content, ps1_matches, hidden, is_input)
+        return _handle_completed_command(
+            self, command, pane_content, ps1_matches, hidden, is_input
+        )
 
     def _detach_pane_to_background(self, bg_session_id: str) -> None:
         return _detach_pane_to_background(self, bg_session_id)
@@ -347,7 +351,9 @@ class BashSession(BaseShellSession):
         pane_content: str,
         ps1_matches: list[Ps1Match],
     ) -> CmdOutputObservation:
-        return _handle_nochange_timeout_command(self, command, pane_content, ps1_matches)
+        return _handle_nochange_timeout_command(
+            self, command, pane_content, ps1_matches
+        )
 
     def _handle_hard_timeout_command(
         self,
@@ -356,7 +362,9 @@ class BashSession(BaseShellSession):
         ps1_matches: list[Ps1Match],
         timeout: float,
     ) -> CmdOutputObservation:
-        return _handle_hard_timeout_command(self, command, pane_content, ps1_matches, timeout)
+        return _handle_hard_timeout_command(
+            self, command, pane_content, ps1_matches, timeout
+        )
 
     def _ready_for_next_command(self) -> None:
         return _ready_for_next_command(self)
@@ -367,7 +375,9 @@ class BashSession(BaseShellSession):
         ps1_matches: list[Ps1Match],
         get_content_before_last_match: bool = False,
     ) -> str:
-        return _combine_outputs_between_matches(self, pane_content, ps1_matches, get_content_before_last_match)
+        return _combine_outputs_between_matches(
+            self, pane_content, ps1_matches, get_content_before_last_match
+        )
 
     def _validate_session_and_command(self, action: CmdRunAction) -> None:
         return _validate_session_and_command(self, action)
@@ -379,7 +389,9 @@ class BashSession(BaseShellSession):
         initial_ps1_matches: list[Ps1Match],
         is_input: bool,
     ) -> CmdOutputObservation | None:
-        return _handle_previous_command_timeout(self, command, last_pane_output, initial_ps1_matches, is_input)
+        return _handle_previous_command_timeout(
+            self, command, last_pane_output, initial_ps1_matches, is_input
+        )
 
     def _send_command_to_pane(self, command: str, is_input: bool) -> None:
         return _send_command_to_pane(self, command, is_input)
@@ -392,7 +404,9 @@ class BashSession(BaseShellSession):
         command: str,
         is_input: bool,
     ) -> CmdOutputObservation | None:
-        return _check_command_completion(self, cur_pane_output, ps1_matches, initial_ps1_count, command, is_input)
+        return _check_command_completion(
+            self, cur_pane_output, ps1_matches, initial_ps1_count, command, is_input
+        )
 
     def _check_timeouts(
         self,
@@ -404,7 +418,16 @@ class BashSession(BaseShellSession):
         ps1_matches: list[Ps1Match],
         first_output_seen: bool = True,
     ) -> CmdOutputObservation | None:
-        return _check_timeouts(self, action, last_change_time, start_time, command, cur_pane_output, ps1_matches, first_output_seen)
+        return _check_timeouts(
+            self,
+            action,
+            last_change_time,
+            start_time,
+            command,
+            cur_pane_output,
+            ps1_matches,
+            first_output_seen,
+        )
 
     def _monitor_command_execution(
         self,
@@ -414,7 +437,9 @@ class BashSession(BaseShellSession):
         action: CmdRunAction,
         initial_pane_output: str | None = None,
     ) -> CmdOutputObservation:
-        return _monitor_command_execution(self, command, initial_ps1_count, is_input, action, initial_pane_output)
+        return _monitor_command_execution(
+            self, command, initial_ps1_count, is_input, action, initial_pane_output
+        )
 
     def _handle_interactive_prompts(self, output: str, is_input: bool) -> bool:
         return _handle_interactive_prompts(self, output, is_input)

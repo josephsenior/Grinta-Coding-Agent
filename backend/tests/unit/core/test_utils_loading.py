@@ -13,7 +13,10 @@ from pydantic import SecretStr
 
 from backend.core.config.api_key_manager import api_key_manager
 from backend.core.config.app_config import AppConfig
-from backend.core.config.compactor_config import AutoCompactorConfig, ContextPipelineConfig
+from backend.core.config.compactor_config import (
+    AutoCompactorConfig,
+    ContextPipelineConfig,
+)
 from backend.core.config.config_loader import (
     ConfigLoadSummary,
     finalize_config,

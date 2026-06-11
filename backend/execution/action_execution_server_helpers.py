@@ -969,7 +969,8 @@ def _execute_multi_edit(executor: Any, action: Any, payload: dict) -> Any:
     original_snapshots = _collect_edit_snapshots(executor, payload)
     try:
         outcome = _handle_multi_edit_command(
-            action.path, {'file_edits': payload.get('file_edits')},
+            action.path,
+            {'file_edits': payload.get('file_edits')},
         )
     except (FunctionCallValidationError, ToolExecutionError, ValueError) as exc:
         return _make_edit_error_obs(exc, payload, command='multi_edit')
@@ -989,7 +990,8 @@ def _collect_edit_snapshots(executor: Any, payload: dict) -> dict:
         resolved_path = _resolve_structured_edit_path(executor, item_path)
         if resolved_path not in snapshots:
             snapshots[resolved_path] = (
-                _read_existing_text(resolved_path), item_path.strip(),
+                _read_existing_text(resolved_path),
+                item_path.strip(),
             )
     return snapshots
 
@@ -1001,6 +1003,7 @@ def _record_undo_snapshots(executor: Any, snapshots: dict) -> None:
 
 def _make_edit_error_obs(exc: Exception, payload: dict, command: str) -> Any:
     from backend.ledger.observation import ErrorObservation
+
     obs: ErrorObservation = ErrorObservation(str(exc))
     obs.tool_result = {
         'tool': 'file_edit',
@@ -1013,7 +1016,9 @@ def _make_edit_error_obs(exc: Exception, payload: dict, command: str) -> Any:
     return obs
 
 
-def _build_edit_result_obs(outcome: Any, original_snapshots: dict, action: Any, payload: dict) -> Any:
+def _build_edit_result_obs(
+    outcome: Any, original_snapshots: dict, action: Any, payload: dict
+) -> Any:
     from backend.ledger.action import MessageAction
     from backend.ledger.observation import FileEditObservation
 
@@ -1043,7 +1048,9 @@ def _build_edit_result_obs(outcome: Any, original_snapshots: dict, action: Any, 
     final_obs.tool_result = {
         'tool': 'file_edit',
         'ok': verification_passed,
-        'error_code': None if verification_passed else 'STRUCTURED_EDIT_VERIFICATION_FAILED',
+        'error_code': None
+        if verification_passed
+        else 'STRUCTURED_EDIT_VERIFICATION_FAILED',
         'retryable': not verification_passed,
         'operation': 'multi_edit',
         'payload': payload,
@@ -1055,7 +1062,9 @@ def _build_edit_result_obs(outcome: Any, original_snapshots: dict, action: Any, 
 
 def _format_edit_content(summary: str, diff: str, verification_text: str) -> str:
     if diff:
-        diff_section = f'{summary}\n\n[EDIT_DIFF]\n{diff}' if summary else f'[EDIT_DIFF]\n{diff}'
+        diff_section = (
+            f'{summary}\n\n[EDIT_DIFF]\n{diff}' if summary else f'[EDIT_DIFF]\n{diff}'
+        )
         return f'{diff_section}\n\n{verification_text}'
     return f'{summary}\n\n{verification_text}' if summary else verification_text
 

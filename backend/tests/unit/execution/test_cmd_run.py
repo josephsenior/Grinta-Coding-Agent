@@ -1020,9 +1020,7 @@ async def test_terminal_read_closes_session_after_empty_streak(
     session = MagicMock()
     session.shell_kind = 'powershell'
     mock_executor.session_manager.get_session.return_value = session
-    mock_executor._read_terminal_with_mode = MagicMock(
-        return_value=('', 0, False, 0)
-    )
+    mock_executor._read_terminal_with_mode = MagicMock(return_value=('', 0, False, 0))
 
     action = TerminalReadAction(session_id='terminal_1')
     for _ in range(2):
@@ -1046,11 +1044,11 @@ async def test_terminal_run_returns_error_when_execution_cap_exceeded(
     workspace.mkdir()
     mock_executor._initial_cwd = str(workspace)
 
-    async def slow_impl(
-        self, _action: TerminalRunAction
-    ) -> ErrorObservation:
+    async def slow_impl(self, _action: TerminalRunAction) -> ErrorObservation:
         await asyncio.sleep(1.0)
-        raise AssertionError('terminal_run should have timed out before slow_impl finished')
+        raise AssertionError(
+            'terminal_run should have timed out before slow_impl finished'
+        )
 
     mock_executor._terminal_run_impl = MethodType(slow_impl, mock_executor)
 

@@ -21,9 +21,9 @@ from backend.cli.theme import (
     CLR_BRAND_HUE,
     CLR_CARD_TITLE,
     CLR_SECONDARY,
+    CLR_STATUS_ERR,
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
-    CLR_STATUS_ERR,
 )
 
 

@@ -13,7 +13,6 @@ import os
 import re
 import shutil
 import time
-from collections.abc import Callable
 from typing import Any
 
 from backend.engine.tools.ignore_filter import (

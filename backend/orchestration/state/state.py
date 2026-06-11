@@ -203,7 +203,9 @@ def _coerce_plan_step_tags(raw_tags: Any) -> list:
 
 
 def _normalize_plan_step_tags(step: dict) -> list[str]:
-    return [str(t) for t in _coerce_plan_step_tags(step.get('tags', [])) if t is not None]
+    return [
+        str(t) for t in _coerce_plan_step_tags(step.get('tags', [])) if t is not None
+    ]
 
 
 def _resolve_plan_step_status(step: dict, normalized_subtasks: list) -> str:

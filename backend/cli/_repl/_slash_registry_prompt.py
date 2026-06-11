@@ -60,9 +60,7 @@ def build_command_completer(
                 return
 
             canonical_command = canonical_command_name(command_token)
-            argument_prefix = (
-                '' if has_trailing_space or len(parts) < 2 else parts[1]
-            )
+            argument_prefix = '' if has_trailing_space or len(parts) < 2 else parts[1]
 
             if canonical_command == '/autonomy':
                 lowered_prefix = argument_prefix.lower()

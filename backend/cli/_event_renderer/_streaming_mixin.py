@@ -128,9 +128,7 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
             sanitize_streaming_thinking_text,
         )
 
-        cleaned_thinking = sanitize_streaming_thinking_text(
-            action.thinking_accumulated
-        )
+        cleaned_thinking = sanitize_streaming_thinking_text(action.thinking_accumulated)
         if cleaned_thinking:
             self._ensure_reasoning()
             self._reasoning.set_streaming_thought(cleaned_thinking)
@@ -153,7 +151,9 @@ class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object
         # Also drop any leftover unclosed opening tag at the end of the chunk
         # (the tag itself is not content — its body arrives in the next chunk).
         display_text = re.sub(
-            r'<(?:redacted_thinking|think)>[^<]*$', '', display_text,
+            r'<(?:redacted_thinking|think)>[^<]*$',
+            '',
+            display_text,
             flags=re.DOTALL | re.IGNORECASE,
         ).strip()
         self._streaming_accumulated = _sanitize_visible_transcript_text(display_text)

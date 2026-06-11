@@ -73,9 +73,12 @@ class TestWrapperToolRegistry:
     def test_registry_only_contains_cache_helpers(self) -> None:
         # The surviving wrappers are pure cache/search helpers that the agent
         # can actually use; no meta-diagnostic tools.
+        from backend.engine.tools.web_tools import NATIVE_WEB_FETCH_ROUTER
+
         assert set(WRAPPER_TOOL_REGISTRY.keys()) == {
             'get_component_cached',
             'get_block_cached',
+            NATIVE_WEB_FETCH_ROUTER,
         }
 
     def test_wrapper_tool_params_does_not_advertise_capabilities_status(

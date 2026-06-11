@@ -81,7 +81,9 @@ async def test_tui_renderer_surfaces_llm_stream_retry_pending_status() -> None:
     call_args = tui.set_retry_status.call_args
     assert call_args is not None
     args, kwargs = call_args
-    assert any('provider' in str(a).lower() for a in args) or any('provider' in str(v).lower() for v in kwargs.values())
+    assert any('provider' in str(a).lower() for a in args) or any(
+        'provider' in str(v).lower() for v in kwargs.values()
+    )
 
 
 @pytest.mark.asyncio

@@ -123,7 +123,8 @@ def test_evaluate_loop_stall_then_recovery(capture_app_log):
     wd._evaluate(now, delta=0.05)
     assert 'EVENT_LOOP_STALL' in capture_app_log.msg_types()
     stall = next(
-        r for r in capture_app_log.records
+        r
+        for r in capture_app_log.records
         if getattr(r, 'msg_type', '') == 'EVENT_LOOP_STALL'
     )
     assert 'step_inner:get_next_action' in stall.getMessage()

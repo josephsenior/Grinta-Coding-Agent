@@ -182,7 +182,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
     def test_format_repair_error_message_is_brief_for_llm_no_action(self):
         msg = self.service._format_repair_error_message(LLMNoActionError('no action'))
 
-        self.assertIn('No tool call detected', msg)
+        self.assertIn('No tool call or final text was detected', msg)
         self.assertNotIn('terminal_manager', msg)
         self.assertNotIn('communicate_with_user', msg)
 

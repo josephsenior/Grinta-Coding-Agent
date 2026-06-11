@@ -92,7 +92,11 @@ class LLMRateGovernor:
         self._evict_old_ceilings()
         logger.info(
             'Learned TPM ceiling for %s/%s: %d tokens/%ds (was %s)',
-            prov, mdl, ceiling, self.history_window_seconds, prev,
+            prov,
+            mdl,
+            ceiling,
+            self.history_window_seconds,
+            prev,
         )
 
     def _evict_old_ceilings(self) -> None:

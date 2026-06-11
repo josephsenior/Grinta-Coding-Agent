@@ -29,7 +29,6 @@ from backend.engine.tools.task_tracker import (
 )
 from backend.ledger.action import (
     CmdRunAction,
-    FileEditAction,
     MessageAction,
     TaskTrackingAction,
 )
@@ -359,9 +358,9 @@ class TestHandleTaskTrackerTool:
         parameters = tool['function']['parameters']
         task_item = parameters['properties']['task_list']['items']
         status = task_item['properties']['status']
-        nested_status = (
-            task_item['properties']['subtasks']['items']['properties']['status']
-        )
+        nested_status = task_item['properties']['subtasks']['items']['properties'][
+            'status'
+        ]
 
         assert status['enum'] == ['todo', 'in_progress', 'done', 'skipped', 'blocked']
         assert nested_status['enum'] == status['enum']
@@ -385,7 +384,10 @@ class TestHandleTaskTrackerTool:
         assert action.command == 'update'
 
     def test_duplicate_update_returns_noop_task_action(self, tmp_path, monkeypatch):
-        monkeypatch.setenv('APP_WORKSPACE_DIR', str(tmp_path))
+        monkeypatch.setattr(
+            'backend.core.workspace_resolution.workspace_agent_state_dir',
+            lambda project_root=None: tmp_path,
+        )
         args = {
             'command': 'update',
             'task_list': [{'id': '1', 'description': 'step', 'status': 'in_progress'}],
@@ -393,6 +395,9 @@ class TestHandleTaskTrackerTool:
 
         first = _handle_task_tracker_tool(args)
         assert isinstance(first, TaskTrackingAction)
+        from backend.engine.tools.task_tracker import TaskTracker
+
+        TaskTracker(tmp_path).save_to_file(first.task_list)
 
         second = _handle_task_tracker_tool(args)
         assert isinstance(second, TaskTrackingAction)

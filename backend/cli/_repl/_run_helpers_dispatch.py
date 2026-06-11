@@ -219,9 +219,7 @@ async def _dispatch_user_turn(
         end_states=end_states,
     )
 
-    logger.debug(
-        'REPL: _dispatch_user_turn: controller_loop done, dispatching event'
-    )
+    logger.debug('REPL: _dispatch_user_turn: controller_loop done, dispatching event')
     # Wrap event dispatch so any failure doesn't silently terminate the REPL.
     try:
         event_stream.add_event(initial_action, EventSource.USER)
@@ -262,8 +260,7 @@ async def _dispatch_user_turn(
         logger.exception('Unhandled exception during agent turn')
         renderer.stop_live()
         renderer.add_system_message(
-            'Agent run failed with an unexpected error. '
-            'Check the logs or try again.',
+            'Agent run failed with an unexpected error. Check the logs or try again.',
             title='error',
         )
         await host._cancel_agent(agent_task)
@@ -284,9 +281,7 @@ async def _prepare_initial_action(
     if host._next_action is not None:
         next_content = getattr(host._next_action, 'content', None)
         if next_content is not None and text.strip() != str(next_content).strip():
-            logger.warning(
-                'Discarding stale _next_action in favor of new user message'
-            )
+            logger.warning('Discarding stale _next_action in favor of new user message')
             host._next_action = None
         else:
             initial_action = host._next_action
@@ -296,9 +291,7 @@ async def _prepare_initial_action(
                 renderer.start_live()
                 await renderer.add_user_message(str(msg_content))
             else:
-                renderer.add_system_message(
-                    'Condensing context\u2026', title='grinta'
-                )
+                renderer.add_system_message('Condensing context\u2026', title='grinta')
                 renderer.start_live()
             return initial_action
     host._last_user_message = text
@@ -348,9 +341,7 @@ async def _ensure_controller_loop(
     await _ensure_runtime_connected(host, runtime)
 
     if controller is None:
-        controller, _ = create_controller(
-            agent, runtime, config, conversation_stats
-        )
+        controller, _ = create_controller(agent, runtime, config, conversation_stats)
         runtime.controller = controller
         early_cb = create_status_callback(controller)
         try:
@@ -409,9 +400,7 @@ async def _finalize_repl_run(
             runtime.close()
             logger.debug('REPL: _finalize_repl_run: closed runtime')
         except Exception as exc:
-            logger.warning(
-                'REPL: _finalize_repl_run: runtime.close() failed: %s', exc
-            )
+            logger.warning('REPL: _finalize_repl_run: runtime.close() failed: %s', exc)
         logger.debug('REPL: _finalize_repl_run: releasing acquire result')
         runtime_orchestrator.release(host._acquire_result)
     _close_event_stream(host)

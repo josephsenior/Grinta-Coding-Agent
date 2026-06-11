@@ -11,7 +11,9 @@ import pytest
 from backend.core import logger as logger_mod
 
 
-def test_workspace_logs_segment_uses_project_root(monkeypatch: pytest.MonkeyPatch, tmp_path):
+def test_workspace_logs_segment_uses_project_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+):
     root = tmp_path / 'my_repo'
     root.mkdir()
     monkeypatch.setenv('PROJECT_ROOT', str(root))
@@ -20,7 +22,9 @@ def test_workspace_logs_segment_uses_project_root(monkeypatch: pytest.MonkeyPatc
     segment = logger_mod._workspace_logs_segment()
     assert segment is not None
     assert segment.startswith('my_repo__')
-    digest = hashlib.sha256(os.path.normcase(os.path.normpath(str(root))).encode()).hexdigest()[:12]
+    digest = hashlib.sha256(
+        os.path.normcase(os.path.normpath(str(root))).encode()
+    ).hexdigest()[:12]
     assert segment == f'my_repo__{digest}'
 
 
@@ -33,7 +37,9 @@ def test_workspace_logs_segment_falls_back_to_cwd(
 
     segment = logger_mod._workspace_logs_segment()
     assert segment is not None
-    digest = hashlib.sha256(os.path.normcase(os.path.normpath(str(tmp_path))).encode()).hexdigest()[:12]
+    digest = hashlib.sha256(
+        os.path.normcase(os.path.normpath(str(tmp_path))).encode()
+    ).hexdigest()[:12]
     base = os.path.basename(str(tmp_path))
     safe = re.sub(r'[^A-Za-z0-9._-]+', '_', base)[:48].strip('_') or 'workspace'
     assert segment == f'{safe}__{digest}'

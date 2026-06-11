@@ -2,7 +2,7 @@
 
 import asyncio
 import time as _time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -38,10 +38,6 @@ class TestDispatchTimeout:
     @pytest.mark.asyncio
     async def test_dispatch_loop_terminates_after_timeout(self, mock_screen):
         """When state stays RUNNING past the timeout, the loop must exit with ERROR."""
-        from backend.cli.tui._app_screen_lifecycle_mixin import (
-            DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS as _TIMEOUT,
-        )
-
         # Make state always RUNNING (never transition to an end state)
         mock_screen._controller.get_agent_state = MagicMock(
             return_value=AgentState.RUNNING

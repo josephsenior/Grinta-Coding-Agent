@@ -6,7 +6,7 @@ import json
 import time
 from types import MethodType
 from typing import Any, cast
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 

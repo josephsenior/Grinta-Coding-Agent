@@ -182,7 +182,9 @@ def build_web_fetch_action(arguments: dict[str, Any]) -> MCPAction:
 
     urls = _coerce_url_list(arguments.get('urls'))
     if not urls:
-        raise FunctionCallValidationError('web_fetch requires at least one URL in urls.')
+        raise FunctionCallValidationError(
+            'web_fetch requires at least one URL in urls.'
+        )
 
     payload: dict[str, Any] = {'urls': urls}
     if arguments.get('max_characters') is not None:

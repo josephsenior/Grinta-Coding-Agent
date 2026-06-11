@@ -34,9 +34,7 @@ from backend.ledger.observation import (
 )
 
 
-async def execute_start_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_start_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     del params
     await self._ensure_session()
     return _finalize_observation(
@@ -49,9 +47,7 @@ async def execute_start_impl(
     )
 
 
-async def execute_close_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_close_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     del params
     await self.shutdown()
     return _finalize_observation(
@@ -73,9 +69,7 @@ async def run_navigation_impl(
     nav_budget: float,
 ) -> None:
     if not new_tab:
-        await asyncio.wait_for(
-            _navigate_direct_cdp(browser, url), timeout=nav_budget
-        )
+        await asyncio.wait_for(_navigate_direct_cdp(browser, url), timeout=nav_budget)
         return
 
     from browser_use.browser.events import NavigateToUrlEvent
@@ -90,9 +84,7 @@ async def run_navigation_impl(
     await asyncio.wait_for(_await_nav_event(nav), timeout=nav_budget)
 
 
-async def execute_navigate_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_navigate_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     url = str(params.get('url') or '').strip()
     err = _validate_http_url(url)
     if err:
@@ -130,9 +122,7 @@ async def execute_navigate_impl(
     _browser_trace(f'navigate done in {elapsed_ms:.0f}ms')
     logger.info('browser navigate done in %.0fms', elapsed_ms)
     base = f'Navigated to {url}.'
-    content = await self._maybe_append_page_state(
-        browser, params=params, prefix=base
-    )
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
         CmdOutputObservation(
@@ -143,22 +133,16 @@ async def execute_navigate_impl(
     )
 
 
-async def execute_go_back_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_go_back_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     from browser_use.browser.events import GoBackEvent
 
     browser = await self._ensure_session()
     await self._dispatch_bus_event(browser, GoBackEvent())
     base = 'Navigated back in history.'
-    content = await self._maybe_append_page_state(
-        browser, params=params, prefix=base
-    )
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
-        CmdOutputObservation(
-            content=content, command='browser go_back', exit_code=0
-        ),
+        CmdOutputObservation(content=content, command='browser go_back', exit_code=0),
     )
 
 
@@ -182,9 +166,7 @@ async def execute_switch_tab_impl(
     tid = pages[idx].target_id
     await self._dispatch_bus_event(browser, SwitchTabEvent(target_id=tid))
     base = f'Switched to tab index {idx}.'
-    content = await self._maybe_append_page_state(
-        browser, params=params, prefix=base
-    )
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
         CmdOutputObservation(
@@ -193,9 +175,7 @@ async def execute_switch_tab_impl(
     )
 
 
-async def execute_close_tab_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_close_tab_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     from browser_use.browser.events import CloseTabEvent
 
     idx, err = self._parse_browser_index(
@@ -213,20 +193,14 @@ async def execute_close_tab_impl(
     tid = pages[idx].target_id
     await self._dispatch_bus_event(browser, CloseTabEvent(target_id=tid))
     base = f'Closed tab index {idx}.'
-    content = await self._maybe_append_page_state(
-        browser, params=params, prefix=base
-    )
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
-        CmdOutputObservation(
-            content=content, command='browser close_tab', exit_code=0
-        ),
+        CmdOutputObservation(content=content, command='browser close_tab', exit_code=0),
     )
 
 
-async def execute_list_tabs_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_list_tabs_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     del params
     browser = await self._ensure_session()
     pages = self._page_targets_ordered(browser)
@@ -242,7 +216,5 @@ async def execute_list_tabs_impl(
     body = json.dumps(rows, ensure_ascii=False, indent=2)
     return _finalize_observation(
         cmd,
-        CmdOutputObservation(
-            content=body, command='browser list_tabs', exit_code=0
-        ),
+        CmdOutputObservation(content=body, command='browser list_tabs', exit_code=0),
     )

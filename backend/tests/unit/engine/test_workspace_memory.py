@@ -37,7 +37,9 @@ def test_rank_entries_prefers_query_overlap(tmp_path, monkeypatch) -> None:
         lambda: tmp_path / 'workspace_memory.json',
     )
     persist_entry(kind='command', key='pytest_cmd', value='uv run pytest backend/tests')
-    persist_entry(kind='lesson', key='auth_note', value='JWT tokens expire after one hour')
+    persist_entry(
+        kind='lesson', key='auth_note', value='JWT tokens expire after one hour'
+    )
 
     ranked = rank_entries('run pytest tests', max_entries=2)
     assert ranked[0]['key'] == 'pytest_cmd'

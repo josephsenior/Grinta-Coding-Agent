@@ -69,8 +69,7 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
             service_no_loop.initialize()
 
         deferred_logged = any(
-            'deferred' in str(call).lower()
-            for call in mock_logger.debug.call_args_list
+            'deferred' in str(call).lower() for call in mock_logger.debug.call_args_list
         )
         self.assertTrue(deferred_logged)
         self.assertIsNone(service_no_loop._retry_worker_task)

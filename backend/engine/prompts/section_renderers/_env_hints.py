@@ -49,9 +49,7 @@ def _discovery_decision_table(*, lsp_available: bool, web_on: bool = True) -> st
             ]
         )
     else:
-        lines.append(
-            '- Interactive/JS-heavy pages → `browser`'
-        )
+        lines.append('- Interactive/JS-heavy pages → `browser`')
     lines.extend(
         [
             '- Directed exploration (1–3 targeted searches): use `grep`, `glob`, or `find_symbols` directly',
@@ -146,9 +144,7 @@ def _routing_memory_tool_placeholders(
     working_memory_on: bool,
     tracker_on: bool,
 ) -> dict[str, str]:
-    ambiguous_intent_instruction = (
-        'If intent is still ambiguous after inspection, see `<ASK_USER_TOOL>` rather than guessing.'
-    )
+    ambiguous_intent_instruction = 'If intent is still ambiguous after inspection, see `<ASK_USER_TOOL>` rather than guessing.'
     if working_memory_on:
         memory_and_context_section = (
             '<MEMORY_AND_CONTEXT>\n'
@@ -169,9 +165,7 @@ def _routing_memory_tool_placeholders(
     post_condensation_retrieval = (
         'Resume from the summary and your most recent verified observations.'
     )
-    surviving_state_facts = (
-        'Only the visible conversation, current files, and tool observations are available.'
-    )
+    surviving_state_facts = 'Only the visible conversation, current files, and tool observations are available.'
     remaining_work_source_of_truth = (
         'Trust your `task_tracker` plan as the source of truth for what remains.'
         if tracker_on

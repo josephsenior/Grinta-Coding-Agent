@@ -178,6 +178,7 @@ class TestGetFeatures:
 
         # Deliberately contradict pattern defaults to verify catalog-first behavior.
         fake_entry = SimpleNamespace(
+            context_window_tokens=10_000,
             max_input_tokens=111,
             max_output_tokens=222,
             supports_function_calling=False,
@@ -190,7 +191,8 @@ class TestGetFeatures:
 
         features = get_features('gpt-5')
 
-        assert features.max_input_tokens == 111
+        assert features.max_input_tokens == 5_682
+        assert features.context_window_tokens == 10_000
         assert features.max_output_tokens == 222
         assert features.supports_function_calling is False
         assert features.supports_reasoning_effort is False
@@ -209,6 +211,7 @@ class TestGetFeatures:
         features = get_features('o1-preview')
 
         assert features.max_input_tokens == 333
+        assert features.context_window_tokens is None
         assert features.max_output_tokens == 444
         assert features.supports_function_calling is True
         assert features.supports_reasoning_effort is True

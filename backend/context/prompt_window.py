@@ -15,14 +15,17 @@ from backend.core.constants import (
     DEFAULT_PROMPT_MIN_TAIL_TOKENS,
     DEFAULT_PROMPT_MIN_TOOL_LOOPS,
 )
-from backend.inference.provider_capabilities import model_token_correction
+from backend.inference.context_limits import limits_from_config
+from backend.inference.provider_capabilities import (
+    model_is_small,
+    model_token_correction,
+)
 from backend.ledger.action import Action
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation.agent import AgentCondensationObservation
 from backend.ledger.serialization.event import event_from_dict, event_to_dict
 
-_DEFAULT_BUDGET_RATIO = 0.50
 _DEFAULT_MIN_EVENTS = 150
 _DEFAULT_MAX_EVENTS = 240
 _MASKED_PLACEHOLDER = '<MASKED>'
@@ -92,9 +95,7 @@ def _build_windowing_context(
     original_event_count = len(event_list)
     full_tokens = estimate_events_tokens(event_list)
     budget = _history_token_budget(llm_config)
-    max_events = _positive_int_attr(
-        llm_config, 'prompt_history_max_events', _DEFAULT_MAX_EVENTS
-    )
+    max_events = _prompt_history_max_events(llm_config)
     default_min_events = (
         DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS if emergency_only else _DEFAULT_MIN_EVENTS
     )
@@ -150,7 +151,9 @@ def _event_id_set(events):
 
 
 def _non_protected_chunks(all_events, protected_ids):
-    return _causal_chunks(event for event in all_events if id(event) not in protected_ids)
+    return _causal_chunks(
+        event for event in all_events if id(event) not in protected_ids
+    )
 
 
 def _chunk_fits(chunk_count, chunk_tokens, ctx, selected_count, selected_tokens):
@@ -364,14 +367,31 @@ def _history_token_budget(llm_config: object) -> int | None:
     explicit = _positive_int_attr(llm_config, 'prompt_history_token_budget', None)
     if explicit is not None:
         return explicit
-    max_input = _positive_int_attr(llm_config, 'max_input_tokens', None)
-    if max_input is None:
+    limits = limits_from_config(llm_config, unknown_default=True)
+    usable_input = limits.usable_input_tokens
+    if usable_input is None:
         return None
-    ratio = _float_attr(llm_config, 'prompt_history_budget_ratio', _DEFAULT_BUDGET_RATIO)
-    ratio = max(0.05, min(0.95, ratio))
+    ratio = _optional_float_attr(llm_config, 'prompt_history_budget_ratio')
+    if ratio is not None:
+        usable_input = int(usable_input * max(0.05, min(0.95, ratio)))
     model = str(getattr(llm_config, 'model', '') or '')
     factor, _ = model_token_correction(model)
-    return max(1, int((max_input * ratio) / factor))
+    return max(1, int(usable_input / factor))
+
+
+def _prompt_history_max_events(llm_config: object) -> int | None:
+    explicit = _positive_int_attr(llm_config, 'prompt_history_max_events', None)
+    if explicit is not None:
+        return explicit
+    model = str(getattr(llm_config, 'model', '') or '')
+    limits = limits_from_config(llm_config, unknown_default=False)
+    if model_is_small(model) or limits.source in {
+        'unknown',
+        'unknown_model',
+        'uncataloged_model',
+    }:
+        return _DEFAULT_MAX_EVENTS
+    return None
 
 
 def _is_nonempty_user_message(event):
@@ -503,7 +523,9 @@ def _missing_tail_events(tail, selected):
 
 
 def _combine_protected_and_tail(protected, selected, protected_ids, missing):
-    merged = list(protected) + [event for event in selected if id(event) not in protected_ids]
+    merged = list(protected) + [
+        event for event in selected if id(event) not in protected_ids
+    ]
     merged.extend(missing)
     return _dedupe_events_preserve_order(merged)
 
@@ -600,7 +622,9 @@ def _shrink_once(result, protected_events, protected_tokens, tail, budget):
     return protected_events + tail, True
 
 
-def _shrink_to_budget(result, protected_events, protected_tokens, protected_ids, budget):
+def _shrink_to_budget(
+    result, protected_events, protected_tokens, protected_ids, budget
+):
     while estimate_events_tokens(result) > budget:
         tail = _removable_events(result, protected_ids)
         if not tail:
@@ -622,12 +646,16 @@ def _enforce_token_ceiling(
     if estimate_events_tokens(selected) <= budget:
         return selected
     protected_ids = _event_id_set(protected)
-    protected_events, removable = _split_protected_and_removable(selected, protected_ids)
+    protected_events, removable = _split_protected_and_removable(
+        selected, protected_ids
+    )
     protected_tokens = estimate_events_tokens(protected_events)
     chunks = _causal_chunks(removable)
     kept_chunks = _build_kept_chunks(chunks, protected_tokens, budget)
     result = protected_events + _flatten_chunks(kept_chunks)
-    return _shrink_to_budget(result, protected_events, protected_tokens, protected_ids, budget)
+    return _shrink_to_budget(
+        result, protected_events, protected_tokens, protected_ids, budget
+    )
 
 
 def _causal_chunks(events: Iterable[Event]) -> list[list[Event]]:
@@ -781,7 +809,9 @@ def _truncate_chunk_to_budget(chunk: list[Event], token_budget: int) -> list[Eve
     if estimate_events_tokens(chunk) <= token_budget:
         return chunk
 
-    _truncate_large_observations(chunk, token_budget, _HEAD_CHARS, _TAIL_CHARS, _TRUNCATION_MARKER)
+    _truncate_large_observations(
+        chunk, token_budget, _HEAD_CHARS, _TAIL_CHARS, _TRUNCATION_MARKER
+    )
     if estimate_events_tokens(chunk) <= token_budget:
         return chunk
 
@@ -795,7 +825,9 @@ def _event_payload_text(event: Event) -> str:
     try:
         return json.dumps(event_to_dict(event), default=str, sort_keys=True)
     except Exception:
-        return str(getattr(event, 'message', '') or getattr(event, 'content', '') or event)
+        return str(
+            getattr(event, 'message', '') or getattr(event, 'content', '') or event
+        )
 
 
 def _result(
@@ -866,18 +898,18 @@ def _positive_int_attr(obj: object, name: str, default: int | None) -> int | Non
     return _parse_positive_int(value, default)
 
 
-def _float_attr(obj: object, name: str, default: float) -> float:
-    value = getattr(obj, name, default)
-    if isinstance(value, bool):
-        return default
+def _optional_float_attr(obj: object, name: str) -> float | None:
+    value = getattr(obj, name, None)
+    if value is None or isinstance(value, bool):
+        return None
     if isinstance(value, (float, int)):
         return float(value)
-    if isinstance(value, str):
+    if isinstance(value, str) and value.strip():
         try:
             return float(value)
         except ValueError:
-            return default
-    return default
+            return None
+    return None
 
 
 def _bool_attr(obj: object, name: str, default: bool) -> bool:

@@ -722,7 +722,9 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
                 seen_labels.add(label)
         return lines
 
-    def _build_preview_lines(self, sid: str, meta: dict[str, Any], event_count: int) -> list[str]:
+    def _build_preview_lines(
+        self, sid: str, meta: dict[str, Any], event_count: int
+    ) -> list[str]:
         lines = [f'[bold]ID:[/] {sid}']
         lines.extend(self._build_preview_metadata_lines(meta))
         lines.append(f'[bold]Events:[/] {event_count}')

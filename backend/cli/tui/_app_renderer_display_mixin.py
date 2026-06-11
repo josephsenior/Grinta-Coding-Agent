@@ -131,9 +131,7 @@ class _AppRendererDisplayMixin:
         for task_id, status, desc in task_signature:
             item_status = _TASK_TO_SIDEBAR_STATUS.get(status, 'neutral')
             meta = task_id if task_id and task_id != '?' else None
-            task_items.append(
-                (desc, f'task:{task_id}', False, item_status, meta)
-            )
+            task_items.append((desc, f'task:{task_id}', False, item_status, meta))
         return task_items
 
     def _build_mcp_sidebar_items(self, mcp_servers):
@@ -142,15 +140,14 @@ class _AppRendererDisplayMixin:
             for server in mcp_servers:
                 name = server.get('name', 'unknown')
                 server_type = server.get('type', 'stdio')
-                mcp_items.append(
-                    (name, f'mcp:{name}', True, 'info', server_type)
-                )
+                mcp_items.append((name, f'mcp:{name}', True, 'info', server_type))
         return mcp_items
 
     def _build_skills_sidebar_items(self):
+        from pathlib import Path
+
         import backend
         from backend.cli._event_renderer.sidebar import _load_playbook_skills
-        from pathlib import Path
 
         skills_list: list[str] = []
         playbook_dir = Path(backend.__file__).resolve().parent / 'playbooks'
@@ -170,9 +167,7 @@ class _AppRendererDisplayMixin:
         skill_items = []
         if skills_list:
             for skill in sorted(skills_list):
-                skill_items.append(
-                    (skill, f'skill:{skill}', True, 'neutral', None)
-                )
+                skill_items.append((skill, f'skill:{skill}', True, 'neutral', None))
         return skill_items
 
     def _resolve_mcp_server_list(self, mcp_count):

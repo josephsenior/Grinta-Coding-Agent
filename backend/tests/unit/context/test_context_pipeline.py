@@ -145,7 +145,9 @@ async def test_prepare_step_uses_prewarmed_compaction(pipeline):
 
 
 @pytest.mark.asyncio
-async def test_prepare_step_rejects_prewarmed_compaction_that_fails_continuity(pipeline):
+async def test_prepare_step_rejects_prewarmed_compaction_that_fails_continuity(
+    pipeline,
+):
     events = [_user('run pytest', 1)]
     for i in range(2, 202):
         events.append(_cmd_output(f'output line {i}\n' * 20, i))
@@ -181,7 +183,9 @@ async def test_prepare_step_rejects_micro_prune_and_respects_cooldown(pipeline):
     state.agent = SimpleNamespace(llm=SimpleNamespace(config=llm_config))
 
     with (
-        patch('backend.context.context_pipeline.session_memory_exists', return_value=True),
+        patch(
+            'backend.context.context_pipeline.session_memory_exists', return_value=True
+        ),
         patch(
             'backend.context.context_pipeline.build_compaction_summary',
             return_value='# Session Memory\nsummary',
@@ -229,7 +233,9 @@ def test_configure_structured_compactor_size_forces_material_prune():
     """Regression: fixed max_size=100 left ~49 post-boundary events with zero pruned (5b no-op)."""
     events = [_cmd_output(f'line {i}', i) for i in range(1, 50)]
     compactor = SimpleNamespace(max_size=100, keep_first=0)
-    ContextPipeline._configure_structured_compactor_size(compactor, events, SimpleNamespace())
+    ContextPipeline._configure_structured_compactor_size(
+        compactor, events, SimpleNamespace()
+    )
 
     target_size = compactor.max_size // 2
     events_from_tail = target_size - compactor.keep_first - 1
@@ -254,7 +260,9 @@ def test_build_prompt_events_injects_context_packet(pipeline):
     assert 'implement feature X' in packet.content
 
 
-def test_build_prompt_events_injects_context_packet_on_fresh_session(pipeline, monkeypatch, tmp_path):
+def test_build_prompt_events_injects_context_packet_on_fresh_session(
+    pipeline, monkeypatch, tmp_path
+):
     events = [_user('Build a raft kv store', 1)]
     state = _make_state(events)
     monkeypatch.setattr(
@@ -299,7 +307,9 @@ def test_ineffective_compaction_backoff_blocks_until_event_threshold(pipeline):
     state = _make_state(events)
     latest_id = events[-1].id
     apply_ineffective_compaction_backoff(state)
-    skip_until = state.extra_data['context_pipeline_state']['skip_compaction_until_event_id']
+    skip_until = state.extra_data['context_pipeline_state'][
+        'skip_compaction_until_event_id'
+    ]
     assert skip_until == latest_id + DEFAULT_INEFFECTIVE_COMPACT_SKIP_EVENTS
     assert pipeline._should_skip_compaction(state, force=False) is True
 
@@ -321,7 +331,9 @@ def test_ineffective_compaction_backoff_escalates_streak(pipeline):
     apply_ineffective_compaction_backoff(state)
     first = state.extra_data['context_pipeline_state']['skip_compaction_until_event_id']
     apply_ineffective_compaction_backoff(state)
-    second = state.extra_data['context_pipeline_state']['skip_compaction_until_event_id']
+    second = state.extra_data['context_pipeline_state'][
+        'skip_compaction_until_event_id'
+    ]
     assert second > first
 
 

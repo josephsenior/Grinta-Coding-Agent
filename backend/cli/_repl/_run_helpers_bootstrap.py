@@ -182,7 +182,9 @@ async def _bootstrap_mcp_warmup(
     verbose = os.environ.get('GRINTA_VERBOSE') == '1'
     server_count, server_names = _count_mcp_servers(agent)
 
-    host._bootstrap_status(_format_warmup_msg(server_count, server_names, verbose), session, renderer)
+    host._bootstrap_status(
+        _format_warmup_msg(server_count, server_names, verbose), session, renderer
+    )
 
     try:
         await _setup_mcp_tools(agent, host._runtime, host._memory)
@@ -190,18 +192,24 @@ async def _bootstrap_mcp_warmup(
         logger.warning('MCP warmup failed after chat became ready', exc_info=True)
         host._hud.update_mcp_servers(0)
         host._handle_mcp_partial_state(agent)
-        host._bootstrap_status(f'MCP warmup failed: {exc}', session, renderer, kind='warning')
+        host._bootstrap_status(
+            f'MCP warmup failed: {exc}', session, renderer, kind='warning'
+        )
         return
 
     host._update_mcp_count_from_agent(agent)
-    host._bootstrap_status(_format_warmup_result(agent, server_count, verbose), session, renderer)
+    host._bootstrap_status(
+        _format_warmup_result(agent, server_count, verbose), session, renderer
+    )
 
 
 def _count_mcp_servers(agent: Any) -> tuple[int, list[str]]:
     server_count = 0
     server_names: list[str] = []
     try:
-        mcp_config = getattr(agent.config, 'mcp', None) or getattr(agent.config, 'mcp_config', None)
+        mcp_config = getattr(agent.config, 'mcp', None) or getattr(
+            agent.config, 'mcp_config', None
+        )
         if mcp_config is not None:
             servers = getattr(mcp_config, 'servers', []) or []
             server_count = len(servers)
@@ -211,7 +219,9 @@ def _count_mcp_servers(agent: Any) -> tuple[int, list[str]]:
     return server_count, server_names
 
 
-def _format_warmup_msg(server_count: int, server_names: list[str], verbose: bool) -> str:
+def _format_warmup_msg(
+    server_count: int, server_names: list[str], verbose: bool
+) -> str:
     if server_count > 0:
         msg = f'MCP: connecting to {server_count} server(s)…'
         if verbose and server_names:

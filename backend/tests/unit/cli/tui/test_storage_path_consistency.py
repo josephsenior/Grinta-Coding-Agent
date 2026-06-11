@@ -22,10 +22,6 @@ causing the agent to lose its memory after every restart.
 from __future__ import annotations
 
 import os
-import tempfile
-from unittest.mock import MagicMock
-
-import pytest
 
 
 def test_get_file_store_call_uses_config_file_store_attribute():

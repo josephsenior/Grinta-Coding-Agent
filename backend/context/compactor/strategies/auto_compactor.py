@@ -82,9 +82,7 @@ class AutoCompactor(Compactor):
     ) -> View | Compaction:
         started = time.perf_counter()
         events = list(view.events)
-        explicit_request = bool(
-            getattr(view, 'unhandled_condensation_request', False)
-        )
+        explicit_request = bool(getattr(view, 'unhandled_condensation_request', False))
         config = (
             self._select_explicit_request_config(len(events))
             if explicit_request
@@ -256,7 +254,9 @@ class AutoCompactor(Compactor):
         self, delegate: Compactor, view: View
     ) -> View | Compaction:
         if isinstance(delegate, RollingCompactor):
-            logger.info('AutoCompactor forcing delegate compaction for explicit request')
+            logger.info(
+                'AutoCompactor forcing delegate compaction for explicit request'
+            )
             return await delegate.get_compaction(view)
         return view
 

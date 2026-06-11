@@ -154,9 +154,7 @@ def _determine_test_status(stripped: str) -> str:
     return 'pass'
 
 
-def _parse_pytest_test_line(
-    result: ParsedTestResult, stripped: str
-) -> None:
+def _parse_pytest_test_line(result: ParsedTestResult, stripped: str) -> None:
     if '::test_' not in stripped and '---' not in stripped:
         return
     status = _determine_test_status(stripped)

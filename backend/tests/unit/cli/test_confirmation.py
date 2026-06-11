@@ -15,7 +15,7 @@ from backend.cli.confirmation import (
     _risk_label,
     render_confirmation,
 )
-from backend.core.enums import ActionSecurityRisk, AgentState
+from backend.core.enums import ActionSecurityRisk
 from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,

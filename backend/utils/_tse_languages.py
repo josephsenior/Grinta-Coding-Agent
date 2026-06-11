@@ -164,6 +164,4 @@ def get_class_node_types(language: str) -> list[str]:
 
 def get_method_node_types(language: str) -> list[str]:
     """Return the method node types for ``language`` (with default)."""
-    return METHOD_NODE_TYPES.get(
-        language, ['method_definition', 'method_declaration']
-    )
+    return METHOD_NODE_TYPES.get(language, ['method_definition', 'method_declaration'])

@@ -76,15 +76,11 @@ class CircuitBreakerConfig:
     # No-step-progress watchdog.  If state==RUNNING for at least this many
     # seconds with no recorded ``step()`` call, the watchdog fires.  Set
     # ``<= 0`` to disable the watchdog entirely.
-    no_step_progress_timeout_seconds: float = (
-        DEFAULT_NO_STEP_PROGRESS_TIMEOUT_SECONDS
-    )
+    no_step_progress_timeout_seconds: float = DEFAULT_NO_STEP_PROGRESS_TIMEOUT_SECONDS
     # Cooldown between auto-recovery attempts.  After the watchdog issues
     # one ``schedule_step_soon`` to recover, it waits this long before
     # declaring a second stall fatal.
-    auto_recover_cooldown_seconds: float = (
-        DEFAULT_STUCK_AUTO_RECOVER_COOLDOWN_SECONDS
-    )
+    auto_recover_cooldown_seconds: float = DEFAULT_STUCK_AUTO_RECOVER_COOLDOWN_SECONDS
 
     def scaled(self, complexity: float, max_iterations: int) -> CircuitBreakerConfig:
         """Return a copy with thresholds scaled for the given task.
@@ -343,9 +339,7 @@ class CircuitBreaker:
         """
         import time as _time
 
-        self._last_step_call_ts = (
-            ts if ts is not None else _time.monotonic()
-        )
+        self._last_step_call_ts = ts if ts is not None else _time.monotonic()
         # Any new step call resets the auto-recover counter so a successful
         # sequence of steps that happens to be slow doesn't get penalised
         # by stale state from a previous stall.

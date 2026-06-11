@@ -269,9 +269,7 @@ class StepGuardService:
         try:
             result = watchdog_fn(agent_state=agent_state)
         except Exception as exc:
-            logger.debug(
-                'No-step-progress watchdog raised: %s', exc, exc_info=True
-            )
+            logger.debug('No-step-progress watchdog raised: %s', exc, exc_info=True)
             return None
 
         if result is None:

@@ -147,9 +147,7 @@ class TestChecksumEmbedding:
         payload = {'action': 'message', 'args': {'value': 'keep-me'}}
         embedded = embed_checksum(payload)
         payload['args']['value'] = 'mutated'
-        stored = json.loads(
-            json.dumps(embedded, ensure_ascii=False, default=str)
-        )
+        stored = json.loads(json.dumps(embedded, ensure_ascii=False, default=str))
         assert verify_event_integrity(stored, 0)
 
 

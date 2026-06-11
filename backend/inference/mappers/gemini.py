@@ -78,9 +78,7 @@ def _resolve_content_text(
     return text, False
 
 
-def _accumulate_system_instruction(
-    current: str | None, text: str
-) -> str:
+def _accumulate_system_instruction(current: str | None, text: str) -> str:
     if current:
         return current + '\n\n' + text
     return text
@@ -129,9 +127,7 @@ def convert_messages(
             continue
 
         if role_name == 'tool':
-            gemini_messages.append(
-                _build_tool_result_message(m, content, content_text)
-            )
+            gemini_messages.append(_build_tool_result_message(m, content, content_text))
             continue
 
         tool_calls = m.get('tool_calls') if role_name == 'assistant' else None

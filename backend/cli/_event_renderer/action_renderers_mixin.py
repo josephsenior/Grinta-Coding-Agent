@@ -50,7 +50,6 @@ from backend.cli.layout_tokens import (
     ACTIVITY_CARD_TITLE_DELEGATION,
     ACTIVITY_CARD_TITLE_FILES,
     ACTIVITY_CARD_TITLE_MCP,
-    ACTIVITY_CARD_TITLE_SEARCH,
     ACTIVITY_CARD_TITLE_SHELL,
     ACTIVITY_CARD_TITLE_TERMINAL,
     ACTIVITY_CARD_TITLE_TOOL,
@@ -75,8 +74,8 @@ from backend.cli.transcript import (
 )
 from backend.ledger.action import (
     Action,
-    AnalyzeProjectStructureAction,
     AgentThinkAction,
+    AnalyzeProjectStructureAction,
     BrowseInteractiveAction,
     BrowserToolAction,
     ClarificationRequestAction,
@@ -94,6 +93,7 @@ from backend.ledger.action import (
     MCPAction,
     MessageAction,
     ProposalAction,
+    ReadSymbolsAction,
     RecallAction,
     StreamingChunkAction,
     TaskTrackingAction,
@@ -101,7 +101,6 @@ from backend.ledger.action import (
     TerminalReadAction,
     TerminalRunAction,
     UncertaintyAction,
-    ReadSymbolsAction,
 )
 
 
@@ -182,8 +181,6 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self._handle_streaming_chunk(action)
 
     def _render_message_action(self, action: MessageAction) -> None:
-        from rich.text import Text
-
         if bool(getattr(action, 'suppress_cli', False)):
             self._stop_reasoning()
         thought = self._resolve_message_thought(action)
@@ -227,9 +224,7 @@ class ActionRenderersMixin(_ActionRenderersBase):
         attachments = self._message_action_attachments(action)
         self._append_assistant_message(display_content, attachments=attachments)
 
-    def _build_message_display_parts(
-        self, thought: str, content: str
-    ) -> list[Any]:
+    def _build_message_display_parts(self, thought: str, content: str) -> list[Any]:
         from rich.text import Text
 
         display_parts: list[Any] = []

@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from backend.context.pre_condensation_snapshot import _snapshot_path, load_snapshot
+from backend.context.session_context import scoped_agent_path
 from backend.context.session_memory import (
     _session_memory_path,
     load_session_memory,
     session_memory_exists,
 )
-from backend.context.session_context import scoped_agent_path
 from backend.engine.tools.note import _notes_path
 from backend.engine.tools.working_memory import (
     _memory_path,
@@ -58,14 +57,18 @@ def test_new_session_does_not_read_prior_session_memory(tmp_path, monkeypatch):
     assert not session_memory_exists()
 
 
-def test_legacy_workspace_files_are_never_used_when_session_bound(tmp_path, monkeypatch):
+def test_legacy_workspace_files_are_never_used_when_session_bound(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda: tmp_path,
     )
     set_current_session_id('sess-new')
     (tmp_path / 'session_memory.md').write_text('legacy memory', encoding='utf-8')
-    (tmp_path / 'working_memory.json').write_text('{"findings":"legacy"}', encoding='utf-8')
+    (tmp_path / 'working_memory.json').write_text(
+        '{"findings":"legacy"}', encoding='utf-8'
+    )
     (tmp_path / 'pre_condensation_snapshot.json').write_text(
         json.dumps({'decisions': ['legacy']}), encoding='utf-8'
     )

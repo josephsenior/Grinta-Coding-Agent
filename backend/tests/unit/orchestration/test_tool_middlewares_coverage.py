@@ -31,6 +31,8 @@ def _controller() -> MagicMock:
     c.state.agent_state = SimpleNamespace(value='running')
     c.state.last_error = ''
     c._pending_action = object()
+    c.services = MagicMock()
+    c.services.pending_action = MagicMock()
     c.autonomy_controller = SimpleNamespace(autonomy_level='full')
     c.agent = SimpleNamespace(llm=None)
     c.config = SimpleNamespace(blackboard=None)
@@ -185,7 +187,7 @@ async def test_safety_validator_middleware_blocks_disallowed_action() -> None:
     assert ctx.blocked is True
     assert ctx.metadata['audit_id'] == 'audit-1'
     assert ctx.metadata['handled'] is True
-    assert controller._pending_action is None
+    controller.services.pending_action.clear_for_action.assert_called_once_with(action)
     controller.event_stream.add_event.assert_called_once()
 
 

@@ -84,7 +84,9 @@ class _AppRendererThinkingMixin:
         compact = ' '.join((text or '').strip().split())
         if not compact:
             compact = fallback
-        return compact[: limit - 3].rstrip() + '...' if len(compact) > limit else compact
+        return (
+            compact[: limit - 3].rstrip() + '...' if len(compact) > limit else compact
+        )
 
     @staticmethod
     def _strip_tool_payload_markup(text: str) -> str:
@@ -111,8 +113,8 @@ class _AppRendererThinkingMixin:
             )
         if kind == 'truncated':
             detail_line = (
-                "Previous tool call arguments were stream-truncated "
-                "(JSON never closed)."
+                'Previous tool call arguments were stream-truncated '
+                '(JSON never closed).'
             )
             return ThinkingRenderIntent(
                 kind='error',
@@ -256,7 +258,9 @@ class _AppRendererThinkingMixin:
         self._last_thinking_artifact_hash = digest
         return True
 
-    def _render_thinking_text_intent(self, intent: ThinkingRenderIntent, finalize: bool) -> None:
+    def _render_thinking_text_intent(
+        self, intent: ThinkingRenderIntent, finalize: bool
+    ) -> None:
         from backend.cli._event_renderer.text_utils import (
             sanitize_streaming_thinking_text,
         )
@@ -284,9 +288,7 @@ class _AppRendererThinkingMixin:
         tool_args: dict | None = None,
     ) -> bool:
         """Render a thinking-like payload according to its normalized intent."""
-        intent = self._classify_thinking_text(
-            text, source_tool=source_tool, kind=kind
-        )
+        intent = self._classify_thinking_text(text, source_tool=source_tool, kind=kind)
         if intent.kind == 'suppress':
             return True
 
@@ -376,7 +378,9 @@ class _AppRendererThinkingMixin:
             body=text,
         )
 
-    def _thinking_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard | None:
+    def _thinking_artifact_card(
+        self, intent: ThinkingRenderIntent
+    ) -> ActivityCard | None:
         text = intent.text
         detail = intent.detail or text
 

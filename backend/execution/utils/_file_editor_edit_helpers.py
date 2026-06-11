@@ -99,7 +99,9 @@ def _validate_replace_string_old_string(old_string: str | None) -> ToolResult | 
     return None
 
 
-def _check_replace_string_preflight(self, file_path: Path, new_string: str) -> ToolResult | None:
+def _check_replace_string_preflight(
+    self, file_path: Path, new_string: str
+) -> ToolResult | None:
     preflight = self._preflight_content_guard(file_path, new_string)
     if preflight is not None:
         return ToolResult(
@@ -136,7 +138,7 @@ def _build_old_string_not_found_result(
     )
     if self._was_recently_written(file_path):
         base_error += (
-            " (The file was modified by a previous edit in this "
+            ' (The file was modified by a previous edit in this '
             "turn — re-read it before retrying, the model's "
             'working copy is now stale.)'
         )
@@ -358,9 +360,7 @@ def build_dry_run_result_impl(
     """Build result for dry-run preview."""
     output = 'Preview generated (no changes applied)'
     if self._last_indent_warnings:
-        output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(
-            self._last_indent_warnings
-        )
+        output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(self._last_indent_warnings)
     return ToolResult(
         output=output,
         old_content=old_content,
@@ -438,9 +438,7 @@ def _format_edit_success_output(
             output += '\n\n' + context_window
 
     if self._last_indent_warnings:
-        output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(
-            self._last_indent_warnings
-        )
+        output += '\n\n[INDENTATION WARNINGS]\n' + '\n'.join(self._last_indent_warnings)
 
     if msg and msg.startswith('WARNING:'):
         output = f'{output}\n{msg}'
@@ -458,7 +456,9 @@ def write_edit_result_impl(
     requested_end_line: int | None = None,
 ) -> ToolResult:
     """Write the result of an edit operation to disk."""
-    validation_err, msg = _validate_edit_before_write(self, file_path, old_content, new_content)
+    validation_err, msg = _validate_edit_before_write(
+        self, file_path, old_content, new_content
+    )
     if validation_err is not None:
         return validation_err
 
@@ -504,8 +504,11 @@ def write_edit_result_impl(
 
 
 def _check_write_create_exists(
-    is_create: bool, file_existed: bool, overwrite_existing: bool,
-    old_content: str | None, content: str,
+    is_create: bool,
+    file_existed: bool,
+    overwrite_existing: bool,
+    old_content: str | None,
+    content: str,
 ) -> ToolResult | None:
     if is_create and file_existed and not overwrite_existing:
         return ToolResult(
@@ -551,7 +554,9 @@ def _check_write_dry_run(
 
 
 def _check_write_noop(
-    file_existed: bool, old_content: str | None, content: str,
+    file_existed: bool,
+    old_content: str | None,
+    content: str,
 ) -> ToolResult | None:
     if file_existed and old_content == content:
         return ToolResult(
@@ -613,7 +618,9 @@ def handle_write_maybe_short_circuit_impl(
     if result is not None:
         return result
 
-    result = _check_write_dry_run(self, dry_run, file_path, content, old_content, is_create)
+    result = _check_write_dry_run(
+        self, dry_run, file_path, content, old_content, is_create
+    )
     if result is not None:
         return result
 
@@ -622,7 +629,13 @@ def handle_write_maybe_short_circuit_impl(
         return result
 
     return _check_large_existing_file_guard(
-        self, file_path, file_existed, is_create, overwrite_existing, old_content, content
+        self,
+        file_path,
+        file_existed,
+        is_create,
+        overwrite_existing,
+        old_content,
+        content,
     )
 
 
@@ -689,7 +702,9 @@ def handle_write_commit_impl(
     is_create: bool,
 ) -> ToolResult:
     """Validate, detect stale disk, backup, undo snapshot, atomic write."""
-    validation_err, soft_warning = _validate_write_commit(self, file_path, old_content, content)
+    validation_err, soft_warning = _validate_write_commit(
+        self, file_path, old_content, content
+    )
     if validation_err is not None:
         return validation_err
 

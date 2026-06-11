@@ -177,9 +177,7 @@ def _extract_git_file_diff(
     if not clean_path or clean_path == '.':
         return None
     try:
-        workspace = resolve_cli_workspace_directory(
-            getattr(orch._tui, '_config', None)
-        )
+        workspace = resolve_cli_workspace_directory(getattr(orch._tui, '_config', None))
         if workspace is None:
             return None
 

@@ -374,7 +374,9 @@ class ChromaDBBackend(VectorBackend):
         return None
 
     @staticmethod
-    def _process_single_match(pid, meta, dist, doc, parent_ids, scores, parent_texts, parent_metas):
+    def _process_single_match(
+        pid, meta, dist, doc, parent_ids, scores, parent_texts, parent_metas
+    ):
         score = 1.0 - dist
         if pid not in scores:
             parent_ids.append(pid)
@@ -402,8 +404,14 @@ class ChromaDBBackend(VectorBackend):
         for i, meta in enumerate(metas_list):
             pid = meta.get('parent_id') or ids_list[i]
             self._process_single_match(
-                pid, meta, dists_list[i], docs_list[i],
-                parent_ids, scores, parent_texts, parent_metas,
+                pid,
+                meta,
+                dists_list[i],
+                docs_list[i],
+                parent_ids,
+                scores,
+                parent_texts,
+                parent_metas,
             )
 
         return parent_ids, scores, parent_texts, parent_metas
@@ -423,12 +431,14 @@ class ChromaDBBackend(VectorBackend):
     def _assemble_and_sort(self, parent_ids, k, scores, parent_texts, parent_metas):
         final_results = []
         for pid in parent_ids[:k]:
-            final_results.append({
-                'step_id': pid,
-                'score': scores.get(pid, 0.0),
-                'excerpt': parent_texts.get(pid, ''),
-                **parent_metas.get(pid, {}),
-            })
+            final_results.append(
+                {
+                    'step_id': pid,
+                    'score': scores.get(pid, 0.0),
+                    'excerpt': parent_texts.get(pid, ''),
+                    **parent_metas.get(pid, {}),
+                }
+            )
         final_results.sort(key=lambda x: x['score'], reverse=True)
         return final_results[:k]
 
@@ -451,9 +461,13 @@ class ChromaDBBackend(VectorBackend):
         if results is None:
             return []
 
-        parent_ids, scores, parent_texts, parent_metas = self._resolve_parent_matches(results)
+        parent_ids, scores, parent_texts, parent_metas = self._resolve_parent_matches(
+            results
+        )
         self._fetch_missing_parents(parent_ids, k, parent_texts, parent_metas)
-        return self._assemble_and_sort(parent_ids, k, scores, parent_texts, parent_metas)
+        return self._assemble_and_sort(
+            parent_ids, k, scores, parent_texts, parent_metas
+        )
 
     async def async_add(
         self,

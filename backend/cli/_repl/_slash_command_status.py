@@ -94,12 +94,9 @@ def _tracing_line() -> str:
         for var in ('DO_NOT_TRACK', 'GRINTA_DISABLE_METRICS')
     )
     tracing_enabled_env = (
-        os.getenv('TRACING_ENABLED', 'true').lower() == 'true'
-        and not tracing_optout
+        os.getenv('TRACING_ENABLED', 'true').lower() == 'true' and not tracing_optout
     )
-    return (
-        f'  tracing: enabled={tracing_enabled_env} opt_out_env={tracing_optout}'
-    )
+    return f'  tracing: enabled={tracing_enabled_env} opt_out_env={tracing_optout}'
 
 
 def build_status_diagnostics(host: Any) -> str:

@@ -37,12 +37,18 @@ def test_format_reflection_metrics_token_usage_and_cost() -> None:
     assert any('1.2300' in ln for ln in lines)
 
 
-def test_format_reflection_metrics_uses_context_pressure_not_accumulated_spend() -> None:
+def test_format_reflection_metrics_uses_context_pressure_not_accumulated_spend() -> (
+    None
+):
     state = SimpleNamespace()
     state.metrics = SimpleNamespace(  # type: ignore[assignment]
         token_usages=[
-            SimpleNamespace(prompt_tokens=2_000, completion_tokens=100, context_window=10_000),
-            SimpleNamespace(prompt_tokens=1_200, completion_tokens=80, context_window=10_000),
+            SimpleNamespace(
+                prompt_tokens=2_000, completion_tokens=100, context_window=10_000
+            ),
+            SimpleNamespace(
+                prompt_tokens=1_200, completion_tokens=80, context_window=10_000
+            ),
         ],
         accumulated_token_usage=SimpleNamespace(
             prompt_tokens=3_200,

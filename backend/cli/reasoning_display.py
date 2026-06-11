@@ -315,7 +315,9 @@ class ReasoningDisplay:
         return None
 
     def _build_wrapped_rows(
-        self, max_width: int | None, stable: int | None,
+        self,
+        max_width: int | None,
+        stable: int | None,
     ) -> tuple[list[str], set[int]]:
         wrapped_rows: list[str] = []
         entry_starts: set[int] = set()
@@ -336,7 +338,9 @@ class ReasoningDisplay:
         return wrapped_rows, entry_starts
 
     def _clip_and_cursor(
-        self, wrapped_rows: list[str], max_lines: int | None,
+        self,
+        wrapped_rows: list[str],
+        max_lines: int | None,
     ) -> tuple[list[str], bool]:
         clipped = False
         if max_lines is not None and max_lines >= 0 and len(wrapped_rows) > max_lines:

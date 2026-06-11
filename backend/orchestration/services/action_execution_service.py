@@ -292,9 +292,7 @@ class ActionExecutionService:
         try:
             executor = getattr(agent, 'executor', None)
             cancel_fn = (
-                getattr(executor, 'cancel_step', None)
-                if executor is not None
-                else None
+                getattr(executor, 'cancel_step', None) if executor is not None else None
             )
             if callable(cancel_fn):
                 cancel_fn()
@@ -798,7 +796,9 @@ class ActionExecutionService:
             if callable(schedule_step_soon):
                 schedule_step_soon()
         except Exception:
-            logger.debug('Failed to schedule context-window recovery step', exc_info=True)
+            logger.debug(
+                'Failed to schedule context-window recovery step', exc_info=True
+            )
 
     async def _stop_after_context_recovery_exhausted(self, exc: Exception) -> None:
         self._expected_no_action_recovery = False

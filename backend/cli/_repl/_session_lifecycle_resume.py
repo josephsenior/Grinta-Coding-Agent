@@ -150,9 +150,7 @@ def _setup_resume_runtime(
         )
     except Exception as exc:
         if host._renderer is not None:
-            host._renderer.add_system_message(
-                f'Resume failed: {exc}', title='error'
-            )
+            host._renderer.add_system_message(f'Resume failed: {exc}', title='error')
         return None
     runtime = runtime_state[0]
     repo_directory = runtime_state[1]
@@ -211,9 +209,7 @@ async def _wire_resume_runtime_state(
             agent,
         )
     except Exception as exc:
-        logger.error(
-            'Resume failed during memory/MCP setup: %s', exc, exc_info=True
-        )
+        logger.error('Resume failed during memory/MCP setup: %s', exc, exc_info=True)
         if host._renderer is not None:
             host._renderer.add_system_message(
                 f'Resume failed during memory/MCP setup: {exc}',

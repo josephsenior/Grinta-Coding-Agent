@@ -13,8 +13,8 @@ from backend.inference.tool_names import (
     FIND_SYMBOLS_TOOL_NAME,
     GLOB_TOOL_NAME,
     GREP_TOOL_NAME,
-    MULTIEDIT_TOOL_NAME,
     MEMORY_TOOL_NAME,
+    MULTIEDIT_TOOL_NAME,
     READ_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
@@ -103,21 +103,15 @@ def _render_examples(
     )
 
     if tracker_on:
-        planning_hint = (
-            f'{_tool_ref(TASK_TRACKER_TOOL_NAME)}(update) with a task_list when committing to structured work'
-        )
+        planning_hint = f'{_tool_ref(TASK_TRACKER_TOOL_NAME)}(update) with a task_list when committing to structured work'
     else:
         planning_hint = 'scope the work mentally before editing'
 
     destructive_confirmation_step = 'See `<ASK_USER_TOOL>` to confirm scope and target'
     if checkpoints_on:
-        checkpoint_step = (
-            'After the change, verify immediately; if it fails, `checkpoint(revert)` or `undo_last_edit`'
-        )
+        checkpoint_step = 'After the change, verify immediately; if it fails, `checkpoint(revert)` or `undo_last_edit`'
     else:
-        checkpoint_step = (
-            'If approved, keep the change surface small and verify immediately after the action'
-        )
+        checkpoint_step = 'If approved, keep the change surface small and verify immediately after the action'
     adjacent_tool_fallback = (
         f'symbol lookup → {_tool_ref(GREP_TOOL_NAME)}; '
         f'{_tool_ref(CODE_INTELLIGENCE_TOOL_NAME)} → {_tool_ref(GREP_TOOL_NAME)}'
@@ -125,7 +119,7 @@ def _render_examples(
         else f'symbol lookup → {_tool_ref(GREP_TOOL_NAME)}; refine the query and read nearby files'
     )
     failure_escalation_step = (
-        f'After repeated failed attempts on the same sub-task, see `<ASK_USER_TOOL>` '
+        'After repeated failed attempts on the same sub-task, see `<ASK_USER_TOOL>` '
         'with a 1-line post-mortem and a specific question'
     )
 

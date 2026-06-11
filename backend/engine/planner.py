@@ -163,9 +163,7 @@ class OrchestratorPlanner:
         tools: list[ChatCompletionToolParam],
     ) -> list[ChatCompletionToolParam]:
         return [
-            tool
-            for tool in tools
-            if self._tool_name(tool) in PLAN_MODE_ALLOWED_TOOLS
+            tool for tool in tools if self._tool_name(tool) in PLAN_MODE_ALLOWED_TOOLS
         ]
 
     def partition_tools(
@@ -382,7 +380,12 @@ class OrchestratorPlanner:
         return params
 
     def _log_debug_mode_info(self, messages: list, state: State, mode: str) -> None:
-        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() not in ('1', 'true', 'yes', 'on'):
+        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() not in (
+            '1',
+            'true',
+            'yes',
+            'on',
+        ):
             return
         mode_injected = None
         for i in range(len(messages) - 1, -1, -1):

@@ -12,7 +12,9 @@ from backend.context.tool_result_storage import (
 from backend.ledger.observation.commands import CmdOutputObservation
 
 
-def test_persist_tool_result_on_observation_stores_frozen_preview(tmp_path, monkeypatch):
+def test_persist_tool_result_on_observation_stores_frozen_preview(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(
         'backend.context.tool_result_storage._tool_results_dir',
         lambda: tmp_path,
@@ -37,7 +39,10 @@ def test_persist_tool_result_on_observation_stores_frozen_preview(tmp_path, monk
     persist_tool_result_on_observation(obs, state)
     replacements = state.extra_data.get(TOOL_RESULT_REPLACEMENTS_KEY, {})
     assert '42' in replacements
-    assert 'persisted-output' in replacements['42'].lower() or 'saved to' in replacements['42'].lower()
+    assert (
+        'persisted-output' in replacements['42'].lower()
+        or 'saved to' in replacements['42'].lower()
+    )
 
     copied = CmdOutputObservation(
         content=content,

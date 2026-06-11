@@ -133,7 +133,8 @@ async def test_read_binary_file_returns_binary_error(mock_executor) -> None:
     with (
         patch('os.path.isfile', return_value=True),
         patch(
-            'backend.execution.io_mixins._aes_io_file_mixin.is_binary', return_value=True
+            'backend.execution.io_mixins._aes_io_file_mixin.is_binary',
+            return_value=True,
         ),
     ):
         out = await mock_executor.read(FileReadAction(path='foo.bin'))

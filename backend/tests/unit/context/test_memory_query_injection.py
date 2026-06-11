@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from backend.context.conversation_memory import ContextMemory
 from backend.ledger.action import MessageAction

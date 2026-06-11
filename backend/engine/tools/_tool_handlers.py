@@ -29,15 +29,12 @@ from backend.engine.tools.browser_native import (
     BROWSER_TOOL_NAME,
     build_browser_tool_action,
 )
-from backend.engine.tools.grep import build_grep_action
 from backend.engine.tools.glob import build_glob_action
-from backend.ledger.action.search import GrepAction, GlobAction
+from backend.engine.tools.grep import build_grep_action
 from backend.engine.tools.task_tracker import TaskTracker
 from backend.inference.tool_names import (
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
-    WEB_FETCH_TOOL_NAME,
-    WEB_SEARCH_TOOL_NAME,
 )
 from backend.ledger.action import (
     Action,
@@ -49,14 +46,14 @@ from backend.ledger.action import (
     MemoryPersistAction,
     MemoryRecallAction,
     TaskTrackingAction,
-    WorkingMemoryAction,
 )
+from backend.ledger.action.agent import CondensationRequestAction
+from backend.ledger.action.mcp import MCPAction
+from backend.ledger.action.search import GlobAction, GrepAction
 from backend.ledger.observation.memory_tools import (
     MemoryPersistObservation,
     MemoryRecallObservation,
 )
-from backend.ledger.action.agent import CondensationRequestAction
-from backend.ledger.action.mcp import MCPAction
 
 ActionToolHandler = Callable[[dict[str, Any]], Action]
 
@@ -227,7 +224,7 @@ def _handle_memory_tool(arguments: Mapping[str, Any]) -> Action:
         return build_wm(wm_args)
 
     raise FunctionCallValidationError(
-        f"Unknown memory action: {action!r}. Use working, persist, or recall."
+        f'Unknown memory action: {action!r}. Use working, persist, or recall.'
     )
 
 

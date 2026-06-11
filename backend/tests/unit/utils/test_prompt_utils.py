@@ -291,8 +291,8 @@ class TestOrchestratorPromptManager:
         ):
             result = opm.get_system_message()
 
-        assert '`lsp`' not in result
-        assert '`lsp_query`' not in result
+        assert '→ `lsp`' not in result
+        assert 'definitions/references, `lsp`' not in result
 
     def test_get_system_message_omits_terminal_manager_when_terminal_disabled(
         self, tmp_path
@@ -586,10 +586,10 @@ class TestPromptBudgetRegression:
         # Floor: prompt must be substantive.
         assert report['total_tokens'] >= 800, 'Prompt shrank unexpectedly'
         # Ceiling: guards against prompt bloat regressions.
-        # Baseline post-compression: 4 203 tokens.  Ceiling = baseline + ~10 %.
-        assert report['total_tokens'] <= 4_650, (
+        # Baseline post-compression: 5 228 tokens.  Ceiling = baseline + ~10 %.
+        assert report['total_tokens'] <= 5_750, (
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
-            '(baseline 4 203). Reduce prompt text or raise this ceiling deliberately.'
+            '(baseline 5 228). Reduce prompt text or raise this ceiling deliberately.'
         )
 
     def test_windows_ps_balanced_no_mcp_token_ceiling(self) -> None:
@@ -605,8 +605,8 @@ class TestPromptBudgetRegression:
             function_calling_mode='native',
         )
         assert report['total_tokens'] >= 800, 'Prompt shrank unexpectedly'
-        # Baseline post-compression: 4 379 tokens.  Ceiling = baseline + ~10 %.
-        assert report['total_tokens'] <= 4_820, (
+        # Baseline post-compression: 5 321 tokens.  Ceiling = baseline + ~10 %.
+        assert report['total_tokens'] <= 5_850, (
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
             '(baseline 4 379). Reduce prompt text or raise this ceiling deliberately.'
         )
@@ -628,10 +628,10 @@ class TestPromptBudgetRegression:
             function_calling_mode='native',
         )
         assert report['total_tokens'] >= 1_000, 'Prompt shrank unexpectedly'
-        # Baseline post-compression: 5 103 tokens.  Ceiling = baseline + ~10 %.
-        assert report['total_tokens'] <= 5_620, (
+        # Baseline post-compression: 5 663 tokens.  Ceiling = baseline + ~10 %.
+        assert report['total_tokens'] <= 6_230, (
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
-            '(baseline 5 103). Reduce prompt text or raise this ceiling deliberately.'
+            '(baseline 5 663). Reduce prompt text or raise this ceiling deliberately.'
         )
 
 

@@ -75,9 +75,7 @@ def handle_checkpoint_list(host: Any, args: list[str]) -> None:
             )
         return
     # Newest first.
-    entries = sorted(entries, key=lambda e: e.get('timestamp', 0), reverse=True)[
-        :limit
-    ]
+    entries = sorted(entries, key=lambda e: e.get('timestamp', 0), reverse=True)[:limit]
     body = '\n'.join(host._format_checkpoint_entry(e) for e in entries)
     if host._renderer is not None:
         host._renderer.add_system_message(body, title='checkpoint list')

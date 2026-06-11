@@ -319,8 +319,7 @@ def _compute_public_surface(
             for name in entry['names']:
                 names[name] += 1
         public_surface[monolith] = [
-            {'name': name, 'import_count': count}
-            for name, count in names.most_common()
+            {'name': name, 'import_count': count} for name, count in names.most_common()
         ]
     return public_surface
 

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 from rich.console import Console as RichConsole
+from textual.widgets import Static
 
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
@@ -15,7 +16,6 @@ from backend.cli.tui.widgets.activity_card import (
 )
 from backend.cli.tui.widgets.activity_card import ThinkingIndicator
 from backend.ledger.action import FileWriteAction, StreamingChunkAction
-from textual.widgets import Static
 
 
 @pytest.fixture
@@ -64,13 +64,13 @@ async def test_thinking_stream_freezes_before_later_activity(
         )
         await pilot.pause()
         renderer._process_event(
-            StreamingChunkAction(
-                thinking_accumulated='First thought.\nStill thinking.'
-            )
+            StreamingChunkAction(thinking_accumulated='First thought.\nStill thinking.')
         )
         await pilot.pause()
         renderer._process_event(
-            FileWriteAction(path='tests/test_order.py', content='def test_ok():\n    pass\n')
+            FileWriteAction(
+                path='tests/test_order.py', content='def test_ok():\n    pass\n'
+            )
         )
         await pilot.pause()
         renderer._process_event(

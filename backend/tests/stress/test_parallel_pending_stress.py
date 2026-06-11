@@ -55,7 +55,9 @@ async def test_clear_primary_does_not_wipe_siblings_under_load() -> None:
         for _ in range(4):
             svc.clear_primary()
             outstanding_counts.append(
-                sum(1 for action in actions if svc.peek_for_cause(action.id) is not None)
+                sum(
+                    1 for action in actions if svc.peek_for_cause(action.id) is not None
+                )
             )
             await asyncio.sleep(0.001)
 

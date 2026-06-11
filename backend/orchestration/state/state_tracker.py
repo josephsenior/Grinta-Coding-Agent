@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Any
 from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import ChangeAgentStateAction
 from backend.ledger.action.empty import NullAction
-from backend.ledger.event.event_filter import EventFilter
 from backend.ledger.action.message import MessageAction
+from backend.ledger.event.event_filter import EventFilter
 from backend.ledger.observation.agent import (
     AgentCondensationObservation,
     AgentStateChangedObservation,

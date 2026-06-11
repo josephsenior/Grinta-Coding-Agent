@@ -326,15 +326,11 @@ class TestSummarizeToolArguments(unittest.TestCase):
         self.assertIn('3', s)
 
     def test_grep(self) -> None:
-        s = summarize_tool_arguments(
-            'grep', {'pattern': 'parse_args', 'path': '/src'}
-        )
+        s = summarize_tool_arguments('grep', {'pattern': 'parse_args', 'path': '/src'})
         self.assertIn('parse_args', s)
 
     def test_glob(self) -> None:
-        s = summarize_tool_arguments(
-            'glob', {'pattern': '*.py', 'path': '/src'}
-        )
+        s = summarize_tool_arguments('glob', {'pattern': '*.py', 'path': '/src'})
         self.assertIn('*.py', s)
 
     def test_lsp(self) -> None:
@@ -727,9 +723,7 @@ class TestMcpSearchSummary(unittest.TestCase):
         self.assertIn('2', result)  # type: ignore[arg-type]
 
     def test_tool_name_is_glob(self) -> None:
-        result = _mcp_search_summary(
-            {'tool_name': 'glob', 'total_count': 7}, ''
-        )
+        result = _mcp_search_summary({'tool_name': 'glob', 'total_count': 7}, '')
         self.assertIsNotNone(result)
         self.assertIn('7', result)  # type: ignore[arg-type]
 

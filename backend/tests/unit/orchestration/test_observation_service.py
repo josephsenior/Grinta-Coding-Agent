@@ -68,7 +68,8 @@ class TestTransitionLogic:
     @pytest.mark.asyncio
     async def test_no_state_transition_runs_pipeline(self):
         """The USER_CONFIRMED/USER_REJECTED special cases are gone; the
-        function now just runs the observation pipeline."""
+        function now just runs the observation pipeline.
+        """
         controller = MagicMock()
         controller.state.agent_state = AgentState.RUNNING
         controller.set_agent_state_to = AsyncMock()

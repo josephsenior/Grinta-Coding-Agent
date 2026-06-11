@@ -8,7 +8,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 from rich.markup import escape as markup_escape
 
 from backend.cli.theme import (

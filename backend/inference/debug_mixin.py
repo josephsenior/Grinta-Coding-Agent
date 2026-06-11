@@ -78,18 +78,6 @@ class DebugMixin:
         if content:
             llm_response_logger.debug(content)
 
-
-def _append_tool_calls_content(content: str, tool_calls: Any) -> str:
-    if not tool_calls:
-        return content
-    for tc in tool_calls:
-        func = tc.get('function') if isinstance(tc, dict) else getattr(tc, 'function', None)
-        if func:
-            name = func.get('name') if isinstance(func, dict) else getattr(func, 'name', '')
-            arguments = func.get('arguments') if isinstance(func, dict) else getattr(func, 'arguments', '')
-            content += f'\nFunction call: {name}({arguments})'
-    return content
-
     def _format_message_content(self, message: dict[str, Any]) -> str:
         """Extract and format the content field of a single message dict."""
         content = message.get('content')
@@ -113,3 +101,27 @@ def _append_tool_calls_content(content: str, tool_calls: Any) -> str:
                 return element['image_url'].get('url', str(element))
             return str(element)
         return str(element)
+
+
+def _append_tool_calls_content(content: str, tool_calls: Any) -> str:
+    if not tool_calls:
+        return content
+    for tc in tool_calls:
+        func = (
+            tc.get('function')
+            if isinstance(tc, dict)
+            else getattr(tc, 'function', None)
+        )
+        if func:
+            name = (
+                func.get('name')
+                if isinstance(func, dict)
+                else getattr(func, 'name', '')
+            )
+            arguments = (
+                func.get('arguments')
+                if isinstance(func, dict)
+                else getattr(func, 'arguments', '')
+            )
+            content += f'\nFunction call: {name}({arguments})'
+    return content

@@ -37,9 +37,7 @@ _DISCOVERY_TOOLS = frozenset(
 
 CHAT_MODE_ALLOWED_TOOLS = _DISCOVERY_TOOLS | frozenset({ASK_USER_TOOL_NAME})
 
-PLAN_MODE_ALLOWED_TOOLS = CHAT_MODE_ALLOWED_TOOLS | frozenset(
-    {TASK_TRACKER_TOOL_NAME}
-)
+PLAN_MODE_ALLOWED_TOOLS = CHAT_MODE_ALLOWED_TOOLS | frozenset({TASK_TRACKER_TOOL_NAME})
 
 
 def normalize_interaction_mode(value: object, default: str = AGENT_MODE) -> str:

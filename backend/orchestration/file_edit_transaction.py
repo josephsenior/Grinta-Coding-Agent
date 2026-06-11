@@ -245,7 +245,9 @@ class FileEditTransactionCoordinator:
         response_id: str,
     ) -> list[FileEditAction]:
         group = [action]
-        pending = getattr(getattr(self._controller, 'agent', None), 'pending_actions', None)
+        pending = getattr(
+            getattr(self._controller, 'agent', None), 'pending_actions', None
+        )
         if not pending:
             return group
         for queued in list(pending):
@@ -331,7 +333,9 @@ class FileEditTransactionCoordinator:
         *,
         current_tool_call_id: str,
     ) -> dict[str, Any]:
-        pending = getattr(getattr(self._controller, 'agent', None), 'pending_actions', None)
+        pending = getattr(
+            getattr(self._controller, 'agent', None), 'pending_actions', None
+        )
         if pending is None:
             return {}
         remaining = transaction.tool_call_ids - transaction.completed_tool_call_ids
@@ -369,7 +373,9 @@ class FileEditTransactionCoordinator:
         skipped_tool_call_ids: dict[str, Any],
     ) -> None:
         restored_lines = '\n'.join(f'- {path}' for path in sorted(restored))
-        skipped_lines = '\n'.join(f'- {tool_id}' for tool_id in sorted(skipped_tool_call_ids))
+        skipped_lines = '\n'.join(
+            f'- {tool_id}' for tool_id in sorted(skipped_tool_call_ids)
+        )
         error_lines = '\n'.join(f'- {err}' for err in restore_errors)
         sections = [
             '[FILE_EDIT_TRANSACTION_ROLLBACK]',

@@ -190,9 +190,7 @@ class SessionLifecycleMixin(_SessionLifecycleBase):
         target: str,
         config: AppConfig,
     ) -> str | None:
-        return _resolve_resume_target(
-            cast(SessionLifecycleHost, self), target, config
-        )
+        return _resolve_resume_target(cast(SessionLifecycleHost, self), target, config)
 
     def _setup_resume_runtime(
         self,

@@ -42,6 +42,7 @@ def _register_observation_handler(obs_type: type):
     def decorator(handler):
         _OBSERVATION_DISPATCH[obs_type] = handler
         return handler
+
     return decorator
 
 
@@ -90,11 +91,12 @@ def _handle_grep_observation(
     obs: GrepObservation, max_message_chars: int | None
 ) -> Message:
     header = (
-        f'[GREP pattern={obs.pattern!r} path={obs.path!r} '
-        f'mode={obs.output_mode!r}]'
+        f'[GREP pattern={obs.pattern!r} path={obs.path!r} mode={obs.output_mode!r}]'
     )
     body = obs.error or obs.content
-    text = truncate_content(f'{header}\n{body}', max_message_chars, strategy='head_heavy')
+    text = truncate_content(
+        f'{header}\n{body}', max_message_chars, strategy='head_heavy'
+    )
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -104,7 +106,9 @@ def _handle_glob_observation(
 ) -> Message:
     header = f'[GLOB pattern={obs.pattern!r} path={obs.path!r}]'
     body = obs.error or obs.content
-    text = truncate_content(f'{header}\n{body}', max_message_chars, strategy='head_heavy')
+    text = truncate_content(
+        f'{header}\n{body}', max_message_chars, strategy='head_heavy'
+    )
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -117,7 +121,9 @@ def _handle_find_symbols_observation(
         f'symbol_kind={obs.symbol_kind!r}]'
     )
     body = obs.error or obs.content
-    text = truncate_content(f'{header}\n{body}', max_message_chars, strategy='head_heavy')
+    text = truncate_content(
+        f'{header}\n{body}', max_message_chars, strategy='head_heavy'
+    )
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -127,7 +133,9 @@ def _handle_read_symbols_observation(
 ) -> Message:
     header = f'[READ_SYMBOLS path={obs.path!r} symbol_kind={obs.symbol_kind!r}]'
     body = obs.error or obs.content
-    text = truncate_content(f'{header}\n{body}', max_message_chars, strategy='head_heavy')
+    text = truncate_content(
+        f'{header}\n{body}', max_message_chars, strategy='head_heavy'
+    )
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -140,7 +148,9 @@ def _handle_analyze_project_structure_observation(
         f'symbol={obs.symbol!r} depth={obs.depth!r} direction={obs.direction!r}]'
     )
     body = obs.error or obs.content
-    text = truncate_content(f'{header}\n{body}', max_message_chars, strategy='head_heavy')
+    text = truncate_content(
+        f'{header}\n{body}', max_message_chars, strategy='head_heavy'
+    )
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -149,7 +159,9 @@ def _handle_checkpoint_observation(
     obs: CheckpointObservation, max_message_chars: int | None
 ) -> Message:
     header = f'[CHECKPOINT command={obs.command!r} status={obs.status!r} ok={obs.ok}]'
-    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
+    text = truncate_content(
+        f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy'
+    )
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -158,7 +170,9 @@ def _handle_working_memory_observation(
     obs: WorkingMemoryObservation, max_message_chars: int | None
 ) -> Message:
     header = f'[WORKING_MEMORY command={obs.command!r} section={obs.section!r}]'
-    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
+    text = truncate_content(
+        f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy'
+    )
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -167,7 +181,9 @@ def _handle_memory_persist_observation(
     obs: MemoryPersistObservation, max_message_chars: int | None
 ) -> Message:
     header = f'[MEMORY_PERSIST key={obs.key!r} kind={obs.kind!r}]'
-    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
+    text = truncate_content(
+        f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy'
+    )
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -176,7 +192,9 @@ def _handle_memory_recall_observation(
     obs: MemoryRecallObservation, max_message_chars: int | None
 ) -> Message:
     header = f'[MEMORY_RECALL query={obs.query!r}]'
-    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
+    text = truncate_content(
+        f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy'
+    )
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -185,7 +203,9 @@ def _handle_scratchpad_note_observation(
     obs: ScratchpadNoteObservation, max_message_chars: int | None
 ) -> Message:
     header = f'[SCRATCHPAD_NOTE key={obs.key!r}]'
-    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
+    text = truncate_content(
+        f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy'
+    )
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -194,7 +214,9 @@ def _handle_scratchpad_recall_observation(
     obs: ScratchpadRecallObservation, max_message_chars: int | None
 ) -> Message:
     header = f'[SCRATCHPAD_RECALL key={obs.key!r} found={obs.found}]'
-    text = truncate_content(f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy')
+    text = truncate_content(
+        f'{header}\n{obs.content}', max_message_chars, strategy='head_heavy'
+    )
     return Message(role='user', content=[TextContent(text=text)])
 
 
@@ -415,9 +437,7 @@ def _truncate_hunk_section(section: list[str], half: int) -> list[str]:
     return section[:half] + ['  [... truncated ...]'] + section[-half:]
 
 
-def _truncate_oversized_hunk(
-    hunk_lines: list[str], lines_per_hunk: int
-) -> list[str]:
+def _truncate_oversized_hunk(hunk_lines: list[str], lines_per_hunk: int) -> list[str]:
     header_lines = []
     body_lines = []
     for line in hunk_lines:

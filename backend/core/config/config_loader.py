@@ -112,6 +112,7 @@ _JSON_LLM_KEYS = (
     'llm_api_key',
     'llm_base_url',
     'llm_provider',
+    'llm_context_window_tokens',
     'llm_max_output_tokens',
     'llm_reasoning_effort',
 )
@@ -256,6 +257,13 @@ def _build_json_llm_config(
         if raw is not None:
             try:
                 llm_dict['max_output_tokens'] = int(str(raw))
+            except (ValueError, TypeError):
+                pass
+    if 'llm_context_window_tokens' in data:
+        raw = data['llm_context_window_tokens']
+        if raw is not None:
+            try:
+                llm_dict['context_window_tokens'] = int(str(raw))
             except (ValueError, TypeError):
                 pass
     if 'llm_reasoning_effort' in data:
@@ -460,7 +468,9 @@ def _ensure_active_agent_compactor_llm(cfg: AppConfig) -> None:
     compactor_config = getattr(agent_config, 'compactor_config', None)
     active_llm_config = cfg.get_llm_config_from_agent(cfg.default_agent)
     if compactor_config is None:
-        agent_config.compactor_config = ContextPipelineConfig(llm_config=active_llm_config)
+        agent_config.compactor_config = ContextPipelineConfig(
+            llm_config=active_llm_config
+        )
         return
     if (
         isinstance(compactor_config, (AutoCompactorConfig, ContextPipelineConfig))

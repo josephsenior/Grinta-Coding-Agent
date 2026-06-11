@@ -141,10 +141,10 @@ class TestAgentState:
         assert AgentState.FINISHED.value == 'finished'
         assert AgentState.ERROR.value == 'error'
         assert AgentState.STOPPED.value == 'stopped'
-        assert AgentState.PAUSED.value == 'paused'
+        assert AgentState.AWAITING_USER_INPUT.value == 'awaiting_user_input'
 
     def test_count(self):
-        assert len(AgentState) == 12
+        assert len(AgentState) == 9
 
 
 class TestObservationType:
@@ -157,7 +157,7 @@ class TestObservationType:
         assert ObservationType.BROWSER_SCREENSHOT.value == 'browser_screenshot'
 
     def test_count(self):
-        assert len(ObservationType) == 26
+        assert len(ObservationType) == 37
 
 
 class TestExitReason:

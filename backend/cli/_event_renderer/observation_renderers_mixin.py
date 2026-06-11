@@ -75,10 +75,10 @@ from backend.cli.transcript import (
     strip_tool_result_validation_annotations,
 )
 from backend.ledger.observation import (
-    AnalyzeProjectStructureObservation,
     AgentCondensationObservation,
     AgentStateChangedObservation,
     AgentThinkObservation,
+    AnalyzeProjectStructureObservation,
     BrowserScreenshotObservation,
     CmdOutputObservation,
     DelegateTaskObservation,
@@ -93,6 +93,7 @@ from backend.ledger.observation import (
     LspQueryObservation,
     MCPObservation,
     Observation,
+    ReadSymbolsObservation,
     RecallFailureObservation,
     RecallObservation,
     ServerReadyObservation,
@@ -101,7 +102,6 @@ from backend.ledger.observation import (
     TaskTrackingObservation,
     TerminalObservation,
     UserRejectObservation,
-    ReadSymbolsObservation,
 )
 from backend.ledger.observation.error import (
     ERROR_CATEGORY_NETWORK,
@@ -584,11 +584,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         if status == 'running' and detail:
             last_action = detail
         action_count = prev.get('action_count', 0)
-        if (
-            status == 'running'
-            and detail
-            and detail != prev.get('last_action', '')
-        ):
+        if status == 'running' and detail and detail != prev.get('last_action', ''):
             action_count += 1
         return last_action, action_count
 
@@ -603,11 +599,17 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         status = str(extras.get('worker_status') or 'running')
         now = time.monotonic()
         started_at, finished_at = ObservationRenderersMixin._compute_worker_timing(
-            status, previous, now,
+            status,
+            previous,
+            now,
         )
         detail = ObservationRenderersMixin._extract_detail(obs, extras)
-        last_action, action_count = ObservationRenderersMixin._compute_worker_action_tracking(
-            status, detail, previous,
+        last_action, action_count = (
+            ObservationRenderersMixin._compute_worker_action_tracking(
+                status,
+                detail,
+                previous,
+            )
         )
         return {
             'label': str(extras.get('worker_label') or worker_id),
@@ -870,7 +872,13 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             query=obs.query,
             content=obs.error or obs.content or '',
             match_count=len(obs.candidates),
-            file_count=len({str(item.get("path") or "") for item in obs.candidates if item.get("path")}),
+            file_count=len(
+                {
+                    str(item.get('path') or '')
+                    for item in obs.candidates
+                    if item.get('path')
+                }
+            ),
         )
         if pending is not None:
             self._render_pending_activity_card(

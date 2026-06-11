@@ -266,7 +266,9 @@ def _save_and_respond(
 def _get_section(section: str) -> WorkingMemoryObservation:
     memory = _load_memory()
     if not memory:
-        return _wm_obs(content='Working memory is empty.', command='get', section=section)
+        return _wm_obs(
+            content='Working memory is empty.', command='get', section=section
+        )
     if section == 'all':
         parts = ['Full cognitive workspace:']
         for sec in _VALID_SECTIONS:
@@ -274,7 +276,9 @@ def _get_section(section: str) -> WorkingMemoryObservation:
             if val:
                 parts.append(f'\n## {sec.upper()}\n{val}')
         if len(parts) == 1:
-            return _wm_obs(content='All sections are empty.', command='get', section='all')
+            return _wm_obs(
+                content='All sections are empty.', command='get', section='all'
+            )
         last = memory.get('_last_updated', '?')
         parts.append(f'\n(last updated: {last})')
         return _wm_obs(content='\n'.join(parts), command='get', section='all')
@@ -302,7 +306,9 @@ def _clear_section(section: str) -> WorkingMemoryObservation:
                 any_cleared = True
         if any_cleared:
             _save_memory(memory)
-        return _wm_obs(content='Cleared all sections.', command='clear_section', section='all')
+        return _wm_obs(
+            content='Cleared all sections.', command='clear_section', section='all'
+        )
     if section not in _VALID_SECTIONS:
         return _wm_obs(
             content=f'Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}',
@@ -314,7 +320,11 @@ def _clear_section(section: str) -> WorkingMemoryObservation:
     if section in memory:
         del memory[section]
         _save_memory(memory)
-    return _wm_obs(content=f"Cleared '{section}' section.", command='clear_section', section=section)
+    return _wm_obs(
+        content=f"Cleared '{section}' section.",
+        command='clear_section',
+        section=section,
+    )
 
 
 def get_full_working_memory() -> str:
@@ -369,7 +379,13 @@ def get_working_memory_prompt_block(char_budget: int = 2000) -> str:
             truncated = True
     if len(lines) == 2:
         return ''
-    if truncated and len('\n'.join(lines + ['... (working memory truncated)', '</WORKING_MEMORY>'])) <= char_budget:
+    if (
+        truncated
+        and len(
+            '\n'.join(lines + ['... (working memory truncated)', '</WORKING_MEMORY>'])
+        )
+        <= char_budget
+    ):
         lines.append('... (working memory truncated)')
     lines.append('</WORKING_MEMORY>')
     return '\n'.join(lines)

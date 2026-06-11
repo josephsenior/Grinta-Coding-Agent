@@ -31,9 +31,7 @@ class TestExecuteGrep:
         assert 'test.py' in obs.content
         assert '.mypy_cache' not in obs.content
 
-    def test_content_mode_returns_matching_lines(
-        self, tmp_path, monkeypatch
-    ) -> None:
+    def test_content_mode_returns_matching_lines(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
 
         test_file = tmp_path / 'test.py'
@@ -51,9 +49,7 @@ class TestExecuteGrep:
         assert 'hello world' in obs.content
         assert 'test.py' in obs.content
 
-    def test_count_mode_returns_per_file_counts(
-        self, tmp_path, monkeypatch
-    ) -> None:
+    def test_count_mode_returns_per_file_counts(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
 
         test_file = tmp_path / 'test.py'
@@ -87,9 +83,7 @@ class TestExecuteGrep:
         assert 'file1.py' in obs.content
         assert 'file4.py' not in obs.content
 
-    def test_invalid_regex_returns_friendly_error(
-        self, tmp_path, monkeypatch
-    ) -> None:
+    def test_invalid_regex_returns_friendly_error(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
 
         action = build_grep_action(pattern='(unclosed', path=str(tmp_path))
@@ -117,4 +111,3 @@ class TestExecuteGrep:
         assert 'non-empty' in obs.content
         assert obs.error
         assert 'glob' in obs.content
-

@@ -117,18 +117,14 @@ def test_persistence_degraded_warning_emitted_once_per_health_level() -> None:
 
             stub._maybe_emit_persistence_degraded_warning()
             events = stream.get_matching_events()
-            status_events = [
-                e for e in events if isinstance(e, StatusObservation)
-            ]
+            status_events = [e for e in events if isinstance(e, StatusObservation)]
             assert len(status_events) == 1
             assert status_events[0].status_type == 'persistence_degraded'
             assert status_events[0].extras.get('persistence_health') == 'degraded'
 
             stub._maybe_emit_persistence_degraded_warning()
             events_after = stream.get_matching_events()
-            status_after = [
-                e for e in events_after if isinstance(e, StatusObservation)
-            ]
+            status_after = [e for e in events_after if isinstance(e, StatusObservation)]
             assert len(status_after) == 1
 
             stream._persistence_health = 'failed'

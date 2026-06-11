@@ -33,7 +33,7 @@ class TestStepPrerequisiteService:
         assert svc.can_step() is True
 
     def test_cannot_step_when_paused(self):
-        ctx = _FakeContext(AgentState.PAUSED)
+        ctx = _FakeContext(AgentState.AWAITING_USER_INPUT)
         svc = StepPrerequisiteService(cast(OrchestrationContext, ctx))
         assert svc.can_step() is False
 

@@ -291,6 +291,7 @@ _INBAND_DISCONNECT_PHRASES: tuple[str, ...] = (
 # in-band error messages fit comfortably within this window.
 _INBAND_PREFIX_LIMIT = 256
 
+
 async def _stream_with_chunk_timeout(
     stream_iter: Any, *, timeout_sec: float | None = None
 ) -> Any:
@@ -488,6 +489,8 @@ class LLM(RetryMixin, DebugMixin):
             if not model:
                 return
             features = get_features(model)
+            if getattr(self.config, 'context_window_tokens', None) is None:
+                self.config.context_window_tokens = features.context_window_tokens
             if self.config.max_input_tokens is None:
                 self.config.max_input_tokens = features.max_input_tokens
             if self.config.max_output_tokens is None:
@@ -644,6 +647,14 @@ class LLM(RetryMixin, DebugMixin):
                 return None
 
         # Model catalog limits (preferred)
+        context_window = _as_int(getattr(self.features, 'context_window_tokens', None))
+        if context_window is None:
+            context_window = _as_int(
+                getattr(self.config, 'context_window_tokens', None)
+            )
+        if context_window is not None:
+            return context_window
+
         max_in = _as_int(getattr(self.features, 'max_input_tokens', None))
         max_out = _as_int(getattr(self.features, 'max_output_tokens', None))
 
@@ -807,9 +818,7 @@ class LLM(RetryMixin, DebugMixin):
                 'prefix_repr': repr(prefix[:120]),
                 'lower_preview': lower[:120],
                 'matched_phrases': [
-                    p
-                    for p in _INBAND_DISCONNECT_PHRASES
-                    if p in lower
+                    p for p in _INBAND_DISCONNECT_PHRASES if p in lower
                 ][:5],
             },
         )
@@ -851,13 +860,9 @@ class LLM(RetryMixin, DebugMixin):
 
         is_retryable = isinstance(e, LLM_RETRY_EXCEPTIONS)
         is_last = attempt >= max_attempts
-        if not self._should_retry_astream(
-            is_retryable, is_last, yielded_any, exc=e
-        ):
+        if not self._should_retry_astream(is_retryable, is_last, yielded_any, exc=e):
             logger.error('LLM astream error: %s', e)
-            mapped = _map_provider_exception(
-                e, (self.config.model or '').strip()
-            )
+            mapped = _map_provider_exception(e, (self.config.model or '').strip())
             if mapped is not e:
                 raise mapped from e
             raise
@@ -901,14 +906,18 @@ class LLM(RetryMixin, DebugMixin):
                 self.log_prompt(messages)
                 stream_iter = self.client.astream(messages=messages, **call_kwargs)
                 async for chunk in _stream_with_chunk_timeout(stream_iter):
-                    result = await self._process_astream_chunk(chunk, yielded_any, _inband_prefix)
+                    result = await self._process_astream_chunk(
+                        chunk, yielded_any, _inband_prefix
+                    )
                     if result is None:
                         return
                     yield chunk
                     yielded_any = True
                 return
             except Exception as e:
-                await self._handle_astream_error(e, attempt, max_attempts, yielded_any, retry_min, retry_max)
+                await self._handle_astream_error(
+                    e, attempt, max_attempts, yielded_any, retry_min, retry_max
+                )
 
     async def _check_cancelled(self) -> bool:
         """Check if the request has been cancelled."""

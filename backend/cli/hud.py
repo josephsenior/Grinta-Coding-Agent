@@ -439,7 +439,9 @@ class HUDBar:
         accumulated_usage: Any,
     ) -> None:
         if not usages:
-            if isinstance(accumulated_usage, dict) and self._apply_dict_accumulated_usage(
+            if isinstance(
+                accumulated_usage, dict
+            ) and self._apply_dict_accumulated_usage(
                 accumulated_usage,
             ):
                 return
@@ -484,9 +486,7 @@ class HUDBar:
         )
         return True
 
-    def _dict_usage_context_slice(
-        self, usages: list[Any]
-    ) -> list[dict[str, Any]]:
+    def _dict_usage_context_slice(self, usages: list[Any]) -> list[dict[str, Any]]:
         usage_count = len(usages)
         start = self._context_usage_ignore_prefix
         if start > usage_count:

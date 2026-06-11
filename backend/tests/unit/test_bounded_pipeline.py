@@ -14,7 +14,6 @@ single hang point:
 from __future__ import annotations
 
 import asyncio
-import os
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -24,7 +23,6 @@ from backend.core.llm_step_timeout import (
     DEFAULT_LLM_STEP_TIMEOUT_SECONDS,
     llm_step_timeout_seconds_from_env,
 )
-
 
 # ── Layer 1: LLM step timeout default ────────────────────────────────
 
@@ -76,12 +74,14 @@ class TestLlmStepTimeoutPropagation:
     the orchestrator's RecoveryService can route it through the retry queue
     (exponential backoff + automatic RUNNING resume).  It must NOT be
     swallowed into a ``None`` action — doing so made the agent halt silently
-    (the liveness guard saw a no-action and went AWAITING_USER_INPUT)."""
+    (the liveness guard saw a no-action and went AWAITING_USER_INPUT).
+    """
 
     @pytest.mark.asyncio
     async def test_hung_step_raises_timeout(self):
         """``_run_async_step_with_timeout`` raises ``Timeout`` once the cap is
-        exceeded, preserving the cap value for diagnostics."""
+        exceeded, preserving the cap value for diagnostics.
+        """
         import asyncio
 
         from backend.inference.exceptions import Timeout
@@ -129,7 +129,8 @@ class TestLlmStepTimeoutPropagation:
 
     def test_local_swallow_handler_is_removed(self):
         """Regression guard: the handler that converted a step timeout into a
-        ``None`` action must not be reintroduced."""
+        ``None`` action must not be reintroduced.
+        """
         from backend.orchestration.services.action_execution_service import (
             ActionExecutionService,
         )
@@ -146,7 +147,8 @@ class TestObservationHandlerTimeout:
     @pytest.mark.asyncio
     async def test_hung_observation_handler_does_not_wedge(self):
         """A hung observation_service.handle_observation is cut off and
-        the controller's step is triggered so the agent can recover."""
+        the controller's step is triggered so the agent can recover.
+        """
         from backend.orchestration.services.event_router_mixins._event_router_delegate_mixin import (
             _EventRouterDelegateMixin,
         )
@@ -191,10 +193,10 @@ class TestObservationHandlerTimeout:
     @pytest.mark.asyncio
     async def test_normal_observation_handler_completes(self):
         """Non-hung observation handlers still complete — timeout is a ceiling."""
+        from backend.ledger.observation import FileWriteObservation
         from backend.orchestration.services.event_router_mixins._event_router_delegate_mixin import (
             _EventRouterDelegateMixin,
         )
-        from backend.ledger.observation import FileWriteObservation
 
         class _Router(_EventRouterDelegateMixin):
             pass
@@ -254,9 +256,7 @@ class TestStepTaskLivenessWatchdog:
 
                 @property
                 def _step_lock(self) -> asyncio.Lock:
-                    return self.__dict__.setdefault(
-                        '_lock', asyncio.Lock()
-                    )
+                    return self.__dict__.setdefault('_lock', asyncio.Lock())
 
                 # Replicate the bound from the real _step method.
                 async def _step_bounded(self) -> None:
@@ -282,6 +282,4 @@ class TestStepTaskLivenessWatchdog:
             elapsed = time.monotonic() - start
 
             # The hang would take 60s; the 0.2s ceiling must cut it.
-            assert elapsed < 1.0, (
-                f'bound took {elapsed:.2f}s; ceiling was 0.2s.'
-            )
+            assert elapsed < 1.0, f'bound took {elapsed:.2f}s; ceiling was 0.2s.'

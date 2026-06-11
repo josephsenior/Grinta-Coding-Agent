@@ -30,9 +30,7 @@ def _render_critical(
         else ''
     )
 
-    destructive_ops_antipattern = (
-        '- **Running `rm`, `Remove-Item`, force pushes, or other destructive ops without explicit confirmation from the user.**'
-    )
+    destructive_ops_antipattern = '- **Running `rm`, `Remove-Item`, force pushes, or other destructive ops without explicit confirmation from the user.**'
     _ = checkpoints_on
 
     planning_tool_list = (

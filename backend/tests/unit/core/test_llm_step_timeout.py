@@ -27,4 +27,7 @@ def test_resolve_step_task_liveness_unbounded_when_step_timeout_disabled() -> No
     agent = MagicMock()
     agent.config.llm_step_timeout_seconds = 0
 
-    assert resolve_step_task_liveness_seconds(agent, default_liveness_seconds=600.0) == 600.0
+    assert (
+        resolve_step_task_liveness_seconds(agent, default_liveness_seconds=600.0)
+        == 600.0
+    )

@@ -12,6 +12,7 @@ from pathlib import Path
 from backend.core.type_safety.path_validation import PathValidationError
 from backend.execution.utils._file_editor_types import ToolResult
 
+
 class ToolError(Exception):
     """Exception raised by file editor operations."""
 
@@ -169,6 +170,7 @@ class _FileEditorRollbackMixin:
             self._last_rollback_results = self._rollback_transaction(backup)
             self._transaction_stack.pop()
             raise
+
     def _rollback_transaction(self, backup: dict[str, str | None]) -> list[ToolResult]:
         """Rollback all file changes in a transaction.
 
@@ -223,4 +225,3 @@ class _FileEditorRollbackMixin:
                     )
                 )
         return results
-

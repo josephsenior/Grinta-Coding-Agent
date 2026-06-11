@@ -1,7 +1,5 @@
 """Tests for the no-step-progress watchdog in CircuitBreaker."""
 
-from unittest.mock import MagicMock, patch
-
 import pytest
 
 from backend.core.schemas import AgentState
@@ -29,22 +27,16 @@ class TestNoStepProgressWatchdog:
         now = 10.0
         cb.record_step_call(ts=now - 0.01)  # 10ms ago — well within 100ms
 
-        result = cb.check_no_step_progress(
-            agent_state=AgentState.RUNNING, now=now
-        )
+        result = cb.check_no_step_progress(agent_state=AgentState.RUNNING, now=now)
 
-        assert result is None, (
-            'Watchdog should be silent when step was called recently'
-        )
+        assert result is None, 'Watchdog should be silent when step was called recently'
 
     def test_watchdog_fires_after_timeout(self, cb):
         """First stall within the timeout fires auto_recover_once."""
         now = 10.0
         cb.record_step_call(ts=now - 0.5)  # 500ms ago — past 100ms timeout
 
-        result = cb.check_no_step_progress(
-            agent_state=AgentState.RUNNING, now=now
-        )
+        result = cb.check_no_step_progress(agent_state=AgentState.RUNNING, now=now)
 
         assert result is not None
         assert result.action == 'auto_recover_once'
@@ -61,9 +53,7 @@ class TestNoStepProgressWatchdog:
         cb._auto_recover_attempts = 1
         cb._last_auto_recover_ts = now - 0.01  # 10ms ago — within cooldown
 
-        result = cb.check_no_step_progress(
-            agent_state=AgentState.RUNNING, now=now
-        )
+        result = cb.check_no_step_progress(agent_state=AgentState.RUNNING, now=now)
 
         assert result is not None
         assert result.action == 'stop'
@@ -103,9 +93,7 @@ class TestNoStepProgressWatchdog:
             AgentState.STOPPED,
         ):
             result = cb.check_no_step_progress(agent_state=state, now=now)
-            assert result is None, (
-                f'Watchdog should ignore state {state}'
-            )
+            assert result is None, f'Watchdog should ignore state {state}'
 
     def test_watchdog_disabled_when_timeout_zero(self):
         """Setting no_step_progress_timeout_seconds <= 0 disables the watchdog."""
@@ -117,9 +105,7 @@ class TestNoStepProgressWatchdog:
         now = 10.0
         cb.record_step_call(ts=now - 999.0)  # Very old call
 
-        result = cb.check_no_step_progress(
-            agent_state=AgentState.RUNNING, now=now
-        )
+        result = cb.check_no_step_progress(agent_state=AgentState.RUNNING, now=now)
 
         assert result is None
 
@@ -129,9 +115,7 @@ class TestNoStepProgressWatchdog:
         now = 10.0
         cb.record_step_call(ts=now - 999.0)
 
-        result = cb.check_no_step_progress(
-            agent_state=AgentState.RUNNING, now=now
-        )
+        result = cb.check_no_step_progress(agent_state=AgentState.RUNNING, now=now)
 
         assert result is None
 
@@ -139,15 +123,14 @@ class TestNoStepProgressWatchdog:
         """If _last_step_call_ts is None (never called), watchdog is silent."""
         cb._last_step_call_ts = None
 
-        result = cb.check_no_step_progress(
-            agent_state=AgentState.RUNNING, now=10.0
-        )
+        result = cb.check_no_step_progress(agent_state=AgentState.RUNNING, now=10.0)
 
         assert result is None
 
     def test_watchdog_cooldown_prevents_immediate_second_fatal(self, cb):
         """A second stall after the cooldown window expires triggers auto-recover
-        again (not a fatal stop)."""
+        again (not a fatal stop).
+        """
         now = 10.0
 
         # First stall
@@ -155,9 +138,7 @@ class TestNoStepProgressWatchdog:
         cb._auto_recover_attempts = 1
         cb._last_auto_recover_ts = now - 0.2  # 200ms ago — past 150ms cooldown
 
-        result = cb.check_no_step_progress(
-            agent_state=AgentState.RUNNING, now=now
-        )
+        result = cb.check_no_step_progress(agent_state=AgentState.RUNNING, now=now)
 
         # Should be another auto_recover_once, not stop
         assert result is not None

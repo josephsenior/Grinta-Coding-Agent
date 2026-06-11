@@ -1,4 +1,5 @@
 """Smoke test: mount both file_create and file_read cards in the TUI and dump their rendered text."""
+
 from textual.app import App, ComposeResult
 
 from backend.cli._event_renderer.unified_renderer import ActivityRenderer
@@ -41,15 +42,36 @@ class TestApp(App):
         print()
 
         from backend.cli.tui.widgets.activity_card import ActivityCard as W
-        yield W(verb=fc.verb, detail=fc.detail, badge_category=fc.badge_category,
-                status='ok', outcome=fc.secondary, collapsed=fc.start_collapsed,
-                collapsible=fc.is_collapsible, syntax_language=fc.syntax_language)
-        yield W(verb=fr.verb, detail=fr.detail, badge_category=fr.badge_category,
-                status='neutral', collapsed=fr.start_collapsed,
-                collapsible=fr.is_collapsible, syntax_language=fr.syntax_language)
-        yield W(verb=fe.verb, detail=fe.detail, badge_category=fe.badge_category,
-                status='ok', outcome=fe.secondary, collapsed=fe.start_collapsed,
-                collapsible=fe.is_collapsible, syntax_language=fe.syntax_language)
+
+        yield W(
+            verb=fc.verb,
+            detail=fc.detail,
+            badge_category=fc.badge_category,
+            status='ok',
+            outcome=fc.secondary,
+            collapsed=fc.start_collapsed,
+            collapsible=fc.is_collapsible,
+            syntax_language=fc.syntax_language,
+        )
+        yield W(
+            verb=fr.verb,
+            detail=fr.detail,
+            badge_category=fr.badge_category,
+            status='neutral',
+            collapsed=fr.start_collapsed,
+            collapsible=fr.is_collapsible,
+            syntax_language=fr.syntax_language,
+        )
+        yield W(
+            verb=fe.verb,
+            detail=fe.detail,
+            badge_category=fe.badge_category,
+            status='ok',
+            outcome=fe.secondary,
+            collapsed=fe.start_collapsed,
+            collapsible=fe.is_collapsible,
+            syntax_language=fe.syntax_language,
+        )
 
 
 if __name__ == '__main__':

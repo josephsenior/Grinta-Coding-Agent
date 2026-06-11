@@ -26,13 +26,17 @@ def _cmd(command: str, event_id: int) -> CmdRunAction:
     return event
 
 
-def _output(command: str, content: str, event_id: int, exit_code: int) -> CmdOutputObservation:
+def _output(
+    command: str, content: str, event_id: int, exit_code: int
+) -> CmdOutputObservation:
     event = CmdOutputObservation(content=content, command=command, exit_code=exit_code)
     event.id = event_id
     return event
 
 
-def test_context_packet_contains_one_canonical_state_and_latest_verification(tmp_path, monkeypatch) -> None:
+def test_context_packet_contains_one_canonical_state_and_latest_verification(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setattr(
         'backend.context.canonical_state.canonical_state_path',
         lambda state=None: tmp_path / 'canonical_task_state.json',
@@ -53,7 +57,9 @@ def test_context_packet_contains_one_canonical_state_and_latest_verification(tmp
     assert len(packet.content) <= 1800
 
 
-def test_context_packet_ignores_old_packets_as_validated_summaries(tmp_path, monkeypatch) -> None:
+def test_context_packet_ignores_old_packets_as_validated_summaries(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setattr(
         'backend.context.canonical_state.canonical_state_path',
         lambda state=None: tmp_path / 'canonical_task_state.json',
@@ -63,7 +69,9 @@ def test_context_packet_ignores_old_packets_as_validated_summaries(tmp_path, mon
         is_working_set=True,
     )
     old_packet.id = 1
-    summary = AgentCondensationObservation(content='# State Summary\nCurrent real summary')
+    summary = AgentCondensationObservation(
+        content='# State Summary\nCurrent real summary'
+    )
     summary.id = 2
     user = _user('Continue the task', 3)
 
@@ -74,7 +82,9 @@ def test_context_packet_ignores_old_packets_as_validated_summaries(tmp_path, mon
     assert 'stale packet' not in packet.content
 
 
-def test_context_packet_observation_is_marked_as_working_set(tmp_path, monkeypatch) -> None:
+def test_context_packet_observation_is_marked_as_working_set(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setattr(
         'backend.context.canonical_state.canonical_state_path',
         lambda state=None: tmp_path / 'canonical_task_state.json',
@@ -88,7 +98,9 @@ def test_context_packet_observation_is_marked_as_working_set(tmp_path, monkeypat
     assert CONTEXT_PACKET_MARKER in observation.content
 
 
-def test_repeated_compaction_replay_keeps_one_current_state(tmp_path, monkeypatch) -> None:
+def test_repeated_compaction_replay_keeps_one_current_state(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setattr(
         'backend.context.canonical_state.canonical_state_path',
         lambda state=None: tmp_path / 'canonical_task_state.json',

@@ -138,8 +138,6 @@ def build_help_table(
     except ImportError:
         return build_help_table_fallback(search_term, show_all=show_all)
 
-    from collections import defaultdict
-
     from backend.cli.theme import CLR_CARD_BORDER, CLR_CARD_TITLE, STYLE_DIM
 
     table = Table(
@@ -164,8 +162,6 @@ def build_help_table_fallback(
     search_term: str | None = None, *, show_all: bool = False
 ) -> Table:
     """Fallback help table without fuzzy matching."""
-    from collections import defaultdict
-
     from backend.cli.theme import CLR_CARD_BORDER, CLR_CARD_TITLE, STYLE_DIM
 
     table = Table(
@@ -188,6 +184,7 @@ def build_help_table_fallback(
 
 def _group_commands_by_section() -> dict[str, list[SlashCommandSpec]]:
     from collections import defaultdict
+
     by_section: dict[str, list[SlashCommandSpec]] = defaultdict(list)
     for spec in _SLASH_COMMANDS:
         by_section[spec.help_section].append(spec)
@@ -203,12 +200,14 @@ def _filter_sections_fuzzy(
     filtered: dict[str, list[SlashCommandSpec]] = {}
     for section, specs in by_section.items():
         matched = [
-            spec for spec in specs
+            spec
+            for spec in specs
             if max(
                 fuzz.partial_ratio(search_lower, spec.name.lower()),
                 fuzz.partial_ratio(search_lower, spec.description.lower()),
                 fuzz.partial_ratio(search_lower, spec.usage.lower()),
-            ) > 60
+            )
+            > 60
         ]
         if matched:
             filtered[section] = matched
@@ -223,7 +222,8 @@ def _filter_sections_plain(
     filtered: dict[str, list[SlashCommandSpec]] = {}
     for section, specs in by_section.items():
         matched = [
-            spec for spec in specs
+            spec
+            for spec in specs
             if search_lower in spec.name.lower()
             or search_lower in spec.description.lower()
         ]
@@ -245,9 +245,7 @@ def _populate_table_rows(
         table.add_row('', '')
         count = len(specs_list)
         collapsed = (
-            not show_all
-            and count > HELP_SECTION_COLLAPSE_THRESHOLD
-            and not search_term
+            not show_all and count > HELP_SECTION_COLLAPSE_THRESHOLD and not search_term
         )
         if collapsed:
             table.add_row(

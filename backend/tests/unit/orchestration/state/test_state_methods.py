@@ -137,9 +137,9 @@ class TestStateMutationMethods:
     def test_set_agent_state_with_source(self):
         """Test setting agent state with source."""
         state = State()
-        state.set_agent_state(AgentState.PAUSED, source='pause_handler')
+        state.set_agent_state(AgentState.AWAITING_USER_INPUT, source='pause_handler')
 
-        assert state.agent_state == AgentState.PAUSED
+        assert state.agent_state == AgentState.AWAITING_USER_INPUT
 
     def test_set_agent_state_transition(self):
         """Test agent state transition."""
@@ -357,7 +357,6 @@ class TestStateConstants:
         from backend.orchestration.state.state import RESUMABLE_STATES
 
         assert AgentState.RUNNING in RESUMABLE_STATES
-        assert AgentState.PAUSED in RESUMABLE_STATES
         assert AgentState.AWAITING_USER_INPUT in RESUMABLE_STATES
         assert AgentState.FINISHED in RESUMABLE_STATES
 

@@ -11,9 +11,9 @@ from backend.context import pre_condensation_snapshot as snapshot_module
 from backend.context.pre_condensation_snapshot import extract_snapshot
 from backend.ledger.action.agent import AgentThinkAction
 from backend.ledger.action.commands import CmdRunAction
+from backend.ledger.action.files import FileEditAction, FileWriteAction
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import EventSource
-from backend.ledger.action.files import FileEditAction, FileWriteAction
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.error import ErrorObservation
 from backend.ledger.observation.files import FileEditObservation, FileReadObservation
@@ -338,6 +338,40 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         )
         assert full_snapshot['decisions'] == ['d'] * snapshot_module._MAX_DECISIONS
 
+    def test_recoverable_tool_schema_errors_are_not_durable(self):
+        snapshot: dict[str, Any] = {
+            'recent_errors': [],
+            'decisions': [],
+            'invalidated_assumptions': [],
+            'attempted_approaches': [],
+        }
+        error_text = (
+            'Missing required argument "type" in tool call read. '
+            'Recover by emitting one corrected tool call with strict JSON arguments.'
+        )
+
+        snapshot_module._extract_errors(
+            _fake_event('ErrorObservation', content=error_text), snapshot
+        )
+        snapshot_module._extract_decisions(
+            _fake_event('AgentThinkAction', thought=error_text), snapshot
+        )
+        snapshot_module._extract_invalidated_assumptions(
+            _fake_event('ErrorObservation', content=error_text), snapshot
+        )
+        snapshot_module._extract_attempted_approaches(
+            [
+                _fake_event('CmdRunAction', command='read file'),
+                _fake_event('ErrorObservation', content=error_text),
+            ],
+            snapshot,
+        )
+
+        assert snapshot['recent_errors'] == []
+        assert snapshot['decisions'] == []
+        assert snapshot['invalidated_assumptions'] == []
+        assert snapshot['attempted_approaches'] == []
+
     def test_extract_commands_honors_limit_and_truncates_long_output(self):
         full_snapshot: dict[str, Any] = {
             'recent_commands': [{}] * snapshot_module._MAX_COMMANDS
@@ -423,7 +457,9 @@ class TestPreCondensationSnapshot(unittest.TestCase):
 
         with (
             patch.object(snapshot_module, '_snapshot_path', return_value=missing),
-            patch.object(snapshot_module, '_snapshot_staging_path', return_value=missing),
+            patch.object(
+                snapshot_module, '_snapshot_staging_path', return_value=missing
+            ),
         ):
             assert snapshot_module.load_snapshot() is None
 

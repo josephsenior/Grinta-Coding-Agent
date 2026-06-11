@@ -24,7 +24,10 @@ def test_autocompact_threshold_reserves_summary_headroom():
         [_user_event('hello', 1)],
         llm_config=llm_config,
     )
-    assert budget.autocompact_threshold == 200_000 - DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS
+    assert (
+        budget.autocompact_threshold
+        == 200_000 - DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS
+    )
     assert budget.should_autocompact is False
 
 

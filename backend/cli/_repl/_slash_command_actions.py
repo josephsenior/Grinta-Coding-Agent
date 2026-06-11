@@ -170,6 +170,7 @@ def _parse_sessions_args(args: list[str], host: Any) -> _SessionsCommandArgs | N
 
 def _run_sessions_delete(host: Any, delete_targets: list[str]) -> bool:
     from backend.cli.session_manager import delete_sessions
+
     if host._renderer is not None:
         with host._renderer.suspend_live():
             delete_sessions(host._console, delete_targets, config=host._config)
@@ -180,6 +181,7 @@ def _run_sessions_delete(host: Any, delete_targets: list[str]) -> bool:
 
 def _run_sessions_preview(host: Any, preview_idx: str) -> bool:
     from backend.cli.session_manager import show_session
+
     if host._renderer is not None:
         with host._renderer.suspend_live():
             found = show_session(host._console, config=host._config, target=preview_idx)
@@ -194,6 +196,7 @@ def _run_sessions_preview(host: Any, preview_idx: str) -> bool:
 
 def _run_sessions_list(host: Any, cmd: _SessionsCommandArgs) -> bool:
     from backend.cli.session_manager import list_sessions
+
     if host._renderer is not None:
         with host._renderer.suspend_live():
             list_sessions(
@@ -318,9 +321,7 @@ def cmd_copy(host: Any, parsed: Any) -> bool:
     if host._reject_extra_args(parsed):
         return True
     last_reply = (
-        host._renderer.last_assistant_message_text
-        if host._renderer is not None
-        else ''
+        host._renderer.last_assistant_message_text if host._renderer is not None else ''
     )
     if not last_reply.strip():
         if host._renderer is not None:
@@ -387,9 +388,7 @@ def cmd_search(host: Any, parsed: Any) -> bool:
     table.add_column('Preview', style=CLR_CARD_BORDER, overflow='fold')
 
     for evt in events:
-        evt_type = (
-            type(evt).__name__.replace('Action', '').replace('Observation', '')
-        )
+        evt_type = type(evt).__name__.replace('Action', '').replace('Observation', '')
         content = getattr(evt, 'content', '') or getattr(evt, 'message', '') or ''
         preview = content.strip()[:120].replace('\n', ' ')
         table.add_row(str(getattr(evt, 'id', '?')), evt_type, preview)

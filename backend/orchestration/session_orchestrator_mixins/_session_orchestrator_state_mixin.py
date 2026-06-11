@@ -105,11 +105,7 @@ class _SessionOrchestratorStateMixin:
             else ActionConfirmationStatus.REJECTED
         )
 
-        new_state = (
-            AgentState.RUNNING
-            if approved
-            else AgentState.AWAITING_USER_INPUT
-        )
+        new_state = AgentState.RUNNING if approved else AgentState.AWAITING_USER_INPUT
         await self.set_agent_state_to(new_state)
 
         self.services.context.emit_event(pending, EventSource.AGENT)

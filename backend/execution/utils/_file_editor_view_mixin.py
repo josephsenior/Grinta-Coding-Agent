@@ -11,6 +11,7 @@ from pathlib import Path
 
 from backend.execution.utils._file_editor_types import ToolResult
 
+
 def _detect_indentation_mismatch(
     original_lines: list[str],
     new_lines: list[str],
@@ -109,9 +110,7 @@ def _check_block_indent_after_colon(
 
 
 class _FileEditorViewMixin:
-    def _handle_view(
-        self, file_path: Path, view_range: list[int] | None
-    ) -> ToolResult:
+    def _handle_view(self, file_path: Path, view_range: list[int] | None) -> ToolResult:
         """Handle view command - read file or specific line range."""
         try:
             content = self._prepare_view_content(file_path)
@@ -217,4 +216,3 @@ class _FileEditorViewMixin:
             old_content=content,
             new_content=content,
         )
-

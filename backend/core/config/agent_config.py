@@ -16,7 +16,7 @@ from pydantic import (
 from backend._canonical import CanonicalModelMetaclass
 
 # Import CompactorConfig directly - needed for Pydantic validation
-from backend.core.config.compactor_config import ContextPipelineConfig, CompactorConfig
+from backend.core.config.compactor_config import CompactorConfig, ContextPipelineConfig
 from backend.core.config.config_telemetry import config_telemetry
 from backend.core.constants import (
     CURRENT_AGENT_CONFIG_SCHEMA_VERSION,
@@ -25,7 +25,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_AUTO_RETRY_ON_ERROR,
     DEFAULT_AGENT_AUTONOMY_LEVEL,
     DEFAULT_AGENT_BROWSING_ENABLED,
-    DEFAULT_AGENT_WEB_ENABLED,
     DEFAULT_AGENT_CLI_MODE,
     DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
     DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
@@ -65,6 +64,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
     DEFAULT_AGENT_WARNING_FIRST_TRIP_ENABLED,
     DEFAULT_AGENT_WARNING_FIRST_TRIP_LIMIT,
+    DEFAULT_AGENT_WEB_ENABLED,
 )
 from backend.core.interaction_modes import VALID_INTERACTION_MODES
 from backend.core.logger import app_logger as logger

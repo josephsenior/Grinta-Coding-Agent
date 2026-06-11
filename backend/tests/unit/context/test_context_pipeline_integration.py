@@ -32,7 +32,9 @@ def _user(text: str, event_id: int) -> MessageAction:
     return action
 
 
-def _pytest_obs(event_id: int, *, failed: int = 2, passed: int = 10) -> CmdOutputObservation:
+def _pytest_obs(
+    event_id: int, *, failed: int = 2, passed: int = 10
+) -> CmdOutputObservation:
     content = (
         f'============================= test session starts ==============================\n'
         f'collected 12 items\n\n'
@@ -50,7 +52,9 @@ def _build_pytest_session_events(count: int = 600) -> list:
             events.append(_pytest_obs(i))
         else:
             text = f'log chunk {i}\n' * 80
-            obs = CmdOutputObservation(content=text, command=f'pytest -k test_{i}', metadata={})
+            obs = CmdOutputObservation(
+                content=text, command=f'pytest -k test_{i}', metadata={}
+            )
             obs.id = i
             events.append(obs)
     return events
@@ -76,7 +80,8 @@ def _make_state(events: list) -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_six_hundred_event_pytest_session_commits_boundary_and_preserves_pytest(
-    tmp_path, monkeypatch,
+    tmp_path,
+    monkeypatch,
 ):
     monkeypatch.setattr(
         'backend.context.pre_condensation_snapshot._snapshot_path',

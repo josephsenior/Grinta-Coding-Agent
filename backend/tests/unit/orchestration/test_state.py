@@ -40,8 +40,8 @@ class TestResumableStates:
     def test_contains_running(self):
         assert AgentState.RUNNING in RESUMABLE_STATES
 
-    def test_contains_paused(self):
-        assert AgentState.PAUSED in RESUMABLE_STATES
+    def test_contains_awaiting_user_input(self):
+        assert AgentState.AWAITING_USER_INPUT in RESUMABLE_STATES
 
     def test_contains_finished(self):
         assert AgentState.FINISHED in RESUMABLE_STATES
@@ -150,7 +150,7 @@ class TestStateJsonRoundTrip:
 
     def test_resume_state_roundtrip(self):
         s = State()
-        s.set_agent_state(AgentState.PAUSED, source='test')
+        s.set_agent_state(AgentState.AWAITING_USER_INPUT, source='test')
         s.resume_state = AgentState.RUNNING
         restored = State._from_json_str(s._to_json_str())
         assert restored.resume_state == AgentState.RUNNING

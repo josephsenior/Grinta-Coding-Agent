@@ -120,6 +120,7 @@ class TestHungActionRecovery:
 
         # The source is the action's source (or AGENT default).
         from backend.ledger import EventSource
+
         assert source in (EventSource.AGENT, action.source or EventSource.AGENT)
 
         # The observation has structured tool_result for downstream

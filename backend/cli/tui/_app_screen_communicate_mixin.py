@@ -115,8 +115,10 @@ class _AppScreenCommunicateMixin:
         """
         options = self._materialize_options(action.options)
         if not options:
-            options = [('Yes, do it', 'Yes, do it', '', False),
-                       ('No, abort', 'No, abort', '', False)]
+            options = [
+                ('Yes, do it', 'Yes, do it', '', False),
+                ('No, abort', 'No, abort', '', False),
+            ]
         details: list[str] = []
         if action.context:
             details.append(action.context)
@@ -124,7 +126,11 @@ class _AppScreenCommunicateMixin:
             details.append('Auto-confirms if you do not respond in time.')
         else:
             details.append('Auto-denies if you do not respond in time (safe default).')
-        default_index = 1 if not (0 <= action.default_index < len(options)) else action.default_index
+        default_index = (
+            1
+            if not (0 <= action.default_index < len(options))
+            else action.default_index
+        )
         card = CommunicatePromptWidget(
             'Confirm',
             action.question or 'The agent wants to perform a risky action.',
@@ -229,7 +235,9 @@ class _AppScreenCommunicateMixin:
             except Exception:
                 header = ''
             if header:
-                scaffold = f'[user answered the prompt: "{header}" \u2014 chose: "{text}"]'
+                scaffold = (
+                    f'[user answered the prompt: "{header}" \u2014 chose: "{text}"]'
+                )
             try:
                 active.set_active(False)
             except Exception:

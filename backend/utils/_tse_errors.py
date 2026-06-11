@@ -147,8 +147,12 @@ def _format_found_lines(node: Any, node_text: str) -> list[str]:
         if len(preview) > 120:
             preview = preview[:117] + '...'
         parts.append(f'Found: {preview!r}')
-    elif getattr(node, 'type', None) == 'ERROR' and not getattr(node, 'is_missing', False):
-        parts.append('Found: unexpected token(s) at this position (see source line below).')
+    elif getattr(node, 'type', None) == 'ERROR' and not getattr(
+        node, 'is_missing', False
+    ):
+        parts.append(
+            'Found: unexpected token(s) at this position (see source line below).'
+        )
     return parts
 
 

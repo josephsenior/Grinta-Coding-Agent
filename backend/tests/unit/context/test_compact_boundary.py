@@ -53,7 +53,5 @@ def test_boundary_info_reports_metadata():
     assert info is not None
     assert info.pruned_event_count == 3
     assert info.has_summary is True
-    assert info.post_boundary_event_count == len(
-        project_after_compact_boundary(events)
-    )
+    assert info.post_boundary_event_count == len(project_after_compact_boundary(events))
     assert info.post_boundary_event_count == len(View.from_events(events).events)

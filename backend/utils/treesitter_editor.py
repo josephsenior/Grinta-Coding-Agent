@@ -517,9 +517,7 @@ class TreeSitterEditor:
         node_types: list[str],
     ) -> list[Any]:
         """Recursively find ALL nodes matching the name and types (not just first)."""
-        return find_all_nodes_by_name(
-            self, node, file_bytes, target_name, node_types
-        )
+        return find_all_nodes_by_name(self, node, file_bytes, target_name, node_types)
 
     def get_name_node(self, node: Any) -> Any | None:
         """Extract the name identifier node from a definition node."""
@@ -553,9 +551,7 @@ class TreeSitterEditor:
             self, tree, file_bytes, symbol_name, file_path, language, symbol_type
         )
 
-    def _get_function_body_node(
-        self, func_node: Any, language: str
-    ) -> Any | None:
+    def _get_function_body_node(self, func_node: Any, language: str) -> Any | None:
         """Get the body node of a function (language-specific)."""
         return get_function_body_node(func_node, language)
 
@@ -656,14 +652,24 @@ class TreeSitterEditor:
         regex = re.compile(pattern, re.MULTILINE)
         match = regex.search(original_code)
         if not match:
-            return EditResult(success=False, message=f"Function '{function_name}' not found in {file_path} (text fallback failed)")
+            return EditResult(
+                success=False,
+                message=f"Function '{function_name}' not found in {file_path} (text fallback failed)",
+            )
 
         indent = match.group(1)
         body_start = match.end()
         body_end = _find_fallback_body_end(original_code, body_start, indent, language)
         return _apply_fallback_edit(
-            self, file_path, function_name, new_body, original_code,
-            language, validate, body_start, body_end,
+            self,
+            file_path,
+            function_name,
+            new_body,
+            original_code,
+            language,
+            validate,
+            body_start,
+            body_end,
         )
 
     def clear_cache(self) -> None:
@@ -673,6 +679,7 @@ class TreeSitterEditor:
 
 def _get_fallback_pattern(language: str, function_name: str) -> str:
     import re
+
     patterns = {
         'python': rf'^(\s*)def\s+{re.escape(function_name)}\s*\([^)]*\)\s*(?::)',
         'javascript': rf'^(\s*)function\s+{re.escape(function_name)}\s*\([^)]*\)',
@@ -685,7 +692,9 @@ def _get_fallback_pattern(language: str, function_name: str) -> str:
     return patterns.get(language, patterns['python'])
 
 
-def _find_fallback_body_end(original_code: str, body_start: int, indent: str, language: str) -> int:
+def _find_fallback_body_end(
+    original_code: str, body_start: int, indent: str, language: str
+) -> int:
     if language in ('javascript', 'typescript', 'java', 'cpp', 'go'):
         return _find_brace_body_end(original_code, body_start)
     return _find_indent_body_end(original_code, body_start, indent)
@@ -708,21 +717,36 @@ def _find_brace_body_end(original_code: str, body_start: int) -> int:
 def _find_indent_body_end(original_code: str, body_start: int, indent: str) -> int:
     lines = original_code[body_start:].split('\n')
     for i, line in enumerate(lines[1:], start=1):
-        if line.strip() and not line.startswith(indent) and not line.startswith(' ' * (len(indent) + 1)):
+        if (
+            line.strip()
+            and not line.startswith(indent)
+            and not line.startswith(' ' * (len(indent) + 1))
+        ):
             return body_start + sum(len(line_obj) + 1 for line_obj in lines[:i])
     return body_start
 
 
 def _apply_fallback_edit(
-    editor, file_path, function_name, new_body, original_code,
-    language, validate, body_start, body_end,
+    editor,
+    file_path,
+    function_name,
+    new_body,
+    original_code,
+    language,
+    validate,
+    body_start,
+    body_end,
 ) -> 'EditResult':
     try:
         new_code = original_code[:body_start] + new_body + original_code[body_end:]
         if validate:
             is_valid, error_msg = editor.validate_syntax(new_code, file_path, language)
             if not is_valid:
-                return EditResult(success=False, message=f'Text fallback produced invalid syntax: {error_msg}', original_code=original_code)
+                return EditResult(
+                    success=False,
+                    message=f'Text fallback produced invalid syntax: {error_msg}',
+                    original_code=original_code,
+                )
         Path(file_path).write_text(new_code, encoding='utf-8')
         editor.tree_cache.pop(file_path, None)
         editor.file_cache.pop(file_path, None)
@@ -730,8 +754,14 @@ def _apply_fallback_edit(
         return EditResult(
             success=True,
             message=f"✓ Edited function '{function_name}' in {language} (text fallback, {lines_changed} lines)",
-            modified_code=new_code, lines_changed=lines_changed, original_code=original_code,
+            modified_code=new_code,
+            lines_changed=lines_changed,
+            original_code=original_code,
         )
     except Exception as e:
         logger.error(f'Text fallback failed: {e}')
-        return EditResult(success=False, message=f'Text fallback error: {e}', original_code=original_code)
+        return EditResult(
+            success=False,
+            message=f'Text fallback error: {e}',
+            original_code=original_code,
+        )

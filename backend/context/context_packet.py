@@ -76,16 +76,33 @@ def build_context_packet(
         sections.append(('canonical_state', canonical_block))
     summary = _latest_summary(history)
     if summary:
-        sections.append(('latest_validated_summary', _bounded_section('Latest validated summary', summary, 900)))
+        sections.append(
+            (
+                'latest_validated_summary',
+                _bounded_section('Latest validated summary', summary, 900),
+            )
+        )
     tail = _recent_tail_summary(events)
     if tail:
-        sections.append(('recent_causal_tail', _bounded_section('Recent causal tail', tail, 1200)))
+        sections.append(
+            ('recent_causal_tail', _bounded_section('Recent causal tail', tail, 1200))
+        )
     active_status = _active_status(canonical)
     if active_status:
-        sections.append(('active_status', _bounded_section('Active tool/background status', active_status, 900)))
+        sections.append(
+            (
+                'active_status',
+                _bounded_section('Active tool/background status', active_status, 900),
+            )
+        )
     restore_hints = _restore_hints(state=state) if just_compacted else ''
     if restore_hints:
-        sections.append(('restore_hints', _bounded_section('Compact restore hints', restore_hints, 900)))
+        sections.append(
+            (
+                'restore_hints',
+                _bounded_section('Compact restore hints', restore_hints, 900),
+            )
+        )
     if not sections:
         return None
     content, lengths = _assemble_sections(sections, char_budget)
@@ -171,7 +188,9 @@ def _restore_hints(*, state: State | None) -> str:
         lines.append(f'Latest directive before compaction: {latest[:240]}')
     tests = snapshot.get('test_results')
     if isinstance(tests, list) and tests:
-        latest_test = next((item for item in reversed(tests) if isinstance(item, dict)), None)
+        latest_test = next(
+            (item for item in reversed(tests) if isinstance(item, dict)), None
+        )
         if latest_test:
             lines.append(
                 'Last test before compaction: '

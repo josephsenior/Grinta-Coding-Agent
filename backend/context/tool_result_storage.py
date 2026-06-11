@@ -61,7 +61,9 @@ def persist_tool_output(content: str, event: Event) -> tuple[str, str]:
     else:
         head = content[: preview_limit // 2]
         tail = content[-(preview_limit // 2) :]
-        preview = f'{head}\n\n[... {len(content):,} chars persisted to disk ...]\n\n{tail}'
+        preview = (
+            f'{head}\n\n[... {len(content):,} chars persisted to disk ...]\n\n{tail}'
+        )
         has_more = True
     block = (
         f'{PERSISTED_OUTPUT_TAG}\n'
@@ -86,7 +88,9 @@ def _copy_event_with_content(event: Event, content: str) -> Event:
 def _should_persist_observation(event: Event, content: str, threshold: int) -> bool:
     if len(content) < threshold:
         return False
-    if isinstance(event, (CmdOutputObservation, FileReadObservation, TerminalObservation)):
+    if isinstance(
+        event, (CmdOutputObservation, FileReadObservation, TerminalObservation)
+    ):
         return True
     if isinstance(event, Observation) and type(event).__name__ == 'MCPObservation':
         return True
@@ -110,7 +114,9 @@ def _shrink_observation_batch(
         return
 
     remaining = list(batch)
-    for _, event, content in sorted(remaining, key=lambda item: len(item[2]), reverse=True):
+    for _, event, content in sorted(
+        remaining, key=lambda item: len(item[2]), reverse=True
+    ):
         if sum(len(c) for _, _, c in remaining) <= per_message_chars:
             break
         replacement = content
@@ -158,7 +164,9 @@ def persist_tool_result_on_observation(event: Event, state: object | None) -> No
     event_id = getattr(event, 'id', None)
     if not isinstance(event_id, int):
         return
-    if not _should_persist_observation(event, content, DEFAULT_TOOL_RESULT_PERSIST_THRESHOLD_CHARS):
+    if not _should_persist_observation(
+        event, content, DEFAULT_TOOL_RESULT_PERSIST_THRESHOLD_CHARS
+    ):
         return
     replacements = _get_replacement_map(state)
     key = str(event_id)

@@ -37,6 +37,8 @@ EXPECTED_EXPORTS = [
     'TASK_TRACKER_TOOL_NAME',
     'TERMINAL_MANAGER_TOOL_NAME',
     'UNDO_LAST_EDIT_TOOL_NAME',
+    'WEB_FETCH_TOOL_NAME',
+    'WEB_SEARCH_TOOL_NAME',
 ]
 
 
@@ -106,10 +108,18 @@ class TestToolNames(TestCase):
 
     def test_legacy_aliases_match_canonical_names(self):
         """Legacy constant names must reference the same runtime strings."""
-        self.assertEqual(tool_names.CODE_INTELLIGENCE_TOOL_NAME, tool_names.LSP_TOOL_NAME)
-        self.assertEqual(tool_names.EXECUTE_MCP_TOOL_TOOL_NAME, tool_names.CALL_MCP_TOOL_NAME)
-        self.assertEqual(tool_names.BLACKBOARD_TOOL_NAME, tool_names.SHARED_TASK_BOARD_TOOL_NAME)
-        self.assertEqual(tool_names.MEMORY_MANAGER_TOOL_NAME, tool_names.MEMORY_TOOL_NAME)
+        self.assertEqual(
+            tool_names.CODE_INTELLIGENCE_TOOL_NAME, tool_names.LSP_TOOL_NAME
+        )
+        self.assertEqual(
+            tool_names.EXECUTE_MCP_TOOL_TOOL_NAME, tool_names.CALL_MCP_TOOL_NAME
+        )
+        self.assertEqual(
+            tool_names.BLACKBOARD_TOOL_NAME, tool_names.SHARED_TASK_BOARD_TOOL_NAME
+        )
+        self.assertEqual(
+            tool_names.MEMORY_MANAGER_TOOL_NAME, tool_names.MEMORY_TOOL_NAME
+        )
 
     def test_runtime_strings_are_unique(self):
         """Canonical tool name strings must not collide."""

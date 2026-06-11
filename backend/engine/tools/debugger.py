@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from backend.ledger.action.debugger import DebuggerAction
-
 from backend.inference.tool_names import DEBUGGER_TOOL_NAME
+from backend.ledger.action.debugger import DebuggerAction
 
 
 def create_debugger_tool() -> dict[str, Any]:

@@ -62,9 +62,7 @@ async def test_on_loop_call_warns(cap):
     result = au.call_async_from_sync(_quick, 5.0)
     assert result == 42
     assert 'BRIDGE_ON_LOOP' in cap.msg_types()
-    rec = next(
-        r for r in cap.records if getattr(r, 'msg_type', '') == 'BRIDGE_ON_LOOP'
-    )
+    rec = next(r for r in cap.records if getattr(r, 'msg_type', '') == 'BRIDGE_ON_LOOP')
     assert getattr(rec, 'bridge', '') == '_quick'
     assert 'site' in rec.__dict__
 

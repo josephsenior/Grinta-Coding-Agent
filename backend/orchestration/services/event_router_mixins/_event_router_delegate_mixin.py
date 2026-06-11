@@ -746,6 +746,7 @@ class _EventRouterDelegateMixin(EventRouterService if TYPE_CHECKING else object)
         runtime action timeout.
         """
         import asyncio as _asyncio
+
         from backend.core.constants import (
             DEFAULT_OBSERVATION_HANDLER_TIMEOUT_SECONDS,
         )

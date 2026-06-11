@@ -4,10 +4,10 @@ from backend.context.compactor.strategies.amortized_pruning_compactor import (
     AmortizedPruningCompactor,
 )
 from backend.context.compactor.strategies.auto_compactor import AutoCompactor
-from backend.context.compactor.strategies.no_op_compactor import NoOpCompactor
 from backend.context.compactor.strategies.microcompact_compactor import (
     MicrocompactCompactor,
 )
+from backend.context.compactor.strategies.no_op_compactor import NoOpCompactor
 from backend.context.compactor.strategies.observation_masking_compactor import (
     ObservationMaskingCompactor,
 )

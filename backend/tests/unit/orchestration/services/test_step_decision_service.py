@@ -61,15 +61,17 @@ class TestStepDecisionService(unittest.TestCase):
 
         self.assertFalse(result)
 
-    def test_should_step_message_from_agent_paused(self):
-        """Test should_step returns True for agent message when paused."""
+    def test_should_step_message_from_agent_not_running(self):
+        """Test should_step returns False for agent message when not RUNNING."""
         action = MessageAction(content='Info')
         action.source = EventSource.AGENT
-        self.mock_controller.get_agent_state.return_value = AgentState.PAUSED
+        self.mock_controller.get_agent_state.return_value = (
+            AgentState.AWAITING_USER_INPUT
+        )
 
         result = self.service.should_step(action)
 
-        self.assertTrue(result)
+        self.assertFalse(result)
 
     def test_should_step_condensation_action(self):
         """Test should_step returns True for CondensationAction."""

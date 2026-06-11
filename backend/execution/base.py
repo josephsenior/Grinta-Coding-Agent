@@ -624,9 +624,16 @@ class Runtime(
         """Handle action execution with timeout, error handling, and observation processing."""
         action_type = type(event).__name__
         action_id = getattr(event, 'id', '?')
-        logger.debug('[runtime %s] _handle_action START %s (id=%s)', self.sid, action_type, action_id)
+        logger.debug(
+            '[runtime %s] _handle_action START %s (id=%s)',
+            self.sid,
+            action_type,
+            action_id,
+        )
         self._set_action_timeout(event)
-        assert event.timeout is not None, f'Action {action_type} (id={action_id}) has no timeout after _set_action_timeout'
+        assert event.timeout is not None, (
+            f'Action {action_type} (id={action_id}) has no timeout after _set_action_timeout'
+        )
 
         observation = await self._execute_with_timeout(event, action_type, action_id)
         if observation is None:
@@ -638,11 +645,20 @@ class Runtime(
         if self.event_stream:
             self.event_stream.add_event(observation, source)
 
-    async def _execute_with_timeout(self, event: Action, action_type: str, action_id: str) -> Observation | None:
+    async def _execute_with_timeout(
+        self, event: Action, action_type: str, action_id: str
+    ) -> Observation | None:
         try:
-            observation = await asyncio.wait_for(self._execute_action(event), timeout=event.timeout)
-            logger.debug('[runtime %s] _handle_action GOT observation %s for %s (id=%s)',
-                         self.sid, type(observation).__name__, action_type, action_id)
+            observation = await asyncio.wait_for(
+                self._execute_action(event), timeout=event.timeout
+            )
+            logger.debug(
+                '[runtime %s] _handle_action GOT observation %s for %s (id=%s)',
+                self.sid,
+                type(observation).__name__,
+                action_type,
+                action_id,
+            )
             return observation
         except asyncio.TimeoutError:
             return self._handle_timeout(event, action_type, action_id)
@@ -655,12 +671,20 @@ class Runtime(
         except Exception as e:
             return self._handle_unexpected_error(event, e, action_type, action_id)
 
-    def _handle_timeout(self, event: Action, action_type: str, action_id: str) -> Observation | None:
-        logger.warning('[runtime %s] _handle_action TIMEOUT for %s (id=%s) after %.1fs',
-                       self.sid, action_type, action_id, event.timeout)
+    def _handle_timeout(
+        self, event: Action, action_type: str, action_id: str
+    ) -> Observation | None:
+        logger.warning(
+            '[runtime %s] _handle_action TIMEOUT for %s (id=%s) after %.1fs',
+            self.sid,
+            action_type,
+            action_id,
+            event.timeout,
+        )
         observation = ErrorObservation(
             content=f'Action {action_type} exceeded the hard wall-clock timeout of {event.timeout:.0f}s. The operation may still complete in the background. Verify the state of any files or resources this action was modifying before proceeding.',
-            error_id='ACTION_EXECUTION_TIMEOUT', timeout_kind='action_execution_timeout',
+            error_id='ACTION_EXECUTION_TIMEOUT',
+            timeout_kind='action_execution_timeout',
         )
         if not self._process_observation(observation, event):
             return None
@@ -668,26 +692,61 @@ class Runtime(
             self.event_stream.add_event(observation, event.source or EventSource.AGENT)
         return None
 
-    def _handle_value_error(self, event: Action, e: ValueError, action_type: str, action_id: str) -> ErrorObservation:
-        from backend.core.workspace_resolution import WORKSPACE_NOT_OPEN_ERROR_ID, is_workspace_not_open_error
+    def _handle_value_error(
+        self, event: Action, e: ValueError, action_type: str, action_id: str
+    ) -> ErrorObservation:
+        from backend.core.workspace_resolution import (
+            WORKSPACE_NOT_OPEN_ERROR_ID,
+            is_workspace_not_open_error,
+        )
+
         if is_workspace_not_open_error(e):
-            return ErrorObservation(content=str(e), error_id=WORKSPACE_NOT_OPEN_ERROR_ID)
+            return ErrorObservation(
+                content=str(e), error_id=WORKSPACE_NOT_OPEN_ERROR_ID
+            )
         self._handle_runtime_error(event, e, is_network_error=False)
-        logger.warning('[runtime %s] _handle_action EXCEPTION for %s (id=%s): %s: %s',
-                       self.sid, action_type, action_id, type(e).__name__, e)
-        return ErrorObservation(content=f'Unexpected error during action execution: {type(e).__name__}: {e}')
+        logger.warning(
+            '[runtime %s] _handle_action EXCEPTION for %s (id=%s): %s: %s',
+            self.sid,
+            action_type,
+            action_id,
+            type(e).__name__,
+            e,
+        )
+        return ErrorObservation(
+            content=f'Unexpected error during action execution: {type(e).__name__}: {e}'
+        )
 
-    def _handle_network_error(self, event: Action, e: Exception, action_type: str, action_id: str) -> ErrorObservation:
+    def _handle_network_error(
+        self, event: Action, e: Exception, action_type: str, action_id: str
+    ) -> ErrorObservation:
         self._handle_runtime_error(event, e, is_network_error=True)
-        logger.warning('[runtime %s] _handle_action RUNTIME ERROR for %s (id=%s): %s',
-                       self.sid, action_type, action_id, e)
-        return ErrorObservation(content=f'Runtime error during action execution: {type(e).__name__}: {e}')
+        logger.warning(
+            '[runtime %s] _handle_action RUNTIME ERROR for %s (id=%s): %s',
+            self.sid,
+            action_type,
+            action_id,
+            e,
+        )
+        return ErrorObservation(
+            content=f'Runtime error during action execution: {type(e).__name__}: {e}'
+        )
 
-    def _handle_unexpected_error(self, event: Action, e: Exception, action_type: str, action_id: str) -> ErrorObservation:
+    def _handle_unexpected_error(
+        self, event: Action, e: Exception, action_type: str, action_id: str
+    ) -> ErrorObservation:
         self._handle_runtime_error(event, e, is_network_error=False)
-        logger.warning('[runtime %s] _handle_action EXCEPTION for %s (id=%s): %s: %s',
-                       self.sid, action_type, action_id, type(e).__name__, e)
-        return ErrorObservation(content=f'Unexpected error during action execution: {type(e).__name__}: {e}')
+        logger.warning(
+            '[runtime %s] _handle_action EXCEPTION for %s (id=%s): %s: %s',
+            self.sid,
+            action_type,
+            action_id,
+            type(e).__name__,
+            e,
+        )
+        return ErrorObservation(
+            content=f'Unexpected error during action execution: {type(e).__name__}: {e}'
+        )
 
     def run_action(self, action: Action) -> Observation:
         """Run an action and return the resulting observation."""
@@ -711,14 +770,18 @@ class Runtime(
             return NullObservation(content='')
 
         observation = self._execute_action_sync(action)
-        if hasattr(action, 'truncation_strategy') and getattr(action, 'truncation_strategy'):
+        if hasattr(action, 'truncation_strategy') and getattr(
+            action, 'truncation_strategy'
+        ):
             observation.truncation_strategy = getattr(action, 'truncation_strategy')
 
         verification_obs = self._verify_action_if_needed(action, observation)
         if verification_obs:
             return verification_obs
 
-        if hasattr(action, 'truncation_strategy') and getattr(action, 'truncation_strategy'):
+        if hasattr(action, 'truncation_strategy') and getattr(
+            action, 'truncation_strategy'
+        ):
             observation.truncation_strategy = getattr(action, 'truncation_strategy')
         return observation
 
@@ -731,10 +794,13 @@ class Runtime(
             return self._handle_debugger_action(action)
         return None
 
-    def _make_think_observation(self, action: AgentThinkAction) -> AgentThinkObservation:
+    def _make_think_observation(
+        self, action: AgentThinkAction
+    ) -> AgentThinkObservation:
         observation = AgentThinkObservation(
             'Your thought has been logged.',
-            suppress_cli=getattr(action, 'suppress_cli', False) or bool(getattr(action, 'source_tool', '')),
+            suppress_cli=getattr(action, 'suppress_cli', False)
+            or bool(getattr(action, 'source_tool', '')),
         )
         tool_result = getattr(action, 'tool_result', None)
         if isinstance(tool_result, dict):
@@ -743,11 +809,16 @@ class Runtime(
 
     def _handle_debugger_action(self, action: Action) -> ErrorObservation | None:
         if not self._agent_debugger_enabled():
-            return ErrorObservation(content='Interactive debugger is disabled for this session (enable_debugger is false in agent config). Set enable_debugger=true on the agent to use the DAP debugger tool.')
+            return ErrorObservation(
+                content='Interactive debugger is disabled for this session (enable_debugger is false in agent config). Set enable_debugger=true on the agent to use the DAP debugger tool.'
+            )
         logger.warning(
             '[DEBUGGER_BRIDGE] run_action entered on worker thread (action id=%s)',
             getattr(action, 'id', '?'),
-            extra={'msg_type': 'DEBUGGER_RUN_ACTION_ENTER', 'action_id': getattr(action, 'id', None)},
+            extra={
+                'msg_type': 'DEBUGGER_RUN_ACTION_ENTER',
+                'action_id': getattr(action, 'id', None),
+            },
         )
         return None
 
@@ -766,8 +837,12 @@ class Runtime(
                 return None
             file_on_disk = self._resolve_verification_path(file_path)
             if not file_on_disk.is_file():
-                return self._make_verification_failure_observation(file_path, observation)
-            return self._enhance_observation_with_line_count(observation, file_path, file_on_disk)
+                return self._make_verification_failure_observation(
+                    file_path, observation
+                )
+            return self._enhance_observation_with_line_count(
+                observation, file_path, file_on_disk
+            )
         except Exception as e:
             logger.warning('Verification error for %s: %s', action.path, e)
             return None
@@ -775,7 +850,7 @@ class Runtime(
     def _resolve_verification_path(self, file_path: str) -> Path:
         normalized = file_path.lstrip('/\\')
         if normalized.startswith('workspace/') or normalized.startswith('workspace\\'):
-            normalized = normalized[len('workspace/'):]
+            normalized = normalized[len('workspace/') :]
         elif normalized == 'workspace':
             normalized = '.'
         file_on_disk = Path(normalized)
@@ -783,12 +858,18 @@ class Runtime(
             file_on_disk = self.workspace_root / file_on_disk
         return file_on_disk
 
-    def _make_verification_failure_observation(self, file_path: str, observation: Observation) -> ErrorObservation:
-        logger.error('VERIFICATION FAILURE: File %s missing after file operation', file_path)
+    def _make_verification_failure_observation(
+        self, file_path: str, observation: Observation
+    ) -> ErrorObservation:
+        logger.error(
+            'VERIFICATION FAILURE: File %s missing after file operation', file_path
+        )
         error_msg = f'❌ CRITICAL VERIFICATION FAILURE:\nFile {file_path} does NOT exist after file operation execution.\nThis indicates an execution failure or stale workspace base.\n\nOriginal observation: {observation.content[:200]}\n\nPlease retry the file creation.'
         return ErrorObservation(content=error_msg)
 
-    def _enhance_observation_with_line_count(self, observation: Observation, file_path: str, file_on_disk: Path) -> FileWriteObservation | None:
+    def _enhance_observation_with_line_count(
+        self, observation: Observation, file_path: str, file_on_disk: Path
+    ) -> FileWriteObservation | None:
         try:
             with file_on_disk.open('r', encoding='utf-8', errors='replace') as f:
                 line_count = sum(1 for _ in f)

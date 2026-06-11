@@ -206,6 +206,7 @@ class GeminiClient(DirectLLMClient):
 
     def _map_gemini_rate_limit(self, exc: Any, error_str: str) -> Exception:
         import re
+
         from backend.inference.exceptions import RateLimitError, RateLimitKind
 
         kind = RateLimitKind.TPM
@@ -223,8 +224,11 @@ class GeminiClient(DirectLLMClient):
         elif 'rpd' in error_str or 'requests per day' in error_str:
             kind = RateLimitKind.RPD
         return RateLimitError(
-            str(exc), llm_provider='google', model=self.model_name,
-            kind=kind, retry_after=retry_after,
+            str(exc),
+            llm_provider='google',
+            model=self.model_name,
+            kind=kind,
+            retry_after=retry_after,
         )
 
     def _map_gemini_bad_request(self, exc: Any, error_str: str) -> Exception:
@@ -233,6 +237,7 @@ class GeminiClient(DirectLLMClient):
             ContextWindowExceededError,
             is_context_window_error,
         )
+
         if is_context_window_error(error_str, exc):
             return ContextWindowExceededError(
                 str(exc), llm_provider='google', model=self.model_name
@@ -241,6 +246,7 @@ class GeminiClient(DirectLLMClient):
 
     def _map_gemini_api_error(self, exc: Any, error_str: str) -> Exception:
         from backend.inference.exceptions import APIError as ProviderAPIError
+
         mapped = _match_gemini_error(exc, error_str, self)
         if mapped is not None:
             return mapped
@@ -249,41 +255,22 @@ class GeminiClient(DirectLLMClient):
     def _map_gemini_error(self, exc: Exception) -> Exception:
         """Map google.genai exceptions to Grinta LLM exceptions."""
         import asyncio
+
         import aiohttp
         from google.genai.errors import APIError
+
         from backend.inference.exceptions import APIConnectionError, Timeout
 
         self._log_gemini_exception(exc)
         if isinstance(exc, (asyncio.TimeoutError, httpx.TimeoutException)):
             return Timeout(str(exc), llm_provider='google', model=self.model_name)
         if isinstance(exc, (aiohttp.ClientError, httpx.RequestError)):
-            return APIConnectionError(str(exc), llm_provider='google', model=self.model_name)
+            return APIConnectionError(
+                str(exc), llm_provider='google', model=self.model_name
+            )
         if isinstance(exc, APIError):
             return self._map_gemini_api_error(exc, str(exc).lower())
         return exc
-
-
-def _match_gemini_error(exc: Any, error_str: str, client: Any) -> Exception | None:
-    from backend.inference.exceptions import (
-        AuthenticationError, InternalServerError, NotFoundError, ServiceUnavailableError,
-    )
-    model = client.model_name
-
-    if client._is_gemini_api_key_error(error_str):
-        return AuthenticationError(str(exc), llm_provider='google', model=model)
-    if exc.code == 429 or 'quota' in error_str or 'rate limit' in error_str:
-        return client._map_gemini_rate_limit(exc, error_str)
-    if exc.code in (401,) or 'unauthorized' in error_str or 'invalid api key' in error_str:
-        return AuthenticationError(str(exc), llm_provider='google', model=model)
-    if exc.code == 404 or 'not found' in error_str:
-        return NotFoundError(str(exc), llm_provider='google', model=model)
-    if exc.code in (500, 502, 503, 504) or 'unavailable' in error_str or 'overloaded' in error_str:
-        return ServiceUnavailableError(str(exc), llm_provider='google', model=model)
-    if exc.code == 400:
-        return client._map_gemini_bad_request(exc, error_str)
-    if exc.code and exc.code >= 500:
-        return InternalServerError(str(exc), llm_provider='google', model=model)
-    return None
 
     @staticmethod
     def _update_gemini_stream_usage(
@@ -568,3 +555,38 @@ def _match_gemini_error(exc: Any, error_str: str, client: Any) -> Exception | No
             _gemini_output_tokens,
         ):
             yield finish_chunk
+
+
+def _match_gemini_error(exc: Any, error_str: str, client: Any) -> Exception | None:
+    from backend.inference.exceptions import (
+        AuthenticationError,
+        InternalServerError,
+        NotFoundError,
+        ServiceUnavailableError,
+    )
+
+    model = client.model_name
+
+    if client._is_gemini_api_key_error(error_str):
+        return AuthenticationError(str(exc), llm_provider='google', model=model)
+    if exc.code == 429 or 'quota' in error_str or 'rate limit' in error_str:
+        return client._map_gemini_rate_limit(exc, error_str)
+    if (
+        exc.code in (401,)
+        or 'unauthorized' in error_str
+        or 'invalid api key' in error_str
+    ):
+        return AuthenticationError(str(exc), llm_provider='google', model=model)
+    if exc.code == 404 or 'not found' in error_str:
+        return NotFoundError(str(exc), llm_provider='google', model=model)
+    if (
+        exc.code in (500, 502, 503, 504)
+        or 'unavailable' in error_str
+        or 'overloaded' in error_str
+    ):
+        return ServiceUnavailableError(str(exc), llm_provider='google', model=model)
+    if exc.code == 400:
+        return client._map_gemini_bad_request(exc, error_str)
+    if exc.code and exc.code >= 500:
+        return InternalServerError(str(exc), llm_provider='google', model=model)
+    return None
