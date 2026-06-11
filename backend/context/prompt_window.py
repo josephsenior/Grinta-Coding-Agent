@@ -10,9 +10,6 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
-_EVENT_TOKEN_CACHE: dict[str, int] = {}
-_EVENT_TOKEN_CACHE_MAX = 4096
-
 from backend.core.constants import (
     DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS,
     DEFAULT_PROMPT_MIN_TAIL_TOKENS,
@@ -29,6 +26,8 @@ _DEFAULT_BUDGET_RATIO = 0.50
 _DEFAULT_MIN_EVENTS = 150
 _DEFAULT_MAX_EVENTS = 240
 _MASKED_PLACEHOLDER = '<MASKED>'
+_EVENT_TOKEN_CACHE: dict[str, int] = {}
+_EVENT_TOKEN_CACHE_MAX = 4096
 
 
 @dataclass(frozen=True)
@@ -408,7 +407,11 @@ def _is_valid_condensation_event(event, seen_ids):
     content = _condensation_content(event)
     if not content or content == _MASKED_PLACEHOLDER:
         return False
+    if '<CONTEXT_PACKET>' in content or '<CANONICAL_TASK_STATE>' in content:
+        return False
     if '<DURABLE_WORKING_SET>' in content:
+        return False
+    if '<POST_COMPACT_RESTORE>' in content or '<RESTORED_CONTEXT>' in content:
         return False
     if id(event) in seen_ids:
         return False
@@ -416,15 +419,18 @@ def _is_valid_condensation_event(event, seen_ids):
 
 
 def _collect_condensation_events(events, seen_ids):
-    result = []
-    for event in events:
+    latest = None
+    for event in reversed(events):
         if not isinstance(event, AgentCondensationObservation):
             continue
         if not _is_valid_condensation_event(event, seen_ids):
             continue
-        result.append(event)
-        seen_ids.add(id(event))
-    return result
+        latest = event
+        break
+    if latest is None:
+        return []
+    seen_ids.add(id(latest))
+    return [latest]
 
 
 def _protected_summary_events(events: list[Event]) -> list[Event]:
@@ -433,6 +439,11 @@ def _protected_summary_events(events: list[Event]) -> list[Event]:
     first_user, last_user = _find_key_user_messages(events)
     _add_key_event(protected, seen_user_ids, first_user)
     _add_key_event(protected, seen_user_ids, last_user)
+    for event in events:
+        if isinstance(event, AgentCondensationObservation):
+            content = _condensation_content(event)
+            if '<CONTEXT_PACKET>' in content:
+                _add_key_event(protected, seen_user_ids, event)
     protected.extend(_collect_condensation_events(events, seen_user_ids))
     return protected
 

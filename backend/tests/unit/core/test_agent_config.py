@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from backend.core.config.agent_config import AgentConfig
-from backend.core.config.compactor_config import AutoCompactorConfig
+from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import (
     DEFAULT_AGENT_NAME,
     DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
@@ -34,7 +34,7 @@ class TestAgentConfigDefaults:
 
     def test_default_compactor_config(self):
         cfg = AgentConfig()
-        assert isinstance(cfg.compactor_config, AutoCompactorConfig)
+        assert isinstance(cfg.compactor_config, ContextPipelineConfig)
 
     def test_default_lsp_query_enabled(self):
         cfg = AgentConfig()

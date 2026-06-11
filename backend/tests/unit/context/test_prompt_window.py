@@ -88,6 +88,47 @@ def test_window_preserves_summary_and_recent_action_observation_chunk() -> None:
     assert old_chunk[1] not in result.events
 
 
+def test_window_protects_only_latest_real_condensation_summary() -> None:
+    old_summary = _with_id(
+        AgentCondensationObservation(content='old condensed summary'),
+        2,
+    )
+    restore = _with_id(
+        AgentCondensationObservation(
+            content='<POST_COMPACT_RESTORE>\nold restore\n</POST_COMPACT_RESTORE>'
+        ),
+        3,
+    )
+    latest_summary = _with_id(
+        AgentCondensationObservation(content='latest condensed summary'),
+        4,
+    )
+    old_chunk = _run_chunk(5, 'old', payload='old payload ' * 200)
+    recent_chunk = _run_chunk(101, 'recent', payload='recent payload')
+    events = [
+        _user_message('start', 1),
+        old_summary,
+        restore,
+        latest_summary,
+        *old_chunk,
+        *recent_chunk,
+    ]
+    cfg = SimpleNamespace(
+        prompt_history_token_budget=90,
+        prompt_history_min_events=1,
+        prompt_history_max_events=10,
+        prompt_history_min_tool_loops=0,
+        prompt_history_min_tail_tokens=0,
+        model='gpt-4o',
+    )
+
+    result = select_prompt_events(events, cfg)
+
+    assert latest_summary in result.events
+    assert old_summary not in result.events
+    assert restore not in result.events
+
+
 def test_event_count_guard_windows_many_tiny_events_without_token_budget() -> None:
     events = [_user_message('start', 1)]
     for idx in range(2, 30, 2):

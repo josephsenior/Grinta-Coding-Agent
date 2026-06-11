@@ -6,8 +6,6 @@ import contextlib
 import time
 from typing import Any
 
-_LIVE_SCROLL_PAINT_INTERVAL = 0.1
-
 from rich.text import (
     Text,
 )
@@ -21,6 +19,8 @@ from backend.cli.tui._app_constants import (
 from backend.ledger import (
     EventStreamSubscriber,
 )
+
+_LIVE_SCROLL_PAINT_INTERVAL = 0.1
 
 
 class _AppRendererLiveMixin:
@@ -153,7 +153,10 @@ class _AppRendererLiveMixin:
                 if in_place_update:
                     # Static.update() reflows on the next refresh; defer tail
                     # follow so scroll_end sees the updated max_scroll_y.
-                    display.call_after_refresh(follow_tail)
+                    def _follow_after_reflow() -> None:
+                        display.call_after_refresh(follow_tail)
+
+                    display.call_after_refresh(_follow_after_reflow)
                 else:
                     follow_tail()
             else:

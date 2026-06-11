@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -189,6 +188,21 @@ def maybe_update(
                 'last_session_memory_updated_at': time.time(),
             },
         )
+    try:
+        from backend.context.canonical_state import (
+            reduce_snapshot_into_state,
+            save_canonical_state,
+        )
+
+        canonical = reduce_snapshot_into_state(
+            snapshot,
+            latest_event_id=last_summarized,
+            source='session_memory',
+            persist_state=state,
+        )
+        save_canonical_state(canonical, state=state)
+    except Exception:
+        logger.debug('Session memory canonical-state sync failed', exc_info=True)
     try:
         from backend.context.working_set import sync_snapshot_to_working_memory
 

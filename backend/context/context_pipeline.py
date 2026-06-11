@@ -6,12 +6,21 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from backend.context.canonical_state import (
+    apply_canonical_patch,
+    load_canonical_state,
+    reduce_events_into_state,
+    render_canonical_state_for_prompt,
+    save_canonical_state,
+    validate_canonical_state_for_compaction,
+)
 from backend.context.compact_boundary import project_after_compact_boundary
 from backend.context.compactor.compactor import Compaction
+from backend.context.condensed_history import CondensedHistory
 from backend.context.context_budget import ContextBudget, record_post_compact_baseline
+from backend.context.context_packet import build_context_packet_observation
 from backend.context.continuity_eval import compaction_passes_continuity_gate
 from backend.context.microcompact import apply_microcompact
-from backend.context.post_compact_restore import inject_post_compact_restore
 from backend.context.pre_condensation_snapshot import (
     commit_snapshot,
     delete_staging_snapshot,
@@ -20,6 +29,7 @@ from backend.context.pre_condensation_snapshot import (
     save_snapshot,
 )
 from backend.context.prompt_window import select_prompt_events
+from backend.context.session_context import bind_session_context
 from backend.context.session_memory import (
     build_compaction_summary,
     maybe_update,
@@ -29,8 +39,7 @@ from backend.context.tool_result_storage import (
     apply_frozen_tool_replacements,
     apply_tool_result_budget,
 )
-from backend.context.session_context import bind_session_context
-from backend.context.working_set import build_working_set_observation, sync_snapshot_to_working_memory
+from backend.context.working_set import sync_snapshot_to_working_memory
 from backend.core.constants import (
     DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_COMPACT_MIN_PRUNED_EVENTS,
@@ -47,8 +56,6 @@ from backend.core.constants import (
 from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import Event
-
-from backend.context.condensed_history import CondensedHistory
 
 if TYPE_CHECKING:
     from backend.core.config.compactor_config import ContextPipelineConfig
@@ -133,18 +140,6 @@ class ContextPipeline:
         events = apply_microcompact(events, preserve_recent=self._preserve_recent)
         return events
 
-    def _inject_working_set(
-        self,
-        events: list[Event],
-        history: list[Event],
-        *,
-        state: State | None = None,
-    ) -> list[Event]:
-        working_set = build_working_set_observation(history, state=state)
-        if working_set is None:
-            return events
-        return [working_set, *events]
-
     def should_emit_compaction_status(self, state: State) -> bool:
         history = list(getattr(state, 'history', []))
         if not history:
@@ -170,6 +165,7 @@ class ContextPipeline:
         llm_config = self._llm_config(state)
 
         self._extract_pre_condensation_snapshot(state, history)
+        reduce_events_into_state(history, state=state, source='context_pipeline')
         post_boundary = self._project_layers_1_to_3(
             history, state, apply_tool_budget=False
         )
@@ -192,8 +188,9 @@ class ContextPipeline:
                         len(action.pruned),
                     )
                     self._set_skip_compaction(state)
+                elif not self._passes_continuity_gate(state, history, action):
+                    self._set_skip_compaction(state)
                 else:
-                    self._log_continuity_metric(state, history, action)
                     commit_snapshot(state=state)
                     sync_snapshot_to_working_memory(load_snapshot(state=state))
                     self._mark_just_compacted(state)
@@ -244,7 +241,11 @@ class ContextPipeline:
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
-        self._log_continuity_metric(state, history, action)
+        if not self._passes_continuity_gate(state, history, action):
+            self._set_skip_compaction(state)
+            delete_staging_snapshot(state=state)
+            return CondensedHistory(history, None)
+
         commit_snapshot(state=state)
         sync_snapshot_to_working_memory(load_snapshot(state=state))
         self._mark_just_compacted(state)
@@ -253,7 +254,9 @@ class ContextPipeline:
         if pressure_active:
             state.ack_memory_pressure(source='ContextPipeline')
             try:
-                from backend.orchestration.memory_pressure import get_memory_pressure_monitor
+                from backend.orchestration.memory_pressure import (
+                    get_memory_pressure_monitor,
+                )
 
                 monitor = get_memory_pressure_monitor()
                 if monitor is not None:
@@ -278,7 +281,6 @@ class ContextPipeline:
         """Assemble LLM-facing events through layers 1–7."""
         history = full_history if full_history is not None else list(condensed_history)
         events = self._project_layers_1_to_3(history, state or _EmptyState(), apply_tool_budget=True)
-        events = self._inject_working_set(events, history, state=state)
 
         just_compacted = False
         if state is not None:
@@ -289,9 +291,14 @@ class ContextPipeline:
                 pipe[_JUST_COMPACTED_KEY] = False
                 state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
 
-        events = inject_post_compact_restore(
-            events, history, just_compacted=just_compacted, state=state
+        packet = build_context_packet_observation(
+            events,
+            history,
+            state=state,
+            just_compacted=just_compacted,
         )
+        if packet is not None:
+            events = [packet, *events]
 
         window = select_prompt_events(
             events,
@@ -434,6 +441,7 @@ class ContextPipeline:
         if isinstance(result, Compaction):
             action = result.action
             if action is not None and action.summary:
+                self._apply_structured_compactor_patch(compactor, state, events)
                 return action
             logger.info(
                 'ContextPipeline: 5b produced no summary (pruned=%d events=%d max_size=%d)',
@@ -442,6 +450,28 @@ class ContextPipeline:
                 getattr(compactor, 'max_size', 0),
             )
         return None
+
+    @staticmethod
+    def _apply_structured_compactor_patch(
+        compactor: object,
+        state: State,
+        events: list[Event],
+    ) -> None:
+        patch = getattr(compactor, 'last_state_patch', None)
+        if not isinstance(patch, dict) or not patch:
+            return
+        latest_id = _latest_event_id(events)
+        try:
+            canonical = load_canonical_state(state=state)
+            canonical = apply_canonical_patch(
+                canonical,
+                patch,
+                event_id=latest_id,
+                source='structured_compactor',
+            )
+            save_canonical_state(canonical, state=state)
+        except Exception:
+            logger.debug('Structured compactor canonical patch failed', exc_info=True)
 
     def _degraded_compaction(
         self,
@@ -522,7 +552,9 @@ class ContextPipeline:
         from backend.context.compactor.strategies.structured_summary_compactor import (
             StructuredSummaryCompactor,
         )
-        from backend.core.config.compactor_config import StructuredSummaryCompactorConfig
+        from backend.core.config.compactor_config import (
+            StructuredSummaryCompactorConfig,
+        )
         from backend.core.config.llm_config import LLMConfig
 
         if isinstance(llm_config, LLMConfig):
@@ -667,37 +699,47 @@ class ContextPipeline:
         token_reduction = budget.estimated_tokens - post_budget.estimated_tokens
         return token_reduction >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
 
-    def _log_continuity_metric(
+    def _passes_continuity_gate(
         self, state: State, history: list[Event], action: CondensationAction
-    ) -> None:
+    ) -> bool:
         if not action.summary:
-            return
+            return True
         restored_parts = [action.summary]
         try:
-            from backend.context.working_set import get_durable_context_block
-
-            durable = get_durable_context_block(history, state=state)
-            if durable:
-                restored_parts.append(durable)
+            canonical = load_canonical_state(state=state)
+            canonical_rendered = render_canonical_state_for_prompt(canonical)
+            if canonical_rendered:
+                restored_parts.append(canonical_rendered)
         except Exception:
-            pass
+            logger.debug('Canonical continuity render failed', exc_info=True)
         snapshot_text = build_compaction_summary(state=state)
         if snapshot_text:
             restored_parts.append(snapshot_text)
         restored = '\n\n'.join(part for part in restored_parts if part.strip())
         passed, result = compaction_passes_continuity_gate(history, restored)
+        canonical_result = validate_canonical_state_for_compaction(
+            load_canonical_state(state=state),
+            history,
+        )
+        if not canonical_result.ok:
+            logger.warning(
+                'Compaction canonical continuity failed: missing=%s',
+                ', '.join(canonical_result.missing),
+            )
+            return False
         if not passed:
             missing = ', '.join(
                 f'{fact.category}:{fact.key[:40]}' for fact in result.missing[:8]
             )
             logger.warning(
                 'Compaction continuity metric score=%.2f matched=%d/%d missing=%s '
-                '(logged only; boundary committed)',
+                '(boundary rejected)',
                 result.score,
                 result.matched,
                 result.total,
                 missing or 'none',
             )
+        return passed
 
     @staticmethod
     def _extract_pre_condensation_snapshot(state: State, history: list[Event]) -> None:
@@ -718,6 +760,9 @@ class ContextPipeline:
                 snapshot.get('files_touched')
                 or snapshot.get('recent_errors')
                 or snapshot.get('decisions')
+                or snapshot.get('latest_directive')
+                or snapshot.get('test_results')
+                or snapshot.get('background_tasks')
             ):
                 save_snapshot(snapshot, state=state)
         except Exception:
@@ -729,6 +774,12 @@ class _EmptyState:
 
     def set_extra(self, *args, **kwargs) -> None:
         pass
+
+
+def _latest_event_id(events: list[Event]) -> int | None:
+    ids = [getattr(event, 'id', None) for event in events]
+    int_ids = [event_id for event_id in ids if isinstance(event_id, int)]
+    return max(int_ids) if int_ids else None
 
 
 def apply_ineffective_compaction_backoff(state: State) -> None:
@@ -864,7 +915,6 @@ def _select_compaction_tail(
         if tail_tokens >= target_tokens:
             break
 
-    compaction_budget = max(target_tokens, min_tail_floor)
     tail = _enforce_min_tool_loops(
         tail,
         events,

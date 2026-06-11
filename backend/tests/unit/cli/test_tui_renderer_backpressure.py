@@ -35,8 +35,9 @@ async def test_tui_renderer_pending_events_are_bounded(monkeypatch):
     for event in range(5):
         renderer._on_event(event)
 
-    assert list(renderer._pending_events) == [2, 3, 4]
-    assert renderer._pending_events_dropped == 2
+    assert list(renderer._pending_events) == [0, 1, 2, 3, 4]
+    assert renderer._pending_events_dropped == 0
+    assert renderer._pending_backpressure is True
     assert loop.call_soon_threadsafe.call_count == 5
     assert renderer._drain_scheduled is True
 

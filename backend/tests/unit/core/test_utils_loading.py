@@ -13,7 +13,7 @@ from pydantic import SecretStr
 
 from backend.core.config.api_key_manager import api_key_manager
 from backend.core.config.app_config import AppConfig
-from backend.core.config.compactor_config import AutoCompactorConfig
+from backend.core.config.compactor_config import AutoCompactorConfig, ContextPipelineConfig
 from backend.core.config.config_loader import (
     ConfigLoadSummary,
     finalize_config,
@@ -106,7 +106,7 @@ class TestFinalization:
                 assert os.path.isabs(cfg.llms['default'].log_completions_folder)
                 assert cast(Any, cfg.jwt_secret).get_secret_value() == 'secret'
 
-    def test_finalize_config_binds_auto_compactor_to_active_llm(self, tmp_path):
+    def test_finalize_config_binds_context_pipeline_to_active_llm(self, tmp_path):
         cfg = AppConfig()
         cfg.cache_dir = str(tmp_path / 'cache')
         cfg.get_llm_config().model = 'openai/gpt-4.1'
@@ -122,7 +122,7 @@ class TestFinalization:
             finalize_config(cfg)
 
         compactor_cfg = cfg.get_agent_config(cfg.default_agent).compactor_config
-        assert isinstance(compactor_cfg, AutoCompactorConfig)
+        assert isinstance(compactor_cfg, ContextPipelineConfig)
         assert compactor_cfg.llm_config.model == 'openai/gpt-4.1'  # type: ignore
 
     def test_finalize_config_preserves_auto_compactor_hot_path_flag(self, tmp_path):
@@ -170,7 +170,7 @@ class TestFinalization:
             cfg.get_agent_config(cfg.default_agent).enable_browsing
         )
 
-    def test_finalize_config_creates_missing_auto_compactor(self, tmp_path):
+    def test_finalize_config_creates_missing_context_pipeline_compactor(self, tmp_path):
         cfg = AppConfig()
         cfg.cache_dir = str(tmp_path / 'cache')
         cfg.get_agent_config(cfg.default_agent).compactor_config = None  # type: ignore[assignment]
@@ -187,7 +187,7 @@ class TestFinalization:
             finalize_config(cfg)
 
         compactor_cfg = cfg.get_agent_config(cfg.default_agent).compactor_config
-        assert isinstance(compactor_cfg, AutoCompactorConfig)
+        assert isinstance(compactor_cfg, ContextPipelineConfig)
         assert compactor_cfg.llm_config is not None
         assert compactor_cfg.llm_config.model == 'openai/gpt-4.1'  # type: ignore[union-attr]
 

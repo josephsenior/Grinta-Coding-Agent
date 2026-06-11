@@ -105,6 +105,26 @@ class TestStateSummary:
         s = StateSummary()
         assert str(s) != ''
 
+    def test_canonical_patch_prefers_explicit_patch_fields(self):
+        s = StateSummary(
+            pending_tasks='old pending task',
+            current_working_step='old next step',
+            files_modified='old.py',
+            canonical_active_plan='patch plan',
+            canonical_next_action='run focused test',
+            canonical_active_files='backend/context/canonical_state.py',
+            canonical_blockers='pytest still failing',
+            narrative_summary='short current summary',
+        )
+
+        patch = s.canonical_patch()
+
+        assert patch['active_plan'] == 'patch plan'
+        assert patch['next_action'] == 'run focused test'
+        assert patch['active_files'] == 'backend/context/canonical_state.py'
+        assert patch['blockers'] == 'pytest still failing'
+        assert patch['narrative_summary'] == 'short current summary'
+
 
 # ---------------------------------------------------------------------------
 # StructuredSummaryCondenser._validate_llm
@@ -245,6 +265,7 @@ class TestGetCompaction:
         assert isinstance(result, Compaction)
         assert result.action.pruned_events_start_id is not None
         assert result.action.pruned_events_end_id is not None
+        assert condenser.last_state_patch['active_plan'] == 'tests'
 
     async def test_llm_receives_previous_summary_in_prompt(self):
         """When a summary event exists at keep_first, it is passed to the LLM."""

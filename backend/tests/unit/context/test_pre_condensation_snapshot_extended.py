@@ -11,6 +11,8 @@ from backend.context import pre_condensation_snapshot as snapshot_module
 from backend.context.pre_condensation_snapshot import extract_snapshot
 from backend.ledger.action.agent import AgentThinkAction
 from backend.ledger.action.commands import CmdRunAction
+from backend.ledger.action.message import MessageAction
+from backend.ledger.event import EventSource
 from backend.ledger.action.files import FileEditAction, FileWriteAction
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.error import ErrorObservation
@@ -170,6 +172,42 @@ class TestPreCondensationSnapshot(unittest.TestCase):
             'Assumption invalidated: the parser error was not caused by TOML.'
         ]
         assert snapshot['decisions'] == ['Use the simpler branch here']
+
+    def test_extract_snapshot_skips_condensation_control_noise(self):
+        events = [
+            AgentThinkAction(thought='Memory condensed. Resuming task.'),
+            AgentThinkAction(thought='Fix config binding for the compactor.'),
+        ]
+
+        snapshot = extract_snapshot(events)
+
+        assert snapshot['decisions'] == ['Fix config binding for the compactor.']
+
+    def test_extract_snapshot_records_user_directives_and_background_task(self):
+        first = MessageAction(content='Fix long-running compaction')
+        first.source = EventSource.USER
+        latest = MessageAction(content='Also preserve background processes')
+        latest.source = EventSource.USER
+        output = CmdOutputObservation(
+            content='[BACKGROUND_DETACH] still running',
+            command='pytest -q',
+            exit_code=-2,
+        )
+        output.metadata.suffix = 'detached session_id="terminal_9"'
+        output.metadata.command_still_running = True
+
+        snapshot = extract_snapshot([first, latest, output])
+
+        assert snapshot['objective'] == 'Fix long-running compaction'
+        assert snapshot['latest_directive'] == 'Also preserve background processes'
+        assert snapshot['background_tasks'] == [
+            {
+                'session_id': 'terminal_9',
+                'command': 'pytest -q',
+                'status': 'still running',
+                'next_action': 'terminal_read(session_id="terminal_9")',
+            }
+        ]
 
     def test_format_snapshot_for_injection(self):
         from backend.context.pre_condensation_snapshot import (

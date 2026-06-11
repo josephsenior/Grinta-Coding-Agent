@@ -28,12 +28,27 @@ from backend.ledger.action.memory_tools import WorkingMemoryAction
 from backend.ledger.observation.memory_tools import WorkingMemoryObservation
 
 _VALID_SECTIONS = (
+    'current_state',
+    'plan',
+    'blockers',
     'hypothesis',
     'findings',
-    'blockers',
     'file_context',
     'decisions',
+    'failed_approaches',
+    'background_tasks',
+)
+
+_PROMPT_SECTION_ORDER = (
+    'current_state',
     'plan',
+    'blockers',
+    'background_tasks',
+    'findings',
+    'file_context',
+    'decisions',
+    'failed_approaches',
+    'hypothesis',
 )
 
 
@@ -63,7 +78,7 @@ def _memory_path() -> Path:
     return scoped_agent_path('working_memory', '.json')
 
 
-def _load_memory() -> dict[str, str]:
+def _load_memory() -> dict[str, Any]:
     p = _memory_path()
     if not p.exists():
         return {}
@@ -76,7 +91,7 @@ def _load_memory() -> dict[str, str]:
     return {}
 
 
-def _save_memory(data: dict[str, str]) -> None:
+def _save_memory(data: dict[str, Any]) -> None:
     p = _memory_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding='utf-8')
@@ -189,7 +204,7 @@ def _update_all_sections(content: str) -> WorkingMemoryObservation:
     )
 
 
-def _apply_json_sections(content: str, memory: dict[str, str]) -> list[str]:
+def _apply_json_sections(content: str, memory: dict[str, Any]) -> list[str]:
     try:
         maybe = json.loads(content)
     except json.JSONDecodeError:
@@ -205,7 +220,7 @@ def _apply_json_sections(content: str, memory: dict[str, str]) -> list[str]:
     return updated
 
 
-def _apply_text_sections(content: str, memory: dict[str, str]) -> list[str]:
+def _apply_text_sections(content: str, memory: dict[str, Any]) -> list[str]:
     sections: dict[str, list[str]] = {}
     current: str | None = None
     for raw_line in content.splitlines():
@@ -236,7 +251,7 @@ def _apply_text_sections(content: str, memory: dict[str, str]) -> list[str]:
 
 
 def _save_and_respond(
-    memory: dict[str, str], updated: list[str]
+    memory: dict[str, Any], updated: list[str]
 ) -> WorkingMemoryObservation:
     memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
     _save_memory(memory)
@@ -313,9 +328,9 @@ def get_full_working_memory() -> str:
         return ''
 
     parts = ['<WORKING_MEMORY>']
-    for sec in _VALID_SECTIONS:
+    for sec in _PROMPT_SECTION_ORDER:
         val = memory.get(sec, '')
-        if val:
+        if isinstance(val, str) and val:
             parts.append(f'[{sec.upper()}] {val}')
 
     if len(parts) == 1:
@@ -330,20 +345,42 @@ def get_working_memory_prompt_block(char_budget: int = 2000) -> str:
     if not memory:
         return ''
 
+    section_budget = max(240, char_budget // max(1, len(_PROMPT_SECTION_ORDER)))
     lines = ['<WORKING_MEMORY>', 'Your structured working memory:']
-    for sec in _VALID_SECTIONS:
+    truncated = False
+    for sec in _PROMPT_SECTION_ORDER:
         val = memory.get(sec, '')
-        if not val:
+        if not isinstance(val, str) or not val.strip():
             continue
-        line = f'[{sec.upper()}] {val}'
+        clipped = _clip_section(val.strip(), section_budget)
+        line = f'[{sec.upper()}]\n{clipped}'
+        while len('\n'.join(lines + [line, '</WORKING_MEMORY>'])) > char_budget:
+            reduced = max(160, len(clipped) // 2)
+            if reduced >= len(clipped):
+                truncated = True
+                break
+            clipped = _clip_section(clipped, reduced)
+            line = f'[{sec.upper()}]\n{clipped}'
         if len('\n'.join(lines + [line, '</WORKING_MEMORY>'])) > char_budget:
-            lines.append('... (additional working memory truncated)')
+            truncated = True
             break
         lines.append(line)
+        if clipped != val.strip():
+            truncated = True
     if len(lines) == 2:
         return ''
+    if truncated and len('\n'.join(lines + ['... (working memory truncated)', '</WORKING_MEMORY>'])) <= char_budget:
+        lines.append('... (working memory truncated)')
     lines.append('</WORKING_MEMORY>')
     return '\n'.join(lines)
+
+
+def _clip_section(text: str, char_budget: int) -> str:
+    if len(text) <= char_budget:
+        return text
+    if char_budget <= 80:
+        return text[:char_budget]
+    return text[: char_budget - 36].rstrip() + '\n... (section truncated)'
 
 
 def _working_memory_already_contains_note(existing: str, key: str, value: str) -> bool:

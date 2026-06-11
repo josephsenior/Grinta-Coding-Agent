@@ -180,6 +180,32 @@ class TestInitialize:
             m.initialize(pm)
         assert m.compactor is fake_compactor
 
+    def test_initialize_context_pipeline_binds_registry_default_llm(self):
+        from backend.core.config.agent_config import AgentConfig
+        from backend.core.config.app_config import AppConfig
+        from backend.core.config.compactor_config import ContextPipelineConfig
+        from backend.core.config.llm_config import LLMConfig
+
+        llm_config = LLMConfig.model_validate({'model': 'openai/gpt-4o'})
+        app_config = AppConfig()
+        app_config.set_llm_config(llm_config)
+        agent_config = AgentConfig(compactor_config=ContextPipelineConfig())
+        registry = MagicMock()
+        registry.config = app_config
+        manager = ContextMemoryManager(config=agent_config, llm_registry=registry)
+
+        with (
+            patch('backend.engine.memory_manager.ContextMemory'),
+            patch(
+                'backend.context.context_pipeline.ContextPipeline.from_config'
+            ) as mock_from_config,
+        ):
+            mock_from_config.return_value = MagicMock()
+            manager.initialize(MagicMock())
+
+        bound_config = mock_from_config.call_args.args[0]
+        assert bound_config.llm_config is llm_config
+
 
 # ---------------------------------------------------------------------------
 # condense_history
