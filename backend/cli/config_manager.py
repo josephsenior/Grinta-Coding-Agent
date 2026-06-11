@@ -480,7 +480,9 @@ def _select_predefined_or_custom_model(
 
     choice = Prompt.ask(
         '  Model number',
-        default=str(options.index(default_bare) + 1) if default_bare in options else '1',
+        default=str(options.index(default_bare) + 1)
+        if default_bare in options
+        else '1',
         console=_console,
     ).strip()
     try:

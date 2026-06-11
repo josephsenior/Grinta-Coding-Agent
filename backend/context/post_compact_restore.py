@@ -161,12 +161,12 @@ def _prioritized_file_paths(files: dict) -> list[str]:
 
 
 def _tail_content_set(events: list[Event]) -> set[str]:
-    return {
-        getattr(event, 'content', '')
-        for event in events
-        if isinstance(getattr(event, 'content', ''), str)
-        and getattr(event, 'content', '')
-    }
+    contents: set[str] = set()
+    for event in events:
+        content = getattr(event, 'content', None)
+        if isinstance(content, str) and content:
+            contents.add(content)
+    return contents
 
 
 def inject_post_compact_restore(

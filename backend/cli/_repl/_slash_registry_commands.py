@@ -269,6 +269,7 @@ _SLASH_COMMANDS = (
     *_PLAYBOOK_SLASH_COMMANDS,
 )
 
+
 def _load_known_models() -> tuple[tuple[str, str], ...]:
     """Load provider/model completions from the catalog."""
     try:

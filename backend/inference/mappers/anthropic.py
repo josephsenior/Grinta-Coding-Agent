@@ -121,11 +121,11 @@ def _parse_tool_arguments(arguments: Any) -> dict[str, Any]:
 
 
 def _is_valid_tool_call_id(tool_id: Any) -> bool:
-    return isinstance(tool_id, str) and tool_id.strip()
+    return isinstance(tool_id, str) and bool(tool_id.strip())
 
 
 def _is_valid_tool_name(name: Any) -> bool:
-    return isinstance(name, str) and name.strip()
+    return isinstance(name, str) and bool(name.strip())
 
 
 def _build_tool_use_block(
@@ -140,11 +140,12 @@ def _build_tool_use_block(
     name = function.get('name')
     if not _is_valid_tool_name(name):
         return None, None
+    tool_name = str(name).strip()
     return (
         {
             'type': 'tool_use',
             'id': tool_id,
-            'name': name.strip(),
+            'name': tool_name,
             'input': _parse_tool_arguments(function.get('arguments')),
         },
         tool_id,
@@ -168,7 +169,7 @@ def _normalize_assistant_message(
         if not isinstance(tool_call, dict):
             continue
         block, tool_id = _build_tool_use_block(tool_call)
-        if block is None:
+        if block is None or tool_id is None:
             continue
         known_tool_ids.add(tool_id)
         content_blocks.append(block)

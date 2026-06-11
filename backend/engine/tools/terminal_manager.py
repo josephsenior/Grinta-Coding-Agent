@@ -230,6 +230,8 @@ def _handle_input_action(arguments: dict) -> TerminalInputAction:
     rows = _opt_int(arguments.get('rows'))
     cols = _opt_int(arguments.get('cols'))
     _validate_input_params(session_id, input_val, control_val, rows)
+    if not isinstance(session_id, str):
+        raise ValueError("Terminal 'input' action requires a string 'session_id'.")
     is_control = _coerce_is_control(arguments.get('is_control', False))
     submit = _coerce_submit(arguments.get('submit', True))
     return TerminalInputAction(

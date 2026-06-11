@@ -41,7 +41,7 @@ def _invoke_zero_arg_callback(callback: Callable[[], object]) -> object:
 if TYPE_CHECKING:
     from backend.ledger.action import Action, MessageAction, SystemMessageAction
     from backend.ledger.event import EventSource
-    from backend.orchestration.services.tool_invocation import ToolInvocationContext
+    from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 """_SessionOrchestratorActionMixin mixin for SessionOrchestrator.
 

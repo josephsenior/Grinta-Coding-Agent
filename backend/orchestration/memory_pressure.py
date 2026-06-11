@@ -355,3 +355,8 @@ class MemoryPressureMonitor:
         if self._last_rss_mb >= self._warn_mb:
             return 'warning'
         return 'normal'
+
+
+def get_memory_pressure_monitor() -> MemoryPressureMonitor | None:
+    """Return the active memory-pressure monitor when wired by the orchestrator."""
+    return None

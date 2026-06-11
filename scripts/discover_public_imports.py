@@ -384,7 +384,7 @@ def build_manifest(roots: Iterable[Path]) -> dict[str, Any]:
         rel = path.relative_to(REPO_ROOT).as_posix()
         info, imports, failure = _parse_python_file(path, rel)
         if info is None:
-            parse_failures.append(failure)
+            parse_failures.append(failure or rel)
             continue
         if failure is not None:
             parse_failures.append(failure)

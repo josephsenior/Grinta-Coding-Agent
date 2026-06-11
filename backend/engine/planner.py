@@ -401,7 +401,11 @@ class OrchestratorPlanner:
         )
 
     def _configure_tool_routing(
-        self, params: dict, tools: list, messages: list, tool_choice: str
+        self,
+        params: dict,
+        tools: list,
+        messages: list,
+        tool_choice: str | dict[Any, Any] | None,
     ) -> dict:
         native_tools, xml_tools = self.partition_tools(tools)
         if self._llm_supports_function_calling():

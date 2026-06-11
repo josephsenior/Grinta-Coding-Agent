@@ -62,11 +62,11 @@ def _format_delta_line(added: int, removed: int) -> str:
 
 
 def _needs_delta(new_file: bool, added: int, removed: int) -> bool:
-    return not new_file and (added or removed)
+    return not new_file and (added > 0 or removed > 0)
 
 
 def _needs_preview(new_file: bool, preview_content: str | None) -> bool:
-    return new_file and preview_content
+    return new_file and preview_content is not None
 
 
 def _format_delta_or_preview(

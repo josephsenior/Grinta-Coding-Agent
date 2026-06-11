@@ -1,0 +1,45 @@
+{
+  "provider": "deepseek",
+  "client": "openai_compatible",
+  "models": {
+    "deepseek-v4-flash": {
+      "aliases": [
+        "deepseek/deepseek-v4-flash",
+        "deepseek-v4-flash",
+        "deepseek v4 flash"
+      ],
+      "context_window_tokens": 1000000,
+      "max_input_tokens": 611904,
+      "max_output_tokens": 384000,
+      "input_price_per_m": 0.14,
+      "cached_input_price_per_m": 0.0028,
+      "output_price_per_m": 0.28,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_reasoning_effort": true,
+      "supports_vision": false,
+      "default_temperature": 1.0
+    },
+    "deepseek-v4-pro": {
+      "aliases": [
+        "deepseek/deepseek-v4-pro",
+        "deepseek-v4-pro",
+        "deepseek v4 pro"
+      ],
+      "context_window_tokens": 1000000,
+      "max_input_tokens": 611904,
+      "max_output_tokens": 384000,
+      "input_price_per_m": 0.435,
+      "cached_input_price_per_m": 0.003625,
+      "output_price_per_m": 0.87,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
+      "supports_reasoning_effort": true,
+      "supports_vision": false
+    }
+  }
+}

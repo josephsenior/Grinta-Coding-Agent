@@ -210,7 +210,7 @@ def memory_query_from_text(
 
 
 def memory_query_from_events(
-    events: list[object],
+    events: list[Any],
     *,
     initial_user_action: object | None = None,
 ) -> str | None:

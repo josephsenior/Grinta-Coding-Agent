@@ -10,7 +10,7 @@ from backend.inference.catalog_loader import (
 
 
 def get_supported_llm_models(config: AppConfig | None = None) -> list[str]:
-    """Get all models marked ``featured`` in catalog.json.
+    """Get all models marked ``featured`` in provider catalog files.
 
     Returns ``provider/name`` strings suitable for the API model picker.
     """

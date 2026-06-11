@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from backend.core.message import ImageContent, Message, TextContent
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
     pass
 
 
-_OBSERVATION_DISPATCH: dict[type, callable] = {}
+_OBSERVATION_DISPATCH: dict[type, Callable[..., Message]] = {}
 
 
 def _register_observation_handler(obs_type: type):

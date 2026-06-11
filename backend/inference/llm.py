@@ -331,7 +331,10 @@ def _get_provider_resolver() -> Any:
 def _apply_base_url_discovery(config: Any, resolver: Any) -> None:
     """Discover and set base_url if not configured."""
     if not config.base_url:
-        discovered = resolver.resolve_base_url(config.model)
+        discovered = resolver.resolve_base_url(
+            config.model,
+            config_provider=getattr(config, 'custom_llm_provider', None),
+        )
         if discovered:
             logger.info('Auto-discovered base_url for %s: %s', config.model, discovered)
             config.base_url = discovered
@@ -433,6 +436,15 @@ class LLM(RetryMixin, DebugMixin):
         # or has an explicit provider prefix. This prevents hard 404s later.
         resolver = _get_provider_resolver()
         config_provider = getattr(self.config, 'custom_llm_provider', None)
+        if (
+            config_provider
+            and self.config.model
+            and '/' not in str(self.config.model)
+        ):
+            provider = str(config_provider).strip().lower()
+            model = str(self.config.model).strip()
+            if provider and model:
+                self.config.model = f'{provider}/{model}'
         try:
             # resolve_provider raises ValueError if the model is unknown and has no prefix
             resolver.resolve_provider(
@@ -465,6 +477,7 @@ class LLM(RetryMixin, DebugMixin):
             api_key=api_key_value or 'not-needed',
             base_url=self.config.base_url,
             timeout=self.config.timeout,
+            provider=getattr(self.config, 'custom_llm_provider', None),
         )
 
         self._function_calling_active = _resolve_function_calling_config(
@@ -522,7 +535,7 @@ class LLM(RetryMixin, DebugMixin):
     def _get_call_kwargs(self, **kwargs) -> dict:
         """Merge default config with call-specific kwargs and handle model-specific parameters.
 
-        Model-specific parameter overrides are driven by catalog.json
+        Model-specific parameter overrides are driven by provider catalog files
         via ``apply_model_param_overrides()``.
         """
         is_stream = kwargs.pop('is_stream', False)

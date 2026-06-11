@@ -280,7 +280,10 @@ def _handle_analyze_project_structure_tool(
     arguments: Mapping[str, Any],
 ) -> AnalyzeProjectStructureAction:
     """Handle analyze_project_structure tool: structural overview of the workspace."""
-    return build_analyze_project_structure_action(dict(arguments))
+    return cast(
+        AnalyzeProjectStructureAction,
+        build_analyze_project_structure_action(dict(arguments)),
+    )
 
 
 def _handle_summarize_context_tool(

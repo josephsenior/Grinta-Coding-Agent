@@ -3,7 +3,7 @@
 Documents and guards Grinta's contract across providers:
 
 * ``apply_model_param_overrides`` may set OpenAI-style ``parallel_tool_calls`` when
-  ``catalog.json`` advertises ``supports_parallel_tool_calls``.
+  provider catalogs advertise ``supports_parallel_tool_calls``.
 * ``sanitize_call_kwargs_for_provider`` strips that kwarg for **native** Google and
   Anthropic SDK routes (different wire protocols; Anthropic still supports parallel
   tool *use* via multiple ``tool_use`` blocks).
@@ -11,7 +11,7 @@ Documents and guards Grinta's contract across providers:
 * ``_render_system_capabilities`` gates the user-facing ENABLED/DISABLED line.
 
 If you change sanitization or catalog defaults, update this module alongside
-``docs/`` or ``catalog.json``.
+``docs/`` or provider catalog files.
 """
 
 from __future__ import annotations
@@ -50,17 +50,17 @@ def _base_kwargs() -> dict[str, Any]:
             id='anthropic_catalog_name_strip',
         ),
         pytest.param(
-            'google/gemini-2.5-flash',
+            'google/gemini-3-flash',
             True,
             id='google_prefixed_strip',
         ),
         pytest.param(
-            'gemini-2.5-flash',
+            'gemini-3-flash',
             True,
             id='google_catalog_name_strip',
         ),
-        pytest.param('gpt-4o', False, id='openai_catalog_keeps'),
-        pytest.param('openai/gpt-4o', False, id='openai_alias_keeps'),
+        pytest.param('gpt-5', False, id='openai_catalog_keeps'),
+        pytest.param('openai/gpt-5', False, id='openai_alias_keeps'),
         pytest.param('lightning/kimi-k2.5', False, id='lightning_openai_compat_keeps'),
         pytest.param(
             'openrouter/meta-llama/llama-3.3-70b-versatile',
@@ -69,8 +69,8 @@ def _base_kwargs() -> dict[str, Any]:
         ),
         pytest.param('groq/llama-3.3-70b-versatile', False, id='groq_keeps'),
         pytest.param('ollama/qwen2.5', False, id='ollama_keeps'),
-        pytest.param('xai/grok-3', False, id='xai_keeps'),
-        pytest.param('deepseek/deepseek-chat', False, id='deepseek_keeps'),
+        pytest.param('xai/grok-build-0.1', False, id='xai_keeps'),
+        pytest.param('deepseek/deepseek-v4-pro', False, id='deepseek_keeps'),
         pytest.param('mistral/mistral-small-latest', False, id='mistral_keeps'),
         pytest.param('vllm/Qwen/Qwen2.5-7B-Instruct', False, id='vllm_keeps'),
         pytest.param('lm_studio/local-model', False, id='lm_studio_keeps'),
@@ -106,7 +106,7 @@ def test_all_known_prefixes_openai_compat_keep_parallel_kwarg() -> None:
 def test_apply_overrides_sets_parallel_only_when_catalog_advertises() -> None:
     """Catalog ``supports_parallel_tool_calls`` drives apply_model_param_overrides."""
     gpt_kw = _base_kwargs()
-    apply_model_param_overrides('gpt-4o', gpt_kw)
+    apply_model_param_overrides('gpt-5', gpt_kw)
     assert gpt_kw.get('parallel_tool_calls') is True
 
     claude_kw = _base_kwargs()
@@ -121,8 +121,8 @@ def test_apply_overrides_sets_parallel_only_when_catalog_advertises() -> None:
 def test_apply_then_sanitize_openai_preserves_parallel_flag() -> None:
     """OpenAI catalog path: overrides add flag; sanitizer does not remove it."""
     kw = _base_kwargs()
-    apply_model_param_overrides('gpt-4o', kw)
-    out = sanitize_call_kwargs_for_provider('gpt-4o', kw)
+    apply_model_param_overrides('gpt-5', kw)
+    out = sanitize_call_kwargs_for_provider('gpt-5', kw)
     assert out.get('parallel_tool_calls') is True
 
 
@@ -130,7 +130,7 @@ def test_apply_then_sanitize_anthropic_drops_parallel_flag() -> None:
     """If parallel_tool_calls were present, Anthropic native sanitizer removes it."""
     kw = {**_base_kwargs(), 'parallel_tool_calls': True}
     apply_model_param_overrides('claude-4.5-sonnet', kw)
-    # Catalog does not set parallel for Claude today; simulate upstream injection.
+    # Simulate upstream injection regardless of the catalog default.
     kw['parallel_tool_calls'] = True
     out = sanitize_call_kwargs_for_provider('claude-4.5-sonnet', kw)
     assert 'parallel_tool_calls' not in out
@@ -139,8 +139,8 @@ def test_apply_then_sanitize_anthropic_drops_parallel_flag() -> None:
 @pytest.mark.parametrize(
     ('model_id', 'expected'),
     [
-        pytest.param('gpt-4o', True, id='gpt4o_catalog_parallel'),
-        pytest.param('openai/gpt-4o', True, id='gpt4o_alias_parallel'),
+        pytest.param('gpt-5', True, id='gpt5_catalog_parallel'),
+        pytest.param('openai/gpt-5', True, id='gpt5_alias_parallel'),
         pytest.param('claude-4.5-sonnet', True, id='claude_catalog_parallel'),
         pytest.param('kimi-k2.5', True, id='kimi_catalog_parallel'),
         pytest.param('lightning/foo', False, id='prefixed_unknown_no_catalog'),

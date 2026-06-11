@@ -594,6 +594,7 @@ class SessionOrchestrator(
         import time as _time
 
         self._watchdog_last_step_ts = _time.monotonic()
+        loop: asyncio.AbstractEventLoop | None
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -618,14 +619,37 @@ class SessionOrchestrator(
         """Background loop that checks for step() progress at regular intervals."""
         import time as _time
 
-        check_interval = 10.0
-        timeout = (
-            getattr(self, '_watchdog_timeout', None)
-            or self.config.circuit_breaker.no_step_progress_timeout_seconds
+        from backend.core.constants import (
+            DEFAULT_NO_STEP_PROGRESS_TIMEOUT_SECONDS,
+            DEFAULT_STUCK_AUTO_RECOVER_COOLDOWN_SECONDS,
         )
+
+        check_interval = 10.0
+        cb_config = getattr(
+            getattr(self.services.circuit_breaker, 'circuit_breaker', None),
+            'config',
+            None,
+        )
+        watchdog_timeout = getattr(self, '_watchdog_timeout', None)
+        if isinstance(watchdog_timeout, (int, float)):
+            timeout = float(watchdog_timeout)
+        else:
+            timeout = float(
+                getattr(
+                    cb_config,
+                    'no_step_progress_timeout_seconds',
+                    DEFAULT_NO_STEP_PROGRESS_TIMEOUT_SECONDS,
+                )
+            )
         if timeout <= 0:
             return
-        cooldown = self.config.circuit_breaker.auto_recover_cooldown_seconds
+        cooldown = float(
+            getattr(
+                cb_config,
+                'auto_recover_cooldown_seconds',
+                DEFAULT_STUCK_AUTO_RECOVER_COOLDOWN_SECONDS,
+            )
+        )
         auto_recover_attempted = False
         auto_recover_ts = 0.0
 

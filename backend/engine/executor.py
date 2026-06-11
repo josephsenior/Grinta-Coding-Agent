@@ -199,7 +199,7 @@ class OrchestratorExecutor(
             checkpoint.discard()
             raise
         except Exception as exc:
-            response = self._handle_stream_error(exc, error_message)
+            self._handle_stream_error(exc, error_message)
         finally:
             self._cleanup_stream_refs(consume_task, stream_iter)
 

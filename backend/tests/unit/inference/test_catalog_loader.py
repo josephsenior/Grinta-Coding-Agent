@@ -77,10 +77,10 @@ class TestLoadRaw:
     """Tests for _load_raw function."""
 
     def test_loads_catalog_data(self):
-        """Test _load_raw returns dict from catalog.json."""
+        """Test _load_raw returns dict from provider catalog files."""
         data = _load_raw()
         assert isinstance(data, dict)
-        assert 'models' in data
+        assert 'providers' in data
 
     def test_caching(self):
         """Test _load_raw caches result."""
@@ -168,11 +168,16 @@ class TestLookup:
                 assert result.name.lower() == name.lower()
 
     def test_lookup_with_provider_prefix(self):
-        """Test lookup strips provider prefix."""
-        # Look up "openai/gpt-4o" should find "gpt-4o"
-        result = lookup('openai/gpt-4o')
-        if result:
-            assert 'gpt-4o' in result.name or 'gpt-4o' in result.aliases
+        """Test lookup resolves provider-prefixed names inside that provider."""
+        result = lookup('openai/gpt-5')
+        assert result is not None
+        assert result.provider == 'openai'
+        assert result.name == 'gpt-5'
+
+    def test_lookup_does_not_cross_unknown_provider_prefix(self):
+        """Unknown providers must not inherit same-named catalog params."""
+        assert lookup('custom/gpt-5') is None
+        assert lookup('xai/gpt-5') is None
 
     def test_lookup_nonexistent(self):
         """Test lookup returns None for nonexistent model."""
@@ -215,11 +220,9 @@ class TestGetPricing:
                 break
 
     def test_pricing_nonexistent_model(self):
-        """Test get_pricing with tier fallback."""
-        # Use a model that might match tier pricing
+        """Unknown models do not receive substring/tier fallback pricing."""
         pricing = get_pricing('nonexistent-gpt-4-model')
-        # May or may not have tier pricing, just check type
-        assert pricing is None or isinstance(pricing, dict)
+        assert pricing is None
 
     def test_pricing_output_defaults_to_zero(self):
         """Test output price defaults to 0 if not set."""
@@ -239,20 +242,20 @@ class TestGetPricing:
     def test_pricing_returns_none_if_no_match(self):
         """Test returns None if no catalog or tier match."""
         pricing = get_pricing('completely-unknown-model-xyz')
-        # Should be None or a tier fallback
-        assert pricing is None or isinstance(pricing, dict)
+        assert pricing is None
 
 
 class TestGetTokenLimits:
     """Tests for get_token_limits function."""
 
     def test_token_limits_from_catalog(self):
-        """Test get_token_limits returns catalog limits."""
+        """Test get_token_limits returns derived usable input from catalog."""
         catalog = get_catalog()
         for entry in catalog:
             if entry.max_input_tokens is not None:
                 input_limit, output_limit = get_token_limits(entry.name)
-                assert input_limit == entry.max_input_tokens
+                assert input_limit is not None
+                assert input_limit > 0
                 assert output_limit == entry.max_output_tokens
                 break
 
@@ -268,26 +271,21 @@ class TestGetTokenLimits:
         for key, entry in idx.items():
             if key in entry.aliases and entry.max_input_tokens:
                 input_limit, output_limit = get_token_limits(key)
-                assert input_limit == entry.max_input_tokens
+                assert input_limit is not None
+                assert input_limit > 0
                 break
 
     def test_openai_long_context_limits_use_native_windows(self):
-        input_limit, output_limit = get_token_limits('openai/gpt-4.1')
-
-        assert get_context_window_tokens('openai/gpt-4.1') == 1_047_576
-        assert input_limit == 1_010_712
-        assert output_limit == 32_768
-
         input_limit, output_limit = get_token_limits('openai/gpt-5')
         assert get_context_window_tokens('openai/gpt-5') == 400_000
-        assert input_limit == 331_904
-        assert output_limit == 64_000
+        assert input_limit == 295_904
+        assert output_limit == 128_000
 
     def test_minimax_m2_7_output_limit_from_catalog(self):
         """OpenCode Go MiniMax should expose its configured output token limit."""
         input_limit, output_limit = get_token_limits('opencode-go/minimax-m2.7')
-        assert input_limit == 204800
-        assert output_limit == 131072
+        assert input_limit == 149_504
+        assert output_limit == 131_072
 
     def test_minimax_m2_7_supports_tools_without_thinking_mode(self):
         entry = lookup('opencode-go/minimax-m2.7')
@@ -453,10 +451,10 @@ class TestApplyModelParamOverrides:
 
 class TestPrefersShortToolDescriptions:
     def test_gpt_family_prefers_short(self):
-        assert prefers_short_tool_descriptions('gpt-4o') is True
+        assert prefers_short_tool_descriptions('gpt-5') is True
 
-    def test_o_family_prefers_short(self):
-        assert prefers_short_tool_descriptions('gpt-4o-mini') is True
+    def test_codex_family_prefers_short(self):
+        assert prefers_short_tool_descriptions('openai/gpt-5-codex') is True
 
     def test_claude_does_not_prefer_short(self):
         assert prefers_short_tool_descriptions('claude-3-opus') is False
@@ -467,7 +465,7 @@ class TestPrefersShortToolDescriptions:
 
 class TestSupportsToolChoice:
     def test_known_openai_model_supports(self):
-        assert supports_tool_choice('gpt-4o') is True
+        assert supports_tool_choice('gpt-5') is True
 
     def test_known_google_model_does_not_support(self):
         assert supports_tool_choice('google/gemini-3-flash') is False

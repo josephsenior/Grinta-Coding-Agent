@@ -101,7 +101,9 @@ def _prompt_provider_model(console: Console, provider_key: str | None) -> str:
         return f'{provider_key}/{options[selected - 1]}'
     if selected == custom_idx:
         custom = Prompt.ask('  Custom model id', console=console).strip()
-        return custom if '/' in custom or not provider_key else f'{provider_key}/{custom}'
+        return (
+            custom if '/' in custom or not provider_key else f'{provider_key}/{custom}'
+        )
     console.print(f'[{CLR_STATUS_ERR}]  ✗ Invalid selection.[/]')
     return ''
 

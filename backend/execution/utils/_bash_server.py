@@ -28,8 +28,8 @@ def _detect_server_startup(orch: BashSession, output: str) -> None:
             detected_server.health_status,
         )
         # Store for runtime to emit ServerReadyObservation - only detect each server once
-        orch._last_detected_server = detected_server
-        orch._last_detected_server_url = detected_server.url
+        setattr(orch, '_last_detected_server', detected_server)
+        setattr(orch, '_last_detected_server_url', detected_server.url)
 
 
 def get_detected_server(orch: BashSession) -> 'DetectedServer | None':

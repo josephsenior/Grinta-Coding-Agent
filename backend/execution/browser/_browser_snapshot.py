@@ -145,7 +145,6 @@ async def execute_snapshot_impl(self, cmd: str, params: dict[str, Any]) -> Obser
     )
 
 
-@staticmethod
 def screenshot_attach_error_impl(cmd: str) -> Observation:
     return _finalize_observation(
         cmd,
@@ -159,7 +158,6 @@ def screenshot_attach_error_impl(cmd: str) -> Observation:
     )
 
 
-@staticmethod
 def screenshot_failure_error_impl(
     cmd: str,
     *,

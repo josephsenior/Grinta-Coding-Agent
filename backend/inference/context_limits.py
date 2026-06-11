@@ -12,6 +12,11 @@ from typing import Any
 DEFAULT_CONTEXT_OVERHEAD_TOKENS = 4_096
 DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS = 200_000
 
+# Cap the output reservation at 25% of the context window so that oversized
+# max_output_tokens (e.g. 128K on a 200K window) don't starve the prompt
+# budget and trigger compaction far too early.
+MAX_OUTPUT_FRACTION = 0.25
+
 
 @dataclass(frozen=True)
 class ModelContextLimits:
@@ -30,12 +35,19 @@ def derive_usable_input_tokens(
     fallback_input_tokens: int | None = None,
     overhead_tokens: int = DEFAULT_CONTEXT_OVERHEAD_TOKENS,
 ) -> int | None:
-    """Derive a safe prompt budget from total context, output, and overhead."""
+    """Derive a safe prompt budget from total context, output, and overhead.
+
+    The output reservation is capped at ``MAX_OUTPUT_FRACTION`` of the context
+    window so that models with oversized ``max_output_tokens`` (e.g. 128 K on
+    a 200 K window) do not starve the prompt budget and trigger compaction
+    far too early.
+    """
     context = _positive_int(context_window_tokens)
     output = _positive_int(max_output_tokens) or 0
     fallback = _positive_int(fallback_input_tokens)
     if context is not None:
-        reserve = max(0, output) + max(0, overhead_tokens)
+        capped_output = min(output, int(context * MAX_OUTPUT_FRACTION))
+        reserve = max(0, capped_output) + max(0, overhead_tokens)
         return max(1, context - reserve)
     return fallback
 
@@ -92,7 +104,10 @@ def limits_from_config(
         )
 
     catalog = limits_from_catalog(model)
-    if catalog.context_window_tokens is not None or catalog.usable_input_tokens is not None:
+    if (
+        catalog.context_window_tokens is not None
+        or catalog.usable_input_tokens is not None
+    ):
         max_output = configured_output or catalog.max_output_tokens
         usable = derive_usable_input_tokens(
             context_window_tokens=catalog.context_window_tokens,

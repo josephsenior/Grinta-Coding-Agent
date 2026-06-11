@@ -361,6 +361,9 @@ class _AppRendererActionHandlersMixin:
 
                 self._tui._write_log(TurnCompletion(duration_str))
 
+        if state in (AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED):
+            self._tui._agent_running = False
+
     @staticmethod
     def _format_turn_duration(total_seconds: int) -> str:
         hours, remainder = divmod(total_seconds, 3600)

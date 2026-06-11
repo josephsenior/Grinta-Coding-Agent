@@ -11,6 +11,8 @@ For searching the *contents* of files (text/regex matches) use the
 
 from __future__ import annotations
 
+from typing import Any
+
 from backend.engine.tools._search_helpers import (
     DEFAULT_SEARCH_HEAD_LIMIT,
     build_ripgrep_file_discovery_args,
@@ -41,9 +43,9 @@ tool instead.  For structural symbol discovery use ``find_symbols``.
 """
 
 
-def create_glob_tool() -> dict:
+def create_glob_tool() -> dict[Any, Any]:
     """Create the glob tool definition."""
-    return create_tool_definition(  # type: ignore[no-any-return]
+    return create_tool_definition(  # type: ignore[no-any-return, return-value]
         name=GLOB_TOOL_NAME,
         description=_GLOB_DESCRIPTION,
         properties={

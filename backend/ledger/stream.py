@@ -976,7 +976,7 @@ class EventStream(EventStore):
         event: Event,
         subscriber_id: str,
         callback_id: str,
-    ) -> asyncio.Future | None:
+    ) -> Any:
         """Execute subscriber callback inside thread pool with error handling.
 
         If the subscriber returns an awaitable, it is scheduled on the
@@ -1057,7 +1057,7 @@ class EventStream(EventStore):
             )
 
     def _handle_callback_future_done(
-        self, future: asyncio.Future, callback_id: str, subscriber_id: str
+        self, future: Any, callback_id: str, subscriber_id: str
     ) -> None:
         """Handle completion of a callback future scheduled on the main loop."""
         try:

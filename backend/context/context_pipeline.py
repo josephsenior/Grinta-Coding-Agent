@@ -114,7 +114,7 @@ class ContextPipeline:
         self._preserve_recent = preserve_recent
         self._llm_compact_cooldown = llm_compact_cooldown_seconds
         self._boundary_compact_cooldown = boundary_compact_cooldown_seconds
-        self._structured_compactor = None
+        self._structured_compactor: Any = None
 
     @classmethod
     def from_config(
@@ -182,7 +182,7 @@ class ContextPipeline:
     def _project_layers_1_to_3(
         self,
         history: list[Event],
-        state: State,
+        state: State | _EmptyState,
         *,
         apply_tool_budget: bool = True,
     ) -> list[Event]:
@@ -433,7 +433,9 @@ class ContextPipeline:
                 try:
                     state.set_memory_pressure('CRITICAL', source='ContextPipeline')
                 except Exception:
-                    logger.debug('Failed to mark emergency memory pressure', exc_info=True)
+                    logger.debug(
+                        'Failed to mark emergency memory pressure', exc_info=True
+                    )
             return events
         return window.events
 
@@ -710,8 +712,10 @@ class ContextPipeline:
 
         if isinstance(llm_config, LLMConfig):
             llm_cfg = llm_config
-        else:
+        elif isinstance(llm_config, str):
             llm_cfg = self._llm_registry.config.get_llm_config(llm_config)
+        else:
+            return None
         cfg = StructuredSummaryCompactorConfig(
             llm_config=llm_cfg,
             max_size=40,
@@ -1022,7 +1026,9 @@ class ContextPipeline:
     ) -> CondensationAction | None:
         try:
             canonical = load_canonical_state(state=state)
-            summary_parts = [render_canonical_state_for_prompt(canonical, char_budget=6000)]
+            summary_parts = [
+                render_canonical_state_for_prompt(canonical, char_budget=6000)
+            ]
         except Exception:
             logger.debug('Canonical fallback summary render failed', exc_info=True)
             summary_parts = []

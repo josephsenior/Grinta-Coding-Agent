@@ -59,7 +59,7 @@ class ContextMemoryManager:
         self._llm_registry = llm_registry
         self.conversation_memory: ContextMemory | None = None
         self.compactor: Compactor | None = None
-        self._pipeline = None
+        self._pipeline: Any = None
         self._build_messages_cache: _BuildMessagesCache | None = None
 
     @staticmethod
@@ -329,6 +329,7 @@ class ContextMemoryManager:
                 prewarmed, turn_signals, history, state
             )
         compaction_started = time.perf_counter()
+        assert self.compactor is not None
         result = await self.compactor.compacted_history(state)
         logger.info(
             'ContextMemoryManager.condense_history compactor returned %s (history_events=%d snapshot=%.3fs compactor=%.3fs)',
@@ -364,6 +365,7 @@ class ContextMemoryManager:
                 prewarm_latest_id,
                 current_latest_id,
             )
+            assert self.compactor is not None
             return await self.compactor.compacted_history(state)
         logger.info('Utilizing background pre-warmed condensation result.')
         action = getattr(prewarmed, 'action', None)
@@ -376,7 +378,7 @@ class ContextMemoryManager:
         state: State,
         condensation_result: Any,
         history: list,
-        memory_pressure: bool,
+        memory_pressure: bool | str | None,
         started: float,
         postprocess_started: float,
     ) -> CondensedHistory:
@@ -682,6 +684,7 @@ class ContextMemoryManager:
         max_message_chars = getattr(llm_config, 'max_message_chars', None)
         vision_is_active = getattr(llm_config, 'vision_is_active', False)
 
+        assert self.conversation_memory is not None
         if incremental and cache is not None:
             messages = self.conversation_memory.process_events_appending(
                 condensed_history=events_for_prompt,

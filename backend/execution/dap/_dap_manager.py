@@ -156,7 +156,7 @@ class DAPDebugManager:
             program=action.program,
         )
         adapter_id = action.adapter_id or adapter or 'generic'
-        language = action.language or adapter
+        language = action.language or adapter or 'generic'
 
         session = self._build_session(
             session_id,

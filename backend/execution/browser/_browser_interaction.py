@@ -36,7 +36,6 @@ from backend.ledger.observation import (
 )
 
 
-@staticmethod
 def parse_browser_index_impl(
     cmd: str, value: Any, *, action_name: str
 ) -> tuple[int | None, Observation | None]:
@@ -156,7 +155,7 @@ async def execute_scroll_impl(self, cmd: str, params: dict[str, Any]) -> Observa
     if to_text:
         return await self._scroll_to_text(cmd, browser, params, to_text)
     if direction in ('top', 'bottom'):
-        return await self._scroll_to_edge(browser, params, direction)
+        return await self._scroll_to_edge(cmd, browser, params, direction)
     return await self._scroll_directional(cmd, browser, params, direction)
 
 
@@ -182,7 +181,7 @@ async def _scroll_to_text(
 
 
 async def _scroll_to_edge(
-    self, browser: Any, params: dict[str, Any], direction: str
+    self, cmd: str, browser: Any, params: dict[str, Any], direction: str
 ) -> Observation:
     from browser_use.browser.events import ScrollEvent
 
@@ -355,7 +354,7 @@ async def _dispatch_wait(
     wait_kind: str,
     timeout_sec: float,
     cmd: str,
-) -> tuple[str, Observation | None]:
+) -> tuple[str | None, Observation | None]:
     if wait_kind == 'timeout':
         return await _wait_for_timeout(browser, params, timeout_sec), None
     if wait_kind == 'text':
@@ -499,7 +498,6 @@ def resolve_workspace_path_impl(self, raw: str) -> tuple[Path | None, str | None
     return candidate, None
 
 
-@staticmethod
 def page_targets_ordered_impl(browser: Any) -> list[Any]:
     try:
         pages = browser.get_page_targets()

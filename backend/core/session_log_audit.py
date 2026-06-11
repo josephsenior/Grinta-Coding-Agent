@@ -6,9 +6,10 @@ import json
 import os
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 NOISE_PATTERNS = (
     re.compile(r'on_event received StreamingChunkAction\b'),
@@ -96,34 +97,18 @@ class _AuditAccumulator:
     total: int = 0
     kept: int = 0
     stripped: int = 0
-    levels: Counter = None
-    issue_lines: list = None
-    state_transitions: list = None
-    actions: list = None
-    llm_calls: list = None
-    file_events: list = None
+    levels: Counter[str] = field(default_factory=Counter)
+    issue_lines: list[str] = field(default_factory=list)
+    state_transitions: list[tuple[str, str, str, int]] = field(default_factory=list)
+    actions: list[tuple[str, str, int]] = field(default_factory=list)
+    llm_calls: list[tuple[float, str, int]] = field(default_factory=list)
+    file_events: list[tuple[str, str, int]] = field(default_factory=list)
     end_state: str | None = None
     first_ts: datetime | None = None
     last_ts: datetime | None = None
     pending_timeouts: int = 0
     retries: int = 0
-    on_event_types: Counter = None
-
-    def __post_init__(self):
-        if self.levels is None:
-            self.levels = Counter()
-        if self.issue_lines is None:
-            self.issue_lines = []
-        if self.state_transitions is None:
-            self.state_transitions = []
-        if self.actions is None:
-            self.actions = []
-        if self.llm_calls is None:
-            self.llm_calls = []
-        if self.file_events is None:
-            self.file_events = []
-        if self.on_event_types is None:
-            self.on_event_types = Counter()
+    on_event_types: Counter[str] = field(default_factory=Counter)
 
 
 def _update_timestamps(acc: _AuditAccumulator, obj: dict) -> None:
@@ -218,13 +203,17 @@ def _compute_duration(acc: _AuditAccumulator) -> float:
     return 0.0
 
 
-def _extract_llm_stats(acc: _AuditAccumulator) -> tuple[list, list]:
+def _extract_llm_stats(
+    acc: _AuditAccumulator,
+) -> tuple[list[float], list[tuple[float, int, str]]]:
     llm_times = [t for t, _, _ in acc.llm_calls]
     slow_llm = [(t, ln, m) for t, m, ln in acc.llm_calls if t >= 60.0]
     return llm_times, slow_llm
 
 
-def _find_suspicious_states(acc: _AuditAccumulator) -> list:
+def _find_suspicious_states(
+    acc: _AuditAccumulator,
+) -> list[tuple[str, str, str, int]]:
     return [
         (a, b, m, ln)
         for a, b, m, ln in acc.state_transitions
@@ -276,7 +265,16 @@ def _assess_log_levels(
     return verdict, notes
 
 
-def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
+def _compute_verdict(
+    acc: _AuditAccumulator,
+) -> tuple[
+    str,
+    list[str],
+    float,
+    list[float],
+    list[tuple[float, int, str]],
+    list[tuple[str, str, str, int]],
+]:
     duration_min = _compute_duration(acc)
     llm_times, slow_llm = _extract_llm_stats(acc)
     suspicious_states = _find_suspicious_states(acc)

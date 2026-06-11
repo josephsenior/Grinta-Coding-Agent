@@ -121,7 +121,7 @@ def _build_windowing_context(
         full_tokens=full_tokens,
         budget=budget,
         max_events=max_events,
-        min_events=min_events,
+        min_events=min_events if min_events is not None else default_min_events,
         enabled=enabled,
         over_budget=over_budget,
         over_count=over_count,
