@@ -14,7 +14,6 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from rich.markdown import Markdown
 from rich.text import Text
 
 from backend.cli._event_renderer.error_panel import notice_panel_title
@@ -46,8 +45,8 @@ from backend.cli.tui._app_helpers import (
 from backend.cli.tui._app_renderer_event_classify import _is_full_autonomy
 from backend.cli.tui._app_renderer_thinking_mixin import ThinkingRenderIntent
 from backend.ledger.action import (
-    AnalyzeProjectStructureAction,
     AgentThinkAction,
+    AnalyzeProjectStructureAction,
     BrowseInteractiveAction,
     BrowserToolAction,
     ChangeAgentStateAction,
@@ -62,14 +61,15 @@ from backend.ledger.action import (
     FileReadAction,
     FileWriteAction,
     FindSymbolsAction,
-    InformAction,
     GlobAction,
     GrepAction,
+    InformAction,
     LspQueryAction,
     MCPAction,
     MessageAction,
     NullAction,
     ProposalAction,
+    ReadSymbolsAction,
     RecallAction,
     StreamingChunkAction,
     TaskTrackingAction,
@@ -77,7 +77,6 @@ from backend.ledger.action import (
     TerminalReadAction,
     TerminalRunAction,
     UncertaintyAction,
-    ReadSymbolsAction,
 )
 from backend.ledger.action.memory_tools import (
     CheckpointAction,
@@ -88,10 +87,10 @@ from backend.ledger.action.memory_tools import (
     WorkingMemoryAction,
 )
 from backend.ledger.observation import (
-    AnalyzeProjectStructureObservation,
     AgentCondensationObservation,
     AgentStateChangedObservation,
     AgentThinkObservation,
+    AnalyzeProjectStructureObservation,
     BrowserScreenshotObservation,
     CmdOutputObservation,
     DelegateTaskObservation,
@@ -106,6 +105,7 @@ from backend.ledger.observation import (
     LspQueryObservation,
     MCPObservation,
     NullObservation,
+    ReadSymbolsObservation,
     RecallFailureObservation,
     RecallObservation,
     ServerReadyObservation,
@@ -114,7 +114,6 @@ from backend.ledger.observation import (
     TaskTrackingObservation,
     TerminalObservation,
     UserRejectObservation,
-    ReadSymbolsObservation,
 )
 from backend.ledger.observation.memory_tools import (
     CheckpointObservation,
@@ -1554,6 +1553,10 @@ def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
         if order is not None and event_id not in order:
             order.append(event_id)
     orch._current_event_id = -1
+    if not getattr(orch, '_async_drain_active', False):
+        flush_sync = getattr(orch, 'flush_pending_final_commits_sync', None)
+        if callable(flush_sync):
+            flush_sync()
 
 
 def _handle_noop_event(

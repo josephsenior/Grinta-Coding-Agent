@@ -5,7 +5,12 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from backend.execution import action_execution_server_helpers as h
-from backend.ledger.observation import ErrorObservation, FileReadObservation
+from backend.ledger.action import MessageAction
+from backend.ledger.observation import (
+    ErrorObservation,
+    FileEditObservation,
+    FileReadObservation,
+)
 
 
 def _executor() -> SimpleNamespace:
@@ -309,3 +314,25 @@ def test_file_read_edit_helpers() -> None:
             ex, 'C:/ws/dir', 'dir', SimpleNamespace(command='read_file')
         )
     assert isinstance(dir_obs, FileReadObservation)
+
+
+def test_build_edit_result_obs_accepts_message_action_outcome() -> None:
+    action = SimpleNamespace(path='.')
+    payload = {'file_edits': [{'path': 'a.py', 'operation': 'replace', 'content': 'x'}]}
+    outcome = MessageAction(content='✓ multi_edit committed 1 file(s) atomically')
+    with (
+        patch.object(h, '_combined_structured_edit_diff', return_value=''),
+        patch.object(
+            h,
+            '_structured_edit_verification_receipt',
+            return_value=('verified', [], True),
+        ),
+    ):
+        obs = h._build_edit_result_obs(
+            outcome,
+            {'C:/ws/a.py': ('old', 'a.py')},
+            action,
+            payload,
+        )
+    assert isinstance(obs, FileEditObservation)
+    assert 'multi_edit committed' in obs.content

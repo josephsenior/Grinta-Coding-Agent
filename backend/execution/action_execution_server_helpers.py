@@ -951,10 +951,7 @@ def _structured_payload_dict(action: Any) -> dict[str, Any]:
 
 
 def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
-    from backend.core.errors import FunctionCallValidationError, ToolExecutionError
-    from backend.engine.function_calling import _handle_multi_edit_command
-    from backend.ledger.action import MessageAction
-    from backend.ledger.observation import ErrorObservation, FileEditObservation
+    from backend.ledger.observation import ErrorObservation
 
     command = str(action.command or '').strip().lower()
     payload = _structured_payload_dict(action)
@@ -968,8 +965,6 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
 def _execute_multi_edit(executor: Any, action: Any, payload: dict) -> Any:
     from backend.core.errors import FunctionCallValidationError, ToolExecutionError
     from backend.engine.function_calling import _handle_multi_edit_command
-    from backend.ledger.action import MessageAction
-    from backend.ledger.observation import ErrorObservation, FileEditObservation
 
     original_snapshots = _collect_edit_snapshots(executor, payload)
     try:
@@ -1019,6 +1014,7 @@ def _make_edit_error_obs(exc: Exception, payload: dict, command: str) -> Any:
 
 
 def _build_edit_result_obs(outcome: Any, original_snapshots: dict, action: Any, payload: dict) -> Any:
+    from backend.ledger.action import MessageAction
     from backend.ledger.observation import FileEditObservation
 
     diff = _combined_structured_edit_diff(original_snapshots)

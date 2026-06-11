@@ -670,9 +670,18 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         force_visible_status: bool,
         retry_signature: tuple[str, str] | None = None,
     ) -> None:
-        host = cast(ObservationRenderersHost, self)
         content = getattr(obs, 'content', '')
         if not content:
+            return
+        lower_c = content.lower()
+        if 'stream timed out' in lower_c or 'retrying without streaming' in lower_c:
+            self._stream_fallback_count += 1
+            logger.warning(
+                'stream_fallback_retry: count=%d content=%r',
+                self._stream_fallback_count,
+                content[:120],
+            )
+            self._append_history(_build_llm_stream_fallback_panel())
             return
         if self._pending_activity_card is not None and not force_visible_status:
             return

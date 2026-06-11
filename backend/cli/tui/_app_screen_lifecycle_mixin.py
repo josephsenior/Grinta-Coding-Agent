@@ -111,6 +111,8 @@ class _AppScreenLifecycleMixin:
 
     async def on_renderer_drain_requested(self, _message: RendererDrainRequested) -> None:
         if self._renderer is not None:
+            if getattr(self._renderer, '_async_drain_active', False):
+                return
             await self._renderer.drain_events_async()
         if not self._welcome_visible:
             return
@@ -147,6 +149,12 @@ class _AppScreenLifecycleMixin:
                 _tui_logger.debug('background bootstrap cancelled')
             except Exception as exc:
                 _tui_logger.debug(f'background bootstrap failed: {exc}')
+                logger.exception('TUI background bootstrap failed')
+                if self._controller is not None:
+                    self._hud.update_agent_state('error')
+                else:
+                    self._hud.update_agent_state('Initializing')
+                self._render_hud_bar()
 
         self._bootstrap_task = asyncio.create_task(_bg(), name='grinta-tui-bootstrap')
 
@@ -349,7 +357,6 @@ class _AppScreenLifecycleMixin:
                 loop=self._loop,
             )
         self._renderer.subscribe(event_stream, event_stream.sid)
-        await self._renderer.hydrate_recent_transcript()
 
         state_after_create = controller.get_agent_state()
         _tui_logger.debug(f'_bootstrap: state after subscribe={state_after_create}')
@@ -358,9 +365,25 @@ class _AppScreenLifecycleMixin:
         )
         self._hud.update_agent_state('awaiting_user_input')
         self._render_hud_bar()
-        self._render_hud_bar()
-        await self._renderer.drain_events_async()
 
+        asyncio.create_task(
+            self._bootstrap_finalize_renderer(),
+            name='grinta-tui-bootstrap-renderer',
+        )
+
+    async def _bootstrap_finalize_renderer(self) -> None:
+        """Hydrate transcript and drain backlog without blocking launch readiness."""
+        renderer = self._renderer
+        if renderer is None:
+            return
+        try:
+            await renderer.hydrate_recent_transcript()
+            await renderer.drain_events_async()
+        except Exception:
+            _tui_logger.debug(
+                '_bootstrap_finalize_renderer failed',
+                exc_info=True,
+            )
 
     def _bootstrap_sync_phase1(
         self,
@@ -551,10 +574,8 @@ class _AppScreenLifecycleMixin:
             )
 
     async def _poll_wait(self):
-        if self._renderer is not None:
-            await self._renderer.wait_for_activity(wait_timeout_sec=0.5)
-        else:
-            await asyncio.sleep(0.5)
+        # Keep the poll loop lightweight; renderer drains are event-driven.
+        await asyncio.sleep(0.1)
 
     def _get_current_event_count(self) -> int:
         try:
