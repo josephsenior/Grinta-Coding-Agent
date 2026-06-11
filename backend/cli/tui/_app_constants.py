@@ -40,15 +40,28 @@ _FILE_DIFF_AUTO_COLLAPSE_LINES = _bounded_int_env(
     default=80,
     minimum=20,
 )
-_TUI_HISTORY_RENDER_LIMIT = _bounded_int_env(
-    'GRINTA_TUI_HISTORY_RENDER_LIMIT',
-    default=2000,
-    minimum=200,
+_TUI_DRAIN_FRAME_BUDGET_SECONDS = float(
+    os.getenv('GRINTA_TUI_DRAIN_FRAME_BUDGET_SECONDS', '0.016')
 )
-_FILE_DIFF_AUTO_COLLAPSE_LINES = _bounded_int_env(
-    'GRINTA_TUI_FILE_DIFF_AUTO_COLLAPSE_LINES',
+_TUI_TERMINAL_DISPLAY_LINE_CAP = _bounded_int_env(
+    'GRINTA_TUI_TERMINAL_DISPLAY_LINE_CAP',
+    default=500,
+    minimum=50,
+)
+_TUI_VIEWPORT_MAX_MOUNTED = _bounded_int_env(
+    'GRINTA_TUI_VIEWPORT_MAX_MOUNTED',
+    default=120,
+    minimum=40,
+)
+_TUI_VIEWPORT_OVERSCAN = _bounded_int_env(
+    'GRINTA_TUI_VIEWPORT_OVERSCAN',
+    default=20,
+    minimum=5,
+)
+_TUI_RESUME_HYDRATE_EVENTS = _bounded_int_env(
+    'GRINTA_TUI_RESUME_HYDRATE_EVENTS',
     default=80,
-    minimum=20,
+    minimum=10,
 )
 
 _TERMINAL_MOUSE_REPORT_RE = re.compile(r'(?:\x1b)?\[(?:<)?\d{1,7};\d{1,7};\d{1,7}[mM]')

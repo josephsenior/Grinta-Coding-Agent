@@ -344,6 +344,8 @@ class ActivityCard(Container):
         self.processing = False
         self.can_focus = bool(extra_content) or collapsible
         self._meta_lines: list[str] = []
+        self._incremental_mode = False
+        self._incremental_hidden_lines = 0
 
         self.add_class(f'category-{badge_category}')
         if collapsed:
@@ -652,6 +654,80 @@ class ActivityCard(Container):
                 event.prevent_default()
                 event.stop()
 
+    def enable_incremental_mode(self) -> None:
+        """Use single-widget tail updates instead of full body remounts."""
+        self._incremental_mode = True
+
+    def _ensure_collapsible_for_extra(self) -> None:
+        if self._collapsible:
+            return
+        self._collapsible = True
+        if not self.is_mounted:
+            return
+        try:
+            row = self.query_one('#collapsed-row-container', Horizontal)
+            if not row.query('#caret'):
+                row.mount(
+                    Static(self._caret_char(), id='caret', classes='card-caret')
+                )
+        except Exception:
+            pass
+
+    def _trim_incremental_lines(self, line_cap: int) -> None:
+        lines = (self._extra_content or '').splitlines()
+        if len(lines) <= line_cap:
+            return
+        hidden = len(lines) - line_cap
+        self._incremental_hidden_lines += hidden
+        self._extra_content = '\n'.join(lines[-line_cap:])
+
+    def _incremental_tail_markup(self) -> str:
+        from backend.cli.tui._app_constants import _TUI_TERMINAL_DISPLAY_LINE_CAP
+
+        lines = (self._extra_content or '').splitlines()
+        if len(lines) > _TUI_TERMINAL_DISPLAY_LINE_CAP:
+            self._trim_incremental_lines(_TUI_TERMINAL_DISPLAY_LINE_CAP)
+            lines = (self._extra_content or '').splitlines()
+        parts: list[str] = []
+        if self._incremental_hidden_lines:
+            parts.append(
+                f'[{NAVY_TEXT_DIM}]…{self._incremental_hidden_lines} earlier '
+                f'line(s) hidden in card…[/]'
+            )
+        parts.extend(
+            f'[{NAVY_TEXT_MUTED}]{line}[/]' for line in lines if line or lines == ['']
+        )
+        return '\n'.join(parts) if parts else ''
+
+    def _mount_incremental_tail(self, body: Container) -> None:
+        markup = self._incremental_tail_markup()
+        try:
+            tail = body.query_one('#incremental-tail', Static)
+            tail.update(markup)
+        except Exception:
+            body.remove_children()
+            body.mount(Static(markup, id='incremental-tail'))
+        body.display = not self._collapsed
+
+    def append_content_incremental(self, text: str) -> None:
+        """Append terminal/shell output without remounting the expanded body."""
+        chunk = (text or '').strip('\n')
+        if not chunk:
+            return
+        if self._extra_content:
+            self._extra_content += '\n' + chunk
+        else:
+            self._extra_content = chunk
+        self.can_focus = True
+        self._ensure_collapsible_for_extra()
+        if not self.is_mounted:
+            return
+        try:
+            body = self.query_one('#expanded-body', Container)
+            self._mount_incremental_tail(body)
+        except Exception:
+            pass
+
     def update_content(self, extra_content: str) -> None:
         """Update or set the extra content."""
         self._extra_content = extra_content
@@ -661,6 +737,9 @@ class ActivityCard(Container):
 
         try:
             body = self.query_one('#expanded-body', Container)
+            if self._incremental_mode and not self._diff_encoded:
+                self._mount_incremental_tail(body)
+                return
             body.remove_children()
             for renderable in self._extra_renderables():
                 body.mount(renderable)
@@ -670,27 +749,17 @@ class ActivityCard(Container):
 
     def append_content(self, text: str) -> None:
         """Append content to the extra section."""
+        if self._incremental_mode and not self._diff_encoded:
+            self.append_content_incremental(text)
+            return
         if self._extra_content:
             self._extra_content += '\n' + text
         else:
             self._extra_content = text
         self.can_focus = True
-
-        # Retroactively enable collapsibility if the card was born without it
-        # (e.g. a terminal card that got output after being created with no content).
-        if not self._collapsible:
-            self._collapsible = True
-            if self.is_mounted:
-                try:
-                    row = self.query_one('#collapsed-row-container', Horizontal)
-                    if not row.query('#caret'):
-                        row.mount(Static(self._caret_char(), id='caret', classes='card-caret'))
-                except Exception:
-                    pass
-
+        self._ensure_collapsible_for_extra()
         if not self.is_mounted:
             return
-
         self.update_content(self._extra_content)
 
     def set_syntax_language(self, language: str | None) -> None:
@@ -758,20 +827,26 @@ class UserMessage(Static):
 class AgentMessage(Static):
     """Agent response display in the transcript."""
 
-    def __init__(self, text: str, *, id: str | None = None) -> None:
-        from rich.markdown import Markdown
+    def __init__(
+        self,
+        text: str,
+        *,
+        renderable: Any | None = None,
+        id: str | None = None,
+    ) -> None:
+        if renderable is None:
+            from backend.cli.tui._render_prep import prep_markdown
 
-        from backend.cli.theme import get_grinta_pygments_style
+            renderable = prep_markdown(text)
+        super().__init__(renderable, id=id)
 
-        super().__init__(Markdown(text, code_theme=get_grinta_pygments_style()), id=id)
-
-    def update_message(self, text: str) -> None:
+    def update_message(self, text: str, *, renderable: Any | None = None) -> None:
         """Update message content dynamically."""
-        from rich.markdown import Markdown
+        if renderable is None:
+            from backend.cli.tui._render_prep import prep_markdown
 
-        from backend.cli.theme import get_grinta_pygments_style
-
-        self.update(Markdown(text, code_theme=get_grinta_pygments_style()))
+            renderable = prep_markdown(text)
+        self.update(renderable)
 
 
 class ThinkingIndicator(Container):

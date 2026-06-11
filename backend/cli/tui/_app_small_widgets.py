@@ -31,7 +31,7 @@ class InfoSidebar(VerticalScroll):
 class Transcript(VerticalScroll):
     """Scrollable conversation transcript container with auto-scroll awareness."""
 
-    _PRUNE_THRESHOLD = 500
+    _VIEWPORT_MAX_MOUNTED = 120
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -86,10 +86,63 @@ class Transcript(VerticalScroll):
         if self.max_scroll_y > 0:
             self._set_user_scrolled_away(True)
 
+    def _content_widgets(self) -> list[Widget]:
+        widgets: list[Widget] = []
+        for child in self.children:
+            if child is self._scroll_badge:
+                continue
+            if child is self._load_earlier_button:
+                continue
+            widgets.append(child)
+        return widgets
+
+    def sync_viewport(self, renderer: Any) -> None:
+        """Unmount off-viewport widgets while retaining render cache for replay."""
+        from backend.cli.tui._app_constants import _TUI_VIEWPORT_MAX_MOUNTED
+        from backend.cli.tui._render_prep import RenderArtifact
+
+        widgets = self._content_widgets()
+        max_mounted = _TUI_VIEWPORT_MAX_MOUNTED
+        if len(widgets) <= max_mounted:
+            return
+
+        overflow = len(widgets) - max_mounted
+        if self.should_follow_tail():
+            to_unmount = widgets[:overflow]
+        else:
+            to_unmount = widgets[-overflow:]
+
+        cache = getattr(renderer, '_render_cache', None)
+        for widget in to_unmount:
+            event_id = getattr(widget, '_ledger_event_id', None)
+            if cache is not None and event_id is not None:
+                cache[event_id] = RenderArtifact(
+                    event_id,
+                    widget,
+                    measured_height=max(getattr(widget, 'size', None).height, 1)
+                    if getattr(widget, 'size', None)
+                    else 1,
+                )
+            try:
+                widget.remove()
+            except Exception:
+                pass
+
+    def _maybe_prefetch_earlier(self) -> None:
+        if not self._user_scrolled_away:
+            return
+        if self.scroll_y > 80:
+            return
+        try:
+            self.post_message(LoadEarlierRequested())
+        except Exception:
+            pass
+
     def on_scroll(self, _event: Widget.Scroll) -> None:
         if self._suppress_scroll_sync:
             return
         self._sync_scroll_state_from_position()
+        self._maybe_prefetch_earlier()
 
     def _on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
         self.pause_auto_scroll()
