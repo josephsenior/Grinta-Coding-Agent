@@ -319,6 +319,7 @@ class TUIRenderer(
         self._pending_backpressure_reclaimed: int = 0
         self._pending_final_commits: list[str] = []
         self._async_drain_active: bool = False
+        self._drain_requested_while_active: bool = False
 
         # Replay mode flags
         self._replay_mode: bool = False

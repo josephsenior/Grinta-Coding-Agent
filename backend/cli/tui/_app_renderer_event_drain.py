@@ -135,6 +135,63 @@ def _coalesce_pending_backlog(pending: Any) -> int:
     return reclaimed
 
 
+def _is_low_value_backlog_event(event: Any) -> bool:
+    """Return True for events that are safe to skip under TUI pressure."""
+    name = type(event).__name__
+    if name in {
+        'AgentThinkAction',
+        'AgentThinkObservation',
+        'NullObservation',
+        'StatusObservation',
+        'TerminalObservation',
+    }:
+        return True
+    if name == 'StreamingChunkAction':
+        return not bool(getattr(event, 'is_final', False))
+    return False
+
+
+def _drop_one_pending_event_for_backpressure(pending: Any) -> bool:
+    """Drop one queued event, preferring stale progress noise over milestones."""
+    if not pending:
+        return False
+    for idx, event in enumerate(pending):
+        if _is_low_value_backlog_event(event):
+            del pending[idx]
+            return True
+    pending.popleft()
+    return True
+
+
+def _make_backpressure_room(
+    orch: '_AppRendererEventProcessorMixin',
+    pending: Any,
+    limit: int,
+) -> bool:
+    """Keep the pending queue bounded before appending a new event."""
+    if limit <= 0 or len(pending) < limit:
+        return False
+
+    reclaimed = _coalesce_pending_backlog(pending)
+    if reclaimed:
+        orch._pending_backpressure_reclaimed = (
+            getattr(orch, '_pending_backpressure_reclaimed', 0) + reclaimed
+        )
+        if len(pending) < limit:
+            return True
+
+    dropped = 0
+    while len(pending) >= limit:
+        if not _drop_one_pending_event_for_backpressure(pending):
+            break
+        dropped += 1
+
+    if dropped:
+        orch._pending_events_dropped += dropped
+        orch._pending_backpressure = True
+    return bool(reclaimed or dropped)
+
+
 def _force_immediate_drain(orch: '_AppRendererEventProcessorMixin') -> None:
     handle = getattr(orch, '_drain_debounce_handle', None)
     if handle is not None:
@@ -154,6 +211,7 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
         orch._drain_scheduled = False
         dropped = orch._pending_events_dropped
         orch._pending_events_dropped = 0
+        orch._pending_backpressure = False
     if not events:
         flush = getattr(orch, 'flush_live_ui', None)
         if callable(flush):
@@ -161,20 +219,7 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
         orch._refresh_display()
         return
     if dropped:
-        from backend.cli.tui._app_renderer_event_processor_mixin import (
-            _TUI_HISTORY_RENDER_LIMIT,
-        )
-
-        orch._history.append(
-            Text(
-                f'... {dropped} TUI event(s) dropped while the renderer was backlogged ...',
-                style=NAVY_TEXT_DIM,
-            )
-        )
-        orch._history.append(Text(''))
-        overflow = len(orch._history) - _TUI_HISTORY_RENDER_LIMIT
-        if overflow > 0:
-            del orch._history[:overflow]
+        _record_dropped_events(orch, dropped)
     events = _collapse_streaming_chunks(events)
     streaming_only = _is_streaming_only_batch(events)
     for event in events:
@@ -208,22 +253,30 @@ def _collect_pending_events(
         orch._drain_scheduled = False
         dropped = orch._pending_events_dropped
         orch._pending_events_dropped = 0
+        orch._pending_backpressure = False
     return events, dropped
 
 
 def _record_dropped_events(
     orch: '_AppRendererEventProcessorMixin', dropped: int
 ) -> None:
+    notice = Text(
+        f'... {dropped} stale TUI event(s) skipped while the renderer caught up ...',
+        style=NAVY_TEXT_DIM,
+    )
+    add_to_history = getattr(orch, 'add_to_history', None)
+    if callable(add_to_history):
+        try:
+            add_to_history(notice)
+            return
+        except Exception:
+            pass
+
     from backend.cli.tui._app_renderer_event_processor_mixin import (
         _TUI_HISTORY_RENDER_LIMIT,
     )
 
-    orch._history.append(
-        Text(
-            f'... {dropped} TUI event(s) dropped while the renderer was backlogged ...',
-            style=NAVY_TEXT_DIM,
-        )
-    )
+    orch._history.append(notice)
     orch._history.append(Text(''))
     overflow = len(orch._history) - _TUI_HISTORY_RENDER_LIMIT
     if overflow > 0:
@@ -302,6 +355,7 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
     backlog drains faster without monopolizing the Textual event loop.
     """
     if getattr(orch, '_async_drain_active', False):
+        orch._drain_requested_while_active = True
         return
 
     _cancel_drain_debounce(orch)
@@ -363,6 +417,10 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
     pending_depth = 0
     with orch._pending_lock:
         pending_depth = len(orch._pending_events)
+        requested_while_active = (
+            getattr(orch, '_drain_requested_while_active', False) is True
+        )
+        orch._drain_requested_while_active = False
     prep_depth = len(getattr(orch, '_render_prep_cache', {}) or {})
     _tui_logger.debug(
         'tui_drain_ms=%.1f tui_pending_depth=%d tui_prep_queue_depth=%d '
@@ -373,6 +431,8 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
         len(last_batch),
         last_streaming_only,
     )
+    if pending_depth and requested_while_active:
+        _force_immediate_drain(orch)
 
 
 async def wait_for_activity(
@@ -522,14 +582,12 @@ def _on_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
             orch._pending_events, event
         ) or _try_coalesce_terminal_enqueue(orch._pending_events, event)
         if not coalesced:
-            if len(orch._pending_events) >= _TUI_PENDING_EVENT_LIMIT:
-                reclaimed = _coalesce_pending_backlog(orch._pending_events)
-                if reclaimed:
-                    orch._pending_backpressure_reclaimed = (
-                        getattr(orch, '_pending_backpressure_reclaimed', 0) + reclaimed
-                    )
-                elif len(orch._pending_events) >= _TUI_PENDING_EVENT_LIMIT:
-                    orch._pending_backpressure = True
+            if _make_backpressure_room(
+                orch,
+                orch._pending_events,
+                _TUI_PENDING_EVENT_LIMIT,
+            ):
+                should_schedule_drain = True
             orch._pending_events.append(event)
             if getattr(orch, '_pending_backpressure', False):
                 should_schedule_drain = True

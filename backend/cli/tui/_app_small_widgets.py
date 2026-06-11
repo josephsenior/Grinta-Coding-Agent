@@ -186,7 +186,7 @@ class Transcript(VerticalScroll):
             if self._user_scrolled_away:
                 return
             self._suppress_scroll_sync = True
-            self.scroll_end(animate=False)
+            self.scroll_end(animate=False, force=True, immediate=True)
             self.call_after_refresh(self._release_programmatic_scroll)
 
         self.call_after_refresh(_scroll_after_layout)
@@ -221,7 +221,7 @@ class Transcript(VerticalScroll):
         """Scroll to bottom regardless of user scroll state."""
         self._set_user_scrolled_away(False)
         self._suppress_scroll_sync = True
-        self.scroll_end(animate=animate)
+        self.scroll_end(animate=animate, force=True, immediate=not animate)
         self.call_after_refresh(self._release_programmatic_scroll)
 
     def clear(self) -> None:

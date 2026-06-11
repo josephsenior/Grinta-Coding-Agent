@@ -113,8 +113,6 @@ class _AppScreenLifecycleMixin:
         self, _message: RendererDrainRequested
     ) -> None:
         if self._renderer is not None:
-            if getattr(self._renderer, '_async_drain_active', False):
-                return
             await self._renderer.drain_events_async()
         if not self._welcome_visible:
             return

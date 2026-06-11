@@ -31,11 +31,29 @@ async def test_tui_renderer_pending_events_are_bounded(monkeypatch):
     for event in range(5):
         renderer._on_event(event)
 
-    assert list(renderer._pending_events) == [0, 1, 2, 3, 4]
-    assert renderer._pending_events_dropped == 0
+    assert list(renderer._pending_events) == [2, 3, 4]
+    assert renderer._pending_events_dropped == 2
     assert renderer._pending_backpressure is True
     assert loop.call_soon_threadsafe.call_count == 5
     assert renderer._drain_scheduled is True
+
+
+@pytest.mark.asyncio
+async def test_tui_renderer_latches_drain_request_while_active():
+    renderer = tui_app.TUIRenderer(
+        console=SimpleNamespace(width=100),
+        hud=SimpleNamespace(
+            state=SimpleNamespace(mcp_servers=0), bundled_skill_count=0
+        ),
+        reasoning=SimpleNamespace(),
+        tui=SimpleNamespace(),
+        loop=asyncio.get_running_loop(),
+    )
+    renderer._async_drain_active = True
+
+    await renderer.drain_events_async()
+
+    assert renderer._drain_requested_while_active is True
 
 
 @pytest.mark.asyncio

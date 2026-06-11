@@ -154,7 +154,17 @@ class _AppRendererLiveMixin:
                     # Static.update() reflows on the next refresh; defer tail
                     # follow so scroll_end sees the updated max_scroll_y.
                     def _follow_after_reflow() -> None:
-                        display.call_after_refresh(follow_tail)
+                        force_scroll_end = getattr(display, 'force_scroll_end', None)
+                        if callable(force_scroll_end):
+                            force_scroll_end(animate=False)
+                            try:
+                                self._loop.call_soon(
+                                    lambda: force_scroll_end(animate=False)
+                                )
+                            except RuntimeError:
+                                pass
+                        else:
+                            follow_tail()
 
                     display.call_after_refresh(_follow_after_reflow)
                 else:
