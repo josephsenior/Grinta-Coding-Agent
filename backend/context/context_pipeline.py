@@ -55,6 +55,7 @@ from backend.core.constants import (
     DEFAULT_PROMPT_MIN_TOOL_LOOPS,
 )
 from backend.core.logger import app_logger as logger
+from backend.inference.context_limits import limits_from_config
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import Event
 
@@ -140,6 +141,43 @@ class ContextPipeline:
         if isinstance(llm_config, LLMConfig):
             return llm_config
         return self._llm_registry.config.get_llm_config(llm_config)
+
+    def _log_budget_snapshot(
+        self,
+        *,
+        stage: str,
+        events: list[Event],
+        budget: ContextBudget,
+        llm_config: object | None,
+        explicit: bool = False,
+        memory_pressure: object | None = None,
+    ) -> None:
+        limits = limits_from_config(llm_config, unknown_default=True)
+        model = str(getattr(llm_config, 'model', '') or '<unknown>')
+        triggered = budget.should_autocompact or explicit or bool(memory_pressure)
+        if not triggered and budget.estimated_tokens < int(
+            budget.autocompact_threshold * 0.75
+        ):
+            return
+        logger.info(
+            'Context budget snapshot stage=%s model=%s limit_source=%s '
+            'context_window=%s usable_input=%s max_output=%s events=%d '
+            'estimated_tokens=%d effective_window=%d autocompact_threshold=%d '
+            'should_autocompact=%s explicit=%s memory_pressure=%s',
+            stage,
+            model,
+            limits.source,
+            limits.context_window_tokens,
+            limits.usable_input_tokens,
+            limits.max_output_tokens,
+            len(events),
+            budget.estimated_tokens,
+            budget.effective_window,
+            budget.autocompact_threshold,
+            budget.should_autocompact,
+            explicit,
+            memory_pressure or '',
+        )
 
     def _project_layers_1_to_3(
         self,
@@ -237,6 +275,36 @@ class ContextPipeline:
         )
         critical_pressure = memory_pressure == 'CRITICAL'
         force = explicit or critical_pressure
+
+        self._log_budget_snapshot(
+            stage='prepare_step',
+            events=events,
+            budget=budget,
+            llm_config=llm_config,
+            explicit=explicit,
+            memory_pressure=memory_pressure,
+        )
+
+        near_token_budget = budget.estimated_tokens >= int(
+            budget.autocompact_threshold * 0.85
+        )
+        if (
+            pressure_active
+            and not budget.should_autocompact
+            and not explicit
+            and not critical_pressure
+            and not near_token_budget
+        ):
+            logger.info(
+                'ContextPipeline: non-critical memory pressure ignored for '
+                'context compaction because prompt budget is below near-threshold '
+                '(estimated=%d threshold=%d pressure=%s)',
+                budget.estimated_tokens,
+                budget.autocompact_threshold,
+                memory_pressure,
+            )
+            delete_staging_snapshot(state=state)
+            return CondensedHistory(history, None)
 
         if not (budget.should_autocompact or explicit or pressure_active):
             delete_staging_snapshot(state=state)
@@ -407,6 +475,16 @@ class ContextPipeline:
         if not events:
             return None
 
+        logger.info(
+            'ContextPipeline: compaction triggered '
+            '(should_autocompact=%s force=%s critical=%s estimated=%d threshold=%d)',
+            budget.should_autocompact,
+            force,
+            critical,
+            budget.estimated_tokens,
+            budget.autocompact_threshold,
+        )
+
         if session_memory_exists(state=state):
             action = self._session_memory_compaction(
                 state, events, budget=budget, llm_config=llm_config
@@ -416,6 +494,10 @@ class ContextPipeline:
             ):
                 logger.info('ContextPipeline: session-memory compaction (5a)')
                 return action
+            logger.info(
+                'ContextPipeline: session-memory compaction (5a) skipped '
+                '(missing or ineffective action)'
+            )
 
         llm_allowed = self._config.allow_llm_hot_path and (
             critical or self._llm_cooldown_elapsed(state)
