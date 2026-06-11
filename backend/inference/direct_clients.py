@@ -823,13 +823,20 @@ def get_direct_client(
     resolved_base_url = resolver.resolve_base_url(
         model, base_url, config_provider=provider
     )
+    metadata = _model_metadata_for_log(
+        requested_model=model,
+        transport_provider=provider,
+        runtime_model=stripped_model,
+        resolved_base_url=resolved_base_url,
+    )
 
     logger.debug(
-        'Resolved model=%s -> provider=%s, base_url=%s, stripped=%s',
+        'Resolved model=%s -> provider=%s, base_url=%s, stripped=%s, metadata=%s',
         model,
         provider,
         resolved_base_url or 'default',
         stripped_model,
+        json.dumps(metadata, sort_keys=True),
     )
 
     client = _try_opencode_go_client(
@@ -862,6 +869,84 @@ def _strip_transport_provider_prefix(model: str, provider: str | None) -> str:
     if prefix.strip().lower() == provider.strip().lower():
         return stripped
     return model
+
+
+def _model_metadata_for_log(
+    *,
+    requested_model: str,
+    transport_provider: str,
+    runtime_model: str,
+    resolved_base_url: str | None,
+) -> dict[str, Any]:
+    """Return deterministic, non-secret model metadata for run logs."""
+    from backend.inference.catalog_loader import (
+        lookup_provider_model,
+        runtime_model_id,
+    )
+    from backend.inference.context_limits import derive_usable_input_tokens
+
+    entry = lookup_provider_model(
+        transport_provider,
+        runtime_model,
+        allow_aliases=True,
+    )
+    metadata: dict[str, Any] = {
+        'requested_model': requested_model,
+        'transport_provider': transport_provider,
+        'runtime_model': runtime_model,
+        'base_url': resolved_base_url or 'default',
+        'catalog_match': entry is not None,
+    }
+    if entry is None:
+        metadata['catalog_miss_reason'] = 'no exact provider catalog entry'
+        return metadata
+
+    usable_input = derive_usable_input_tokens(
+        context_window_tokens=entry.context_window_tokens,
+        max_output_tokens=entry.max_output_tokens,
+        fallback_input_tokens=entry.max_input_tokens,
+    )
+    metadata['catalog'] = {
+        'provider': entry.provider,
+        'client': entry.client,
+        'catalog_file': entry.catalog_file,
+        'name': entry.name,
+        'runtime_model_id': runtime_model_id(entry),
+        'verified': entry.verified,
+        'featured': entry.featured,
+        'context_window_tokens': entry.context_window_tokens,
+        'configured_max_input_tokens': entry.max_input_tokens,
+        'usable_input_tokens': usable_input,
+        'max_output_tokens': entry.max_output_tokens,
+        'pricing_per_million': {
+            'input': entry.input_price_per_m,
+            'cached_input': entry.cached_input_price_per_m,
+            'output': entry.output_price_per_m,
+            'long_context_threshold_tokens': entry.long_context_threshold_tokens,
+            'long_input': entry.long_input_price_per_m,
+            'long_cached_input': entry.long_cached_input_price_per_m,
+            'long_output': entry.long_output_price_per_m,
+        },
+        'capabilities': {
+            'function_calling': entry.supports_function_calling,
+            'parallel_tool_calls': entry.supports_parallel_tool_calls,
+            'reasoning_effort': entry.supports_reasoning_effort,
+            'prompt_cache': entry.supports_prompt_cache,
+            'response_schema': entry.supports_response_schema,
+            'stop_words': entry.supports_stop_words,
+            'vision': entry.supports_vision,
+        },
+        'param_overrides': {
+            'strip_reasoning_effort': entry.strip_reasoning_effort,
+            'thinking_mode': entry.thinking_mode,
+            'strip_temperature': entry.strip_temperature,
+            'strip_top_p': entry.strip_top_p,
+            'strip_penalties': entry.strip_penalties,
+            'use_max_completion_tokens': entry.use_max_completion_tokens,
+            'default_temperature': entry.default_temperature,
+        },
+    }
+    return metadata
 
 
 def _try_opencode_go_client(

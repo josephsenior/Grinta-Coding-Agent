@@ -28,6 +28,7 @@ class ModelEntry:
     name: str
     provider: str
     client: str | None = None
+    catalog_file: str | None = None
     provider_model_id: str | None = None
     aliases: tuple[str, ...] = ()
     context_window_tokens: int | None = None
@@ -91,6 +92,7 @@ def _entry_from_catalog(
     *,
     provider: str,
     provider_client: str | None,
+    source_file: str | None,
     name: str,
     info: dict[str, Any],
 ) -> ModelEntry:
@@ -98,6 +100,7 @@ def _entry_from_catalog(
         name=name,
         provider=provider,
         client=info.get('client', provider_client),
+        catalog_file=source_file,
         provider_model_id=info.get('provider_model_id'),
         aliases=tuple(info.get('aliases', ())),
         context_window_tokens=info.get('context_window_tokens'),
@@ -148,6 +151,7 @@ def get_catalog() -> tuple[ModelEntry, ...]:
                 _entry_from_catalog(
                     provider=provider,
                     provider_client=provider_client,
+                    source_file=source_file,
                     name=name,
                     info=info,
                 )
