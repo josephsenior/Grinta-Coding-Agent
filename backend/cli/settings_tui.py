@@ -56,7 +56,7 @@ def _prompt_model_change(console: Console) -> bool:
         return False
     provider_key, base_url = selection
 
-    new_model = Prompt.ask('  Model name', console=console).strip()
+    new_model = _prompt_provider_model(console, provider_key)
     if not new_model:
         console.print(f'[{CLR_META}]  · Cancelled.[/]')
         return False
@@ -66,6 +66,44 @@ def _prompt_model_change(console: Console) -> bool:
     update_model(new_model, provider=provider_key, base_url=base_url)
     console.print(f'[{CLR_STATUS_OK}]  ✓ Model updated to [bold]{new_model}[/bold].[/]')
     return True
+
+
+def _prompt_provider_model(console: Console, provider_key: str | None) -> str:
+    options: list[str] = []
+    if provider_key:
+        try:
+            from backend.inference.catalog_loader import get_models_for_provider
+
+            options = get_models_for_provider(provider_key)
+        except Exception:
+            options = []
+    if not options:
+        return Prompt.ask('  Model name', console=console).strip()
+
+    console.print()
+    console.print('[bold]Select model:[/bold]')
+    for idx, model_id in enumerate(options, 1):
+        console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {model_id}')
+    custom_idx = len(options) + 1
+    console.print(f'  [{CLR_BRAND}]{custom_idx:>2}[/]  Custom model id')
+    choice = Prompt.ask(
+        '  Model number [dim](Enter to cancel)[/dim]',
+        default='',
+        console=console,
+    ).strip()
+    if not choice:
+        return ''
+    try:
+        selected = int(choice)
+    except ValueError:
+        return choice
+    if 1 <= selected <= len(options):
+        return f'{provider_key}/{options[selected - 1]}'
+    if selected == custom_idx:
+        custom = Prompt.ask('  Custom model id', console=console).strip()
+        return custom if '/' in custom or not provider_key else f'{provider_key}/{custom}'
+    console.print(f'[{CLR_STATUS_ERR}]  ✗ Invalid selection.[/]')
+    return ''
 
 
 def _print_provider_menu(

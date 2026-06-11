@@ -13,7 +13,12 @@ import time
 import httpx
 
 from backend.core.logger import app_logger as logger
-from backend.inference.catalog_loader import ModelEntry, lookup
+from backend.inference.catalog_loader import (
+    ModelEntry,
+    lookup,
+    lookup_provider_model,
+    runtime_model_id,
+)
 
 _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'groq': 'https://api.groq.com/openai/v1',
@@ -118,6 +123,10 @@ def canonicalize_model_selection(
     _OPENAI_COMPAT_PROVIDERS = {'lightning', 'cerebras'}
 
     if normalized_provider:
+        entry = lookup_provider_model(normalized_provider, model, allow_aliases=False)
+        if entry is not None:
+            return f'{entry.provider}/{runtime_model_id(entry)}', entry.provider
+
         if normalized_provider in _OPENAI_COMPAT_PROVIDERS:
             # Strip any redundant provider prefix, keep the model identifier
             # the proxy API expects, and prepend openai/.

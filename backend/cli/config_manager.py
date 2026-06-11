@@ -31,18 +31,18 @@ from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 logger = logging.getLogger(__name__)
 
 _console = Console(no_color=no_color_enabled())
-DEFAULT_ONBOARDING_MODEL = 'openai/gpt-4.1'
+DEFAULT_ONBOARDING_MODEL = 'openai/gpt-5.1'
 DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
     'anthropic': 'anthropic/claude-sonnet-4.6',
-    'google': 'google/gemini-3-flash-preview',
+    'google': 'google/gemini-3-flash',
     'groq': 'groq/meta-llama/llama-4-scout',
     'lightning': 'lightning/meta-llama/Meta-Llama-3.1-8B-Instruct',
     'opencode': 'opencode/deepseek-v4-flash-free',
-    'opencode-go': 'opencode-go/deepseek-v4-flash',
+    'opencode-go': 'opencode-go/glm-5',
     'openai': DEFAULT_ONBOARDING_MODEL,
     'openrouter': 'openrouter/anthropic/claude-4.5-sonnet',
-    'xai': 'xai/grok-4.1-fast',
-    'deepseek': 'deepseek/deepseek-chat',
+    'xai': 'xai/grok-build-0.1',
+    'deepseek': 'deepseek/deepseek-v4-flash',
 }
 
 # Provider registry — grouped for clean onboarding display.
@@ -414,6 +414,12 @@ def _select_model(provider_key: str, custom_name: str | None = None) -> str:
     _console.print()
 
     default = DEFAULT_MODEL_BY_PROVIDER.get(provider_key, '')
+    options = _provider_model_options(provider_key, custom_name=custom_name)
+    if options:
+        chosen = _select_predefined_or_custom_model(provider_key, options, default)
+        if chosen:
+            return chosen
+
     if default:
         _console.print(f'[bold]Model[/bold] [dim](Enter for {default})[/dim]\n')
     else:
@@ -440,6 +446,60 @@ def _select_model(provider_key: str, custom_name: str | None = None) -> str:
         prefix = custom_name or provider_key
         return f'{prefix}/{model_input}'
     return model_input
+
+
+def _provider_model_options(
+    provider_key: str, *, custom_name: str | None = None
+) -> list[str]:
+    if custom_name:
+        return []
+    try:
+        from backend.inference.catalog_loader import get_models_for_provider
+
+        return get_models_for_provider(provider_key)
+    except Exception:
+        logger.debug('Could not load provider model options', exc_info=True)
+        return []
+
+
+def _select_predefined_or_custom_model(
+    provider_key: str,
+    options: list[str],
+    default: str,
+) -> str | None:
+    default_bare = default.split('/', 1)[1] if '/' in default else default
+    if default_bare not in options and options:
+        default_bare = options[0]
+
+    _console.print('[bold]Model[/bold]\n')
+    for idx, model_id in enumerate(options, 1):
+        marker = ' [dim](default)[/dim]' if model_id == default_bare else ''
+        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {model_id}{marker}')
+    custom_idx = len(options) + 1
+    _console.print(f'  [{CLR_BRAND}]{custom_idx:>2}[/]  [dim]Custom model id[/dim]\n')
+
+    choice = Prompt.ask(
+        '  Model number',
+        default=str(options.index(default_bare) + 1) if default_bare in options else '1',
+        console=_console,
+    ).strip()
+    try:
+        selected = int(choice)
+    except ValueError:
+        model_input = choice
+    else:
+        if 1 <= selected <= len(options):
+            return f'{provider_key}/{options[selected - 1]}'
+        if selected == custom_idx:
+            model_input = Prompt.ask('  Custom model id', console=_console).strip()
+        else:
+            _console.print(f'[{CLR_STATUS_ERR}]  Enter a number from the list.[/]')
+            return None
+
+    if not model_input:
+        _console.print(f'[{CLR_STATUS_ERR}]  Model name is required.[/]')
+        raise SystemExit(1)
+    return model_input if '/' in model_input else f'{provider_key}/{model_input}'
 
 
 def _collect_api_key(provider_key: str) -> str:
