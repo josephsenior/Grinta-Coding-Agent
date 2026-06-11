@@ -272,9 +272,7 @@ class DurableEventWriter:
                     self._in_flight -= 1
                 self._queue.task_done()
 
-    def _quarantine_pending_file(
-        self, pending_path: str, item: PersistedEvent
-    ) -> None:
+    def _quarantine_pending_file(self, pending_path: str, item: PersistedEvent) -> None:
         """Preserve a failed WAL marker under lost_events/ for manual recovery."""
         normalized = item.filename.replace('\\', '/')
         events_dir = os.path.dirname(normalized)
@@ -291,8 +289,7 @@ class DurableEventWriter:
             self._file_store.write(dest_path, serialized)
             self._file_store.delete(pending_path)
             logger.error(
-                'WAL: quarantined permanently failed pending file to %s '
-                '(event id=%s)',
+                'WAL: quarantined permanently failed pending file to %s (event id=%s)',
                 dest_path,
                 item.event_id,
             )

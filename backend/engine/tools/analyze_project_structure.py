@@ -30,10 +30,9 @@ from backend.engine.tools._aps_file_modes import (
 )
 from backend.engine.tools._aps_shared import _analyze_depth, _diag
 from backend.engine.tools._aps_tree import _build_symbols_action, _build_tree_action
+from backend.inference.tool_names import ANALYZE_PROJECT_STRUCTURE_TOOL_NAME
 from backend.ledger.action.search import AnalyzeProjectStructureAction
 from backend.ledger.observation.search import AnalyzeProjectStructureObservation
-
-from backend.inference.tool_names import ANALYZE_PROJECT_STRUCTURE_TOOL_NAME
 
 
 def create_analyze_project_structure_tool() -> dict:
@@ -44,11 +43,11 @@ def create_analyze_project_structure_tool() -> dict:
             'name': ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
             'description': (
                 'Structural project overview — use when grep/glob/find_symbols are not enough. '
-                "tree: directory tree; recent: git-modified files; "
-                "imports/dependencies: import graph for a known file; "
-                "symbols: per-file symbol list; file_outline: compact signatures only; "
-                "callers: fast regex reference scan (prefer over semantic_search first); "
-                "semantic_search: AST reference scan fallback. "
+                'tree: directory tree; recent: git-modified files; '
+                'imports/dependencies: import graph for a known file; '
+                'symbols: per-file symbol list; file_outline: compact signatures only; '
+                'callers: fast regex reference scan (prefer over semantic_search first); '
+                'semantic_search: AST reference scan fallback. '
                 'To find test files: use glob + grep (not this tool). '
                 'Use BEFORE multi-file edits to understand dependencies.'
             ),
@@ -198,7 +197,7 @@ def execute_analyze_project_structure(
                 'Use one of: tree, imports, symbols, file_outline, recent, '
                 'callers, semantic_search, dependencies.',
             ],
-        )
+        ),
     )
 
 

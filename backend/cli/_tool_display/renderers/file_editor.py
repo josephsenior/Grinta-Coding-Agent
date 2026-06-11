@@ -131,12 +131,19 @@ def render_file_edit(
     lines: list[Any] = []
 
     detail = _format_file_detail(
-        path, new_file=new_file, added=added, line_range=line_range,
+        path,
+        new_file=new_file,
+        added=added,
+        line_range=line_range,
     )
-    lines.extend(_format_delta_or_preview(
-        new_file=new_file, added=added, removed=removed,
-        preview_content=preview_content,
-    ))
+    lines.extend(
+        _format_delta_or_preview(
+            new_file=new_file,
+            added=added,
+            removed=removed,
+            preview_content=preview_content,
+        )
+    )
     lines.append(format_activity_primary(verb, detail))
 
     if diff_lines:

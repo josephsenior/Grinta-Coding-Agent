@@ -12,8 +12,8 @@ from backend.engine.tools._tool_handlers import (
 from backend.engine.tools.web_tools import (
     EXA_WEB_SEARCH_MCP_TOOL,
     FALLBACK_FETCH_MCP_TOOL,
-    NATIVE_WEB_FETCH_ROUTER,
     MCP_TOOLS_HIDDEN_BY_NATIVE_WEB,
+    NATIVE_WEB_FETCH_ROUTER,
     build_web_fetch_action,
     build_web_search_action,
     create_web_fetch_tool,
@@ -29,7 +29,9 @@ def test_create_web_tool_schemas():
 
 
 def test_build_web_search_action_maps_to_exa_mcp():
-    action = build_web_search_action({'query': 'pytest fixture patterns', 'num_results': 5})
+    action = build_web_search_action(
+        {'query': 'pytest fixture patterns', 'num_results': 5}
+    )
     assert isinstance(action, MCPAction)
     assert action.name == EXA_WEB_SEARCH_MCP_TOOL
     assert action.arguments == {'query': 'pytest fixture patterns', 'numResults': 5}

@@ -141,7 +141,9 @@ class MessageActionSchema(ActionSchemaV1):
     wait_for_response: bool = Field(False, description='Whether to wait for user input')
     suppress_cli: bool = Field(False, description='Whether to suppress CLI rendering')
     transcript_only: bool = Field(False, description='Persist without LLM context')
-    final_response: bool = Field(False, description='Plain-text response that ends the run')
+    final_response: bool = Field(
+        False, description='Plain-text response that ends the run'
+    )
     protocol_status: bool = Field(False, description='Render as a mid-task status')
     protocol_abandoned: bool = Field(False, description='Render as a retry prompt')
 
@@ -413,9 +415,7 @@ class ConfirmRequestActionSchema(ActionSchemaV1):
     is selected (1 = deny, the safe choice).
     """
 
-    action_type: Literal['confirm'] = Field(
-        ActionType.CONFIRM.value, frozen=True
-    )
+    action_type: Literal['confirm'] = Field(ActionType.CONFIRM.value, frozen=True)
     runnable: bool = Field(False, frozen=True)
     question: str = Field(..., description='The confirm question')
     options: list[str] = Field(
@@ -436,9 +436,7 @@ class InformActionSchema(ActionSchemaV1):
     pause; the user sees the message in the transcript and the agent continues.
     """
 
-    action_type: Literal['inform'] = Field(
-        ActionType.INFORM.value, frozen=True
-    )
+    action_type: Literal['inform'] = Field(ActionType.INFORM.value, frozen=True)
     runnable: bool = Field(False, frozen=True)
     text: str = Field(..., description='The status update to share')
     context: str = Field(default='', description='Optional background')

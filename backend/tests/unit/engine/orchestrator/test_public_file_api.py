@@ -102,7 +102,9 @@ def test_read_file_range_requires_both_line_bounds(monkeypatch, tmp_path):
     _use_tmp_workspace(monkeypatch, tmp_path)
     (tmp_path / 'a.txt').write_text('one\ntwo\n', encoding='utf-8')
 
-    with pytest.raises(FunctionCallValidationError, match='both start_line and end_line'):
+    with pytest.raises(
+        FunctionCallValidationError, match='both start_line and end_line'
+    ):
         _handle_read_tool(
             {
                 'type': 'file',
@@ -149,9 +151,7 @@ def test_find_symbols_discovers_candidates_and_read_symbols_reports_ambiguity(
 
     find_action = _handle_find_symbols_tool({'query': 'run', 'security_risk': 'LOW'})
     assert isinstance(find_action, FindSymbolsAction)
-    candidates = _payload(
-        execute_find_symbols(find_action)
-    )
+    candidates = _payload(execute_find_symbols(find_action))
     read_action = _handle_read_tool(
         {
             'type': 'symbols',

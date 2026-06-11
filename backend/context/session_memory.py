@@ -68,7 +68,9 @@ def _read_metadata(content: str) -> dict[str, Any]:
         return {}
 
 
-def _format_session_memory(snapshot: dict[str, Any], *, last_event_id: int | None) -> str:
+def _format_session_memory(
+    snapshot: dict[str, Any], *, last_event_id: int | None
+) -> str:
     body = format_snapshot_for_injection(snapshot)
     if not body.strip():
         body = '_No structured facts extracted yet._'
@@ -158,7 +160,8 @@ def maybe_update(
     tokens_delta = max(0, estimated - last_tokens)
 
     should_init = (
-        not session_memory_exists(state=state) and estimated >= DEFAULT_SESSION_MEMORY_INIT_TOKENS
+        not session_memory_exists(state=state)
+        and estimated >= DEFAULT_SESSION_MEMORY_INIT_TOKENS
     )
     should_update = session_memory_exists(state=state) and (
         tokens_delta >= DEFAULT_SESSION_MEMORY_UPDATE_TOKENS

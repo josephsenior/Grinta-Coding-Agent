@@ -43,11 +43,15 @@ _GLOBAL_UNDO_HISTORY: dict[str, deque[str | None]] = defaultdict(
 )
 _GLOBAL_FILE_LOCKS: dict[str, threading.RLock] = {}
 _GLOBAL_FILE_LOCKS_GUARD = threading.Lock()
+
+
 def _canonical_lock_key(file_path: Path) -> str:
     try:
         return str(file_path.resolve())
     except OSError:
         return str(file_path)
+
+
 def _file_lock_for_path(file_path: Path) -> threading.RLock:
     key = _canonical_lock_key(file_path)
     with _GLOBAL_FILE_LOCKS_GUARD:
@@ -56,7 +60,6 @@ def _file_lock_for_path(file_path: Path) -> threading.RLock:
             lock = threading.RLock()
             _GLOBAL_FILE_LOCKS[key] = lock
         return lock
-
 
 
 class FileEditor(
@@ -313,7 +316,6 @@ class FileEditor(
             return str(new_str)  # Type narrowing: if not MISSING and not None, it's str
         # Both are MISSING or None
         return ''
-
 
 
 # ---------------------------------------------------------------------------

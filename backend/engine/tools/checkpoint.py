@@ -17,10 +17,9 @@ import time
 from pathlib import Path
 from typing import Any
 
+from backend.inference.tool_names import CHECKPOINT_TOOL_NAME
 from backend.ledger.action.memory_tools import CheckpointAction
 from backend.ledger.observation.memory_tools import CheckpointObservation
-
-from backend.inference.tool_names import CHECKPOINT_TOOL_NAME
 
 _CHECKPOINTS_FILE = 'checkpoints.json'
 

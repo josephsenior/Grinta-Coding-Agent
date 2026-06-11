@@ -6,9 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 
-def _build_response_style_block(
-    _mode: str, *, meta_cognition_on: bool = False
-) -> str:
+def _build_response_style_block(_mode: str, *, meta_cognition_on: bool = False) -> str:
     _ = meta_cognition_on
     return (
         'Use the output form required for this turn:\n'

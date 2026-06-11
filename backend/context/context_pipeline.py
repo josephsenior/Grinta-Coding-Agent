@@ -45,6 +45,7 @@ from backend.core.constants import (
     DEFAULT_COMPACT_MIN_PRUNED_EVENTS,
     DEFAULT_COMPACT_MIN_TOKEN_REDUCTION,
     DEFAULT_DEGRADED_COMPACT_TAIL_RATIO,
+    DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS,
     DEFAULT_INEFFECTIVE_COMPACT_BACKOFF_SECONDS,
     DEFAULT_INEFFECTIVE_COMPACT_MAX_SKIP_EVENTS,
     DEFAULT_INEFFECTIVE_COMPACT_SKIP_EVENTS,
@@ -69,6 +70,9 @@ _SKIP_COMPACTION_UNTIL_KEY = 'skip_compaction_until_event_id'
 _INEFFECTIVE_COMPACT_STREAK_KEY = 'ineffective_compact_streak'
 _INEFFECTIVE_COMPACT_UNTIL_KEY = 'ineffective_compact_until'
 _CONSECUTIVE_CONDENSATION_KEY = 'consecutive_condensation_steps'
+_CONTINUITY_REJECTION_FP_KEY = 'last_continuity_rejection_fingerprint'
+_CONTINUITY_REJECTION_STREAK_KEY = 'continuity_rejection_streak'
+_DETERMINISTIC_FALLBACK_THRESHOLD = 2
 _COMPACTION_TARGET_RATIO = 0.7
 
 
@@ -79,6 +83,17 @@ class PipelineStepResult:
     events: list[Event]
     pending_action: CondensationAction | None = None
     compacted: bool = False
+
+
+@dataclass(frozen=True)
+class _ContinuityGateDecision:
+    passed: bool
+    canonical_ok: bool
+    fingerprint: str
+    missing: tuple[str, ...]
+    score: float
+    matched: int
+    total: int
 
 
 class ContextPipeline:
@@ -188,26 +203,38 @@ class ContextPipeline:
                         len(action.pruned),
                     )
                     self._set_skip_compaction(state)
-                elif not self._passes_continuity_gate(state, history, action):
-                    self._set_skip_compaction(state)
                 else:
-                    commit_snapshot(state=state)
-                    sync_snapshot_to_working_memory(load_snapshot(state=state))
-                    self._mark_just_compacted(state)
-                    self._record_boundary_compact(state, history, action)
-                    self._increment_condensation_counter(state)
-                    logger.info(
-                        'ContextPipeline used pre-warmed compaction in %.3fs',
-                        time.perf_counter() - started,
+                    resolved_action = self._resolve_continuity_or_fallback(
+                        state,
+                        history,
+                        post_boundary,
+                        action,
+                        budget,
+                        llm_config,
                     )
-                    return CondensedHistory([], action)
+                    if resolved_action is None:
+                        self._set_skip_compaction(state)
+                    else:
+                        action = resolved_action
+                        commit_snapshot(state=state)
+                        sync_snapshot_to_working_memory(load_snapshot(state=state))
+                        self._mark_just_compacted(state)
+                        self._record_boundary_compact(state, history, action)
+                        self._increment_condensation_counter(state)
+                        logger.info(
+                            'ContextPipeline used pre-warmed compaction in %.3fs',
+                            time.perf_counter() - started,
+                        )
+                        return CondensedHistory([], action)
 
         events = post_boundary
         budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
         view = getattr(state, 'view', None)
         explicit = bool(getattr(view, 'unhandled_condensation_request', False))
         memory_pressure = getattr(turn_signals, 'memory_pressure', None)
-        pressure_active = isinstance(memory_pressure, str) and bool(memory_pressure.strip())
+        pressure_active = isinstance(memory_pressure, str) and bool(
+            memory_pressure.strip()
+        )
         critical_pressure = memory_pressure == 'CRITICAL'
         force = explicit or critical_pressure
 
@@ -232,7 +259,9 @@ class ContextPipeline:
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
-        if not self._passes_effectiveness_gate(history, events, action, budget, state, llm_config):
+        if not self._passes_effectiveness_gate(
+            history, events, action, budget, state, llm_config
+        ):
             logger.warning(
                 'Compaction ineffective (pruned=%d); skipping boundary commit',
                 len(action.pruned),
@@ -241,10 +270,19 @@ class ContextPipeline:
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
-        if not self._passes_continuity_gate(state, history, action):
+        resolved_action = self._resolve_continuity_or_fallback(
+            state,
+            history,
+            events,
+            action,
+            budget,
+            llm_config,
+        )
+        if resolved_action is None:
             self._set_skip_compaction(state)
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
+        action = resolved_action
 
         commit_snapshot(state=state)
         sync_snapshot_to_working_memory(load_snapshot(state=state))
@@ -262,7 +300,9 @@ class ContextPipeline:
                 if monitor is not None:
                     monitor.record_condensation()
             except Exception:
-                logger.debug('Memory pressure record_condensation failed', exc_info=True)
+                logger.debug(
+                    'Memory pressure record_condensation failed', exc_info=True
+                )
         logger.info(
             'ContextPipeline committed compaction (pruned=%d elapsed=%.3fs)',
             len(action.pruned),
@@ -280,7 +320,9 @@ class ContextPipeline:
     ) -> list[Event]:
         """Assemble LLM-facing events through layers 1–7."""
         history = full_history if full_history is not None else list(condensed_history)
-        events = self._project_layers_1_to_3(history, state or _EmptyState(), apply_tool_budget=True)
+        events = self._project_layers_1_to_3(
+            history, state or _EmptyState(), apply_tool_budget=True
+        )
 
         just_compacted = False
         if state is not None:
@@ -289,7 +331,9 @@ class ContextPipeline:
             if just_compacted:
                 pipe = dict(pipe)
                 pipe[_JUST_COMPACTED_KEY] = False
-                state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
+                state.set_extra(
+                    'context_pipeline_state', pipe, source='ContextPipeline'
+                )
 
         packet = build_context_packet_observation(
             events,
@@ -306,6 +350,23 @@ class ContextPipeline:
             emergency_only=True,
             tool_budget_applied=True,
         )
+        if (
+            window.windowed
+            and window.original_events >= DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
+            and window.selected_events < DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
+        ):
+            logger.warning(
+                'Emergency prompt window would collapse to %d/%d events; '
+                'returning unwindowed prompt and marking critical memory pressure',
+                window.selected_events,
+                window.original_events,
+            )
+            if state is not None and hasattr(state, 'set_memory_pressure'):
+                try:
+                    state.set_memory_pressure('CRITICAL', source='ContextPipeline')
+                except Exception:
+                    logger.debug('Failed to mark emergency memory pressure', exc_info=True)
+            return events
         return window.events
 
     async def prewarm_compaction(self, state: State) -> Compaction | None:
@@ -350,7 +411,9 @@ class ContextPipeline:
             action = self._session_memory_compaction(
                 state, events, budget=budget, llm_config=llm_config
             )
-            if action is not None and self._action_meets_effectiveness(events, action, budget, state, llm_config):
+            if action is not None and self._action_meets_effectiveness(
+                events, action, budget, state, llm_config
+            ):
                 logger.info('ContextPipeline: session-memory compaction (5a)')
                 return action
 
@@ -426,7 +489,9 @@ class ContextPipeline:
     ) -> CondensationAction | None:
         compactor = self._get_structured_compactor(state)
         if compactor is None:
-            logger.info('ContextPipeline: 5b skipped (no structured compactor / llm_config)')
+            logger.info(
+                'ContextPipeline: 5b skipped (no structured compactor / llm_config)'
+            )
             return None
         if budget is not None:
             self._configure_structured_compactor_size(compactor, events, budget)
@@ -496,7 +561,9 @@ class ContextPipeline:
             )
 
             pruned_events = [
-                event for event in events if getattr(event, 'id', None) in pruned_preview
+                event
+                for event in events
+                if getattr(event, 'id', None) in pruned_preview
             ]
             summary = AmortizedPruningCompactor._build_recovery_summary(pruned_events)
         tail = _shrink_tail_for_token_reduction(
@@ -546,7 +613,9 @@ class ContextPipeline:
     def _get_structured_compactor(self, state: State):
         if self._structured_compactor is not None:
             return self._structured_compactor
-        llm_config = getattr(self._config, 'llm_config', None) or self._llm_config(state)
+        llm_config = getattr(self._config, 'llm_config', None) or self._llm_config(
+            state
+        )
         if llm_config is None:
             return None
         from backend.context.compactor.strategies.structured_summary_compactor import (
@@ -620,7 +689,10 @@ class ContextPipeline:
             if isinstance(latest_id, int) and latest_id < skip_until:
                 return True
         ineffective_until = pipe.get(_INEFFECTIVE_COMPACT_UNTIL_KEY)
-        if isinstance(ineffective_until, (int, float)) and time.time() < ineffective_until:
+        if (
+            isinstance(ineffective_until, (int, float))
+            and time.time() < ineffective_until
+        ):
             return True
         return False
 
@@ -632,6 +704,8 @@ class ContextPipeline:
         pipe.pop(_SKIP_COMPACTION_UNTIL_KEY, None)
         pipe.pop(_INEFFECTIVE_COMPACT_STREAK_KEY, None)
         pipe.pop(_INEFFECTIVE_COMPACT_UNTIL_KEY, None)
+        pipe.pop(_CONTINUITY_REJECTION_FP_KEY, None)
+        pipe.pop(_CONTINUITY_REJECTION_STREAK_KEY, None)
         state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
 
     def _increment_condensation_counter(self, state: State) -> None:
@@ -677,7 +751,9 @@ class ContextPipeline:
         post_budget = ContextBudget.from_events(
             post_events, llm_config=llm_config, state=state
         )
-        return (pre_tokens - post_budget.estimated_tokens) >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
+        return (
+            pre_tokens - post_budget.estimated_tokens
+        ) >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
 
     def _passes_effectiveness_gate(
         self,
@@ -702,8 +778,55 @@ class ContextPipeline:
     def _passes_continuity_gate(
         self, state: State, history: list[Event], action: CondensationAction
     ) -> bool:
+        return self._evaluate_continuity_gate(state, history, action).passed
+
+    def _resolve_continuity_or_fallback(
+        self,
+        state: State,
+        history: list[Event],
+        events: list[Event],
+        action: CondensationAction,
+        budget: ContextBudget,
+        llm_config: object | None,
+    ) -> CondensationAction | None:
+        gate_passed = self._passes_continuity_gate(state, history, action)
+        if gate_passed:
+            self._clear_continuity_rejection(state)
+            return action
+        decision = self._evaluate_continuity_gate(state, history, action)
+        if decision.passed:
+            decision = _ContinuityGateDecision(
+                passed=False,
+                canonical_ok=True,
+                fingerprint='continuity:forced_false',
+                missing=(),
+                score=decision.score,
+                matched=decision.matched,
+                total=decision.total,
+            )
+        fallback = self._deterministic_fallback_after_rejection(
+            state,
+            history,
+            events,
+            budget,
+            llm_config,
+            decision,
+        )
+        return fallback
+
+    def _evaluate_continuity_gate(
+        self, state: State, history: list[Event], action: CondensationAction
+    ) -> _ContinuityGateDecision:
         if not action.summary:
-            return True
+            return _ContinuityGateDecision(
+                passed=True,
+                canonical_ok=True,
+                fingerprint='no_summary',
+                missing=(),
+                score=1.0,
+                matched=0,
+                total=0,
+            )
         restored_parts = [action.summary]
         try:
             canonical = load_canonical_state(state=state)
@@ -726,10 +849,18 @@ class ContextPipeline:
                 'Compaction canonical continuity failed: missing=%s',
                 ', '.join(canonical_result.missing),
             )
-            return False
+            return _ContinuityGateDecision(
+                passed=False,
+                canonical_ok=False,
+                fingerprint='canonical:' + '|'.join(sorted(canonical_result.missing)),
+                missing=tuple(canonical_result.missing),
+                score=result.score,
+                matched=result.matched,
+                total=result.total,
+            )
         if not passed:
-            missing = ', '.join(
-                f'{fact.category}:{fact.key[:40]}' for fact in result.missing[:8]
+            missing_items = tuple(
+                f'{fact.category}:{fact.key[:80]}' for fact in result.missing[:8]
             )
             logger.warning(
                 'Compaction continuity metric score=%.2f matched=%d/%d missing=%s '
@@ -737,9 +868,142 @@ class ContextPipeline:
                 result.score,
                 result.matched,
                 result.total,
-                missing or 'none',
+                ', '.join(missing_items) or 'none',
             )
-        return passed
+            return _ContinuityGateDecision(
+                passed=False,
+                canonical_ok=True,
+                fingerprint='continuity:' + '|'.join(sorted(missing_items)),
+                missing=missing_items,
+                score=result.score,
+                matched=result.matched,
+                total=result.total,
+            )
+        if result.missing:
+            logger.info(
+                'Compaction continuity telemetry score=%.2f matched=%d/%d missing=%d',
+                result.score,
+                result.matched,
+                result.total,
+                len(result.missing),
+            )
+        return _ContinuityGateDecision(
+            passed=True,
+            canonical_ok=True,
+            fingerprint='ok',
+            missing=(),
+            score=result.score,
+            matched=result.matched,
+            total=result.total,
+        )
+
+    def _deterministic_fallback_after_rejection(
+        self,
+        state: State,
+        history: list[Event],
+        events: list[Event],
+        budget: ContextBudget,
+        llm_config: object | None,
+        decision: _ContinuityGateDecision,
+    ) -> CondensationAction | None:
+        streak = self._record_continuity_rejection(state, decision)
+        if not decision.canonical_ok or streak < _DETERMINISTIC_FALLBACK_THRESHOLD:
+            return None
+        fallback = self._build_deterministic_canonical_compaction(
+            state,
+            history,
+            events,
+            budget,
+            llm_config,
+        )
+        if fallback is None:
+            return None
+        if not self._passes_effectiveness_gate(
+            history, events, fallback, budget, state, llm_config
+        ):
+            return None
+        logger.warning(
+            'Compaction continuity rejected twice for same fingerprint; '
+            'committing deterministic canonical fallback (pruned=%d)',
+            len(fallback.pruned),
+        )
+        self._clear_continuity_rejection(state)
+        return fallback
+
+    def _build_deterministic_canonical_compaction(
+        self,
+        state: State,
+        history: list[Event],
+        events: list[Event],
+        budget: ContextBudget,
+        llm_config: object | None,
+    ) -> CondensationAction | None:
+        try:
+            canonical = load_canonical_state(state=state)
+            summary_parts = [render_canonical_state_for_prompt(canonical, char_budget=6000)]
+        except Exception:
+            logger.debug('Canonical fallback summary render failed', exc_info=True)
+            summary_parts = []
+        audit = build_compaction_summary(state=state)
+        if audit.strip():
+            summary_parts.append('Compaction audit evidence:\n' + audit.strip()[:4000])
+        summary = '\n\n'.join(part for part in summary_parts if part.strip())
+        if not summary.strip():
+            return None
+        tail = _select_compaction_tail(
+            events,
+            budget,
+            llm_config=llm_config,
+            tail_ratio=_COMPACTION_TARGET_RATIO,
+        )
+        tail = _shrink_tail_for_token_reduction(
+            events,
+            tail,
+            history=history,
+            budget=budget,
+            state=state,
+            llm_config=llm_config,
+            summary=summary,
+        )
+        pruned = _pruned_ids(events, tail)
+        if len(pruned) < DEFAULT_COMPACT_MIN_PRUNED_EVENTS:
+            return None
+        return CondensationAction(
+            pruned_event_ids=sorted(pruned),
+            summary=summary,
+            summary_offset=0,
+        )
+
+    def _record_continuity_rejection(
+        self,
+        state: State,
+        decision: _ContinuityGateDecision,
+    ) -> int:
+        pipe = self._pipeline_state(state)
+        previous = pipe.get(_CONTINUITY_REJECTION_FP_KEY)
+        streak = pipe.get(_CONTINUITY_REJECTION_STREAK_KEY, 0)
+        if previous != decision.fingerprint or not isinstance(streak, int):
+            streak = 0
+        streak += 1
+        pipe[_CONTINUITY_REJECTION_FP_KEY] = decision.fingerprint
+        pipe[_CONTINUITY_REJECTION_STREAK_KEY] = streak
+        state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
+        logger.info(
+            'Compaction continuity rejection recorded (streak=%d fingerprint=%s)',
+            streak,
+            decision.fingerprint[:160],
+        )
+        return streak
+
+    def _clear_continuity_rejection(self, state: State) -> None:
+        pipe = self._pipeline_state(state)
+        changed = False
+        for key in (_CONTINUITY_REJECTION_FP_KEY, _CONTINUITY_REJECTION_STREAK_KEY):
+            if key in pipe:
+                pipe.pop(key, None)
+                changed = True
+        if changed:
+            state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
 
     @staticmethod
     def _extract_pre_condensation_snapshot(state: State, history: list[Event]) -> None:

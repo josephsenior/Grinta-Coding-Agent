@@ -230,7 +230,9 @@ class TestOrchestratorPromptManager:
             assert 'note value' in result
             assert '<WORKSPACE_MEMORY>' in result
 
-    def test_inject_workspace_memory_falls_back_to_lessons_md(self, prompt_dir, tmp_path):
+    def test_inject_workspace_memory_falls_back_to_lessons_md(
+        self, prompt_dir, tmp_path
+    ):
         opm = OrchestratorPromptManager(prompt_dir)
         lessons = tmp_path / 'lessons.md'
         lessons.write_text('verified fix for auth', encoding='utf-8')

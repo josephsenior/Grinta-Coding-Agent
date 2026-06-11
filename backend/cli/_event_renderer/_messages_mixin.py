@@ -166,7 +166,6 @@ class _EventRendererMessagesMixin(CLIEventRenderer if TYPE_CHECKING else object)
 
         from io import StringIO
 
-
         sio = StringIO()
         tc = Console(file=sio, force_terminal=True, width=100)
         tc.print(renderable)

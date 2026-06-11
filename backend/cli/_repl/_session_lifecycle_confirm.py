@@ -19,7 +19,6 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.cli.confirmation import (
-    ConfirmationDecision,
     render_confirmation,
 )
 
@@ -82,7 +81,9 @@ def _get_pending_action(controller: Any) -> Any:
         return getattr(controller, '_pending_action', None)
 
 
-async def _check_confirmation_loop(host: 'SessionLifecycleHost', controller: Any) -> bool:
+async def _check_confirmation_loop(
+    host: 'SessionLifecycleHost', controller: Any
+) -> bool:
     """Returns True if loop detected and handled (caller should return)."""
     if not hasattr(host, '_confirmation_prompt_count'):
         host._confirmation_prompt_count = 0
@@ -110,6 +111,7 @@ async def _try_auto_approve_low_risk(
     if pending is None or not host._suppress_low_risk_confirmations:
         return False
     from backend.core.enums import ActionSecurityRisk
+
     risk = getattr(pending, 'security_risk', ActionSecurityRisk.UNKNOWN)
     if risk == ActionSecurityRisk.LOW:
         await _apply_decision(controller, approved=True)
@@ -117,7 +119,9 @@ async def _try_auto_approve_low_risk(
     return False
 
 
-def _render_decision(host: 'SessionLifecycleHost', pending: Any) -> tuple[bool, bool, bool]:
+def _render_decision(
+    host: 'SessionLifecycleHost', pending: Any
+) -> tuple[bool, bool, bool]:
     """Returns (approved, remember_always, suppress_low_risk)."""
     if pending is not None:
         if host._renderer is not None:
@@ -128,6 +132,7 @@ def _render_decision(host: 'SessionLifecycleHost', pending: Any) -> tuple[bool, 
         return decision.approved, decision.remember, decision.suppress_low_risk
 
     from rich.prompt import Confirm
+
     prompt = '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]'
     if host._renderer is not None:
         with host._renderer.suspend_live():

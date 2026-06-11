@@ -117,7 +117,9 @@ class DAPDebugSession:
             phase = 'set breakpoints'
             breakpoint_results = self._sync_all_breakpoints(time_left)
             phase = 'configurationDone request'
-            self._start_configuration_done(time_left, wall_budget, session_started, breakpoint_results)
+            self._start_configuration_done(
+                time_left, wall_budget, session_started, breakpoint_results
+            )
             event = self._wait_for_pause_or_exit(timeout=min(0.5, time_left()))
             elapsed_total = time.monotonic() - session_started
             _dap_log(
@@ -174,13 +176,17 @@ class DAPDebugSession:
             dap_session_id=self.session_id,
         )
 
-    def _start_initialize(self, time_left: Callable[[], float], wall_budget: float, session_started: float) -> None:
+    def _start_initialize(
+        self, time_left: Callable[[], float], wall_budget: float, session_started: float
+    ) -> None:
         try:
             self.client.request(
                 'initialize', self._initialize_arguments(), timeout=time_left()
             )
         except DAPError as exc:
-            raise DAPStartPhaseError('initialize request', str(exc), timeout=wall_budget) from exc
+            raise DAPStartPhaseError(
+                'initialize request', str(exc), timeout=wall_budget
+            ) from exc
         _dap_log(
             logging.INFO,
             'DAP initialize acknowledged',
@@ -190,7 +196,9 @@ class DAPDebugSession:
             elapsed_seconds=round(time.monotonic() - session_started, 3),
         )
 
-    def _start_wait_initialized(self, time_left: Callable[[], float], wall_budget: float, session_started: float) -> None:
+    def _start_wait_initialized(
+        self, time_left: Callable[[], float], wall_budget: float, session_started: float
+    ) -> None:
         initialized = self.client.wait_for_event('initialized', timeout=time_left())
         if initialized is None:
             raise DAPStartPhaseError(
@@ -207,11 +215,19 @@ class DAPDebugSession:
             elapsed_seconds=round(time.monotonic() - session_started, 3),
         )
 
-    def _start_configuration_done(self, time_left: Callable[[], float], wall_budget: float, session_started: float, breakpoint_results: dict[str, Any]) -> None:
+    def _start_configuration_done(
+        self,
+        time_left: Callable[[], float],
+        wall_budget: float,
+        session_started: float,
+        breakpoint_results: dict[str, Any],
+    ) -> None:
         try:
             self.client.request('configurationDone', {}, timeout=time_left())
         except DAPError as exc:
-            raise DAPStartPhaseError('configurationDone request', str(exc), timeout=wall_budget) from exc
+            raise DAPStartPhaseError(
+                'configurationDone request', str(exc), timeout=wall_budget
+            ) from exc
         _dap_log(
             logging.INFO,
             'configurationDone acknowledged',
@@ -229,11 +245,15 @@ class DAPDebugSession:
                     self.start_request_seq, timeout=min(1.0, time_left())
                 )
             except DAPError:
-                logger.debug(
-                    'DAP start response was not available yet', exc_info=True
-                )
+                logger.debug('DAP start response was not available yet', exc_info=True)
 
-    def _start_log_failed(self, phase: str, exc: DAPStartPhaseError, target: str | None, wall_budget: float) -> None:
+    def _start_log_failed(
+        self,
+        phase: str,
+        exc: DAPStartPhaseError,
+        target: str | None,
+        wall_budget: float,
+    ) -> None:
         _dap_log(
             logging.WARNING,
             'DAP session start failed',
@@ -243,12 +263,12 @@ class DAPDebugSession:
             detail=str(exc),
             stderr_tail=self.client.stderr_tail(12),
             program=target,
-            adapter_argv0=(
-                self.adapter_command[0] if self.adapter_command else None
-            ),
+            adapter_argv0=(self.adapter_command[0] if self.adapter_command else None),
         )
 
-    def _start_log_failed_unexpected(self, phase: str, exc: Exception, target: str | None, wall_budget: float) -> None:
+    def _start_log_failed_unexpected(
+        self, phase: str, exc: Exception, target: str | None, wall_budget: float
+    ) -> None:
         _dap_log(
             logging.WARNING,
             'DAP session start failed (unexpected)',
@@ -259,9 +279,7 @@ class DAPDebugSession:
             detail=str(exc),
             stderr_tail=self.client.stderr_tail(12),
             program=target,
-            adapter_argv0=(
-                self.adapter_command[0] if self.adapter_command else None
-            ),
+            adapter_argv0=(self.adapter_command[0] if self.adapter_command else None),
         )
 
     def set_breakpoints(

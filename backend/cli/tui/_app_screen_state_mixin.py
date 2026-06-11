@@ -92,7 +92,11 @@ class _AppScreenStateMixin:
         return workspace
 
     def _build_hud_line1(
-        self, display_state: str, state_color: str, model_display: str, ws_display: str,
+        self,
+        display_state: str,
+        state_color: str,
+        model_display: str,
+        ws_display: str,
     ) -> str:
         parts = [
             '[#91abec bold]GRINTA[/]',
@@ -157,7 +161,9 @@ class _AppScreenStateMixin:
 
         workspace = self._resolve_workspace_display(hud.state.workspace_path)
         ws_display = HUDBar.ellipsize_path(workspace, 35)
-        line1 = self._build_hud_line1(display_state, state_color, model_display, ws_display)
+        line1 = self._build_hud_line1(
+            display_state, state_color, model_display, ws_display
+        )
 
         token_display = self._build_context_display(used, limit)
         help_hint = r'[#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
@@ -334,17 +340,9 @@ class _AppScreenStateMixin:
         cmd: str,
         parts: list[str],
     ) -> str | None:
-        if (
-            cmd == '/sessions'
-            and len(parts) > 1
-            and parts[-1].startswith('--')
-        ):
+        if cmd == '/sessions' and len(parts) > 1 and parts[-1].startswith('--'):
             return 'Sessions flags: --limit --search --sort --preview --delete'
-        if (
-            cmd == '/help'
-            and len(parts) > 1
-            and parts[-1].startswith('--')
-        ):
+        if cmd == '/help' and len(parts) > 1 and parts[-1].startswith('--'):
             return 'Help flags: --all or --search <term>'
         return None
 

@@ -462,9 +462,8 @@ class ActivityCard(Container):
         )
 
     def _try_json_syntax(self, content: str) -> Any | None:
-        is_json_shape = (
-            (content.startswith('{') and content.endswith('}'))
-            or (content.startswith('[') and content.endswith(']'))
+        is_json_shape = (content.startswith('{') and content.endswith('}')) or (
+            content.startswith('[') and content.endswith(']')
         )
         if not is_json_shape:
             return None
@@ -481,9 +480,7 @@ class ActivityCard(Container):
 
     def _auto_detect_format(self, content: str) -> Any:
         if self._is_diff_like_content(content):
-            return self._build_syntax_renderable(
-                content, 'diff', line_numbers=True
-            )
+            return self._build_syntax_renderable(content, 'diff', line_numbers=True)
         json_result = self._try_json_syntax(content)
         if json_result is not None:
             return json_result
@@ -667,9 +664,7 @@ class ActivityCard(Container):
         try:
             row = self.query_one('#collapsed-row-container', Horizontal)
             if not row.query('#caret'):
-                row.mount(
-                    Static(self._caret_char(), id='caret', classes='card-caret')
-                )
+                row.mount(Static(self._caret_char(), id='caret', classes='card-caret'))
         except Exception:
             pass
 
@@ -881,10 +876,7 @@ class ThinkingIndicator(Container):
     """
 
     # Pattern to match fenced code blocks: ```language\n...\n```
-    _CODE_BLOCK_PATTERN = re.compile(
-        r'```(\w*)\n(.*?)```',
-        re.DOTALL
-    )
+    _CODE_BLOCK_PATTERN = re.compile(r'```(\w*)\n(.*?)```', re.DOTALL)
 
     def __init__(self, *, id: str | None = None) -> None:
         super().__init__(id=id)
@@ -934,7 +926,7 @@ class ThinkingIndicator(Container):
         last_end = 0
         for match in self._CODE_BLOCK_PATTERN.finditer(text):
             if match.start() > last_end:
-                plain_text = text[last_end:match.start()]
+                plain_text = text[last_end : match.start()]
                 if plain_text.strip():
                     segments.append(('plain', plain_text))
             language = match.group(1) or 'text'
@@ -958,12 +950,13 @@ class ThinkingIndicator(Container):
         for seg_type, seg_content in segments:
             if seg_type == 'plain':
                 if not children:
-                    parts = [(prefix, f'bold {prefix_color}'), (seg_content, text_color)]
+                    parts = [
+                        (prefix, f'bold {prefix_color}'),
+                        (seg_content, text_color),
+                    ]
                     text_widget = TextualStatic(Text.assemble(*parts))
                 else:
-                    text_widget = TextualStatic(
-                        Text(seg_content, style=text_color)
-                    )
+                    text_widget = TextualStatic(Text(seg_content, style=text_color))
                 children.append(text_widget)
             else:
                 language, code = seg_content
@@ -1006,7 +999,10 @@ class ThinkingIndicator(Container):
         prefix_color = '#42a394'
         text_color = '#8c8c94'
         lines = self._thoughts
-        parts: list[tuple[str, str]] = [(prefix, f'bold {prefix_color}'), (lines[0], text_color)]
+        parts: list[tuple[str, str]] = [
+            (prefix, f'bold {prefix_color}'),
+            (lines[0], text_color),
+        ]
         for line in lines[1:]:
             parts.append(('\n  ', text_color))
             parts.append((line, text_color))

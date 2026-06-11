@@ -53,7 +53,7 @@ class TestEnsureCanStep:
             tripped=True, reason='rate limit', action='pause', recommendation='slow'
         )
         assert await svc.ensure_can_step() is False
-        ctrl.set_agent_state_to.assert_awaited_once_with(AgentState.PAUSED)
+        ctrl.set_agent_state_to.assert_awaited_once_with(AgentState.STOPPED)
 
     @pytest.mark.asyncio
     async def test_stuck_detection(self):

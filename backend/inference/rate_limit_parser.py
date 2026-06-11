@@ -140,7 +140,9 @@ def _classify_message(text: str) -> RateLimitKind:
     return RateLimitKind.UNKNOWN
 
 
-def _get_remaining_from_headers(headers: dict[str, str]) -> tuple[str | None, str | None]:
+def _get_remaining_from_headers(
+    headers: dict[str, str],
+) -> tuple[str | None, str | None]:
     rem_tokens = headers.get('x-ratelimit-remaining-tokens') or headers.get(
         'anthropic-ratelimit-tokens-remaining'
     )

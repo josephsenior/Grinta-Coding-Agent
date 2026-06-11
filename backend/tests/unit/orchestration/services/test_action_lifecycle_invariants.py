@@ -171,8 +171,8 @@ class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):
 
     async def test_restored_state_late_observation_does_not_duplicate_advancement(self):
         """A restored controller with no pending action must ignore stale late observations."""
-        self.controller.state.resume_state = AgentState.PAUSED
-        self.controller.state.agent_state = AgentState.PAUSED
+        self.controller.state.resume_state = AgentState.AWAITING_USER_INPUT
+        self.controller.state.agent_state = AgentState.AWAITING_USER_INPUT
 
         late_observation = CmdOutputObservation(
             content='late result',

@@ -15,8 +15,12 @@ from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.terminal import TerminalObservation
 
 
-def _cmd_output(event_id: int, content: str, *, exit_code: int = 0) -> CmdOutputObservation:
-    obs = CmdOutputObservation(content=content, command='pytest -q', exit_code=exit_code)
+def _cmd_output(
+    event_id: int, content: str, *, exit_code: int = 0
+) -> CmdOutputObservation:
+    obs = CmdOutputObservation(
+        content=content, command='pytest -q', exit_code=exit_code
+    )
     obs.id = event_id
     return obs
 
@@ -68,7 +72,13 @@ def test_apply_tool_result_budget_persists_terminal_observation(tmp_path: Path) 
 
 def test_extract_latest_pytest_summary() -> None:
     events = [
-        _cmd_output(1, '============================= 2 passed in 1.0s ============================='),
-        _cmd_output(3, '======================== 18 failed, 9 passed in 50.31s ========================'),
+        _cmd_output(
+            1,
+            '============================= 2 passed in 1.0s =============================',
+        ),
+        _cmd_output(
+            3,
+            '======================== 18 failed, 9 passed in 50.31s ========================',
+        ),
     ]
     assert extract_latest_pytest_summary(events) == '18 failed, 9 passed in 50.31s'

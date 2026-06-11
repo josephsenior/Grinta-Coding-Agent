@@ -103,7 +103,9 @@ def _apply_mcp_tools(orch: Orchestrator, mcp_tools: list[dict]) -> None:
         visible_names = list(orch.mcp_tools.keys())
         if native_web_on:
             visible_names = [
-                name for name in visible_names if name not in MCP_TOOLS_HIDDEN_BY_NATIVE_WEB
+                name
+                for name in visible_names
+                if name not in MCP_TOOLS_HIDDEN_BY_NATIVE_WEB
             ]
         pm.mcp_tool_names = visible_names
         descriptions = _mcp_tool_descriptions_from_specs(mcp_tools)

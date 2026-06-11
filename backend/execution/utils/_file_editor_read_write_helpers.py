@@ -27,9 +27,7 @@ from backend.execution.utils._file_editor_types import ToolResult
 from backend.execution.utils._file_editor_view_mixin import _detect_indentation_mismatch
 
 
-def read_file_with_meta_impl(
-    self, file_path: Path
-) -> tuple[str, _FileReadMeta]:
+def read_file_with_meta_impl(self, file_path: Path) -> tuple[str, _FileReadMeta]:
     """Read text and capture encoding + newline style for symmetric writes."""
     raw = file_path.read_bytes()
     if not raw:
@@ -58,9 +56,7 @@ def read_file_with_meta_impl(
 
     crlf = text.count('\r\n')
     lone_lf = text.count('\n') - crlf
-    newline: Literal['crlf', 'lf'] = (
-        'crlf' if crlf > 0 and crlf >= lone_lf else 'lf'
-    )
+    newline: Literal['crlf', 'lf'] = 'crlf' if crlf > 0 and crlf >= lone_lf else 'lf'
     return text, _FileReadMeta(encoding=encoding, newline=newline, had_bom=had_bom)
 
 
@@ -159,11 +155,15 @@ def _validate_replace_range_bounds(
     lines = content.splitlines(keepends=True)
 
     if not lines:
-        return ToolResult(
-            output='',
-            error=f'Cannot edit range {start_line}-{end_line} in an empty file.',
-            new_content=content,
-        ) if start_line != 1 else None
+        return (
+            ToolResult(
+                output='',
+                error=f'Cannot edit range {start_line}-{end_line} in an empty file.',
+                new_content=content,
+            )
+            if start_line != 1
+            else None
+        )
 
     if start_line < 1:
         return ToolResult(

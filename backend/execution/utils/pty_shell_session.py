@@ -308,9 +308,7 @@ class PtyInteractiveShellSession(BaseShellSession):
             timeout=open_wait,
         ):
             self._shell_ready = True
-            logger.info(
-                'Pty pwsh session prompt ready (execute/read can proceed).'
-            )
+            logger.info('Pty pwsh session prompt ready (execute/read can proceed).')
             return
         # Best-effort: any buffered output means the shell is alive; proceed so
         # terminal_run can return within the open budget instead of blocking writes.

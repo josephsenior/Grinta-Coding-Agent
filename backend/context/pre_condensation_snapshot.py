@@ -17,8 +17,8 @@ Extracted context:
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -319,6 +319,8 @@ def _extract_errors(event: Event, snapshot: dict) -> None:
         if getattr(event, 'notify_ui_only', False):
             return
         content = str(getattr(event, 'content', ''))[:_MAX_CONTENT_LENGTH]
+        if _is_recoverable_tool_error_text(content):
+            return
         if content:
             snapshot['recent_errors'].append(content)
     elif cls_name == 'CmdOutputObservation':
@@ -327,6 +329,8 @@ def _extract_errors(event: Event, snapshot: dict) -> None:
             content = str(getattr(event, 'content', ''))
             lines = content.strip().split('\n')
             error_tail = '\n'.join(lines[-5:])[:_MAX_CONTENT_LENGTH]
+            if _is_recoverable_tool_error_text(error_tail):
+                return
             if error_tail:
                 snapshot['recent_errors'].append(
                     f'[exit_code={exit_code}] {error_tail}'
@@ -369,6 +373,7 @@ def _extract_decisions(event: Event, snapshot: dict) -> None:
             and not should_skip
             and not _is_invalidated_assumption_text(thought)
             and not _is_control_noise_text(thought)
+            and not _is_recoverable_tool_error_text(thought)
         ):
             snapshot['decisions'].append(thought[:_MAX_CONTENT_LENGTH])
 
@@ -384,6 +389,20 @@ def _is_control_noise_text(text: str) -> bool:
         'restored context',
     )
     return any(marker in lower for marker in control_markers)
+
+
+def _is_recoverable_tool_error_text(text: str) -> bool:
+    lower = ' '.join(str(text).casefold().split())
+    if not lower:
+        return False
+    markers = (
+        'missing required argument',
+        'recover by emitting one corrected tool call',
+        'strict json arguments',
+        'line range requires both start_line and end_line',
+        'tool call read',
+    )
+    return any(marker in lower for marker in markers)
 
 
 _INVALIDATION_MARKERS = (
@@ -443,6 +462,8 @@ def _extract_invalidated_assumptions(event: Event, snapshot: dict) -> None:
     text = _event_reasoning_text(event)
     if not text:
         return
+    if _is_recoverable_tool_error_text(text):
+        return
     if _is_invalidated_assumption_text(text):
         clipped = text[:_MAX_CONTENT_LENGTH]
         if clipped not in invalidated:
@@ -489,7 +510,9 @@ def _extract_background_tasks(event: Event, snapshot: dict) -> None:
     if still_running is False:
         return
     suffix = str(getattr(metadata, 'suffix', '') or '')
-    session_id = _extract_background_session_id(suffix) or _extract_background_session_id(content)
+    session_id = _extract_background_session_id(
+        suffix
+    ) or _extract_background_session_id(content)
     command = str(getattr(event, 'command', '')).strip()
     next_action = (
         f'terminal_read(session_id="{session_id}")'
@@ -591,9 +614,9 @@ def _process_event_for_approaches(
     if cls_name == 'CmdRunAction':
         return _make_cmd_run_action(event)
     if cls_name == 'ErrorObservation' and pending:
-        _append_with_outcome(
-            approaches, pending, f'FAILED: {str(getattr(event, "content", ""))[:150]}'
-        )
+        content = str(getattr(event, 'content', ''))
+        if not _is_recoverable_tool_error_text(content):
+            _append_with_outcome(approaches, pending, f'FAILED: {content[:150]}')
         return None
     if cls_name == 'CmdOutputObservation' and pending:
         _handle_cmd_output(approaches, pending, event)
@@ -624,6 +647,8 @@ def _make_cmd_run_action(event: Event) -> dict[str, Any]:
 
 def _append_with_outcome(approaches: list, action: dict, outcome: str) -> None:
     """Append action with outcome to approaches if under the max limit."""
+    if _is_recoverable_tool_error_text(outcome):
+        return
     if len(approaches) < _MAX_ATTEMPTED_APPROACHES:
         action['outcome'] = outcome
         approaches.append(action)
@@ -636,6 +661,8 @@ def _handle_cmd_output(
     exit_code = getattr(event, 'exit_code', 0)
     if exit_code != 0:
         content = str(getattr(event, 'content', ''))
+        if _is_recoverable_tool_error_text(content):
+            return None
         lines = content.strip().split('\n')
         tail = lines[-1][:150] if lines else ''
         outcome = f'FAILED (exit={exit_code}): {tail}'
@@ -827,9 +854,7 @@ def _format_invalidated_assumptions_section(invalidated: list) -> list[str]:
     """Format assumptions that should not be relied on after recovery."""
     if not invalidated:
         return []
-    lines = [
-        f'\nInvalidated assumptions ({len(invalidated)}) - do not rely on these:'
-    ]
+    lines = [f'\nInvalidated assumptions ({len(invalidated)}) - do not rely on these:']
     for item in invalidated[-8:]:
         lines.append(f'  - {str(item)[:200]}')
     return lines

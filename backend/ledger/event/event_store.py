@@ -254,9 +254,7 @@ class EventStore(EventStoreABC):
                 yield from batch_events
                 return
 
-        yield from self._search_event_files(
-            start_id, end_id, step, event_filter, limit
-        )
+        yield from self._search_event_files(start_id, end_id, step, event_filter, limit)
 
     def _can_use_sqlite_batch(
         self, reverse: bool, event_filter: EventFilter | None, step: int
@@ -273,12 +271,15 @@ class EventStore(EventStoreABC):
     ) -> list[Event]:
         try:
             batch = self._sqlite_store.list_events(
-                start_id=start_id, end_id=end_id, limit=limit,
+                start_id=start_id,
+                end_id=end_id,
+                limit=limit,
             )
         except (json.JSONDecodeError, ValueError) as exc:
             logger.debug(
                 'SQLite batch read failed for %s; falling back to per-event scan: %s',
-                self.sid, exc,
+                self.sid,
+                exc,
             )
             return []
         events: list[Event] = []
@@ -288,7 +289,8 @@ class EventStore(EventStoreABC):
             except (json.JSONDecodeError, ValueError, TypeError) as exc:
                 logger.warning(
                     'Skipping corrupt SQLite event in batch for %s: %s',
-                    self.sid, exc,
+                    self.sid,
+                    exc,
                 )
                 continue
             events.append(event)
@@ -336,13 +338,18 @@ class EventStore(EventStoreABC):
             corrupt_seen += 1
             logger.warning(
                 'Skipping corrupt event id=%s in search for %s: %s (skipped %s/%s)',
-                index, self.sid, exc, corrupt_seen, max_corrupt,
+                index,
+                self.sid,
+                exc,
+                corrupt_seen,
+                max_corrupt,
                 extra={'session_id': self.sid, 'event_id': index},
             )
             if corrupt_seen >= max_corrupt:
                 logger.error(
                     'Aborting event search for %s: %s consecutive corrupt events',
-                    self.sid, max_corrupt,
+                    self.sid,
+                    max_corrupt,
                 )
                 return _SEARCH_ABORT
             return None, corrupt_seen
@@ -488,7 +495,9 @@ class EventStore(EventStoreABC):
         if pruned > 0:
             logger.info(
                 'prune_old_events: removed %d events older than id %d for session %s',
-                pruned, cutoff_id, self.sid,
+                pruned,
+                cutoff_id,
+                self.sid,
             )
         return pruned
 

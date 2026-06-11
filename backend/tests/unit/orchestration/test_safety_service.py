@@ -16,7 +16,6 @@ from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
 )
-from backend.orchestration.autonomy import AutonomyLevel
 from backend.orchestration.services.safety_service import SafetyService
 
 

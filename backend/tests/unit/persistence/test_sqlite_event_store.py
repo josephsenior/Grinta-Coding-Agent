@@ -628,9 +628,11 @@ class TestErrorHandling:
         self, store: SQLiteEventStore
     ) -> None:
         store.write_event(0, {'action': 'message', 'args': {'n': 1}})
-        row = store._get_read_conn().execute(
-            'SELECT payload FROM events WHERE id = 0'
-        ).fetchone()
+        row = (
+            store._get_read_conn()
+            .execute('SELECT payload FROM events WHERE id = 0')
+            .fetchone()
+        )
         assert row is not None
         import json
 
@@ -652,9 +654,11 @@ class TestErrorHandling:
         self, store: SQLiteEventStore
     ) -> None:
         store.write_event(0, {'action': 'message', 'args': {'n': 1}})
-        row = store._get_read_conn().execute(
-            'SELECT payload FROM events WHERE id = 0'
-        ).fetchone()
+        row = (
+            store._get_read_conn()
+            .execute('SELECT payload FROM events WHERE id = 0')
+            .fetchone()
+        )
         assert row is not None
         import json
 

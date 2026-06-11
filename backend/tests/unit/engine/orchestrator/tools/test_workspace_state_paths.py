@@ -19,8 +19,9 @@ def test_working_memory_writes_under_app_dir(tmp_path, monkeypatch) -> None:
     action = wm.build_working_memory_action(
         {'command': 'update', 'section': 'plan', 'content': 'next step'}
     )
+    observation = wm.execute_working_memory(action)
 
-    assert "Updated 'plan'" in action.thought
+    assert "Updated 'plan'" in observation.content
     memory_file = tmp_path / 'working_memory_test-session.json'
     assert memory_file.exists()
     assert json.loads(memory_file.read_text(encoding='utf-8'))['plan'] == 'next step'
@@ -39,8 +40,9 @@ def test_working_memory_update_all_sections_parses_markdown_headers(
     action = wm.build_working_memory_action(
         {'command': 'update', 'section': 'all', 'content': content}
     )
+    observation = wm.execute_working_memory(action)
 
-    assert 'Updated sections: hypothesis, findings' in action.thought
+    assert 'Updated sections: hypothesis, findings' in observation.content
     payload = json.loads(
         (tmp_path / 'working_memory_test-session.json').read_text(encoding='utf-8')
     )
@@ -73,8 +75,9 @@ def test_working_memory_clear_section_all_clears_all_sections(
     action = wm.build_working_memory_action(
         {'command': 'clear_section', 'section': 'all'}
     )
+    observation = wm.execute_working_memory(action)
 
-    assert 'Cleared all sections' in action.thought
+    assert 'Cleared all sections' in observation.content
     payload = json.loads(memory_file.read_text(encoding='utf-8'))
     for section in ('hypothesis', 'findings', 'plan'):
         assert section not in payload
@@ -120,7 +123,9 @@ def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) 
     ]
 
 
-def test_smart_compactor_reads_in_progress_ids_from_app_plan(tmp_path, monkeypatch) -> None:
+def test_smart_compactor_reads_in_progress_ids_from_app_plan(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setattr(
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,

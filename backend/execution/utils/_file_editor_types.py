@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from typing import Any
 
 
-
 @dataclass
 class ToolResult:
     """Result of a file editor operation."""
@@ -23,4 +22,3 @@ class ToolResult:
     retryable: bool = False
     operation: str | None = None
     metadata: dict[str, Any] | None = None
-

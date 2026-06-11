@@ -87,6 +87,18 @@ def test_compaction_continuity_gate_passes_for_complete_snapshot():
     assert result.passed
 
 
+def test_compaction_gate_demotes_noncritical_missing_text_to_telemetry():
+    events = _coding_session_events()
+    restored = format_snapshot_for_injection(extract_snapshot(events))
+    restored = restored.replace('Use token-budget-aware backward assembly.', '')
+
+    passed, result = compaction_passes_continuity_gate(events, restored)
+
+    assert passed
+    assert not result.passed
+    assert any(f.category == 'decision' for f in result.missing)
+
+
 def test_continuity_eval_reports_missing_semantic_fact():
     events = _coding_session_events()
     restored = format_snapshot_for_injection(extract_snapshot(events))

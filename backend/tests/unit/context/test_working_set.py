@@ -36,7 +36,11 @@ def test_sync_snapshot_to_working_memory_updates_sections(tmp_path) -> None:
         ],
         'decisions': ['Fix message routing in client_set'],
         'attempted_approaches': [
-            {'type': 'cmd', 'detail': 'rewrite network.py', 'outcome': 'FAILED: timeout'}
+            {
+                'type': 'cmd',
+                'detail': 'rewrite network.py',
+                'outcome': 'FAILED: timeout',
+            }
         ],
     }
     from backend.engine.tools.working_memory import set_current_session_id
@@ -45,7 +49,9 @@ def test_sync_snapshot_to_working_memory_updates_sections(tmp_path) -> None:
     memory_file = tmp_path / 'working_memory_ws-test.json'
 
     with (
-        patch('backend.engine.tools.working_memory._memory_path', return_value=memory_file),
+        patch(
+            'backend.engine.tools.working_memory._memory_path', return_value=memory_file
+        ),
         patch(
             'backend.context.pre_condensation_snapshot.format_snapshot_for_injection',
             return_value='<RESTORED_CONTEXT>summary</RESTORED_CONTEXT>',
@@ -71,7 +77,9 @@ def test_failed_approaches_are_deduped_outside_hypothesis(tmp_path) -> None:
     memory_file = tmp_path / 'working_memory_ws-failed-dedupe.json'
 
     with (
-        patch('backend.engine.tools.working_memory._memory_path', return_value=memory_file),
+        patch(
+            'backend.engine.tools.working_memory._memory_path', return_value=memory_file
+        ),
         patch(
             'backend.context.pre_condensation_snapshot.format_snapshot_for_injection',
             return_value='',
@@ -105,7 +113,9 @@ def test_sync_snapshot_preserves_background_task_as_blocker(tmp_path) -> None:
     memory_file = tmp_path / 'working_memory_ws-bg-task.json'
 
     with (
-        patch('backend.engine.tools.working_memory._memory_path', return_value=memory_file),
+        patch(
+            'backend.engine.tools.working_memory._memory_path', return_value=memory_file
+        ),
         patch(
             'backend.context.pre_condensation_snapshot.format_snapshot_for_injection',
             return_value='',
@@ -121,7 +131,9 @@ def test_sync_snapshot_preserves_background_task_as_blocker(tmp_path) -> None:
     assert 'terminal_read' in data['current_state']
 
 
-def test_working_memory_prompt_prioritizes_current_state_over_hypothesis(tmp_path) -> None:
+def test_working_memory_prompt_prioritizes_current_state_over_hypothesis(
+    tmp_path,
+) -> None:
     from backend.engine.tools.working_memory import (
         get_working_memory_prompt_block,
         set_current_session_id,
@@ -140,7 +152,9 @@ def test_working_memory_prompt_prioritizes_current_state_over_hypothesis(tmp_pat
         encoding='utf-8',
     )
 
-    with patch('backend.engine.tools.working_memory._memory_path', return_value=memory_file):
+    with patch(
+        'backend.engine.tools.working_memory._memory_path', return_value=memory_file
+    ):
         block = get_working_memory_prompt_block(char_budget=700)
 
     assert 'Next action: fix parser' in block

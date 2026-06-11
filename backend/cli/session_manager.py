@@ -134,6 +134,7 @@ def _fuzzy_score_session(
     session: tuple[str, dict[str, Any], int],
 ) -> int:
     from rapidfuzz import fuzz
+
     sid, meta, _ = session
     title = _safe_str(meta.get('title') or meta.get('name')).lower()
     model = _safe_str(meta.get('llm_model')).lower()
@@ -460,6 +461,7 @@ def _print_delete_confirmation(
     to_delete: list[tuple[str, dict[str, Any], int]],
 ) -> bool:
     from rich.prompt import Confirm
+
     console.print(f'Will delete {len(to_delete)} session(s):')
     for sid, meta, _count in to_delete:
         title = str(meta.get('title') or meta.get('name') or sid)

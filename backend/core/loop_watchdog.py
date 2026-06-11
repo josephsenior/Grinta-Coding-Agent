@@ -198,8 +198,7 @@ class _LoopWatchdog:
                     self._log_stall(loop_age)
             elif self._stalled_since is not None:
                 logger.warning(
-                    'EVENT_LOOP_RECOVERED: main loop resumed after ~%.0fs '
-                    'blocked.',
+                    'EVENT_LOOP_RECOVERED: main loop resumed after ~%.0fs blocked.',
                     now - self._stalled_since,
                     extra={
                         'msg_type': 'EVENT_LOOP_RECOVERED',

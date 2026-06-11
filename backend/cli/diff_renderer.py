@@ -199,9 +199,7 @@ def _build_diff_header(file_path: str, total_added: int, total_removed: int) -> 
     return Text(f'  {header_text}', style=f'bold {CLR_CARD_TITLE}')
 
 
-def _append_group_lines(
-    all_lines: list[Text], group: dict[str, list[str]]
-) -> None:
+def _append_group_lines(all_lines: list[Text], group: dict[str, list[str]]) -> None:
     for line in group.get('before_edits', []):
         all_lines.append(_style_diff_line(line))
     for line in group.get('after_edits', []):
@@ -426,7 +424,9 @@ class DiffPanel:
         from rich.text import Text
 
         total_added, total_removed = _count_diff_totals(groups)
-        all_lines: list[Text] = [_build_diff_header(file_path, total_added, total_removed)]
+        all_lines: list[Text] = [
+            _build_diff_header(file_path, total_added, total_removed)
+        ]
 
         for i, group in enumerate(groups):
             if i > 0:

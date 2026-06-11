@@ -10,9 +10,9 @@ import json
 import time
 from pathlib import Path
 
-from backend.inference.tool_names import NOTE_TOOL_NAME, RECALL_TOOL_NAME
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
+from backend.inference.tool_names import NOTE_TOOL_NAME, RECALL_TOOL_NAME
 from backend.ledger.action.memory_tools import (
     ScratchpadNoteAction,
     ScratchpadRecallAction,

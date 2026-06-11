@@ -452,9 +452,7 @@ def _detach_idle_to_background(
     session._bg_stderr_capture = stderr_cap
     partial = stdout_cap.read_all()
     err_partial = _read_stderr(stderr_cap)
-    combined = partial + (
-        f'\n[stderr so far]:\n{err_partial}' if err_partial else ''
-    )
+    combined = partial + (f'\n[stderr so far]:\n{err_partial}' if err_partial else '')
     return combined, '', -2
 
 
@@ -479,7 +477,9 @@ def _kill_on_hard_timeout(
     return partial_out, err_msg, 124
 
 
-def _try_create_interactive_session(session_kwargs: dict[str, Any]) -> UnifiedShellSession | None:
+def _try_create_interactive_session(
+    session_kwargs: dict[str, Any],
+) -> UnifiedShellSession | None:
     try:
         from backend.execution.utils.pty_session import PtyUnavailableError
         from backend.execution.utils.pty_shell_session import (

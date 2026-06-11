@@ -3004,8 +3004,6 @@ async def test_renderer_dedupes_identical_retry_status_lines() -> None:
 
 @pytest.mark.asyncio
 async def test_renderer_renders_final_message_action() -> None:
-    from backend.ledger.observation.agent import AgentStateChangedObservation
-
     console = _make_console()
     hud = HUDBar()
     renderer = CLIEventRenderer(

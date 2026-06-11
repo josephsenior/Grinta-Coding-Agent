@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -95,9 +94,7 @@ class TestActionExecutionTimeout:
         from backend.ledger.observation import FileReadObservation
 
         runtime = _make_runtime_with_mocked_execute()
-        normal_obs = FileReadObservation(
-            content='hello world', path='/tmp/example.py'
-        )
+        normal_obs = FileReadObservation(content='hello world', path='/tmp/example.py')
         runtime._execute_action = AsyncMock(return_value=normal_obs)  # type: ignore[method-assign]
 
         event_stream = MagicMock()

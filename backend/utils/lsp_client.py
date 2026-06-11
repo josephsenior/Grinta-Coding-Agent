@@ -164,8 +164,7 @@ class LspResult:
         """Return a human-readable summary for the LLM."""
         if not self.available:
             return (
-                'LSP is not available (pylsp not installed). '
-                'Use grep or glob instead.'
+                'LSP is not available (pylsp not installed). Use grep or glob instead.'
             )
         if self.error:
             return f'LSP error: {self.error}'

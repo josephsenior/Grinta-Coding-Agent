@@ -474,7 +474,9 @@ class TestBaseLLMCompactor:
             patch.object(c._compactor, 'compact', return_value=view.events),
             patch.object(c, 'should_compact', return_value=False),
             patch.object(c, '_exceeds_token_budget', return_value=False),
-            patch.object(c, 'get_compaction', return_value=compaction) as get_compaction,
+            patch.object(
+                c, 'get_compaction', return_value=compaction
+            ) as get_compaction,
         ):
             result = await c.compact(view)
 

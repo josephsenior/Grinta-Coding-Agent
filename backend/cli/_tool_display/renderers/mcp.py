@@ -66,7 +66,9 @@ def render_mcp_tool(
     return lines
 
 
-def _try_match_path_args(short_name: str, args: dict[str, Any], keywords: tuple[str, ...]) -> str | None:
+def _try_match_path_args(
+    short_name: str, args: dict[str, Any], keywords: tuple[str, ...]
+) -> str | None:
     if any(kw in short_name.lower() for kw in keywords) and 'path' in args:
         path = args.get('path', '')
         if isinstance(path, str) and path:
@@ -82,7 +84,9 @@ def _try_match_search_args(short_name: str, args: dict[str, Any]) -> str | None:
     return None
 
 
-def _try_match_command_args(short_name: str, args: dict[str, Any], keywords: tuple[str, ...]) -> str | None:
+def _try_match_command_args(
+    short_name: str, args: dict[str, Any], keywords: tuple[str, ...]
+) -> str | None:
     if any(kw in short_name.lower() for kw in keywords) and 'command' in args:
         cmd = args.get('command', '')
         if isinstance(cmd, str):
@@ -211,9 +215,7 @@ def _format_mcp_result_list(result: list) -> list[str]:
     output = [f'[{CLR_STATUS_OK}]Items ({len(result)}):[/]']
     for item in result[:5]:
         if isinstance(item, dict):
-            name = item.get(
-                'name', item.get('title', item.get('path', str(item)[:40]))
-            )
+            name = item.get('name', item.get('title', item.get('path', str(item)[:40])))
             output.append(f'  [dim]· {name}[/dim]')
         elif isinstance(item, str):
             output.append(f'  [dim]· {item[:60]}[/dim]')

@@ -123,7 +123,9 @@ def work_remains(state: object | None) -> bool:
     """The only active-work predicate: any tracker item todo/in_progress."""
     if not tracker_created(state):
         return False
-    return any(task_status(step) in ACTIVE_TASK_STATUSES for step in current_task_steps(state))
+    return any(
+        task_status(step) in ACTIVE_TASK_STATUSES for step in current_task_steps(state)
+    )
 
 
 def tracker_terminal(state: object | None) -> bool:

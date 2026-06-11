@@ -2,13 +2,12 @@ from typing import Any
 
 from backend.core.errors import FunctionCallValidationError
 from backend.engine.function_calling_helpers import validate_security_risk
+from backend.inference.tool_names import TERMINAL_MANAGER_TOOL_NAME
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
 )
-
-from backend.inference.tool_names import TERMINAL_MANAGER_TOOL_NAME
 
 
 def create_terminal_manager_tool() -> dict[str, Any]:
@@ -121,9 +120,9 @@ def create_terminal_manager_tool() -> dict[str, Any]:
                         'enum': ['LOW', 'MEDIUM', 'HIGH'],
                         'description': (
                             "Required when action='open'. Classify the risk of the command you are launching: "
-                            "LOW for safe project commands (e.g. running tests, listing files), "
-                            "MEDIUM for project-scoped installs or scripts, "
-                            "HIGH for system-level or potentially destructive commands."
+                            'LOW for safe project commands (e.g. running tests, listing files), '
+                            'MEDIUM for project-scoped installs or scripts, '
+                            'HIGH for system-level or potentially destructive commands.'
                         ),
                     },
                 },
@@ -187,7 +186,9 @@ def _handle_open_action(arguments: dict) -> TerminalRunAction:
     )
 
 
-def _has_input_content(input_val: object, control_val: object, rows: int | None) -> bool:
+def _has_input_content(
+    input_val: object, control_val: object, rows: int | None
+) -> bool:
     if str(input_val).strip():
         return True
     if control_val and str(control_val).strip():
@@ -195,7 +196,9 @@ def _has_input_content(input_val: object, control_val: object, rows: int | None)
     return rows is not None
 
 
-def _validate_input_params(session_id: object, input_val: object, control_val: object, rows: int | None) -> None:
+def _validate_input_params(
+    session_id: object, input_val: object, control_val: object, rows: int | None
+) -> None:
     if not session_id:
         raise ValueError(
             "Terminal 'input' action requires 'session_id'. "
@@ -249,9 +252,7 @@ def _handle_read_action(arguments: dict) -> TerminalReadAction:
         )
     mode = str(arguments.get('mode', 'delta') or 'delta').lower()
     if mode not in {'delta', 'snapshot'}:
-        raise ValueError(
-            "Terminal 'read' action requires mode in {'delta','snapshot'}"
-        )
+        raise ValueError("Terminal 'read' action requires mode in {'delta','snapshot'}")
     return TerminalReadAction(
         session_id=session_id,
         offset=_opt_int(arguments.get('offset')),

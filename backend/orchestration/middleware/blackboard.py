@@ -21,7 +21,6 @@ class BlackboardMiddleware(ToolInvocationMiddleware):
         from backend.ledger.action.agent import BlackboardAction
         from backend.ledger.event import EventSource
         from backend.ledger.observation import AgentThinkObservation, ErrorObservation
-        from backend.ledger.observation_cause import attach_observation_cause
 
         if not isinstance(ctx.action, BlackboardAction):
             return
@@ -39,12 +38,15 @@ class BlackboardMiddleware(ToolInvocationMiddleware):
             content = await self._execute_blackboard_cmd(blackboard, cmd, key, value)
             self._emit_result(ctx, content, EventSource, AgentThinkObservation)
         except Exception as e:
-            self._emit_error(ctx, f'[BLACKBOARD] Error: {e}', EventSource, ErrorObservation)
+            self._emit_error(
+                ctx, f'[BLACKBOARD] Error: {e}', EventSource, ErrorObservation
+            )
 
     def _resolve_blackboard(self):
         blackboard = getattr(self.controller.config, 'blackboard', None)
         if blackboard is None:
             from backend.orchestration.blackboard import Blackboard
+
             blackboard = Blackboard()
         return blackboard
 

@@ -23,10 +23,10 @@ from backend.core.constants import (
     DEFAULT_AGENT_STEP_DRAIN_LIMIT,
     DEFAULT_PENDING_ACTION_TIMEOUT,
 )
-from backend.core.step_phase import clear_step_phase, set_step_phase
 from backend.core.enums import LifecyclePhase
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
+from backend.core.step_phase import clear_step_phase, set_step_phase
 from backend.ledger import EventSource, EventStreamSubscriber
 from backend.ledger.action import (
     Action,
@@ -292,7 +292,8 @@ class SessionOrchestrator(
         self.services.retry.ensure_worker_started()
 
         step_liveness_seconds = resolve_step_task_liveness_seconds(
-            getattr(self, 'agent', None), default_liveness_seconds=DEFAULT_STEP_TASK_LIVENESS_SECONDS,
+            getattr(self, 'agent', None),
+            default_liveness_seconds=DEFAULT_STEP_TASK_LIVENESS_SECONDS,
         )
 
         async with self._step_lock:
@@ -305,12 +306,13 @@ class SessionOrchestrator(
                     asyncio.get_event_loop().call_soon(self._create_step_task)
 
     async def _drain_steps(self, step_liveness_seconds: float) -> None:
-        from backend.core.constants import DEFAULT_AGENT_STEP_DRAIN_LIMIT
         drained_count = 0
         while drained_count < DEFAULT_AGENT_STEP_DRAIN_LIMIT:
             drained_count += 1
             try:
-                await asyncio.wait_for(self._step_inner(), timeout=step_liveness_seconds)
+                await asyncio.wait_for(
+                    self._step_inner(), timeout=step_liveness_seconds
+                )
             except asyncio.TimeoutError:
                 await self._handle_liveness_timeout(step_liveness_seconds)
                 break
@@ -326,7 +328,8 @@ class SessionOrchestrator(
     async def _handle_liveness_timeout(self, step_liveness_seconds: float) -> None:
         logger.error(
             'STEP_TASK_LIVENESS_TIMEOUT: _step_inner did not complete within %.0fs; force-cancelling and clearing pending state.',
-            step_liveness_seconds, extra={'msg_type': 'STEP_TASK_LIVENESS_TIMEOUT'},
+            step_liveness_seconds,
+            extra={'msg_type': 'STEP_TASK_LIVENESS_TIMEOUT'},
         )
         self._cancel_executor_on_timeout()
         self._clear_pending_state_on_timeout()
@@ -338,33 +341,47 @@ class SessionOrchestrator(
             if agent is None:
                 return
             executor = getattr(agent, 'executor', None)
-            cancel_fn = getattr(executor, 'cancel_step', None) if executor is not None else None
+            cancel_fn = (
+                getattr(executor, 'cancel_step', None) if executor is not None else None
+            )
             if callable(cancel_fn):
                 cancel_fn()
         except Exception:
-            logger.debug('Failed to cancel executor after step-task liveness timeout', exc_info=True)
+            logger.debug(
+                'Failed to cancel executor after step-task liveness timeout',
+                exc_info=True,
+            )
 
     def _clear_pending_state_on_timeout(self) -> None:
         try:
-            pending_service = getattr(getattr(self, 'services', None), 'pending_action', None)
+            pending_service = getattr(
+                getattr(self, 'services', None), 'pending_action', None
+            )
             if pending_service is not None:
                 pending_service.clear_primary()
         except Exception:
-            logger.debug('Failed to clear pending state after step-task liveness timeout', exc_info=True)
+            logger.debug(
+                'Failed to clear pending state after step-task liveness timeout',
+                exc_info=True,
+            )
 
     def _emit_liveness_timeout_observation(self, step_liveness_seconds: float) -> None:
         try:
             from backend.ledger import EventSource
             from backend.ledger.observation import ErrorObservation
+
             self.event_stream.add_event(
                 ErrorObservation(
                     content=f'Step task exceeded the liveness ceiling of {step_liveness_seconds:.0f}s and was force-cancelled. Pending state was cleared; the next step will retry. The underlying cause is a hang in the agent loop — check the log for the last completed step.',
-                    error_id='STEP_TASK_LIVENESS_TIMEOUT', notify_ui_only=True,
+                    error_id='STEP_TASK_LIVENESS_TIMEOUT',
+                    notify_ui_only=True,
                 ),
                 EventSource.ENVIRONMENT,
             )
         except Exception:
-            logger.debug('Failed to emit STEP_TASK_LIVENESS_TIMEOUT observation', exc_info=True)
+            logger.debug(
+                'Failed to emit STEP_TASK_LIVENESS_TIMEOUT observation', exc_info=True
+            )
 
     async def _step_inner_connect_and_check(self, _step_inner_start: float) -> bool:
         """Connect runtime and check prerequisites. Returns False if should exit."""
@@ -426,7 +443,9 @@ class SessionOrchestrator(
             return None
         return action
 
-    async def _step_inner_execute_action(self, action: Action, _step_inner_start: float) -> None:
+    async def _step_inner_execute_action(
+        self, action: Action, _step_inner_start: float
+    ) -> None:
         """Execute the action and handle post-execution state."""
         if self.services.retry.retry_count > 0:
             logger.debug(
@@ -452,7 +471,9 @@ class SessionOrchestrator(
         if isinstance(extra_data, dict):
             extra_data.pop('__survivable_error_consecutive', None)
 
-    async def _step_inner_handle_message_action(self, action: Action, _step_inner_start: float) -> bool:
+    async def _step_inner_handle_message_action(
+        self, action: Action, _step_inner_start: float
+    ) -> bool:
         """Handle MessageAction special cases. Returns True if should exit."""
         if isinstance(action, MessageAction) and action.source == EventSource.AGENT:
             if action.wait_for_response:
@@ -460,9 +481,8 @@ class SessionOrchestrator(
                     set_step_phase('step_inner:await_user_input')
                     await self.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
 
-        if (
-            isinstance(action, MessageAction)
-            and bool(getattr(action, 'final_response', False))
+        if isinstance(action, MessageAction) and bool(
+            getattr(action, 'final_response', False)
         ):
             set_step_phase('step_inner:finish')
             with contextlib.suppress(Exception):
@@ -599,9 +619,10 @@ class SessionOrchestrator(
         import time as _time
 
         check_interval = 10.0
-        timeout = getattr(
-            self, '_watchdog_timeout', None
-        ) or self.config.circuit_breaker.no_step_progress_timeout_seconds
+        timeout = (
+            getattr(self, '_watchdog_timeout', None)
+            or self.config.circuit_breaker.no_step_progress_timeout_seconds
+        )
         if timeout <= 0:
             return
         cooldown = self.config.circuit_breaker.auto_recover_cooldown_seconds

@@ -29,7 +29,7 @@ class TestEventRuntimeDefaults:
                 'hwm_ratio': 0.8,
                 'block_timeout': 0.1,
                 'rate_window_seconds': 60,
-                'workers': 1,
+                'workers': 4,
                 'async_write': False,
                 'coalesce': False,
                 'coalesce_window_ms': 100.0,

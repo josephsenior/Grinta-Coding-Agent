@@ -4,6 +4,7 @@ Placed in a dedicated module to avoid circular imports between the main
 event_renderer.py (which imports the mixins) and the mixins (which need these
 constants).
 """
+
 from __future__ import annotations
 
 from backend.core.enums import AgentState

@@ -276,37 +276,67 @@ class ContextMemoryManager:
         started = time.perf_counter()
         history = list(getattr(state, 'history', []))
         if not self.compactor:
-            logger.debug('ContextMemoryManager.condense_history skipped: no compactor (history_events=%d elapsed=%.3fs)', len(history), time.perf_counter() - started)
+            logger.debug(
+                'ContextMemoryManager.condense_history skipped: no compactor (history_events=%d elapsed=%.3fs)',
+                len(history),
+                time.perf_counter() - started,
+            )
             return CondensedHistory(history, None)
 
         snapshot_started = time.perf_counter()
         self._extract_pre_condensation_snapshot(state, history)
         snapshot_elapsed = time.perf_counter() - snapshot_started
 
-        condensation_result = await self._get_condensation_result(state, history, snapshot_elapsed)
+        condensation_result = await self._get_condensation_result(
+            state, history, snapshot_elapsed
+        )
 
         postprocess_started = time.perf_counter()
-        condensation_result = await self._maybe_force_compaction_for_explicit_request(state, condensation_result)
-        condensation_result = await self._maybe_force_compaction_under_memory_pressure(state, history, condensation_result)
+        condensation_result = await self._maybe_force_compaction_for_explicit_request(
+            state, condensation_result
+        )
+        condensation_result = await self._maybe_force_compaction_under_memory_pressure(
+            state, history, condensation_result
+        )
         memory_pressure = self._memory_pressure_signal(state)
 
         if isinstance(condensation_result, View):
             delete_staging_snapshot(state=state)
-            logger.info('ContextMemoryManager.condense_history finished with View (events=%d postprocess=%.3fs elapsed=%.3fs)',
-                        len(condensation_result.events), time.perf_counter() - postprocess_started, time.perf_counter() - started)
+            logger.info(
+                'ContextMemoryManager.condense_history finished with View (events=%d postprocess=%.3fs elapsed=%.3fs)',
+                len(condensation_result.events),
+                time.perf_counter() - postprocess_started,
+                time.perf_counter() - started,
+            )
             return CondensedHistory(condensation_result.events, None)
 
-        return await self._finalize_compaction(state, condensation_result, history, memory_pressure, started, postprocess_started)
+        return await self._finalize_compaction(
+            state,
+            condensation_result,
+            history,
+            memory_pressure,
+            started,
+            postprocess_started,
+        )
 
-    async def _get_condensation_result(self, state: State, history: list, snapshot_elapsed: float) -> Any:
+    async def _get_condensation_result(
+        self, state: State, history: list, snapshot_elapsed: float
+    ) -> Any:
         turn_signals = getattr(state, 'turn_signals', None)
         prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
         if prewarmed is not None:
-            return await self._use_prewarmed_result(prewarmed, turn_signals, history, state)
+            return await self._use_prewarmed_result(
+                prewarmed, turn_signals, history, state
+            )
         compaction_started = time.perf_counter()
         result = await self.compactor.compacted_history(state)
-        logger.info('ContextMemoryManager.condense_history compactor returned %s (history_events=%d snapshot=%.3fs compactor=%.3fs)',
-                    type(result).__name__, len(history), snapshot_elapsed, time.perf_counter() - compaction_started)
+        logger.info(
+            'ContextMemoryManager.condense_history compactor returned %s (history_events=%d snapshot=%.3fs compactor=%.3fs)',
+            type(result).__name__,
+            len(history),
+            snapshot_elapsed,
+            time.perf_counter() - compaction_started,
+        )
         return result
 
     async def _use_prewarmed_result(
@@ -323,10 +353,17 @@ class ContextMemoryManager:
         turn_signals.prewarm_latest_event_id = None
         current_len = len(history)
         current_latest_id = getattr(history[-1], 'id', None) if history else None
-        prewarm_stale = prewarm_len is not None and (prewarm_len != current_len or prewarm_latest_id != current_latest_id)
+        prewarm_stale = prewarm_len is not None and (
+            prewarm_len != current_len or prewarm_latest_id != current_latest_id
+        )
         if prewarm_stale:
-            logger.warning('Discarding stale pre-warmed condensation (prewarm_len=%s current_len=%s prewarm_latest_id=%s current_latest_id=%s); recomputing compaction.',
-                          prewarm_len, current_len, prewarm_latest_id, current_latest_id)
+            logger.warning(
+                'Discarding stale pre-warmed condensation (prewarm_len=%s current_len=%s prewarm_latest_id=%s current_latest_id=%s); recomputing compaction.',
+                prewarm_len,
+                current_len,
+                prewarm_latest_id,
+                current_latest_id,
+            )
             return await self.compactor.compacted_history(state)
         logger.info('Utilizing background pre-warmed condensation result.')
         action = getattr(prewarmed, 'action', None)
@@ -334,27 +371,46 @@ class ContextMemoryManager:
             action.is_prewarmed = True
         return prewarmed
 
-    async def _finalize_compaction(self, state: State, condensation_result: Any, history: list, memory_pressure: bool, started: float, postprocess_started: float) -> CondensedHistory:
+    async def _finalize_compaction(
+        self,
+        state: State,
+        condensation_result: Any,
+        history: list,
+        memory_pressure: bool,
+        started: float,
+        postprocess_started: float,
+    ) -> CondensedHistory:
         action = condensation_result.action
         commit_snapshot(state=state)
         try:
             from backend.context.working_set import sync_snapshot_to_working_memory
+
             sync_snapshot_to_working_memory(load_snapshot(state=state))
         except Exception:
             logger.debug('Post-compaction working memory sync failed', exc_info=True)
 
-        if self._is_noop_condensation_action(action) and not self._has_unhandled_condensation_request(state):
+        if self._is_noop_condensation_action(
+            action
+        ) and not self._has_unhandled_condensation_request(state):
             logger.info('Ignoring no-op condensation action without explicit request')
             if memory_pressure:
                 state.ack_memory_pressure(source='ContextMemoryManager')
-            logger.info('ContextMemoryManager.condense_history finished with ignored no-op (history_events=%d elapsed=%.3fs)', len(history), time.perf_counter() - started)
+            logger.info(
+                'ContextMemoryManager.condense_history finished with ignored no-op (history_events=%d elapsed=%.3fs)',
+                len(history),
+                time.perf_counter() - started,
+            )
             return CondensedHistory(history, None)
 
         if memory_pressure:
             state.ack_memory_pressure(source='ContextMemoryManager')
         self._release_post_compaction_resources(state, action)
-        logger.info('ContextMemoryManager.condense_history finished with pending action %s (postprocess=%.3fs elapsed=%.3fs)',
-                    type(action).__name__, time.perf_counter() - postprocess_started, time.perf_counter() - started)
+        logger.info(
+            'ContextMemoryManager.condense_history finished with pending action %s (postprocess=%.3fs elapsed=%.3fs)',
+            type(action).__name__,
+            time.perf_counter() - postprocess_started,
+            time.perf_counter() - started,
+        )
         return CondensedHistory([], action)
 
     def _extract_pre_condensation_snapshot(
@@ -498,8 +554,7 @@ class ContextMemoryManager:
         event_stream = getattr(state, 'event_stream', None)
         event_store = (
             event_stream
-            if event_stream is not None
-            and hasattr(event_stream, 'prune_old_events')
+            if event_stream is not None and hasattr(event_stream, 'prune_old_events')
             else None
         )
         if event_store is not None:
@@ -542,15 +597,17 @@ class ContextMemoryManager:
             events_for_prompt, initial_user_message, llm_config, prompt_window
         )
 
-        self._log_build_messages(metrics={
-            'events_for_prompt': len(events_for_prompt),
-            'original_events': prompt_window.original_events,
-            'messages': len(messages),
-            'elapsed': time.perf_counter() - window_started,
-            'window_elapsed': window_elapsed,
-            'windowed': prompt_window.windowed,
-            'prompt_window': prompt_window,
-        })
+        self._log_build_messages(
+            metrics={
+                'events_for_prompt': len(events_for_prompt),
+                'original_events': prompt_window.original_events,
+                'messages': len(messages),
+                'elapsed': time.perf_counter() - window_started,
+                'window_elapsed': window_elapsed,
+                'windowed': prompt_window.windowed,
+                'prompt_window': prompt_window,
+            }
+        )
 
         if not messages:
             self._build_messages_cache = None
@@ -570,14 +627,22 @@ class ContextMemoryManager:
         self, condensed_list: list, state: State | None, llm_config
     ):
         if self._pipeline is not None:
-            full_history = list(getattr(state, 'history', [])) if state is not None else condensed_list
+            full_history = (
+                list(getattr(state, 'history', []))
+                if state is not None
+                else condensed_list
+            )
             events_for_prompt = self._pipeline.build_prompt_events(
-                condensed_list, state=state, llm_config=llm_config, full_history=full_history,
+                condensed_list,
+                state=state,
+                llm_config=llm_config,
+                full_history=full_history,
             )
             from backend.context.prompt_window import (
                 PromptWindowResult,
                 estimate_events_tokens,
             )
+
             prompt_window = PromptWindowResult(
                 events=events_for_prompt,
                 original_events=len(full_history),
@@ -597,7 +662,9 @@ class ContextMemoryManager:
             if info is not None:
                 logger.debug(
                     'Prompt projection after compact boundary id=%d pruned=%d post_boundary=%d',
-                    info.boundary_event_id, info.pruned_event_count, info.post_boundary_event_count,
+                    info.boundary_event_id,
+                    info.pruned_event_count,
+                    info.post_boundary_event_count,
                 )
             prompt_window = select_prompt_events(events, llm_config)
             events_for_prompt = prompt_window.events
@@ -609,7 +676,9 @@ class ContextMemoryManager:
         config_key = self._llm_build_config_key(llm_config)
         fingerprints = tuple(event_fingerprint(event) for event in events_for_prompt)
         cache = self._build_messages_cache
-        incremental = self._is_incremental(cache, config_key, fingerprints, prompt_window)
+        incremental = self._is_incremental(
+            cache, config_key, fingerprints, prompt_window
+        )
         max_message_chars = getattr(llm_config, 'max_message_chars', None)
         vision_is_active = getattr(llm_config, 'vision_is_active', False)
 
@@ -624,7 +693,8 @@ class ContextMemoryManager:
             )
             logger.debug(
                 'ContextMemoryManager.build_messages incremental tail=%d/%d events',
-                len(fingerprints) - len(cache.event_fingerprints), len(fingerprints),
+                len(fingerprints) - len(cache.event_fingerprints),
+                len(fingerprints),
             )
         else:
             messages = self.conversation_memory.process_events(
@@ -642,7 +712,8 @@ class ContextMemoryManager:
             and cache.llm_config_key == config_key
             and not prompt_window.windowed
             and len(fingerprints) > len(cache.event_fingerprints)
-            and fingerprints[: len(cache.event_fingerprints)] == cache.event_fingerprints
+            and fingerprints[: len(cache.event_fingerprints)]
+            == cache.event_fingerprints
         )
 
     def _log_build_messages(self, metrics: dict) -> None:
@@ -652,18 +723,30 @@ class ContextMemoryManager:
                 'ContextMemoryManager.prompt_window selected %d/%d events '
                 '(dropped=%d estimated_tokens=%d selected_tokens=%d budget=%s '
                 'protected=%d reason=%s fingerprint=%s elapsed=%.3fs)',
-                prompt_window.selected_events, prompt_window.original_events,
-                prompt_window.dropped_events, prompt_window.estimated_tokens,
-                prompt_window.selected_estimated_tokens, prompt_window.token_budget,
-                prompt_window.protected_events, prompt_window.reason,
-                prompt_window.cache_fingerprint, metrics['window_elapsed'],
+                prompt_window.selected_events,
+                prompt_window.original_events,
+                prompt_window.dropped_events,
+                prompt_window.estimated_tokens,
+                prompt_window.selected_estimated_tokens,
+                prompt_window.token_budget,
+                prompt_window.protected_events,
+                prompt_window.reason,
+                prompt_window.cache_fingerprint,
+                metrics['window_elapsed'],
             )
-        if metrics['elapsed'] >= 0.25 or metrics['events_for_prompt'] >= 100 or prompt_window.windowed:
+        if (
+            metrics['elapsed'] >= 0.25
+            or metrics['events_for_prompt'] >= 100
+            or prompt_window.windowed
+        ):
             logger.info(
                 'ContextMemoryManager.build_messages processed %d/%d events into %d '
                 'messages in %.3fs (window=%.3fs)',
-                metrics['events_for_prompt'], metrics['original_events'],
-                metrics['messages'], metrics['elapsed'], metrics['window_elapsed'],
+                metrics['events_for_prompt'],
+                metrics['original_events'],
+                metrics['messages'],
+                metrics['elapsed'],
+                metrics['window_elapsed'],
             )
 
     @staticmethod

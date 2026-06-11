@@ -17,21 +17,6 @@ from backend.ledger.observation.agent import (
 )
 from backend.ledger.observation.browser_screenshot import BrowserScreenshotObservation
 from backend.ledger.observation.code_nav import LspQueryObservation
-from backend.ledger.observation.memory_tools import (
-    CheckpointObservation,
-    MemoryPersistObservation,
-    MemoryRecallObservation,
-    ScratchpadNoteObservation,
-    ScratchpadRecallObservation,
-    WorkingMemoryObservation,
-)
-from backend.ledger.observation.search import (
-    AnalyzeProjectStructureObservation,
-    FindSymbolsObservation,
-    GlobObservation,
-    GrepObservation,
-    ReadSymbolsObservation,
-)
 from backend.ledger.observation.commands import (
     CmdOutputMetadata,
     CmdOutputObservation,
@@ -46,8 +31,23 @@ from backend.ledger.observation.files import (
     FileWriteObservation,
 )
 from backend.ledger.observation.mcp import MCPObservation
+from backend.ledger.observation.memory_tools import (
+    CheckpointObservation,
+    MemoryPersistObservation,
+    MemoryRecallObservation,
+    ScratchpadNoteObservation,
+    ScratchpadRecallObservation,
+    WorkingMemoryObservation,
+)
 from backend.ledger.observation.observation import Observation
 from backend.ledger.observation.reject import UserRejectObservation
+from backend.ledger.observation.search import (
+    AnalyzeProjectStructureObservation,
+    FindSymbolsObservation,
+    GlobObservation,
+    GrepObservation,
+    ReadSymbolsObservation,
+)
 from backend.ledger.observation.status import StatusObservation
 from backend.ledger.observation.success import SuccessObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation

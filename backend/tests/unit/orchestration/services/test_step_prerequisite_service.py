@@ -36,7 +36,9 @@ class TestStepPrerequisiteService(unittest.TestCase):
 
     def test_can_step_blocked_by_state(self):
         """Test can_step returns False when not in RUNNING state."""
-        self.mock_controller.get_agent_state.return_value = AgentState.PAUSED
+        self.mock_controller.get_agent_state.return_value = (
+            AgentState.AWAITING_USER_INPUT
+        )
         self.mock_context.pending_action = None
 
         result = self.service.can_step()
@@ -47,7 +49,7 @@ class TestStepPrerequisiteService(unittest.TestCase):
         self.mock_controller.log.assert_called_once()
         call_args = self.mock_controller.log.call_args[0]
         self.assertEqual(call_args[0], 'debug')
-        self.assertIn('PAUSED', call_args[1])
+        self.assertIn('AWAITING_USER_INPUT', call_args[1])
 
     def test_can_step_blocked_by_state_finished(self):
         """Test can_step returns False when state is FINISHED."""

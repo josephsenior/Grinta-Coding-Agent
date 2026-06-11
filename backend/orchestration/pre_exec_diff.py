@@ -125,7 +125,9 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
         if not old_string:
             return None
         old_match = self._normalize_line_endings(old_content, old_string)
-        new_replacement = self._normalize_line_endings(old_content, action.new_str or '')
+        new_replacement = self._normalize_line_endings(
+            old_content, action.new_str or ''
+        )
         replace_all = getattr(action, 'replace_all', False)
         replace_all = replace_all if isinstance(replace_all, bool) else False
         match_count = old_content.count(old_match)

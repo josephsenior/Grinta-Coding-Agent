@@ -48,9 +48,7 @@ class TestPendingActionServiceInit:
 class TestEffectiveTimeout:
     def test_terminal_run_uses_run_floor(self) -> None:
         base = float(DEFAULT_PENDING_ACTION_TIMEOUT)
-        eff = PendingActionService._effective_timeout_seconds(
-            base, TerminalRunAction()
-        )
+        eff = PendingActionService._effective_timeout_seconds(base, TerminalRunAction())
         assert eff == max(base, TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR)
 
     def test_terminal_io_uses_io_floor(self) -> None:

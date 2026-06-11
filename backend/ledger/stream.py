@@ -372,10 +372,7 @@ class EventStream(EventStore):
     def pre_dispatch_lock(self) -> asyncio.Lock:
         """Return a loop-bound lock serializing one-shot pre-dispatch hook swaps."""
         loop = asyncio.get_running_loop()
-        if (
-            self._pre_dispatch_lock is None
-            or self._pre_dispatch_lock_loop is not loop
-        ):
+        if self._pre_dispatch_lock is None or self._pre_dispatch_lock_loop is not loop:
             self._pre_dispatch_lock = asyncio.Lock()
             self._pre_dispatch_lock_loop = loop
         return self._pre_dispatch_lock
@@ -968,13 +965,10 @@ class EventStream(EventStore):
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
             cross_loop_futures = [
-                r for r in results
-                if isinstance(r, asyncio.Future) and not r.done()
+                r for r in results if isinstance(r, asyncio.Future) and not r.done()
             ]
             if cross_loop_futures:
-                await asyncio.gather(
-                    *cross_loop_futures, return_exceptions=True
-                )
+                await asyncio.gather(*cross_loop_futures, return_exceptions=True)
 
     def _execute_callback(
         self,
@@ -1006,7 +1000,9 @@ class EventStream(EventStore):
                     main,
                 )
                 future.add_done_callback(
-                    lambda f: self._handle_callback_future_done(f, callback_id, subscriber_id)
+                    lambda f: self._handle_callback_future_done(
+                        f, callback_id, subscriber_id
+                    )
                 )
                 return future
             else:
@@ -1019,15 +1015,22 @@ class EventStream(EventStore):
                     loop = asyncio.get_event_loop()
                     if not loop.is_closed():
                         future = asyncio.run_coroutine_threadsafe(
-                            self._await_result_with_logging(result, callback_id, subscriber_id), loop  # type: ignore[arg-type]
+                            self._await_result_with_logging(
+                                result, callback_id, subscriber_id
+                            ),
+                            loop,  # type: ignore[arg-type]
                         )
                         future.add_done_callback(
-                            lambda f: self._handle_callback_future_done(f, callback_id, subscriber_id)
+                            lambda f: self._handle_callback_future_done(
+                                f, callback_id, subscriber_id
+                            )
                         )
                         return future
                 except RuntimeError:
                     pass
-                asyncio.run(self._await_result_with_logging(result, callback_id, subscriber_id))  # type: ignore[arg-type]
+                asyncio.run(
+                    self._await_result_with_logging(result, callback_id, subscriber_id)
+                )  # type: ignore[arg-type]
                 return None
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error(

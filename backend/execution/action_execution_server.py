@@ -48,13 +48,7 @@ from backend.execution.utils.memory_monitor import MemoryMonitor
 from backend.execution.utils.session_manager import SessionManager
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
-from backend.ledger.action.search import (
-    AnalyzeProjectStructureAction,
-    FindSymbolsAction,
-    GlobAction,
-    GrepAction,
-    ReadSymbolsAction,
-)
+from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.memory_tools import (
     CheckpointAction,
     MemoryPersistAction,
@@ -63,7 +57,13 @@ from backend.ledger.action.memory_tools import (
     ScratchpadRecallAction,
     WorkingMemoryAction,
 )
-from backend.ledger.action.mcp import MCPAction
+from backend.ledger.action.search import (
+    AnalyzeProjectStructureAction,
+    FindSymbolsAction,
+    GlobAction,
+    GrepAction,
+    ReadSymbolsAction,
+)
 from backend.ledger.observation import (
     ErrorObservation,
     LspQueryObservation,

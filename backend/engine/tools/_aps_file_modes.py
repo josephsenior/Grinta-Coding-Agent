@@ -258,14 +258,18 @@ def _build_semantic_search_action(symbol: str, path: str) -> str:
             [sys.executable, script_path, 'find_references', symbol, path],
             process_timeout=30.0,
         )
-        return res.stdout if res.stdout.strip() else _diag(
-            reason='AST search returned no output',
-            command='semantic_search',
-            params={'symbol': symbol, 'path': path},
-            next_steps=[
-                'Confirm path points to a parseable source file.',
-                'Try command=callers for a faster regex-based scan.',
-            ],
+        return (
+            res.stdout
+            if res.stdout.strip()
+            else _diag(
+                reason='AST search returned no output',
+                command='semantic_search',
+                params={'symbol': symbol, 'path': path},
+                next_steps=[
+                    'Confirm path points to a parseable source file.',
+                    'Try command=callers for a faster regex-based scan.',
+                ],
+            )
         )
     except Exception as e:
         return f'(error running semantic search: {e})'

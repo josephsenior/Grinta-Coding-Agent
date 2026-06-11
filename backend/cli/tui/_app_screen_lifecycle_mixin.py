@@ -109,7 +109,9 @@ class _AppScreenLifecycleMixin:
         self._start_background_bootstrap()
         self.set_timer(0.5, self._show_welcome)
 
-    async def on_renderer_drain_requested(self, _message: RendererDrainRequested) -> None:
+    async def on_renderer_drain_requested(
+        self, _message: RendererDrainRequested
+    ) -> None:
         if self._renderer is not None:
             if getattr(self._renderer, '_async_drain_active', False):
                 return
@@ -220,7 +222,9 @@ class _AppScreenLifecycleMixin:
 
                 bind_session_context(session_id=sid)
             except Exception:
-                logger.debug('Failed to bind session context at bootstrap', exc_info=True)
+                logger.debug(
+                    'Failed to bind session context at bootstrap', exc_info=True
+                )
             event_stream = EventStream(sid=sid, file_store=file_store, user_id='tui')
             self._event_stream = event_stream
             try:
@@ -664,9 +668,7 @@ class _AppScreenLifecycleMixin:
 
     def _maybe_log_periodic_status(self, loop_count: int, state):
         if loop_count == 1 or loop_count % 20 == 0:
-            _tui_logger.debug(
-                f'_dispatch_to_agent: poll #{loop_count}, state={state}'
-            )
+            _tui_logger.debug(f'_dispatch_to_agent: poll #{loop_count}, state={state}')
             logger.info(
                 '[TUI] _dispatch_to_agent: poll #%d, state=%s',
                 loop_count,
@@ -675,20 +677,12 @@ class _AppScreenLifecycleMixin:
 
     def _check_completion(self, state, end_states: set[AgentState]) -> bool:
         if state in end_states:
-            _tui_logger.debug(
-                f'_dispatch_to_agent: reached end state {state}'
-            )
-            logger.info(
-                '[TUI] _dispatch_to_agent: reached end state %s', state
-            )
+            _tui_logger.debug(f'_dispatch_to_agent: reached end state {state}')
+            logger.info('[TUI] _dispatch_to_agent: reached end state %s', state)
             return True
         if self._agent_task and self._agent_task.done():
-            _tui_logger.debug(
-                f'_dispatch_to_agent: agent task done, state={state}'
-            )
-            logger.info(
-                '[TUI] _dispatch_to_agent: agent task done, state=%s', state
-            )
+            _tui_logger.debug(f'_dispatch_to_agent: agent task done, state={state}')
+            logger.info('[TUI] _dispatch_to_agent: agent task done, state=%s', state)
             return True
         return False
 

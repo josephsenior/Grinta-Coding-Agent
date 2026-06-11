@@ -8,8 +8,6 @@ the loop thread.
 
 from __future__ import annotations
 
-from typing import Any
-
 from backend.execution.utils.bounded_io import (
     BoundedResult,
     async_bounded_subprocess_exec,

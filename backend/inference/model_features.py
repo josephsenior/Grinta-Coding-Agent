@@ -53,6 +53,7 @@ from backend.inference.capabilities import ModelCapabilities  # noqa: E402
 class ModelFeatures(ModelCapabilities):
     """Capabilities and limits reported for a particular LLM provider/model pair."""
 
+    context_window_tokens: int | None = None
     max_input_tokens: int | None = None
     max_output_tokens: int | None = None
 
@@ -143,10 +144,17 @@ def get_features(model: str) -> ModelFeatures:
 
     """
     from backend.inference.catalog_loader import lookup
+    from backend.inference.context_limits import derive_usable_input_tokens
 
     if entry := lookup(model):
+        usable_input = derive_usable_input_tokens(
+            context_window_tokens=getattr(entry, 'context_window_tokens', None),
+            max_output_tokens=entry.max_output_tokens,
+            fallback_input_tokens=entry.max_input_tokens,
+        )
         return ModelFeatures(
-            max_input_tokens=entry.max_input_tokens,
+            context_window_tokens=getattr(entry, 'context_window_tokens', None),
+            max_input_tokens=usable_input,
             max_output_tokens=entry.max_output_tokens,
             supports_function_calling=entry.supports_function_calling,
             supports_reasoning_effort=entry.supports_reasoning_effort,
@@ -157,6 +165,7 @@ def get_features(model: str) -> ModelFeatures:
 
     max_input, max_output = get_model_token_limits(model)
     return ModelFeatures(
+        context_window_tokens=None,
         max_input_tokens=max_input,
         max_output_tokens=max_output,
         supports_function_calling=model_matches(model, FUNCTION_CALLING_PATTERNS),

@@ -79,7 +79,9 @@ def test_event_router_records_transcript_only_agent_message(tmp_path):
     router = EventRouterService.__new__(EventRouterService)
     router._ctrl = _Ctrl()  # type: ignore[attr-defined]
 
-    agent = MessageAction(content='I will create the package layout.', transcript_only=True)
+    agent = MessageAction(
+        content='I will create the package layout.', transcript_only=True
+    )
     agent.source = EventSource.AGENT
     agent.id = 7
     router._record_agent_transcript(agent)

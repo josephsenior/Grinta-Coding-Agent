@@ -155,7 +155,9 @@ def _handle_interactive_prompts(orch: BashSession, output: str, is_input: bool) 
     return False
 
 
-def execute(orch: BashSession, action: CmdRunAction) -> CmdOutputObservation | ErrorObservation:
+def execute(
+    orch: BashSession, action: CmdRunAction
+) -> CmdOutputObservation | ErrorObservation:
     """Execute a command in the bash session."""
     try:
         # Validate session and command

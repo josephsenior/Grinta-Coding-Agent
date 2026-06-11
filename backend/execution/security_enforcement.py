@@ -183,7 +183,9 @@ def evaluate_hardened_local_command_policy(
         return blocked
 
     effective_cwd = resolve_command_cwd(
-        requested_cwd, workspace_root=workspace_root, base_cwd=base_cwd,
+        requested_cwd,
+        workspace_root=workspace_root,
+        base_cwd=base_cwd,
     )
     if not path_is_within_workspace(effective_cwd, workspace_root):
         return (
@@ -205,7 +207,9 @@ def evaluate_hardened_local_command_policy(
 def _check_background_policy(
     command: str, security_config: Any, is_background: bool
 ) -> str | None:
-    if is_background and not getattr(security_config, 'allow_background_processes', False):
+    if is_background and not getattr(
+        security_config, 'allow_background_processes', False
+    ):
         return (
             'Action blocked by hardened_local policy: background processes are disabled. '
             f'Command: {command}'
@@ -247,7 +251,9 @@ def _check_package_policy(command: str, security_config: Any) -> str | None:
 
 def _check_network_policy(command: str, security_config: Any) -> str | None:
     assessment = CommandAnalyzer().analyze_command(command)
-    network_key = classify_network_command(command or '', assessment.is_network_operation)
+    network_key = classify_network_command(
+        command or '', assessment.is_network_operation
+    )
     if network_key is None:
         return None
     if getattr(security_config, 'allow_network_commands', False):

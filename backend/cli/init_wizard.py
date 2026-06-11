@@ -414,7 +414,9 @@ def _collect_and_persist(
     if choices is None:
         return None
     provider, model, api_key, base_url = choices
-    err = _write_settings_file(console, settings_file, provider, model, api_key, base_url)
+    err = _write_settings_file(
+        console, settings_file, provider, model, api_key, base_url
+    )
     if err is not None:
         return None
     _persist_api_key_safe(console, api_key, settings_file)

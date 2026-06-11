@@ -17,7 +17,6 @@ from backend.core.config.compactor_config import (
     CompactorConfig,
     MicrocompactCompactorConfig,
     NoOpCompactorConfig,
-    ObservationMaskingCompactorConfig,
     RecentEventsCompactorConfig,
     SmartCompactorConfig,
     StructuredSummaryCompactorConfig,

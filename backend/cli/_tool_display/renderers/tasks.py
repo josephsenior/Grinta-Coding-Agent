@@ -13,7 +13,6 @@ from backend.cli.theme import (
 )
 from backend.cli.transcript import format_activity_primary
 
-
 _ACTIVE_STATUSES = ('active', 'in_progress', 'running')
 _DONE_STATUSES = ('done', 'completed', 'finished')
 _BLOCKED_STATUSES = ('blocked', 'waiting')
@@ -53,9 +52,7 @@ def _task_dot_and_style(status: str) -> tuple[str, str]:
 
 
 def _render_task_item(task: dict[str, str]) -> str:
-    name = task.get(
-        'description', task.get('name', task.get('title', 'Unknown task'))
-    )
+    name = task.get('description', task.get('name', task.get('title', 'Unknown task')))
     status = task.get('status', 'pending')
     progress = task.get('progress', task.get('pct', ''))
     dot, name_style = _task_dot_and_style(status)

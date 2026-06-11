@@ -51,6 +51,7 @@ def test_rapid_failure_burst_reaches_failed_then_recovers(temp_stream) -> None:
 
 def test_concurrent_add_event_under_persist_failure_stays_degraded(temp_stream) -> None:
     """Concurrent producers with persist failures must not crash; health stays degraded+."""
+
     def _always_fail(*_args, **_kwargs):
         raise OSError('disk full')
 

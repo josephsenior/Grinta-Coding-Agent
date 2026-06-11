@@ -185,9 +185,7 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
     flush_sync = getattr(orch, 'flush_pending_final_commits_sync', None)
     if callable(flush_sync):
         flush_sync()
-    if not streaming_only or any(
-        getattr(event, 'is_final', False) for event in events
-    ):
+    if not streaming_only or any(getattr(event, 'is_final', False) for event in events):
         orch._refresh_display(skip_sidebar=streaming_only)
 
 
@@ -201,7 +199,9 @@ def _cancel_drain_debounce(orch: '_AppRendererEventProcessorMixin') -> None:
         orch._drain_debounce_handle = None
 
 
-def _collect_pending_events(orch: '_AppRendererEventProcessorMixin') -> tuple[list[Any], int]:
+def _collect_pending_events(
+    orch: '_AppRendererEventProcessorMixin',
+) -> tuple[list[Any], int]:
     with orch._pending_lock:
         events = list(orch._pending_events)
         orch._pending_events.clear()
@@ -211,10 +211,13 @@ def _collect_pending_events(orch: '_AppRendererEventProcessorMixin') -> tuple[li
     return events, dropped
 
 
-def _record_dropped_events(orch: '_AppRendererEventProcessorMixin', dropped: int) -> None:
+def _record_dropped_events(
+    orch: '_AppRendererEventProcessorMixin', dropped: int
+) -> None:
     from backend.cli.tui._app_renderer_event_processor_mixin import (
         _TUI_HISTORY_RENDER_LIMIT,
     )
+
     orch._history.append(
         Text(
             f'... {dropped} TUI event(s) dropped while the renderer was backlogged ...',
@@ -239,9 +242,7 @@ def _flush_and_refresh(
         flush()
     if skip_sidebar is None:
         skip_sidebar = streaming_only
-    if not streaming_only or any(
-        getattr(event, 'is_final', False) for event in events
-    ):
+    if not streaming_only or any(getattr(event, 'is_final', False) for event in events):
         orch._refresh_display(skip_sidebar=skip_sidebar)
 
 
@@ -422,9 +423,7 @@ async def hydrate_recent_transcript(
     if getattr(display, 'child_widget_count', lambda: 0)() > 0:
         return 0
     try:
-        events = list(
-            event_stream.search_events(reverse=True, limit=limit)
-        )
+        events = list(event_stream.search_events(reverse=True, limit=limit))
     except Exception:
         return 0
     if not events:
@@ -463,11 +462,13 @@ async def load_earlier_messages(
 
     start_id = max(0, min_id - batch_size)
     try:
-        events = list(event_stream.search_events(
-            start_id=start_id,
-            end_id=min_id,
-            reverse=False,
-        ))
+        events = list(
+            event_stream.search_events(
+                start_id=start_id,
+                end_id=min_id,
+                reverse=False,
+            )
+        )
     except Exception:
         return 0
 
@@ -510,21 +511,22 @@ def _on_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
     should_schedule_drain = False
     with orch._pending_lock:
         if event_id >= 0:
-            if orch._min_rendered_event_id < 0 or event_id < orch._min_rendered_event_id:
+            if (
+                orch._min_rendered_event_id < 0
+                or event_id < orch._min_rendered_event_id
+            ):
                 orch._min_rendered_event_id = event_id
             if event_id > orch._max_rendered_event_id:
                 orch._max_rendered_event_id = event_id
-        coalesced = (
-            _try_coalesce_streaming_enqueue(orch._pending_events, event)
-            or _try_coalesce_terminal_enqueue(orch._pending_events, event)
-        )
+        coalesced = _try_coalesce_streaming_enqueue(
+            orch._pending_events, event
+        ) or _try_coalesce_terminal_enqueue(orch._pending_events, event)
         if not coalesced:
             if len(orch._pending_events) >= _TUI_PENDING_EVENT_LIMIT:
                 reclaimed = _coalesce_pending_backlog(orch._pending_events)
                 if reclaimed:
                     orch._pending_backpressure_reclaimed = (
-                        getattr(orch, '_pending_backpressure_reclaimed', 0)
-                        + reclaimed
+                        getattr(orch, '_pending_backpressure_reclaimed', 0) + reclaimed
                     )
                 elif len(orch._pending_events) >= _TUI_PENDING_EVENT_LIMIT:
                     orch._pending_backpressure = True

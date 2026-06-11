@@ -5,7 +5,7 @@ we expose ONE gateway tool. The model sees MCP tool names/descriptions in
 the system prompt and routes calls through this gateway.
 """
 
-from backend.inference.tool_names import CALL_MCP_TOOL_NAME, EXECUTE_MCP_TOOL_TOOL_NAME
+from backend.inference.tool_names import CALL_MCP_TOOL_NAME
 
 
 def create_execute_mcp_tool_tool() -> dict:

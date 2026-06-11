@@ -65,8 +65,12 @@ def _normalize_entry(raw: object) -> dict[str, Any] | None:
         'kind': kind,
         'key': key,
         'value': value,
-        'created': str(raw.get('created') or time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())),
-        'updated': str(raw.get('updated') or time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())),
+        'created': str(
+            raw.get('created') or time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        ),
+        'updated': str(
+            raw.get('updated') or time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        ),
         'seen_count': seen_count,
     }
 
@@ -83,7 +87,11 @@ def list_entries() -> list[dict[str, Any]]:
 
 
 def _entry_tokens(text: str) -> set[str]:
-    return {tok for tok in re.split(r'[^a-z0-9_]+', normalize_lesson_text(text)) if len(tok) >= 3}
+    return {
+        tok
+        for tok in re.split(r'[^a-z0-9_]+', normalize_lesson_text(text))
+        if len(tok) >= 3
+    }
 
 
 def _score_entry(entry: dict[str, Any], query: str | None) -> float:
@@ -141,7 +149,9 @@ def persist_entry(
         kind_norm = 'lesson'
 
     store = _load_store()
-    entries = [e for e in (_normalize_entry(raw) for raw in store.get('entries', [])) if e]
+    entries = [
+        e for e in (_normalize_entry(raw) for raw in store.get('entries', [])) if e
+    ]
 
     for entry in entries:
         same_key = entry['key'].casefold() == key.casefold()
@@ -168,7 +178,9 @@ def persist_entry(
         }
     )
     if len(entries) > _MAX_ENTRIES:
-        entries.sort(key=lambda e: (int(e.get('seen_count', 1)), str(e.get('updated', ''))))
+        entries.sort(
+            key=lambda e: (int(e.get('seen_count', 1)), str(e.get('updated', '')))
+        )
         entries = entries[-_MAX_ENTRIES:]
     store['entries'] = entries
     _save_store(store)
@@ -185,7 +197,9 @@ def get_entry(key: str) -> dict[str, Any] | None:
     return None
 
 
-def memory_query_from_text(text: object, *, max_chars: int = _MEMORY_QUERY_MAX_CHARS) -> str | None:
+def memory_query_from_text(
+    text: object, *, max_chars: int = _MEMORY_QUERY_MAX_CHARS
+) -> str | None:
     """Normalize user task text for ranked workspace-memory injection."""
     normalized = str(text or '').strip()
     if not normalized:

@@ -232,7 +232,9 @@ def _find_suspicious_states(acc: _AuditAccumulator) -> list:
     ]
 
 
-def _assess_end_state(acc: _AuditAccumulator, verdict: str, notes: list[str]) -> tuple[str, list[str]]:
+def _assess_end_state(
+    acc: _AuditAccumulator, verdict: str, notes: list[str]
+) -> tuple[str, list[str]]:
     if acc.end_state == 'FINISHED':
         notes.append('Session ended in FINISHED (success).')
     elif acc.end_state == 'AWAITING_USER_INPUT':
@@ -244,7 +246,10 @@ def _assess_end_state(acc: _AuditAccumulator, verdict: str, notes: list[str]) ->
 
 
 def _assess_health_signals(
-    acc: _AuditAccumulator, suspicious_states: list, verdict: str, notes: list[str],
+    acc: _AuditAccumulator,
+    suspicious_states: list,
+    verdict: str,
+    notes: list[str],
 ) -> tuple[str, list[str]]:
     if acc.pending_timeouts:
         verdict = 'ISSUES FOUND'
@@ -255,7 +260,9 @@ def _assess_health_signals(
     return verdict, notes
 
 
-def _assess_log_levels(acc: _AuditAccumulator, verdict: str, notes: list[str]) -> tuple[str, list[str]]:
+def _assess_log_levels(
+    acc: _AuditAccumulator, verdict: str, notes: list[str]
+) -> tuple[str, list[str]]:
     warn_count = acc.levels.get('WARNING', 0)
     err_count = acc.levels.get('ERROR', 0) + acc.levels.get('CRITICAL', 0)
     if err_count:
@@ -281,7 +288,9 @@ def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
     return verdict, notes, duration_min, llm_times, slow_llm, suspicious_states
 
 
-def _write_report_header(rep, acc: _AuditAccumulator, log_path: Path, stripped_path: Path) -> None:
+def _write_report_header(
+    rep, acc: _AuditAccumulator, log_path: Path, stripped_path: Path
+) -> None:
     rep.write('SESSION LOG AUDIT\n')
     rep.write('=' * 72 + '\n')
     rep.write(f'Source: {log_path}\n')
@@ -435,18 +444,28 @@ def analyze_session(
 ) -> SessionAuditResult:
     acc = _AuditAccumulator()
 
-    with log_path.open(encoding='utf-8', errors='replace') as src, stripped_path.open(
-        'w', encoding='utf-8'
-    ) as out:
+    with (
+        log_path.open(encoding='utf-8', errors='replace') as src,
+        stripped_path.open('w', encoding='utf-8') as out,
+    ):
         for line_no, line in enumerate(src, 1):
             _process_log_line(line_no, line, acc, out)
 
-    verdict, notes, duration_min, llm_times, slow_llm, suspicious_states = _compute_verdict(acc)
+    verdict, notes, duration_min, llm_times, slow_llm, suspicious_states = (
+        _compute_verdict(acc)
+    )
 
     with report_path.open('w', encoding='utf-8') as rep:
         _write_report(
-            rep, acc, log_path, stripped_path, verdict, notes,
-            llm_times, slow_llm, suspicious_states,
+            rep,
+            acc,
+            log_path,
+            stripped_path,
+            verdict,
+            notes,
+            llm_times,
+            slow_llm,
+            suspicious_states,
         )
 
     return SessionAuditResult(

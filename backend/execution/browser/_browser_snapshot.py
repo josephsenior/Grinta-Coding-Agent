@@ -44,9 +44,7 @@ from backend.ledger.observation import (
 )
 
 
-async def snapshot_formatted_impl(
-    self, browser: Any, mode: str
-) -> str:
+async def snapshot_formatted_impl(self, browser: Any, mode: str) -> str:
     """Return DOM text for ``full`` / ``interactive`` / ``diff`` modes."""
     try:
         raw_text = await asyncio.wait_for(
@@ -75,6 +73,7 @@ async def snapshot_formatted_impl(
     if len(text) > cap:
         text = text[:cap] + '\n… (truncated)'
     return text
+
 
 def _snapshot_diff(self, raw_text: str, cap: int) -> str:
     lines = _interactive_index_lines(raw_text)
@@ -111,9 +110,7 @@ async def maybe_append_page_state_impl(
     return f'{prefix}\n--- page state ---\n{snap}'
 
 
-async def execute_snapshot_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_snapshot_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     mode = str(params.get('mode') or 'interactive').strip().lower()
     if mode not in ('full', 'interactive', 'diff'):
         return _finalize_observation(

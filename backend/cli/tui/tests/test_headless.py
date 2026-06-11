@@ -367,9 +367,7 @@ async def test_tui_live_response_follows_tail_when_not_user_scrolled(
 
 
 @pytest.mark.asyncio
-async def test_tui_live_response_respects_user_scrolled_away(
-    mock_config, monkeypatch
-):
+async def test_tui_live_response_respects_user_scrolled_away(mock_config, monkeypatch):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
@@ -836,7 +834,7 @@ async def test_tui_communicate_selection_scaffolds_user_reply_with_question(
         )
         await pilot.pause()
 
-        card = s.query_one(CommunicatePromptWidget)
+        s.query_one(CommunicatePromptWidget)
         await pilot.press('down')
         await pilot.pause()
         await pilot.press('enter')
@@ -2203,7 +2201,9 @@ async def test_tui_duplicate_thinking_payload_renders_once(mock_config):
 
         thinking_blocks = list(s.query(ThinkingIndicator).results())
         assert len(thinking_blocks) == 1
-        rendered = str(thinking_blocks[0].query_one('#thinking-content', Static).renderable)
+        rendered = str(
+            thinking_blocks[0].query_one('#thinking-content', Static).renderable
+        )
         assert rendered.count(thought) == 1
 
 
@@ -2266,9 +2266,7 @@ async def test_tui_find_symbols_observation_renders_card(mock_config):
         from backend.ledger.action.search import FindSymbolsAction
         from backend.ledger.observation.search import FindSymbolsObservation
 
-        renderer._process_event(
-            FindSymbolsAction(query='render', path='backend')
-        )
+        renderer._process_event(FindSymbolsAction(query='render', path='backend'))
         renderer._process_event(
             FindSymbolsObservation(
                 content='{"status":"ok"}',
@@ -2370,7 +2368,9 @@ async def test_tui_read_symbols_observation_updates_pending_card(mock_config):
         from backend.ledger.observation.search import ReadSymbolsObservation
 
         renderer._process_event(
-            ReadSymbolsAction(targets=[{'symbol_name': 'UserService.login'}], path='auth.py')
+            ReadSymbolsAction(
+                targets=[{'symbol_name': 'UserService.login'}], path='auth.py'
+            )
         )
         renderer._process_event(
             ReadSymbolsObservation(
@@ -2570,9 +2570,7 @@ async def test_tui_compaction_status_renders_persistent_card(mock_config):
         await pilot.pause()
 
         cards = s.query(TUIActivityCard).results()
-        compaction_cards = [
-            card for card in cards if 'category-tool' in card.classes
-        ]
+        compaction_cards = [card for card in cards if 'category-tool' in card.classes]
         assert len(compaction_cards) == 1
         collapsed = compaction_cards[0].query_one('#collapsed-row')
         assert 'Compacting (1st)' in str(collapsed.renderable)
@@ -2820,16 +2818,23 @@ async def test_tui_file_read_card_completes_without_expanded_body(mock_config):
         await pilot.pause()
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
+
         renderer = TUIRenderer(
-            console=console, hud=HUDBar(), reasoning=ReasoningDisplay(),
-            tui=s, loop=loop,
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
         )
-        long_path = 'backend/cli/tui/some/really/long/path/that/should/not/stretch/read_card.py'
+        long_path = (
+            'backend/cli/tui/some/really/long/path/that/should/not/stretch/read_card.py'
+        )
         renderer._process_event(FileReadAction(path=long_path))
         await pilot.pause()
 
         file_cards = [
-            card for card in s.query(TUIActivityCard).results()
+            card
+            for card in s.query(TUIActivityCard).results()
             if 'category-files' in card.classes
         ]
         assert len(file_cards) == 1
@@ -2847,11 +2852,17 @@ async def test_tui_file_read_observation_updates_card_collapsed_markup(mock_conf
         await pilot.pause()
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
+
         renderer = TUIRenderer(
-            console=console, hud=HUDBar(), reasoning=ReasoningDisplay(),
-            tui=s, loop=loop,
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
         )
-        long_path = 'backend/cli/tui/some/really/long/path/that/should/not/stretch/read_card.py'
+        long_path = (
+            'backend/cli/tui/some/really/long/path/that/should/not/stretch/read_card.py'
+        )
         renderer._process_event(FileReadAction(path=long_path))
         renderer._process_event(
             FileReadObservation(path=long_path, content='alpha\nbeta\ngamma')
@@ -2859,7 +2870,8 @@ async def test_tui_file_read_observation_updates_card_collapsed_markup(mock_conf
         await pilot.pause()
 
         file_cards = [
-            card for card in s.query(TUIActivityCard).results()
+            card
+            for card in s.query(TUIActivityCard).results()
             if 'category-files' in card.classes
         ]
         assert len(file_cards) == 1
@@ -2885,9 +2897,13 @@ async def test_tui_file_read_ranged_card_shows_range_info(mock_config):
         await pilot.pause()
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
+
         renderer = TUIRenderer(
-            console=console, hud=HUDBar(), reasoning=ReasoningDisplay(),
-            tui=s, loop=loop,
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
         )
         renderer._process_event(
             FileReadAction(path='backend/cli/tui/ranged_read.py', view_range=[50, 100])
@@ -2901,7 +2917,8 @@ async def test_tui_file_read_ranged_card_shows_range_info(mock_config):
         await pilot.pause()
 
         ranged_cards = [
-            card for card in s.query(TUIActivityCard).results()
+            card
+            for card in s.query(TUIActivityCard).results()
             if 'category-files' in card.classes and 'ranged_read.py' in card._detail
         ]
         assert len(ranged_cards) == 1
@@ -3723,7 +3740,9 @@ async def test_bootstrap_setup_renderer_marks_ready_before_hydrate(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_drain_invocation_budget_reschedules_with_backlog(mock_config, monkeypatch):
+async def test_drain_invocation_budget_reschedules_with_backlog(
+    mock_config, monkeypatch
+):
     from collections import deque
     from threading import Lock
 

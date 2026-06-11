@@ -77,6 +77,7 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         custom_tokenizer: A custom tokenizer to use for token counting.
         native_tool_calling: Whether to use native tool calling if supported by the model.
         reasoning_effort: The effort to put into reasoning ('low', 'medium', 'high', 'none').
+        context_window_tokens: Optional explicit total model context window.
         seed: The seed to use for the LLM.
         safety_settings: Safety settings for models that support them (like Gemini).
         correct_num: The number of times the draft editor LLM tries to fix an error when editing.
@@ -148,6 +149,14 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     max_output_tokens: int | None = Field(
         default=None, ge=1, description='The maximum number of output tokens'
     )
+    context_window_tokens: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            'Optional explicit total model context window. When unset, Grinta '
+            'uses provider/model metadata.'
+        ),
+    )
     prompt_history_windowing_enabled: bool = Field(
         default=True,
         description='Bound rendered conversation history before prompt assembly.',
@@ -157,24 +166,30 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         ge=1,
         description=(
             'Optional explicit token budget for rendered conversation history. '
-            'When unset, max_input_tokens * prompt_history_budget_ratio is used.'
+            'When unset, the usable native model input window is used.'
         ),
     )
-    prompt_history_budget_ratio: float = Field(
-        default=0.50,
+    prompt_history_budget_ratio: float | None = Field(
+        default=None,
         ge=0.05,
         le=0.95,
-        description='Fraction of max_input_tokens reserved for conversation history.',
+        description=(
+            'Optional fraction of usable input tokens reserved for conversation '
+            'history. When unset, the full usable input window is used.'
+        ),
     )
     prompt_history_min_events: int = Field(
         default=150,
         ge=1,
         description='Minimum event count before count-based prompt windowing can activate.',
     )
-    prompt_history_max_events: int = Field(
-        default=240,
+    prompt_history_max_events: int | None = Field(
+        default=None,
         ge=1,
-        description='Safety cap for rendered prompt history events after causal windowing.',
+        description=(
+            'Optional safety cap for rendered prompt history events after '
+            'causal windowing. Known large models are token-budgeted by default.'
+        ),
     )
     prompt_history_min_tool_loops: int = Field(
         default=12,

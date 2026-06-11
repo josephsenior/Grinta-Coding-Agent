@@ -356,12 +356,14 @@ class PendingActionService:
         action_id = getattr(action, 'id', 'unknown')
         action_type = type(action).__name__
 
-        _SUBPROCESS_ACTION_TYPES = frozenset({
-            'CmdRunAction',
-            'TerminalRunAction',
-            'TerminalInputAction',
-            'DebuggerAction',
-        })
+        _SUBPROCESS_ACTION_TYPES = frozenset(
+            {
+                'CmdRunAction',
+                'TerminalRunAction',
+                'TerminalInputAction',
+                'DebuggerAction',
+            }
+        )
         if action_type in _SUBPROCESS_ACTION_TYPES:
             try:
                 self._context.kill_running_command()

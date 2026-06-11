@@ -77,7 +77,10 @@ def _build_restore_block(
 
 def _append_clipped(parts: list[str], text: str) -> None:
     if len(text) > _RESTORE_SECTION_CHAR_BUDGET:
-        text = text[: _RESTORE_SECTION_CHAR_BUDGET - 32].rstrip() + '\n... (section clipped)'
+        text = (
+            text[: _RESTORE_SECTION_CHAR_BUDGET - 32].rstrip()
+            + '\n... (section clipped)'
+        )
     parts.append(text)
 
 
@@ -179,9 +182,15 @@ def inject_post_compact_restore(
     if _has_existing_restore(events):
         return events
     block = _build_restore_block(history, events, state=state)
-    if not block.strip() or block == '<POST_COMPACT_RESTORE>\n\n</POST_COMPACT_RESTORE>':
+    if (
+        not block.strip()
+        or block == '<POST_COMPACT_RESTORE>\n\n</POST_COMPACT_RESTORE>'
+    ):
         return events
-    if estimate_events_tokens(events) + len(block) // 4 > DEFAULT_POST_COMPACT_TOKEN_BUDGET * 2:
+    if (
+        estimate_events_tokens(events) + len(block) // 4
+        > DEFAULT_POST_COMPACT_TOKEN_BUDGET * 2
+    ):
         logger.debug('Skipping post-compact restore: would exceed budget')
         return events
     observation = AgentCondensationObservation(content=block)

@@ -75,9 +75,7 @@ class _EventRendererPanelsMixin(CLIEventRenderer if TYPE_CHECKING else object):
 
     def _count_workers_by_status(self, statuses: frozenset[str]) -> int:
         return sum(
-            1
-            for w in self._delegate_workers.values()
-            if w.get('status') in statuses
+            1 for w in self._delegate_workers.values() if w.get('status') in statuses
         )
 
     def _delegate_status_text(self, total: int) -> str:

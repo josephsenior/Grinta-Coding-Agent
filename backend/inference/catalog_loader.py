@@ -28,6 +28,7 @@ class ModelEntry:
     name: str
     provider: str
     aliases: tuple[str, ...] = ()
+    context_window_tokens: int | None = None
     max_input_tokens: int | None = None
     max_output_tokens: int | None = None
     input_price_per_m: float | None = None
@@ -72,6 +73,7 @@ def get_catalog() -> tuple[ModelEntry, ...]:
                 name=name,
                 provider=info['provider'],
                 aliases=tuple(info.get('aliases', ())),
+                context_window_tokens=info.get('context_window_tokens'),
                 max_input_tokens=info.get('max_input_tokens'),
                 max_output_tokens=info.get('max_output_tokens'),
                 input_price_per_m=info.get('input_price_per_m'),
@@ -153,8 +155,27 @@ def get_token_limits(model: str) -> tuple[int | None, int | None]:
     """Return ``(max_input_tokens, max_output_tokens)`` for *model*."""
     entry = lookup(model)
     if entry:
-        return entry.max_input_tokens, entry.max_output_tokens
+        from backend.inference.context_limits import derive_usable_input_tokens
+
+        usable_input = derive_usable_input_tokens(
+            context_window_tokens=entry.context_window_tokens,
+            max_output_tokens=entry.max_output_tokens,
+            fallback_input_tokens=entry.max_input_tokens,
+        )
+        return usable_input, entry.max_output_tokens
     return None, None
+
+
+def get_context_window_tokens(model: str) -> int | None:
+    """Return total context-window tokens for *model* when known."""
+    entry = lookup(model)
+    if entry is None:
+        return None
+    if entry.context_window_tokens is not None:
+        return entry.context_window_tokens
+    if entry.max_input_tokens is not None and entry.max_output_tokens is not None:
+        return entry.max_input_tokens + entry.max_output_tokens
+    return None
 
 
 def get_featured_models() -> list[str]:
@@ -265,7 +286,8 @@ def get_provider_info(model: str) -> dict[str, Any]:
             'supports_function_calling': entry.supports_function_calling,
             'supports_vision': entry.supports_vision,
             'supports_prompt_cache': entry.supports_prompt_cache,
-            'max_input_tokens': entry.max_input_tokens,
+            'context_window_tokens': entry.context_window_tokens,
+            'max_input_tokens': get_token_limits(model)[0],
             'max_output_tokens': entry.max_output_tokens,
         }
 
@@ -277,6 +299,7 @@ def get_provider_info(model: str) -> dict[str, Any]:
         'supports_function_calling': False,
         'supports_vision': False,
         'supports_prompt_cache': False,
+        'context_window_tokens': None,
         'max_input_tokens': None,
         'max_output_tokens': None,
     }

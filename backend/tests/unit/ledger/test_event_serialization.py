@@ -5,15 +5,15 @@ from __future__ import annotations
 import pytest
 
 from backend.ledger.action import AgentThinkAction, MessageAction, NullAction
-from backend.ledger.event import EventSource
 from backend.ledger.action.search import (
     AnalyzeProjectStructureAction,
     GrepAction,
     ReadSymbolsAction,
 )
+from backend.ledger.event import EventSource
 from backend.ledger.observation import (
-    AnalyzeProjectStructureObservation,
     AgentThinkObservation,
+    AnalyzeProjectStructureObservation,
     ErrorObservation,
     GlobObservation,
     GrepObservation,

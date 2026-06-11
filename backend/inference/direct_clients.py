@@ -742,9 +742,7 @@ class OpenAIClient(DirectLLMClient):
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
-        kwargs = _with_default_timeout(
-            kwargs, self._request_timeout, streaming=True
-        )
+        kwargs = _with_default_timeout(kwargs, self._request_timeout, streaming=True)
         async for chunk in _openai_astream(self, messages, **kwargs):
             yield chunk
 
@@ -801,9 +799,7 @@ class AnthropicClient(DirectLLMClient):
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
-        kwargs = _with_default_timeout(
-            kwargs, self._request_timeout, streaming=True
-        )
+        kwargs = _with_default_timeout(kwargs, self._request_timeout, streaming=True)
         async for chunk in _anthropic_astream(self, messages, **kwargs):
             yield chunk
 
@@ -824,10 +820,15 @@ def get_direct_client(
 
     logger.debug(
         'Resolved model=%s -> provider=%s, base_url=%s, stripped=%s',
-        model, provider, resolved_base_url or 'default', stripped_model,
+        model,
+        provider,
+        resolved_base_url or 'default',
+        stripped_model,
     )
 
-    client = _try_opencode_go_client(provider, stripped_model, api_key, timeout, resolved_base_url)
+    client = _try_opencode_go_client(
+        provider, stripped_model, api_key, timeout, resolved_base_url
+    )
     if client is not None:
         return client
 
@@ -835,13 +836,25 @@ def get_direct_client(
     if client is not None:
         return client
 
-    return _route_by_provider(provider, stripped_model, api_key, base_url, resolved_base_url, timeout, model, resolver)
+    return _route_by_provider(
+        provider,
+        stripped_model,
+        api_key,
+        base_url,
+        resolved_base_url,
+        timeout,
+        model,
+        resolver,
+    )
 
 
-def _try_opencode_go_client(provider, stripped_model, api_key, timeout, resolved_base_url):
+def _try_opencode_go_client(
+    provider, stripped_model, api_key, timeout, resolved_base_url
+):
     if provider != 'opencode-go':
         return None
     from backend.inference.provider_resolver import opencode_go_required_endpoint
+
     required_endpoint = opencode_go_required_endpoint(stripped_model)
     if required_endpoint != '/messages':
         return None
@@ -849,8 +862,11 @@ def _try_opencode_go_client(provider, stripped_model, api_key, timeout, resolved
     if anthropic_base_url and anthropic_base_url.rstrip('/').endswith('/v1'):
         anthropic_base_url = anthropic_base_url.rstrip('/')[:-3]
     return AnthropicClient(
-        model_name=stripped_model, api_key=api_key,
-        timeout=timeout, base_url=anthropic_base_url, provider_name='opencode-go',
+        model_name=stripped_model,
+        api_key=api_key,
+        timeout=timeout,
+        base_url=anthropic_base_url,
+        provider_name='opencode-go',
     )
 
 
@@ -867,17 +883,35 @@ def _try_proxy_client(provider, resolved_base_url, model, api_key, timeout):
         return None
     profile = _resolve_transport_profile(provider, resolved_base_url)
     return OpenAIClient(
-        model_name=model, api_key=api_key,
-        base_url=resolved_base_url, profile=profile,
-        timeout=timeout, provider_name=provider,
+        model_name=model,
+        api_key=api_key,
+        base_url=resolved_base_url,
+        profile=profile,
+        timeout=timeout,
+        provider_name=provider,
     )
 
 
-def _route_by_provider(provider, stripped_model, api_key, base_url, resolved_base_url, timeout, model, resolver):
+def _route_by_provider(
+    provider,
+    stripped_model,
+    api_key,
+    base_url,
+    resolved_base_url,
+    timeout,
+    model,
+    resolver,
+):
     if provider == 'anthropic':
-        return AnthropicClient(model_name=stripped_model, api_key=api_key, timeout=timeout, provider_name='anthropic')
+        return AnthropicClient(
+            model_name=stripped_model,
+            api_key=api_key,
+            timeout=timeout,
+            provider_name='anthropic',
+        )
 
     from backend.inference.direct_clients_gemini_ops import GeminiClient
+
     if provider == 'google':
         return GeminiClient(model_name=stripped_model, api_key=api_key, timeout=timeout)
 
@@ -889,9 +923,12 @@ def _route_by_provider(provider, stripped_model, api_key, base_url, resolved_bas
             pass
     profile = _resolve_transport_profile(model_family, resolved_base_url)
     return OpenAIClient(
-        model_name=stripped_model, api_key=api_key,
-        base_url=resolved_base_url, profile=profile,
-        timeout=timeout, provider_name=provider,
+        model_name=stripped_model,
+        api_key=api_key,
+        base_url=resolved_base_url,
+        profile=profile,
+        timeout=timeout,
+        provider_name=provider,
     )
 
 

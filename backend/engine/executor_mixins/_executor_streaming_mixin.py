@@ -350,9 +350,7 @@ class _ExecutorStreamingMixin:
             accumulated=draft_reply_accum,
             is_final=True,
             suppress_live_response=has_tools,
-            thinking_accumulated=sanitize_streaming_thinking_text(
-                thinking_accumulate
-            ),
+            thinking_accumulated=sanitize_streaming_thinking_text(thinking_accumulate),
         )
         ev.source = EventSource.AGENT
         event_stream.add_event(ev, EventSource.AGENT)
@@ -423,9 +421,7 @@ class _ExecutorStreamingMixin:
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
-        thinking_display = sanitize_streaming_thinking_text(
-            state.thinking_accumulate
-        )
+        thinking_display = sanitize_streaming_thinking_text(state.thinking_accumulate)
         ev = StreamingChunkAction(
             chunk='',
             accumulated=redact_streamed_tool_call_markers(state.content_accumulate),

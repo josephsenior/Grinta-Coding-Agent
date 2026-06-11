@@ -283,7 +283,11 @@ def _has_disallowed_colons(path: str, *, must_be_relative: bool) -> bool:
     colon_indexes = [index for index, char in enumerate(path) if char == ':']
     if not colon_indexes:
         return False
-    allowed_colons = {1} if _is_drive_colon_allowed(path, must_be_relative=must_be_relative) else set()
+    allowed_colons = (
+        {1}
+        if _is_drive_colon_allowed(path, must_be_relative=must_be_relative)
+        else set()
+    )
     return any(index not in allowed_colons for index in colon_indexes)
 
 

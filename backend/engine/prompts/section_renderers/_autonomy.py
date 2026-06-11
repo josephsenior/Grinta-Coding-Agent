@@ -79,7 +79,9 @@ def _build_when_to_use_context(
     if tracker_on:
         parts.append('- **task_tracker**: See `<TASK_TRACKING>`.')
     if not tracker_on:
-        parts.append('- Use fresh reads/searches and recent observations to stay grounded.')
+        parts.append(
+            '- Use fresh reads/searches and recent observations to stay grounded.'
+        )
     parts.append('</WHEN_TO_USE_CONTEXT>')
     return '\n'.join(parts)
 
@@ -95,7 +97,9 @@ def _build_mandatory_discipline_checkpoints(
     if tracker_on:
         items.append('1. For multi-step work, follow `<TASK_TRACKING>` checkpoints')
     else:
-        items.append('1. For complex work, inspect first and verify before final summary')
+        items.append(
+            '1. For complex work, inspect first and verify before final summary'
+        )
     if working_memory_on:
         items.append(
             '2. After major findings or pivots, update `memory(action="working")` — not task progress'
@@ -206,7 +210,9 @@ def _render_autonomy(
             base_workflow
             + '\n\nWith **task_tracker** enabled, treat **sync** as part of the loop: after verify, update the plan when progress changed.'
         )
-        task_sync_instruction = '**Task synchronization:** See `<TASK_TRACKING>` before the final summary.'
+        task_sync_instruction = (
+            '**Task synchronization:** See `<TASK_TRACKING>` before the final summary.'
+        )
     else:
         problem_solving_workflow_body = base_workflow
         task_sync_instruction = '**Plan synchronization:** Keep your final response aligned with what was actually completed.'

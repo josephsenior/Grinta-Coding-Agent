@@ -7,9 +7,7 @@ from backend.ledger.observation.search import GlobObservation
 
 
 class TestExecuteGlob:
-    def test_file_discovery_with_python_fallback(
-        self, tmp_path, monkeypatch
-    ) -> None:
+    def test_file_discovery_with_python_fallback(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
 
         (tmp_path / 'test1.py').touch()
@@ -22,9 +20,7 @@ class TestExecuteGlob:
         assert 'test1.py' in obs.content
         assert 'test2.js' not in obs.content
 
-    def test_nested_glob_with_python_fallback(
-        self, tmp_path, monkeypatch
-    ) -> None:
+    def test_nested_glob_with_python_fallback(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
 
         src_dir = tmp_path / 'src' / 'deep'
@@ -32,9 +28,7 @@ class TestExecuteGlob:
         (src_dir / 'nested1.py').touch()
         (src_dir / 'ignore.txt').touch()
 
-        action = build_glob_action(
-            pattern='src/**/*.py', path=str(tmp_path)
-        )
+        action = build_glob_action(pattern='src/**/*.py', path=str(tmp_path))
         obs = execute_glob(action)
         assert 'nested1.py' in obs.content
         assert 'ignore.txt' not in obs.content
@@ -44,9 +38,7 @@ class TestExecuteGlob:
         assert 'nested1.py' in obs2.content
         assert 'ignore.txt' not in obs2.content
 
-    def test_hidden_file_pattern_globbing(
-        self, tmp_path, monkeypatch
-    ) -> None:
+    def test_hidden_file_pattern_globbing(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
 
         (tmp_path / '.env').write_text('SECRET=value\n', encoding='utf-8')

@@ -103,9 +103,7 @@ class TestBuildFallbackAction:
             'Which Python version should I target?',
         ],
     )
-    def test_agent_mode_non_empty_text_yields_final_response(
-        self, text: str
-    ) -> None:
+    def test_agent_mode_non_empty_text_yields_final_response(self, text: str) -> None:
         orch = _make_orchestrator()
         action = _build_fallback_action(orch, _make_result(text))
 

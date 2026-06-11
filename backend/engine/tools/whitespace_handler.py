@@ -536,14 +536,18 @@ class WhitespaceHandler:
         while norm_pos < normalized_offset and orig_pos < len(original):
             ch = original[orig_pos]
             if ch in (' ', '\t'):
-                orig_pos = WhitespaceHandler._skip_trailing_whitespace(original, orig_pos)
-                continue
-            norm_pos += 4 if ch == '\t' else 1
-            orig_pos += 1
-            if ch in (' ', '\t'):
+                skipped = WhitespaceHandler._skip_trailing_whitespace(
+                    original, orig_pos
+                )
+                if skipped != orig_pos:
+                    orig_pos = skipped
+                    continue
                 norm_pos, orig_pos = WhitespaceHandler._advance_through_whitespace(
                     original, orig_pos, norm_pos, normalized_offset
                 )
+                continue
+            norm_pos += 1
+            orig_pos += 1
         return orig_pos
 
     @staticmethod

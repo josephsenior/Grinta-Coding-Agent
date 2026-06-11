@@ -233,10 +233,17 @@ def _resolve_read_symbol_lookup(
 ) -> tuple[Path, str, list[dict[str, Any]]]:
     if path:
         return _resolve_symbol_candidates_with_path(
-            path, symbol_name, symbol_kind, parent_symbol, occurrence,
+            path,
+            symbol_name,
+            symbol_kind,
+            parent_symbol,
+            occurrence,
         )
     return _resolve_symbol_candidates_without_path(
-        symbol_name, symbol_kind, parent_symbol, occurrence,
+        symbol_name,
+        symbol_kind,
+        parent_symbol,
+        occurrence,
     )
 
 
@@ -310,11 +317,22 @@ def _resolve_read_symbol_target(
             'message': 'Symbol target requires qualified_name, symbol_name, or symbol_id.',
         }
     safe_path, content, candidates = _resolve_read_symbol_lookup(
-        path, symbol_name, symbol_kind, parent_symbol, occurrence,
+        path,
+        symbol_name,
+        symbol_kind,
+        parent_symbol,
+        occurrence,
     )
-    candidates = _filter_candidates_by_position(candidates, requested_start, requested_end)
+    candidates = _filter_candidates_by_position(
+        candidates, requested_start, requested_end
+    )
     return _build_read_symbol_final(
-        candidates, safe_path, content, path, display_target, symbol_name,
+        candidates,
+        safe_path,
+        content,
+        path,
+        display_target,
+        symbol_name,
     )
 
 
@@ -466,9 +484,7 @@ def _handle_read_tool(arguments: Mapping[str, Any]) -> Action:
         return _build_read_file_action(str(path), {})
     if read_type == 'symbols':
         return _handle_read_symbols_public(arguments)
-    raise FunctionCallValidationError(
-        "read type must be one of 'file' or 'symbols'."
-    )
+    raise FunctionCallValidationError("read type must be one of 'file' or 'symbols'.")
 
 
 def _coerce_insert_position(value: object) -> str:
@@ -979,7 +995,9 @@ def _validate_multi_edit_arguments(raw_edits: Any) -> None:
         )
 
 
-def _parse_multi_edit_items(raw_edits: list) -> list[tuple[str, str, str, dict[str, Any]]]:
+def _parse_multi_edit_items(
+    raw_edits: list,
+) -> list[tuple[str, str, str, dict[str, Any]]]:
     parsed: list[tuple[str, str, str, dict[str, Any]]] = []
     seen_paths: set[str] = set()
     for idx, item in enumerate(raw_edits):
@@ -1048,11 +1066,7 @@ def _verify_no_concurrent_modifications(
 ) -> None:
     for item_path, old_content in original_snapshots.items():
         real_path = Path(item_path)
-        disk_now = (
-            real_path.read_text(encoding='utf-8')
-            if real_path.exists()
-            else None
-        )
+        disk_now = real_path.read_text(encoding='utf-8') if real_path.exists() else None
         if disk_now != old_content:
             _multi_edit_raise(
                 '❌ multi_edit aborted because the file changed on disk during batch preparation. Re-read and retry.',
@@ -1067,12 +1081,16 @@ def _commit_multi_edit_transaction(
 ) -> Any:
     for item_path, final_content in final_contents.items():
         operation = 'modify' if Path(item_path).exists() else 'create'
-        refactor.add_file_edit(transaction, item_path, final_content, operation=operation)
+        refactor.add_file_edit(
+            transaction, item_path, final_content, operation=operation
+        )
     return refactor.commit(transaction, validate=False)
 
 
 def _format_multi_edit_success(parsed: list, result: Any) -> MessageAction:
-    paths = sorted({display_path for _item_path, display_path, _operation, _item in parsed})
+    paths = sorted(
+        {display_path for _item_path, display_path, _operation, _item in parsed}
+    )
     if len(paths) == 1:
         file_lines = f'  • {paths[0]}'
     else:
@@ -1120,14 +1138,22 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
         with ExitStack() as stack:
             for item_path in sorted(seen_paths):
                 stack.enter_context(_file_lock_for_path(Path(item_path)))
-            with tempfile.TemporaryDirectory(prefix='grinta-multi-edit-') as temp_root_str:
+            with tempfile.TemporaryDirectory(
+                prefix='grinta-multi-edit-'
+            ) as temp_root_str:
                 temp_root = Path(temp_root_str)
                 temp_editor = FileEditor(workspace_root=str(temp_root))
                 original_snapshots, final_contents = _apply_multi_edit_to_temp_files(
-                    parsed, seen_paths, workspace_root, temp_root, temp_editor,
+                    parsed,
+                    seen_paths,
+                    workspace_root,
+                    temp_root,
+                    temp_editor,
                 )
             _verify_no_concurrent_modifications(original_snapshots, workspace_root)
-            result = _commit_multi_edit_transaction(refactor, transaction, final_contents)
+            result = _commit_multi_edit_transaction(
+                refactor, transaction, final_contents
+            )
     except FunctionCallValidationError:
         raise
     except Exception as e:
@@ -1135,7 +1161,9 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             refactor.rollback(transaction)
         except Exception:
             pass
-        _multi_edit_raise(f'❌ multi_edit failed before commit: {e}. No files modified.')
+        _multi_edit_raise(
+            f'❌ multi_edit failed before commit: {e}. No files modified.'
+        )
 
     if result.success:
         return _format_multi_edit_success(parsed, result)

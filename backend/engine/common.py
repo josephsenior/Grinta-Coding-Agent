@@ -397,21 +397,34 @@ def common_response_to_actions(
     text_marker_tool_calls = _extract_text_marker_tool_calls_from_content(content_text)
 
     xml_tool_calls = _parse_xml_tool_calls(content_text, xml_tool_names)
-    native_tool_calls = _deduplicate_xml_native_calls(native_tool_calls, xml_tool_calls, xml_tool_names)
+    native_tool_calls = _deduplicate_xml_native_calls(
+        native_tool_calls, xml_tool_calls, xml_tool_names
+    )
     _enforce_xml_compliance_if_needed(native_tool_calls, xml_tool_names)
 
     all_tool_calls = native_tool_calls + text_marker_tool_calls + xml_tool_calls
     actions = _build_message_actions(content, all_tool_calls)
 
     if all_tool_calls:
-        actions.extend(_build_tool_actions(assistant_msg, response, all_tool_calls, create_action_fn, combine_thought_fn, mcp_tool_names))
+        actions.extend(
+            _build_tool_actions(
+                assistant_msg,
+                response,
+                all_tool_calls,
+                create_action_fn,
+                combine_thought_fn,
+                mcp_tool_names,
+            )
+        )
     elif not actions:
         actions.append(_empty_message_action())
 
     return actions
 
 
-def _parse_xml_tool_calls(content_text: str, xml_tool_names: frozenset[str] | None) -> list[Any]:
+def _parse_xml_tool_calls(
+    content_text: str, xml_tool_names: frozenset[str] | None
+) -> list[Any]:
     if not xml_tool_names:
         return []
     return _extract_xml_tool_calls_from_content(content_text, xml_tool_names)
@@ -422,41 +435,64 @@ def _deduplicate_xml_native_calls(
 ) -> list:
     if not (xml_tool_names and native_tool_calls and xml_tool_calls):
         return native_tool_calls
-    return _filter_native_tool_calls_superseded_by_xml(native_tool_calls, xml_tool_calls, xml_tool_names)
+    return _filter_native_tool_calls_superseded_by_xml(
+        native_tool_calls, xml_tool_calls, xml_tool_names
+    )
 
 
-def _enforce_xml_compliance_if_needed(native_tool_calls: list, xml_tool_names: frozenset[str] | None) -> None:
+def _enforce_xml_compliance_if_needed(
+    native_tool_calls: list, xml_tool_names: frozenset[str] | None
+) -> None:
     if xml_tool_names and native_tool_calls:
         _enforce_xml_compliance(native_tool_calls, xml_tool_names)
 
 
 def _build_message_actions(content: Any, all_tool_calls: list) -> list[Action]:
     from backend.ledger.action import MessageAction
+
     text_content = _coerce_visible_message_content_text(content)
     if not text_content.strip():
         return []
     cot = ''
     if not all_tool_calls:
-        cot = extract_redacted_thinking_inner(_raw_message_content_text(content)).strip()
-    return [MessageAction(
-        content=text_content, thought=cot, wait_for_response=False,
-        suppress_cli=False, transcript_only=bool(all_tool_calls),
-        final_response=not all_tool_calls,
-    )]
+        cot = extract_redacted_thinking_inner(
+            _raw_message_content_text(content)
+        ).strip()
+    return [
+        MessageAction(
+            content=text_content,
+            thought=cot,
+            wait_for_response=False,
+            suppress_cli=False,
+            transcript_only=bool(all_tool_calls),
+            final_response=not all_tool_calls,
+        )
+    ]
 
 
 def _build_tool_actions(
-    assistant_msg: Any, response: Any, all_tool_calls: list,
-    create_action_fn: Callable, combine_thought_fn: Callable, mcp_tool_names: list | None,
+    assistant_msg: Any,
+    response: Any,
+    all_tool_calls: list,
+    create_action_fn: Callable,
+    combine_thought_fn: Callable,
+    mcp_tool_names: list | None,
 ) -> list[Action]:
     for tc in all_tool_calls:
         tc._mcp_tool_names = mcp_tool_names
     assistant_msg.tool_calls = all_tool_calls
-    return process_tool_calls(assistant_msg, response, create_action_fn, extract_thought_from_message, combine_thought_fn)
+    return process_tool_calls(
+        assistant_msg,
+        response,
+        create_action_fn,
+        extract_thought_from_message,
+        combine_thought_fn,
+    )
 
 
 def _empty_message_action() -> Action:
     from backend.ledger.action import MessageAction
+
     return MessageAction(content='', thought='', wait_for_response=False)
 
     set_response_id_for_actions(actions, response)
@@ -649,9 +685,7 @@ def _annotate_xml_syntax_errors(
         )
 
 
-def _apply_xml_retry_guard(
-    params: dict[str, str], fn_name: str
-) -> dict[str, str]:
+def _apply_xml_retry_guard(params: dict[str, str], fn_name: str) -> dict[str, str]:
     if '__xml_syntax_error__' not in params:
         return params
     serialized_args = json.dumps(params, sort_keys=True, ensure_ascii=False)
@@ -740,7 +774,9 @@ def _extract_xml_tool_calls_from_content(
             end_pos = close_m.end(0)
             is_unclosed = False
 
-        params = _extract_xml_params(fn_body, fn_name, is_unclosed, _iter_parameter_matches)
+        params = _extract_xml_params(
+            fn_body, fn_name, is_unclosed, _iter_parameter_matches
+        )
 
         call_id = f'xml_toolu_{call_counter:02d}'
         call_counter += 1

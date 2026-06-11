@@ -26,9 +26,11 @@ class TestInvalidStateTransitionError:
         assert 'bot' in str(err)
 
     def test_attributes(self):
-        err = InvalidStateTransitionError(AgentState.PAUSED, AgentState.RUNNING, 'ag')
-        assert err.old_state == AgentState.PAUSED
-        assert err.new_state == AgentState.RUNNING
+        err = InvalidStateTransitionError(
+            AgentState.AWAITING_USER_INPUT, AgentState.LOADING, 'ag'
+        )
+        assert err.old_state == AgentState.AWAITING_USER_INPUT
+        assert err.new_state == AgentState.LOADING
 
     def test_is_runtime_error(self):
         err = InvalidStateTransitionError(AgentState.ERROR, AgentState.RUNNING, 'x')
@@ -51,15 +53,15 @@ class TestValidTransitions:
         required = {
             AgentState.LOADING,
             AgentState.RUNNING,
-            AgentState.PAUSED,
+            AgentState.AWAITING_USER_INPUT,
             AgentState.STOPPED,
             AgentState.FINISHED,
             AgentState.ERROR,
         }
         assert required.issubset(VALID_TRANSITIONS.keys())
 
-    def test_running_can_go_to_paused(self):
-        assert AgentState.PAUSED in VALID_TRANSITIONS[AgentState.RUNNING]
+    def test_running_can_go_to_awaiting_user_input(self):
+        assert AgentState.AWAITING_USER_INPUT in VALID_TRANSITIONS[AgentState.RUNNING]
 
     def test_running_can_go_to_finished(self):
         assert AgentState.FINISHED in VALID_TRANSITIONS[AgentState.RUNNING]
@@ -67,8 +69,8 @@ class TestValidTransitions:
     def test_running_can_go_to_error(self):
         assert AgentState.ERROR in VALID_TRANSITIONS[AgentState.RUNNING]
 
-    def test_paused_can_resume_to_running(self):
-        assert AgentState.RUNNING in VALID_TRANSITIONS[AgentState.PAUSED]
+    def test_awaiting_user_input_can_resume_to_running(self):
+        assert AgentState.RUNNING in VALID_TRANSITIONS[AgentState.AWAITING_USER_INPUT]
 
     def test_finished_can_restart(self):
         assert AgentState.RUNNING in VALID_TRANSITIONS[AgentState.FINISHED]
@@ -142,8 +144,8 @@ class TestStateTransitionServiceUnit:
         assert not ctx.event_stream.events
 
     async def test_valid_transition_emits_event(self, svc, ctx):
-        await svc.set_agent_state(AgentState.PAUSED)
-        assert ctx.state.agent_state == AgentState.PAUSED
+        await svc.set_agent_state(AgentState.AWAITING_USER_INPUT)
+        assert ctx.state.agent_state == AgentState.AWAITING_USER_INPUT
         assert len(ctx.event_stream.events) == 1
         assert ctx._saved
 

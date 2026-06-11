@@ -186,8 +186,8 @@ class TestAgentState:
         )
 
     def test_enum_count(self):
-        """Test AgentState has at least 10 values."""
-        assert len(list(AgentState)) >= 10
+        """Test AgentState has at least 9 values."""
+        assert len(list(AgentState)) >= 9
 
     def test_state_transitions(self):
         """Test AgentState values are distinct."""

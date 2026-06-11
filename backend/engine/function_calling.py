@@ -200,12 +200,18 @@ def _process_single_tool_call(
         return tool_dispatch[tool_name](arguments)
     if mcp_tool_names and tool_name in mcp_tool_names:
         return _handle_mcp_tool(tool_name, arguments)
-    raise FunctionCallNotExistsError(f'Tool {tool_name} is not registered. (arguments: {arguments}). Please check the tool name and retry with an existing tool.')
+    raise FunctionCallNotExistsError(
+        f'Tool {tool_name} is not registered. (arguments: {arguments}). Please check the tool name and retry with an existing tool.'
+    )
 
 
-def _validate_tool_mode(tool_name: str, normalized_mode: str, mcp_tool_names: list[str] | None) -> None:
+def _validate_tool_mode(
+    tool_name: str, normalized_mode: str, mcp_tool_names: list[str] | None
+) -> None:
     if is_chat_mode(normalized_mode):
-        if tool_name not in CHAT_MODE_ALLOWED_TOOLS or (mcp_tool_names and tool_name in mcp_tool_names):
+        if tool_name not in CHAT_MODE_ALLOWED_TOOLS or (
+            mcp_tool_names and tool_name in mcp_tool_names
+        ):
             raise FunctionCallValidationError(
                 f'Tool `{tool_name}` is not available in Chat Mode. '
                 'Use discovery tools (read, grep, glob, find_symbols, lsp, analyze_project_structure) or ask_user only.'
@@ -219,20 +225,31 @@ def _validate_tool_mode(tool_name: str, normalized_mode: str, mcp_tool_names: li
 
 def _validate_tool_exists(tool_name: str) -> None:
     if tool_name == 'file_editor':
-        raise FunctionCallValidationError('The legacy file_editor tool has been removed. Use read, create, replace_string, edit_symbols, or multiedit.')
+        raise FunctionCallValidationError(
+            'The legacy file_editor tool has been removed. Use read, create, replace_string, edit_symbols, or multiedit.'
+        )
 
 
 def _check_xml_syntax_errors(tool_name: str, arguments: dict[str, Any]) -> None:
     if '__xml_syntax_error__' not in arguments:
         return
     from backend.engine.common import _check_format_error_retry_guard
+
     serialized_args = json.dumps(arguments, sort_keys=True, ensure_ascii=False)
     error_sig = f'xml_syntax_error:{arguments["__xml_syntax_error__"]}'
-    allowed, reason = _check_format_error_retry_guard(tool_name, serialized_args, error_sig)
+    allowed, reason = _check_format_error_retry_guard(
+        tool_name, serialized_args, error_sig
+    )
     if not allowed:
-        logger.error('FORMAT_ERROR retry guard in _process_single_tool_call: %s', reason)
-        raise FunctionCallValidationError(f'[FORMAT_ERROR] Retry guard stopped repeated FORMAT_ERROR for tool `{tool_name}` after multiple attempts.\n{reason}\n[SYSTEM_ACTION] Report this as a system/tool error.')
-    raise FunctionCallValidationError(f'Malformed XML tool call for {tool_name}: {arguments["__xml_syntax_error__"]}')
+        logger.error(
+            'FORMAT_ERROR retry guard in _process_single_tool_call: %s', reason
+        )
+        raise FunctionCallValidationError(
+            f'[FORMAT_ERROR] Retry guard stopped repeated FORMAT_ERROR for tool `{tool_name}` after multiple attempts.\n{reason}\n[SYSTEM_ACTION] Report this as a system/tool error.'
+        )
+    raise FunctionCallValidationError(
+        f'Malformed XML tool call for {tool_name}: {arguments["__xml_syntax_error__"]}'
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -305,16 +322,16 @@ from backend.engine.tools._file_ops import (  # noqa: E402, F401
 from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E402, F401
     _apply_context7_resolve_library_defaults,
     _handle_analyze_project_structure_tool,
+    _handle_ask_user_tool,
     _handle_browser_tool,
     _handle_checkpoint_tool,
     _handle_cmd_run_tool,
-    _handle_ask_user_tool,
     _handle_execute_mcp_tool_tool,
-    _handle_mcp_tool,
-    _handle_memory_tool,
-    _handle_memory_manager_tool,
-    _handle_grep_tool,
     _handle_glob_tool,
+    _handle_grep_tool,
+    _handle_mcp_tool,
+    _handle_memory_manager_tool,
+    _handle_memory_tool,
     _handle_summarize_context_tool,
     _handle_task_tracker_tool,
     _handle_undo_last_edit_tool,

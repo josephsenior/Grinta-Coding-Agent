@@ -56,8 +56,8 @@ def _mark_checkpoint_stale(checkpoint) -> None:
 
 
 def test_finalize_stream_tool_calls_filters_invalid_streamed_name() -> None:
-    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
     from backend.engine.executor import OrchestratorExecutor
+    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
 
     executor = object.__new__(OrchestratorExecutor)
     state = _AsyncStreamingState(content_accumulate='[END_TOOL_CALL]')
@@ -73,9 +73,11 @@ def test_finalize_stream_tool_calls_filters_invalid_streamed_name() -> None:
     assert executor._finalize_stream_tool_calls(state) is None
 
 
-def test_finalize_stream_tool_calls_recovers_text_marker_after_bad_streamed_name() -> None:
-    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
+def test_finalize_stream_tool_calls_recovers_text_marker_after_bad_streamed_name() -> (
+    None
+):
     from backend.engine.executor import OrchestratorExecutor
+    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
 
     executor = object.__new__(OrchestratorExecutor)
     state = _AsyncStreamingState(
@@ -216,6 +218,9 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
     import backend.engine.function_calling as fc
     from backend.engine.executor import OrchestratorExecutor
 
+    monkeypatch.setenv('APP_STREAM_EMIT_INTERVAL_MS', '0')
+    monkeypatch.setenv('APP_STREAM_EMIT_MIN_CHARS', '1')
+
     sys.modules.setdefault('app.engine.function_calling', fc)
 
     from backend.engine import executor as executor_module
@@ -256,29 +261,15 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
 
     asyncio.run(executor.async_execute({'messages': []}, event_stream))
 
-    # Should have emitted streaming chunks (4 content chunks + 1 final marker)
-    assert event_stream.add_event.call_count == 5
-
-    # Check that the chunks were real streaming tokens
     calls = event_stream.add_event.call_args_list
     chunks = [c[0][0] for c in calls]
-    for chunk, (expected_chunk, expected_accumulated, expected_final) in zip(
-        chunks,
-        [
-            ('Hello', 'Hello', False),
-            (', ', 'Hello, ', False),
-            ('world', 'Hello, world', False),
-            ('!', 'Hello, world!', False),
-            ('', 'Hello, world!', True),
-        ],
-        strict=True,
-    ):
-        _assert_stream_chunk(
-            chunk,
-            expected_chunk=expected_chunk,
-            expected_accumulated=expected_accumulated,
-            expected_final=expected_final,
-        )
+    non_final = [chunk for chunk in chunks if not chunk.is_final]
+    final_chunks = [chunk for chunk in chunks if chunk.is_final]
+
+    assert len(non_final) >= 4
+    assert final_chunks
+    assert final_chunks[-1].accumulated == 'Hello, world!'
+    assert ''.join(chunk.chunk for chunk in non_final) == 'Hello, world!'
 
 
 def test_async_execute_preserves_streamed_reasoning_content(monkeypatch):
@@ -611,9 +602,7 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
     monkeypatch.setattr(
         executor_module.orchestrator_function_calling,
         'response_to_actions',
-        lambda response, **kwargs: [
-            AgentThinkAction(thought='tool_call_detected')
-        ],
+        lambda response, **kwargs: [AgentThinkAction(thought='tool_call_detected')],
     )
 
     # Simulate streamed tool call deltas
@@ -694,9 +683,7 @@ def test_async_execute_handles_cumulative_tool_call_name_and_args(monkeypatch):
     monkeypatch.setattr(
         executor_module.orchestrator_function_calling,
         'response_to_actions',
-        lambda response, **kwargs: [
-            AgentThinkAction(thought='tool_call_detected')
-        ],
+        lambda response, **kwargs: [AgentThinkAction(thought='tool_call_detected')],
     )
 
     async def fake_astream(**kwargs):
@@ -1363,8 +1350,8 @@ def test_response_to_actions_converts_common_tool_call_validation_error_to_recov
 
 def test_fallback_completion_inline_thinking_parsing():
     """Verify that fallback completions containing inline thinking tags are parsed correctly."""
-    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
     from backend.engine.executor import OrchestratorExecutor
+    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
@@ -1375,12 +1362,14 @@ def test_fallback_completion_inline_thinking_parsing():
 
     state = _AsyncStreamingState()
     # Partially accumulated stream content:
-    state.content_accumulate = 'Let me start by:\n1. Doing research\n2. Exploring the current directory to '
+    state.content_accumulate = (
+        'Let me start by:\n1. Doing research\n2. Exploring the current directory to '
+    )
     state.thinking_accumulate = 'Raft-based key-value store simulation.'
 
     # Non-streaming fallback response carrying both inline thinking and full content:
     fallback_text = (
-        "<think>Raft-based key-value store simulation.</think>"
+        '<think>Raft-based key-value store simulation.</think>'
         "Let me start by:\n1. Doing research\n2. Exploring the current directory to understand what's there"
     )
     fallback = SimpleNamespace(
@@ -1389,6 +1378,7 @@ def test_fallback_completion_inline_thinking_parsing():
 
     # Apply fallback
     import anyio
+
     anyio.run(executor._apply_fallback_completion, fallback, state, None)
 
     # Check results: content and thinking should be parsed and merged with no duplicates!

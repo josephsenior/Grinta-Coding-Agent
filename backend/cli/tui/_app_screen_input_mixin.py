@@ -50,7 +50,7 @@ def _parse_sessions_tui_args(args: list[str]) -> dict[str, Any]:
 def _parse_one_sessions_arg(
     remaining: list[str], i: int, result: dict[str, Any]
 ) -> tuple[int, bool]:
-    token = remaining[i]
+    remaining[i]
     handlers = [
         _try_parse_search_arg,
         _try_parse_sort_arg,
@@ -203,7 +203,9 @@ class _AppScreenInputMixin:
         if len(matches) == 1:
             ta.text = matches[0] + ' '
 
-    def _complete_command_flag(self, ta: Any, cmd: str, parts: list[str], raw: str) -> None:
+    def _complete_command_flag(
+        self, ta: Any, cmd: str, parts: list[str], raw: str
+    ) -> None:
         flags = self._COMMAND_FLAGS.get(cmd)
         if not flags or not parts[-1].startswith('--'):
             return
@@ -245,9 +247,7 @@ class _AppScreenInputMixin:
         elif self._active_communicate_card is not None and getattr(
             self._active_communicate_card, 'has_options', False
         ):
-            _tui_logger.debug(
-                'action_submit_input: routing to communicate selection'
-            )
+            _tui_logger.debug('action_submit_input: routing to communicate selection')
             self._active_communicate_card.action_submit_option()
         else:
             _tui_logger.debug('action_submit_input: empty text, ignoring')
@@ -316,7 +316,9 @@ class _AppScreenInputMixin:
             await self._bootstrapping.wait()
 
         if self._controller is not None:
-            _tui_logger.debug('_handle_input: controller exists, dispatch will ensure task')
+            _tui_logger.debug(
+                '_handle_input: controller exists, dispatch will ensure task'
+            )
             logger.info('[TUI] _handle_input: controller exists')
             return
 

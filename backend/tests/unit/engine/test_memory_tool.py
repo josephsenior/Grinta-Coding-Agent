@@ -12,12 +12,12 @@ from backend.engine.tools._tool_handlers import (
     execute_memory_persist,
     execute_memory_recall,
 )
+from backend.engine.tools.working_memory import execute_working_memory
 from backend.ledger.action.memory_tools import (
     MemoryPersistAction,
     MemoryRecallAction,
     WorkingMemoryAction,
 )
-from backend.engine.tools.working_memory import execute_working_memory
 
 
 def test_memory_working_get_empty() -> None:

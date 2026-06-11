@@ -227,7 +227,9 @@ def _handle_hard_timeout_command(
         pane_content, ps1_matches
     )
     metadata = CmdOutputMetadata()
-    metadata.suffix = f'\n[The command timed out after {timeout} seconds. {TIMEOUT_MESSAGE_TEMPLATE}]'
+    metadata.suffix = (
+        f'\n[The command timed out after {timeout} seconds. {TIMEOUT_MESSAGE_TEMPLATE}]'
+    )
     command_output = orch._get_command_output(
         command,
         raw_command_output,

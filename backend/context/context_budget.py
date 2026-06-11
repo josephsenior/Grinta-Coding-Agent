@@ -11,6 +11,7 @@ from backend.core.constants import (
     DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS,
 )
+from backend.inference.context_limits import limits_from_config
 from backend.inference.provider_capabilities import model_token_correction
 
 if TYPE_CHECKING:
@@ -71,18 +72,9 @@ def record_post_compact_baseline(state: object, events: list[Event]) -> None:
 
 
 def _effective_context_window(llm_config: object | None) -> int:
-    if llm_config is None:
-        return 200_000
-    for attr in ('max_input_tokens', 'context_window', 'max_context_tokens'):
-        value = getattr(llm_config, attr, None)
-        if isinstance(value, int) and value > 0:
-            return value
-    budget = getattr(llm_config, 'prompt_history_token_budget', None)
-    if isinstance(budget, int) and budget > 0:
-        ratio = getattr(llm_config, 'prompt_history_budget_ratio', 0.5)
-        if isinstance(ratio, (int, float)) and ratio > 0:
-            return int(budget / ratio)
-        return budget * 2
+    limits = limits_from_config(llm_config, unknown_default=True)
+    if limits.usable_input_tokens is not None:
+        return limits.usable_input_tokens
     return 200_000
 
 

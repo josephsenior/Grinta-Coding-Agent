@@ -69,7 +69,10 @@ class TestLLMResponse:
             {
                 'id': 'bad',
                 'type': 'function',
-                'function': {'name': 'Progress! <invoke name="read"', 'arguments': '{}'},
+                'function': {
+                    'name': 'Progress! <invoke name="read"',
+                    'arguments': '{}',
+                },
             },
             {
                 'id': 'good',
@@ -98,7 +101,13 @@ class TestLLMResponse:
         assert d['usage']['total_tokens'] == 3
 
     def test_to_dict_with_tool_calls(self):
-        tcs = [{'id': 'tc1'}]
+        tcs = [
+            {
+                'id': 'tc1',
+                'type': 'function',
+                'function': {'name': 'example_tool', 'arguments': '{}'},
+            }
+        ]
         resp = LLMResponse(content='', model='m', usage={}, tool_calls=tcs)
         d = resp.to_dict()
         tool_calls = d['choices'][0]['message']['tool_calls']
@@ -196,7 +205,7 @@ class TestSharedHttpClients:
             client = OpenAIClient('gpt-4o', 'sk-test', timeout=12)
             client.completion(messages=[])
 
-        assert completion.call_args.kwargs['timeout'] == 12.0
+        assert completion.call_args.kwargs['timeout'].read == 12.0
 
     def test_anthropic_client_applies_default_timeout(self):
         from backend.inference.direct_clients import AnthropicClient
@@ -211,7 +220,7 @@ class TestSharedHttpClients:
             client = AnthropicClient('claude-3', 'sk-test', timeout=9)
             client.completion(messages=[])
 
-        assert completion.call_args.kwargs['timeout'] == 9.0
+        assert completion.call_args.kwargs['timeout'].read == 9.0
 
     def test_gemini_client_uses_configured_timeout_ms(self):
         from backend.inference.direct_clients import GeminiClient

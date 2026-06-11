@@ -427,8 +427,12 @@ def _parse_tag_attrs(attrs_text: str) -> dict[str, str]:
     attrs: dict[str, str] = {}
     for match in _TAG_ATTR_RE.finditer(attrs_text):
         key = match.group(1).strip().lower()
-        value = match.group(2) if match.group(2) is not None else (
-            match.group(3) if match.group(3) is not None else match.group(4) or ''
+        value = (
+            match.group(2)
+            if match.group(2) is not None
+            else (
+                match.group(3) if match.group(3) is not None else match.group(4) or ''
+            )
         )
         if key:
             attrs[key] = value
@@ -436,16 +440,10 @@ def _parse_tag_attrs(attrs_text: str) -> dict[str, str]:
 
 
 def _extract_name_from_payload(payload: dict[str, Any]) -> str | None:
-    return (
-        payload.get('name')
-        or payload.get('tool')
-        or payload.get('function_name')
-    )
+    return payload.get('name') or payload.get('tool') or payload.get('function_name')
 
 
-def _extract_arguments_from_payload(
-    payload: dict[str, Any], name: str | None
-) -> Any:
+def _extract_arguments_from_payload(payload: dict[str, Any], name: str | None) -> Any:
     function_payload = payload.get('function')
     if isinstance(function_payload, dict):
         arguments = function_payload.get('arguments')

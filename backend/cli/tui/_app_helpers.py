@@ -218,50 +218,80 @@ def _split_diff_opcode_rows(
 
 
 def _equal_rows(
-    old_lines: list[str], new_lines: list[str],
-    i1: int, i2: int, j1: int, j2: int, pad: int,
+    old_lines: list[str],
+    new_lines: list[str],
+    i1: int,
+    i2: int,
+    j1: int,
+    j2: int,
+    pad: int,
 ) -> list[tuple[str, str, str, str]]:
     rows = []
     for offset, old_index in enumerate(range(i1, i2)):
         new_index = j1 + offset
-        rows.append((
-            _numbered_diff_line('ctx', old_index + 1, old_lines[old_index], pad),
-            _numbered_diff_line('ctx', new_index + 1, new_lines[new_index], pad),
-            'ctx', 'ctx',
-        ))
+        rows.append(
+            (
+                _numbered_diff_line('ctx', old_index + 1, old_lines[old_index], pad),
+                _numbered_diff_line('ctx', new_index + 1, new_lines[new_index], pad),
+                'ctx',
+                'ctx',
+            )
+        )
     return rows
 
 
 def _delete_rows(
-    old_lines: list[str], new_lines: list[str],
-    i1: int, i2: int, j1: int, j2: int, pad: int,
+    old_lines: list[str],
+    new_lines: list[str],
+    i1: int,
+    i2: int,
+    j1: int,
+    j2: int,
+    pad: int,
 ) -> list[tuple[str, str, str, str]]:
     rows = []
     for old_index in range(i1, i2):
-        rows.append((
-            _numbered_diff_line('rem', old_index + 1, old_lines[old_index], pad),
-            '', 'rem', 'ctx',
-        ))
+        rows.append(
+            (
+                _numbered_diff_line('rem', old_index + 1, old_lines[old_index], pad),
+                '',
+                'rem',
+                'ctx',
+            )
+        )
     return rows
 
 
 def _insert_rows(
-    old_lines: list[str], new_lines: list[str],
-    i1: int, i2: int, j1: int, j2: int, pad: int,
+    old_lines: list[str],
+    new_lines: list[str],
+    i1: int,
+    i2: int,
+    j1: int,
+    j2: int,
+    pad: int,
 ) -> list[tuple[str, str, str, str]]:
     rows = []
     for new_index in range(j1, j2):
-        rows.append((
-            '',
-            _numbered_diff_line('add', new_index + 1, new_lines[new_index], pad),
-            'ctx', 'add',
-        ))
+        rows.append(
+            (
+                '',
+                _numbered_diff_line('add', new_index + 1, new_lines[new_index], pad),
+                'ctx',
+                'add',
+            )
+        )
     return rows
 
 
 def _replace_rows(
-    old_lines: list[str], new_lines: list[str],
-    i1: int, i2: int, j1: int, j2: int, pad: int,
+    old_lines: list[str],
+    new_lines: list[str],
+    i1: int,
+    i2: int,
+    j1: int,
+    j2: int,
+    pad: int,
 ) -> list[tuple[str, str, str, str]]:
     rows = []
     old_count = i2 - i1
@@ -271,17 +301,22 @@ def _replace_rows(
         new_index = j1 + offset
         left = (
             _numbered_diff_line('rem', old_index + 1, old_lines[old_index], pad)
-            if offset < old_count else ''
+            if offset < old_count
+            else ''
         )
         right = (
             _numbered_diff_line('add', new_index + 1, new_lines[new_index], pad)
-            if offset < new_count else ''
+            if offset < new_count
+            else ''
         )
-        rows.append((
-            left, right,
-            'rem' if left else 'ctx',
-            'add' if right else 'ctx',
-        ))
+        rows.append(
+            (
+                left,
+                right,
+                'rem' if left else 'ctx',
+                'add' if right else 'ctx',
+            )
+        )
     return rows
 
 

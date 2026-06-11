@@ -224,11 +224,14 @@ class FileStateMiddleware(ToolInvocationMiddleware):
     def _is_observation_error(self, observation: Observation) -> bool:
         try:
             from backend.ledger.observation import ErrorObservation
+
             return isinstance(observation, ErrorObservation)
         except Exception:
             return False
 
-    def _record_file_action(self, action: Any, action_cls: str, observation_failed: bool) -> str:
+    def _record_file_action(
+        self, action: Any, action_cls: str, observation_failed: bool
+    ) -> str:
         """Record file action in tracker. Returns mutated_path if applicable."""
         try:
             if action_cls == 'FileEditAction':
@@ -275,7 +278,9 @@ class FileStateMiddleware(ToolInvocationMiddleware):
             if not symbols:
                 return
             session_files = [e.path for e in self._tracker._files.values()]
-            refs = _find_symbol_references(symbols, session_files, exclude_path=mutated_path)
+            refs = _find_symbol_references(
+                symbols, session_files, exclude_path=mutated_path
+            )
             if not refs:
                 return
             content = getattr(observation, 'content', None)
@@ -291,7 +296,9 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                     + '</BLAST_RADIUS>'
                 )
         except Exception:
-            logger.debug('FileStateMiddleware: blast radius check failed', exc_info=True)
+            logger.debug(
+                'FileStateMiddleware: blast radius check failed', exc_info=True
+            )
 
     async def observe(
         self, ctx: ToolInvocationContext, observation: Observation | None

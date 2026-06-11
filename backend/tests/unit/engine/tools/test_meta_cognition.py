@@ -33,8 +33,7 @@ def test_ask_user_builds_waiting_message_with_numbered_questions() -> None:
     assert action.wait_for_response is True
     assert action.final_response is False
     assert action.content == (
-        '1. Which backend should I target?\n'
-        '2. Should I keep the current schema?'
+        '1. Which backend should I target?\n2. Should I keep the current schema?'
     )
 
 

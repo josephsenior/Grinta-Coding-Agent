@@ -134,7 +134,9 @@ class _SessionOrchestratorParallelMixin:
             decision.reason,
             len(decision.overflow),
         )
-        failed_actions, last_failures = await self._execute_parallel_batch_with_retries(batch)
+        failed_actions, last_failures = await self._execute_parallel_batch_with_retries(
+            batch
+        )
         await self._handle_parallel_batch_failures(failed_actions, last_failures)
         await self._handle_post_execution()
         return True
@@ -315,7 +317,6 @@ class _SessionOrchestratorParallelMixin:
         if mm is None or (pipeline is None and compactor is None):
             return
 
-        import asyncio
         import copy as _copy_mod
 
         state_copy = _copy_mod.copy(self.state)
@@ -327,9 +328,12 @@ class _SessionOrchestratorParallelMixin:
 
         async def _run_bg():
             import inspect
+
             if pipeline is not None:
                 return await pipeline.prewarm_compaction(state_copy)
-            background_compact = getattr(compactor, 'compacted_history_background', None)
+            background_compact = getattr(
+                compactor, 'compacted_history_background', None
+            )
             if callable(background_compact):
                 background_result = background_compact(state_copy)
                 if inspect.isawaitable(background_result):
@@ -344,9 +348,11 @@ class _SessionOrchestratorParallelMixin:
             return
         logger.debug('Critical memory pressure: awaiting in-flight prewarm task...')
         import asyncio
+
         try:
             from backend.ledger import EventSource
             from backend.ledger.observation import StatusObservation
+
             compaction_status = StatusObservation(
                 content='Compacting context...',
                 status_type='compaction',
@@ -367,7 +373,9 @@ class _SessionOrchestratorParallelMixin:
             current_history = getattr(self.state, 'history', None) or []
             self.state.turn_signals.prewarm_history_len = len(current_history)
             latest_event = current_history[-1] if current_history else None
-            self.state.turn_signals.prewarm_latest_event_id = getattr(latest_event, 'id', None)
+            self.state.turn_signals.prewarm_latest_event_id = getattr(
+                latest_event, 'id', None
+            )
             logger.info('Injected prewarmed compaction into turn signals.')
         else:
             self.state.turn_signals.prewarmed_compaction = None
@@ -412,10 +420,7 @@ class _SessionOrchestratorParallelMixin:
         history_events = len(history) if history is not None else None
         self._signal_memory_pressure(history, history_events)
 
-        if (
-            hasattr(self.state, 'turn_signals')
-            and self.memory_pressure.is_critical()
-        ):
+        if hasattr(self.state, 'turn_signals') and self.memory_pressure.is_critical():
             await self._await_prewarm_if_critical('CRITICAL')
             self._apply_prewarmed_compaction_signals()
 

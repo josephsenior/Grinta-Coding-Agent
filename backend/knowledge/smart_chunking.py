@@ -95,15 +95,27 @@ class SmartChunker:
 
             if is_header and header_level <= 2 and current_section:
                 chunk_index, current_section, current_size = self._flush_section(
-                    chunks, current_section, chunk_index, document_id, metadata,
-                    'markdown_header', max_size,
+                    chunks,
+                    current_section,
+                    chunk_index,
+                    document_id,
+                    metadata,
+                    'markdown_header',
+                    max_size,
                 )
                 current_section = [line]
                 current_size = len(line)
             elif current_size + len(line) + 1 > max_size and current_section:
                 chunk_index, current_section, current_size = self._flush_section(
-                    chunks, current_section, chunk_index, document_id, metadata,
-                    'markdown_body', max_size, overlap, next_line=line,
+                    chunks,
+                    current_section,
+                    chunk_index,
+                    document_id,
+                    metadata,
+                    'markdown_body',
+                    max_size,
+                    overlap,
+                    next_line=line,
                 )
             else:
                 current_section.append(line)
@@ -111,7 +123,12 @@ class SmartChunker:
 
         if current_section:
             self._append_chunk(
-                chunks, current_section, chunk_index, document_id, metadata, 'markdown_body'
+                chunks,
+                current_section,
+                chunk_index,
+                document_id,
+                metadata,
+                'markdown_body',
             )
 
         return chunks
@@ -130,7 +147,9 @@ class SmartChunker:
     ) -> tuple[int, list[str], int]:
         chunk_text = '\n'.join(section).strip()
         if chunk_text:
-            self._append_chunk(chunks, section, chunk_index, document_id, metadata, section_type)
+            self._append_chunk(
+                chunks, section, chunk_index, document_id, metadata, section_type
+            )
             chunk_index += 1
         if next_line is not None and overlap > 0:
             overlap_lines = section[-overlap // 50 :]
@@ -225,7 +244,11 @@ class SmartChunker:
 
             if is_document_start and current_doc:
                 chunk_index = self._flush_yaml_section(
-                    chunks, current_doc, chunk_index, document_id, metadata,
+                    chunks,
+                    current_doc,
+                    chunk_index,
+                    document_id,
+                    metadata,
                     'yaml_document',
                 )
                 current_doc = []
@@ -233,7 +256,11 @@ class SmartChunker:
 
             if current_size + len(line) + 1 > max_size and current_doc:
                 chunk_index = self._flush_yaml_section(
-                    chunks, current_doc, chunk_index, document_id, metadata,
+                    chunks,
+                    current_doc,
+                    chunk_index,
+                    document_id,
+                    metadata,
                     'yaml_body',
                 )
                 current_doc = []
@@ -264,7 +291,9 @@ class SmartChunker:
     ) -> int:
         chunk_text = '\n'.join(section).strip()
         if chunk_text:
-            self._append_chunk(chunks, section, chunk_index, document_id, metadata, section_type)
+            self._append_chunk(
+                chunks, section, chunk_index, document_id, metadata, section_type
+            )
             return chunk_index + 1
         return chunk_index
 

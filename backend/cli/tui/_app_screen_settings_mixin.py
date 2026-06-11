@@ -92,9 +92,7 @@ class _AppScreenSettingsMixin:
 
     def _update_mode_extra_data(self, controller, mode: str) -> None:
         state = getattr(controller, 'state', None)
-        extra_data = (
-            getattr(state, 'extra_data', None) if state is not None else None
-        )
+        extra_data = getattr(state, 'extra_data', None) if state is not None else None
         if not isinstance(extra_data, dict):
             return
         if is_chat_mode(mode):

@@ -169,9 +169,7 @@ def _file_read_range_from_bounds(start: int, end: int) -> str:
     return ''
 
 
-def _resolve_file_read_line_range(
-    view_range: Any, start: int, end: int
-) -> str:
+def _resolve_file_read_line_range(view_range: Any, start: int, end: int) -> str:
     result = _file_read_range_from_view_range(view_range)
     if result is not None:
         return result
@@ -285,7 +283,14 @@ def _handle_file_edit_action(
     end_line = getattr(event, 'end_line', None)
 
     verb, line_range = _resolve_file_edit_verb_and_range(
-        orch, event, cmd, insert_line, start, end, start_line, end_line,
+        orch,
+        event,
+        cmd,
+        insert_line,
+        start,
+        end,
+        start_line,
+        end_line,
     )
 
     if cmd == 'create_file':
@@ -404,9 +409,7 @@ def _handle_file_edit_multi_file(
         if per_file:
             _write_multi_file_edit_cards(orch, per_file)
         else:
-            orch._write_card(
-                ActivityRenderer.file_edit('Edited', path or '?')
-            )
+            orch._write_card(ActivityRenderer.file_edit('Edited', path or '?'))
     else:
         orch._write_card(ActivityRenderer.file_edit('Edited', path or '?'))
 
@@ -428,9 +431,7 @@ def _resolve_existing_file_edit_diff(
     diff_text = orch._extract_file_edit_diff(event)
     if not (added or removed):
         added, removed = _count_unified_diff_changes(diff_text)
-    encoded_diff = (
-        _encode_unified_diff_text(diff_text) if diff_text else None
-    )
+    encoded_diff = _encode_unified_diff_text(diff_text) if diff_text else None
     return encoded_diff, added, removed
 
 
@@ -467,7 +468,10 @@ def _handle_file_edit_existing(
     removed: int,
 ) -> None:
     encoded_diff, added, removed = _resolve_existing_file_edit_diff(
-        orch, event, added, removed,
+        orch,
+        event,
+        added,
+        removed,
     )
     _write_file_edit_existing_card(orch, path, encoded_diff, added, removed)
 
@@ -475,6 +479,7 @@ def _handle_file_edit_existing(
 def _clean_file_edit_content(event: FileEditObservation) -> None:
     if hasattr(event, 'content') and event.content:
         from backend.cli.transcript import strip_indentation_warnings
+
         event.content = strip_indentation_warnings(event.content)
 
 
@@ -548,9 +553,7 @@ def _handle_mcp_observation(
     )
     preview = None
     if event.content:
-        truncated = event.content[:200] + (
-            '...' if len(event.content) > 200 else ''
-        )
+        truncated = event.content[:200] + ('...' if len(event.content) > 200 else '')
         preview = f'  {truncated}'
     pending = orch._pending_mcp_card
     if pending is not None:
@@ -604,10 +607,7 @@ def _handle_error_observation(
     content = event.content or 'An unknown error occurred'
     if getattr(event, 'notify_ui_only', False):
         error_category = getattr(event, 'error_category', None)
-        if (
-            error_category
-            and error_category not in _TRANSIENT_HUD_ONLY_CATEGORIES
-        ):
+        if error_category and error_category not in _TRANSIENT_HUD_ONLY_CATEGORIES:
             summary = notice_panel_title(content, error_category=error_category)
             first_line = content.split('\n', 1)[0].strip()
             orch._update_runtime_strip(summary, first_line, active=True)
@@ -629,9 +629,7 @@ def _handle_status_retry(
     status_type: str,
     extras: dict,
 ) -> None:
-    label, last_status, message = orch._format_retry_status_message(
-        status_type, extras
-    )
+    label, last_status, message = orch._format_retry_status_message(status_type, extras)
     orch._hud.update_ledger('Backoff')
     orch._hud.update_agent_state(label)
     orch._tui.set_agent_phase(label)
@@ -696,9 +694,7 @@ def _handle_agent_think_action(
     thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
     kind = getattr(event, 'kind', '') or ''
     tool_args = (
-        arguments_from_tool_call_metadata(
-            getattr(event, 'tool_call_metadata', None)
-        )
+        arguments_from_tool_call_metadata(getattr(event, 'tool_call_metadata', None))
         if source_tool in ('grep', 'glob')
         else None
     )
@@ -727,9 +723,7 @@ def _browser_click_url(event: BrowserToolAction) -> str:
     return selector[:80] if selector else ''
 
 
-def _resolve_browser_action_url(
-    action_name: str, event: BrowserToolAction
-) -> str:
+def _resolve_browser_action_url(action_name: str, event: BrowserToolAction) -> str:
     if action_name == 'navigate':
         return _browser_navigate_url(event)
     if action_name == 'click':
@@ -752,9 +746,7 @@ def _handle_browse_interactive_action(
     orch: '_AppRendererEventProcessorMixin', event: BrowseInteractiveAction
 ) -> None:
     actions = getattr(event, 'browser_actions', '') or ''
-    detail = (
-        actions[:80] + ('...' if len(actions) > 80 else '') if actions else ''
-    )
+    detail = actions[:80] + ('...' if len(actions) > 80 else '') if actions else ''
     card = ActivityRenderer.browser_action('browse', detail)
     widget = orch._write_card(card)
     orch._last_browser_action_card = widget
@@ -901,7 +893,9 @@ def _handle_grep_observation(
         result_lines=result_lines,
         source_tool='grep',
         scope=event.path or '',
-        pending_attr='_pending_search_card' if orch._pending_search_tool == 'grep' else None,
+        pending_attr='_pending_search_card'
+        if orch._pending_search_tool == 'grep'
+        else None,
     )
 
 
@@ -919,7 +913,9 @@ def _handle_glob_observation(
         result_lines=files,
         source_tool='glob',
         scope=event.path or '',
-        pending_attr='_pending_search_card' if orch._pending_search_tool == 'glob' else None,
+        pending_attr='_pending_search_card'
+        if orch._pending_search_tool == 'glob'
+        else None,
     )
 
 
@@ -929,9 +925,7 @@ def _handle_lsp_query_observation(
     content = (event.content or '').strip()
     symbol = getattr(event, 'symbol', '') or ''
     available = bool(getattr(event, 'available', True))
-    card = ActivityRenderer.lsp_query(
-        symbol, result=content, available=available
-    )
+    card = ActivityRenderer.lsp_query(symbol, result=content, available=available)
     preview = _build_lsp_preview(content)
     _update_or_write_lsp_card(orch, card, symbol, available, preview)
 
@@ -1114,9 +1108,7 @@ def _handle_terminal_input_action(
     orch: '_AppRendererEventProcessorMixin', event: TerminalInputAction
 ) -> None:
     session_id = getattr(event, 'session_id', '') or ''
-    submitted = _sanitize_terminal_display_text(
-        getattr(event, 'input', '') or ''
-    )
+    submitted = _sanitize_terminal_display_text(getattr(event, 'input', '') or '')
     detail = orch._terminal_card_detail(session_id, submitted)
     orch._upsert_terminal_session_card(
         session_id=session_id,
@@ -1217,11 +1209,7 @@ def _handle_agent_condensation_observation(
 def _resolve_delegate_task_and_worker(
     event: DelegateTaskAction,
 ) -> tuple[str, str]:
-    task = (
-        getattr(event, 'task_description', '')
-        or getattr(event, 'task', '')
-        or ''
-    )
+    task = getattr(event, 'task_description', '') or getattr(event, 'task', '') or ''
     worker = getattr(event, 'worker', '') or ''
     return task, worker
 
@@ -1404,9 +1392,7 @@ def _handle_checkpoint_action(
     orch: '_AppRendererEventProcessorMixin', event: CheckpointAction
 ) -> None:
     detail = event.label or event.command or 'checkpoint'
-    _render_memory_tool_card(
-        orch, detail, kind='checkpoint', source_tool='checkpoint'
-    )
+    _render_memory_tool_card(orch, detail, kind='checkpoint', source_tool='checkpoint')
 
 
 def _handle_working_memory_action(
@@ -1559,9 +1545,7 @@ def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
             flush_sync()
 
 
-def _handle_noop_event(
-    orch: '_AppRendererEventProcessorMixin', event: Any
-) -> None:
+def _handle_noop_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
     pass
 
 
@@ -1645,16 +1629,12 @@ def _handle_file_download_dispatch(
     )
 
 
-def _handle_unknown_event(
-    orch: '_AppRendererEventProcessorMixin', event: Any
-) -> None:
+def _handle_unknown_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
     name = type(event).__name__
     orch._tui._write_log(Text(f'  [{name}]', style=NAVY_TEXT_MUTED))
 
 
-def _dispatch_event(
-    orch: '_AppRendererEventProcessorMixin', event: Any
-) -> None:
+def _dispatch_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
     event_type = type(event)
     handler = _EVENT_HANDLERS.get(event_type)
     if handler is not None:

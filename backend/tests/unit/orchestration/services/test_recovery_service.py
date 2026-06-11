@@ -98,7 +98,7 @@ class TestRecoveryService:
         mock_context.discard_invocation_context_for_action.assert_called_once_with(
             pending
         )
-        ctrl.pending_action_service.set.assert_called_once_with(None)
+        ctrl.pending_action_service.pop_for_cause.assert_called_once_with(7)
 
     @pytest.mark.asyncio
     async def test_retry_scheduled_still_transitions_to_awaiting_input(

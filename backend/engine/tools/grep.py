@@ -74,7 +74,7 @@ def create_grep_tool() -> dict:
             'file_pattern': {
                 'type': 'string',
                 'description': (
-                    "Optional glob to limit which files are searched "
+                    'Optional glob to limit which files are searched '
                     "(e.g. '*.ts', 'src/**/*.test.js')."
                 ),
             },

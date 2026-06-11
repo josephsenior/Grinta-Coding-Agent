@@ -43,9 +43,7 @@ def _build_terminal_content(content: str) -> list[Text]:
             line = line[:117] + '\u2026'
         lines.append(Text(line, style=NAVY_TEXT_MUTED))
     if len(all_lines) > 15:
-        lines.append(
-            Text(f'... {len(all_lines) - 15} more lines', style=NAVY_TEXT_DIM)
-        )
+        lines.append(Text(f'... {len(all_lines) - 15} more lines', style=NAVY_TEXT_DIM))
     return lines
 
 

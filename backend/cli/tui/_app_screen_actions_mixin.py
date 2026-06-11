@@ -99,7 +99,9 @@ class _AppScreenActionsMixin:
         hud = getattr(self, '_hud', None)
         state = getattr(hud, 'state', None)
         if state is not None:
-            return normalize_autonomy_level(getattr(state, 'autonomy_level', '')) == 'full'
+            return (
+                normalize_autonomy_level(getattr(state, 'autonomy_level', '')) == 'full'
+            )
         return False
 
     def _get_pending_action(self) -> Any:

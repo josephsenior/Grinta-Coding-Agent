@@ -39,7 +39,9 @@ def _user_message(text: str, event_id: int) -> MessageAction:
 def _run_chunk(event_id: int, label: str, payload: str = '') -> list[Event]:
     action = _with_id(CmdRunAction(command=f'echo {label}'), event_id)
     observation = _with_id(
-        CmdOutputObservation(content=payload or f'output {label}', command=f'echo {label}'),
+        CmdOutputObservation(
+            content=payload or f'output {label}', command=f'echo {label}'
+        ),
         event_id + 1,
     )
     return [action, observation]
@@ -151,6 +153,50 @@ def test_event_count_guard_windows_many_tiny_events_without_token_budget() -> No
     assert events[-1] in result.events
 
 
+def test_known_large_model_does_not_apply_default_event_cap() -> None:
+    events = [_user_message('start', 1)]
+    for idx in range(2, 702, 2):
+        events.extend(_run_chunk(idx, f'cmd-{idx}', payload='ok'))
+    cfg = SimpleNamespace(
+        prompt_history_token_budget=None,
+        context_window_tokens=1_047_576,
+        max_input_tokens=None,
+        max_output_tokens=32_768,
+        prompt_history_min_events=1,
+        prompt_history_max_events=None,
+        prompt_history_min_tool_loops=0,
+        prompt_history_min_tail_tokens=0,
+        model='openai/gpt-4.1',
+    )
+
+    result = select_prompt_events(events, cfg)
+
+    assert result.windowed is False
+    assert result.selected_events == len(events)
+    assert result.selected_events > 240
+
+
+def test_unknown_model_keeps_default_count_cap() -> None:
+    events = [_user_message('start', 1)]
+    for idx in range(2, 702, 2):
+        events.extend(_run_chunk(idx, f'cmd-{idx}', payload='ok'))
+    cfg = SimpleNamespace(
+        prompt_history_token_budget=None,
+        max_input_tokens=None,
+        max_output_tokens=None,
+        prompt_history_min_events=1,
+        prompt_history_max_events=None,
+        prompt_history_min_tool_loops=0,
+        prompt_history_min_tail_tokens=0,
+        model='unknown-provider-model',
+    )
+
+    result = select_prompt_events(events, cfg)
+
+    assert result.windowed is True
+    assert result.selected_events <= 240
+
+
 def test_windowing_does_not_mutate_input_event_content() -> None:
     long_payload = 'x' * 5000
     events = [_user_message('start', 1), *_run_chunk(2, 'big', payload=long_payload)]
@@ -234,11 +280,7 @@ def test_window_enforces_minimum_tool_loops() -> None:
     result = select_prompt_events(events, cfg)
 
     assert result.windowed is True
-    chunk_count = sum(
-        1
-        for event in result.events
-        if isinstance(event, CmdRunAction)
-    )
+    chunk_count = sum(1 for event in result.events if isinstance(event, CmdRunAction))
     assert chunk_count >= 3
 
 

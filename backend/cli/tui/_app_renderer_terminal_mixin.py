@@ -142,8 +142,13 @@ class _AppRendererTerminalMixin:
         widget = self._resolve_terminal_widget(session_key, session_id)
         if widget is None:
             self._create_and_write_terminal_card(
-                session_key, session_id, verb, detail,
-                secondary, secondary_kind, extra_content,
+                session_key,
+                session_id,
+                verb,
+                detail,
+                secondary,
+                secondary_kind,
+                extra_content,
             )
             return
 
@@ -157,11 +162,18 @@ class _AppRendererTerminalMixin:
 
         del collapse_after_update
         self._apply_terminal_processing(
-            widget, processing, verb, detail, secondary, session_key,
+            widget,
+            processing,
+            verb,
+            detail,
+            secondary,
+            session_key,
         )
 
     @staticmethod
-    def _build_shell_meta_header(command: str, cwd: str | None, exit_code: int | None) -> list[str]:
+    def _build_shell_meta_header(
+        command: str, cwd: str | None, exit_code: int | None
+    ) -> list[str]:
         meta_lines = [f'$ {command}']
         if cwd:
             meta_lines.append(f'cwd: {cwd}')

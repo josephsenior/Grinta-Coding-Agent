@@ -30,7 +30,9 @@ def _cmd(command: str, event_id: int) -> CmdRunAction:
     return event
 
 
-def _output(command: str, content: str, event_id: int, exit_code: int) -> CmdOutputObservation:
+def _output(
+    command: str, content: str, event_id: int, exit_code: int
+) -> CmdOutputObservation:
     event = CmdOutputObservation(content=content, command=command, exit_code=exit_code)
     event.id = event_id
     return event
@@ -103,6 +105,32 @@ def test_failed_approaches_are_deduped_and_capped() -> None:
 
     assert len(canonical.failed_approaches) == 1
     assert canonical.failed_approaches[0].detail == 'pytest -q'
+
+
+def test_recent_work_ledger_dedupes_commands_and_files() -> None:
+    snapshot = {
+        'files_touched': {
+            'backend/context/prompt_window.py': {
+                'action': 'read',
+                'sha256': 'abcdef1234567890',
+            }
+        },
+        'recent_commands': [
+            {'command': 'pytest -q', 'output': 'failed\nline 1'},
+            {'command': 'pytest -q', 'output': 'passed'},
+        ],
+    }
+
+    canonical = reduce_snapshot_into_state(
+        snapshot,
+        CanonicalTaskState(),
+        latest_event_id=10,
+    )
+    rendered = render_canonical_state_for_prompt(canonical, char_budget=1200)
+
+    assert 'Recent work ledger' in rendered
+    assert rendered.count('pytest -q') == 1
+    assert 'backend/context/prompt_window.py' in rendered
 
 
 def test_llm_patch_cannot_overwrite_newer_facts() -> None:

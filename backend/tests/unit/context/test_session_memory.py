@@ -20,7 +20,9 @@ def _user(text: str, event_id: int) -> MessageAction:
     return action
 
 
-def test_maybe_update_writes_session_memory_when_threshold_crossed(tmp_path, monkeypatch):
+def test_maybe_update_writes_session_memory_when_threshold_crossed(
+    tmp_path, monkeypatch
+):
     memory_path = tmp_path / 'session_memory.md'
     monkeypatch.setattr(
         'backend.context.session_memory._session_memory_path',
@@ -42,4 +44,7 @@ def test_maybe_update_writes_session_memory_when_threshold_crossed(tmp_path, mon
     ):
         assert maybe_update(state, events) is True
     assert session_memory_exists()
-    assert 'Session Memory' in get_content_for_compaction() or 'pipeline' in get_content_for_compaction()
+    assert (
+        'Session Memory' in get_content_for_compaction()
+        or 'pipeline' in get_content_for_compaction()
+    )

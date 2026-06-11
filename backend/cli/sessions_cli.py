@@ -121,7 +121,8 @@ def _filter_sessions_plain(
 ) -> list[tuple[str, dict[str, Any], int, Path]]:
     search_lower = search_term.lower()
     return [
-        r for r in rows
+        r
+        for r in rows
         if search_lower in str(r[1].get('title', '') or '').lower()
         or search_lower in str(r[1].get('name', '') or '').lower()
         or search_lower in str(r[1].get('llm_model', '') or '').lower()
@@ -130,9 +131,12 @@ def _filter_sessions_plain(
 
 def _fuzzy_session_score(search_lower: str, meta: dict[str, Any]) -> int:
     from rapidfuzz import fuzz
+
     title = str(meta.get('title') or meta.get('name') or '').lower()
     model = str(meta.get('llm_model') or '').lower()
-    return max(fuzz.partial_ratio(search_lower, title), fuzz.partial_ratio(search_lower, model))
+    return max(
+        fuzz.partial_ratio(search_lower, title), fuzz.partial_ratio(search_lower, model)
+    )
 
 
 def _build_session_table(console: Console) -> Table:

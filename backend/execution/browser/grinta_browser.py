@@ -245,14 +245,10 @@ class GrintaNativeBrowser:
             self, browser, url=url, new_tab=new_tab, nav_budget=nav_budget
         )
 
-    async def _execute_navigate(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_navigate(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_navigate_impl(self, cmd, params)
 
-    async def _execute_snapshot(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_snapshot(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_snapshot_impl(self, cmd, params)
 
     @staticmethod
@@ -316,14 +312,10 @@ class GrintaNativeBrowser:
     ) -> tuple[Any | None, Observation | None]:
         return await _get_browser_node_impl(self, browser, cmd=cmd, index=index)
 
-    async def _execute_click(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_click(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_click_impl(self, cmd, params)
 
-    async def _execute_type(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_type(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_type_impl(self, cmd, params)
 
     def _resolve_workspace_path(self, raw: str) -> tuple[Path | None, str | None]:
@@ -336,19 +328,13 @@ class GrintaNativeBrowser:
     async def _dispatch_bus_event(self, browser: Any, event_obj: Any) -> None:
         await _dispatch_bus_event_impl(self, browser, event_obj)
 
-    async def _execute_scroll(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_scroll(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_scroll_impl(self, cmd, params)
 
-    async def _execute_send_keys(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_send_keys(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_send_keys_impl(self, cmd, params)
 
-    async def _execute_wait(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_wait(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_wait_impl(self, cmd, params)
 
     async def _execute_switch_tab(
@@ -356,24 +342,16 @@ class GrintaNativeBrowser:
     ) -> Observation:
         return await _execute_switch_tab_impl(self, cmd, params)
 
-    async def _execute_close_tab(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_close_tab(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_close_tab_impl(self, cmd, params)
 
-    async def _execute_list_tabs(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_list_tabs(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_list_tabs_impl(self, cmd, params)
 
-    async def _execute_go_back(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_go_back(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_go_back_impl(self, cmd, params)
 
-    async def _execute_extract(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_extract(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_extract_impl(self, cmd, params)
 
     async def _execute_upload_file(

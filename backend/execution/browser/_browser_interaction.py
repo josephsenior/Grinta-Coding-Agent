@@ -71,9 +71,7 @@ async def get_browser_node_impl(
     return node, None
 
 
-async def execute_click_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_click_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     index, error_observation = self._parse_browser_index(
         cmd,
         params.get('index'),
@@ -97,9 +95,7 @@ async def execute_click_impl(
     await evt
     await evt.event_result(raise_if_any=True, raise_if_none=False)
     base = f'Clicked element index {index}.'
-    content = await self._maybe_append_page_state(
-        browser, params=params, prefix=base
-    )
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
         CmdOutputObservation(
@@ -110,9 +106,7 @@ async def execute_click_impl(
     )
 
 
-async def execute_type_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_type_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     text = str(params.get('text') or '')
     if len(text) > _MAX_TYPE_LEN:
         return _finalize_observation(
@@ -140,15 +134,11 @@ async def execute_type_impl(
     clear = bool(params.get('clear', True))
     from browser_use.browser.events import TypeTextEvent
 
-    evt = browser.event_bus.dispatch(
-        TypeTextEvent(node=node, text=text, clear=clear)
-    )
+    evt = browser.event_bus.dispatch(TypeTextEvent(node=node, text=text, clear=clear))
     await evt
     await evt.event_result(raise_if_any=True, raise_if_none=False)
     base = f'Typed into element index {index}.'
-    content = await self._maybe_append_page_state(
-        browser, params=params, prefix=base
-    )
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
         CmdOutputObservation(
@@ -159,11 +149,7 @@ async def execute_type_impl(
     )
 
 
-async def execute_scroll_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
-    from browser_use.browser.events import ScrollEvent, ScrollToTextEvent
-
+async def execute_scroll_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     direction = str(params.get('direction') or 'down').strip().lower()
     browser = await self._ensure_session()
     to_text = params.get('to_text')
@@ -172,6 +158,7 @@ async def execute_scroll_impl(
     if direction in ('top', 'bottom'):
         return await self._scroll_to_edge(browser, params, direction)
     return await self._scroll_directional(cmd, browser, params, direction)
+
 
 async def _scroll_to_text(
     self, cmd: str, browser: Any, params: dict[str, Any], to_text: Any
@@ -189,8 +176,10 @@ async def _scroll_to_text(
     base = 'Scrolled toward text match.'
     content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
-        cmd, CmdOutputObservation(content=content, command='browser scroll', exit_code=0)
+        cmd,
+        CmdOutputObservation(content=content, command='browser scroll', exit_code=0),
     )
+
 
 async def _scroll_to_edge(
     self, browser: Any, params: dict[str, Any], direction: str
@@ -205,8 +194,10 @@ async def _scroll_to_edge(
     base = f'Scrolled {direction}.'
     content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
-        cmd, CmdOutputObservation(content=content, command='browser scroll', exit_code=0)
+        cmd,
+        CmdOutputObservation(content=content, command='browser scroll', exit_code=0),
     )
+
 
 async def _scroll_directional(
     self, cmd: str, browser: Any, params: dict[str, Any], direction: str
@@ -227,9 +218,7 @@ async def _scroll_directional(
         )
         if err is not None:
             return err
-        node, err2 = await self._get_browser_node(
-            browser, cmd=cmd, index=six or 0
-        )
+        node, err2 = await self._get_browser_node(browser, cmd=cmd, index=six or 0)
         if err2 is not None:
             return err2
     await self._dispatch_bus_event(
@@ -239,13 +228,12 @@ async def _scroll_directional(
     base = f'Scrolled {direction} by {amount}px.'
     content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
-        cmd, CmdOutputObservation(content=content, command='browser scroll', exit_code=0)
+        cmd,
+        CmdOutputObservation(content=content, command='browser scroll', exit_code=0),
     )
 
 
-async def execute_send_keys_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_send_keys_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     from browser_use.browser.events import SendKeysEvent
 
     keys = str(params.get('keys') or '').strip()
@@ -256,14 +244,10 @@ async def execute_send_keys_impl(
     browser = await self._ensure_session()
     await self._dispatch_bus_event(browser, SendKeysEvent(keys=keys))
     base = f'Sent keys: {keys!r}'
-    content = await self._maybe_append_page_state(
-        browser, params=params, prefix=base
-    )
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
-        CmdOutputObservation(
-            content=content, command='browser send_keys', exit_code=0
-        ),
+        CmdOutputObservation(content=content, command='browser send_keys', exit_code=0),
     )
 
 
@@ -271,6 +255,7 @@ async def _wait_for_timeout(
     browser: Any, params: dict[str, Any], timeout_sec: float
 ) -> str:
     from browser_use.browser.events import WaitEvent
+
     sec = min(float(params.get('seconds') or timeout_sec), 10.0)
     await browser.event_bus.dispatch(WaitEvent(seconds=sec))
     return f'Waited {sec}s.'
@@ -341,31 +326,35 @@ async def _wait_for_network_idle(
     )
 
 
-async def execute_wait_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_wait_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     wait_kind = (
         str(params.get('wait_kind') or params.get('wait_for') or 'timeout')
         .strip()
         .lower()
     )
-    timeout_sec = min(float(params.get('timeout_sec') or 10.0), BROWSER_WAIT_TIMEOUT_SEC)
+    timeout_sec = min(
+        float(params.get('timeout_sec') or 10.0), BROWSER_WAIT_TIMEOUT_SEC
+    )
     browser = await self._ensure_session()
 
     base, err = await self._dispatch_wait(browser, params, wait_kind, timeout_sec, cmd)
     if err is not None:
         return err
 
-    content = await self._maybe_append_page_state(
-        browser, params=params, prefix=base
-    )
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
         CmdOutputObservation(content=content, command='browser wait', exit_code=0),
     )
 
+
 async def _dispatch_wait(
-    self, browser: Any, params: dict[str, Any], wait_kind: str, timeout_sec: float, cmd: str
+    self,
+    browser: Any,
+    params: dict[str, Any],
+    wait_kind: str,
+    timeout_sec: float,
+    cmd: str,
 ) -> tuple[str, Observation | None]:
     if wait_kind == 'timeout':
         return await _wait_for_timeout(browser, params, timeout_sec), None
@@ -381,16 +370,12 @@ async def _dispatch_wait(
     )
 
 
-async def execute_extract_impl(
-    self, cmd: str, params: dict[str, Any]
-) -> Observation:
+async def execute_extract_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
     if self._structured_extract is None:
         return _finalize_observation(
             cmd,
             ErrorObservation(
-                content=(
-                    'ERROR: Structured extract is not configured on this runtime.'
-                )
+                content=('ERROR: Structured extract is not configured on this runtime.')
             ),
         )
     schema = params.get('schema')
@@ -435,9 +420,7 @@ async def execute_upload_file_impl(
     raw_path = str(params.get('path') or '').strip()
     resolved, perr = self._resolve_workspace_path(raw_path)
     if perr:
-        return _finalize_observation(
-            cmd, ErrorObservation(content=f'ERROR: {perr}')
-        )
+        return _finalize_observation(cmd, ErrorObservation(content=f'ERROR: {perr}'))
     if resolved is None:
         return _finalize_observation(
             cmd, ErrorObservation(content='ERROR: could not resolve upload path.')
@@ -455,9 +438,7 @@ async def execute_upload_file_impl(
         browser, UploadFileEvent(node=node, file_path=str(resolved))
     )
     base = f'Uploaded {resolved.name} to element index {idx}.'
-    content = await self._maybe_append_page_state(
-        browser, params=params, prefix=base
-    )
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
         CmdOutputObservation(
@@ -479,9 +460,7 @@ async def execute_select_dropdown_impl(
     if not choice:
         return _finalize_observation(
             cmd,
-            ErrorObservation(
-                content='ERROR: option_text or option_value required.'
-            ),
+            ErrorObservation(content='ERROR: option_text or option_value required.'),
         )
     idx, err = self._parse_browser_index(
         cmd, params.get('index'), action_name='select_dropdown_option'
@@ -496,9 +475,7 @@ async def execute_select_dropdown_impl(
         browser, SelectDropdownOptionEvent(node=node, text=choice)
     )
     base = f'Selected dropdown option {choice!r} at index {idx}.'
-    content = await self._maybe_append_page_state(
-        browser, params=params, prefix=base
-    )
+    content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
         CmdOutputObservation(
@@ -509,9 +486,7 @@ async def execute_select_dropdown_impl(
     )
 
 
-def resolve_workspace_path_impl(
-    self, raw: str
-) -> tuple[Path | None, str | None]:
+def resolve_workspace_path_impl(self, raw: str) -> tuple[Path | None, str | None]:
     p = Path(raw).expanduser()
     root = self._workspace_root.resolve()
     candidate = (root / p).resolve() if not p.is_absolute() else p.resolve()

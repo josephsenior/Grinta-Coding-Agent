@@ -1,0 +1,3 @@
+Compaction continuity metric score=0.98 matched=105/107 missing=decision:Missing required argument "type" in tool call read (boundary rejected)
+Compaction backoff: skip until event id>=612 (20 new events) for 240s (streak=10)
+Emergency prompt window selected only 8/582 events (min=16); post-boundary tail may still exceed budget

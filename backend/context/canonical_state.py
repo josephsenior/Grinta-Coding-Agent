@@ -27,6 +27,7 @@ _MAX_DECISIONS = 12
 _MAX_FAILED_APPROACHES = 12
 _MAX_BACKGROUND_TASKS = 8
 _MAX_INVALIDATED = 10
+_MAX_RECENT_WORK = 16
 _MAX_OUTPUT_CHARS = 360
 
 
@@ -76,6 +77,17 @@ class BackgroundTaskState:
 
 
 @dataclass
+class RecentWorkItem:
+    """A compact factual ledger of work already inspected or run."""
+
+    kind: str = ''
+    detail: str = ''
+    outcome: str = ''
+    event_id: int | None = None
+    updated_at: str = ''
+
+
+@dataclass
 class CanonicalTaskState:
     """Durable compact task profile used by prompt packets and compaction gates."""
 
@@ -89,6 +101,7 @@ class CanonicalTaskState:
     blockers: list[str] = field(default_factory=list)
     failed_approaches: list[FailedApproach] = field(default_factory=list)
     background_tasks: list[BackgroundTaskState] = field(default_factory=list)
+    recent_work: list[RecentWorkItem] = field(default_factory=list)
     invalidated_assumptions: list[str] = field(default_factory=list)
     decisions: list[str] = field(default_factory=list)
     vcs_status: str = ''
@@ -122,7 +135,9 @@ class CanonicalTaskState:
                 setattr(state, key, data[key])
         verification = data.get('verification')
         if isinstance(verification, dict):
-            state.verification = VerificationState(**_known_dataclass_fields(VerificationState, verification))
+            state.verification = VerificationState(
+                **_known_dataclass_fields(VerificationState, verification)
+            )
         state.failed_approaches = [
             FailedApproach(**_known_dataclass_fields(FailedApproach, item))
             for item in data.get('failed_approaches', [])
@@ -133,6 +148,11 @@ class CanonicalTaskState:
             for item in data.get('background_tasks', [])
             if isinstance(item, dict)
         ]
+        state.recent_work = [
+            RecentWorkItem(**_known_dataclass_fields(RecentWorkItem, item))
+            for item in data.get('recent_work', [])
+            if isinstance(item, dict)
+        ][-_MAX_RECENT_WORK:]
         freshness: dict[str, FieldFreshness] = {}
         raw_freshness = data.get('field_freshness', {})
         if isinstance(raw_freshness, dict):
@@ -254,6 +274,7 @@ def reduce_snapshot_into_state(
 
     _merge_failed_approaches(canonical, snapshot, event_id, source)
     _merge_background_tasks(canonical, snapshot, event_id, source)
+    _merge_recent_work(canonical, snapshot, event_id, source)
     _update_blockers(canonical, snapshot, event_id, source)
     canonical.decisions = _merge_strings(
         canonical.decisions,
@@ -264,7 +285,11 @@ def reduce_snapshot_into_state(
         _touch_field(canonical, 'decisions', event_id, source)
     canonical.invalidated_assumptions = _merge_strings(
         canonical.invalidated_assumptions,
-        _string_tail(snapshot.get('invalidated_assumptions', []), _MAX_INVALIDATED, _MAX_OUTPUT_CHARS),
+        _string_tail(
+            snapshot.get('invalidated_assumptions', []),
+            _MAX_INVALIDATED,
+            _MAX_OUTPUT_CHARS,
+        ),
         _MAX_INVALIDATED,
     )
     if canonical.invalidated_assumptions:
@@ -343,18 +368,33 @@ def render_canonical_state_for_prompt(
             session = task.session_id or 'unknown session'
             _append(lines, f'  - {session}: {task.command} ({task.status})')
             _append(lines, f'    Next: {task.next_action}')
+    if canonical.recent_work:
+        _append(lines, '- Recent work ledger:')
+        for item in canonical.recent_work[-8:]:
+            detail = f'[{item.kind}] {item.detail}'
+            if item.outcome:
+                detail += f' -> {item.outcome}'
+            _append(lines, f'  - {detail}')
     if canonical.failed_approaches:
         _append(lines, '- Failed approaches to avoid unless inputs changed:')
         for approach in canonical.failed_approaches[-6:]:
-            _append(lines, f'  - [{approach.kind}] {approach.detail} -> {approach.outcome}')
-    _append_list(lines, 'Invalidated assumptions', canonical.invalidated_assumptions[-5:])
+            _append(
+                lines, f'  - [{approach.kind}] {approach.detail} -> {approach.outcome}'
+            )
+    _append_list(
+        lines, 'Invalidated assumptions', canonical.invalidated_assumptions[-5:]
+    )
     _append_list(lines, 'Decisions', canonical.decisions[-5:])
     _append(lines, f'- VCS status: {canonical.vcs_status}')
     _append(lines, f'- Summary: {canonical.narrative_summary}')
     lines.append(CANONICAL_STATE_MARKER)
     block = '\n'.join(line for line in lines if line.strip())
     if len(block) > char_budget:
-        block = block[: char_budget - 48].rstrip() + '\n... (canonical state truncated)\n' + CANONICAL_STATE_MARKER
+        block = (
+            block[: char_budget - 48].rstrip()
+            + '\n... (canonical state truncated)\n'
+            + CANONICAL_STATE_MARKER
+        )
     return block
 
 
@@ -374,10 +414,14 @@ def validate_canonical_state_for_compaction(
         missing.append('latest_verification')
     if snapshot.get('background_tasks') and not canonical.background_tasks:
         missing.append('background_tasks')
-    fingerprints = [item.fingerprint for item in canonical.failed_approaches if item.fingerprint]
+    fingerprints = [
+        item.fingerprint for item in canonical.failed_approaches if item.fingerprint
+    ]
     if len(fingerprints) != len(set(fingerprints)):
         missing.append('deduped_failed_approaches')
-    if any(_is_control_noise(text) for text in [*canonical.decisions, *canonical.blockers]):
+    if any(
+        _is_control_noise(text) for text in [*canonical.decisions, *canonical.blockers]
+    ):
         missing.append('control_noise_removed')
     return CanonicalValidationResult(ok=not missing, missing=tuple(missing))
 
@@ -390,10 +434,16 @@ def _import_legacy_state(*, state: State | None = None) -> CanonicalTaskState:
         memory = _load_memory()
         if isinstance(memory, dict):
             canonical.active_plan = _clean(memory.get('plan'))
-            canonical.next_action = _extract_next_action(memory.get('current_state', ''))
+            canonical.next_action = _extract_next_action(
+                memory.get('current_state', '')
+            )
             canonical.narrative_summary = _clean(memory.get('findings'))[:900]
-            canonical.blockers = _coerce_string_list(memory.get('blockers'))[-_MAX_BLOCKERS:]
-            canonical.decisions = _coerce_string_list(memory.get('decisions'))[-_MAX_DECISIONS:]
+            canonical.blockers = _coerce_string_list(memory.get('blockers'))[
+                -_MAX_BLOCKERS:
+            ]
+            canonical.decisions = _coerce_string_list(memory.get('decisions'))[
+                -_MAX_DECISIONS:
+            ]
     except Exception:
         logger.debug('Legacy working memory import failed', exc_info=True)
     try:
@@ -408,7 +458,9 @@ def _import_legacy_state(*, state: State | None = None) -> CanonicalTaskState:
 
 
 def _known_dataclass_fields(cls: type, data: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in data.items() if key in cls.__dataclass_fields__}
+    return {
+        key: value for key, value in data.items() if key in cls.__dataclass_fields__
+    }
 
 
 def _set_field(
@@ -468,7 +520,9 @@ def _update_verification(
     canonical.verification = VerificationState(
         command=str(result.get('command', ''))[:240],
         status=str(result.get('status', '')).lower(),
-        exit_code=result.get('exit_code') if isinstance(result.get('exit_code'), int) else None,
+        exit_code=result.get('exit_code')
+        if isinstance(result.get('exit_code'), int)
+        else None,
         output=str(result.get('output', ''))[:_MAX_OUTPUT_CHARS],
         event_id=result_event_id,
         updated_at=_now(),
@@ -507,7 +561,9 @@ def _merge_failed_approaches(
         )
         changed = True
     if changed:
-        canonical.failed_approaches = list(by_fingerprint.values())[-_MAX_FAILED_APPROACHES:]
+        canonical.failed_approaches = list(by_fingerprint.values())[
+            -_MAX_FAILED_APPROACHES:
+        ]
         _touch_field(canonical, 'failed_approaches', event_id, source)
 
 
@@ -567,9 +623,96 @@ def _resolve_background_tasks_from_events(
             resolved.add(session_id)
     if resolved:
         canonical.background_tasks = [
-            task for task in canonical.background_tasks if task.session_id not in resolved
+            task
+            for task in canonical.background_tasks
+            if task.session_id not in resolved
         ]
-        _touch_field(canonical, 'background_tasks', _latest_event_id(events), 'terminal_observation')
+        _touch_field(
+            canonical,
+            'background_tasks',
+            _latest_event_id(events),
+            'terminal_observation',
+        )
+
+
+def _merge_recent_work(
+    canonical: CanonicalTaskState,
+    snapshot: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
+    incoming: list[RecentWorkItem] = []
+    files = snapshot.get('files_touched', {})
+    if isinstance(files, dict):
+        for path, info in list(files.items())[-12:]:
+            if not isinstance(path, str) or not path:
+                continue
+            action = '?'
+            outcome = ''
+            if isinstance(info, dict):
+                action = str(info.get('action', '?'))[:40]
+                file_hash = info.get('sha256')
+                if isinstance(file_hash, str) and file_hash:
+                    outcome = f'sha256:{file_hash[:12]}'
+            incoming.append(
+                RecentWorkItem(
+                    kind='file',
+                    detail=f'{action}: {path}'[:300],
+                    outcome=outcome,
+                    event_id=event_id,
+                    updated_at=_now(),
+                )
+            )
+
+    commands = snapshot.get('recent_commands', [])
+    if isinstance(commands, list):
+        for item in commands[-10:]:
+            if not isinstance(item, dict):
+                continue
+            command = str(item.get('command', '')).strip()
+            if not command:
+                continue
+            incoming.append(
+                RecentWorkItem(
+                    kind='command',
+                    detail=command[:240],
+                    outcome=_summarize_work_output(item.get('output', '')),
+                    event_id=event_id,
+                    updated_at=_now(),
+                )
+            )
+
+    latest_test = _latest_dict(snapshot.get('test_results', []))
+    if latest_test:
+        command = str(latest_test.get('command', '')).strip()
+        status = str(latest_test.get('status', '')).upper()
+        if command:
+            incoming.append(
+                RecentWorkItem(
+                    kind='verification',
+                    detail=command[:240],
+                    outcome=f'{status} exit={latest_test.get("exit_code")}',
+                    event_id=latest_test.get('event_id')
+                    if isinstance(latest_test.get('event_id'), int)
+                    else event_id,
+                    updated_at=_now(),
+                )
+            )
+
+    if not incoming:
+        return
+    by_key = {
+        _recent_work_key(item): item
+        for item in canonical.recent_work
+        if item.kind or item.detail
+    }
+    for item in incoming:
+        key = _recent_work_key(item)
+        if key in by_key:
+            by_key.pop(key)
+        by_key[key] = item
+    canonical.recent_work = list(by_key.values())[-_MAX_RECENT_WORK:]
+    _touch_field(canonical, 'recent_work', event_id, source)
 
 
 def _update_blockers(
@@ -580,10 +723,16 @@ def _update_blockers(
 ) -> None:
     blockers: list[str] = []
     if canonical.background_tasks:
-        blockers.append('Pending background command must be polled before starting another long command.')
+        blockers.append(
+            'Pending background command must be polled before starting another long command.'
+        )
     if canonical.verification.command and canonical.verification.status != 'passed':
-        blockers.append(f'Latest verification is failing: {canonical.verification.command}')
-    blockers.extend(_string_tail(snapshot.get('recent_errors', []), 6, _MAX_OUTPUT_CHARS))
+        blockers.append(
+            f'Latest verification is failing: {canonical.verification.command}'
+        )
+    blockers.extend(
+        _string_tail(snapshot.get('recent_errors', []), 6, _MAX_OUTPUT_CHARS)
+    )
     canonical.blockers = _merge_strings([], blockers, _MAX_BLOCKERS)
     if blockers:
         _touch_field(canonical, 'blockers', event_id, source)
@@ -627,7 +776,11 @@ def _latest_event_id(events: list[Event]) -> int | None:
 
 def _snapshot_latest_event_id(snapshot: dict[str, Any]) -> int | None:
     ids: list[int] = []
-    for result in snapshot.get('test_results', []) if isinstance(snapshot.get('test_results'), list) else []:
+    for result in (
+        snapshot.get('test_results', [])
+        if isinstance(snapshot.get('test_results'), list)
+        else []
+    ):
         if isinstance(result, dict) and isinstance(result.get('event_id'), int):
             ids.append(result['event_id'])
     return max(ids) if ids else None
@@ -673,6 +826,20 @@ def _merge_strings(existing: list[str], incoming: list[str], limit: int) -> list
             by_key.pop(key)
         by_key[key] = text
     return list(by_key.values())[-limit:]
+
+
+def _recent_work_key(item: RecentWorkItem) -> str:
+    return f'{_normalize(item.kind)}:{_normalize(item.detail)}'
+
+
+def _summarize_work_output(value: object) -> str:
+    text = str(value or '').strip()
+    if not text:
+        return ''
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return ''
+    return ' | '.join(lines[-3:])[:220]
 
 
 def _failed_fingerprint(item: dict[str, Any]) -> str:
@@ -736,6 +903,7 @@ __all__ = [
     'CanonicalValidationResult',
     'FailedApproach',
     'FieldFreshness',
+    'RecentWorkItem',
     'VerificationState',
     'apply_canonical_patch',
     'canonical_state_path',

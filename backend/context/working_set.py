@@ -21,7 +21,9 @@ _MAX_BACKGROUND_TASK_RECORDS = 5
 _MAX_CURRENT_STATE_FILES = 12
 
 
-def _sync_findings_block(memory: dict[str, Any], snapshot: dict[str, Any]) -> str | None:
+def _sync_findings_block(
+    memory: dict[str, Any], snapshot: dict[str, Any]
+) -> str | None:
     from backend.context.pre_condensation_snapshot import format_snapshot_for_injection
 
     block = format_snapshot_for_injection(snapshot)
@@ -58,12 +60,16 @@ def _sync_decisions(memory: dict[str, Any], snapshot: dict[str, Any]) -> str | N
     return None
 
 
-def _sync_failed_approaches(memory: dict[str, Any], snapshot: dict[str, Any]) -> str | None:
+def _sync_failed_approaches(
+    memory: dict[str, Any], snapshot: dict[str, Any]
+) -> str | None:
     approaches = snapshot.get('attempted_approaches', [])
     if not (isinstance(approaches, list) and approaches):
         return None
     failed = [
-        a for a in approaches if isinstance(a, dict) and 'FAILED' in str(a.get('outcome', ''))
+        a
+        for a in approaches
+        if isinstance(a, dict) and 'FAILED' in str(a.get('outcome', ''))
     ]
     if not failed:
         return None
@@ -122,7 +128,9 @@ def _render_failed_approaches(records: list[dict[str, str]]) -> str:
     return '\n'.join(lines)
 
 
-def _sync_background_tasks(memory: dict[str, Any], snapshot: dict[str, Any]) -> str | None:
+def _sync_background_tasks(
+    memory: dict[str, Any], snapshot: dict[str, Any]
+) -> str | None:
     tasks = snapshot.get('background_tasks', [])
     if not (isinstance(tasks, list) and tasks):
         return None
@@ -204,7 +212,11 @@ def _active_files(snapshot: dict[str, Any]) -> list[str]:
     files = snapshot.get('files_touched', {})
     if not isinstance(files, dict):
         return []
-    return [path for path in list(files.keys())[-_MAX_CURRENT_STATE_FILES:] if isinstance(path, str)]
+    return [
+        path
+        for path in list(files.keys())[-_MAX_CURRENT_STATE_FILES:]
+        if isinstance(path, str)
+    ]
 
 
 def _current_blockers(
@@ -214,7 +226,10 @@ def _current_blockers(
     background_tasks = snapshot.get('background_tasks', [])
     if isinstance(background_tasks, list) and background_tasks:
         blockers.append('Background command still running; poll it before new actions.')
-    if latest_test is not None and str(latest_test.get('status', '')).lower() != 'passed':
+    if (
+        latest_test is not None
+        and str(latest_test.get('status', '')).lower() != 'passed'
+    ):
         command = str(latest_test.get('command', '')).strip()
         blockers.append(f'Latest verification is failing: {command}')
     blockers.extend(_string_tail(snapshot.get('recent_errors', []), 4, 220))
@@ -234,7 +249,10 @@ def _infer_next_action(
     background_tasks: object,
 ) -> str:
     if isinstance(background_tasks, list) and background_tasks:
-        latest = next((task for task in reversed(background_tasks) if isinstance(task, dict)), None)
+        latest = next(
+            (task for task in reversed(background_tasks) if isinstance(task, dict)),
+            None,
+        )
         if latest is not None:
             session_id = str(latest.get('session_id', '')).strip()
             if session_id:
@@ -256,7 +274,9 @@ def _render_current_state(state: dict[str, Any]) -> str:
     lines = ['Canonical current state:']
     if state.get('objective'):
         lines.append(f'- Objective: {state["objective"]}')
-    if state.get('latest_directive') and state.get('latest_directive') != state.get('objective'):
+    if state.get('latest_directive') and state.get('latest_directive') != state.get(
+        'objective'
+    ):
         lines.append(f'- Latest directive: {state["latest_directive"]}')
     active_files = state.get('active_files')
     if isinstance(active_files, list) and active_files:
@@ -415,7 +435,11 @@ def get_durable_context_block(
         return ''
     block = '\n'.join(parts)
     if len(block) > char_budget:
-        block = block[: char_budget - 40] + '\n... (working set truncated)\n' + _WORKING_SET_MARKER
+        block = (
+            block[: char_budget - 40]
+            + '\n... (working set truncated)\n'
+            + _WORKING_SET_MARKER
+        )
     return block
 
 

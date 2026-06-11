@@ -39,7 +39,11 @@ class TestTaskTrackingMixin(TestCase):
         """Test handling task update command."""
         task_list = [
             {'description': 'Task 1', 'status': 'todo', 'result': 'Do something'},
-            {'description': 'Task 2', 'status': 'in_progress', 'result': 'Working on it'},
+            {
+                'description': 'Task 2',
+                'status': 'in_progress',
+                'result': 'Working on it',
+            },
         ]
         action = TaskTrackingAction(command='update', task_list=task_list)
 
@@ -179,7 +183,9 @@ class TestTaskTrackingMixin(TestCase):
 
     def test_handle_task_view_action_preserves_hydrated_task_list(self):
         """View responses should carry the hydrated plan so UI sidebars do not clear."""
-        hydrated = [{'id': '1', 'description': 'Persisted task', 'status': 'in_progress'}]
+        hydrated = [
+            {'id': '1', 'description': 'Persisted task', 'status': 'in_progress'}
+        ]
         action = TaskTrackingAction(command='view', task_list=hydrated)
         task_file_path = '/path/to/TASKS.md'
         stored_content = '# Task List\n\n1. 🔄 Persisted task\n'

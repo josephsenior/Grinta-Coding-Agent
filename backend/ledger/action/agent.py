@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Mapping
+from typing import Any, ClassVar
 
 from backend.core.enums import RecallType
 from backend.core.schemas import ActionType, AgentState

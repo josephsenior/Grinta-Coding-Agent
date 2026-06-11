@@ -21,6 +21,7 @@ def test_open_maps_rows_and_cols() -> None:
             'cwd': '/tmp',
             'rows': 30,
             'cols': 120,
+            'security_risk': 'LOW',
         }
     )
     assert isinstance(act, TerminalRunAction)

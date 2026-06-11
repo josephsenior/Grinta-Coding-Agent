@@ -85,7 +85,11 @@ class _AppRendererActionHandlersMixin:
         if pending_attr is not None:
             pending = getattr(self, pending_attr, None)
             if pending is not None:
-                status = 'err' if content.startswith('Error') or 'does not exist' in content else 'ok'
+                status = (
+                    'err'
+                    if content.startswith('Error') or 'does not exist' in content
+                    else 'ok'
+                )
                 self._update_activity_card_outcome(
                     pending,
                     status=status,
@@ -270,17 +274,19 @@ class _AppRendererActionHandlersMixin:
         self._dbg_chunk_n = _chunk_n
         if _chunk_n % 5 == 1:
             import logging as _logging
+
             _log = _logging.getLogger(__name__)
             _log.info(
-                '[streaming-dbg] chunk=%d thinking_accumulated len=%d '
-                'head=%r tail=%r',
+                '[streaming-dbg] chunk=%d thinking_accumulated len=%d head=%r tail=%r',
                 _chunk_n,
                 len(thinking),
                 thinking[:80],
                 thinking[-80:],
             )
 
-    def _finalize_streaming_response(self, action: StreamingChunkAction, content: str) -> None:
+    def _finalize_streaming_response(
+        self, action: StreamingChunkAction, content: str
+    ) -> None:
         if bool(getattr(action, 'suppress_live_response', False)):
             self.clear_live_response()
             return
@@ -352,6 +358,7 @@ class _AppRendererActionHandlersMixin:
                 elapsed = time.monotonic() - self._turn_start_time
                 duration_str = self._format_turn_duration(int(elapsed))
                 from backend.cli.tui.widgets.activity_card import TurnCompletion
+
                 self._tui._write_log(TurnCompletion(duration_str))
 
     @staticmethod

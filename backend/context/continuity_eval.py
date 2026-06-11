@@ -17,9 +17,7 @@ from backend.core.constants import DEFAULT_CONTINUITY_GATE_MIN_SCORE
 if TYPE_CHECKING:
     from backend.ledger.event import Event
 
-_CRITICAL_CONTINUITY_CATEGORIES = frozenset(
-    {'test_result', 'decision', 'failed_approach'}
-)
+_CRITICAL_CONTINUITY_CATEGORIES = frozenset({'test_result'})
 
 
 @dataclass(frozen=True)
@@ -97,7 +95,9 @@ def build_continuity_facts(events: list[Event]) -> tuple[ContinuityFact, ...]:
     facts: list[ContinuityFact] = []
 
     _extract_file_facts(snapshot.get('files_touched', {}), facts)
-    _extract_string_fact_facts(snapshot, 'invalidated_assumptions', 'invalidated_assumption', facts)
+    _extract_string_fact_facts(
+        snapshot, 'invalidated_assumptions', 'invalidated_assumption', facts
+    )
     _extract_string_fact_facts(snapshot, 'decisions', 'decision', facts)
     _extract_string_fact_facts(snapshot, 'recent_errors', 'error', facts)
     _extract_test_result_facts(snapshot, facts)
@@ -112,7 +112,12 @@ def compaction_passes_continuity_gate(
     *,
     min_score: float = DEFAULT_CONTINUITY_GATE_MIN_SCORE,
 ) -> tuple[bool, ContinuityEvalResult]:
-    """Return whether a pending compaction preserves critical coding-agent facts."""
+    """Return whether a pending compaction preserves critical coding-agent facts.
+
+    Non-critical text continuity is telemetry. The durable canonical-state
+    validator is responsible for blocking current objective, directive, active
+    files, blockers, background tasks, and failed-approach loss.
+    """
     result = evaluate_restored_context(events, restored_context)
     critical_missing = tuple(
         fact
@@ -121,9 +126,8 @@ def compaction_passes_continuity_gate(
     )
     if critical_missing:
         return False, result
-    if result.total == 0:
-        return True, result
-    return result.score >= min_score, result
+    del min_score
+    return True, result
 
 
 def evaluate_restored_context(

@@ -38,9 +38,7 @@ _BODY_NODE_TYPES = ('block', 'body', 'compound_statement', 'expression_statement
 # Child node types whose presence between ``:`` and the block signals
 # comments/decorators that should be replaced together with the body. We skip
 # NEWLINE/INDENT/DEDENT (whitespace sentinels in the Python grammar).
-_BODY_SKIP_CHILD_TYPES = frozenset(
-    {':', 'NEWLINE', 'INDENT', 'DEDENT', 'newline'}
-)
+_BODY_SKIP_CHILD_TYPES = frozenset({':', 'NEWLINE', 'INDENT', 'DEDENT', 'newline'})
 
 
 def get_name_node(node: NodeType) -> NodeType | None:
@@ -75,9 +73,9 @@ def find_node_by_name(
     if node.type in node_types:
         name_node = editor.get_name_node(node)
         if name_node:
-            name_text = file_bytes[
-                name_node.start_byte : name_node.end_byte
-            ].decode('utf-8')
+            name_text = file_bytes[name_node.start_byte : name_node.end_byte].decode(
+                'utf-8'
+            )
             if name_text == target_name:
                 return node
     for child in node.children:
@@ -103,9 +101,9 @@ def find_all_nodes_by_name(
     if node.type in node_types:
         name_node = editor.get_name_node(node)
         if name_node:
-            name_text = file_bytes[
-                name_node.start_byte : name_node.end_byte
-            ].decode('utf-8')
+            name_text = file_bytes[name_node.start_byte : name_node.end_byte].decode(
+                'utf-8'
+            )
             if name_text == target_name:
                 matches.append(node)
     for child in node.children:
@@ -254,9 +252,7 @@ def search_tree_for_symbol(
     )
 
 
-def get_function_body_node(
-    func_node: NodeType, language: str
-) -> NodeType | None:
+def get_function_body_node(func_node: NodeType, language: str) -> NodeType | None:
     """Return the body node of ``func_node`` (language-agnostic).
 
     ``language`` is currently unused; kept in the signature to match the
@@ -278,9 +274,7 @@ def has_syntax_errors(node: NodeType) -> bool:
     return False
 
 
-def expand_body_range(
-    func_node: NodeType, body_node: NodeType
-) -> SimpleNamespace:
+def expand_body_range(func_node: NodeType, body_node: NodeType) -> SimpleNamespace:
     """Expand ``body_node`` to also include comments/decorators between ``:`` and the block.
 
     Tree-sitter places comments as siblings of the block, so the raw

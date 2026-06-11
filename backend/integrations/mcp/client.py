@@ -206,6 +206,7 @@ class MCPClient(BaseModel):
         # Merge MCP server stderr into the unified (session-scoped) app.log
         # instead of a scattered mcp_<name>_stderr.log file.
         from backend.core.logger import mcp_log_stream
+
         log_file = mcp_log_stream(cfg.name)
 
         transport = StdioTransport(
@@ -369,6 +370,7 @@ class MCPClient(BaseModel):
             # Merge MCP server stderr into the unified (session-scoped) app.log
             # instead of a scattered mcp_<name>_stderr.log file.
             from backend.core.logger import mcp_log_stream
+
             log_file = mcp_log_stream(server.name)
 
             transport = StdioTransport(

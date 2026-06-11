@@ -11,7 +11,7 @@ from backend.integrations.mcp.wrappers import WRAPPER_TOOL_REGISTRY, wrapper_too
 def test_wrapper_tool_registry_maps_cached_names_to_underlying_tools() -> None:
     assert 'get_component_cached' in WRAPPER_TOOL_REGISTRY
     assert 'get_block_cached' in WRAPPER_TOOL_REGISTRY
-    assert len(WRAPPER_TOOL_REGISTRY) == 2
+    assert len(WRAPPER_TOOL_REGISTRY) == 3
 
 
 @pytest.mark.integration

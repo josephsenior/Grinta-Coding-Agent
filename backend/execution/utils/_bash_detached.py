@@ -122,10 +122,6 @@ def _detach_pane_to_background(orch: BashSession, bg_session_id: str) -> None:
     """
     session = _set_detached_target(orch, bg_session_id)
     live_cwd = _live_cwd_for_detach(orch)
-    new_window, new_pane = _create_detached_foreground_window(
-        orch, session, live_cwd
-    )
+    new_window, new_pane = _create_detached_foreground_window(orch, session, live_cwd)
     _initialize_detached_foreground(orch, new_window, new_pane)
-    logger.info(
-        'Detached timed-out process to background session %s', bg_session_id
-    )
+    logger.info('Detached timed-out process to background session %s', bg_session_id)
