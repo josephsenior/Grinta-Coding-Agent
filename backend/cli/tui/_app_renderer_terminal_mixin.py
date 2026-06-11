@@ -84,6 +84,7 @@ class _AppRendererTerminalMixin:
             extra_content=extra_content,
         )
         widget = self._write_card(card, collapsed=True)
+        widget.enable_incremental_mode()
         if session_id:
             self._terminal_cards_by_session[session_key] = widget
         else:
@@ -152,7 +153,7 @@ class _AppRendererTerminalMixin:
             outcome=secondary,
         )
         if extra_content:
-            widget.append_content(extra_content)
+            widget.append_content_incremental(extra_content)
 
         del collapse_after_update
         self._apply_terminal_processing(

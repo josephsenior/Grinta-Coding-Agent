@@ -418,6 +418,11 @@ def _resolve_existing_file_edit_diff(
     added: int,
     removed: int,
 ) -> tuple[str | None, int, int]:
+    event_id = getattr(event, 'id', -1)
+    if event_id >= 0:
+        cached = getattr(orch, '_render_prep_cache', {}).get(event_id)
+        if cached:
+            return cached, added, removed
     encoded_diff = orch._extract_file_edit_group_rows(event)
     if encoded_diff:
         return encoded_diff, added, removed
@@ -1519,7 +1524,15 @@ def _process_event_commit_response(
 
 
 def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
+    event_id = getattr(event, 'id', -1)
     replay_mode = getattr(orch, '_replay_mode', False)
+    if (
+        replay_mode
+        and event_id >= 0
+        and event_id in getattr(orch, '_mounted_event_ids', set())
+    ):
+        return
+    orch._current_event_id = event_id
     if not replay_mode:
         orch._update_metrics(event)
     if _process_event_is_noop(event):
@@ -1533,6 +1546,14 @@ def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
         _process_event_finalize_thinking(orch, event)
         _process_event_commit_response(orch, event, is_tool)
     _dispatch_event(orch, event)
+    if event_id >= 0:
+        mounted = getattr(orch, '_mounted_event_ids', None)
+        if mounted is not None:
+            mounted.add(event_id)
+        order = getattr(orch, '_event_order', None)
+        if order is not None and event_id not in order:
+            order.append(event_id)
+    orch._current_event_id = -1
 
 
 def _handle_noop_event(

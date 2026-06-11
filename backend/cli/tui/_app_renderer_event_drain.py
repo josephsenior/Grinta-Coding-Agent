@@ -16,12 +16,14 @@ Owns:
 from __future__ import annotations
 
 import asyncio
+import time
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from rich.text import Text
 
 from backend.cli.theme import NAVY_TEXT_DIM
+from backend.cli.tui._app_constants import _TUI_DRAIN_FRAME_BUDGET_SECONDS, _tui_logger
 from backend.cli.tui._app_small_widgets import RendererDrainRequested
 
 if TYPE_CHECKING:
@@ -78,6 +80,68 @@ def _try_coalesce_streaming_enqueue(pending: Any, event: Any) -> bool:
     return True
 
 
+def _try_coalesce_terminal_enqueue(pending: Any, event: Any) -> bool:
+    """Collapse consecutive terminal observations for the same session."""
+    from backend.ledger.observation.terminal import TerminalObservation
+
+    if not isinstance(event, TerminalObservation) or not pending:
+        return False
+    session_id = (event.session_id or '').strip()
+    if not session_id:
+        return False
+    for idx in range(len(pending) - 1, -1, -1):
+        candidate = pending[idx]
+        if not isinstance(candidate, TerminalObservation):
+            continue
+        if (candidate.session_id or '').strip() != session_id:
+            continue
+        pending[idx] = event
+        return True
+    return False
+
+
+def _coalesce_pending_backlog(pending: Any) -> int:
+    """Merge adjacent streaming/terminal events; return slots reclaimed."""
+    from backend.ledger.action.message import StreamingChunkAction
+    from backend.ledger.observation.terminal import TerminalObservation
+
+    if len(pending) < 2:
+        return 0
+    reclaimed = 0
+    idx = 1
+    while idx < len(pending):
+        prev = pending[idx - 1]
+        cur = pending[idx]
+        if isinstance(prev, StreamingChunkAction) and isinstance(
+            cur, StreamingChunkAction
+        ):
+            pending[idx - 1] = cur
+            del pending[idx]
+            reclaimed += 1
+            continue
+        if isinstance(prev, TerminalObservation) and isinstance(
+            cur, TerminalObservation
+        ):
+            if (prev.session_id or '') == (cur.session_id or ''):
+                pending[idx - 1] = cur
+                del pending[idx]
+                reclaimed += 1
+                continue
+        idx += 1
+    return reclaimed
+
+
+def _force_immediate_drain(orch: '_AppRendererEventProcessorMixin') -> None:
+    handle = getattr(orch, '_drain_debounce_handle', None)
+    if handle is not None:
+        try:
+            handle.cancel()
+        except Exception:
+            pass
+        orch._drain_debounce_handle = None
+    _post_drain_message(orch)
+
+
 def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
     """Synchronous drain for non-async contexts (backward compatibility)."""
     with orch._pending_lock:
@@ -114,6 +178,9 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
     flush = getattr(orch, 'flush_live_ui', None)
     if callable(flush):
         flush()
+    flush_sync = getattr(orch, 'flush_pending_final_commits_sync', None)
+    if callable(flush_sync):
+        flush_sync()
     if not streaming_only or any(
         getattr(event, 'is_final', False) for event in events
     ):
@@ -160,41 +227,78 @@ def _flush_and_refresh(
     orch: '_AppRendererEventProcessorMixin',
     events: list[Any],
     streaming_only: bool,
+    *,
+    skip_sidebar: bool | None = None,
 ) -> None:
     flush = getattr(orch, 'flush_live_ui', None)
     if callable(flush):
         flush()
+    if skip_sidebar is None:
+        skip_sidebar = streaming_only
     if not streaming_only or any(
         getattr(event, 'is_final', False) for event in events
     ):
-        orch._refresh_display(skip_sidebar=streaming_only)
+        orch._refresh_display(skip_sidebar=skip_sidebar)
 
 
-async def _process_events_in_batches(
+async def _preprocess_event_async(
+    orch: '_AppRendererEventProcessorMixin', event: Any
+) -> None:
+    """Run heavy prep off the UI thread before synchronous dispatch."""
+    event_id = getattr(event, 'id', -1)
+    if event_id < 0:
+        return
+    cache = getattr(orch, '_render_prep_cache', None)
+    if cache is None:
+        return
+    if event_id in cache:
+        return
+
+    from backend.ledger.observation.files import FileEditObservation
+    from backend.cli.tui._render_prep import prep_file_edit_encoded_diff_async
+
+    if not isinstance(event, FileEditObservation):
+        return
+    encoded = await prep_file_edit_encoded_diff_async(orch, event)
+    if encoded:
+        cache[event_id] = encoded
+
+
+async def _process_events_with_frame_budget(
     orch: '_AppRendererEventProcessorMixin',
     events: list[Any],
-) -> None:
-    _BATCH_SIZE = 10
-    for i in range(0, len(events), _BATCH_SIZE):
-        batch = events[i:i + _BATCH_SIZE]
-        for event in batch:
-            orch._process_event(event)
-        await asyncio.sleep(0)
+) -> int:
+    """Process events until the frame budget elapses. Returns count processed."""
+    started = time.monotonic()
+    processed = 0
+    for event in events:
+        await _preprocess_event_async(orch, event)
+        orch._process_event(event)
+        processed += 1
+        if (time.monotonic() - started) >= _TUI_DRAIN_FRAME_BUDGET_SECONDS:
+            break
+    return processed
 
 
 async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
     """Async drain that yields control to the event loop periodically.
-    
-    This prevents blocking the Textual event loop when processing many events,
-    allowing keyboard and mouse input to be processed during active agent runs.
+
+    Extends the existing batch-of-10 + sleep(0) approach with a wall-clock
+    frame budget and reschedules when the pending queue still has events.
     """
     _cancel_drain_debounce(orch)
+    drain_started = time.monotonic()
+    orch._async_drain_active = True
 
     events, dropped = _collect_pending_events(orch)
     if not events:
         flush = getattr(orch, 'flush_live_ui', None)
         if callable(flush):
             flush()
+        flush_commits = getattr(orch, 'flush_pending_final_commits', None)
+        if callable(flush_commits):
+            await flush_commits()
+        orch._async_drain_active = False
         orch._refresh_display()
         return
     if dropped:
@@ -203,8 +307,41 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
     events = _collapse_streaming_chunks(events)
     streaming_only = _is_streaming_only_batch(events)
 
-    await _process_events_in_batches(orch, events)
-    _flush_and_refresh(orch, events, streaming_only)
+    processed = await _process_events_with_frame_budget(orch, events)
+    if processed < len(events):
+        remainder = events[processed:]
+        with orch._pending_lock:
+            orch._pending_events.extendleft(reversed(remainder))
+            orch._drain_scheduled = True
+        _force_immediate_drain(orch)
+
+    has_pending = False
+    with orch._pending_lock:
+        has_pending = bool(orch._pending_events)
+
+    _flush_and_refresh(
+        orch,
+        events,
+        streaming_only,
+        skip_sidebar=streaming_only or has_pending,
+    )
+
+    flush_commits = getattr(orch, 'flush_pending_final_commits', None)
+    if callable(flush_commits):
+        await flush_commits()
+    orch._async_drain_active = False
+
+    elapsed_ms = (time.monotonic() - drain_started) * 1000.0
+    pending_depth = 0
+    with orch._pending_lock:
+        pending_depth = len(orch._pending_events)
+    prep_depth = len(getattr(orch, '_render_prep_cache', {}) or {})
+    _tui_logger.debug(
+        'tui_drain_ms=%.1f tui_pending_depth=%d tui_prep_queue_depth=%d',
+        elapsed_ms,
+        pending_depth,
+        prep_depth,
+    )
 
 
 async def wait_for_activity(
@@ -228,6 +365,50 @@ async def wait_for_activity(
 
 
 _LOAD_EARLIER_BATCH_SIZE = 100
+
+
+async def hydrate_recent_transcript(
+    orch: '_AppRendererEventProcessorMixin',
+    *,
+    limit: int | None = None,
+) -> int:
+    """Render the most recent ledger events into an empty transcript."""
+    from backend.cli.tui._app_constants import _TUI_RESUME_HYDRATE_EVENTS
+
+    if limit is None:
+        limit = _TUI_RESUME_HYDRATE_EVENTS
+    event_stream = getattr(orch, '_event_stream', None)
+    if event_stream is None or limit <= 0:
+        return 0
+    try:
+        display = orch._tui._get_display()
+    except Exception:
+        return 0
+    if getattr(display, 'child_widget_count', lambda: 0)() > 0:
+        return 0
+    try:
+        events = list(
+            event_stream.search_events(reverse=True, limit=limit)
+        )
+    except Exception:
+        return 0
+    if not events:
+        return 0
+    events.reverse()
+    orch._replay_mode = True
+    try:
+        idx = 0
+        while idx < len(events):
+            chunk = events[idx : idx + 25]
+            processed = await _process_events_with_frame_budget(orch, chunk)
+            idx += max(processed, 1)
+            await asyncio.sleep(0)
+    finally:
+        orch._replay_mode = False
+    sync = getattr(orch, '_sync_transcript_viewport', None)
+    if callable(sync):
+        sync()
+    return len(events)
 
 
 async def load_earlier_messages(
@@ -261,8 +442,12 @@ async def load_earlier_messages(
     orch._replay_mode = True
     orch._prepend_mode = True
     try:
-        for event in events:
-            orch._process_event(event)
+        idx = 0
+        while idx < len(events):
+            chunk = events[idx : idx + 25]
+            processed = await _process_events_with_frame_budget(orch, chunk)
+            idx += max(processed, 1)
+            await asyncio.sleep(0)
         flush = getattr(orch, 'flush_live_ui', None)
         if callable(flush):
             flush()
@@ -294,12 +479,23 @@ def _on_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
                 orch._min_rendered_event_id = event_id
             if event_id > orch._max_rendered_event_id:
                 orch._max_rendered_event_id = event_id
-        coalesced = _try_coalesce_streaming_enqueue(orch._pending_events, event)
+        coalesced = (
+            _try_coalesce_streaming_enqueue(orch._pending_events, event)
+            or _try_coalesce_terminal_enqueue(orch._pending_events, event)
+        )
         if not coalesced:
             if len(orch._pending_events) >= _TUI_PENDING_EVENT_LIMIT:
-                orch._pending_events.popleft()
-                orch._pending_events_dropped += 1
+                reclaimed = _coalesce_pending_backlog(orch._pending_events)
+                if reclaimed:
+                    orch._pending_backpressure_reclaimed = (
+                        getattr(orch, '_pending_backpressure_reclaimed', 0)
+                        + reclaimed
+                    )
+                elif len(orch._pending_events) >= _TUI_PENDING_EVENT_LIMIT:
+                    orch._pending_backpressure = True
             orch._pending_events.append(event)
+            if getattr(orch, '_pending_backpressure', False):
+                should_schedule_drain = True
         if not orch._drain_scheduled:
             orch._drain_scheduled = True
             should_schedule_drain = True

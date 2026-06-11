@@ -349,6 +349,7 @@ class _AppScreenLifecycleMixin:
                 loop=self._loop,
             )
         self._renderer.subscribe(event_stream, event_stream.sid)
+        await self._renderer.hydrate_recent_transcript()
 
         state_after_create = controller.get_agent_state()
         _tui_logger.debug(f'_bootstrap: state after subscribe={state_after_create}')

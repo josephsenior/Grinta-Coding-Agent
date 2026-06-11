@@ -27,6 +27,20 @@ from backend.cli._event_renderer.unified_renderer import (
 class _AppRendererDisplayMixin:
     """history refresh, display writes, retry/runtime strips, cards."""
 
+    _playbook_skills_cache: list[str] | None = None
+    _playbook_skills_cache_mtime: float = 0.0
+
+    def _register_widget_event_id(self, widget: Any) -> None:
+        event_id = getattr(self, '_current_event_id', -1)
+        if event_id < 0:
+            return
+        setattr(widget, '_ledger_event_id', event_id)
+        cache = getattr(self, '_render_cache', None)
+        if cache is not None:
+            from backend.cli.tui._render_prep import RenderArtifact
+
+            cache[event_id] = RenderArtifact(event_id, widget, measured_height=1)
+
     def clear_history(self) -> None:
         self._live_thinking_widget = None
         self._live_response_widget = None
@@ -52,6 +66,10 @@ class _AppRendererDisplayMixin:
         self._last_thinking_artifact_hash = ''
         self._min_rendered_event_id = -1
         self._max_rendered_event_id = -1
+        self._render_cache = {}
+        self._render_prep_cache = {}
+        self._mounted_event_ids = set()
+        self._event_order = []
         try:
             self._tui._get_display().clear()
         except (AttributeError, NoMatches):
@@ -130,9 +148,25 @@ class _AppRendererDisplayMixin:
         return mcp_items
 
     def _build_skills_sidebar_items(self):
+        import backend
         from backend.cli._event_renderer.sidebar import _load_playbook_skills
+        from pathlib import Path
 
-        skills_list = _load_playbook_skills()
+        skills_list: list[str] = []
+        playbook_dir = Path(backend.__file__).resolve().parent / 'playbooks'
+        try:
+            mtime = playbook_dir.stat().st_mtime
+        except OSError:
+            mtime = 0.0
+        if (
+            self._playbook_skills_cache is not None
+            and mtime == self._playbook_skills_cache_mtime
+        ):
+            skills_list = list(self._playbook_skills_cache)
+        else:
+            skills_list = _load_playbook_skills()
+            self._playbook_skills_cache = list(skills_list)
+            self._playbook_skills_cache_mtime = mtime
         skill_items = []
         if skills_list:
             for skill in sorted(skills_list):
@@ -318,11 +352,12 @@ class _AppRendererDisplayMixin:
             )
 
         display = self._tui._get_display()
+        self._register_widget_event_id(widget)
         if getattr(self, '_prepend_mode', False):
             display.prepend_widget(widget)
         else:
             display.append_widget(widget)
-        self._maybe_prune_transcript()
+        self._sync_transcript_viewport()
         return widget
 
     def _apply_card_final_state(
@@ -430,40 +465,36 @@ class _AppRendererDisplayMixin:
             active=False,
         )
         display = self._tui._get_display()
+        self._register_widget_event_id(widget)
         display.append_widget(widget)
-        self._maybe_prune_transcript()
+        self._sync_transcript_viewport()
 
-    def _maybe_prune_transcript(self) -> None:
-        """Prune oldest widgets if transcript exceeds threshold, insert load-earlier button."""
+    def _sync_transcript_viewport(self) -> None:
+        """Keep mounted transcript widgets within the viewport budget."""
         try:
             display = self._tui._get_display()
         except (AttributeError, NoMatches):
             return
         if type(display).__name__ == 'MagicMock':
             return
+        sync = getattr(display, 'sync_viewport', None)
+        if callable(sync):
+            sync(self)
+            return
+        self._maybe_prune_transcript_legacy()
 
-        from backend.cli.tui._app_small_widgets import LoadEarlierButton
-
+    def _maybe_prune_transcript_legacy(self) -> None:
+        """Legacy prune path for mocks/tests without viewport support."""
+        try:
+            display = self._tui._get_display()
+        except (AttributeError, NoMatches):
+            return
         if not hasattr(display, 'child_widget_count'):
             return
-        if not hasattr(display, '_PRUNE_THRESHOLD'):
+        if not hasattr(display, '_VIEWPORT_MAX_MOUNTED'):
             return
-
-        threshold = display._PRUNE_THRESHOLD
+        threshold = display._VIEWPORT_MAX_MOUNTED
         if display.child_widget_count <= threshold:
             return
-
         overflow = display.child_widget_count - threshold
         display.prune_oldest(overflow)
-
-        has_earlier_events = (
-            self._min_rendered_event_id > 0
-            and self._event_stream is not None
-        )
-        if has_earlier_events and display._load_earlier_button is None:
-            button = LoadEarlierButton()
-            display.set_load_earlier_button(button)
-            try:
-                display.mount(button, before=display.children[0] if display.children else None)
-            except Exception:
-                display.mount(button)

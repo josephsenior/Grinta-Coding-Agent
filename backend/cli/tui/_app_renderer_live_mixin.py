@@ -47,6 +47,7 @@ class _AppRendererLiveMixin:
         """Add a finalized renderable or widget to the transcript."""
         self.commit_live_thinking()
         self.clear_live_response()
+        register = getattr(self, '_register_widget_event_id', None)
 
         self._history.append(renderable)
         self._history.append(Text(''))
@@ -65,12 +66,20 @@ class _AppRendererLiveMixin:
                 widget = renderable
             else:
                 widget = Static(renderable)
+            if callable(register):
+                register(widget)
             if getattr(self, '_prepend_mode', False):
                 display.prepend_widget(widget)
             else:
                 display.append_widget(widget)
         self._refresh_display()
-        self._maybe_prune_transcript()
+        sync = getattr(self, '_sync_transcript_viewport', None)
+        if callable(sync):
+            sync()
+        else:
+            prune = getattr(self, '_maybe_prune_transcript', None)
+            if callable(prune):
+                prune()
 
     def update_live_thinking(self, text: str) -> None:
         """Update the real-time reasoning preview in-place."""
@@ -122,12 +131,18 @@ class _AppRendererLiveMixin:
             self.clear_live_response()
             return
 
+        should_follow = display.should_follow_tail()
         if not self._live_response_widget:
             self._live_response_widget = Static(Text(text))
             display.append_widget(self._live_response_widget)
         else:
             self._live_response_widget.update(Text(text))
-            self._maybe_scroll_to_tail(display)
+        if should_follow:
+            follow_tail = getattr(display, 'follow_tail', None)
+            if callable(follow_tail):
+                follow_tail()
+            else:
+                self._maybe_scroll_to_tail(display)
 
     def clear_live_response(self) -> None:
         """Clear the in-flight response preview widget."""

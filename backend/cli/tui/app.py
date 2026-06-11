@@ -303,9 +303,18 @@ class TUIRenderer(
         self._pending_mcp_card: Any | None = None
         self._pending_delegate_card: Any | None = None
 
-        # Event ID tracking for virtual scrolling (prune + replay)
+        # Event ID tracking for virtual scrolling (viewport + replay)
         self._min_rendered_event_id: int = -1
         self._max_rendered_event_id: int = -1
+        self._render_cache: dict[int, Any] = {}
+        self._render_prep_cache: dict[int, Any] = {}
+        self._mounted_event_ids: set[int] = set()
+        self._event_order: list[int] = []
+        self._current_event_id: int = -1
+        self._pending_backpressure: bool = False
+        self._pending_backpressure_reclaimed: int = 0
+        self._pending_final_commits: list[str] = []
+        self._async_drain_active: bool = False
 
         # Replay mode flags
         self._replay_mode: bool = False
@@ -317,8 +326,12 @@ from backend.cli.tui._app_constants import (  # noqa: F401
     _FILE_DIFF_AUTO_COLLAPSE_LINES,
     _TERMINAL_MOUSE_REPORT_RE,
     _TERMINAL_ORPHAN_PARAM_TOKEN_RE,
+    _TUI_DRAIN_FRAME_BUDGET_SECONDS,
     _TUI_HISTORY_RENDER_LIMIT,
     _TUI_PENDING_EVENT_LIMIT,
+    _TUI_TERMINAL_DISPLAY_LINE_CAP,
+    _TUI_VIEWPORT_MAX_MOUNTED,
+    _TUI_VIEWPORT_OVERSCAN,
     _WELCOME_FIGLET_CACHE,
     _WELCOME_FIGLET_FALLBACK,
     _WELCOME_SUGGESTIONS,

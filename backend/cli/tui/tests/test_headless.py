@@ -319,6 +319,8 @@ async def test_tui_transcript_autoscrolls_on_rapid_append(mock_config, monkeypat
 
         for idx in range(30):
             display.append_widget(Static(f'burst line {idx}'))
+        display.follow_tail()
+        await pilot.pause()
         await pilot.pause()
 
         assert display._user_scrolled_away is False
@@ -3625,3 +3627,114 @@ async def test_tui_stats_panel_exists(mock_config):
         s = _get_screen(app)
         stats = s.query_one('#hud-bar')
         assert stats is not None
+
+
+@pytest.mark.asyncio
+async def test_terminal_append_does_not_remount_all_children(mock_config):
+    """Incremental terminal append keeps a single tail widget."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        card = TUIActivityCard(
+            verb='Terminal',
+            detail='session s1',
+            badge_category='terminal',
+            collapsed=True,
+        )
+        card.enable_incremental_mode()
+        await pilot.app.mount(card)
+        card.append_content_incremental('first line')
+        card.append_content_incremental('second line')
+        body = card.query_one('#expanded-body', Container)
+        children = list(body.children)
+        assert len(children) == 1
+        assert children[0].id == 'incremental-tail'
+
+
+@pytest.mark.asyncio
+async def test_drain_respects_frame_budget(mock_config, monkeypatch):
+    from backend.cli.tui import _app_renderer_event_drain as drain_mod
+    from backend.cli.tui import _app_renderer_event_processor as processor_mod
+
+    orch = MagicMock()
+    processed: list[int] = []
+
+    def counting_process(_orch, event):
+        processed.append(getattr(event, 'id', -1))
+
+    events = [SimpleNamespace(id=idx) for idx in range(6)]
+    clock = iter([0.0, 0.0, 0.05, 0.05, 0.05, 0.05, 0.05])
+
+    monkeypatch.setattr(drain_mod, '_TUI_DRAIN_FRAME_BUDGET_SECONDS', 0.02)
+    monkeypatch.setattr(drain_mod.time, 'monotonic', lambda: next(clock, 0.05))
+    monkeypatch.setattr(
+        drain_mod, '_preprocess_event_async', AsyncMock(return_value=None)
+    )
+    monkeypatch.setattr(processor_mod, '_process_event', counting_process)
+    orch._process_event = lambda event: counting_process(orch, event)
+
+    count = await drain_mod._process_events_with_frame_budget(orch, events)
+    assert count < len(events)
+    assert count >= 1
+
+
+@pytest.mark.asyncio
+async def test_viewport_keeps_bounded_child_count(mock_config):
+    from backend.cli.tui._app_constants import _TUI_VIEWPORT_MAX_MOUNTED
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        display = s._get_display()
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        for idx in range(_TUI_VIEWPORT_MAX_MOUNTED + 15):
+            widget = Static(f'row-{idx}')
+            setattr(widget, '_ledger_event_id', idx)
+            display.mount(widget)
+        await pilot.pause()
+        display.sync_viewport(renderer)
+        await pilot.pause()
+        assert display.child_widget_count <= _TUI_VIEWPORT_MAX_MOUNTED
+
+
+def test_no_pending_event_drop_under_burst(monkeypatch):
+    from backend.cli.tui import _app_renderer_event_drain as drain_mod
+    from backend.ledger.observation.terminal import TerminalObservation
+
+    orch = MagicMock()
+    orch._pending_events = __import__('collections').deque()
+    orch._pending_lock = __import__('threading').Lock()
+    orch._drain_scheduled = False
+    orch._pending_events_dropped = 0
+    orch._min_rendered_event_id = -1
+    orch._max_rendered_event_id = -1
+    orch._loop = MagicMock()
+    orch._loop.call_soon_threadsafe = lambda fn, *args: fn(*args)
+
+    from backend.cli.tui import _app_renderer_event_processor_mixin as ep_mod
+
+    monkeypatch.setattr(ep_mod, '_TUI_PENDING_EVENT_LIMIT', 3)
+
+    for idx in range(5):
+        obs = TerminalObservation(
+            session_id='s1',
+            content=f'chunk-{idx}',
+        )
+        obs.id = idx
+        drain_mod._on_event(orch, obs)
+
+    assert orch._pending_events_dropped == 0
+    assert len(orch._pending_events) <= 5

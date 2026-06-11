@@ -120,9 +120,32 @@ class _AppRendererActionHandlersMixin:
         if content == self._last_final_response_text:
             return
         self._last_final_response_text = content
+        self._pending_final_commits.append(content)
+        if not getattr(self, '_async_drain_active', False):
+            self.flush_pending_final_commits_sync()
+
+    def flush_pending_final_commits_sync(self) -> None:
+        if not self._pending_final_commits:
+            return
+        from backend.cli.tui._render_prep import prep_markdown
         from backend.cli.tui.widgets.activity_card import AgentMessage
 
-        self.add_to_history(AgentMessage(content))
+        for content in list(self._pending_final_commits):
+            self.add_to_history(
+                AgentMessage(content, renderable=prep_markdown(content))
+            )
+        self._pending_final_commits.clear()
+
+    async def flush_pending_final_commits(self) -> None:
+        if not self._pending_final_commits:
+            return
+        from backend.cli.tui._render_prep import prep_markdown_async
+        from backend.cli.tui.widgets.activity_card import AgentMessage
+
+        for content in list(self._pending_final_commits):
+            renderable = await prep_markdown_async(content)
+            self.add_to_history(AgentMessage(content, renderable=renderable))
+        self._pending_final_commits.clear()
 
     def _handle_message_action(self, action: MessageAction) -> None:
         if bool(getattr(action, 'suppress_cli', False)):

@@ -22,6 +22,7 @@ from backend.cli.tui._app_renderer_event_drain import (
     _signal_activity,
     drain_events,
     drain_events_async,
+    hydrate_recent_transcript,
     load_earlier_messages,
     wait_for_activity,
 )
@@ -73,6 +74,9 @@ class _AppRendererEventProcessorMixin:
 
     async def load_earlier_messages(self, batch_size: int = 100) -> int:
         return await load_earlier_messages(self, batch_size)
+
+    async def hydrate_recent_transcript(self, *, limit: int | None = None) -> int:
+        return await hydrate_recent_transcript(self, limit=limit)
 
     def _on_event(self, event) -> None:
         _on_event(self, event)
