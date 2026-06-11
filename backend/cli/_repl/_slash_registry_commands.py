@@ -269,22 +269,27 @@ _SLASH_COMMANDS = (
     *_PLAYBOOK_SLASH_COMMANDS,
 )
 
+def _load_known_models() -> tuple[tuple[str, str], ...]:
+    """Load provider/model completions from the catalog."""
+    try:
+        from backend.inference.catalog_loader import get_catalog, runtime_model_id
+
+        return tuple(
+            (f'{entry.provider}/{runtime_model_id(entry)}', entry.provider)
+            for entry in get_catalog()
+            if entry.featured
+        )
+    except Exception:
+        return (
+            ('openai/gpt-5.1', 'openai'),
+            ('anthropic/claude-sonnet-4-6', 'anthropic'),
+            ('google/gemini-3-flash', 'google'),
+        )
+
+
 # Known models surfaced in `/model` tab-completion.
 # provider/model pairs — provider shown as display_meta in the completer.
-_KNOWN_MODELS: tuple[tuple[str, str], ...] = (
-    ('openai/gpt-4.1', 'OpenAI'),
-    ('openai/gpt-4o', 'OpenAI'),
-    ('openai/gpt-5.5', 'OpenAI'),
-    ('anthropic/claude-opus-4-20250514', 'Anthropic'),
-    ('anthropic/claude-sonnet-4-6', 'Anthropic'),
-    ('anthropic/claude-haiku-4-20250514', 'Anthropic'),
-    ('google/gemini-2.5-pro', 'Google'),
-    ('google/gemini-2.5-flash', 'Google'),
-    ('groq/meta-llama/llama-4-scout', 'Groq'),
-    ('xai/grok-4.1-fast', 'xAI'),
-    ('deepseek/deepseek-chat', 'DeepSeek'),
-    ('openrouter/anthropic/claude-3.5-sonnet', 'OpenRouter'),
-)
+_KNOWN_MODELS: tuple[tuple[str, str], ...] = _load_known_models()
 _COMMAND_ALIASES = {
     alias: spec.name for spec in _SLASH_COMMANDS for alias in spec.aliases
 }

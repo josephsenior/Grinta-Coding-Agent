@@ -27,12 +27,18 @@ class ModelEntry:
 
     name: str
     provider: str
+    provider_model_id: str | None = None
     aliases: tuple[str, ...] = ()
     context_window_tokens: int | None = None
     max_input_tokens: int | None = None
     max_output_tokens: int | None = None
     input_price_per_m: float | None = None
+    cached_input_price_per_m: float | None = None
     output_price_per_m: float | None = None
+    long_context_threshold_tokens: int | None = None
+    long_input_price_per_m: float | None = None
+    long_cached_input_price_per_m: float | None = None
+    long_output_price_per_m: float | None = None
     verified: bool = False
     featured: bool = False
     supports_function_calling: bool = False
@@ -72,12 +78,22 @@ def get_catalog() -> tuple[ModelEntry, ...]:
             ModelEntry(
                 name=name,
                 provider=info['provider'],
+                provider_model_id=info.get('provider_model_id'),
                 aliases=tuple(info.get('aliases', ())),
                 context_window_tokens=info.get('context_window_tokens'),
                 max_input_tokens=info.get('max_input_tokens'),
                 max_output_tokens=info.get('max_output_tokens'),
                 input_price_per_m=info.get('input_price_per_m'),
+                cached_input_price_per_m=info.get('cached_input_price_per_m'),
                 output_price_per_m=info.get('output_price_per_m'),
+                long_context_threshold_tokens=info.get(
+                    'long_context_threshold_tokens'
+                ),
+                long_input_price_per_m=info.get('long_input_price_per_m'),
+                long_cached_input_price_per_m=info.get(
+                    'long_cached_input_price_per_m'
+                ),
+                long_output_price_per_m=info.get('long_output_price_per_m'),
                 verified=info.get('verified', False),
                 featured=info.get('featured', False),
                 supports_function_calling=info.get('supports_function_calling', False),
@@ -107,39 +123,143 @@ def _name_index() -> dict[str, ModelEntry]:
     idx: dict[str, ModelEntry] = {}
     for entry in get_catalog():
         idx[entry.name] = entry
+        idx[entry.name.lower()] = entry
+        if entry.provider_model_id:
+            idx[entry.provider_model_id] = entry
+            idx[entry.provider_model_id.lower()] = entry
         for alias in entry.aliases:
             idx[alias] = entry
+            idx[alias.lower()] = entry
     return idx
 
 
+def runtime_model_id(entry: ModelEntry) -> str:
+    """Return the exact model id that should be sent to the provider."""
+    return entry.provider_model_id or entry.name
+
+
+def _normalize_provider(provider: str | None) -> str | None:
+    normalized = str(provider or '').strip().lower()
+    return normalized or None
+
+
+def _normalize_provider_model_key(provider: str, model: str | None) -> str:
+    key = str(model or '').strip().lower()
+    prefix = f'{provider.lower()}/'
+    if key.startswith(prefix):
+        key = key[len(prefix) :]
+    return key
+
+
+@functools.lru_cache(maxsize=1)
+def _provider_exact_index() -> dict[tuple[str, str], ModelEntry]:
+    idx: dict[tuple[str, str], ModelEntry] = {}
+    for entry in get_catalog():
+        provider = entry.provider.lower()
+        for candidate in (entry.name, entry.provider_model_id):
+            if candidate:
+                idx[(provider, _normalize_provider_model_key(provider, candidate))] = (
+                    entry
+                )
+    return idx
+
+
+@functools.lru_cache(maxsize=1)
+def _provider_alias_index() -> dict[tuple[str, str], ModelEntry]:
+    idx = dict(_provider_exact_index())
+    for entry in get_catalog():
+        provider = entry.provider.lower()
+        for alias in entry.aliases:
+            idx[(provider, _normalize_provider_model_key(provider, alias))] = entry
+    return idx
+
+
+def lookup_provider_model(
+    provider: str | None,
+    model: str | None,
+    *,
+    allow_aliases: bool = False,
+) -> ModelEntry | None:
+    """Look up a catalog entry by an explicit provider/model pair.
+
+    This is the deterministic path used by settings and provider-scoped UI.
+    Aliases are disabled by default so selected provider/model ids cannot
+    silently resolve to another provider's entry.
+    """
+    normalized_provider = _normalize_provider(provider)
+    if normalized_provider is None:
+        return None
+    key = _normalize_provider_model_key(normalized_provider, model)
+    if not key:
+        return None
+    index = _provider_alias_index() if allow_aliases else _provider_exact_index()
+    return index.get((normalized_provider, key))
+
+
 def lookup(model: str) -> ModelEntry | None:
-    """Look up a model by name or alias (case-insensitive, strips provider prefix)."""
+    """Look up a model by name or alias.
+
+    Provider-prefixed names resolve provider-scoped first. This avoids the old
+    brittle behavior where ``xai/gpt-5`` could strip to ``gpt-5`` and match the
+    OpenAI catalog entry.
+    """
     idx = _name_index()
     key = model.strip()
-    # Try exact
     entry = idx.get(key) or idx.get(key.lower())
     if entry:
         return entry
-    # Strip provider prefix (e.g. "openai/gpt-4o" → "gpt-4o")
+
     if '/' in key:
-        bare = key.split('/')[-1]
-        entry = idx.get(bare) or idx.get(bare.lower())
-        if entry:
-            return entry
+        provider, bare = key.split('/', 1)
+        provider_match = lookup_provider_model(provider, bare, allow_aliases=True)
+        if provider_match is not None:
+            return provider_match
+        catalog_providers = {entry.provider.lower() for entry in get_catalog()}
+        if provider.strip().lower() in catalog_providers:
+            return None
+
+        # Legacy compatibility for non-catalog provider prefixes embedded in
+        # aliases, e.g. moonshotai/kimi-k2.5.
+        return idx.get(bare) or idx.get(bare.lower())
     return None
 
 
-def get_pricing(model: str) -> dict[str, float] | None:
+def _pricing_for_entry(
+    entry: ModelEntry, *, prompt_tokens: int | None = None
+) -> dict[str, float] | None:
+    input_price = entry.input_price_per_m
+    output_price = entry.output_price_per_m
+    cached_input = entry.cached_input_price_per_m
+    threshold = entry.long_context_threshold_tokens
+    if (
+        prompt_tokens is not None
+        and threshold is not None
+        and prompt_tokens > threshold
+    ):
+        input_price = entry.long_input_price_per_m or input_price
+        output_price = entry.long_output_price_per_m or output_price
+        cached_input = entry.long_cached_input_price_per_m or cached_input
+    if input_price is None:
+        return None
+    return {
+        'input': input_price,
+        'output': output_price or 0.0,
+        'cached_input': cached_input or input_price,
+    }
+
+
+def get_pricing(
+    model: str, *, prompt_tokens: int | None = None
+) -> dict[str, float] | None:
     """Get pricing for a model, with tier fallback.
 
     Returns ``{"input": <per_1M>, "output": <per_1M>}`` or ``None``.
     """
     entry = lookup(model)
-    if entry and entry.input_price_per_m is not None:
-        return {
-            'input': entry.input_price_per_m,
-            'output': entry.output_price_per_m or 0.0,
-        }
+    if entry:
+        prices = _pricing_for_entry(entry, prompt_tokens=prompt_tokens)
+        if prices is not None:
+            return prices
 
     # Tier fallback — substring matching
     data = _load_raw()
@@ -180,7 +300,32 @@ def get_context_window_tokens(model: str) -> int | None:
 
 def get_featured_models() -> list[str]:
     """Return ``provider/name`` strings for models marked ``featured = true``."""
-    return [f'{e.provider}/{e.name}' for e in get_catalog() if e.featured]
+    return [f'{e.provider}/{runtime_model_id(e)}' for e in get_catalog() if e.featured]
+
+
+def get_models_for_provider(
+    provider: str, *, featured_only: bool = True
+) -> list[str]:
+    """Return exact provider model ids for a provider."""
+    normalized_provider = _normalize_provider(provider)
+    if normalized_provider is None:
+        return []
+    return [
+        runtime_model_id(entry)
+        for entry in get_catalog()
+        if entry.provider == normalized_provider
+        and (entry.featured or not featured_only)
+    ]
+
+
+def get_model_options_by_provider(*, featured_only: bool = True) -> dict[str, list[str]]:
+    """Return exact predefined model ids grouped by provider."""
+    options: dict[str, list[str]] = {}
+    for entry in get_catalog():
+        if featured_only and not entry.featured:
+            continue
+        options.setdefault(entry.provider, []).append(runtime_model_id(entry))
+    return options
 
 
 def get_verified_models(provider: str | None = None) -> list[str]:
@@ -209,12 +354,36 @@ def is_openai_compatible(model: str) -> bool:
     entry = lookup(model)
     if entry:
         # These providers are OpenAI-compatible
-        return entry.provider in ['openai', 'cerebras', 'deepseek', 'mistral', 'xai']
+        return entry.provider in [
+            'openai',
+            'cerebras',
+            'deepseek',
+            'groq',
+            'lightning',
+            'mistral',
+            'nvidia',
+            'opencode',
+            'opencode-go',
+            'openrouter',
+            'xai',
+        ]
 
     from backend.inference.provider_resolver import extract_provider_prefix
 
     provider = extract_provider_prefix(model)
-    return provider in {'openai', 'cerebras', 'deepseek', 'mistral', 'xai'}
+    return provider in {
+        'openai',
+        'cerebras',
+        'deepseek',
+        'groq',
+        'lightning',
+        'mistral',
+        'nvidia',
+        'opencode',
+        'opencode-go',
+        'openrouter',
+        'xai',
+    }
 
 
 def supports_tool_choice(model: str) -> bool:

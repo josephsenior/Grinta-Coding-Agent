@@ -32,7 +32,7 @@ def get_completion_cost(
                 completion_tokens * config.output_cost_per_token
             )
 
-    prices = get_pricing(model)
+    prices = get_pricing(model, prompt_tokens=prompt_tokens)
     if prices:
         input_cost = (prompt_tokens / 1_000_000) * prices['input']
         output_cost = (completion_tokens / 1_000_000) * prices['output']
