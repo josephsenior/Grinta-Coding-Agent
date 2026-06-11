@@ -20,6 +20,9 @@ from backend.ledger.observation.agent import AgentCondensationObservation
 if TYPE_CHECKING:
     pass
 
+_RESTORE_MARKER = '<POST_COMPACT_RESTORE>'
+_RESTORE_SECTION_CHAR_BUDGET = 1_200
+
 
 def _tail_event_ids(events: list[Event]) -> set[int]:
     ids: set[int] = set()
@@ -54,11 +57,11 @@ def _build_restore_block(
     *,
     state: object | None = None,
 ) -> str:
-    parts: list[str] = ['<POST_COMPACT_RESTORE>']
+    parts: list[str] = [_RESTORE_MARKER]
 
     pytest_summary = extract_latest_pytest_summary(history)
     if pytest_summary:
-        parts.append(f'Latest pytest: {pytest_summary}')
+        _append_clipped(parts, f'Latest pytest: {pytest_summary}')
 
     snapshot = load_snapshot(state=state)  # type: ignore[arg-type]
     parts.extend(_extract_snapshot_sections(snapshot))
@@ -72,6 +75,12 @@ def _build_restore_block(
     return block
 
 
+def _append_clipped(parts: list[str], text: str) -> None:
+    if len(text) > _RESTORE_SECTION_CHAR_BUDGET:
+        text = text[: _RESTORE_SECTION_CHAR_BUDGET - 32].rstrip() + '\n... (section clipped)'
+    parts.append(text)
+
+
 def _extract_snapshot_sections(snapshot: dict | None) -> list[str]:
     sections: list[str] = []
     if not snapshot:
@@ -81,6 +90,9 @@ def _extract_snapshot_sections(snapshot: dict | None) -> list[str]:
         iteration = runtime.get('iteration')
         if iteration is not None:
             sections.append(f'Resume at iteration: {iteration}')
+    latest_directive = str(snapshot.get('latest_directive', '')).strip()
+    if latest_directive:
+        sections.append(f'Latest directive: {latest_directive[:300]}')
     test_results = snapshot.get('test_results')
     if isinstance(test_results, list) and test_results:
         latest = test_results[-1]
@@ -88,6 +100,19 @@ def _extract_snapshot_sections(snapshot: dict | None) -> list[str]:
             status = latest.get('status', '?')
             command = str(latest.get('command', ''))[:120]
             sections.append(f'Last test run: {status} — {command}')
+    background_tasks = snapshot.get('background_tasks')
+    if isinstance(background_tasks, list) and background_tasks:
+        for task in background_tasks[-2:]:
+            if not isinstance(task, dict):
+                continue
+            session_id = str(task.get('session_id', '')).strip() or 'unknown session'
+            next_action = str(task.get('next_action', 'terminal_read'))[:150]
+            sections.append(
+                f'Pending background task: {session_id}; next action: {next_action}'
+            )
+    recent_errors = snapshot.get('recent_errors')
+    if isinstance(recent_errors, list) and recent_errors:
+        sections.append('Recent blocker: ' + str(recent_errors[-1])[:250])
     return sections
 
 
@@ -100,7 +125,8 @@ def _extract_restored_files(
     tail_contents = _tail_content_set(preserved_tail)
     parts: list[str] = []
     restored_files = 0
-    for path in reversed(list(files.keys())):
+    prioritized = _prioritized_file_paths(files)
+    for path in prioritized:
         if restored_files >= DEFAULT_POST_COMPACT_MAX_FILES:
             break
         if not isinstance(path, str) or not path:
@@ -114,6 +140,21 @@ def _extract_restored_files(
             parts.append(f'File: {path}\n```\n{preview}\n```')
             restored_files += 1
     return parts
+
+
+def _prioritized_file_paths(files: dict) -> list[str]:
+    edited: list[str] = []
+    read_only: list[str] = []
+    for path, info in reversed(list(files.items())):
+        if not isinstance(path, str) or not path:
+            continue
+        if isinstance(info, dict) and (
+            info.get('type') == 'edit' or info.get('action') in {'edit', 'write'}
+        ):
+            edited.append(path)
+        else:
+            read_only.append(path)
+    return [*edited, *read_only]
 
 
 def _tail_content_set(events: list[Event]) -> set[str]:
@@ -135,6 +176,8 @@ def inject_post_compact_restore(
     """Re-inject pytest, file, and task context after compaction."""
     if not just_compacted or not events:
         return events
+    if _has_existing_restore(events):
+        return events
     block = _build_restore_block(history, events, state=state)
     if not block.strip() or block == '<POST_COMPACT_RESTORE>\n\n</POST_COMPACT_RESTORE>':
         return events
@@ -144,6 +187,14 @@ def inject_post_compact_restore(
     observation = AgentCondensationObservation(content=block)
     logger.info('Injected post-compact restore block (%d chars)', len(block))
     return [observation, *events]
+
+
+def _has_existing_restore(events: list[Event]) -> bool:
+    for event in events:
+        content = getattr(event, 'content', None)
+        if isinstance(content, str) and _RESTORE_MARKER in content:
+            return True
+    return False
 
 
 __all__ = ['inject_post_compact_restore']

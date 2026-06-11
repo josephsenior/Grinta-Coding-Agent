@@ -63,12 +63,12 @@ def _extract_file_facts(files: object, facts: list[ContinuityFact]) -> None:
 def _extract_string_fact_facts(
     snapshot: dict, key: str, category: str, facts: list[ContinuityFact]
 ) -> None:
-    for item in _string_items(snapshot.get(key, [])):
+    for item in _string_items(snapshot.get(key, []))[-8:]:
         facts.append(ContinuityFact(category, item[:80], item[:200]))
 
 
 def _extract_test_result_facts(snapshot: dict, facts: list[ContinuityFact]) -> None:
-    for result in _dict_items(snapshot.get('test_results', [])):
+    for result in _dict_items(snapshot.get('test_results', []))[-3:]:
         command = str(result.get('command', '')).strip()
         status = str(result.get('status', '')).upper()
         exit_code = result.get('exit_code')
@@ -83,7 +83,7 @@ def _extract_test_result_facts(snapshot: dict, facts: list[ContinuityFact]) -> N
 
 
 def _extract_failed_approach_facts(snapshot: dict, facts: list[ContinuityFact]) -> None:
-    for approach in _dict_items(snapshot.get('attempted_approaches', [])):
+    for approach in _dict_items(snapshot.get('attempted_approaches', []))[-8:]:
         outcome = str(approach.get('outcome', '')).strip()
         detail = str(approach.get('detail', '')).strip()
         if detail and 'FAILED' in outcome:

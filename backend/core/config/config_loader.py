@@ -450,22 +450,24 @@ def _get_active_agent_config(cfg: AppConfig) -> AgentConfig:
     return cfg.get_agent_config(agent_name)
 
 
-def _ensure_active_agent_auto_compactor(cfg: AppConfig) -> None:
-    from backend.core.config.compactor_config import AutoCompactorConfig
+def _ensure_active_agent_compactor_llm(cfg: AppConfig) -> None:
+    from backend.core.config.compactor_config import (
+        AutoCompactorConfig,
+        ContextPipelineConfig,
+    )
 
     agent_config = _get_active_agent_config(cfg)
     compactor_config = getattr(agent_config, 'compactor_config', None)
+    active_llm_config = cfg.get_llm_config_from_agent(cfg.default_agent)
     if compactor_config is None:
-        agent_config.compactor_config = AutoCompactorConfig(
-            llm_config=cfg.get_llm_config_from_agent(cfg.default_agent)
-        )
+        agent_config.compactor_config = ContextPipelineConfig(llm_config=active_llm_config)
         return
     if (
-        isinstance(compactor_config, AutoCompactorConfig)
+        isinstance(compactor_config, (AutoCompactorConfig, ContextPipelineConfig))
         and compactor_config.llm_config is None
     ):
         agent_config.compactor_config = compactor_config.model_copy(
-            update={'llm_config': cfg.get_llm_config_from_agent(cfg.default_agent)}
+            update={'llm_config': active_llm_config}
         )
 
 
@@ -478,7 +480,7 @@ def finalize_config(cfg: AppConfig) -> None:
     """More tweaks to the config after it's been loaded."""
     from backend.core.config.mcp_config import extend_mcp_servers_with_bundled_defaults
 
-    _ensure_active_agent_auto_compactor(cfg)
+    _ensure_active_agent_compactor_llm(cfg)
     agent_cfg = cfg.get_agent_config(cfg.default_agent)
     # In-process native browser (browser-use) needs AppConfig.enable_browser on the runtime.
     # Do not clobber agent enable_browsing here — respect loaded defaults / settings.

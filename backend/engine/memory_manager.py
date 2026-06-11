@@ -4,15 +4,17 @@ import copy
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.context import ContextMemory
-from backend.context.condensed_history import CondensedHistory
+from backend.context.compact_boundary import (
+    boundary_info,
+    project_after_compact_boundary,
+)
 from backend.context.compactor import Compactor
-from backend.context.compact_boundary import boundary_info, project_after_compact_boundary
+from backend.context.condensed_history import CondensedHistory
 from backend.context.pre_condensation_snapshot import (
     commit_snapshot,
-    delete_snapshot,
     delete_staging_snapshot,
     extract_snapshot,
     format_snapshot_for_injection,
@@ -31,7 +33,6 @@ if TYPE_CHECKING:
     from backend.core.config import AgentConfig
     from backend.core.contracts.state import State
     from backend.inference.llm_registry import LLMRegistry
-    from backend.ledger.action import Action
     from backend.ledger.event import Event
     from backend.utils.prompt import PromptManager
 
@@ -67,6 +68,35 @@ class ContextMemoryManager:
 
         return isinstance(compactor_config, ContextPipelineConfig)
 
+    def _resolve_pipeline_llm_config(self) -> object | None:
+        """Return the effective LLM config for context-pipeline compaction."""
+        getter = getattr(self._config, 'get_llm_config', None)
+        if callable(getter):
+            try:
+                agent_llm = getter()
+                if agent_llm is not None:
+                    return agent_llm
+            except Exception:
+                logger.debug('Agent LLM config lookup failed', exc_info=True)
+        registry_config = getattr(self._llm_registry, 'config', None)
+        if registry_config is None:
+            return None
+        getter = getattr(registry_config, 'get_llm_config_from_agent_config', None)
+        if callable(getter):
+            try:
+                agent_llm = getter(self._config)
+                if agent_llm is not None:
+                    return agent_llm
+            except Exception:
+                logger.debug('Registry agent LLM config lookup failed', exc_info=True)
+        getter = getattr(registry_config, 'get_llm_config', None)
+        if callable(getter):
+            try:
+                return getter('llm')
+            except Exception:
+                logger.debug('Default LLM config lookup failed', exc_info=True)
+        return None
+
     def initialize(self, prompt_manager: PromptManager) -> None:
         """Initialize context memory with prompt manager."""
         self.conversation_memory = ContextMemory(self._config, prompt_manager)
@@ -76,7 +106,7 @@ class ContextMemoryManager:
                 from backend.context.context_pipeline import ContextPipeline
                 from backend.core.config.compactor_config import ContextPipelineConfig
 
-                agent_llm = self._config.get_llm_config()
+                agent_llm = self._resolve_pipeline_llm_config()
                 if (
                     isinstance(compactor_config, ContextPipelineConfig)
                     and compactor_config.llm_config is None
@@ -272,14 +302,20 @@ class ContextMemoryManager:
         turn_signals = getattr(state, 'turn_signals', None)
         prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
         if prewarmed is not None:
-            return self._use_prewarmed_result(prewarmed, turn_signals, history)
+            return await self._use_prewarmed_result(prewarmed, turn_signals, history, state)
         compaction_started = time.perf_counter()
         result = await self.compactor.compacted_history(state)
         logger.info('ContextMemoryManager.condense_history compactor returned %s (history_events=%d snapshot=%.3fs compactor=%.3fs)',
                     type(result).__name__, len(history), snapshot_elapsed, time.perf_counter() - compaction_started)
         return result
 
-    def _use_prewarmed_result(self, prewarmed: Any, turn_signals: Any, history: list) -> Any:
+    async def _use_prewarmed_result(
+        self,
+        prewarmed: Any,
+        turn_signals: Any,
+        history: list,
+        state: State,
+    ) -> Any:
         turn_signals.prewarmed_compaction = None
         prewarm_len = getattr(turn_signals, 'prewarm_history_len', None)
         prewarm_latest_id = getattr(turn_signals, 'prewarm_latest_event_id', None)
@@ -291,8 +327,7 @@ class ContextMemoryManager:
         if prewarm_stale:
             logger.warning('Discarding stale pre-warmed condensation (prewarm_len=%s current_len=%s prewarm_latest_id=%s current_latest_id=%s); recomputing compaction.',
                           prewarm_len, current_len, prewarm_latest_id, current_latest_id)
-            import asyncio
-            return asyncio.get_event_loop().run_until_complete(self.compactor.compacted_history(None))
+            return await self.compactor.compacted_history(state)
         logger.info('Utilizing background pre-warmed condensation result.')
         action = getattr(prewarmed, 'action', None)
         if action:
@@ -333,11 +368,30 @@ class ContextMemoryManager:
         try:
             snapshot = extract_snapshot(history)
             self._attach_runtime_snapshot(snapshot, state)
+            try:
+                from backend.context.canonical_state import (
+                    reduce_snapshot_into_state,
+                    save_canonical_state,
+                )
+
+                latest_id = getattr(history[-1], 'id', None) if history else None
+                canonical = reduce_snapshot_into_state(
+                    snapshot,
+                    latest_event_id=latest_id if isinstance(latest_id, int) else None,
+                    source='memory_manager',
+                    persist_state=state,
+                )
+                save_canonical_state(canonical, state=state)
+            except Exception:
+                logger.debug('Canonical state update failed', exc_info=True)
             if (
                 snapshot.get('files_touched')
                 or snapshot.get('recent_errors')
                 or snapshot.get('decisions')
                 or snapshot.get('runtime')
+                or snapshot.get('latest_directive')
+                or snapshot.get('test_results')
+                or snapshot.get('background_tasks')
             ):
                 save_snapshot(snapshot, state=state)
         except Exception:
@@ -520,7 +574,10 @@ class ContextMemoryManager:
             events_for_prompt = self._pipeline.build_prompt_events(
                 condensed_list, state=state, llm_config=llm_config, full_history=full_history,
             )
-            from backend.context.prompt_window import PromptWindowResult, estimate_events_tokens
+            from backend.context.prompt_window import (
+                PromptWindowResult,
+                estimate_events_tokens,
+            )
             prompt_window = PromptWindowResult(
                 events=events_for_prompt,
                 original_events=len(full_history),

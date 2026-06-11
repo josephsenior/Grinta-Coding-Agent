@@ -111,6 +111,34 @@ class StateSummary(BaseModel):
         default='',
         description="Any other important information that doesn't fit into the categories above.",
     )
+    canonical_active_plan: str = Field(
+        default='',
+        description='Canonical-state patch: concise active plan that remains valid after compaction.',
+    )
+    canonical_next_action: str = Field(
+        default='',
+        description='Canonical-state patch: exact next action the agent should take after compaction.',
+    )
+    canonical_blockers: str = Field(
+        default='',
+        description='Canonical-state patch: newline-separated unresolved blockers only; omit stale blockers.',
+    )
+    canonical_decisions: str = Field(
+        default='',
+        description='Canonical-state patch: newline-separated durable decisions that affect future work.',
+    )
+    canonical_invalidated_assumptions: str = Field(
+        default='',
+        description='Canonical-state patch: newline-separated assumptions proven false or rejected by the user.',
+    )
+    canonical_active_files: str = Field(
+        default='',
+        description='Canonical-state patch: newline-separated file paths still relevant to the task.',
+    )
+    narrative_summary: str = Field(
+        default='',
+        description='Optional short narrative summary. This is secondary to the canonical-state patch.',
+    )
 
     @classmethod
     def tool_description(cls) -> dict[str, Any]:
@@ -173,8 +201,53 @@ class StateSummary(BaseModel):
             f'**PR Status**: {self.pr_status}',
             '## Additional Context',
             f'**Other Relevant Context**: {self.other_relevant_context}',
+            '## Canonical State Patch',
+            f'**Active Plan**: {self.canonical_active_plan}',
+            f'**Next Action**: {self.canonical_next_action}',
+            f'**Blockers**: {self.canonical_blockers}',
+            f'**Decisions**: {self.canonical_decisions}',
+            f'**Invalidated Assumptions**: {self.canonical_invalidated_assumptions}',
+            f'**Active Files**: {self.canonical_active_files}',
+            f'**Narrative Summary**: {self.narrative_summary}',
         ]
         return '\n\n'.join(sections)
+
+    def canonical_patch(self) -> dict[str, Any]:
+        """Return the low-authority canonical-state enrichment patch."""
+        narrative = self.narrative_summary or '\n'.join(
+            part
+            for part in (
+                self.user_context,
+                self.completed_tasks,
+                self.pending_tasks,
+                self.other_relevant_context,
+            )
+            if part
+        )
+        return {
+            'active_plan': self.canonical_active_plan or self.pending_tasks,
+            'next_action': self.canonical_next_action or self.current_working_step,
+            'blockers': self.canonical_blockers or self.known_failures_or_avoid,
+            'decisions': self.canonical_decisions,
+            'invalidated_assumptions': self.canonical_invalidated_assumptions,
+            'active_files': self.canonical_active_files or self.files_modified,
+            'narrative_summary': narrative[:1200],
+            'vcs_status': self._vcs_status_patch(),
+        }
+
+    def _vcs_status_patch(self) -> str:
+        parts = []
+        if self.branch_name:
+            parts.append(f'branch={self.branch_name}')
+        if self.branch_created:
+            parts.append(f'branch_created={self.branch_created}')
+        if self.commits_made:
+            parts.append(f'commits_made={self.commits_made}')
+        if self.pr_created:
+            parts.append(f'pr_created={self.pr_created}')
+        if self.pr_status:
+            parts.append(f'pr_status={self.pr_status}')
+        return '; '.join(parts)
 
 
 class StructuredSummaryCompactor(BaseLLMCompactor):
@@ -206,9 +279,12 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         # Build prompt for LLM
         prompt = self._build_condensation_prompt(summary_event, pruned_events)
 
+        self.last_state_patch: dict[str, Any] = {}
+
         # Get summary from LLM, with degraded fallback
         try:
             summary = await self._get_llm_summary(prompt)
+            self.last_state_patch = summary.canonical_patch()
             summary_text = str(summary)
         except Exception as e:
             logger.warning(
@@ -295,6 +371,9 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             '2. Prevents lost work when the session length exceeds token limits\n'
             '3. Helps maintain continuity across multiple interactions\n\n'
             'CRITICAL: You MUST strictly enforce that the *original user objective* is always preserved verbatim at the very top of every compressed state summary. Never allow the core goal to be lost or diluted.\n\n'
+            'Your tool output has two layers:\n'
+            '- Regular narrative fields for human-readable continuity.\n'
+            '- canonical_* fields that form a compact canonical-state patch. These must contain only current, still-valid facts. Do not repeat stale failed approaches, old test statuses, or generic "resuming task" boilerplate.\n\n'
             'You will be given:\n'
             '- A list of events (actions taken by the agent)\n'
             '- The most recent previous summary (if one exists)\n\n'
@@ -309,6 +388,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             '- Explicit approaches the user rejected or asked not to repeat\n'
             '- Current state of code, variables, and data structures\n'
             '- The status of any version control operations\n\n'
+            'For canonical_next_action, write one concrete next action. For canonical_active_files, include only paths still relevant to upcoming work. For canonical_blockers, include only unresolved blockers.\n\n'
         )
 
         # Add previous summary

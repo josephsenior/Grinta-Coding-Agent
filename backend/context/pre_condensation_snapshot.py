@@ -131,6 +131,8 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
     snapshot: dict[str, Any] = {
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
         'events_condensed': len(events),
+        'objective': '',
+        'latest_directive': '',
         'files_touched': {},
         'recent_errors': [],
         'decisions': [],
@@ -138,14 +140,17 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
         'recent_commands': [],
         'test_results': [],
         'attempted_approaches': [],
+        'background_tasks': [],
     }
 
     for event in events:
+        _extract_user_directive(event, snapshot)
         _extract_file_info(event, snapshot)
         _extract_errors(event, snapshot)
         _extract_decisions(event, snapshot)
         _extract_invalidated_assumptions(event, snapshot)
         _extract_commands(event, snapshot)
+        _extract_background_tasks(event, snapshot)
 
     _extract_attempted_approaches(events, snapshot)
     _extract_test_results(events, snapshot)
@@ -288,6 +293,22 @@ def _extract_file_info(event: Event, snapshot: dict) -> None:
         _extract_cmd_run_file_paths(event, files)
 
 
+def _extract_user_directive(event: Event, snapshot: dict) -> None:
+    """Capture the original task and latest user directive for recovery."""
+    if type(event).__name__ != 'MessageAction':
+        return
+    source = getattr(event, 'source', None)
+    source_value = getattr(source, 'value', source)
+    if str(source_value).lower() != 'user':
+        return
+    content = str(getattr(event, 'content', '')).strip()
+    if not content:
+        return
+    if not snapshot.get('objective'):
+        snapshot['objective'] = content[:_MAX_CONTENT_LENGTH]
+    snapshot['latest_directive'] = content[:_MAX_CONTENT_LENGTH]
+
+
 def _extract_errors(event: Event, snapshot: dict) -> None:
     """Extract recent error messages from error-producing observations."""
     if len(snapshot['recent_errors']) >= _MAX_ERRORS:
@@ -343,8 +364,26 @@ def _extract_decisions(event: Event, snapshot: dict) -> None:
                 },
             )
         # #endregion
-        if thought and not should_skip and not _is_invalidated_assumption_text(thought):
+        if (
+            thought
+            and not should_skip
+            and not _is_invalidated_assumption_text(thought)
+            and not _is_control_noise_text(thought)
+        ):
             snapshot['decisions'].append(thought[:_MAX_CONTENT_LENGTH])
+
+
+def _is_control_noise_text(text: str) -> bool:
+    lower = ' '.join(text.casefold().split())
+    control_markers = (
+        'memory condensed',
+        'context condensed',
+        'resuming task',
+        'resume the task',
+        'post compact restore',
+        'restored context',
+    )
+    return any(marker in lower for marker in control_markers)
 
 
 _INVALIDATION_MARKERS = (
@@ -432,6 +471,48 @@ def _extract_commands(event: Event, snapshot: dict) -> None:
             else:
                 truncated = lines
             commands[-1]['output'] = '\n'.join(truncated)[:_MAX_CONTENT_LENGTH]
+
+
+def _extract_background_tasks(event: Event, snapshot: dict) -> None:
+    """Extract detached background commands that must be polled after compaction."""
+    tasks = snapshot.get('background_tasks')
+    if not isinstance(tasks, list) or len(tasks) >= 5:
+        return
+    if type(event).__name__ != 'CmdOutputObservation':
+        return
+    content = str(getattr(event, 'content', ''))
+    metadata = getattr(event, 'metadata', None)
+    exit_code = getattr(metadata, 'exit_code', getattr(event, 'exit_code', None))
+    if exit_code != -2 and '[BACKGROUND_DETACH]' not in content:
+        return
+    still_running = getattr(metadata, 'command_still_running', True)
+    if still_running is False:
+        return
+    suffix = str(getattr(metadata, 'suffix', '') or '')
+    session_id = _extract_background_session_id(suffix) or _extract_background_session_id(content)
+    command = str(getattr(event, 'command', '')).strip()
+    next_action = (
+        f'terminal_read(session_id="{session_id}")'
+        if session_id
+        else 'terminal_read for the detached background session'
+    )
+    tasks.append(
+        {
+            'session_id': session_id,
+            'command': command[:_MAX_CONTENT_LENGTH],
+            'status': 'still running',
+            'next_action': next_action,
+        }
+    )
+
+
+def _extract_background_session_id(text: str) -> str:
+    if 'session_id="' not in text:
+        return ''
+    try:
+        return text.split('session_id="', 1)[1].split('"', 1)[0]
+    except (IndexError, ValueError):
+        return ''
 
 
 def _summarize_command_output(content: str) -> str:
@@ -641,6 +722,7 @@ def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
     """
     parts = ['<RESTORED_CONTEXT>']
     parts.append(f'Events condensed: {snapshot.get("events_condensed", "?")}')
+    parts.extend(_format_directive_section(snapshot))
     parts.extend(_format_runtime_section(snapshot.get('runtime', {})))
     parts.extend(_format_files_section(snapshot.get('files_touched', {})))
     parts.extend(_format_errors_section(snapshot.get('recent_errors', [])))
@@ -652,9 +734,21 @@ def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
     )
     parts.extend(_format_commands_section(snapshot.get('recent_commands', [])))
     parts.extend(_format_test_results_section(snapshot.get('test_results', [])))
+    parts.extend(_format_background_tasks_section(snapshot.get('background_tasks', [])))
     parts.extend(_format_approaches_section(snapshot.get('attempted_approaches', [])))
     parts.append('</RESTORED_CONTEXT>')
     return '\n'.join(parts)
+
+
+def _format_directive_section(snapshot: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+    objective = str(snapshot.get('objective', '')).strip()
+    latest = str(snapshot.get('latest_directive', '')).strip()
+    if objective:
+        lines.append(f'\nOriginal objective: {objective[:300]}')
+    if latest and latest != objective:
+        lines.append(f'Latest directive: {latest[:300]}')
+    return lines
 
 
 def _format_runtime_section(runtime: dict) -> list[str]:
@@ -767,6 +861,22 @@ def _format_test_results_section(results: list) -> list[str]:
         output = str(result.get('output', '')).strip()
         if output:
             lines.append(f'    output: {output[:200]}')
+    return lines
+
+
+def _format_background_tasks_section(tasks: list) -> list[str]:
+    """Format pending background commands that require terminal reads."""
+    if not tasks:
+        return []
+    lines = [f'\nPending background tasks ({len(tasks)}):']
+    for task in tasks[-5:]:
+        if not isinstance(task, dict):
+            continue
+        session_id = str(task.get('session_id', '')).strip() or 'unknown session'
+        command = str(task.get('command', ''))[:150]
+        next_action = str(task.get('next_action', 'terminal_read'))[:150]
+        lines.append(f'  - {session_id}: {command}')
+        lines.append(f'    next: {next_action}')
     return lines
 
 

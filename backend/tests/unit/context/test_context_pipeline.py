@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from backend.context.compactor.compactor import Compaction
 from backend.context.context_pipeline import (
     ContextPipeline,
-    apply_ineffective_compaction_backoff,
     _shrink_tail_for_token_reduction,
+    apply_ineffective_compaction_backoff,
 )
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import (
@@ -77,6 +77,10 @@ def _isolate_snapshot_paths(tmp_path, monkeypatch):
         'backend.context.session_memory._session_memory_path',
         lambda state=None: tmp_path / 'session_memory.md',
     )
+    monkeypatch.setattr(
+        'backend.context.canonical_state.canonical_state_path',
+        lambda state=None: tmp_path / 'canonical_task_state.json',
+    )
 
 
 @pytest.mark.asyncio
@@ -138,6 +142,32 @@ async def test_prepare_step_uses_prewarmed_compaction(pipeline):
         result = await pipeline.prepare_step(state)
     assert result.pending_action is action
     assert result.events == []
+
+
+@pytest.mark.asyncio
+async def test_prepare_step_rejects_prewarmed_compaction_that_fails_continuity(pipeline):
+    events = [_user('run pytest', 1)]
+    for i in range(2, 202):
+        events.append(_cmd_output(f'output line {i}\n' * 20, i))
+    action = CondensationAction(
+        pruned_event_ids=list(range(2, 182)),
+        summary='prewarmed summary ' * 200,
+        summary_offset=0,
+    )
+    state = _make_state(events)
+    state.turn_signals.prewarmed_compaction = Compaction(action=action)
+    with (
+        patch('backend.context.context_pipeline.commit_snapshot') as mock_commit,
+        patch('backend.context.context_pipeline.delete_staging_snapshot'),
+        patch('backend.context.context_pipeline.maybe_update'),
+        patch.object(pipeline, '_passes_effectiveness_gate', return_value=True),
+        patch.object(pipeline, '_passes_continuity_gate', return_value=False),
+    ):
+        result = await pipeline.prepare_step(state)
+
+    assert result.pending_action is None
+    assert result.events == events
+    mock_commit.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -209,18 +239,22 @@ def test_configure_structured_compactor_size_forces_material_prune():
     assert pruned_count >= 20
 
 
-def test_build_prompt_events_injects_working_set(pipeline):
+def test_build_prompt_events_injects_context_packet(pipeline):
     events = [_user('implement feature X', 1)]
     state = _make_state(events)
-    with patch(
-        'backend.context.context_pipeline.build_working_set_observation',
-        return_value=MagicMock(id=99),
-    ):
-        prompt_events = pipeline.build_prompt_events(events, state=state, llm_config=None)
-    assert len(prompt_events) >= 1
+
+    prompt_events = pipeline.build_prompt_events(events, state=state, llm_config=None)
+
+    from backend.ledger.observation.agent import AgentCondensationObservation
+
+    packet = prompt_events[0]
+    assert isinstance(packet, AgentCondensationObservation)
+    assert packet.is_working_set is True
+    assert '<CONTEXT_PACKET>' in packet.content
+    assert 'implement feature X' in packet.content
 
 
-def test_build_prompt_events_skips_working_set_on_fresh_session(pipeline, monkeypatch, tmp_path):
+def test_build_prompt_events_injects_context_packet_on_fresh_session(pipeline, monkeypatch, tmp_path):
     events = [_user('Build a raft kv store', 1)]
     state = _make_state(events)
     monkeypatch.setattr(
@@ -235,7 +269,11 @@ def test_build_prompt_events_skips_working_set_on_fresh_session(pipeline, monkey
 
     from backend.ledger.observation.agent import AgentCondensationObservation
 
-    assert not any(isinstance(event, AgentCondensationObservation) for event in prompt_events)
+    packet = prompt_events[0]
+    assert isinstance(packet, AgentCondensationObservation)
+    assert packet.is_working_set is True
+    assert '<CONTEXT_PACKET>' in packet.content
+    assert 'Build a raft kv store' in packet.content
 
 
 def test_note_llm_step_does_not_clear_ineffective_compaction_backoff(pipeline):

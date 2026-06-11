@@ -1026,7 +1026,11 @@ def _build_edit_result_obs(outcome: Any, original_snapshots: dict, action: Any, 
         if isinstance(outcome, MessageAction)
         else getattr(outcome, 'thought', '') or getattr(outcome, 'content', '')
     )
-    content = _format_edit_content(summary, diff, verification_text)
+    content = _format_edit_content(
+        str(summary or ''),
+        diff or '',
+        verification_text,
+    )
     final_obs = FileEditObservation(
         content=content,
         path=action.path,
