@@ -346,13 +346,34 @@ class PromptTextArea(TextArea):
                 return
 
 
+class HudModeSelect(Select):
+    """Mode picker that propagates programmatic value changes to the screen."""
+
+    def watch_value(self, value: object) -> None:
+        if value is Select.BLANK:
+            return
+        screen = self.screen
+        if screen is None:
+            return
+        active_config = getattr(screen, '_active_agent_config', None)
+        if callable(active_config):
+            agent_config = active_config()
+            if agent_config is not None and getattr(agent_config, 'mode', None) == str(
+                value
+            ):
+                return
+        apply_mode = getattr(screen, '_apply_mode', None)
+        if callable(apply_mode):
+            apply_mode(str(value))
+
+
 class HUD(Vertical):
     """Multi-line status bar at the very bottom."""
 
     def compose(self) -> ComposeResult:
         with Horizontal(id='hud-line-2-row'):
             yield Label('[#7a6a4a]Mode:[/]', id='hud-label-mode')
-            yield Select(
+            yield HudModeSelect(
                 [(c.capitalize(), c) for c in VISIBLE_INTERACTION_MODES],
                 value=AGENT_MODE,
                 id='hud-mode',

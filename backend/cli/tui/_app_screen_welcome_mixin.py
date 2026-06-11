@@ -24,10 +24,13 @@ class _AppScreenWelcomeMixin:
         return None
 
     def _show_welcome(self) -> None:
-        if self._welcome_visible or self._is_unmounted:
+        if self._is_unmounted:
             return
         try:
             if self._transcript_has_real_content():
+                self._hide_welcome()
+                return
+            if self._welcome_visible:
                 return
             display = self._get_display()
             if self._get_welcome_widget() is not None:
@@ -76,5 +79,3 @@ class _AppScreenWelcomeMixin:
         widget_id = event.select.id
         if widget_id == 'hud-autonomy':
             self._apply_autonomy_level(event.value)
-        elif widget_id == 'hud-mode':
-            self._apply_mode(event.value)

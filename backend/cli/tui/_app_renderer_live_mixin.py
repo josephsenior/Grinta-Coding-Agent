@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import time
 from typing import Any
 
@@ -40,7 +41,15 @@ class _AppRendererLiveMixin:
             display.scroll_end(animate=False)
 
     def subscribe(self, event_stream: Any, sid: str) -> None:
+        if self._event_stream is event_stream:
+            return
+        old_stream = self._event_stream
+        if old_stream is not None:
+            with contextlib.suppress(Exception):
+                old_stream.unsubscribe(EventStreamSubscriber.CLI, old_stream.sid)
         self._event_stream = event_stream
+        with contextlib.suppress(Exception):
+            event_stream.unsubscribe(EventStreamSubscriber.CLI, sid)
         event_stream.subscribe(EventStreamSubscriber.CLI, self._on_event, sid)
 
     def add_to_history(self, renderable: Any) -> None:
@@ -132,6 +141,7 @@ class _AppRendererLiveMixin:
             return
 
         should_follow = display.should_follow_tail()
+        in_place_update = self._live_response_widget is not None
         if not self._live_response_widget:
             self._live_response_widget = Static(Text(text))
             display.append_widget(self._live_response_widget)
@@ -140,7 +150,12 @@ class _AppRendererLiveMixin:
         if should_follow:
             follow_tail = getattr(display, 'follow_tail', None)
             if callable(follow_tail):
-                follow_tail()
+                if in_place_update:
+                    # Static.update() reflows on the next refresh; defer tail
+                    # follow so scroll_end sees the updated max_scroll_y.
+                    display.call_after_refresh(follow_tail)
+                else:
+                    follow_tail()
             else:
                 self._maybe_scroll_to_tail(display)
 

@@ -3655,6 +3655,117 @@ async def test_terminal_append_does_not_remount_all_children(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_hydrate_skips_when_welcome_visible(mock_config):
+    from backend.cli.tui._app_renderer_event_drain import hydrate_recent_transcript
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        s._show_welcome()
+        await pilot.pause()
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._event_stream = MagicMock()
+        renderer._event_stream.search_events.return_value = [
+            SimpleNamespace(id=0),
+        ]
+
+        loaded = await hydrate_recent_transcript(renderer)
+        assert loaded == 0
+        renderer._event_stream.search_events.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_setup_renderer_marks_ready_before_hydrate(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    hydrate_started = asyncio.Event()
+
+    async def slow_hydrate(*_args, **_kwargs):
+        hydrate_started.set()
+        await asyncio.Event().wait()
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        controller = MagicMock()
+        controller.get_agent_state.return_value = AgentState.LOADING
+        event_stream = MagicMock()
+        event_stream.sid = 'test-session'
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=s._hud,
+            reasoning=s._reasoning,
+            tui=s,
+            loop=loop,
+        )
+        renderer.hydrate_recent_transcript = slow_hydrate  # type: ignore[method-assign]
+        renderer.drain_events_async = AsyncMock(return_value=None)  # type: ignore[method-assign]
+        s._renderer = renderer
+
+        await s._bootstrap_setup_renderer(event_stream, controller)
+
+        assert s._hud.state.agent_state_label == 'awaiting_user_input'
+        await asyncio.wait_for(hydrate_started.wait(), timeout=2.0)
+
+
+@pytest.mark.asyncio
+async def test_drain_invocation_budget_reschedules_with_backlog(mock_config, monkeypatch):
+    from collections import deque
+    from threading import Lock
+
+    from backend.cli.tui import _app_renderer_event_drain as drain_mod
+
+    orch = MagicMock()
+    orch._async_drain_active = False
+    orch._pending_events = deque()
+    orch._pending_lock = Lock()
+    orch._drain_scheduled = False
+    orch._pending_events_dropped = 0
+    orch._history = []
+    orch._loop = MagicMock()
+    orch._tui = MagicMock()
+    orch._render_prep_cache = {}
+    orch._process_event = MagicMock()
+    orch.flush_live_ui = MagicMock()
+    orch.flush_pending_final_commits = AsyncMock(return_value=None)
+    orch._refresh_display = MagicMock()
+
+    for idx in range(8):
+        event = SimpleNamespace(id=idx)
+        orch._pending_events.append(event)
+
+    clock = iter([0.0, 0.0, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02])
+    monkeypatch.setattr(drain_mod, '_TUI_DRAIN_FRAME_BUDGET_SECONDS', 0.02)
+    monkeypatch.setattr(drain_mod, '_TUI_DRAIN_INVOCATION_BUDGET_SECONDS', 0.03)
+    monkeypatch.setattr(drain_mod.time, 'monotonic', lambda: next(clock, 0.05))
+    monkeypatch.setattr(
+        drain_mod, '_preprocess_event_async', AsyncMock(return_value=None)
+    )
+    post_drain = MagicMock()
+    monkeypatch.setattr(drain_mod, '_force_immediate_drain', post_drain)
+
+    await drain_mod.drain_events_async(orch)
+
+    assert orch._process_event.call_count >= 1
+    assert post_drain.called
+    assert len(orch._pending_events) > 0
+
+
+@pytest.mark.asyncio
 async def test_drain_respects_frame_budget(mock_config, monkeypatch):
     from backend.cli.tui import _app_renderer_event_drain as drain_mod
     from backend.cli.tui import _app_renderer_event_processor as processor_mod

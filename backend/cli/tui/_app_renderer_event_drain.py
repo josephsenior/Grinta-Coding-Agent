@@ -23,7 +23,11 @@ from typing import TYPE_CHECKING, Any
 from rich.text import Text
 
 from backend.cli.theme import NAVY_TEXT_DIM
-from backend.cli.tui._app_constants import _TUI_DRAIN_FRAME_BUDGET_SECONDS, _tui_logger
+from backend.cli.tui._app_constants import (
+    _TUI_DRAIN_FRAME_BUDGET_SECONDS,
+    _TUI_DRAIN_INVOCATION_BUDGET_SECONDS,
+    _tui_logger,
+)
 from backend.cli.tui._app_small_widgets import RendererDrainRequested
 
 if TYPE_CHECKING:
@@ -254,8 +258,8 @@ async def _preprocess_event_async(
     if event_id in cache:
         return
 
-    from backend.ledger.observation.files import FileEditObservation
     from backend.cli.tui._render_prep import prep_file_edit_encoded_diff_async
+    from backend.ledger.observation.files import FileEditObservation
 
     if not isinstance(event, FileEditObservation):
         return
@@ -280,67 +284,93 @@ async def _process_events_with_frame_budget(
     return processed
 
 
-async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
-    """Async drain that yields control to the event loop periodically.
-
-    Extends the existing batch-of-10 + sleep(0) approach with a wall-clock
-    frame budget and reschedules when the pending queue still has events.
-    """
-    _cancel_drain_debounce(orch)
-    drain_started = time.monotonic()
-    orch._async_drain_active = True
-
-    events, dropped = _collect_pending_events(orch)
-    if not events:
-        flush = getattr(orch, 'flush_live_ui', None)
-        if callable(flush):
-            flush()
-        flush_commits = getattr(orch, 'flush_pending_final_commits', None)
-        if callable(flush_commits):
-            await flush_commits()
-        orch._async_drain_active = False
-        orch._refresh_display()
-        return
-    if dropped:
-        _record_dropped_events(orch, dropped)
-
-    events = _collapse_streaming_chunks(events)
-    streaming_only = _is_streaming_only_batch(events)
-
-    processed = await _process_events_with_frame_budget(orch, events)
-    if processed < len(events):
-        remainder = events[processed:]
-        with orch._pending_lock:
-            orch._pending_events.extendleft(reversed(remainder))
-            orch._drain_scheduled = True
-        _force_immediate_drain(orch)
-
-    has_pending = False
-    with orch._pending_lock:
-        has_pending = bool(orch._pending_events)
-
-    _flush_and_refresh(
-        orch,
-        events,
-        streaming_only,
-        skip_sidebar=streaming_only or has_pending,
-    )
-
+async def _finalize_drain_pass(orch: '_AppRendererEventProcessorMixin') -> None:
+    flush = getattr(orch, 'flush_live_ui', None)
+    if callable(flush):
+        flush()
     flush_commits = getattr(orch, 'flush_pending_final_commits', None)
     if callable(flush_commits):
         await flush_commits()
-    orch._async_drain_active = False
+    orch._refresh_display()
 
-    elapsed_ms = (time.monotonic() - drain_started) * 1000.0
+
+async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
+    """Async drain that yields control to the event loop periodically.
+
+    Processes multiple micro-batches per invocation up to a wall-clock cap so
+    backlog drains faster without monopolizing the Textual event loop.
+    """
+    if getattr(orch, '_async_drain_active', False):
+        return
+
+    _cancel_drain_debounce(orch)
+    invocation_started = time.monotonic()
+    orch._async_drain_active = True
+    last_batch: list[Any] = []
+    last_streaming_only = False
+
+    try:
+        while True:
+            events, dropped = _collect_pending_events(orch)
+            if not events:
+                await _finalize_drain_pass(orch)
+                return
+            if dropped:
+                _record_dropped_events(orch, dropped)
+
+            events = _collapse_streaming_chunks(events)
+            streaming_only = _is_streaming_only_batch(events)
+            last_batch = events
+            last_streaming_only = streaming_only
+
+            processed = await _process_events_with_frame_budget(orch, events)
+            if processed < len(events):
+                remainder = events[processed:]
+                with orch._pending_lock:
+                    orch._pending_events.extendleft(reversed(remainder))
+
+            has_pending = False
+            with orch._pending_lock:
+                has_pending = bool(orch._pending_events)
+                if has_pending:
+                    orch._drain_scheduled = True
+
+            _flush_and_refresh(
+                orch,
+                events,
+                streaming_only,
+                skip_sidebar=streaming_only or has_pending,
+            )
+
+            flush_commits = getattr(orch, 'flush_pending_final_commits', None)
+            if callable(flush_commits):
+                await flush_commits()
+
+            if not has_pending:
+                break
+
+            elapsed = time.monotonic() - invocation_started
+            if elapsed >= _TUI_DRAIN_INVOCATION_BUDGET_SECONDS:
+                _force_immediate_drain(orch)
+                break
+
+            await asyncio.sleep(0)
+    finally:
+        orch._async_drain_active = False
+
+    elapsed_ms = (time.monotonic() - invocation_started) * 1000.0
     pending_depth = 0
     with orch._pending_lock:
         pending_depth = len(orch._pending_events)
     prep_depth = len(getattr(orch, '_render_prep_cache', {}) or {})
     _tui_logger.debug(
-        'tui_drain_ms=%.1f tui_pending_depth=%d tui_prep_queue_depth=%d',
+        'tui_drain_ms=%.1f tui_pending_depth=%d tui_prep_queue_depth=%d '
+        'tui_last_batch=%d streaming_only=%s',
         elapsed_ms,
         pending_depth,
         prep_depth,
+        len(last_batch),
+        last_streaming_only,
     )
 
 
@@ -383,6 +413,11 @@ async def hydrate_recent_transcript(
     try:
         display = orch._tui._get_display()
     except Exception:
+        return 0
+    if getattr(orch._tui, '_welcome_visible', False):
+        return 0
+    get_welcome = getattr(orch._tui, '_get_welcome_widget', None)
+    if callable(get_welcome) and get_welcome() is not None:
         return 0
     if getattr(display, 'child_widget_count', lambda: 0)() > 0:
         return 0

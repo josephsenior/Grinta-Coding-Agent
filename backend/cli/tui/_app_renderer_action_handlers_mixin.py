@@ -121,8 +121,9 @@ class _AppRendererActionHandlersMixin:
             return
         self._last_final_response_text = content
         self._pending_final_commits.append(content)
-        if not getattr(self, '_async_drain_active', False):
-            self.flush_pending_final_commits_sync()
+        from backend.cli.tui._app_renderer_event_drain import _force_immediate_drain
+
+        _force_immediate_drain(self)
 
     def flush_pending_final_commits_sync(self) -> None:
         if not self._pending_final_commits:

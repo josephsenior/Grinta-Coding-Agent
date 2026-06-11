@@ -310,15 +310,15 @@ class _AppScreenInputMixin:
 
     async def _ensure_controller_ready(self) -> None:
         """Ensure controller is initialized, bootstrapping if needed."""
-        if self._controller is not None:
-            _tui_logger.debug('_handle_input: controller exists, dispatch will ensure task')
-            logger.info('[TUI] _handle_input: controller exists')
-            return
-
         if self._bootstrapping is not None and not self._bootstrapping.is_set():
             _tui_logger.debug('_handle_input: waiting for background bootstrap')
             logger.info('[TUI] _handle_input: waiting for background bootstrap')
             await self._bootstrapping.wait()
+
+        if self._controller is not None:
+            _tui_logger.debug('_handle_input: controller exists, dispatch will ensure task')
+            logger.info('[TUI] _handle_input: controller exists')
+            return
 
         if self._controller is None:
             _tui_logger.debug('_handle_input: calling _bootstrap()')
