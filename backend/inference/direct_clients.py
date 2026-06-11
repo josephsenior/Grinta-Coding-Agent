@@ -830,7 +830,7 @@ def get_direct_client(
         resolved_base_url=resolved_base_url,
     )
 
-    logger.debug(
+    logger.info(
         'Resolved model=%s -> provider=%s, base_url=%s, stripped=%s, metadata=%s',
         model,
         provider,

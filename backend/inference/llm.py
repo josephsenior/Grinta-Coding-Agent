@@ -17,6 +17,7 @@ from typing import (
     Any,
 )
 
+from backend.core import json_compat as json
 from backend.core.errors import LLMNoResponseError
 from backend.core.logger import app_logger as logger
 from backend.core.message import Message
@@ -408,6 +409,128 @@ def _apply_custom_tokenizer(config: Any) -> None:
         config.custom_tokenizer = tokenizer
 
 
+def _safe_call_kwargs_for_log(call_kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Return compact, non-secret kwargs actually sent to the LLM client."""
+    logged: dict[str, Any] = {}
+    scalar_keys = (
+        'model',
+        'temperature',
+        'top_p',
+        'top_k',
+        'max_tokens',
+        'max_completion_tokens',
+        'timeout',
+        'seed',
+        'reasoning_effort',
+        'parallel_tool_calls',
+        'tool_choice',
+    )
+    for key in scalar_keys:
+        if key in call_kwargs:
+            logged[key] = call_kwargs[key]
+    if 'thinking' in call_kwargs:
+        logged['thinking'] = call_kwargs['thinking']
+    if 'response_format' in call_kwargs:
+        response_format = call_kwargs['response_format']
+        if isinstance(response_format, dict):
+            logged['response_format'] = {
+                key: response_format.get(key)
+                for key in ('type', 'name')
+                if key in response_format
+            } or sorted(response_format)
+        else:
+            logged['response_format'] = type(response_format).__name__
+    tools = call_kwargs.get('tools')
+    if isinstance(tools, list):
+        logged['tool_count'] = len(tools)
+        names: list[str] = []
+        for tool in tools[:25]:
+            if not isinstance(tool, dict):
+                continue
+            function = tool.get('function')
+            if isinstance(function, dict) and function.get('name'):
+                names.append(str(function['name']))
+            elif tool.get('name'):
+                names.append(str(tool['name']))
+        if names:
+            logged['tool_names_preview'] = names
+            logged['tool_names_truncated'] = len(tools) > len(names)
+    return logged
+
+
+def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
+    """Return visible active model metadata for run logs."""
+    from backend.inference.catalog_loader import lookup, runtime_model_id
+    from backend.inference.context_limits import limits_from_config
+
+    model = str(getattr(config, 'model', '') or '').strip()
+    config_provider = getattr(config, 'custom_llm_provider', None)
+    try:
+        resolved_provider = resolver.resolve_provider(
+            model, config_provider=config_provider
+        )
+    except Exception:
+        resolved_provider = config_provider or 'unknown'
+    limits = limits_from_config(config, unknown_default=False)
+    metadata: dict[str, Any] = {
+        'model': model,
+        'custom_llm_provider': config_provider,
+        'resolved_provider': resolved_provider,
+        'base_url': getattr(config, 'base_url', None) or 'default',
+        'context_window_tokens': getattr(config, 'context_window_tokens', None),
+        'max_input_tokens': getattr(config, 'max_input_tokens', None),
+        'max_output_tokens': getattr(config, 'max_output_tokens', None),
+        'resolved_limits': {
+            'context_window_tokens': limits.context_window_tokens,
+            'usable_input_tokens': limits.usable_input_tokens,
+            'max_output_tokens': limits.max_output_tokens,
+            'source': limits.source,
+        },
+        'config_params': {
+            'temperature': getattr(config, 'temperature', None),
+            'top_p': getattr(config, 'top_p', None),
+            'top_k': getattr(config, 'top_k', None),
+            'reasoning_effort': getattr(config, 'reasoning_effort', None),
+            'native_tool_calling': getattr(config, 'native_tool_calling', None),
+            'prompt_history_token_budget': getattr(
+                config, 'prompt_history_token_budget', None
+            ),
+            'prompt_history_budget_ratio': getattr(
+                config, 'prompt_history_budget_ratio', None
+            ),
+            'prompt_history_max_events': getattr(
+                config, 'prompt_history_max_events', None
+            ),
+        },
+    }
+    entry = lookup(model)
+    metadata['catalog_match'] = entry is not None
+    if entry is not None:
+        metadata['catalog'] = {
+            'provider': entry.provider,
+            'client': entry.client,
+            'catalog_file': entry.catalog_file,
+            'name': entry.name,
+            'runtime_model_id': runtime_model_id(entry),
+            'verified': entry.verified,
+            'featured': entry.featured,
+            'supports_function_calling': entry.supports_function_calling,
+            'supports_parallel_tool_calls': entry.supports_parallel_tool_calls,
+            'supports_reasoning_effort': entry.supports_reasoning_effort,
+            'supports_prompt_cache': entry.supports_prompt_cache,
+            'supports_response_schema': entry.supports_response_schema,
+            'supports_vision': entry.supports_vision,
+            'strip_reasoning_effort': entry.strip_reasoning_effort,
+            'thinking_mode': entry.thinking_mode,
+            'strip_temperature': entry.strip_temperature,
+            'strip_top_p': entry.strip_top_p,
+            'strip_penalties': entry.strip_penalties,
+            'use_max_completion_tokens': entry.use_max_completion_tokens,
+            'default_temperature': entry.default_temperature,
+        }
+    return metadata
+
+
 class LLM(RetryMixin, DebugMixin):
     """Language Model abstraction layer with direct SDK client support.
 
@@ -484,6 +607,13 @@ class LLM(RetryMixin, DebugMixin):
             self.config.native_tool_calling, self.config.model
         )
         self.init_model_info()
+        logger.info(
+            'LLM active model metadata: %s',
+            json.dumps(
+                _llm_model_metadata_for_log(self.config, resolver),
+                sort_keys=True,
+            ),
+        )
         self._cached_features = _load_cached_features(self.config.model)
         _apply_custom_tokenizer(self.config)
 
@@ -593,7 +723,12 @@ class LLM(RetryMixin, DebugMixin):
 
         # Drop explicit None values to avoid sending JSON nulls.
         # Keep falsy values like 0/False.
-        return {k: v for k, v in call_kwargs.items() if v is not None}
+        final_kwargs = {k: v for k, v in call_kwargs.items() if v is not None}
+        logger.info(
+            'LLM applied call params: %s',
+            json.dumps(_safe_call_kwargs_for_log(final_kwargs), sort_keys=True),
+        )
+        return final_kwargs
 
     def _record_response_metrics(self, response: Any, latency: float) -> None:
         """Record latency, cost, and token usage from an LLM response.

@@ -462,6 +462,9 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
         # Additional validation for custom_llm_provider based on provider configuration
         if hasattr(self, 'custom_llm_provider') and self.custom_llm_provider:
+            configured_provider = self.custom_llm_provider.strip().lower()
+            if configured_provider == str(provider).strip().lower():
+                return
             # Check if custom_llm_provider is forbidden for this provider
             if not provider_config.is_param_allowed('custom_llm_provider'):
                 logger.info(
