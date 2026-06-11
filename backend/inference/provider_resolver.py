@@ -231,6 +231,10 @@ class ProviderResolver:
             ValueError: When provider is not explicit and the model is not an
                 exact catalog entry.
         """
+        normalized_config_provider = normalize_provider_name(config_provider)
+        if normalized_config_provider:
+            return normalized_config_provider
+
         prefixed_provider = extract_provider_prefix(model_name)
         if prefixed_provider:
             return prefixed_provider
@@ -246,14 +250,6 @@ class ProviderResolver:
                     'or configure llm_provider alongside llm_model.'
                 )
             return entry.provider
-
-        # NEW: Fall back to config_provider from settings.json if provided and valid
-        if config_provider and config_provider.lower() in KNOWN_PROVIDER_PREFIXES:
-            return config_provider.lower()
-
-        # Check if config_provider base_url would work
-        if config_provider and config_provider.lower() in _PROVIDER_DEFAULT_URLS:
-            return config_provider.lower()
 
         raise ValueError(
             'Provider is ambiguous for model '
@@ -277,7 +273,10 @@ class ProviderResolver:
         )
 
     def resolve_base_url(
-        self, model_name: str, explicit_base_url: str | None = None
+        self,
+        model_name: str,
+        explicit_base_url: str | None = None,
+        config_provider: str | None = None,
     ) -> str | None:
         """Resolve the base URL for a model.
 
@@ -297,7 +296,7 @@ class ProviderResolver:
         if explicit_base_url:
             return explicit_base_url
 
-        provider = self.resolve_provider(model_name)
+        provider = self.resolve_provider(model_name, config_provider=config_provider)
 
         if provider == 'ollama' and (url := _resolve_ollama_env_url()):
             return url

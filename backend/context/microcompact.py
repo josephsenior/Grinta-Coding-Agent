@@ -38,7 +38,7 @@ def _is_microcompactable(event: Event) -> bool:
 def _clear_observation_content(event: Event) -> Event:
     copied = event_from_dict(event_to_dict(event))
     try:
-        copied.content = TOOL_RESULT_CLEARED_MESSAGE
+        setattr(copied, 'content', TOOL_RESULT_CLEARED_MESSAGE)
     except Exception:
         pass
     return copied

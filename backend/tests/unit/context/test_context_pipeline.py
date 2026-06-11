@@ -88,7 +88,10 @@ async def test_prepare_step_skips_compaction_under_threshold(pipeline):
     events = [_user('fix tests', 1), _cmd_output('ok', 2)]
     state = _make_state(events)
     with patch('backend.context.context_pipeline.ContextBudget') as mock_budget:
-        mock_budget.from_events.return_value = SimpleNamespace(should_autocompact=False)
+        mock_budget.from_events.return_value = SimpleNamespace(
+            should_autocompact=False,
+            estimated_tokens=100,
+        )
         result = await pipeline.prepare_step(state)
     assert result.pending_action is None
     assert result.events == events

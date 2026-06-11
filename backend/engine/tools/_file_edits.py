@@ -904,8 +904,9 @@ def _multi_edit_raise(message: str, *, path: str | None = None) -> NoReturn:
     )
 
 
-def _multi_edit_relative_path(item_path: str, workspace_root: Path) -> str:
-    return str(Path(item_path).resolve().relative_to(workspace_root.resolve()))
+def _multi_edit_relative_path(item_path: str, workspace_root: str | Path) -> str:
+    root = Path(workspace_root)
+    return str(Path(item_path).resolve().relative_to(root.resolve()))
 
 
 def _parse_multi_edit_operation(
@@ -1021,7 +1022,7 @@ def _parse_multi_edit_items(
 def _apply_multi_edit_to_temp_files(
     parsed: list[tuple[str, str, str, dict[str, Any]]],
     seen_paths: set[str],
-    workspace_root: str,
+    workspace_root: str | Path,
     temp_root: Path,
     temp_editor: Any,
 ) -> tuple[dict[str, str | None], dict[str, str]]:
@@ -1062,7 +1063,7 @@ def _apply_multi_edit_to_temp_files(
 
 def _verify_no_concurrent_modifications(
     original_snapshots: dict[str, str | None],
-    workspace_root: str,
+    workspace_root: str | Path,
 ) -> None:
     for item_path, old_content in original_snapshots.items():
         real_path = Path(item_path)
@@ -1119,6 +1120,7 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     """
     raw_edits = arguments.get('file_edits')
     _validate_multi_edit_arguments(raw_edits)
+    assert isinstance(raw_edits, list)
     parsed = _parse_multi_edit_items(raw_edits)
     seen_paths = {p for p, _, _, _ in parsed}
 
@@ -1168,3 +1170,4 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     if result.success:
         return _format_multi_edit_success(parsed, result)
     _format_multi_edit_failure(result)
+    raise AssertionError('unreachable: _format_multi_edit_failure always raises')

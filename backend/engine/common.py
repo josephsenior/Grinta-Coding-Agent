@@ -495,9 +495,6 @@ def _empty_message_action() -> Action:
 
     return MessageAction(content='', thought='', wait_for_response=False)
 
-    set_response_id_for_actions(actions, response)
-    return actions
-
 
 def _tool_call_function_name(tool_call: Any) -> str:
     fn = getattr(tool_call, 'function', None)

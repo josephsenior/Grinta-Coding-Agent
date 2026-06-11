@@ -234,13 +234,19 @@ def resolve_search_pagination(
 ) -> tuple[int, int | None]:
     """Return ``(offset, head_limit)``; ``head_limit=None`` means unlimited."""
     try:
-        head_limit = int(
-            raw_head_limit if raw_head_limit is not None else default_head_limit
-        )
+        if raw_head_limit is None:
+            head_limit = default_head_limit
+        elif isinstance(raw_head_limit, (int, str)):
+            head_limit = int(raw_head_limit)
+        else:
+            head_limit = default_head_limit
     except (TypeError, ValueError):
         head_limit = default_head_limit
     try:
-        offset = max(0, int(raw_offset or 0))
+        if isinstance(raw_offset, (int, str)):
+            offset = max(0, int(raw_offset))
+        else:
+            offset = 0
     except (TypeError, ValueError):
         offset = 0
     if head_limit == 0:

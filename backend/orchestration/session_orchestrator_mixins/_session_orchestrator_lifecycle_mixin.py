@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from backend.ledger.action import Action
     from backend.ledger.event import EventSource
     from backend.ledger.observation import ErrorObservation
-    from backend.orchestration.services.tool_invocation import ToolInvocationContext
+    from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 """_SessionOrchestratorLifecycleMixin mixin for SessionOrchestrator.
 

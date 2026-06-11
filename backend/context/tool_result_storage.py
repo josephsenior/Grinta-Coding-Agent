@@ -79,7 +79,7 @@ def persist_tool_output(content: str, event: Event) -> tuple[str, str]:
 def _copy_event_with_content(event: Event, content: str) -> Event:
     copied = event_from_dict(event_to_dict(event))
     try:
-        copied.content = content
+        setattr(copied, 'content', content)
     except Exception:
         pass
     return copied

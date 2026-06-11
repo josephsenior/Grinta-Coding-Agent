@@ -134,8 +134,11 @@ def _fuzzy_session_score(search_lower: str, meta: dict[str, Any]) -> int:
 
     title = str(meta.get('title') or meta.get('name') or '').lower()
     model = str(meta.get('llm_model') or '').lower()
-    return max(
-        fuzz.partial_ratio(search_lower, title), fuzz.partial_ratio(search_lower, model)
+    return int(
+        max(
+            fuzz.partial_ratio(search_lower, title),
+            fuzz.partial_ratio(search_lower, model),
+        )
     )
 
 

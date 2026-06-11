@@ -11,6 +11,7 @@ Exposes three view shapes:
 from __future__ import annotations
 
 from difflib import get_close_matches
+from typing import Any
 
 from rich.table import Table
 

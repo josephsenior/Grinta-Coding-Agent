@@ -391,10 +391,10 @@ class ChromaDBBackend(VectorBackend):
             scores[pid] = max(scores[pid], score)
 
     def _resolve_parent_matches(self, results):
-        parent_ids = []
-        scores = {}
-        parent_texts = {}
-        parent_metas = {}
+        parent_ids: list[str] = []
+        scores: dict[str, float] = {}
+        parent_texts: dict[str, str] = {}
+        parent_metas: dict[str, dict[str, Any]] = {}
 
         ids_list = results['ids'][0]
         metas_list = results['metadatas'][0]
@@ -424,9 +424,14 @@ class ChromaDBBackend(VectorBackend):
             ids=needed_ids,
             include=['documents', 'metadatas'],
         )
-        for i, pid in enumerate(parent_results['ids']):
-            parent_texts[pid] = parent_results['documents'][i]
-            parent_metas[pid] = dict(parent_results['metadatas'][i])
+        result_ids = parent_results.get('ids') or []
+        result_documents = parent_results.get('documents') or []
+        result_metadatas = parent_results.get('metadatas') or []
+        for i, pid in enumerate(result_ids):
+            if i < len(result_documents):
+                parent_texts[pid] = result_documents[i]
+            if i < len(result_metadatas):
+                parent_metas[pid] = dict(result_metadatas[i])
 
     def _assemble_and_sort(self, parent_ids, k, scores, parent_texts, parent_metas):
         final_results = []

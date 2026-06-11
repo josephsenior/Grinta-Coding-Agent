@@ -1,10 +1,10 @@
-"""Unified model catalog loader.
+"""Provider-scoped model catalog loader.
 
-Reads ``catalog.json`` once and exposes typed helpers consumed by
+Reads ``catalogs/*.json`` once and exposes typed helpers consumed by
 ``cost_tracker``, ``model_features``, ``model_catalog``, and ``constants``.
 
-Adding a new model requires editing **only** ``catalog.json`` — no Python
-changes needed.
+Each catalog file belongs to one provider/client route.  This keeps resolution
+deterministic: provider/model pairs resolve only inside that provider's file.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from typing import Any
 
 from backend.core.constants import DEFAULT_LLM_TEMPERATURE
 
-_CATALOG_PATH = Path(__file__).with_name('catalog.json')
+_CATALOG_DIR = Path(__file__).with_name('catalogs')
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +27,7 @@ class ModelEntry:
 
     name: str
     provider: str
+    client: str | None = None
     provider_model_id: str | None = None
     aliases: tuple[str, ...] = ()
     context_window_tokens: int | None = None
@@ -63,73 +64,137 @@ class ModelEntry:
 
 @functools.lru_cache(maxsize=1)
 def _load_raw() -> dict:
-    """Load and cache the raw catalog data."""
-    with open(_CATALOG_PATH, encoding='utf-8') as f:
-        return json.load(f)
+    """Load and cache provider catalog files."""
+    if not _CATALOG_DIR.exists():
+        return {'providers': {}}
+
+    providers: dict[str, dict[str, Any]] = {}
+    for path in sorted(_CATALOG_DIR.glob('*.json')):
+        with open(path, encoding='utf-8') as f:
+            raw = json.load(f)
+
+        provider = str(raw.get('provider') or path.stem).strip().lower()
+        if not provider:
+            continue
+        if provider in providers:
+            raise ValueError(f'Duplicate catalog for provider {provider!r}')
+
+        catalog = dict(raw)
+        catalog['provider'] = provider
+        catalog['source_file'] = path.name
+        providers[provider] = catalog
+
+    return {'providers': providers}
+
+
+def _entry_from_catalog(
+    *,
+    provider: str,
+    provider_client: str | None,
+    name: str,
+    info: dict[str, Any],
+) -> ModelEntry:
+    return ModelEntry(
+        name=name,
+        provider=provider,
+        client=info.get('client', provider_client),
+        provider_model_id=info.get('provider_model_id'),
+        aliases=tuple(info.get('aliases', ())),
+        context_window_tokens=info.get('context_window_tokens'),
+        max_input_tokens=info.get('max_input_tokens'),
+        max_output_tokens=info.get('max_output_tokens'),
+        input_price_per_m=info.get('input_price_per_m'),
+        cached_input_price_per_m=info.get('cached_input_price_per_m'),
+        output_price_per_m=info.get('output_price_per_m'),
+        long_context_threshold_tokens=info.get('long_context_threshold_tokens'),
+        long_input_price_per_m=info.get('long_input_price_per_m'),
+        long_cached_input_price_per_m=info.get('long_cached_input_price_per_m'),
+        long_output_price_per_m=info.get('long_output_price_per_m'),
+        verified=info.get('verified', False),
+        featured=info.get('featured', False),
+        supports_function_calling=info.get('supports_function_calling', False),
+        supports_parallel_tool_calls=info.get('supports_parallel_tool_calls', False),
+        supports_reasoning_effort=info.get('supports_reasoning_effort', False),
+        supports_prompt_cache=info.get('supports_prompt_cache', False),
+        supports_stop_words=info.get('supports_stop_words', True),
+        supports_response_schema=info.get('supports_response_schema', False),
+        supports_vision=info.get('supports_vision', False),
+        strip_reasoning_effort=info.get('strip_reasoning_effort', False),
+        thinking_mode=info.get('thinking_mode'),
+        strip_temperature=info.get('strip_temperature', False),
+        strip_top_p=info.get('strip_top_p', False),
+        strip_penalties=info.get('strip_penalties', False),
+        use_max_completion_tokens=info.get('use_max_completion_tokens', False),
+        default_temperature=info.get('default_temperature'),
+    )
 
 
 @functools.lru_cache(maxsize=1)
 def get_catalog() -> tuple[ModelEntry, ...]:
-    """Return all model entries from ``catalog.json``."""
+    """Return all model entries from provider catalog files."""
     data = _load_raw()
     entries: list[ModelEntry] = []
-    for name, info in data.get('models', {}).items():
-        entries.append(
-            ModelEntry(
-                name=name,
-                provider=info['provider'],
-                provider_model_id=info.get('provider_model_id'),
-                aliases=tuple(info.get('aliases', ())),
-                context_window_tokens=info.get('context_window_tokens'),
-                max_input_tokens=info.get('max_input_tokens'),
-                max_output_tokens=info.get('max_output_tokens'),
-                input_price_per_m=info.get('input_price_per_m'),
-                cached_input_price_per_m=info.get('cached_input_price_per_m'),
-                output_price_per_m=info.get('output_price_per_m'),
-                long_context_threshold_tokens=info.get(
-                    'long_context_threshold_tokens'
-                ),
-                long_input_price_per_m=info.get('long_input_price_per_m'),
-                long_cached_input_price_per_m=info.get(
-                    'long_cached_input_price_per_m'
-                ),
-                long_output_price_per_m=info.get('long_output_price_per_m'),
-                verified=info.get('verified', False),
-                featured=info.get('featured', False),
-                supports_function_calling=info.get('supports_function_calling', False),
-                supports_parallel_tool_calls=info.get(
-                    'supports_parallel_tool_calls', False
-                ),
-                supports_reasoning_effort=info.get('supports_reasoning_effort', False),
-                supports_prompt_cache=info.get('supports_prompt_cache', False),
-                supports_stop_words=info.get('supports_stop_words', True),
-                supports_response_schema=info.get('supports_response_schema', False),
-                supports_vision=info.get('supports_vision', False),
-                strip_reasoning_effort=info.get('strip_reasoning_effort', False),
-                thinking_mode=info.get('thinking_mode'),
-                strip_temperature=info.get('strip_temperature', False),
-                strip_top_p=info.get('strip_top_p', False),
-                strip_penalties=info.get('strip_penalties', False),
-                use_max_completion_tokens=info.get('use_max_completion_tokens', False),
-                default_temperature=info.get('default_temperature'),
+    for provider, provider_data in data.get('providers', {}).items():
+        provider_client = provider_data.get('client')
+        source_file = provider_data.get('source_file', '<catalog>')
+        for name, info in provider_data.get('models', {}).items():
+            declared_provider = str(info.get('provider') or provider).strip().lower()
+            if declared_provider != provider:
+                raise ValueError(
+                    f"Model {name!r} in {source_file} declares provider "
+                    f"{declared_provider!r}, expected {provider!r}"
+                )
+            entries.append(
+                _entry_from_catalog(
+                    provider=provider,
+                    provider_client=provider_client,
+                    name=name,
+                    info=info,
+                )
             )
-        )
     return tuple(entries)
 
 
 @functools.lru_cache(maxsize=1)
 def _name_index() -> dict[str, ModelEntry]:
-    """Build a lookup dict: canonical name and all aliases → ModelEntry."""
+    """Build a lookup dict without crossing provider boundaries.
+
+    Bare model names are indexed only when they are unique across all provider
+    catalogs.  Provider-prefixed names and explicit aliases stay exact.
+    """
     idx: dict[str, ModelEntry] = {}
+    bare_candidates: dict[str, list[ModelEntry]] = {}
+
+    def add_exact(key: str | None, entry: ModelEntry) -> None:
+        if not key:
+            return
+        idx[key] = entry
+        idx[key.lower()] = entry
+
+    def add_bare_candidate(key: str | None, entry: ModelEntry) -> None:
+        if not key:
+            return
+        bare_candidates.setdefault(key.lower(), []).append(entry)
+
     for entry in get_catalog():
-        idx[entry.name] = entry
-        idx[entry.name.lower()] = entry
-        if entry.provider_model_id:
-            idx[entry.provider_model_id] = entry
-            idx[entry.provider_model_id.lower()] = entry
+        add_exact(f'{entry.provider}/{entry.name}', entry)
+        add_exact(f'{entry.provider}/{runtime_model_id(entry)}', entry)
         for alias in entry.aliases:
-            idx[alias] = entry
-            idx[alias.lower()] = entry
+            if '/' in alias:
+                add_exact(alias, entry)
+            else:
+                add_bare_candidate(alias, entry)
+        add_bare_candidate(entry.name, entry)
+        add_bare_candidate(runtime_model_id(entry), entry)
+
+    for _key, matches in bare_candidates.items():
+        unique = {(entry.provider, entry.name) for entry in matches}
+        if len(unique) != 1:
+            continue
+        entry = matches[0]
+        idx[_key] = entry
+        add_exact(entry.name, entry)
+        add_exact(runtime_model_id(entry), entry)
     return idx
 
 
@@ -203,24 +268,17 @@ def lookup(model: str) -> ModelEntry | None:
     brittle behavior where ``xai/gpt-5`` could strip to ``gpt-5`` and match the
     OpenAI catalog entry.
     """
-    idx = _name_index()
     key = model.strip()
+    if not key:
+        return None
+    idx = _name_index()
     entry = idx.get(key) or idx.get(key.lower())
     if entry:
         return entry
 
     if '/' in key:
         provider, bare = key.split('/', 1)
-        provider_match = lookup_provider_model(provider, bare, allow_aliases=True)
-        if provider_match is not None:
-            return provider_match
-        catalog_providers = {entry.provider.lower() for entry in get_catalog()}
-        if provider.strip().lower() in catalog_providers:
-            return None
-
-        # Legacy compatibility for non-catalog provider prefixes embedded in
-        # aliases, e.g. moonshotai/kimi-k2.5.
-        return idx.get(bare) or idx.get(bare.lower())
+        return lookup_provider_model(provider, bare, allow_aliases=True)
     return None
 
 
@@ -251,7 +309,7 @@ def _pricing_for_entry(
 def get_pricing(
     model: str, *, prompt_tokens: int | None = None
 ) -> dict[str, float] | None:
-    """Get pricing for a model, with tier fallback.
+    """Get pricing for an exact catalog-resolved model.
 
     Returns ``{"input": <per_1M>, "output": <per_1M>}`` or ``None``.
     """
@@ -260,14 +318,6 @@ def get_pricing(
         prices = _pricing_for_entry(entry, prompt_tokens=prompt_tokens)
         if prices is not None:
             return prices
-
-    # Tier fallback — substring matching
-    data = _load_raw()
-    tier = data.get('tier_pricing', {})
-    bare = model.split('/')[-1].lower() if '/' in model else model.lower()
-    for prefix, prices in tier.items():
-        if prefix in bare:
-            return {'input': prices['input'], 'output': prices['output']}
     return None
 
 
@@ -303,9 +353,7 @@ def get_featured_models() -> list[str]:
     return [f'{e.provider}/{runtime_model_id(e)}' for e in get_catalog() if e.featured]
 
 
-def get_models_for_provider(
-    provider: str, *, featured_only: bool = True
-) -> list[str]:
+def get_models_for_provider(provider: str, *, featured_only: bool = True) -> list[str]:
     """Return exact provider model ids for a provider."""
     normalized_provider = _normalize_provider(provider)
     if normalized_provider is None:
@@ -318,7 +366,9 @@ def get_models_for_provider(
     ]
 
 
-def get_model_options_by_provider(*, featured_only: bool = True) -> dict[str, list[str]]:
+def get_model_options_by_provider(
+    *, featured_only: bool = True
+) -> dict[str, list[str]]:
     """Return exact predefined model ids grouped by provider."""
     options: dict[str, list[str]] = {}
     for entry in get_catalog():

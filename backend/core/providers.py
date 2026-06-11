@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-# Verified models for CLI and configuration — derived from catalog.json.
+# Verified models for CLI and configuration — derived from provider catalogs.
 # Uses lazy loading to avoid circular imports (constants ← config ← models).
 VERIFIED_PROVIDERS = ['anthropic', 'openai', 'mistral', 'groq']
 

@@ -11,6 +11,7 @@ contents) use the ``glob`` tool instead.
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from backend.engine.tools._search_helpers import (
     DEFAULT_GREP_OUTPUT_MODE,
@@ -51,9 +52,9 @@ For symbol-aware navigation use ``find_symbols`` or ``lsp``.
 """
 
 
-def create_grep_tool() -> dict:
+def create_grep_tool() -> dict[Any, Any]:
     """Create the grep tool definition."""
-    return create_tool_definition(  # type: ignore[no-any-return]
+    return create_tool_definition(  # type: ignore[no-any-return, return-value]
         name=GREP_TOOL_NAME,
         description=_GREP_DESCRIPTION,
         properties={

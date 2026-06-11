@@ -145,7 +145,7 @@ def _target_paths_for_action(root: Path, action: FileEditAction) -> list[Path]:
     seen: set[Path] = set()
     for raw_path in raw_paths:
         try:
-            path = _resolve_action_path(root, raw_path).resolve()
+            resolved_path = _resolve_action_path(root, raw_path).resolve()
         except (PathValidationError, OSError, ValueError) as exc:
             logger.debug(
                 'Skipping file edit transaction snapshot for invalid path %r: %s',
@@ -153,10 +153,10 @@ def _target_paths_for_action(root: Path, action: FileEditAction) -> list[Path]:
                 exc,
             )
             continue
-        if path in seen:
+        if resolved_path in seen:
             continue
-        seen.add(path)
-        resolved.append(path)
+        seen.add(resolved_path)
+        resolved.append(resolved_path)
     return resolved
 
 

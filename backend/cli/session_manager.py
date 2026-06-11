@@ -141,7 +141,7 @@ def _fuzzy_score_session(
     sid_score = fuzz.partial_ratio(search_lower, sid.lower())
     title_score = fuzz.partial_ratio(search_lower, title)
     model_score = fuzz.partial_ratio(search_lower, model)
-    return max(sid_score, title_score, model_score)
+    return int(max(sid_score, title_score, model_score))
 
 
 def _filter_sessions_scored(

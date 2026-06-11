@@ -67,7 +67,7 @@ class TestProviderResolver(TestCase):
 
     def test_resolve_provider_catalog_entry_xai(self):
         """Exact catalog entries remain valid without heuristics."""
-        self.assertEqual(self.resolver.resolve_provider('grok-3'), 'xai')
+        self.assertEqual(self.resolver.resolve_provider('grok-build-0.1'), 'xai')
 
     def test_resolve_provider_prefixed_ollama_model(self):
         """Prefixed local models resolve by prefix."""
@@ -82,11 +82,24 @@ class TestProviderResolver(TestCase):
 
     def test_resolve_provider_catalog_entry_deepseek(self):
         """Exact DeepSeek catalog entries remain valid."""
-        self.assertEqual(self.resolver.resolve_provider('deepseek-chat'), 'deepseek')
+        self.assertEqual(self.resolver.resolve_provider('deepseek-v4-pro'), 'deepseek')
 
-    def test_resolve_provider_catalog_entry_mistral(self):
-        """Exact Mistral catalog entries remain valid."""
-        self.assertEqual(self.resolver.resolve_provider('codestral-latest'), 'mistral')
+    def test_resolve_provider_config_provider_wins_for_proxy_routing(self):
+        """The selected provider is the transport provider for proxy routing."""
+        self.assertEqual(
+            self.resolver.resolve_provider(
+                'anthropic/claude-sonnet-4-6',
+                config_provider='openrouter',
+            ),
+            'openrouter',
+        )
+
+    def test_resolve_provider_allows_custom_config_provider(self):
+        """Custom providers are explicit and do not need catalog membership."""
+        self.assertEqual(
+            self.resolver.resolve_provider('custom/gpt-5', config_provider='custom'),
+            'custom',
+        )
 
     def test_resolve_provider_unknown_model_raises(self):
         """Unknown models must be prefixed explicitly."""
@@ -125,19 +138,27 @@ class TestProviderResolver(TestCase):
 
     def test_resolve_base_url_xai_catalog_entry(self):
         """Catalog-backed models still resolve provider defaults."""
-        result = self.resolver.resolve_base_url('grok-3')
+        result = self.resolver.resolve_base_url('grok-build-0.1')
         self.assertEqual(result, 'https://api.x.ai/v1')
 
     def test_resolve_base_url_deepseek_catalog_entry(self):
         """Catalog-backed models still resolve provider defaults."""
-        result = self.resolver.resolve_base_url('deepseek-chat')
+        result = self.resolver.resolve_base_url('deepseek-v4-pro')
         self.assertEqual(result, 'https://api.deepseek.com/v1')
 
     def test_resolve_base_url_cloud_providers(self):
         """Test resolve_base_url returns None for cloud providers."""
-        self.assertIsNone(self.resolver.resolve_base_url('gpt-4o'))
+        self.assertIsNone(self.resolver.resolve_base_url('gpt-5'))
         self.assertIsNone(self.resolver.resolve_base_url('anthropic/claude-sonnet-4-6'))
         self.assertIsNone(self.resolver.resolve_base_url('google/gemini-2.5-flash'))
+
+    def test_resolve_base_url_uses_config_provider_default(self):
+        """Configured proxy providers own base-url defaults."""
+        result = self.resolver.resolve_base_url(
+            'anthropic/claude-sonnet-4-6',
+            config_provider='openrouter',
+        )
+        self.assertEqual(result, 'https://openrouter.ai/api/v1')
 
     def test_resolve_base_url_lightning_provider(self):
         """Lightning models use the hosted OpenAI-compatible proxy."""
@@ -367,7 +388,7 @@ class TestProviderResolver(TestCase):
             self.resolver.strip_provider_prefix('anthropic/claude-opus-4'),
             'claude-opus-4',
         )
-        self.assertEqual(self.resolver.strip_provider_prefix('openai/gpt-4o'), 'gpt-4o')
+        self.assertEqual(self.resolver.strip_provider_prefix('openai/gpt-5'), 'gpt-5')
         self.assertEqual(
             self.resolver.strip_provider_prefix('google/gemini-2.5-flash'),
             'gemini-2.5-flash',
@@ -389,7 +410,7 @@ class TestProviderResolver(TestCase):
     def test_strip_provider_prefix_no_prefix(self):
         """Test strip_provider_prefix returns original when no prefix."""
         self.assertEqual(self.resolver.strip_provider_prefix('llama3.2'), 'llama3.2')
-        self.assertEqual(self.resolver.strip_provider_prefix('gpt-4o'), 'gpt-4o')
+        self.assertEqual(self.resolver.strip_provider_prefix('gpt-5'), 'gpt-5')
 
     def test_strip_provider_prefix_case_insensitive(self):
         """Test strip_provider_prefix is case-insensitive."""

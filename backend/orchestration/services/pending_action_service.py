@@ -19,7 +19,7 @@ from backend.core.logger import app_logger as logger
 from backend.core.timeout_policy import effective_cmd_run_pending_timeout_seconds
 from backend.ledger import EventSource
 from backend.ledger.action import Action, ActionConfirmationStatus
-from backend.ledger.observation import ErrorObservation
+from backend.ledger.observation import ErrorObservation, Observation
 from backend.ledger.observation_cause import attach_observation_cause
 
 if TYPE_CHECKING:
@@ -384,7 +384,7 @@ class PendingActionService:
             f'Pending action timed out after {elapsed:.1f}s, auto-clearing: {action_type} (id={action_id})',
             extra={'msg_type': 'PENDING_ACTION_TIMEOUT_CLEARED'},
         )
-        timeout_obs = ErrorObservation(
+        timeout_observation: Observation = ErrorObservation(
             content=(
                 f'Pending action timed out after {elapsed:.1f}s: {action_type}. '
                 f'WARNING: The operation may still complete in the background. '
@@ -396,16 +396,16 @@ class PendingActionService:
             timeout_kind='pending_action',
         )
         attach_observation_cause(
-            timeout_obs, action, context='pending_action_service.timeout'
+            timeout_observation, action, context='pending_action_service.timeout'
         )
         try:
             from backend.orchestration.file_edit_transaction import (
                 get_file_edit_transaction_coordinator,
             )
 
-            timeout_obs = get_file_edit_transaction_coordinator(
+            timeout_observation = get_file_edit_transaction_coordinator(
                 controller
-            ).after_observation(action, timeout_obs)
+            ).after_observation(action, timeout_observation)
         except Exception:
             controller.log(
                 'warning',
@@ -414,7 +414,9 @@ class PendingActionService:
             )
         try:
             self.clear_for_action(action)
-            controller.event_stream.add_event(timeout_obs, EventSource.ENVIRONMENT)
+            controller.event_stream.add_event(
+                timeout_observation, EventSource.ENVIRONMENT
+            )
         finally:
             aid = self._int_action_id(action)
             if aid is not None:

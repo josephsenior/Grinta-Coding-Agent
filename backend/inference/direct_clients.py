@@ -142,8 +142,11 @@ def _coerce_bounded_request_timeout(
 ) -> httpx.Timeout:
     """Normalize SDK timeout kwargs to a bounded ``httpx.Timeout``."""
     if isinstance(value, httpx.Timeout):
+        timeout_total = getattr(value, 'timeout', None) or getattr(
+            value, 'read', None
+        )
         return bounded_llm_http_timeout(
-            value.timeout if value.timeout else default_total,
+            timeout_total if timeout_total else default_total,
             streaming=streaming,
         )
     if isinstance(value, (int, float)):
@@ -809,14 +812,17 @@ def get_direct_client(
     api_key: str,
     base_url: str | None = None,
     timeout: float | int | None = None,
+    provider: str | None = None,
 ) -> DirectLLMClient:
     """Factory function to get the correct direct client using explicit routing."""
     from backend.inference.provider_resolver import get_resolver
 
     resolver = get_resolver()
-    stripped_model = resolver.strip_provider_prefix(model)
-    provider = resolver.resolve_provider(model)
-    resolved_base_url = resolver.resolve_base_url(model, base_url)
+    provider = resolver.resolve_provider(model, config_provider=provider)
+    stripped_model = _strip_transport_provider_prefix(model, provider)
+    resolved_base_url = resolver.resolve_base_url(
+        model, base_url, config_provider=provider
+    )
 
     logger.debug(
         'Resolved model=%s -> provider=%s, base_url=%s, stripped=%s',
@@ -846,6 +852,16 @@ def get_direct_client(
         model,
         resolver,
     )
+
+
+def _strip_transport_provider_prefix(model: str, provider: str | None) -> str:
+    """Strip ``provider/`` only when it names the transport provider."""
+    if not provider or '/' not in model:
+        return model
+    prefix, stripped = model.split('/', 1)
+    if prefix.strip().lower() == provider.strip().lower():
+        return stripped
+    return model
 
 
 def _try_opencode_go_client(

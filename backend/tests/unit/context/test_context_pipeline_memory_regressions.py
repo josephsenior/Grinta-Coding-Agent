@@ -40,7 +40,9 @@ def _cmd(command: str, event_id: int) -> CmdRunAction:
     return action
 
 
-def _output(command: str, content: str, event_id: int, exit_code: int) -> CmdOutputObservation:
+def _output(
+    command: str, content: str, event_id: int, exit_code: int
+) -> CmdOutputObservation:
     obs = CmdOutputObservation(content=content, command=command, exit_code=exit_code)
     obs.id = event_id
     return obs
@@ -156,7 +158,9 @@ def test_deterministic_fallback_commits_after_repeated_equivalent_rejection(
     assert second is not None
     assert len(second.pruned) >= 20
     assert 'Canonical task state' in (second.summary or '')
-    assert 'continuity_rejection_streak' not in state.extra_data['context_pipeline_state']
+    assert (
+        'continuity_rejection_streak' not in state.extra_data['context_pipeline_state']
+    )
 
 
 def test_recent_work_ledger_renders_once_for_latest_verification() -> None:

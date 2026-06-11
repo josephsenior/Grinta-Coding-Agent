@@ -173,6 +173,8 @@ def handle_replace_string_impl(
         if preflight is not None:
             return preflight
 
+        assert old_string is not None
+
         if not file_path.exists():
             return ToolResult(
                 output='',

@@ -138,6 +138,8 @@ class MemoryManagerProtocol(Protocol):
         condensed_history: list[Event],
         initial_user_message: MessageAction,
         llm_config: Any,
+        *,
+        state: Any | None = None,
     ) -> list[Message]:
         """Convert condensed events into an LLM-ready message list."""
         ...

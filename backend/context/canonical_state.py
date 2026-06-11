@@ -458,9 +458,10 @@ def _import_legacy_state(*, state: State | None = None) -> CanonicalTaskState:
 
 
 def _known_dataclass_fields(cls: type, data: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: value for key, value in data.items() if key in cls.__dataclass_fields__
-    }
+    from dataclasses import fields
+
+    field_names = {field.name for field in fields(cls)}
+    return {key: value for key, value in data.items() if key in field_names}
 
 
 def _set_field(

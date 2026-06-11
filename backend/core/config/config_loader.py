@@ -287,6 +287,8 @@ def _apply_json_llm_config(
     model_value, provider_value = _canonicalize_json_llm_selection(llm_dict, data)
     if model_value:
         llm_dict['model'] = model_value
+    if provider_value:
+        llm_dict['custom_llm_provider'] = provider_value
     _maybe_set_provider_default_base_url(llm_dict, model_value, provider_value)
     if _handle_missing_json_llm_provider(
         llm_dict,

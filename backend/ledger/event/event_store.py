@@ -318,6 +318,8 @@ class EventStore(EventStoreABC):
             )
             if load_result is _SEARCH_ABORT:
                 return
+            if not isinstance(load_result, tuple):
+                return
             event_obj, corrupt_seen = load_result
             if event_obj is None:
                 continue

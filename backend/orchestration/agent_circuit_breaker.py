@@ -13,6 +13,8 @@ from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from backend.core.enums import AgentState
+
 if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 

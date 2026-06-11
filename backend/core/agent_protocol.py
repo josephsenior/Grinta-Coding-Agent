@@ -42,8 +42,9 @@ def _extra(state: object | None) -> dict[str, Any]:
     if isinstance(extra, dict):
         return extra
     try:
-        state.extra_data = {}
-        return state.extra_data
+        extra_data: dict[str, Any] = {}
+        setattr(state, 'extra_data', extra_data)
+        return extra_data
     except Exception:
         return {}
 

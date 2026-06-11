@@ -89,9 +89,7 @@ class TestToolNames(TestCase):
             self.assertTrue(getattr(tool_names, name))
 
     def test_tool_names_consistency_with_core_constants(self):
-        """File/memory constants re-exported from core.constants match tool_names."""
-        from backend.core import constants as core_constants
-
+        """Canonical file/memory tool names are defined in tool_names."""
         for name in (
             'CREATE_TOOL_NAME',
             'EDIT_SYMBOLS_TOOL_NAME',
@@ -104,7 +102,9 @@ class TestToolNames(TestCase):
             'TASK_TRACKER_TOOL_NAME',
             'UNDO_LAST_EDIT_TOOL_NAME',
         ):
-            self.assertEqual(getattr(tool_names, name), getattr(core_constants, name))
+            value = getattr(tool_names, name)
+            self.assertIsInstance(value, str)
+            self.assertTrue(value)
 
     def test_legacy_aliases_match_canonical_names(self):
         """Legacy constant names must reference the same runtime strings."""

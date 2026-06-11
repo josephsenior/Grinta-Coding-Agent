@@ -49,6 +49,7 @@ class RetryService:
         if self._retry_worker_task is not None and not self._retry_worker_task.done():
             return
 
+        loop: asyncio.AbstractEventLoop | None
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:

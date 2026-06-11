@@ -2097,8 +2097,8 @@ def test_ensure_default_model_sets_model_from_google_key() -> None:
     with patch.dict(os.environ, {'LLM_API_KEY': 'AIzaSyBxxxxxxxxxxxxxxx'}, clear=True):
         selected = ensure_default_model(config)
 
-    assert selected == 'google/gemini-3-flash-preview'
-    assert llm_cfg.model == 'google/gemini-3-flash-preview'
+    assert selected == 'google/gemini-3-flash'
+    assert llm_cfg.model == 'google/gemini-3-flash'
 
 
 def test_ensure_default_model_preserves_existing_model() -> None:
