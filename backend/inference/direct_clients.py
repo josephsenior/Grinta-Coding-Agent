@@ -681,13 +681,23 @@ class DirectLLMClient(ABC):
         return self._model_name
 
     def get_completion_cost(
-        self, prompt_tokens: int, completion_tokens: int, config: Any | None = None
+        self,
+        prompt_tokens: int,
+        completion_tokens: int,
+        config: Any | None = None,
+        cache_read_tokens: int = 0,
+        cache_write_tokens: int = 0,
     ) -> float:
         """Calculate completion cost for this client's model."""
         from backend.inference.cost_tracker import get_completion_cost
 
         return get_completion_cost(
-            self.model_name, prompt_tokens, completion_tokens, config
+            self.model_name,
+            prompt_tokens,
+            completion_tokens,
+            config,
+            cache_read_tokens=cache_read_tokens,
+            cache_write_tokens=cache_write_tokens,
         )
 
 
@@ -839,7 +849,7 @@ def get_direct_client(
         json.dumps(metadata, sort_keys=True),
     )
 
-    client = _try_opencode_go_client(
+    client = _try_opencode_messages_client(
         provider, stripped_model, api_key, timeout, resolved_base_url
     )
     if client is not None:
@@ -910,6 +920,7 @@ def _model_metadata_for_log(
         'provider': entry.provider,
         'client': entry.client,
         'catalog_file': entry.catalog_file,
+        'provider_metadata': entry.provider_metadata,
         'name': entry.name,
         'runtime_model_id': runtime_model_id(entry),
         'verified': entry.verified,
@@ -921,10 +932,12 @@ def _model_metadata_for_log(
         'pricing_per_million': {
             'input': entry.input_price_per_m,
             'cached_input': entry.cached_input_price_per_m,
+            'cached_write': entry.cached_write_price_per_m,
             'output': entry.output_price_per_m,
             'long_context_threshold_tokens': entry.long_context_threshold_tokens,
             'long_input': entry.long_input_price_per_m,
             'long_cached_input': entry.long_cached_input_price_per_m,
+            'long_cached_write': entry.long_cached_write_price_per_m,
             'long_output': entry.long_output_price_per_m,
         },
         'capabilities': {
@@ -949,14 +962,20 @@ def _model_metadata_for_log(
     return metadata
 
 
-def _try_opencode_go_client(
+def _try_opencode_messages_client(
     provider, stripped_model, api_key, timeout, resolved_base_url
 ):
-    if provider != 'opencode-go':
+    if provider not in {'opencode', 'opencode-go'}:
         return None
-    from backend.inference.provider_resolver import opencode_go_required_endpoint
+    from backend.inference.provider_resolver import (
+        opencode_go_required_endpoint,
+        opencode_required_endpoint,
+    )
 
-    required_endpoint = opencode_go_required_endpoint(stripped_model)
+    if provider == 'opencode-go':
+        required_endpoint = opencode_go_required_endpoint(stripped_model)
+    else:
+        required_endpoint = opencode_required_endpoint(stripped_model)
     if required_endpoint != '/messages':
         return None
     anthropic_base_url = resolved_base_url
@@ -967,7 +986,7 @@ def _try_opencode_go_client(
         api_key=api_key,
         timeout=timeout,
         base_url=anthropic_base_url,
-        provider_name='opencode-go',
+        provider_name=provider,
     )
 
 

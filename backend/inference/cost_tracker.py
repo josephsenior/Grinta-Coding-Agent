@@ -20,6 +20,8 @@ def get_completion_cost(
     prompt_tokens: int,
     completion_tokens: int,
     config: LLMConfig | None = None,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
 ) -> float:
     """Calculate the cost of a completion call in USD."""
     # Check for config overrides first
@@ -34,9 +36,14 @@ def get_completion_cost(
 
     prices = get_pricing(model, prompt_tokens=prompt_tokens)
     if prices:
-        input_cost = (prompt_tokens / 1_000_000) * prices['input']
+        cached_read = max(0, cache_read_tokens)
+        cached_write = max(0, cache_write_tokens)
+        uncached_input = max(0, prompt_tokens - cached_read - cached_write)
+        input_cost = (uncached_input / 1_000_000) * prices['input']
+        cache_read_cost = (cached_read / 1_000_000) * prices['cached_input']
+        cache_write_cost = (cached_write / 1_000_000) * prices['cached_write']
         output_cost = (completion_tokens / 1_000_000) * prices['output']
-        return input_cost + output_cost
+        return input_cost + cache_read_cost + cache_write_cost + output_cost
 
     logger.debug('No pricing data for model %s — cost reported as $0.00', model)
     return 0.0
@@ -73,8 +80,17 @@ def record_llm_cost_from_response(
     usage = response.get('usage', {})
     prompt_tokens = usage.get('prompt_tokens', 0)
     completion_tokens = usage.get('completion_tokens', 0)
+    cache_read_tokens = usage.get('cache_read_tokens', 0)
+    cache_write_tokens = usage.get('cache_write_tokens', 0)
 
-    cost = get_completion_cost(model, prompt_tokens, completion_tokens, config)
+    cost = get_completion_cost(
+        model,
+        prompt_tokens,
+        completion_tokens,
+        config,
+        cache_read_tokens=cache_read_tokens,
+        cache_write_tokens=cache_write_tokens,
+    )
 
     if cost > 0:
         logger.debug('LLM cost for %s using %s: $%.4f', user_key, model, cost)

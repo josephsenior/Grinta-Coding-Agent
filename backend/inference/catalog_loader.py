@@ -29,6 +29,7 @@ class ModelEntry:
     provider: str
     client: str | None = None
     catalog_file: str | None = None
+    provider_metadata: dict[str, Any] | None = None
     provider_model_id: str | None = None
     aliases: tuple[str, ...] = ()
     context_window_tokens: int | None = None
@@ -36,10 +37,12 @@ class ModelEntry:
     max_output_tokens: int | None = None
     input_price_per_m: float | None = None
     cached_input_price_per_m: float | None = None
+    cached_write_price_per_m: float | None = None
     output_price_per_m: float | None = None
     long_context_threshold_tokens: int | None = None
     long_input_price_per_m: float | None = None
     long_cached_input_price_per_m: float | None = None
+    long_cached_write_price_per_m: float | None = None
     long_output_price_per_m: float | None = None
     verified: bool = False
     featured: bool = False
@@ -101,6 +104,7 @@ def _entry_from_catalog(
         provider=provider,
         client=info.get('client', provider_client),
         catalog_file=source_file,
+        provider_metadata=info.get('provider_metadata'),
         provider_model_id=info.get('provider_model_id'),
         aliases=tuple(info.get('aliases', ())),
         context_window_tokens=info.get('context_window_tokens'),
@@ -108,10 +112,12 @@ def _entry_from_catalog(
         max_output_tokens=info.get('max_output_tokens'),
         input_price_per_m=info.get('input_price_per_m'),
         cached_input_price_per_m=info.get('cached_input_price_per_m'),
+        cached_write_price_per_m=info.get('cached_write_price_per_m'),
         output_price_per_m=info.get('output_price_per_m'),
         long_context_threshold_tokens=info.get('long_context_threshold_tokens'),
         long_input_price_per_m=info.get('long_input_price_per_m'),
         long_cached_input_price_per_m=info.get('long_cached_input_price_per_m'),
+        long_cached_write_price_per_m=info.get('long_cached_write_price_per_m'),
         long_output_price_per_m=info.get('long_output_price_per_m'),
         verified=info.get('verified', False),
         featured=info.get('featured', False),
@@ -292,21 +298,40 @@ def _pricing_for_entry(
     input_price = entry.input_price_per_m
     output_price = entry.output_price_per_m
     cached_input = entry.cached_input_price_per_m
+    cached_write = entry.cached_write_price_per_m
     threshold = entry.long_context_threshold_tokens
     if (
         prompt_tokens is not None
         and threshold is not None
         and prompt_tokens > threshold
     ):
-        input_price = entry.long_input_price_per_m or input_price
-        output_price = entry.long_output_price_per_m or output_price
-        cached_input = entry.long_cached_input_price_per_m or cached_input
+        input_price = (
+            entry.long_input_price_per_m
+            if entry.long_input_price_per_m is not None
+            else input_price
+        )
+        output_price = (
+            entry.long_output_price_per_m
+            if entry.long_output_price_per_m is not None
+            else output_price
+        )
+        cached_input = (
+            entry.long_cached_input_price_per_m
+            if entry.long_cached_input_price_per_m is not None
+            else cached_input
+        )
+        cached_write = (
+            entry.long_cached_write_price_per_m
+            if entry.long_cached_write_price_per_m is not None
+            else cached_write
+        )
     if input_price is None:
         return None
     return {
         'input': input_price,
-        'output': output_price or 0.0,
-        'cached_input': cached_input or input_price,
+        'output': output_price if output_price is not None else 0.0,
+        'cached_input': cached_input if cached_input is not None else input_price,
+        'cached_write': cached_write if cached_write is not None else input_price,
     }
 
 

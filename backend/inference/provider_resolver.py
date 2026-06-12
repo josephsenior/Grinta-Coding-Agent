@@ -164,6 +164,17 @@ def _strip_known_transport_prefixes(model_name: str) -> str:
         model = parts[1]
 
 
+def _catalog_inference_endpoint(provider: str, model_name: str) -> str | None:
+    model = _strip_known_transport_prefixes(model_name)
+    entry = lookup_provider_model(provider, model, allow_aliases=True)
+    if entry is None or not isinstance(entry.provider_metadata, dict):
+        return None
+    endpoint = entry.provider_metadata.get('inference_endpoint')
+    if isinstance(endpoint, str) and endpoint.startswith('/'):
+        return endpoint
+    return None
+
+
 def opencode_required_endpoint(model_name: str) -> str:
     """Return the expected OpenCode Zen endpoint family for *model_name*.
 
@@ -171,6 +182,8 @@ def opencode_required_endpoint(model_name: str) -> str:
     We classify by model id family so callers can fail fast when a request is
     sent to the wrong surface (instead of surfacing opaque upstream 500s).
     """
+    if endpoint := _catalog_inference_endpoint('opencode', model_name):
+        return endpoint
     model = _strip_known_transport_prefixes(model_name).lower()
     if model.startswith('gpt-5'):
         return '/responses'
@@ -183,6 +196,8 @@ def opencode_required_endpoint(model_name: str) -> str:
 
 def opencode_go_required_endpoint(model_name: str) -> str:
     """Return expected OpenCode Go endpoint family for *model_name*."""
+    if endpoint := _catalog_inference_endpoint('opencode-go', model_name):
+        return endpoint
     model = _strip_known_transport_prefixes(model_name).lower()
     if model.startswith('minimax-m2.'):
         return '/messages'
