@@ -385,10 +385,10 @@ def render_canonical_state_for_prompt(
     _append(lines, f'- Active plan: {canonical.active_plan}')
     if canonical.task_plan:
         _append(lines, '- Task tracker:')
-        for item in canonical.task_plan[-10:]:
-            detail = f'[{item.status}] {item.description}'
-            if item.result:
-                detail += f' -> {item.result}'
+        for plan_item in canonical.task_plan[-10:]:
+            detail = f'[{plan_item.status}] {plan_item.description}'
+            if plan_item.result:
+                detail += f' -> {plan_item.result}'
             _append(lines, f'  - {detail}')
     if canonical.active_files:
         _append(lines, '- Active files: ' + ', '.join(canonical.active_files[-12:]))
@@ -401,10 +401,10 @@ def render_canonical_state_for_prompt(
             _append(lines, f'    Next: {task.next_action}')
     if canonical.recent_work:
         _append(lines, '- Recent work ledger:')
-        for item in canonical.recent_work[-8:]:
-            detail = f'[{item.kind}] {item.detail}'
-            if item.outcome:
-                detail += f' -> {item.outcome}'
+        for work_item in canonical.recent_work[-8:]:
+            detail = f'[{work_item.kind}] {work_item.detail}'
+            if work_item.outcome:
+                detail += f' -> {work_item.outcome}'
             _append(lines, f'  - {detail}')
     if canonical.failed_approaches:
         _append(lines, '- Failed approaches to avoid unless inputs changed:')

@@ -896,6 +896,7 @@ def _model_metadata_for_log(
         runtime_parameter_mode,
     )
     from backend.inference.context_limits import derive_usable_input_tokens
+    from backend.inference.reasoning import reasoning_effort_options
 
     entry = lookup_provider_model(
         transport_provider,
@@ -946,6 +947,9 @@ def _model_metadata_for_log(
             'function_calling': entry.supports_function_calling,
             'parallel_tool_calls': entry.supports_parallel_tool_calls,
             'reasoning_effort': entry.supports_reasoning_effort,
+            'resolved_reasoning_effort_options': list(
+                reasoning_effort_options(entry, include_disabled=True)
+            ),
             'prompt_cache': entry.supports_prompt_cache,
             'response_schema': entry.supports_response_schema,
             'stop_words': entry.supports_stop_words,

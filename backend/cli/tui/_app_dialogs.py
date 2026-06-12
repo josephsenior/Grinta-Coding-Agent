@@ -383,21 +383,56 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
     def __init__(self, config: AppConfig) -> None:
         super().__init__()
         self._config = config
+        self._entries_by_provider = self._load_catalog_entries()
 
     def compose(self) -> ComposeResult:
-        from backend.cli.config_manager import get_current_model, get_masked_api_key
+        from backend.cli.config_manager import get_masked_api_key
 
-        current_model = get_current_model(self._config)
-        masked_key = get_masked_api_key(self._config)
+        current_provider = self._current_provider()
+        current_model = self._current_model_for_provider(current_provider)
+        current_custom_model = self._current_custom_model_for_provider(current_provider)
+        current_reasoning = self._current_reasoning_for_model(
+            current_provider, current_model
+        )
+        masked_key = get_masked_api_key(self._config, current_provider)
         raw_budget = getattr(self._config, 'max_budget_per_task', None)
         budget_value = '' if raw_budget is None else f'{float(raw_budget):g}'
         icons_enabled = bool(getattr(self._config, 'cli_tool_icons', True))
 
         with Vertical(id='dialog-container'):
             yield Label('[bold]Settings[/]', id='dialog-title')
-            yield Label(f'Current API key: {masked_key}', id='settings-current-key')
+            yield Label(
+                f'Current {self._provider_label(current_provider)} API key: {masked_key}',
+                id='settings-current-key',
+            )
+            yield Label('Provider', classes='field-label')
+            yield Select(
+                options=self._provider_options(),
+                value=current_provider,
+                allow_blank=False,
+                id='settings-provider',
+            )
             yield Label('Model', classes='field-label')
-            yield Input(value=current_model, id='settings-model')
+            yield Select(
+                options=self._model_options(current_provider),
+                value=current_model,
+                allow_blank=False,
+                id='settings-model',
+            )
+            yield Label(
+                'Custom model id',
+                classes='field-label',
+                id='settings-custom-model-label',
+            )
+            yield Input(value=current_custom_model, id='settings-custom-model')
+            yield Label('', id='settings-model-meta')
+            yield Label('Reasoning effort', classes='field-label')
+            yield Select(
+                options=self._reasoning_options(current_provider, current_model),
+                value=current_reasoning,
+                allow_blank=False,
+                id='settings-reasoning',
+            )
             yield Label(
                 'API key (leave blank to keep current key)', classes='field-label'
             )
@@ -418,7 +453,9 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
                 yield Button('Cancel', id='settings-cancel')
 
     def on_mount(self) -> None:
-        self.query_one('#settings-model', Input).focus()
+        self.query_one('#settings-provider', Select).focus()
+        self._sync_custom_model_visibility()
+        self._sync_model_metadata()
 
     def action_save(self) -> None:
         self._submit()
@@ -434,12 +471,280 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         style = NAVY_ERROR if error else NAVY_READY
         self.query_one('#dialog-feedback', Label).update(f'[{style}]{message}[/]')
 
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if not isinstance(event.value, str):
+            return
+        if event.select.id == 'settings-provider':
+            provider = event.value
+            model_select = self.query_one('#settings-model', Select)
+            model = self._current_model_for_provider(provider)
+            model_select.set_options(self._model_options(provider))
+            model_select.value = model
+            self.query_one('#settings-custom-model', Input).value = (
+                self._current_custom_model_for_provider(provider)
+            )
+            self._sync_api_key_label(provider)
+            self._sync_custom_model_visibility()
+            self._sync_reasoning_options(provider, model)
+            self._sync_model_metadata()
+            return
+        if event.select.id == 'settings-model':
+            provider = self._selected_provider()
+            self._sync_custom_model_visibility()
+            self._sync_reasoning_options(provider, event.value)
+            self._sync_model_metadata()
+
+    @staticmethod
+    def _load_catalog_entries() -> dict[str, list[Any]]:
+        from backend.core.providers import PROVIDER_CONFIGURATIONS
+        from backend.inference.catalog_loader import get_catalog
+
+        entries_by_provider: dict[str, list[Any]] = {}
+        for entry in get_catalog():
+            entries_by_provider.setdefault(entry.provider, []).append(entry)
+        for provider, entries in entries_by_provider.items():
+            entries.sort(
+                key=lambda item: (
+                    not bool(getattr(item, 'featured', False)),
+                    not bool(getattr(item, 'verified', False)),
+                    GrintaSettingsDialog._entry_label(item),
+                )
+            )
+        for provider in PROVIDER_CONFIGURATIONS:
+            entries_by_provider.setdefault(provider, [])
+        return dict(sorted(entries_by_provider.items()))
+
+    @staticmethod
+    def _provider_label(provider: str | None) -> str:
+        labels = {
+            'anthropic': 'Anthropic',
+            'cerebras': 'Cerebras',
+            'deepinfra': 'DeepInfra',
+            'deepseek': 'DeepSeek',
+            'digitalocean': 'DigitalOcean',
+            'fireworks': 'Fireworks',
+            'google': 'Google Gemini',
+            'groq': 'Groq',
+            'lightning': 'Lightning AI',
+            'mistral': 'Mistral AI',
+            'nvidia': 'NVIDIA',
+            'openai': 'OpenAI',
+            'opencode': 'OpenCode Zen',
+            'opencode-go': 'OpenCode Go',
+            'openrouter': 'OpenRouter',
+            'vercel': 'Vercel AI Gateway',
+            'perplexity': 'Perplexity',
+            'together': 'Together AI',
+            'xai': 'xAI',
+        }
+        if not provider:
+            return 'selected provider'
+        return labels.get(provider, provider.replace('-', ' ').title())
+
+    @staticmethod
+    def _entry_label(entry: Any) -> str:
+        metadata = getattr(entry, 'metadata', None) or {}
+        label = str(metadata.get('display_name') or entry.name)
+        return label
+
+    def _provider_options(self) -> list[tuple[str, str]]:
+        return [
+            (self._provider_label(provider), provider)
+            for provider in self._entries_by_provider
+        ]
+
+    def _model_options(self, provider: str | None) -> list[tuple[str, str]]:
+        entries = self._entries_by_provider.get(provider or '', [])
+        options: list[tuple[str, str]] = []
+        for entry in entries:
+            label = self._entry_label(entry)
+            if label != entry.name:
+                label = f'{label} ({entry.name})'
+            options.append((label, entry.name))
+        if options:
+            options.append(('Custom model id', '__custom__'))
+            return options
+        return [('Custom model id', '__custom__')]
+
+    def _current_provider(self) -> str:
+        from backend.cli.config_manager import get_current_provider
+
+        provider = get_current_provider(self._config)
+        if provider in self._entries_by_provider:
+            return provider
+        return next(iter(self._entries_by_provider), 'openai')
+
+    def _current_model_for_provider(self, provider: str | None) -> str:
+        from backend.inference.catalog_loader import (
+            lookup_provider_model,
+            runtime_model_id,
+        )
+
+        entries = self._entries_by_provider.get(provider or '', [])
+        if not entries:
+            return '__custom__'
+        try:
+            model = (self._config.get_llm_config().model or '').strip()
+            bare = model.split('/', 1)[1] if model.startswith(f'{provider}/') else model
+            entry = lookup_provider_model(provider, bare, allow_aliases=True)
+            if entry is not None:
+                return entry.name
+            for candidate in entries:
+                if bare in {candidate.name, runtime_model_id(candidate)}:
+                    return candidate.name
+        except Exception:
+            pass
+        return entries[0].name if entries else '__custom__'
+
+    def _current_custom_model_for_provider(self, provider: str | None) -> str:
+        try:
+            model = (self._config.get_llm_config().model or '').strip()
+        except Exception:
+            return ''
+        provider = (provider or '').strip()
+        if provider and model.startswith(f'{provider}/'):
+            return model.split('/', 1)[1]
+        from backend.inference.provider_resolver import extract_provider_prefix
+
+        prefixed = extract_provider_prefix(model)
+        if prefixed == provider:
+            return model.split('/', 1)[1]
+        return model if self._current_model_for_provider(provider) == '__custom__' else ''
+
+    def _selected_provider(self) -> str:
+        value = self.query_one('#settings-provider', Select).value
+        return value if isinstance(value, str) else self._current_provider()
+
+    def _selected_model(self) -> str:
+        value = self.query_one('#settings-model', Select).value
+        return value if isinstance(value, str) else ''
+
+    def _selected_entry(self, provider: str | None, model: str | None):
+        from backend.inference.catalog_loader import lookup_provider_model
+
+        if model == '__custom__':
+            return None
+        return lookup_provider_model(provider, model, allow_aliases=False)
+
+    def _custom_model_enabled(self) -> bool:
+        return self._selected_model() == '__custom__'
+
+    def _sync_custom_model_visibility(self) -> None:
+        enabled = self._custom_model_enabled()
+        try:
+            self.query_one('#settings-custom-model-label', Label).display = enabled
+            self.query_one('#settings-custom-model', Input).display = enabled
+        except Exception:
+            pass
+
+    def _reasoning_options(
+        self, provider: str | None, model: str | None
+    ) -> list[tuple[str, str]]:
+        from backend.inference.reasoning import reasoning_effort_options
+
+        entry = self._selected_entry(provider, model)
+        if entry is None:
+            return [('Default', '')]
+        values = reasoning_effort_options(entry, include_disabled=True)
+        if not values:
+            return [('Not supported by selected model', '')]
+        labels = [('Default', '')]
+        labels.extend(
+            (self._reasoning_label(value), value)
+            for value in values
+        )
+        return labels
+
+    @staticmethod
+    def _reasoning_label(value: str) -> str:
+        labels = {
+            'none': 'Off (omit)',
+            'minimal': 'Minimal',
+            'low': 'Low',
+            'medium': 'Medium',
+            'high': 'High',
+            'xhigh': 'Extra high',
+            'max': 'Max',
+        }
+        return labels.get(value, value.replace('_', ' ').title())
+
+    def _current_reasoning_for_model(self, provider: str, model: str) -> str:
+        configured = ''
+        try:
+            configured = (
+                getattr(self._config.get_llm_config(), 'reasoning_effort', None) or ''
+            ).strip().lower()
+        except Exception:
+            configured = ''
+        allowed = {value for _label, value in self._reasoning_options(provider, model)}
+        return configured if configured in allowed else ''
+
+    def _sync_reasoning_options(self, provider: str, model: str) -> None:
+        select = self.query_one('#settings-reasoning', Select)
+        options = self._reasoning_options(provider, model)
+        select.set_options(options)
+        values = {value for _label, value in options}
+        current = self._current_reasoning_for_model(provider, model)
+        select.value = current if current in values else ''
+
+    def _sync_api_key_label(self, provider: str) -> None:
+        from backend.cli.config_manager import get_masked_api_key
+
+        masked = get_masked_api_key(self._config, provider)
+        self.query_one('#settings-current-key', Label).update(
+            f'Current {self._provider_label(provider)} API key: {masked}'
+        )
+
+    def _sync_model_metadata(self) -> None:
+        provider = self._selected_provider()
+        model = self._selected_model()
+        entry = self._selected_entry(provider, model)
+        if entry is None:
+            if self._custom_model_enabled():
+                self.query_one('#settings-model-meta', Label).update(
+                    f'[{NAVY_TEXT_MUTED}]custom model: provider defaults, no catalog metadata[/]'
+                )
+            else:
+                self.query_one('#settings-model-meta', Label).update('')
+            return
+        context = getattr(entry, 'context_window_tokens', None)
+        output = getattr(entry, 'max_output_tokens', None)
+        tools = (
+            'tools'
+            if getattr(entry, 'supports_function_calling', False)
+            else 'no tools'
+        )
+        parallel = (
+            'parallel tools'
+            if getattr(entry, 'supports_parallel_tool_calls', False)
+            else 'serial tools'
+        )
+        details = [tools, parallel]
+        if context:
+            details.append(f'context {context:,}')
+        if output:
+            details.append(f'output {output:,}')
+        self.query_one('#settings-model-meta', Label).update(
+            f'[{NAVY_TEXT_MUTED}]{" | ".join(details)}[/]'
+        )
+
     def _submit(self) -> None:
-        model = self.query_one('#settings-model', Input).value.strip()
+        from backend.inference.catalog_loader import runtime_model_id
+
+        provider = self._selected_provider()
+        selected_model = self._selected_model()
+        custom_model = self.query_one('#settings-custom-model', Input).value.strip()
+        model = custom_model if selected_model == '__custom__' else selected_model
+        entry = self._selected_entry(provider, model)
+        reasoning_value = self.query_one('#settings-reasoning', Select).value
+        reasoning = reasoning_value if isinstance(reasoning_value, str) else ''
         api_key = self.query_one('#settings-api-key', Input).value.strip()
         budget_raw = self.query_one('#settings-budget', Input).value.strip()
         icons_enabled = self.query_one('#settings-icons', Checkbox).value
 
+        if not provider:
+            self._set_feedback('Provider is required.', error=True)
+            return
         if not model:
             self._set_feedback('Model is required.', error=True)
             return
@@ -457,9 +762,12 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
                 self._set_feedback('Budget cannot be negative.', error=True)
                 return
 
+        runtime_model = runtime_model_id(entry) if entry is not None else model
         self.dismiss(
             {
-                'model': model,
+                'provider': provider,
+                'model': runtime_model,
+                'reasoning_effort': reasoning,
                 'api_key': api_key,
                 'budget': budget_value,
                 'icons': bool(icons_enabled),

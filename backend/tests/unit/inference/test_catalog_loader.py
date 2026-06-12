@@ -289,14 +289,14 @@ class TestGetTokenLimits:
         assert input_limit == 149_504
         assert output_limit == 131_072
 
-    def test_minimax_m2_7_supports_tools_and_family_reasoning(self):
+    def test_minimax_m2_7_supports_tools_without_fake_reasoning_controls(self):
         from backend.inference.reasoning import supports_reasoning
 
         entry = lookup('opencode-go/minimax-m2.7')
 
         assert entry is not None
         assert entry.thinking_mode is None
-        assert supports_reasoning(entry) is True
+        assert supports_reasoning(entry) is False
         assert supports_function_calling('opencode-go/minimax-m2.7') is True
 
     def test_unknown_opencode_go_chat_models_keep_native_tools(self):

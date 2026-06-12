@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -15,6 +16,7 @@ from backend.context.canonical_state import (
     validate_canonical_state_for_compaction,
 )
 from backend.context.compact_boundary import project_after_compact_boundary
+from backend.context.compaction_finalizer import finalize_compaction_artifacts
 from backend.context.compactor.compactor import Compaction
 from backend.context.condensed_history import CondensedHistory
 from backend.context.context_budget import ContextBudget, record_post_compact_baseline
@@ -23,7 +25,6 @@ from backend.context.context_packet import (
     build_context_packet_observation,
 )
 from backend.context.continuity_eval import compaction_passes_continuity_gate
-from backend.context.compaction_finalizer import finalize_compaction_artifacts
 from backend.context.microcompact import apply_microcompact
 from backend.context.pre_condensation_snapshot import (
     delete_staging_snapshot,
@@ -109,12 +110,14 @@ class ContextPipeline:
         preserve_recent: int = DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
         llm_compact_cooldown_seconds: int = DEFAULT_LLM_COMPACT_COOLDOWN_SECONDS,
         boundary_compact_cooldown_seconds: int = DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
+        condensation_recorder: Callable[[], None] | None = None,
     ) -> None:
         self._llm_registry = llm_registry
         self._config = config
         self._preserve_recent = preserve_recent
         self._llm_compact_cooldown = llm_compact_cooldown_seconds
         self._boundary_compact_cooldown = boundary_compact_cooldown_seconds
+        self._condensation_recorder = condensation_recorder
         self._structured_compactor: Any = None
 
     @classmethod
@@ -122,6 +125,8 @@ class ContextPipeline:
         cls,
         config: ContextPipelineConfig,
         llm_registry: LLMRegistry,
+        *,
+        condensation_recorder: Callable[[], None] | None = None,
     ) -> ContextPipeline:
         from backend.core.pydantic_compat import model_dump_with_options
 
@@ -129,7 +134,20 @@ class ContextPipeline:
             config,
             exclude={'type', 'llm_config', 'allow_llm_hot_path'},
         )
-        return cls(llm_registry=llm_registry, config=config, **kwargs)
+        return cls(
+            llm_registry=llm_registry,
+            config=config,
+            condensation_recorder=condensation_recorder,
+            **kwargs,
+        )
+
+    def _record_pressure_condensation(self) -> None:
+        if self._condensation_recorder is None:
+            return
+        try:
+            self._condensation_recorder()
+        except Exception:
+            logger.debug('Memory pressure record_condensation failed', exc_info=True)
 
     def _llm_config(self, state: State) -> object | None:
         llm_config = getattr(self._config, 'llm_config', None)
@@ -361,18 +379,7 @@ class ContextPipeline:
         self._increment_condensation_counter(state)
         if pressure_active:
             state.ack_memory_pressure(source='ContextPipeline')
-            try:
-                from backend.orchestration.memory_pressure import (
-                    get_memory_pressure_monitor,
-                )
-
-                monitor = get_memory_pressure_monitor()
-                if monitor is not None:
-                    monitor.record_condensation()
-            except Exception:
-                logger.debug(
-                    'Memory pressure record_condensation failed', exc_info=True
-                )
+            self._record_pressure_condensation()
         logger.info(
             'ContextPipeline committed compaction (pruned=%d elapsed=%.3fs)',
             len(action.pruned),

@@ -27,7 +27,6 @@ from __future__ import annotations
 from backend.engine.prompts.section_renderers._autonomy import (
     _build_autonomy_block,
     _build_context_discipline_section,
-    _build_mandatory_discipline_checkpoints,
     _build_risk_preview,
     _build_when_to_use_context,
     _render_autonomy,
@@ -73,7 +72,6 @@ __all__ = [
     '_append_mcp_connected_catalog_sections',
     '_build_autonomy_block',
     '_build_context_discipline_section',
-    '_build_mandatory_discipline_checkpoints',
     '_build_response_style_block',
     '_build_risk_preview',
     '_build_when_to_use_context',

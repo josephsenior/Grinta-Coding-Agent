@@ -16,14 +16,21 @@ def _settings_path_default() -> Path:
     return Path(get_app_settings_root()) / 'settings.json'
 
 
-def _format_llm_api_key_line(value: str) -> str:
+def _format_env_secret_line(name: str, value: str) -> str:
+    key = name.strip()
+    if not key:
+        raise ValueError('Environment variable name is required')
     v = value.strip()
     if not v:
-        return 'LLM_API_KEY=\n'
+        return f'{key}=\n'
     if any(c in v for c in ' \t\n#"\'') or '$' in v:
         escaped = v.replace('\\', '\\\\').replace('"', '\\"')
-        return f'LLM_API_KEY="{escaped}"\n'
-    return f'LLM_API_KEY={v}\n'
+        return f'{key}="{escaped}"\n'
+    return f'{key}={v}\n'
+
+
+def _format_llm_api_key_line(value: str) -> str:
+    return _format_env_secret_line('LLM_API_KEY', value)
 
 
 def _load_env_lines(env_path: Path) -> list[str]:
@@ -32,10 +39,10 @@ def _load_env_lines(env_path: Path) -> list[str]:
     return env_path.read_text(encoding='utf-8').splitlines(keepends=True)
 
 
-def _upsert_llm_api_key_lines(lines: list[str], line_out: str) -> list[str]:
+def _upsert_env_key_lines(lines: list[str], key: str, line_out: str) -> list[str]:
     new_lines: list[str] = []
     replaced = False
-    prefixes = ('LLM_API_KEY=', 'export LLM_API_KEY=')
+    prefixes = (f'{key}=', f'export {key}=')
     for line in lines:
         stripped = line.lstrip()
         if any(stripped.startswith(prefix) for prefix in prefixes):
@@ -52,6 +59,10 @@ def _upsert_llm_api_key_lines(lines: list[str], line_out: str) -> list[str]:
         new_lines[-1] += '\n'
     new_lines.append(line_out)
     return new_lines
+
+
+def _upsert_llm_api_key_lines(lines: list[str], line_out: str) -> list[str]:
+    return _upsert_env_key_lines(lines, 'LLM_API_KEY', line_out)
 
 
 def _write_env_file(env_path: Path, body: str) -> None:
@@ -73,6 +84,13 @@ def _update_process_llm_api_key(api_key: str) -> None:
     stripped = api_key.strip()
     if stripped:
         os.environ['LLM_API_KEY'] = stripped
+
+
+def _update_process_env_key(name: str, api_key: str) -> None:
+    stripped = api_key.strip()
+    key = name.strip()
+    if stripped and key:
+        os.environ[key] = stripped
 
 
 def persist_llm_api_key_to_dotenv(
@@ -101,5 +119,32 @@ def persist_llm_api_key_to_dotenv(
 
     if update_process_environ:
         _update_process_llm_api_key(api_key)
+
+    return env_path
+
+
+def persist_provider_api_key_to_dotenv(
+    provider: str,
+    api_key: str,
+    *,
+    settings_json_path: Path | None = None,
+    update_process_environ: bool = True,
+) -> Path:
+    """Upsert a provider-specific API key in ``.env`` next to settings.json."""
+    from backend.core.config.provider_config import provider_config_manager
+
+    env_var = provider_config_manager.get_environment_variable(provider)
+    if not env_var:
+        env_var = f'{provider.strip().upper().replace("-", "_")}_API_KEY'
+    settings_path = settings_json_path or _settings_path_default()
+    env_path = settings_path.parent / '.env'
+    line_out = _format_env_secret_line(env_var, api_key)
+
+    lines = _load_env_lines(env_path)
+    body = ''.join(_upsert_env_key_lines(lines, env_var, line_out))
+    _write_env_file(env_path, body)
+
+    if update_process_environ:
+        _update_process_env_key(env_var, api_key)
 
     return env_path

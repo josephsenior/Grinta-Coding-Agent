@@ -25,6 +25,8 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'xai': 'https://api.x.ai/v1',
     'deepseek': 'https://api.deepseek.com/v1',
     'openrouter': 'https://openrouter.ai/api/v1',
+    # Vercel AI Gateway: OpenAI-compatible unified endpoint for 200+ models.
+    'vercel': 'https://ai-gateway.vercel.sh/v1',
     'nvidia': 'https://integrate.api.nvidia.com/v1',
     # Lightning AI: Grinta routes `llm_provider=lightning` through OpenAIClient
     # (see get_direct_client) with this OpenAI-compatible root. If the key or
@@ -32,6 +34,14 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'lightning': 'https://lightning.ai/api/v1',
     # DigitalOcean AI Platform (Serverless Inference endpoint)
     'digitalocean': 'https://inference.do-ai.run/v1',
+    # DeepInfra OpenAI-compatible inference endpoint.
+    'deepinfra': 'https://api.deepinfra.com/v1/openai',
+    # Fireworks OpenAI-compatible inference endpoint.
+    'fireworks': 'https://api.fireworks.ai/inference/v1',
+    # Together AI OpenAI-compatible inference endpoint.
+    'together': 'https://api.together.xyz/v1',
+    # Perplexity OpenAI-compatible chat endpoint.
+    'perplexity': 'https://api.perplexity.ai',
     # Cerebras AI: OpenAI-compatible endpoint for fast inference on CS-3 systems.
     'cerebras': 'https://api.cerebras.ai/v1',
     # Mistral AI: official API for Mistral models.
@@ -63,6 +73,7 @@ KNOWN_PROVIDER_PREFIXES: set[str] = {
     'perplexity',
     'replicate',
     'together',
+    'vercel',
     'vllm',
     'xai',
 }
@@ -119,22 +130,10 @@ def canonicalize_model_selection(
     normalized_provider = normalize_provider_name(provider)
     prefixed_provider = extract_provider_prefix(model)
 
-    # Proxy providers that need openai/ prefix for correct routing.
-    _OPENAI_COMPAT_PROVIDERS = {'lightning', 'cerebras'}
-
     if normalized_provider:
         entry = lookup_provider_model(normalized_provider, model, allow_aliases=False)
         if entry is not None:
             return f'{entry.provider}/{runtime_model_id(entry)}', entry.provider
-
-        if normalized_provider in _OPENAI_COMPAT_PROVIDERS:
-            # Strip any redundant provider prefix, keep the model identifier
-            # the proxy API expects, and prepend openai/.
-            if prefixed_provider == normalized_provider:
-                bare = model.split('/', 1)[1]
-            else:
-                bare = model
-            return f'openai/{bare}', normalized_provider
 
         if prefixed_provider and prefixed_provider != normalized_provider:
             # Cross-provider routing (e.g. anthropic model on openrouter).
@@ -301,6 +300,7 @@ class ProviderResolver:
         Args:
             model_name: Model name
             explicit_base_url: User-provided base URL
+            config_provider: Optional provider name to use instead of resolved provider
 
         Returns:
             Base URL or None for default cloud endpoints

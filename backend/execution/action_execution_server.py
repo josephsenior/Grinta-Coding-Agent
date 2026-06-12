@@ -159,7 +159,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         self.session_manager.security_config = security_config
 
         if self.session_manager.tool_registry is not None:
-            from backend.engine.tools.prompt import set_active_tool_registry
+            from backend.utils.terminal_contract import set_active_tool_registry
 
             set_active_tool_registry(self.session_manager.tool_registry)
 

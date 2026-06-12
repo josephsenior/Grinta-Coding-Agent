@@ -466,11 +466,11 @@ class TestOrchestratorPromptManager:
         with (
             patch('backend.utils.prompt.OS_CAPS') as mock_caps,
             patch(
-                'backend.engine.tools.prompt.get_terminal_tool_name',
+                'backend.utils.terminal_contract.get_terminal_tool_name',
                 return_value='execute_powershell',
             ),
             patch(
-                'backend.engine.tools.prompt.is_windows_with_bash',
+                'backend.utils.terminal_contract.is_windows_with_bash',
                 return_value=True,
             ),
         ):

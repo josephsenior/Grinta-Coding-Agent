@@ -79,6 +79,12 @@ _PROVIDER_PRESETS: dict[str, dict[str, str]] = {
         'base_url': 'https://openrouter.ai/api/v1',
         'help': 'OpenRouter (proxy to many providers)',
     },
+    'vercel': {
+        'env': 'VERCEL_API_KEY',
+        'default_model': DEFAULT_MODEL_BY_PROVIDER['vercel'],
+        'base_url': 'https://ai-gateway.vercel.sh/v1',
+        'help': 'Vercel AI Gateway (OpenAI-compatible, 200+ models)',
+    },
 }
 
 

@@ -417,7 +417,7 @@ def _fixed_prompt_reserve_tokens(state: object | None) -> int:
     total = 0
     for key in ('static_prompt_tokens', 'tool_schema_tokens', 'context_packet_tokens'):
         value = raw.get(key)
-        if isinstance(value, bool):
+        if value is None or isinstance(value, bool):
             continue
         try:
             parsed = int(value)

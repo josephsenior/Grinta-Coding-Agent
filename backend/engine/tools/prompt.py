@@ -1,130 +1,29 @@
-"""Helpers for adapting tool prompts to the active terminal runtime."""
+"""Backward-compatible re-export of terminal runtime helper functions."""
 
-from __future__ import annotations
-
-import base64
-import functools
-from contextvars import ContextVar
-from typing import Any
-
-from backend.core.os_capabilities import OS_CAPS
-
-_active_tool_registry: ContextVar[Any | None] = ContextVar(
-    'active_tool_registry', default=None
+from backend.utils.terminal_contract import (
+    OS_CAPS,
+    _get_global_tool_registry,
+    _runtime_prefers_powershell,
+    build_python_exec_command,
+    get_active_tool_registry,
+    get_python_shell_command,
+    get_shell_name,
+    get_terminal_tool_name,
+    is_windows_with_bash,
+    set_active_tool_registry,
+    uses_powershell_terminal,
 )
-# Worker threads (e.g. Orchestrator.step ThreadPoolExecutor) do not inherit
-# ContextVar values; mirror the active registry here so tool command generation
-# matches the same ToolRegistry as SessionManager / create_shell_session.
-_registry_for_process: Any | None = None
 
-
-def set_active_tool_registry(registry: Any | None) -> None:
-    """Bind the ToolRegistry used by ``SessionManager`` / ``create_shell_session``.
-
-    When set (from :class:`~backend.execution.action_execution_server.RuntimeExecutor`
-    startup), :func:`uses_powershell_terminal` reads runtime registry flags so
-    generated shell command strings match the actual shell contract.
-    """
-    global _registry_for_process
-    _registry_for_process = registry
-    _active_tool_registry.set(registry)
-
-
-def get_active_tool_registry() -> Any | None:
-    """Return the registry installed by :func:`set_active_tool_registry`, if any."""
-    ctx = _active_tool_registry.get()
-    if ctx is not None:
-        return ctx
-    return _registry_for_process
-
-
-@functools.cache
-def _get_global_tool_registry() -> Any:
-    from backend.execution.utils.tool_registry import ToolRegistry
-
-    return ToolRegistry()
-
-
-def _runtime_prefers_powershell() -> bool:
-    """Mirror runtime shell-session selection for prompt-side tool generation."""
-    from backend.execution.utils.tool_registry import (
-        resolve_windows_powershell_preference,
-    )
-
-    def _flag(obj: Any, attr: str) -> bool:
-        value = getattr(obj, attr, False)
-        return value if isinstance(value, bool) else False
-
-    active = get_active_tool_registry()
-    if active is not None:
-        return resolve_windows_powershell_preference(
-            has_bash=_flag(active, 'has_bash'),
-            has_powershell=_flag(active, 'has_powershell'),
-        )
-    registry = _get_global_tool_registry()
-    return resolve_windows_powershell_preference(
-        has_bash=registry.has_bash,
-        has_powershell=registry.has_powershell,
-    )
-
-
-def uses_powershell_terminal() -> bool:
-    """Return True when the active terminal contract should be PowerShell.
-
-    Aligns with ``create_shell_session()`` by asking the same ToolRegistry-
-    based question the runtime uses on Windows: prefer PowerShell by default,
-    with bash fallback or explicit override.
-    """
-    if not OS_CAPS.is_windows:
-        return False
-    return _runtime_prefers_powershell()
-
-
-def get_shell_name() -> str:
-    """Return the shell name that matches the runtime terminal contract."""
-    return 'powershell' if uses_powershell_terminal() else 'bash'
-
-
-def is_windows_with_bash() -> bool:
-    """True when running on Windows but using Git Bash as the active shell."""
-    return OS_CAPS.is_windows and not uses_powershell_terminal()
-
-
-def get_python_shell_command() -> str:
-    """Return the preferred Python executable for the active shell contract."""
-    if uses_powershell_terminal():
-        return 'python'
-    return 'python3'
-
-
-def build_python_exec_command(script: str) -> str:
-    """Return a shell-safe Python command that executes a base64-encoded script."""
-    encoded = base64.b64encode(script.encode()).decode()
-    py_expr = f"import base64;exec(base64.b64decode(b'{encoded}').decode())"
-
-    if uses_powershell_terminal():
-        return f'python -c "{py_expr}"'
-
-    return (
-        'if command -v python3 >/dev/null 2>&1; then '
-        f'python3 -c "{py_expr}"; '
-        'elif command -v python >/dev/null 2>&1; then '
-        f'python -c "{py_expr}"; '
-        'elif command -v py >/dev/null 2>&1; then '
-        f'py -3 -c "{py_expr}"; '
-        "else echo '[MISSING_TOOL] python/python3/py not found in PATH'; exit 127; fi"
-    )
-
-
-def get_terminal_tool_name() -> str:
-    """Return the terminal tool name that matches the runtime shell."""
-    from backend.inference.tool_names import (
-        EXECUTE_BASH_TOOL_NAME,
-        EXECUTE_POWERSHELL_TOOL_NAME,
-    )
-
-    return (
-        EXECUTE_POWERSHELL_TOOL_NAME
-        if uses_powershell_terminal()
-        else EXECUTE_BASH_TOOL_NAME
-    )
+__all__ = [
+    'OS_CAPS',
+    '_get_global_tool_registry',
+    '_runtime_prefers_powershell',
+    'build_python_exec_command',
+    'get_active_tool_registry',
+    'get_python_shell_command',
+    'get_shell_name',
+    'get_terminal_tool_name',
+    'is_windows_with_bash',
+    'set_active_tool_registry',
+    'uses_powershell_terminal',
+]

@@ -27,7 +27,7 @@ def _build_context_discipline_section(
     parts = ['<CONTEXT_DISCIPLINE>']
     parts.append(
         'Use the visible conversation, current files, and fresh tool observations as context. '
-        'After condensation, resume from the summary without restarting broad exploration.'
+        'After condensation, resume from durable state without restarting broad exploration.'
     )
     if working_memory_on:
         parts.extend(
@@ -86,34 +86,6 @@ def _build_when_to_use_context(
     return '\n'.join(parts)
 
 
-def _build_mandatory_discipline_checkpoints(
-    *,
-    working_memory_on: bool,
-    tracker_on: bool,
-    checkpoints_on: bool,
-) -> str:
-    parts = ['<MANDATORY_DISCIPLINE_CHECKPOINTS>']
-    items: list[str] = []
-    if tracker_on:
-        items.append('1. For multi-step work, follow `<TASK_TRACKING>` checkpoints')
-    else:
-        items.append(
-            '1. For complex work, inspect first and verify before final summary'
-        )
-    if working_memory_on:
-        items.append(
-            '2. After major findings or pivots, update `memory(action="working")` — not task progress'
-        )
-    if checkpoints_on:
-        step = 3 if working_memory_on else 2
-        items.append(
-            f'{step}. After completing a logical phase, consider `checkpoint(save)` with a short label'
-        )
-    parts.extend(items)
-    parts.append('</MANDATORY_DISCIPLINE_CHECKPOINTS>')
-    return '\n'.join(parts)
-
-
 def _build_risk_preview(
     *,
     tracker_on: bool,
@@ -137,9 +109,7 @@ def _build_autonomy_block(_mode: str, *, checkpoints_on: bool) -> str:
         'for discussion or planning work, keep the response aligned with the active protocol. '
         'During implementation, plain text is terminal; if work remains, make the next response a tool call. '
         'The runtime may interrupt a tool call to surface a user decision; treat that decision as '
-        'authoritative and continue from where you stopped. On tool failure, make '
-        'the next action a corrected retry or a different tool (e.g. `read` \u2192 `edit_symbols`, '
-        'or `read` \u2192 `replace_string`) and auto-retry recoverable errors before reporting back.'
+        'authoritative and continue from where you stopped. On tool failure, follow `<ERROR_RECOVERY>`.'
         '\n</AUTONOMY>'
     )
 
@@ -170,11 +140,6 @@ def _render_autonomy(
         condensation_on=condensation_on,
     )
     when_to_use_context = _build_when_to_use_context(
-        working_memory_on=working_memory_on,
-        tracker_on=tracker_on,
-        checkpoints_on=checkpoints_on,
-    )
-    mandatory_discipline_checkpoints = _build_mandatory_discipline_checkpoints(
         working_memory_on=working_memory_on,
         tracker_on=tracker_on,
         checkpoints_on=checkpoints_on,
@@ -231,7 +196,6 @@ def _render_autonomy(
         autonomy_block=autonomy_block,
         context_discipline=context_discipline,
         when_to_use_context=when_to_use_context,
-        mandatory_discipline_checkpoints=mandatory_discipline_checkpoints,
         risk_preview=risk_preview,
         task_tracker_discipline_block=task_tracker_discipline_block,
         task_sync_instruction=task_sync_instruction,

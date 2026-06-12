@@ -825,7 +825,7 @@ async def _execute_direct_tool(
     action: MCPAction, matching_client: MCPClient
 ) -> MCPObservation:
     """Execute a direct MCP tool call and return observation."""
-    from backend.engine.tools.prompt import get_terminal_tool_name as _terminal_tool
+    from backend.utils.terminal_contract import get_terminal_tool_name as _terminal_tool
 
     try:
         if cached := get_cached(action.name, action.arguments):
@@ -977,7 +977,7 @@ async def call_tool_mcp(
     if action.name in WRAPPER_TOOL_REGISTRY:
         return await _execute_wrapper_tool(action, mcps)
 
-    from backend.engine.tools.prompt import get_terminal_tool_name as _terminal_tool
+    from backend.utils.terminal_contract import get_terminal_tool_name as _terminal_tool
 
     if not mcps:
         return _make_mcp_observation(

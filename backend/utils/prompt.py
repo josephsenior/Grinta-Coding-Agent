@@ -81,7 +81,7 @@ class PromptManager:
     def get_system_message(self, **context) -> str:
         """Render system prompt via Python prompt builder and apply refinement."""
         from backend.engine.prompts.prompt_builder import build_system_prompt
-        from backend.engine.tools.prompt import (
+        from backend.utils.terminal_contract import (
             get_terminal_tool_name,
             is_windows_with_bash,
         )
@@ -269,7 +269,7 @@ class OrchestratorPromptManager(PromptManager):
 
         # Keep prompt shell identity aligned with the same terminal contract
         # used by runtime execution (execute_bash vs execute_powershell).
-        from backend.engine.tools.prompt import (
+        from backend.utils.terminal_contract import (
             get_terminal_tool_name,
             is_windows_with_bash,
         )

@@ -547,9 +547,17 @@ DataTable > .datatable--row-selected {
     margin-top: 1;
 }
 
+#settings-provider,
 #settings-model,
+#settings-reasoning,
+#settings-custom-model,
 #settings-api-key,
 #settings-budget {
+    margin-bottom: 1;
+}
+
+#settings-model-meta {
+    color: #8f9fc1;
     margin-bottom: 1;
 }
 

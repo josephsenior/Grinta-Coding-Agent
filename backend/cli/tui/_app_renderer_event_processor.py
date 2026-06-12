@@ -18,19 +18,6 @@ from rich.text import Text
 
 from backend.cli._event_renderer.error_panel import notice_panel_title
 from backend.cli._event_renderer.unified_renderer import ActivityRenderer
-from backend.ledger.observation.error import (
-    ERROR_CATEGORY_NETWORK,
-    ERROR_CATEGORY_RATE_LIMIT,
-    ERROR_CATEGORY_TIMEOUT,
-)
-
-_TRANSIENT_HUD_ONLY_CATEGORIES = frozenset(
-    {
-        ERROR_CATEGORY_TIMEOUT,
-        ERROR_CATEGORY_NETWORK,
-        ERROR_CATEGORY_RATE_LIMIT,
-    }
-)
 from backend.cli.theme import NAVY_TEXT_MUTED, NAVY_TEXT_PRIMARY
 from backend.cli.transcript import strip_tool_result_validation_annotations
 from backend.cli.tui._app_helpers import (
@@ -115,6 +102,11 @@ from backend.ledger.observation import (
     TerminalObservation,
     UserRejectObservation,
 )
+from backend.ledger.observation.error import (
+    ERROR_CATEGORY_NETWORK,
+    ERROR_CATEGORY_RATE_LIMIT,
+    ERROR_CATEGORY_TIMEOUT,
+)
 from backend.ledger.observation.memory_tools import (
     CheckpointObservation,
     MemoryPersistObservation,
@@ -128,6 +120,15 @@ if TYPE_CHECKING:
     from backend.cli.tui._app_renderer_event_processor_mixin import (
         _AppRendererEventProcessorMixin,
     )
+
+
+_TRANSIENT_HUD_ONLY_CATEGORIES = frozenset(
+    {
+        ERROR_CATEGORY_TIMEOUT,
+        ERROR_CATEGORY_NETWORK,
+        ERROR_CATEGORY_RATE_LIMIT,
+    }
+)
 
 
 def _show_compaction_started_card(orch: '_AppRendererEventProcessorMixin') -> None:

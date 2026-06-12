@@ -187,6 +187,21 @@ class LLMRegistry:
             raise ValueError(msg)
         return self._create_new_llm(config=config, service_id=service_id)
 
+    def replace_llm(self, service_id: str, config: LLMConfig) -> LLM:
+        """Replace a registered LLM service with a fresh client."""
+        logger.info(
+            '[LLM registry %s]: Replacing service for %s',
+            self.registry_id,
+            service_id,
+        )
+        self.config.set_llm_config(config)
+        self.agent_to_llm_config[service_id] = config
+        self.service_to_llm.pop(service_id, None)
+        llm = self._create_new_llm(config=config, service_id=service_id)
+        if service_id == 'agent':
+            self.active_agent_llm = llm
+        return llm
+
     def get_active_llm(self) -> LLM:
         """Get the currently active agent LLM.
 

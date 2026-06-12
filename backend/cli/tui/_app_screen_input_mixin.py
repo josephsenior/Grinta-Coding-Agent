@@ -435,6 +435,8 @@ class _AppScreenInputMixin:
                 assert self._controller is not None, (
                     'Controller must be initialized after agent task setup'
                 )
+                if getattr(self, '_pending_llm_config_apply', False):
+                    self._apply_llm_config_to_active_session(self._config)
                 agent_text = text
                 self._turn_in_flight = True
             except Exception as exc:
@@ -489,10 +491,17 @@ class _AppScreenInputMixin:
         if not result:
             return
         try:
-            update_model(str(result.get('model', '')).strip())
+            provider = str(result.get('provider', '')).strip()
+            update_model(
+                str(result.get('model', '')).strip(),
+                provider=provider or None,
+                reasoning_effort=str(result.get('reasoning_effort', '')).strip()
+                or None,
+                clear_base_url=True,
+            )
             api_key = str(result.get('api_key', '')).strip()
             if api_key:
-                update_api_key(api_key)
+                update_api_key(api_key, provider=provider or None)
             budget = result.get('budget')
             if budget is not None:
                 update_budget(float(budget))
@@ -503,6 +512,7 @@ class _AppScreenInputMixin:
             return
 
         self._config = load_app_config()
+        runtime_status = self._apply_llm_config_to_active_session(self._config)
         self._hud.update_model(get_current_model(self._config))
         mcp_servers = getattr(getattr(self._config, 'mcp', None), 'servers', []) or []
         mcp_count = sum(
@@ -510,7 +520,7 @@ class _AppScreenInputMixin:
         )
         self._hud.update_mcp_servers(mcp_count)
         self._render_hud_bar()
-        self.add_success('Settings updated.')
+        self.add_success(f'Settings updated ({runtime_status}).')
 
     async def _run_sessions_tui(self, args: list[str]) -> None:
         parsed = _parse_sessions_tui_args(args)

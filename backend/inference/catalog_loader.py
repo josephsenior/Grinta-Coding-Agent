@@ -341,8 +341,8 @@ def validate_model_transport(
         )
     raise BadRequestError(
         (
-            f"Model {model!r} requires unsupported transport endpoint "
-            f"{endpoint!r}."
+            f'Model {model!r} requires unsupported transport endpoint '
+            f'{endpoint!r}.'
         ),
         llm_provider=provider,
         model=model,
@@ -445,8 +445,8 @@ def get_catalog() -> tuple[ModelEntry, ...]:
             declared_provider = str(runtime.get('provider') or provider).strip().lower()
             if declared_provider != provider:
                 raise ValueError(
-                    f"Model {name!r} in {source_file} declares provider "
-                    f"{declared_provider!r}, expected {provider!r}"
+                    f'Model {name!r} in {source_file} declares provider '
+                    f'{declared_provider!r}, expected {provider!r}'
                 )
             entries.append(
                 _entry_from_catalog(
@@ -517,7 +517,11 @@ def runtime_parameter_mode(entry: ModelEntry) -> dict[str, Any]:
     Provider metadata can contain raw docs or upstream SDK config. This helper
     describes only what Grinta's Python transport will actually apply.
     """
-    from backend.inference.reasoning import resolve_reasoning_plan, supports_reasoning
+    from backend.inference.reasoning import (
+        reasoning_effort_options,
+        resolve_reasoning_plan,
+        supports_reasoning,
+    )
 
     if entry.thinking_mode:
         reasoning = f'catalog_thinking_mode:{entry.thinking_mode}'
@@ -530,8 +534,10 @@ def runtime_parameter_mode(entry: ModelEntry) -> dict[str, Any]:
         )
     else:
         reasoning = 'not_configured'
+    options = reasoning_effort_options(entry, include_disabled=True)
     return {
         'reasoning': reasoning,
+        'reasoning_effort_options': list(options),
         'temperature': 'stripped' if entry.strip_temperature else 'standard',
         'top_p': 'stripped' if entry.strip_top_p else 'standard',
         'penalties': 'stripped' if entry.strip_penalties else 'standard',
@@ -831,6 +837,7 @@ def is_openai_compatible(model: str) -> bool:
             'opencode',
             'opencode-go',
             'openrouter',
+            'vercel',
             'xai',
         ]
 
@@ -848,6 +855,7 @@ def is_openai_compatible(model: str) -> bool:
         'opencode',
         'opencode-go',
         'openrouter',
+        'vercel',
         'xai',
     }
 
@@ -986,7 +994,10 @@ def apply_model_param_overrides(
     if entry.thinking_mode:
         _apply_thinking_mode(call_kwargs, entry, reasoning_effort, is_stream)
     else:
-        from backend.inference.reasoning import apply_reasoning_plan, resolve_reasoning_plan
+        from backend.inference.reasoning import (
+            apply_reasoning_plan,
+            resolve_reasoning_plan,
+        )
 
         plan = resolve_reasoning_plan(entry, reasoning_effort)
         apply_reasoning_plan(call_kwargs, plan)
