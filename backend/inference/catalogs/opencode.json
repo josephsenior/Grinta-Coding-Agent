@@ -3484,64 +3484,6 @@
         },
         "variants": {}
       }
-    },
-    "qwen3.6-plus": {
-      "runtime": {
-        "client": "anthropic_compatible",
-        "aliases": [
-          "opencode/qwen3.6-plus",
-          "qwen3.6-plus"
-        ],
-        "context_window_tokens": 262144,
-        "max_output_tokens": 65536,
-        "input_price_per_m": 0.5,
-        "cached_input_price_per_m": 0.05,
-        "cached_write_price_per_m": 0.625,
-        "output_price_per_m": 3,
-        "verified": true,
-        "featured": true,
-        "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
-        "supports_vision": true,
-        "inference_endpoint": "/messages"
-      },
-      "metadata": {
-        "source": "user_provided_opencode_internal_config",
-        "provider_id": "opencode",
-        "display_name": "Qwen3.6 Plus",
-        "family": "qwen3.6",
-        "status": "active",
-        "release_date": "2026-04-02",
-        "api": {
-          "id": "qwen3.6-plus",
-          "url": "https://opencode.ai/zen/v1",
-          "npm": "@ai-sdk/anthropic"
-        },
-        "inference_url": "https://opencode.ai/zen/v1/messages",
-        "options": {},
-        "capabilities": {
-          "temperature": true,
-          "reasoning": true,
-          "attachment": true,
-          "toolcall": true,
-          "input": {
-            "text": true,
-            "audio": false,
-            "image": true,
-            "video": true,
-            "pdf": false
-          },
-          "output": {
-            "text": true,
-            "audio": false,
-            "image": false,
-            "video": false,
-            "pdf": false
-          },
-          "interleaved": false
-        },
-        "variants": {}
-      }
     }
   }
 }

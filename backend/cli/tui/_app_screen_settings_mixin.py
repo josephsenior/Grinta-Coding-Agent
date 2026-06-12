@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 from typing import Any
 
@@ -109,6 +110,124 @@ class _AppScreenSettingsMixin:
         self._update_input_identity(mode)
         self._toggle_autonomy_tabs_visibility(mode)
         self.notify(f'Mode: {mode}', severity='information', timeout=2.0)
+
+    def _apply_llm_config_to_active_session(self, config) -> str:
+        controller = self._controller
+        if controller is None:
+            return 'saved for new sessions'
+        try:
+            state = controller.get_agent_state()
+        except Exception:
+            state = None
+        if 'RUNNING' in str(state).upper():
+            self._pending_llm_config_apply = True
+            return 'saved; active run keeps current model until it is idle'
+
+        agent = getattr(controller, 'agent', None)
+        if agent is None:
+            return 'saved; no active agent to update'
+        registry = getattr(agent, 'llm_registry', None)
+        if registry is None:
+            return 'saved; active session has no LLM registry'
+
+        llm_config = config.get_llm_config()
+        try:
+            registry.config = copy.deepcopy(config)
+            registry.agent_to_llm_config = registry.config.get_agent_to_llm_config_map()
+        except Exception:
+            _tui_logger.debug(
+                'Failed to refresh registry config during model switch',
+                exc_info=True,
+            )
+        replace_llm = getattr(registry, 'replace_llm', None)
+        if callable(replace_llm):
+            llm = replace_llm('agent', llm_config)
+        else:
+            service_to_llm = getattr(registry, 'service_to_llm', None)
+            if isinstance(service_to_llm, dict):
+                service_to_llm.pop('agent', None)
+            llm = registry.get_llm('agent', llm_config)
+
+        set_llm = getattr(agent, 'set_llm', None)
+        if callable(set_llm):
+            set_llm(llm)
+        else:
+            setattr(agent, 'llm', llm)
+
+        running_config = getattr(agent, 'config', None)
+        if running_config is not None:
+            try:
+                running_config.llm_config = llm_config
+            except Exception:
+                _tui_logger.debug(
+                    'Failed to update active agent config LLM during model switch',
+                    exc_info=True,
+                )
+
+        planner = getattr(agent, 'planner', None)
+        planner_config = getattr(planner, '_config', None)
+        if planner_config is not None:
+            try:
+                planner_config.llm_config = llm_config
+            except Exception:
+                _tui_logger.debug(
+                    'Failed to update planner config LLM during model switch',
+                    exc_info=True,
+                )
+        if planner is not None and hasattr(planner, 'build_toolset'):
+            try:
+                agent.tools = planner.build_toolset()
+            except Exception:
+                _tui_logger.debug(
+                    'Failed to rebuild toolset after model switch',
+                    exc_info=True,
+                )
+
+        self._refresh_prompt_managers_after_llm_switch(agent, registry)
+
+        try:
+            agent_name = getattr(getattr(agent, 'config', None), 'name', None)
+            controller.agent_to_llm_config['agent'] = llm_config
+            if isinstance(agent_name, str) and agent_name.strip():
+                controller.agent_to_llm_config[agent_name.strip()] = llm_config
+        except Exception:
+            _tui_logger.debug(
+                'Failed to update controller agent_to_llm_config after model switch',
+                exc_info=True,
+            )
+        self._pending_llm_config_apply = False
+        return 'applied to active session'
+
+    def _refresh_prompt_managers_after_llm_switch(
+        self, agent: Any, registry: Any
+    ) -> None:
+        prompt_managers = []
+        for attr in ('_prompt_manager', 'prompt_manager'):
+            try:
+                value = getattr(agent, attr, None)
+            except Exception:
+                value = None
+            if value is not None and value not in prompt_managers:
+                prompt_managers.append(value)
+        memory_manager = getattr(agent, 'memory_manager', None)
+        conversation_memory = getattr(memory_manager, 'conversation_memory', None)
+        prompt_manager = getattr(conversation_memory, 'prompt_manager', None)
+        if prompt_manager is not None and prompt_manager not in prompt_managers:
+            prompt_managers.append(prompt_manager)
+
+        for prompt_manager in prompt_managers:
+            for attr, value in (
+                ('_app_config', getattr(registry, 'config', None)),
+                ('app_config', getattr(registry, 'config', None)),
+                ('_config', getattr(agent, 'config', None)),
+                ('config', getattr(agent, 'config', None)),
+            ):
+                if value is None:
+                    continue
+                try:
+                    setattr(prompt_manager, attr, value)
+                except Exception:
+                    pass
 
     def _toggle_autonomy_tabs_visibility(self, mode: str) -> None:
         mode = normalize_interaction_mode(mode)

@@ -116,6 +116,7 @@ class TestProviderConstants:
         assert 'lightning' in PROVIDER_CONFIGURATIONS
         assert 'opencode' in PROVIDER_CONFIGURATIONS
         assert 'opencode-go' in PROVIDER_CONFIGURATIONS
+        assert 'vercel' in PROVIDER_CONFIGURATIONS
         assert 'xai' in PROVIDER_CONFIGURATIONS
 
     def test_each_config_has_required_keys(self):

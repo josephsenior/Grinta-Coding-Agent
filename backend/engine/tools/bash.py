@@ -12,7 +12,7 @@ from backend.engine.tools.common import (
     get_security_risk_param,
     get_timeout_param,
 )
-from backend.engine.tools.prompt import (
+from backend.utils.terminal_contract import (
     get_shell_name,
     get_terminal_tool_name,
     is_windows_with_bash,

@@ -29,36 +29,32 @@ WIRE_GLM_THINKING = 'glm_thinking'
 WIRE_NONE = 'none'
 
 _DEFAULT_EFFORTS_BY_WIRE: dict[str, tuple[str, ...]] = {
-    WIRE_OPENAI_REASONING_EFFORT: (
-        'none',
-        'minimal',
-        'low',
-        'medium',
-        'high',
-        'xhigh',
-    ),
-    WIRE_OPENAI_THINKING_AND_EFFORT: ('low', 'medium', 'high', 'max'),
-    WIRE_OPENAI_THINKING_ENABLED: ('low', 'medium', 'high', 'max'),
-    WIRE_ANTHROPIC_ADAPTIVE: ('low', 'medium', 'high', 'xhigh', 'max'),
+    WIRE_OPENAI_REASONING_EFFORT: ('minimal', 'low', 'medium', 'high'),
+    WIRE_OPENAI_THINKING_AND_EFFORT: ('low', 'medium', 'high'),
+    WIRE_OPENAI_THINKING_ENABLED: ('low', 'medium', 'high'),
+    WIRE_ANTHROPIC_ADAPTIVE: ('low', 'medium', 'high'),
     WIRE_ANTHROPIC_EXTENDED: ('low', 'medium', 'high'),
-    WIRE_GEMINI_NATIVE: ('low', 'medium', 'high'),
-    WIRE_GEMINI_OPENAI_COMPAT: ('low', 'medium', 'high'),
+    WIRE_GEMINI_NATIVE: ('minimal', 'low', 'medium', 'high'),
+    WIRE_GEMINI_OPENAI_COMPAT: ('minimal', 'low', 'medium', 'high'),
     WIRE_GLM_THINKING: ('low', 'medium', 'high'),
 }
 
 _EFFORT_TO_GEMINI_LEVEL: dict[str, str] = {
+    'minimal': 'minimal',
     'low': 'low',
     'medium': 'medium',
     'high': 'high',
-    'minimal': 'low',
     'max': 'high',
     'xhigh': 'high',
 }
 
-_HAIKU_BUDGET_BY_EFFORT: dict[str, int] = {
+_ANTHROPIC_BUDGET_BY_EFFORT: dict[str, int] = {
+    'minimal': 1024,
     'low': 1024,
     'medium': 4096,
     'high': 8192,
+    'xhigh': 16000,
+    'max': 31999,
 }
 
 
@@ -130,31 +126,31 @@ def infer_family(entry: ModelEntry) -> str:
 
 
 def supports_reasoning(entry: ModelEntry) -> bool:
-    """Return whether reasoning should be applied for this catalog entry."""
+    """Return whether Grinta can safely configure reasoning for this entry."""
     caps = _capabilities(entry)
+    variants = _variants(entry)
     if caps.get('reasoning') is True:
-        return True
+        if variants or entry.provider in {'anthropic', 'google', 'openai', 'xai'}:
+            return True
     if caps.get('reasoning') is False:
         return False
+    if entry.thinking_mode:
+        return True
     if entry.supports_reasoning_effort:
         return True
 
     family = infer_family(entry)
-    if family.startswith(
-        (
-            'gpt',
-            'claude',
-            'deepseek',
-            'gemini',
-            'kimi',
-            'qwen',
-            'glm',
-            'minimax',
-            'grok',
-        )
-    ):
+    if entry.provider == 'anthropic' and family.startswith('claude'):
+        return True
+    if entry.provider == 'google' and family.startswith('gemini'):
+        return True
+    if entry.provider == 'openai' and family.startswith('gpt'):
         return True
     normalized = entry.name.lower()
+    if entry.provider == 'openai' and normalized.startswith(('o1', 'o3', 'o4', 'gpt-')):
+        return True
+    if entry.provider == 'xai' and normalized.startswith('grok-4'):
+        return True
     return normalized.startswith(('o1', 'o3', 'o4', 'gpt-'))
 
 
@@ -171,11 +167,9 @@ def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
     if transport == 'google_native':
         return WIRE_GEMINI_NATIVE
     if transport == 'anthropic_native' or endpoint == '/messages':
-        if family.startswith('claude') and family == 'claude-haiku':
+        if family.startswith(('claude', 'minimax', 'qwen')):
             return WIRE_ANTHROPIC_EXTENDED
-        if family.startswith(('claude', 'minimax')):
-            return WIRE_ANTHROPIC_ADAPTIVE
-        return WIRE_ANTHROPIC_ADAPTIVE
+        return WIRE_ANTHROPIC_EXTENDED
     if family.startswith('gpt') or (
         entry.provider == 'openai' and entry.supports_reasoning_effort
     ):
@@ -207,6 +201,27 @@ def _allowed_efforts(entry: ModelEntry, wire: str) -> tuple[str, ...]:
     if variants:
         return tuple(str(key).lower() for key in variants.keys())
     return _DEFAULT_EFFORTS_BY_WIRE.get(wire, ('low', 'medium', 'high'))
+
+
+def reasoning_effort_options(
+    entry: ModelEntry | None,
+    *,
+    include_disabled: bool = False,
+) -> tuple[str, ...]:
+    """Return executable reasoning effort values for UI/config surfaces.
+
+    The list is derived from the same wire plan used for real calls, so the TUI
+    cannot show labels that the runtime would never be able to apply.
+    """
+    if entry is None or not supports_reasoning(entry):
+        return ()
+    wire = _resolve_wire_schema(entry, infer_family(entry))
+    if wire == WIRE_NONE:
+        return ()
+    values = _allowed_efforts(entry, wire)
+    if include_disabled:
+        return ('none', *tuple(value for value in values if value != 'none'))
+    return values
 
 
 def _normalize_effort(
@@ -253,14 +268,60 @@ def _variant_to_kwargs(variant: dict[str, Any]) -> dict[str, Any]:
     for key, value in variant.items():
         snake = _camel_to_snake(key)
         if snake == 'effort':
-            patch['output_config'] = {'effort': value}
+            # AI SDK metadata. The Python Anthropic SDK used by Grinta does
+            # not accept a top-level output_config field, so effort labels are
+            # mapped by _anthropic_thinking_for_effort() instead.
+            continue
         elif snake == 'reasoning_effort':
             patch['reasoning_effort'] = value
         elif snake == 'thinking' and isinstance(value, dict):
-            patch['thinking'] = value
+            patch['thinking'] = _normalize_thinking_dict(value)
+        elif snake == 'thinking_config' and isinstance(value, dict):
+            patch['thinking_config'] = _normalize_thinking_config_dict(value)
         else:
             patch[snake] = value
     return patch
+
+
+def _normalize_thinking_dict(value: dict[str, Any]) -> dict[str, Any]:
+    thinking: dict[str, Any] = {}
+    for key, raw in value.items():
+        snake = _camel_to_snake(str(key))
+        if snake == 'budget_tokens':
+            thinking['budget_tokens'] = raw
+        elif snake == 'type':
+            thinking['type'] = raw
+        elif snake == 'display':
+            # AI SDK metadata, not accepted by the Anthropic Python SDK.
+            continue
+        else:
+            thinking[snake] = raw
+    return thinking
+
+
+def _normalize_thinking_config_dict(value: dict[str, Any]) -> dict[str, Any]:
+    config: dict[str, Any] = {}
+    for key, raw in value.items():
+        snake = _camel_to_snake(str(key))
+        if snake == 'thinking_level' and isinstance(raw, str):
+            config[snake] = raw.lower()
+        else:
+            config[snake] = raw
+    return config
+
+
+def _anthropic_thinking_for_effort(effort: str, entry: ModelEntry) -> dict[str, Any]:
+    variants = _variants(entry)
+    variant = variants.get(effort)
+    if isinstance(variant, dict):
+        thinking = variant.get('thinking')
+        if isinstance(thinking, dict):
+            normalized = _normalize_thinking_dict(thinking)
+            budget = normalized.get('budget_tokens')
+            if budget is not None:
+                return {'type': 'enabled', 'budget_tokens': int(budget)}
+    budget = _ANTHROPIC_BUDGET_BY_EFFORT.get(effort, 4096)
+    return {'type': 'enabled', 'budget_tokens': budget}
 
 
 def _build_wire_kwargs(wire: str, effort: str, entry: ModelEntry) -> dict[str, Any]:
@@ -287,14 +348,10 @@ def _build_wire_kwargs(wire: str, effort: str, entry: ModelEntry) -> dict[str, A
         return patch
 
     if wire == WIRE_ANTHROPIC_ADAPTIVE:
-        return {
-            'thinking': {'type': 'adaptive'},
-            'output_config': {'effort': effort},
-        }
+        return {'thinking': _anthropic_thinking_for_effort(effort, entry)}
 
     if wire == WIRE_ANTHROPIC_EXTENDED:
-        budget = _HAIKU_BUDGET_BY_EFFORT.get(effort, 4096)
-        return {'thinking': {'type': 'enabled', 'budget_tokens': budget}}
+        return {'thinking': _anthropic_thinking_for_effort(effort, entry)}
 
     if wire == WIRE_GEMINI_NATIVE:
         level = _EFFORT_TO_GEMINI_LEVEL.get(effort, 'medium')
@@ -356,8 +413,14 @@ def resolve_reasoning_plan(
     variants = _variants(entry)
     if resolved in variants and isinstance(variants[resolved], dict):
         kwargs_patch = _variant_to_kwargs(variants[resolved])
-        for key, value in _build_wire_kwargs(wire, resolved, entry).items():
-            kwargs_patch.setdefault(key, value)
+        wire_patch = _build_wire_kwargs(wire, resolved, entry)
+        if wire in {WIRE_ANTHROPIC_ADAPTIVE, WIRE_ANTHROPIC_EXTENDED}:
+            kwargs_patch = {**kwargs_patch, **wire_patch}
+            kwargs_patch.pop('output_config', None)
+            kwargs_patch.pop('effort', None)
+        else:
+            for key, value in wire_patch.items():
+                kwargs_patch.setdefault(key, value)
     else:
         kwargs_patch = _build_wire_kwargs(wire, resolved, entry)
 
@@ -373,7 +436,13 @@ def resolve_reasoning_plan(
 
 def apply_reasoning_plan(call_kwargs: dict[str, Any], plan: ReasoningPlan) -> None:
     """Merge *plan* into *call_kwargs* in place."""
-    for key in ('reasoning_effort', 'thinking', 'output_config', 'enable_thinking'):
+    for key in (
+        'reasoning_effort',
+        'thinking',
+        'output_config',
+        'enable_thinking',
+        'thinking_config',
+    ):
         call_kwargs.pop(key, None)
 
     if not plan.enabled:

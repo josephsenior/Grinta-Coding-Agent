@@ -80,6 +80,23 @@ class TestProviderResolver(TestCase):
             'lightning',
         )
 
+    def test_resolve_provider_prefixed_vercel_model(self):
+        """Prefixed Vercel models resolve by prefix."""
+        self.assertEqual(
+            self.resolver.resolve_provider('vercel/anthropic/claude-haiku-4.5'),
+            'vercel',
+        )
+
+    def test_resolve_provider_config_provider_wins_for_vercel_routing(self):
+        """The selected provider is the transport provider for Vercel proxy routing."""
+        self.assertEqual(
+            self.resolver.resolve_provider(
+                'anthropic/claude-haiku-4.5',
+                config_provider='vercel',
+            ),
+            'vercel',
+        )
+
     def test_resolve_provider_catalog_entry_deepseek(self):
         """Exact DeepSeek catalog entries remain valid."""
         self.assertEqual(self.resolver.resolve_provider('deepseek-v4-pro'), 'deepseek')
@@ -164,6 +181,11 @@ class TestProviderResolver(TestCase):
         """Lightning models use the hosted OpenAI-compatible proxy."""
         result = self.resolver.resolve_base_url('lightning/claude-sonnet-4-6')
         self.assertEqual(result, 'https://lightning.ai/api/v1')
+
+    def test_resolve_base_url_vercel_provider(self):
+        """Vercel AI Gateway models use the hosted OpenAI-compatible proxy."""
+        result = self.resolver.resolve_base_url('vercel/anthropic/claude-haiku-4.5')
+        self.assertEqual(result, 'https://ai-gateway.vercel.sh/v1')
 
     def test_resolve_base_url_ollama_from_env(self):
         """Test resolve_base_url uses OLLAMA_HOST environment variable."""

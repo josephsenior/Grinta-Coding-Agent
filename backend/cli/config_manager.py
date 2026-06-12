@@ -25,7 +25,10 @@ from backend.cli.theme import (
 )
 from backend.core.app_paths import get_app_settings_root
 from backend.core.config import AppConfig, load_app_config
-from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
+from backend.core.config.dotenv_keys import (
+    persist_llm_api_key_to_dotenv,
+    persist_provider_api_key_to_dotenv,
+)
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
 logger = logging.getLogger(__name__)
@@ -41,6 +44,7 @@ DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
     'opencode-go': 'opencode-go/glm-5',
     'openai': DEFAULT_ONBOARDING_MODEL,
     'openrouter': 'openrouter/anthropic/claude-4.5-sonnet',
+    'vercel': 'vercel/anthropic/claude-haiku-4.5',
     'xai': 'xai/grok-build-0.1',
     'deepseek': 'deepseek/deepseek-v4-flash',
 }
@@ -57,6 +61,7 @@ _PROVIDERS: list[tuple[str, str, str]] = [
     ('deepseek', 'DeepSeek', 'cloud'),
     # ── Aggregators / proxies ──
     ('openrouter', 'OpenRouter', 'aggregator'),
+    ('vercel', 'Vercel AI Gateway', 'aggregator'),
     ('lightning', 'Lightning AI', 'aggregator'),
     ('opencode', 'OpenCode Zen', 'aggregator'),
     ('opencode-go', 'OpenCode Go', 'aggregator'),
@@ -632,6 +637,7 @@ def _strip_provider_prefix(model: str) -> str:
         'deepseek',
         'opencode',
         'opencode-go',
+        'vercel',
     ):
         return parts[1]
     return model
@@ -657,6 +663,7 @@ def _provider_base_url(provider: str) -> str | None:
         'xai': 'https://api.x.ai',
         'deepseek': 'https://api.deepseek.com',
         'openrouter': 'https://openrouter.ai/api',
+        'vercel': 'https://ai-gateway.vercel.sh',
         'lightning': 'https://lightning.ai/api',
         'opencode': 'https://opencode.ai/zen',
         'opencode-go': 'https://opencode.ai/zen/go',
@@ -678,7 +685,42 @@ def get_current_model(config: AppConfig) -> str:
         return '(not set)'
 
 
-def _resolve_api_key_value(config: AppConfig) -> str | None:
+def get_current_provider(config: AppConfig) -> str | None:
+    try:
+        from backend.inference.provider_resolver import extract_provider_prefix
+
+        llm_cfg = config.get_llm_config()
+        configured = (getattr(llm_cfg, 'custom_llm_provider', None) or '').strip()
+        if configured:
+            return configured.lower()
+        model = (getattr(llm_cfg, 'model', None) or '').strip()
+        if not model:
+            return None
+        prefixed = extract_provider_prefix(model)
+        if prefixed:
+            return prefixed
+        from backend.inference.catalog_loader import lookup
+
+        entry = lookup(model)
+        return entry.provider if entry else None
+    except Exception:
+        logger.debug('Could not read current provider from config', exc_info=True)
+        return None
+
+
+def _resolve_api_key_value(
+    config: AppConfig, provider: str | None = None
+) -> str | None:
+    if provider:
+        try:
+            from backend.core.config.api_key_manager import api_key_manager
+
+            provider_key = api_key_manager.get_provider_key_from_env(provider)
+            if provider_key and provider_key.strip():
+                return provider_key.strip()
+        except Exception:
+            logger.debug('Could not resolve provider API key', exc_info=True)
+
     llm_cfg = config.get_llm_config()
     raw = _api_key_from_llm_cfg(llm_cfg)
     if raw:
@@ -730,9 +772,9 @@ def _mask_secret(raw: str) -> str:
     return raw[:4] + '•' * min(len(raw) - 8, 20) + raw[-4:]
 
 
-def get_masked_api_key(config: AppConfig) -> str:
+def get_masked_api_key(config: AppConfig, provider: str | None = None) -> str:
     try:
-        raw = _resolve_api_key_value(config)
+        raw = _resolve_api_key_value(config, provider)
         if not raw:
             return '(not set)'
         return _mask_secret(raw)
@@ -742,7 +784,11 @@ def get_masked_api_key(config: AppConfig) -> str:
 
 
 def update_model(
-    model: str, provider: str | None = None, base_url: str | None = None
+    model: str,
+    provider: str | None = None,
+    base_url: str | None = None,
+    reasoning_effort: str | None = None,
+    clear_base_url: bool = False,
 ) -> None:
     settings = _load_raw_settings()
     settings['llm_model'] = model
@@ -750,13 +796,23 @@ def update_model(
         settings['llm_provider'] = provider
     if base_url:
         settings['llm_base_url'] = base_url
+    elif clear_base_url:
+        settings.pop('llm_base_url', None)
+    if reasoning_effort and str(reasoning_effort).strip():
+        settings['llm_reasoning_effort'] = str(reasoning_effort).strip()
+    else:
+        settings.pop('llm_reasoning_effort', None)
     _save_raw_settings(settings)
 
 
-def update_api_key(key: str) -> None:
+def update_api_key(key: str, provider: str | None = None) -> None:
     settings = _load_raw_settings()
     settings['llm_api_key'] = LLM_API_KEY_SETTINGS_PLACEHOLDER
     _save_raw_settings(settings)
+    if provider and provider.strip():
+        persist_provider_api_key_to_dotenv(
+            provider.strip().lower(), key, settings_json_path=_settings_path()
+        )
     persist_llm_api_key_to_dotenv(key, settings_json_path=_settings_path())
 
 

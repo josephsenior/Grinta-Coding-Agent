@@ -16,19 +16,19 @@ warnings.filterwarnings(
 from importlib.metadata import PackageNotFoundError, version  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-_DEFAULT_VERSION = '1.0.0'
+_DEFAULT_VERSION = '1.0.0rc1'
 __version__ = _DEFAULT_VERSION
 __package_name__ = 'grinta-ai'
 
 
 def get_version() -> str:
-    """Get the package version from metadata or pyproject.toml fallback."""
-    from_metadata = _version_from_metadata()
-    if from_metadata:
-        return from_metadata
+    """Get the package version, preferring the local source tree when present."""
     from_pyproject = _version_from_pyproject()
     if from_pyproject:
         return from_pyproject
+    from_metadata = _version_from_metadata()
+    if from_metadata:
+        return from_metadata
     return _DEFAULT_VERSION
 
 

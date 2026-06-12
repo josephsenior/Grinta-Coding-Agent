@@ -31,7 +31,11 @@ def _entry(
 class TestSupportsReasoning:
     def test_metadata_capabilities_reasoning(self):
         entry = _entry(
-            metadata={'capabilities': {'reasoning': True}, 'family': 'deepseek-flash-free'}
+            metadata={
+                'capabilities': {'reasoning': True},
+                'family': 'deepseek-flash-free',
+                'variants': {'high': {'reasoningEffort': 'high'}},
+            }
         )
         assert supports_reasoning(entry) is True
 
@@ -139,8 +143,9 @@ class TestApplyModelParamOverridesIntegration:
             reasoning_effort='high',
         )
         sanitized = sanitize_call_kwargs_for_provider('opencode/claude-fable-5', out)
-        assert sanitized['thinking']['type'] == 'adaptive'
-        assert sanitized['output_config'] == {'effort': 'high'}
+        assert sanitized['thinking']['type'] == 'enabled'
+        assert sanitized['thinking']['budget_tokens'] == 8192
+        assert 'output_config' not in sanitized
         assert 'reasoning_effort' not in sanitized
 
     @pytest.mark.parametrize(

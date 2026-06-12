@@ -269,9 +269,7 @@ class _EventRouterDelegateMixin(EventRouterService if TYPE_CHECKING else object)
                         TASK_STATUS_PLAN_ICONS,
                         TASK_STATUS_TODO,
                     )
-                    from backend.engine.tools.task_tracker import (
-                        TaskTracker,
-                    )
+                    from backend.core.task_tracker import TaskTracker
 
                     tasks = TaskTracker().load_from_file()
                     if tasks:

@@ -14,6 +14,7 @@ import backend.engine.tools.checkpoint as checkpoint_tools
 from backend.core.enums import FileEditSource
 from backend.core.errors import FunctionCallValidationError
 from backend.core.logger import app_logger as logger
+from backend.core.task_tracker import TaskTracker
 from backend.engine.function_calling_helpers import (
     parse_bool_argument,
     require_tool_argument,
@@ -31,7 +32,6 @@ from backend.engine.tools.browser_native import (
 )
 from backend.engine.tools.glob import build_glob_action
 from backend.engine.tools.grep import build_grep_action
-from backend.engine.tools.task_tracker import TaskTracker
 from backend.inference.tool_names import (
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -11,8 +11,8 @@ from backend.context.compact_boundary import (
     boundary_info,
     project_after_compact_boundary,
 )
-from backend.context.compactor import Compactor
 from backend.context.compaction_finalizer import finalize_compaction_artifacts
+from backend.context.compactor import Compactor
 from backend.context.condensed_history import CondensedHistory
 from backend.context.pre_condensation_snapshot import (
     delete_staging_snapshot,
@@ -54,9 +54,11 @@ class ContextMemoryManager:
         self,
         config: AgentConfig,
         llm_registry: LLMRegistry,
+        condensation_recorder: Callable[[], None] | None = None,
     ) -> None:
         self._config = config
         self._llm_registry = llm_registry
+        self._condensation_recorder = condensation_recorder
         self.conversation_memory: ContextMemory | None = None
         self.compactor: Compactor | None = None
         self._pipeline: Any = None
@@ -106,18 +108,21 @@ class ContextMemoryManager:
                 from backend.context.context_pipeline import ContextPipeline
                 from backend.core.config.compactor_config import ContextPipelineConfig
 
+                pipeline_config = compactor_config
+                if not isinstance(pipeline_config, ContextPipelineConfig):
+                    raise TypeError(
+                        'Expected ContextPipelineConfig for context pipeline'
+                    )
+
                 agent_llm = self._resolve_pipeline_llm_config()
-                if (
-                    isinstance(compactor_config, ContextPipelineConfig)
-                    and compactor_config.llm_config is None
-                    and agent_llm is not None
-                ):
-                    compactor_config = compactor_config.model_copy(
+                if pipeline_config.llm_config is None and agent_llm is not None:
+                    pipeline_config = pipeline_config.model_copy(
                         update={'llm_config': agent_llm}
                     )
                 self._pipeline = ContextPipeline.from_config(
-                    compactor_config,
+                    pipeline_config,
                     self._llm_registry,
+                    condensation_recorder=self._condensation_recorder,
                 )
                 self.compactor = None
                 logger.debug('Using context pipeline')

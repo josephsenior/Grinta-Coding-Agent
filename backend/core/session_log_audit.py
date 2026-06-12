@@ -9,7 +9,6 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 NOISE_PATTERNS = (
     re.compile(r'on_event received StreamingChunkAction\b'),

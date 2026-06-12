@@ -8,7 +8,7 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 echo "[2/4] Syncing dependencies"
-uv sync --group dev --group test --group runtime
+uv sync --group dev --group test
 
 echo "[3/4] Running quick unit smoke"
 PYTHONPATH=".:${PYTHONPATH:-}" uv run pytest -q backend/tests/unit -k "not integration" --maxfail=1

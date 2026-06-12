@@ -42,7 +42,7 @@ jobs:
       - name: Lockfile validation
         run: uv lock --check
       - name: Install Python dependencies
-        run: uv sync --group dev --group test --group runtime
+        run: uv sync --group dev --group test
       - name: Verify optional imports
         run: python backend/scripts/verify/verify_optional_imports.py
       - name: Compile backend (syntax gate)
@@ -84,7 +84,7 @@ jobs:
       - name: Lockfile validation
         run: uv lock --check
       - name: Install Python dependencies
-        run: uv sync --group dev --group test --group runtime
+        run: uv sync --group dev --group test
       - name: Verify optional imports
         run: python backend/scripts/verify/verify_optional_imports.py
       - name: Compile backend (syntax gate)
@@ -92,14 +92,14 @@ jobs:
       - name: Run unit tests (full corpus)
         run: uv run pytest -q backend/tests/unit
         env:
-          PYTHONPATH: ".;$env:PYTHONPATH"
+          PYTHONPATH: '.;$env:PYTHONPATH'
 
       - name: Run coverage for Codecov
         if: always()
         shell: pwsh
         run: uv run pytest --maxfail=1 -q --cov=backend --cov-fail-under=0 --cov-report=xml:coverage.xml backend/tests/unit
         env:
-          PYTHONPATH: ".;$env:PYTHONPATH"
+          PYTHONPATH: '.;$env:PYTHONPATH'
 
       - name: Upload coverage to Codecov
         if: always()
@@ -130,7 +130,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Python dependencies
-        run: uv sync --group dev --group test --group runtime
+        run: uv sync --group dev --group test
       - name: Lockfile validation
         run: uv lock --check
       - name: Verify optional imports
@@ -159,7 +159,7 @@ jobs:
       - name: Lockfile validation
         run: uv lock --check
       - name: Install Python dependencies
-        run: uv sync --group dev --group test --group runtime
+        run: uv sync --group dev --group test
       - name: Verify optional imports
         run: python backend/scripts/verify/verify_optional_imports.py
       - name: Compile backend (syntax gate)

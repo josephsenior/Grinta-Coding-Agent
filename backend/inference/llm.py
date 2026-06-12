@@ -467,6 +467,7 @@ def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
         runtime_parameter_mode,
     )
     from backend.inference.context_limits import limits_from_config
+    from backend.inference.reasoning import reasoning_effort_options
 
     model = str(getattr(config, 'model', '') or '').strip()
     config_provider = getattr(config, 'custom_llm_provider', None)
@@ -530,6 +531,9 @@ def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
             'supports_function_calling': entry.supports_function_calling,
             'supports_parallel_tool_calls': entry.supports_parallel_tool_calls,
             'supports_reasoning_effort': entry.supports_reasoning_effort,
+            'resolved_reasoning_effort_options': list(
+                reasoning_effort_options(entry, include_disabled=True)
+            ),
             'supports_prompt_cache': entry.supports_prompt_cache,
             'supports_response_schema': entry.supports_response_schema,
             'supports_vision': entry.supports_vision,

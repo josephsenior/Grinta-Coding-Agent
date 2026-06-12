@@ -163,7 +163,7 @@ def _filter_sessions_fuzzy(
 ) -> list[tuple[str, dict[str, Any], int]]:
     """Filter sessions using fuzzy matching on id, title, and model."""
     try:
-        from rapidfuzz import fuzz
+        from rapidfuzz import fuzz  # noqa: F401
     except ImportError:
         return _filter_sessions_fallback(sessions, search_term)
     return _filter_sessions_scored(sessions, search_term.lower())

@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.core.enums import AgentState
 from backend.core.schemas import AgentState
 
 

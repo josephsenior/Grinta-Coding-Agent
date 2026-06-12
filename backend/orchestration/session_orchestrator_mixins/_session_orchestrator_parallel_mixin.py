@@ -217,7 +217,7 @@ class _SessionOrchestratorParallelMixin:
                 for action in reversed(failed_actions):
                     _prepend_action(current_pending, action)
 
-    async def _drain_step_barrier(self, *, timeout: float = 2.0) -> bool:
+    async def _drain_step_barrier(self, *, timeout: float = 2.0) -> bool:  # noqa: ASYNC109
         """Drain background tasks and wait for outstanding pending actions."""
         from backend.utils.async_utils import drain_step_barrier
 

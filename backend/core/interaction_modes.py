@@ -2,13 +2,6 @@
 
 from __future__ import annotations
 
-AGENT_MODE = 'agent'
-CHAT_MODE = 'chat'
-PLAN_MODE = 'plan'
-
-VISIBLE_INTERACTION_MODES = (CHAT_MODE, PLAN_MODE, AGENT_MODE)
-VALID_INTERACTION_MODES = frozenset(VISIBLE_INTERACTION_MODES)
-
 from backend.inference.tool_names import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
     ASK_USER_TOOL_NAME,
@@ -21,6 +14,13 @@ from backend.inference.tool_names import (
     WEB_FETCH_TOOL_NAME,
     WEB_SEARCH_TOOL_NAME,
 )
+
+AGENT_MODE = 'agent'
+CHAT_MODE = 'chat'
+PLAN_MODE = 'plan'
+
+VISIBLE_INTERACTION_MODES = (CHAT_MODE, PLAN_MODE, AGENT_MODE)
+VALID_INTERACTION_MODES = frozenset(VISIBLE_INTERACTION_MODES)
 
 _DISCOVERY_TOOLS = frozenset(
     {

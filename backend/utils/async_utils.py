@@ -614,7 +614,7 @@ async def drain_step_barrier(
     *,
     has_outstanding: Callable[[], bool] | None = None,
     max_rounds: int = 20,
-    timeout: float = 2.0,
+    timeout: float = 2.0,  # noqa: ASYNC109
     poll_interval: float = 0.05,
 ) -> bool:
     """Drain background tasks and wait for outstanding pending actions to clear.

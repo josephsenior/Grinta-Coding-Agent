@@ -104,9 +104,10 @@ class WelcomeWidget(Vertical):
 
     @property
     def header(self) -> str:
-        """Public accessor for the header text (used by callers that want
-        to reference the card's question/title in a reply, e.g. to scaffold
-        a user reply that preserves question context).
+        """Public accessor for the header text.
+
+        Used by callers that want to reference the card's question/title
+        in a reply, e.g. to scaffold a user reply that preserves question context.
         """
         return self._header_text
 

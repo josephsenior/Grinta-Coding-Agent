@@ -51,7 +51,7 @@ uv run python -m backend.cli.entry
 **Required** GitHub Actions jobs on Linux and Windows run the full **unit** corpus only. Match that locally before you open a PR:
 
 ```bash
-uv sync --group dev --group test --group runtime
+uv sync --group dev --group test
 PYTHONPATH=. uv run pytest backend/tests/unit
 ```
 

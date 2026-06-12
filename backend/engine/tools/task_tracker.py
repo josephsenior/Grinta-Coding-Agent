@@ -1,7 +1,5 @@
 """Structured task tracking tool definition for Orchestrator runs."""
 
-import json
-from pathlib import Path
 from typing import Any
 
 from backend.core.task_status import (
@@ -11,14 +9,10 @@ from backend.core.task_status import (
     TASK_STATUS_SKIPPED,
     TASK_STATUS_TODO,
 )
+from backend.core.task_tracker import TaskTracker
 from backend.engine.contracts import ChatCompletionToolParam
-from backend.engine.tools.common import (
-    create_tool_definition,
-    get_command_param,
-)
-from backend.inference.tool_names import (
-    TASK_TRACKER_TOOL_NAME,
-)
+from backend.engine.tools.common import create_tool_definition, get_command_param
+from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
 
 _TASK_TRACKER_DESCRIPTION = (
     'Maintain a structured plan to track progress. '
@@ -79,124 +73,6 @@ def _task_step_schema(depth: int = 2) -> dict[str, Any]:
     }
 
 
-class TaskTracker:
-    """Manages the persistence of the task plan to disk."""
-
-    def __init__(self, workspace_root: str | Path | None = None):
-        """Initialize the task tracker with a workspace root."""
-        if workspace_root is None:
-            from backend.core.workspace_resolution import (
-                require_effective_workspace_root,
-            )
-
-            workspace_root = require_effective_workspace_root()
-        from backend.core.workspace_resolution import workspace_agent_state_dir
-
-        self.path = workspace_agent_state_dir(workspace_root) / 'active_plan.json'
-
-    def load_from_file(self) -> list[dict[str, Any]]:
-        """Load the task list from disk."""
-        if not self.path.exists():
-            return []
-        try:
-            with open(self.path, encoding='utf-8') as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            return []
-
-        if not isinstance(data, list):
-            return []
-
-        from backend.core.contracts.state import normalize_plan_step_payload
-
-        try:
-            return [
-                normalize_plan_step_payload(task, i + 1) for i, task in enumerate(data)
-            ]
-        except TypeError:
-            return []
-
-    def save_to_file(self, task_list: list[dict[str, Any]]) -> None:
-        """Save the task list to disk atomically.
-
-        Writes to a sibling ``.tmp`` file first, fsyncs it, then uses
-        ``os.replace`` for an atomic rename.  This prevents a crash or
-        disk-full event mid-write from silently corrupting or truncating
-        ``active_plan.json``.
-        """
-        import os
-
-        from backend.core.contracts.state import normalize_plan_step_payload
-
-        normalized = [
-            normalize_plan_step_payload(task, i + 1) for i, task in enumerate(task_list)
-        ]
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix('.json.tmp')
-        with open(tmp, 'w', encoding='utf-8') as f:
-            json.dump(normalized, f, indent=2, ensure_ascii=False)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, self.path)
-
-    def update_task_status(
-        self, task_id: str, status: str, result: str | None = None
-    ) -> tuple[bool, str]:
-        """Update status of a single task by ID.
-
-        Args:
-            task_id: The ID of the task to update (e.g., '1', '1.1', '2')
-            status: New status value
-            result: Optional result or note about the task outcome
-
-        Returns:
-            Tuple of (success, message)
-        """
-        valid_statuses = {
-            TASK_STATUS_TODO,
-            TASK_STATUS_IN_PROGRESS,
-            TASK_STATUS_DONE,
-            TASK_STATUS_SKIPPED,
-            TASK_STATUS_BLOCKED,
-        }
-        if status not in valid_statuses:
-            return (
-                False,
-                f"Invalid status '{status}'. Valid: {', '.join(sorted(valid_statuses))}",
-            )
-
-        task_list = self.load_from_file()
-        if not task_list:
-            return False, 'No tasks found. Create a plan first with update command.'
-
-        task = _find_task_by_id(task_list, task_id)
-        if task is None:
-            return False, f"Task '{task_id}' not found."
-
-        old_status = task.get('status', 'unknown')
-        task['status'] = status
-        if result is not None:
-            task['result'] = result
-        self.save_to_file(task_list)
-        return True, f"Task '{task_id}' status updated: {old_status} -> {status}"
-
-
-def _find_task_by_id(
-    task_list: list[dict[str, Any]], task_id: str
-) -> dict[str, Any] | None:
-    """Find a task by ID in the task list, including nested subtasks."""
-    for task in task_list:
-        if task.get('id') == task_id:
-            return task
-        # Search subtasks recursively
-        subtasks = task.get('subtasks', [])
-        if subtasks:
-            found = _find_task_by_id(subtasks, task_id)
-            if found is not None:
-                return found
-    return None
-
-
 def create_task_tracker_tool() -> ChatCompletionToolParam:
     """Create the task tracker tool for the Orchestrator agent."""
     return create_tool_definition(
@@ -238,3 +114,6 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
         },
         required=['command'],
     )
+
+
+__all__ = ['TaskTracker', 'create_task_tracker_tool']

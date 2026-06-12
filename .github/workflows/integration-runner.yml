@@ -68,13 +68,13 @@ jobs:
     if: needs.detect-integration-assets.outputs.available == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
     permissions:
-      contents: "read"
-      id-token: "write"
-      pull-requests: "write"
-      issues: "write"
+      contents: 'read'
+      id-token: 'write'
+      pull-requests: 'write'
+      issues: 'write'
     strategy:
       matrix:
-        python-version: ["3.12"]
+        python-version: ['3.12']
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -103,11 +103,11 @@ jobs:
             Hi! I started running the integration tests on your PR. You will receive a comment with the results shortly.
 
       - name: Install Python dependencies
-        run: uv sync --group dev --group test --group runtime
+        run: uv sync --group dev --group test
 
       - name: Configure settings.json for testing with Haiku
         env:
-          LLM_MODEL: "litellm_proxy/anthropic/claude-haiku-4-5-20251001"
+          LLM_MODEL: 'litellm_proxy/anthropic/claude-haiku-4-5-20251001'
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           MAX_ITERATIONS: 10
@@ -136,7 +136,7 @@ jobs:
 
       - name: Configure settings.json for testing with DeepSeek
         env:
-          LLM_MODEL: "litellm_proxy/deepseek-chat"
+          LLM_MODEL: 'litellm_proxy/deepseek-chat'
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           MAX_ITERATIONS: 10
@@ -164,7 +164,7 @@ jobs:
 
       - name: Configure settings.json for testing VisualNavigator (DeepSeek)
         env:
-          LLM_MODEL: "litellm_proxy/deepseek-chat"
+          LLM_MODEL: 'litellm_proxy/deepseek-chat'
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           MAX_ITERATIONS: 15
@@ -220,17 +220,17 @@ jobs:
           number: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || 9745 }}
           unique: false
           comment: |
-              Trigger by: ${{ github.event_name == 'pull_request' && format('Pull Request #{0}', github.event.pull_request.number) || (github.event_name == 'workflow_dispatch' && format('Manual Trigger: {0}', github.event.inputs.reason)) || 'Nightly Scheduled Run' }}
-              Commit: ${{ github.sha }}
-              **Integration Tests Report (Haiku)**
-              Haiku LLM Test Results:
-              ${{ env.INTEGRATION_TEST_REPORT_HAIKU }}
-              ---
-              **Integration Tests Report (DeepSeek)**
-              DeepSeek LLM Test Results:
-              ${{ env.INTEGRATION_TEST_REPORT_DEEPSEEK }}
-              ---
-              **Integration Tests Report VisualBrowsing (DeepSeek)**
-              ${{ env.INTEGRATION_TEST_REPORT_VISUALBROWSING_DEEPSEEK }}
-              ---
-              Download testing outputs (includes both Haiku and DeepSeek results): [Download](${{ steps.upload_results_artifact.outputs.artifact-url }})
+            Trigger by: ${{ github.event_name == 'pull_request' && format('Pull Request #{0}', github.event.pull_request.number) || (github.event_name == 'workflow_dispatch' && format('Manual Trigger: {0}', github.event.inputs.reason)) || 'Nightly Scheduled Run' }}
+            Commit: ${{ github.sha }}
+            **Integration Tests Report (Haiku)**
+            Haiku LLM Test Results:
+            ${{ env.INTEGRATION_TEST_REPORT_HAIKU }}
+            ---
+            **Integration Tests Report (DeepSeek)**
+            DeepSeek LLM Test Results:
+            ${{ env.INTEGRATION_TEST_REPORT_DEEPSEEK }}
+            ---
+            **Integration Tests Report VisualBrowsing (DeepSeek)**
+            ${{ env.INTEGRATION_TEST_REPORT_VISUALBROWSING_DEEPSEEK }}
+            ---
+            Download testing outputs (includes both Haiku and DeepSeek results): [Download](${{ steps.upload_results_artifact.outputs.artifact-url }})
