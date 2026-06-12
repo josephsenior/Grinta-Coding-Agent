@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -110,10 +110,9 @@ async def test_prepare_step_commits_degraded_boundary_when_over_threshold(pipeli
             'backend.context.context_pipeline.session_memory_exists',
             return_value=False,
         ),
-        patch('backend.context.context_pipeline.commit_snapshot'),
+        patch('backend.context.context_pipeline.finalize_compaction_artifacts'),
         patch('backend.context.context_pipeline.delete_staging_snapshot'),
         patch('backend.context.context_pipeline.maybe_update'),
-        patch('backend.context.context_pipeline.sync_snapshot_to_working_memory'),
         patch.object(pipeline, '_llm_config', return_value=llm_config),
     ):
         result = await pipeline.prepare_step(state)
@@ -138,8 +137,7 @@ async def test_prepare_step_uses_prewarmed_compaction(pipeline):
     state = _make_state(events)
     state.turn_signals.prewarmed_compaction = prewarmed
     with (
-        patch('backend.context.context_pipeline.commit_snapshot'),
-        patch('backend.context.context_pipeline.sync_snapshot_to_working_memory'),
+        patch('backend.context.context_pipeline.finalize_compaction_artifacts'),
         patch('backend.context.context_pipeline.maybe_update'),
     ):
         result = await pipeline.prepare_step(state)
@@ -162,7 +160,9 @@ async def test_prepare_step_rejects_prewarmed_compaction_that_fails_continuity(
     state = _make_state(events)
     state.turn_signals.prewarmed_compaction = Compaction(action=action)
     with (
-        patch('backend.context.context_pipeline.commit_snapshot') as mock_commit,
+        patch(
+            'backend.context.context_pipeline.finalize_compaction_artifacts'
+        ) as mock_finalize,
         patch('backend.context.context_pipeline.delete_staging_snapshot'),
         patch('backend.context.context_pipeline.maybe_update'),
         patch.object(pipeline, '_passes_effectiveness_gate', return_value=True),
@@ -172,7 +172,7 @@ async def test_prepare_step_rejects_prewarmed_compaction_that_fails_continuity(
 
     assert result.pending_action is None
     assert result.events == events
-    mock_commit.assert_not_called()
+    mock_finalize.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -197,7 +197,9 @@ async def test_prepare_step_rejects_micro_prune_and_respects_cooldown(pipeline):
             'backend.context.context_pipeline._select_compaction_tail',
             return_value=events[-47:],
         ),
-        patch('backend.context.context_pipeline.commit_snapshot') as mock_commit,
+        patch(
+            'backend.context.context_pipeline.finalize_compaction_artifacts'
+        ) as mock_finalize,
         patch('backend.context.context_pipeline.delete_staging_snapshot'),
         patch('backend.context.context_pipeline.maybe_update'),
     ):
@@ -213,7 +215,7 @@ async def test_prepare_step_rejects_micro_prune_and_respects_cooldown(pipeline):
             ):
                 first = await pipeline.prepare_step(state)
         assert first.pending_action is None
-        mock_commit.assert_not_called()
+        mock_finalize.assert_not_called()
 
         state.extra_data['context_pipeline_state'] = {
             'last_boundary_compact_at': __import__('time').time(),
@@ -246,6 +248,111 @@ def test_configure_structured_compactor_size_forces_material_prune():
     stop = len(events) - tail_count if tail_count else len(events)
     pruned_count = stop - compactor.keep_first
     assert pruned_count >= 20
+
+
+@pytest.mark.asyncio
+async def test_run_compaction_tries_structured_llm_before_session_memory():
+    events = [_user('fix context', 1)]
+    for event_id in range(2, 80):
+        events.append(_cmd_output(f'line {event_id}', event_id))
+    state = _make_state(events)
+    pipeline = ContextPipeline(
+        llm_registry=MagicMock(),
+        config=ContextPipelineConfig(allow_llm_hot_path=True),
+        llm_compact_cooldown_seconds=0,
+    )
+    llm_action = CondensationAction(
+        pruned_event_ids=list(range(2, 60)),
+        summary='structured summary',
+        summary_offset=0,
+    )
+    budget = SimpleNamespace(
+        should_autocompact=True,
+        estimated_tokens=80_000,
+        autocompact_threshold=70_000,
+        fixed_prompt_reserve_tokens=0,
+    )
+
+    with (
+        patch.object(
+            pipeline,
+            '_llm_structured_compaction',
+            new=AsyncMock(return_value=llm_action),
+        ) as mock_llm,
+        patch.object(pipeline, '_session_memory_compaction') as mock_session,
+        patch(
+            'backend.context.context_pipeline.session_memory_exists',
+            return_value=True,
+        ),
+    ):
+        action = await pipeline._run_compaction(
+            state,
+            events,
+            events,
+            budget,  # type: ignore[arg-type]
+            llm_config=SimpleNamespace(model='test-model'),
+            force=False,
+            critical=False,
+        )
+
+    assert action is llm_action
+    mock_llm.assert_awaited_once()
+    mock_session.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_run_compaction_uses_session_memory_only_as_fallback():
+    events = [_user('fix context', 1)]
+    for event_id in range(2, 80):
+        events.append(_cmd_output(f'line {event_id}', event_id))
+    state = _make_state(events)
+    pipeline = ContextPipeline(
+        llm_registry=MagicMock(),
+        config=ContextPipelineConfig(allow_llm_hot_path=True),
+        llm_compact_cooldown_seconds=0,
+    )
+    session_action = CondensationAction(
+        pruned_event_ids=list(range(2, 60)),
+        summary='session fallback summary',
+        summary_offset=0,
+    )
+    budget = SimpleNamespace(
+        should_autocompact=True,
+        estimated_tokens=80_000,
+        autocompact_threshold=70_000,
+        fixed_prompt_reserve_tokens=0,
+    )
+
+    with (
+        patch.object(
+            pipeline,
+            '_llm_structured_compaction',
+            new=AsyncMock(return_value=None),
+        ) as mock_llm,
+        patch.object(
+            pipeline,
+            '_session_memory_compaction',
+            return_value=session_action,
+        ) as mock_session,
+        patch.object(pipeline, '_action_meets_effectiveness', return_value=True),
+        patch(
+            'backend.context.context_pipeline.session_memory_exists',
+            return_value=True,
+        ),
+    ):
+        action = await pipeline._run_compaction(
+            state,
+            events,
+            events,
+            budget,  # type: ignore[arg-type]
+            llm_config=SimpleNamespace(model='test-model'),
+            force=False,
+            critical=False,
+        )
+
+    assert action is session_action
+    mock_llm.assert_awaited_once()
+    mock_session.assert_called_once()
 
 
 def test_build_prompt_events_injects_context_packet(pipeline):

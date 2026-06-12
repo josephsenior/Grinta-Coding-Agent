@@ -12,9 +12,9 @@ from backend.context.compact_boundary import (
     project_after_compact_boundary,
 )
 from backend.context.compactor import Compactor
+from backend.context.compaction_finalizer import finalize_compaction_artifacts
 from backend.context.condensed_history import CondensedHistory
 from backend.context.pre_condensation_snapshot import (
-    commit_snapshot,
     delete_staging_snapshot,
     extract_snapshot,
     format_snapshot_for_injection,
@@ -383,13 +383,7 @@ class ContextMemoryManager:
         postprocess_started: float,
     ) -> CondensedHistory:
         action = condensation_result.action
-        commit_snapshot(state=state)
-        try:
-            from backend.context.working_set import sync_snapshot_to_working_memory
-
-            sync_snapshot_to_working_memory(load_snapshot(state=state))
-        except Exception:
-            logger.debug('Post-compaction working memory sync failed', exc_info=True)
+        finalize_compaction_artifacts(state=state)
 
         if self._is_noop_condensation_action(
             action
@@ -642,7 +636,7 @@ class ContextMemoryManager:
             )
             from backend.context.prompt_window import (
                 PromptWindowResult,
-                estimate_events_tokens,
+                estimate_prompt_events_tokens,
             )
 
             prompt_window = PromptWindowResult(
@@ -650,8 +644,10 @@ class ContextMemoryManager:
                 original_events=len(full_history),
                 selected_events=len(events_for_prompt),
                 dropped_events=max(0, len(full_history) - len(events_for_prompt)),
-                estimated_tokens=estimate_events_tokens(full_history),
-                selected_estimated_tokens=estimate_events_tokens(events_for_prompt),
+                estimated_tokens=estimate_prompt_events_tokens(full_history),
+                selected_estimated_tokens=estimate_prompt_events_tokens(
+                    events_for_prompt
+                ),
                 token_budget=None,
                 protected_events=0,
                 windowed=False,
@@ -668,7 +664,7 @@ class ContextMemoryManager:
                     info.pruned_event_count,
                     info.post_boundary_event_count,
                 )
-            prompt_window = select_prompt_events(events, llm_config)
+            prompt_window = select_prompt_events(events, llm_config, state=state)
             events_for_prompt = prompt_window.events
         return events_for_prompt, prompt_window
 

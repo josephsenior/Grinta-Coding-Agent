@@ -28,6 +28,7 @@ _MAX_FAILED_APPROACHES = 12
 _MAX_BACKGROUND_TASKS = 8
 _MAX_INVALIDATED = 10
 _MAX_RECENT_WORK = 16
+_MAX_TASK_PLAN_ITEMS = 20
 _MAX_OUTPUT_CHARS = 360
 
 
@@ -88,6 +89,18 @@ class RecentWorkItem:
 
 
 @dataclass
+class TaskPlanItem:
+    """Latest task-tracker item preserved across compaction."""
+
+    description: str = ''
+    status: str = 'todo'
+    result: str = ''
+    task_id: str = ''
+    event_id: int | None = None
+    updated_at: str = ''
+
+
+@dataclass
 class CanonicalTaskState:
     """Durable compact task profile used by prompt packets and compaction gates."""
 
@@ -96,6 +109,8 @@ class CanonicalTaskState:
     latest_directive: str = ''
     active_plan: str = ''
     next_action: str = ''
+    implementation_checkpoint: str = ''
+    task_plan: list[TaskPlanItem] = field(default_factory=list)
     active_files: list[str] = field(default_factory=list)
     verification: VerificationState = field(default_factory=VerificationState)
     blockers: list[str] = field(default_factory=list)
@@ -122,6 +137,7 @@ class CanonicalTaskState:
             'latest_directive',
             'active_plan',
             'next_action',
+            'implementation_checkpoint',
             'active_files',
             'blockers',
             'invalidated_assumptions',
@@ -153,6 +169,11 @@ class CanonicalTaskState:
             for item in data.get('recent_work', [])
             if isinstance(item, dict)
         ][-_MAX_RECENT_WORK:]
+        state.task_plan = [
+            TaskPlanItem(**_known_dataclass_fields(TaskPlanItem, item))
+            for item in data.get('task_plan', [])
+            if isinstance(item, dict)
+        ][-_MAX_TASK_PLAN_ITEMS:]
         freshness: dict[str, FieldFreshness] = {}
         raw_freshness = data.get('field_freshness', {})
         if isinstance(raw_freshness, dict):
@@ -274,6 +295,7 @@ def reduce_snapshot_into_state(
 
     _merge_failed_approaches(canonical, snapshot, event_id, source)
     _merge_background_tasks(canonical, snapshot, event_id, source)
+    _merge_task_plan(canonical, snapshot, event_id, source)
     _merge_recent_work(canonical, snapshot, event_id, source)
     _update_blockers(canonical, snapshot, event_id, source)
     canonical.decisions = _merge_strings(
@@ -314,6 +336,7 @@ def apply_canonical_patch(
     text_fields = {
         'active_plan': 'active_plan',
         'next_action': 'next_action',
+        'implementation_checkpoint': 'implementation_checkpoint',
         'narrative_summary': 'narrative_summary',
         'vcs_status': 'vcs_status',
     }
@@ -349,10 +372,8 @@ def render_canonical_state_for_prompt(
     _append(lines, f'- Objective: {canonical.objective}')
     if canonical.latest_directive and canonical.latest_directive != canonical.objective:
         _append(lines, f'- Latest directive: {canonical.latest_directive}')
-    _append(lines, f'- Active plan: {canonical.active_plan}')
     _append(lines, f'- Next action: {canonical.next_action}')
-    if canonical.active_files:
-        _append(lines, '- Active files: ' + ', '.join(canonical.active_files[-12:]))
+    _append(lines, f'- Implementation checkpoint: {canonical.implementation_checkpoint}')
     if canonical.verification.command:
         status = canonical.verification.status.upper() or '?'
         _append(
@@ -361,6 +382,16 @@ def render_canonical_state_for_prompt(
             f'(exit={canonical.verification.exit_code}): {canonical.verification.command}',
         )
         _append(lines, f'  Output: {canonical.verification.output[:220]}')
+    _append(lines, f'- Active plan: {canonical.active_plan}')
+    if canonical.task_plan:
+        _append(lines, '- Task tracker:')
+        for item in canonical.task_plan[-10:]:
+            detail = f'[{item.status}] {item.description}'
+            if item.result:
+                detail += f' -> {item.result}'
+            _append(lines, f'  - {detail}')
+    if canonical.active_files:
+        _append(lines, '- Active files: ' + ', '.join(canonical.active_files[-12:]))
     _append_list(lines, 'Blockers', canonical.blockers[-6:])
     if canonical.background_tasks:
         _append(lines, '- Background tasks:')
@@ -414,6 +445,10 @@ def validate_canonical_state_for_compaction(
         missing.append('latest_verification')
     if snapshot.get('background_tasks') and not canonical.background_tasks:
         missing.append('background_tasks')
+    if snapshot.get('task_plan') and not canonical.task_plan:
+        missing.append('task_plan')
+    if snapshot.get('task_plan') and not canonical.next_action:
+        missing.append('next_action')
     fingerprints = [
         item.fingerprint for item in canonical.failed_approaches if item.fingerprint
     ]
@@ -605,6 +640,117 @@ def _merge_background_tasks(
         _touch_field(canonical, 'background_tasks', event_id, source)
 
 
+def _merge_task_plan(
+    canonical: CanonicalTaskState,
+    snapshot: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
+    raw_plan = snapshot.get('task_plan')
+    if not isinstance(raw_plan, dict) or not raw_plan:
+        return
+    plan_event_id = raw_plan.get('event_id')
+    if not isinstance(plan_event_id, int):
+        plan_event_id = event_id
+    if not _can_update(canonical, 'task_plan', plan_event_id):
+        return
+    tasks = _coerce_task_plan(raw_plan.get('tasks'), plan_event_id)
+    if not tasks:
+        return
+    canonical.task_plan = tasks[-_MAX_TASK_PLAN_ITEMS:]
+    _touch_field(canonical, 'task_plan', plan_event_id, source)
+
+    active_plan = _render_active_plan(tasks)
+    if active_plan:
+        _set_field(canonical, 'active_plan', active_plan, plan_event_id, source)
+    next_action = _clean(raw_plan.get('next_action')) or _next_action_from_task_plan(
+        tasks
+    )
+    if next_action:
+        _set_field(canonical, 'next_action', next_action, plan_event_id, source)
+    checkpoint = _implementation_checkpoint_from_task_plan(tasks)
+    if checkpoint:
+        _set_field(
+            canonical,
+            'implementation_checkpoint',
+            checkpoint,
+            plan_event_id,
+            source,
+        )
+
+
+def _coerce_task_plan(value: object, event_id: int | None) -> list[TaskPlanItem]:
+    if not isinstance(value, list):
+        return []
+    tasks: list[TaskPlanItem] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        description = _clean(item.get('description'))[:240]
+        if not description:
+            continue
+        tasks.append(
+            TaskPlanItem(
+                description=description,
+                status=_normalize_task_status(item.get('status')),
+                result=_clean(item.get('result'))[:240],
+                task_id=_clean(item.get('id') or item.get('task_id'))[:80],
+                event_id=event_id,
+                updated_at=_now(),
+            )
+        )
+    return tasks
+
+
+def _normalize_task_status(value: object) -> str:
+    try:
+        from backend.core.task_status import TASK_STATUS_TODO, normalize_task_status
+
+        return normalize_task_status(value, default=TASK_STATUS_TODO)
+    except Exception:
+        status = str(value or 'todo').strip().lower()
+        return status or 'todo'
+
+
+def _render_active_plan(tasks: list[TaskPlanItem]) -> str:
+    parts: list[str] = []
+    for item in tasks[:12]:
+        detail = f'[{item.status}] {item.description}'
+        if item.result:
+            detail += f' -> {item.result}'
+        parts.append(detail[:260])
+    return '; '.join(parts)[:1200]
+
+
+def _next_action_from_task_plan(tasks: list[TaskPlanItem]) -> str:
+    for status in ('in_progress', 'todo', 'blocked'):
+        item = next((task for task in tasks if task.status == status), None)
+        if item is None:
+            continue
+        if status == 'blocked':
+            return f'Unblock task: {item.description}'[:240]
+        return item.description[:240]
+    return ''
+
+
+def _implementation_checkpoint_from_task_plan(tasks: list[TaskPlanItem]) -> str:
+    done = [task.description for task in tasks if task.status == 'done']
+    current = [
+        task.description for task in tasks if task.status in {'in_progress', 'blocked'}
+    ]
+    remaining = [task.description for task in tasks if task.status == 'todo']
+    pieces: list[str] = []
+    if done:
+        pieces.append('done: ' + ', '.join(done[-5:]))
+    if current:
+        pieces.append('current: ' + ', '.join(current[:3]))
+    if remaining:
+        pieces.append('remaining: ' + ', '.join(remaining[:8]))
+    if not pieces and tasks:
+        pieces.append('task tracker has no active remaining items')
+    return ' | '.join(pieces)[:900]
+
+
 def _resolve_background_tasks_from_events(
     canonical: CanonicalTaskState,
     events: list[Event],
@@ -700,6 +846,24 @@ def _merge_recent_work(
                 )
             )
 
+    raw_plan = snapshot.get('task_plan')
+    if isinstance(raw_plan, dict):
+        next_action = str(raw_plan.get('next_action', '') or '').strip()
+        tasks = raw_plan.get('tasks')
+        task_count = len(tasks) if isinstance(tasks, list) else 0
+        if next_action or task_count:
+            incoming.append(
+                RecentWorkItem(
+                    kind='plan',
+                    detail=(next_action or f'{task_count} task tracker items')[:240],
+                    outcome=f'{task_count} tasks' if task_count else '',
+                    event_id=raw_plan.get('event_id')
+                    if isinstance(raw_plan.get('event_id'), int)
+                    else event_id,
+                    updated_at=_now(),
+                )
+            )
+
     if not incoming:
         return
     by_key = {
@@ -759,6 +923,10 @@ def _update_vcs_status(
 
 
 def _infer_next_action(canonical: CanonicalTaskState) -> str:
+    if canonical.task_plan:
+        next_action = _next_action_from_task_plan(canonical.task_plan)
+        if next_action:
+            return next_action
     if canonical.background_tasks:
         task = canonical.background_tasks[-1]
         return task.next_action or f'Read background terminal {task.session_id}.'
@@ -777,6 +945,9 @@ def _latest_event_id(events: list[Event]) -> int | None:
 
 def _snapshot_latest_event_id(snapshot: dict[str, Any]) -> int | None:
     ids: list[int] = []
+    task_plan = snapshot.get('task_plan')
+    if isinstance(task_plan, dict) and isinstance(task_plan.get('event_id'), int):
+        ids.append(task_plan['event_id'])
     for result in (
         snapshot.get('test_results', [])
         if isinstance(snapshot.get('test_results'), list)

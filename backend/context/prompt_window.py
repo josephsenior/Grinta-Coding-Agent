@@ -86,6 +86,7 @@ def _build_windowing_context(
     events: list[Event],
     llm_config: object,
     *,
+    state: object | None = None,
     emergency_only: bool = False,
     tool_budget_applied: bool = False,
 ) -> _WindowingContext:
@@ -93,8 +94,8 @@ def _build_windowing_context(
 
     event_list = events if tool_budget_applied else apply_tool_result_budget(events)
     original_event_count = len(event_list)
-    full_tokens = estimate_events_tokens(event_list)
-    budget = _history_token_budget(llm_config)
+    full_tokens = estimate_prompt_events_tokens(event_list)
+    budget = _history_token_budget(llm_config, state=state)
     max_events = _prompt_history_max_events(llm_config)
     default_min_events = (
         DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS if emergency_only else _DEFAULT_MIN_EVENTS
@@ -139,7 +140,7 @@ def _inject_working_set(ctx: _WindowingContext, raw_events: list[Event]) -> None
     working_set = build_working_set_observation(raw_events)
     if working_set is not None:
         ctx.event_list = [working_set, *ctx.event_list]
-        ctx.full_tokens = estimate_events_tokens(ctx.event_list)
+        ctx.full_tokens = estimate_prompt_events_tokens(ctx.event_list)
         ctx.over_budget = ctx.budget is not None and ctx.full_tokens > ctx.budget
         ctx.over_count = (
             ctx.max_events is not None and len(ctx.event_list) > ctx.max_events
@@ -168,11 +169,11 @@ def _truncate_if_over_budget(chunk, chunk_tokens, ctx, selected_tokens):
         return chunk, chunk_tokens, len(chunk)
     remaining = max(1, ctx.budget - selected_tokens)
     chunk = _truncate_chunk_to_budget(chunk, remaining)
-    return chunk, estimate_events_tokens(chunk), len(chunk)
+    return chunk, estimate_prompt_events_tokens(chunk), len(chunk)
 
 
 def _resolve_chunk(chunk, ctx, selected_chunks, selected_tokens, selected_count):
-    chunk_tokens = estimate_events_tokens(chunk)
+    chunk_tokens = estimate_prompt_events_tokens(chunk)
     chunk_count = len(chunk)
     must_keep_latest = not bool(selected_chunks)
     if not must_keep_latest and not _chunk_fits(
@@ -192,7 +193,7 @@ def _select_causal_chunks(
 ) -> tuple[list[list[Event]], int, int]:
     protected_ids = _event_id_set(protected)
     chunks = _non_protected_chunks(ctx.event_list, protected_ids)
-    protected_tokens = estimate_events_tokens(protected)
+    protected_tokens = estimate_prompt_events_tokens(protected)
     selected_chunks: list[list[Event]] = []
     selected_tokens = protected_tokens
     selected_count = len(protected)
@@ -257,7 +258,7 @@ def _build_windowed_result(ctx, protected, selected_chunks, llm_config):
         events=selected,
         original_events=ctx.original_event_count,
         estimated_tokens=ctx.full_tokens,
-        selected_estimated_tokens=estimate_events_tokens(selected),
+        selected_estimated_tokens=estimate_prompt_events_tokens(selected),
         token_budget=ctx.budget,
         protected_events=len(protected),
         windowed=True,
@@ -269,6 +270,7 @@ def select_prompt_events(
     events: Iterable[Event],
     llm_config: object,
     *,
+    state: object | None = None,
     emergency_only: bool = False,
     tool_budget_applied: bool = False,
 ) -> PromptWindowResult:
@@ -277,6 +279,7 @@ def select_prompt_events(
     ctx = _build_windowing_context(
         raw_events,
         llm_config,
+        state=state,
         emergency_only=emergency_only,
         tool_budget_applied=tool_budget_applied,
     )
@@ -355,6 +358,22 @@ def estimate_events_tokens(events: Iterable[Event]) -> int:
     return _tokenize_text(text)
 
 
+def estimate_prompt_event_tokens(event: Event) -> int:
+    """Estimate tokens for the model-visible rendering of one event."""
+    content = getattr(event, 'content', None)
+    if isinstance(content, str) and content.strip() == _MASKED_PLACEHOLDER:
+        return 4
+    return _tokenize_text(_event_prompt_payload_text(event))
+
+
+def estimate_prompt_events_tokens(events: Iterable[Event]) -> int:
+    """Estimate tokens for the model-visible rendering of event history."""
+    total = 0
+    for event in events:
+        total += estimate_prompt_event_tokens(event)
+    return total if total > 0 else 1
+
+
 def event_fingerprint(event: Event) -> str:
     """Stable fingerprint for prompt-window/cache diagnostics."""
     payload = _event_payload_text(event)
@@ -363,7 +382,11 @@ def event_fingerprint(event: Event) -> str:
     return f'{type(event).__name__}:{event_id}:{digest}'
 
 
-def _history_token_budget(llm_config: object) -> int | None:
+def _history_token_budget(
+    llm_config: object,
+    *,
+    state: object | None = None,
+) -> int | None:
     explicit = _positive_int_attr(llm_config, 'prompt_history_token_budget', None)
     if explicit is not None:
         return explicit
@@ -371,12 +394,38 @@ def _history_token_budget(llm_config: object) -> int | None:
     usable_input = limits.usable_input_tokens
     if usable_input is None:
         return None
+    reserve = _fixed_prompt_reserve_tokens(state)
+    if reserve > 0:
+        usable_input = max(1, usable_input - reserve)
     ratio = _optional_float_attr(llm_config, 'prompt_history_budget_ratio')
     if ratio is not None:
         usable_input = int(usable_input * max(0.05, min(0.95, ratio)))
     model = str(getattr(llm_config, 'model', '') or '')
     factor, _ = model_token_correction(model)
     return max(1, int(usable_input / factor))
+
+
+def _fixed_prompt_reserve_tokens(state: object | None) -> int:
+    if state is None:
+        return 0
+    extra = getattr(state, 'extra_data', None)
+    if not isinstance(extra, dict):
+        return 0
+    raw = extra.get('prompt_token_accounting')
+    if not isinstance(raw, dict):
+        return 0
+    total = 0
+    for key in ('static_prompt_tokens', 'tool_schema_tokens', 'context_packet_tokens'):
+        value = raw.get(key)
+        if isinstance(value, bool):
+            continue
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            continue
+        if parsed > 0:
+            total += parsed
+    return total
 
 
 def _prompt_history_max_events(llm_config: object) -> int | None:
@@ -453,6 +502,63 @@ def _collect_condensation_events(events, seen_ids):
     return [latest]
 
 
+def _event_type_name(event: Event | None) -> str:
+    return type(event).__name__ if event is not None else ''
+
+
+def _has_task_plan(event: Event) -> bool:
+    task_list = getattr(event, 'task_list', None)
+    return isinstance(task_list, list) and bool(task_list)
+
+
+def _is_file_mutation_event(event: Event) -> bool:
+    return _event_type_name(event) in (
+        'FileEditAction',
+        'FileEditObservation',
+        'FileWriteAction',
+        'FileWriteObservation',
+    )
+
+
+def _is_test_observation(event: Event) -> bool:
+    if _event_type_name(event) != 'CmdOutputObservation':
+        return False
+    command = str(getattr(event, 'command', '') or '')
+    if not command:
+        return False
+    try:
+        from backend.validation.command_classification import is_test_run_command
+
+        return is_test_run_command(command)
+    except Exception:
+        lowered = command.casefold()
+        return any(token in lowered for token in ('pytest', 'npm test', 'cargo test'))
+
+
+def _collect_operational_anchor_events(events: list[Event], seen_ids: set[int]):
+    anchors: list[Event] = []
+    latest_task_tracker: Event | None = None
+    latest_test: Event | None = None
+    file_mutations: list[Event] = []
+    for event in reversed(events):
+        name = _event_type_name(event)
+        if (
+            latest_task_tracker is None
+            and name in ('TaskTrackingAction', 'TaskTrackingObservation')
+            and _has_task_plan(event)
+        ):
+            latest_task_tracker = event
+        if latest_test is None and _is_test_observation(event):
+            latest_test = event
+        if _is_file_mutation_event(event) and len(file_mutations) < 8:
+            file_mutations.append(event)
+        if latest_task_tracker and latest_test and len(file_mutations) >= 8:
+            break
+    for event in [latest_task_tracker, latest_test, *reversed(file_mutations)]:
+        _add_key_event(anchors, seen_ids, event)
+    return anchors
+
+
 def _protected_summary_events(events: list[Event]) -> list[Event]:
     protected: list[Event] = []
     seen_user_ids: set[int] = set()
@@ -465,6 +571,7 @@ def _protected_summary_events(events: list[Event]) -> list[Event]:
             if '<CONTEXT_PACKET>' in content:
                 _add_key_event(protected, seen_user_ids, event)
     protected.extend(_collect_condensation_events(events, seen_user_ids))
+    protected.extend(_collect_operational_anchor_events(events, seen_user_ids))
     return protected
 
 
@@ -505,9 +612,9 @@ def _enforce_min_tool_loops(
 
 def _build_token_tail(chunks, protected, budget, min_tail_tokens):
     tail: list[Event] = []
-    tail_tokens = estimate_events_tokens(protected)
+    tail_tokens = estimate_prompt_events_tokens(protected)
     for chunk in reversed(chunks):
-        chunk_tokens = estimate_events_tokens(chunk)
+        chunk_tokens = estimate_prompt_events_tokens(chunk)
         if tail and tail_tokens + chunk_tokens > budget:
             break
         tail = chunk + tail
@@ -548,7 +655,7 @@ def _enforce_min_tail_tokens(
     """Grow the tail until recent causal chunks reach *min_tail_tokens*."""
     if min_tail_tokens <= 0:
         return selected
-    if estimate_events_tokens(selected) >= min(min_tail_tokens, budget):
+    if estimate_prompt_events_tokens(selected) >= min(min_tail_tokens, budget):
         return selected
     protected_ids = _event_id_set(protected)
     chunks = _non_protected_chunks(all_events, protected_ids)
@@ -579,10 +686,10 @@ def _split_protected_and_removable(selected, protected_ids):
 
 
 def _truncate_latest_if_needed(chunk, kept_tokens, budget):
-    chunk_tokens = estimate_events_tokens(chunk)
+    chunk_tokens = estimate_prompt_events_tokens(chunk)
     if kept_tokens + chunk_tokens > budget:
         chunk = _truncate_chunk_to_budget(chunk, max(1, budget - kept_tokens))
-        chunk_tokens = estimate_events_tokens(chunk)
+        chunk_tokens = estimate_prompt_events_tokens(chunk)
     return chunk, chunk_tokens
 
 
@@ -595,7 +702,7 @@ def _build_kept_chunks(chunks, protected_tokens, budget):
             kept_chunks.append(chunk)
             kept_tokens += chunk_tokens
         else:
-            chunk_tokens = estimate_events_tokens(chunk)
+            chunk_tokens = estimate_prompt_events_tokens(chunk)
             if kept_tokens + chunk_tokens <= budget:
                 kept_chunks.append(chunk)
                 kept_tokens += chunk_tokens
@@ -615,7 +722,7 @@ def _shrink_once(result, protected_events, protected_tokens, tail, budget):
     remaining = max(1, budget - protected_tokens)
     truncated_tail = _truncate_chunk_to_budget(tail, remaining)
     result = protected_events + truncated_tail
-    if estimate_events_tokens(result) <= budget:
+    if estimate_prompt_events_tokens(result) <= budget:
         return result, False
     if not _drop_oldest_removable_unit(tail):
         return result, False
@@ -625,7 +732,7 @@ def _shrink_once(result, protected_events, protected_tokens, tail, budget):
 def _shrink_to_budget(
     result, protected_events, protected_tokens, protected_ids, budget
 ):
-    while estimate_events_tokens(result) > budget:
+    while estimate_prompt_events_tokens(result) > budget:
         tail = _removable_events(result, protected_ids)
         if not tail:
             break
@@ -643,13 +750,13 @@ def _enforce_token_ceiling(
     protected: list[Event],
 ) -> list[Event]:
     """Drop oldest removable causal units until the selection fits the token budget."""
-    if estimate_events_tokens(selected) <= budget:
+    if estimate_prompt_events_tokens(selected) <= budget:
         return selected
     protected_ids = _event_id_set(protected)
     protected_events, removable = _split_protected_and_removable(
         selected, protected_ids
     )
-    protected_tokens = estimate_events_tokens(protected_events)
+    protected_tokens = estimate_prompt_events_tokens(protected_events)
     chunks = _causal_chunks(removable)
     kept_chunks = _build_kept_chunks(chunks, protected_tokens, budget)
     result = protected_events + _flatten_chunks(kept_chunks)
@@ -722,7 +829,7 @@ def _collect_truncatable_events(chunk, head_chars, tail_chars):
 
 def _apply_truncations(chunk, sized, token_budget, head_chars, tail_chars, marker):
     for _size, idx, event in sized:
-        if estimate_events_tokens(chunk) <= token_budget:
+        if estimate_prompt_events_tokens(chunk) <= token_budget:
             break
         content = getattr(event, 'content', '')
         truncated = content[:head_chars] + marker + content[-tail_chars:]
@@ -747,7 +854,7 @@ def _drop_oldest_units_until_fit(
     chunk: list[Event],
     token_budget: int,
 ) -> None:
-    while len(chunk) > 1 and estimate_events_tokens(chunk) > token_budget:
+    while len(chunk) > 1 and estimate_prompt_events_tokens(chunk) > token_budget:
         if not _drop_oldest_removable_unit(chunk):
             break
 
@@ -769,7 +876,7 @@ def _aggressively_shrink_observations(
     token_budget: int,
     marker: str,
 ) -> None:
-    while estimate_events_tokens(chunk) > token_budget:
+    while estimate_prompt_events_tokens(chunk) > token_budget:
         if not _shrink_one_observation(chunk, marker):
             break
 
@@ -806,13 +913,13 @@ def _truncate_chunk_to_budget(chunk: list[Event], token_budget: int) -> list[Eve
     _HEAD_CHARS = 500
     _TAIL_CHARS = 500
 
-    if estimate_events_tokens(chunk) <= token_budget:
+    if estimate_prompt_events_tokens(chunk) <= token_budget:
         return chunk
 
     _truncate_large_observations(
         chunk, token_budget, _HEAD_CHARS, _TAIL_CHARS, _TRUNCATION_MARKER
     )
-    if estimate_events_tokens(chunk) <= token_budget:
+    if estimate_prompt_events_tokens(chunk) <= token_budget:
         return chunk
 
     _drop_oldest_units_until_fit(chunk, token_budget)
@@ -828,6 +935,53 @@ def _event_payload_text(event: Event) -> str:
         return str(
             getattr(event, 'message', '') or getattr(event, 'content', '') or event
         )
+
+
+def _event_prompt_payload_text(event: Event) -> str:
+    parts: list[str] = []
+    event_id = getattr(event, 'id', None)
+    if event_id is not None:
+        parts.append(f'{type(event).__name__} id={event_id}')
+    else:
+        parts.append(type(event).__name__)
+
+    for attr in (
+        'message',
+        'content',
+        'thought',
+        'command',
+        'path',
+        'query',
+        'code',
+        'task_list',
+        'tool_result',
+    ):
+        try:
+            value = getattr(event, attr, None)
+        except Exception:
+            continue
+        if callable(value):
+            try:
+                value = value()
+            except Exception:
+                value = None
+        if value is None:
+            continue
+        if isinstance(value, str):
+            text = value.strip()
+        else:
+            try:
+                text = json.dumps(value, default=str, sort_keys=True)
+            except Exception:
+                text = str(value)
+        if text and text not in parts:
+            parts.append(text)
+
+    if len(parts) <= 1:
+        fallback = str(event)
+        if fallback:
+            parts.append(fallback)
+    return '\n'.join(parts)
 
 
 def _result(
@@ -935,6 +1089,8 @@ __all__ = [
     'PromptWindowResult',
     'estimate_event_tokens',
     'estimate_events_tokens',
+    'estimate_prompt_event_tokens',
+    'estimate_prompt_events_tokens',
     'event_fingerprint',
     'select_prompt_events',
 ]

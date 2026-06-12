@@ -15,7 +15,7 @@ class TestOpenAICompatibleMetadataRouting:
         return_value=MagicMock(),
     )
     def test_default_openai_endpoint_keeps_metadata(self, _h, _ah, _oai, _aoai):
-        client = get_direct_client('gpt-4o', api_key='sk-test')
+        client = get_direct_client('openai/gpt-5', api_key='sk-test')
         assert client._profile.supports_request_metadata is True  # type: ignore
 
     @patch('backend.inference.direct_clients.AsyncOpenAI')

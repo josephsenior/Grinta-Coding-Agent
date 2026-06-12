@@ -135,6 +135,7 @@ def _build_autonomy_block(_mode: str, *, checkpoints_on: bool) -> str:
         '<AUTONOMY>\n'
         'For implementation work, drive the request through tools and verification; '
         'for discussion or planning work, keep the response aligned with the active protocol. '
+        'During implementation, plain text is terminal; if work remains, make the next response a tool call. '
         'The runtime may interrupt a tool call to surface a user decision; treat that decision as '
         'authoritative and continue from where you stopped. On tool failure, make '
         'the next action a corrected retry or a different tool (e.g. `read` \u2192 `edit_symbols`, '

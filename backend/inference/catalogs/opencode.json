@@ -3,13 +3,27 @@
   "client": "mixed_opencode_surfaces",
   "models": {
     "claude-fable-5": {
-      "client": "anthropic_compatible",
-      "aliases": [
-        "opencode/claude-fable-5",
-        "claude-fable-5",
-        "claude fable 5"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "anthropic_compatible",
+        "aliases": [
+          "opencode/claude-fable-5",
+          "claude-fable-5"
+        ],
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 10,
+        "cached_input_price_per_m": 1,
+        "cached_write_price_per_m": 12.5,
+        "output_price_per_m": 50,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "strip_temperature": true,
+        "inference_endpoint": "/messages"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Claude Fable 5",
@@ -21,7 +35,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/anthropic"
         },
-        "inference_endpoint": "/messages",
         "inference_url": "https://opencode.ai/zen/v1/messages",
         "options": {},
         "capabilities": {
@@ -82,30 +95,29 @@
             "effort": "max"
           }
         }
-      },
-      "context_window_tokens": 1000000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 10,
-      "cached_input_price_per_m": 1,
-      "cached_write_price_per_m": 12.5,
-      "output_price_per_m": 50,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "strip_temperature": true
+      }
     },
     "claude-haiku-4-5": {
-      "client": "anthropic_compatible",
-      "aliases": [
-        "opencode/claude-haiku-4-5",
-        "claude-haiku-4-5",
-        "claude haiku 4 5"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "anthropic_compatible",
+        "aliases": [
+          "opencode/claude-haiku-4-5",
+          "claude-haiku-4-5"
+        ],
+        "context_window_tokens": 200000,
+        "max_output_tokens": 64000,
+        "input_price_per_m": 1,
+        "cached_input_price_per_m": 0.1,
+        "cached_write_price_per_m": 1.25,
+        "output_price_per_m": 5,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/messages"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Claude Haiku 4.5",
@@ -117,7 +129,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/anthropic"
         },
-        "inference_endpoint": "/messages",
         "inference_url": "https://opencode.ai/zen/v1/messages",
         "options": {},
         "capabilities": {
@@ -155,29 +166,29 @@
             }
           }
         }
-      },
-      "context_window_tokens": 200000,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 1,
-      "cached_input_price_per_m": 0.1,
-      "cached_write_price_per_m": 1.25,
-      "output_price_per_m": 5,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "claude-opus-4-1": {
-      "client": "anthropic_compatible",
-      "aliases": [
-        "opencode/claude-opus-4-1",
-        "claude-opus-4-1",
-        "claude opus 4 1"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "anthropic_compatible",
+        "aliases": [
+          "opencode/claude-opus-4-1",
+          "claude-opus-4-1"
+        ],
+        "context_window_tokens": 200000,
+        "max_output_tokens": 32000,
+        "input_price_per_m": 15,
+        "cached_input_price_per_m": 1.5,
+        "cached_write_price_per_m": 18.75,
+        "output_price_per_m": 75,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/messages"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Claude Opus 4.1",
@@ -189,7 +200,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/anthropic"
         },
-        "inference_endpoint": "/messages",
         "inference_url": "https://opencode.ai/zen/v1/messages",
         "options": {},
         "capabilities": {
@@ -227,29 +237,29 @@
             }
           }
         }
-      },
-      "context_window_tokens": 200000,
-      "max_output_tokens": 32000,
-      "input_price_per_m": 15,
-      "cached_input_price_per_m": 1.5,
-      "cached_write_price_per_m": 18.75,
-      "output_price_per_m": 75,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "claude-opus-4-5": {
-      "client": "anthropic_compatible",
-      "aliases": [
-        "opencode/claude-opus-4-5",
-        "claude-opus-4-5",
-        "claude opus 4 5"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "anthropic_compatible",
+        "aliases": [
+          "opencode/claude-opus-4-5",
+          "claude-opus-4-5"
+        ],
+        "context_window_tokens": 200000,
+        "max_output_tokens": 64000,
+        "input_price_per_m": 5,
+        "cached_input_price_per_m": 0.5,
+        "cached_write_price_per_m": 6.25,
+        "output_price_per_m": 25,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/messages"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Claude Opus 4.5",
@@ -261,7 +271,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/anthropic"
         },
-        "inference_endpoint": "/messages",
         "inference_url": "https://opencode.ai/zen/v1/messages",
         "options": {},
         "capabilities": {
@@ -296,29 +305,29 @@
             "effort": "high"
           }
         }
-      },
-      "context_window_tokens": 200000,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 5,
-      "cached_input_price_per_m": 0.5,
-      "cached_write_price_per_m": 6.25,
-      "output_price_per_m": 25,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "claude-opus-4-6": {
-      "client": "anthropic_compatible",
-      "aliases": [
-        "opencode/claude-opus-4-6",
-        "claude-opus-4-6",
-        "claude opus 4 6"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "anthropic_compatible",
+        "aliases": [
+          "opencode/claude-opus-4-6",
+          "claude-opus-4-6"
+        ],
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5,
+        "cached_input_price_per_m": 0.5,
+        "cached_write_price_per_m": 6.25,
+        "output_price_per_m": 25,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/messages"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Claude Opus 4.6",
@@ -330,7 +339,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/anthropic"
         },
-        "inference_endpoint": "/messages",
         "inference_url": "https://opencode.ai/zen/v1/messages",
         "options": {},
         "capabilities": {
@@ -380,29 +388,30 @@
             "effort": "max"
           }
         }
-      },
-      "context_window_tokens": 1000000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 5,
-      "cached_input_price_per_m": 0.5,
-      "cached_write_price_per_m": 6.25,
-      "output_price_per_m": 25,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "claude-opus-4-7": {
-      "client": "anthropic_compatible",
-      "aliases": [
-        "opencode/claude-opus-4-7",
-        "claude-opus-4-7",
-        "claude opus 4 7"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "anthropic_compatible",
+        "aliases": [
+          "opencode/claude-opus-4-7",
+          "claude-opus-4-7"
+        ],
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5,
+        "cached_input_price_per_m": 0.5,
+        "cached_write_price_per_m": 6.25,
+        "output_price_per_m": 25,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "strip_temperature": true,
+        "inference_endpoint": "/messages"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Claude Opus 4.7",
@@ -414,7 +423,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/anthropic"
         },
-        "inference_endpoint": "/messages",
         "inference_url": "https://opencode.ai/zen/v1/messages",
         "options": {},
         "capabilities": {
@@ -475,30 +483,30 @@
             "effort": "max"
           }
         }
-      },
-      "context_window_tokens": 1000000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 5,
-      "cached_input_price_per_m": 0.5,
-      "cached_write_price_per_m": 6.25,
-      "output_price_per_m": 25,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "strip_temperature": true
+      }
     },
     "claude-opus-4-8": {
-      "client": "anthropic_compatible",
-      "aliases": [
-        "opencode/claude-opus-4-8",
-        "claude-opus-4-8",
-        "claude opus 4 8"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "anthropic_compatible",
+        "aliases": [
+          "opencode/claude-opus-4-8",
+          "claude-opus-4-8"
+        ],
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5,
+        "cached_input_price_per_m": 0.5,
+        "cached_write_price_per_m": 6.25,
+        "output_price_per_m": 25,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "strip_temperature": true,
+        "inference_endpoint": "/messages"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Claude Opus 4.8",
@@ -510,7 +518,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/anthropic"
         },
-        "inference_endpoint": "/messages",
         "inference_url": "https://opencode.ai/zen/v1/messages",
         "options": {},
         "capabilities": {
@@ -571,30 +578,34 @@
             "effort": "max"
           }
         }
-      },
-      "context_window_tokens": 1000000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 5,
-      "cached_input_price_per_m": 0.5,
-      "cached_write_price_per_m": 6.25,
-      "output_price_per_m": 25,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "strip_temperature": true
+      }
     },
     "claude-sonnet-4-5": {
-      "client": "anthropic_compatible",
-      "aliases": [
-        "opencode/claude-sonnet-4-5",
-        "claude-sonnet-4-5",
-        "claude sonnet 4 5"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "anthropic_compatible",
+        "aliases": [
+          "opencode/claude-sonnet-4-5",
+          "claude-sonnet-4-5"
+        ],
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 64000,
+        "input_price_per_m": 3,
+        "cached_input_price_per_m": 0.3,
+        "cached_write_price_per_m": 3.75,
+        "output_price_per_m": 15,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "long_context_threshold_tokens": 200000,
+        "long_input_price_per_m": 6,
+        "long_cached_input_price_per_m": 0.6,
+        "long_cached_write_price_per_m": 7.5,
+        "long_output_price_per_m": 22.5,
+        "inference_endpoint": "/messages"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Claude Sonnet 4.5",
@@ -606,7 +617,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/anthropic"
         },
-        "inference_endpoint": "/messages",
         "inference_url": "https://opencode.ai/zen/v1/messages",
         "options": {},
         "capabilities": {
@@ -658,34 +668,29 @@
             }
           }
         ]
-      },
-      "context_window_tokens": 1000000,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 3,
-      "cached_input_price_per_m": 0.3,
-      "cached_write_price_per_m": 3.75,
-      "output_price_per_m": 15,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "long_context_threshold_tokens": 200000,
-      "long_input_price_per_m": 6,
-      "long_cached_input_price_per_m": 0.6,
-      "long_cached_write_price_per_m": 7.5,
-      "long_output_price_per_m": 22.5
+      }
     },
     "claude-sonnet-4-6": {
-      "client": "anthropic_compatible",
-      "aliases": [
-        "opencode/claude-sonnet-4-6",
-        "claude-sonnet-4-6",
-        "claude sonnet 4 6"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "anthropic_compatible",
+        "aliases": [
+          "opencode/claude-sonnet-4-6",
+          "claude-sonnet-4-6"
+        ],
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 64000,
+        "input_price_per_m": 3,
+        "cached_input_price_per_m": 0.3,
+        "cached_write_price_per_m": 3.75,
+        "output_price_per_m": 15,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/messages"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Claude Sonnet 4.6",
@@ -697,7 +702,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/anthropic"
         },
-        "inference_endpoint": "/messages",
         "inference_url": "https://opencode.ai/zen/v1/messages",
         "options": {},
         "capabilities": {
@@ -747,29 +751,30 @@
             "effort": "max"
           }
         }
-      },
-      "context_window_tokens": 1000000,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 3,
-      "cached_input_price_per_m": 0.3,
-      "cached_write_price_per_m": 3.75,
-      "output_price_per_m": 15,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "deepseek-v4-flash": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/deepseek-v4-flash",
-        "deepseek-v4-flash",
-        "deepseek v4 flash"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/deepseek-v4-flash",
+          "deepseek-v4-flash"
+        ],
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 384000,
+        "input_price_per_m": 0.14,
+        "cached_input_price_per_m": 0.028,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 0.28,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_reasoning_effort": true,
+        "supports_vision": false,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "DeepSeek V4 Flash",
@@ -781,7 +786,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -821,29 +825,30 @@
             "reasoningEffort": "max"
           }
         }
-      },
-      "context_window_tokens": 1000000,
-      "max_output_tokens": 384000,
-      "input_price_per_m": 0.14,
-      "cached_input_price_per_m": 0.028,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 0.28,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
+      }
     },
     "deepseek-v4-flash-free": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/deepseek-v4-flash-free",
-        "deepseek-v4-flash-free",
-        "deepseek v4 flash free"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/deepseek-v4-flash-free",
+          "deepseek-v4-flash-free"
+        ],
+        "context_window_tokens": 200000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 0,
+        "cached_input_price_per_m": 0,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_reasoning_effort": true,
+        "supports_vision": false,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "DeepSeek V4 Flash Free",
@@ -855,7 +860,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -895,29 +899,30 @@
             "reasoningEffort": "max"
           }
         }
-      },
-      "context_window_tokens": 200000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 0,
-      "cached_input_price_per_m": 0,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 0,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
+      }
     },
     "deepseek-v4-pro": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/deepseek-v4-pro",
-        "deepseek-v4-pro",
-        "deepseek v4 pro"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/deepseek-v4-pro",
+          "deepseek-v4-pro"
+        ],
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 384000,
+        "input_price_per_m": 1.74,
+        "cached_input_price_per_m": 0.145,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 3.84,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_reasoning_effort": true,
+        "supports_vision": false,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "DeepSeek V4 Pro",
@@ -929,7 +934,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -969,29 +973,29 @@
             "reasoningEffort": "max"
           }
         }
-      },
-      "context_window_tokens": 1000000,
-      "max_output_tokens": 384000,
-      "input_price_per_m": 1.74,
-      "cached_input_price_per_m": 0.145,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 3.84,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
+      }
     },
     "gemini-3-flash": {
-      "client": "google_compatible",
-      "aliases": [
-        "opencode/gemini-3-flash",
-        "gemini-3-flash",
-        "gemini 3 flash"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "google_compatible",
+        "aliases": [
+          "opencode/gemini-3-flash",
+          "gemini-3-flash"
+        ],
+        "context_window_tokens": 1048576,
+        "max_output_tokens": 65536,
+        "input_price_per_m": 0.5,
+        "cached_input_price_per_m": 0.05,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 3,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/models/gemini-3-flash"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Gemini 3 Flash",
@@ -1003,7 +1007,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/google"
         },
-        "inference_endpoint": "/models/gemini-3-flash",
         "inference_url": "https://opencode.ai/zen/v1/models/gemini-3-flash",
         "options": {},
         "capabilities": {
@@ -1053,29 +1056,34 @@
             }
           }
         }
-      },
-      "context_window_tokens": 1048576,
-      "max_output_tokens": 65536,
-      "input_price_per_m": 0.5,
-      "cached_input_price_per_m": 0.05,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 3,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "gemini-3.1-pro": {
-      "client": "google_compatible",
-      "aliases": [
-        "opencode/gemini-3.1-pro",
-        "gemini-3.1-pro",
-        "gemini 3 1 pro"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "google_compatible",
+        "aliases": [
+          "opencode/gemini-3.1-pro",
+          "gemini-3.1-pro"
+        ],
+        "context_window_tokens": 1048576,
+        "max_output_tokens": 65536,
+        "input_price_per_m": 2,
+        "cached_input_price_per_m": 0.2,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 12,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "long_context_threshold_tokens": 200000,
+        "long_input_price_per_m": 4,
+        "long_cached_input_price_per_m": 0.4,
+        "long_cached_write_price_per_m": 0,
+        "long_output_price_per_m": 18,
+        "inference_endpoint": "/models/gemini-3.1-pro"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Gemini 3.1 Pro Preview",
@@ -1087,7 +1095,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/google"
         },
-        "inference_endpoint": "/models/gemini-3.1-pro",
         "inference_url": "https://opencode.ai/zen/v1/models/gemini-3.1-pro",
         "options": {},
         "capabilities": {
@@ -1145,34 +1152,29 @@
             }
           }
         ]
-      },
-      "context_window_tokens": 1048576,
-      "max_output_tokens": 65536,
-      "input_price_per_m": 2,
-      "cached_input_price_per_m": 0.2,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 12,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "long_context_threshold_tokens": 200000,
-      "long_input_price_per_m": 4,
-      "long_cached_input_price_per_m": 0.4,
-      "long_cached_write_price_per_m": 0,
-      "long_output_price_per_m": 18
+      }
     },
     "gemini-3.5-flash": {
-      "client": "google_compatible",
-      "aliases": [
-        "opencode/gemini-3.5-flash",
-        "gemini-3.5-flash",
-        "gemini 3 5 flash"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "google_compatible",
+        "aliases": [
+          "opencode/gemini-3.5-flash",
+          "gemini-3.5-flash"
+        ],
+        "context_window_tokens": 1048576,
+        "max_output_tokens": 65536,
+        "input_price_per_m": 1.5,
+        "cached_input_price_per_m": 0.15,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 9,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/models/gemini-3.5-flash"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Gemini 3.5 Flash",
@@ -1184,7 +1186,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/google"
         },
-        "inference_endpoint": "/models/gemini-3.5-flash",
         "inference_url": "https://opencode.ai/zen/v1/models/gemini-3.5-flash",
         "options": {},
         "capabilities": {
@@ -1234,29 +1235,29 @@
             }
           }
         }
-      },
-      "context_window_tokens": 1048576,
-      "max_output_tokens": 65536,
-      "input_price_per_m": 1.5,
-      "cached_input_price_per_m": 0.15,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 9,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "glm-5": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/glm-5",
-        "glm-5",
-        "glm 5"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/glm-5",
+          "glm-5"
+        ],
+        "context_window_tokens": 204800,
+        "max_output_tokens": 131072,
+        "input_price_per_m": 1,
+        "cached_input_price_per_m": 0.2,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 3.2,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": false,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GLM-5",
@@ -1268,7 +1269,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -1295,29 +1295,29 @@
           }
         },
         "variants": {}
-      },
-      "context_window_tokens": 204800,
-      "max_output_tokens": 131072,
-      "input_price_per_m": 1,
-      "cached_input_price_per_m": 0.2,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 3.2,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
+      }
     },
     "glm-5.1": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/glm-5.1",
-        "glm-5.1",
-        "glm 5 1"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/glm-5.1",
+          "glm-5.1"
+        ],
+        "context_window_tokens": 204800,
+        "max_output_tokens": 131072,
+        "input_price_per_m": 1.4,
+        "cached_input_price_per_m": 0.26,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 4.4,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": false,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GLM-5.1",
@@ -1329,7 +1329,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -1356,29 +1355,31 @@
           }
         },
         "variants": {}
-      },
-      "context_window_tokens": 204800,
-      "max_output_tokens": 131072,
-      "input_price_per_m": 1.4,
-      "cached_input_price_per_m": 0.26,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 4.4,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
+      }
     },
     "gpt-5": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5",
-        "gpt-5",
-        "gpt 5"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5",
+          "gpt-5"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.07,
+        "cached_input_price_per_m": 0.107,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 8.5,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5",
@@ -1390,7 +1391,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -1444,31 +1444,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 1.07,
-      "cached_input_price_per_m": 0.107,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 8.5,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5-codex": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5-codex",
-        "gpt-5-codex",
-        "gpt 5 codex"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5-codex",
+          "gpt-5-codex"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.07,
+        "cached_input_price_per_m": 0.107,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 8.5,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5 Codex",
@@ -1480,7 +1480,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -1527,31 +1526,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 1.07,
-      "cached_input_price_per_m": 0.107,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 8.5,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5-nano": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5-nano",
-        "gpt-5-nano",
-        "gpt 5 nano"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5-nano",
+          "gpt-5-nano"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 0.05,
+        "cached_input_price_per_m": 0.005,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 0.4,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5 Nano",
@@ -1563,7 +1562,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -1617,31 +1615,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 0.05,
-      "cached_input_price_per_m": 0.005,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 0.4,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.1": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.1",
-        "gpt-5.1",
-        "gpt 5 1"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.1",
+          "gpt-5.1"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.07,
+        "cached_input_price_per_m": 0.107,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 8.5,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.1",
@@ -1653,7 +1651,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -1707,31 +1704,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 1.07,
-      "cached_input_price_per_m": 0.107,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 8.5,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.1-codex": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.1-codex",
-        "gpt-5.1-codex",
-        "gpt 5 1 codex"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.1-codex",
+          "gpt-5.1-codex"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.07,
+        "cached_input_price_per_m": 0.107,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 8.5,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.1 Codex",
@@ -1743,7 +1740,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -1790,31 +1786,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 1.07,
-      "cached_input_price_per_m": 0.107,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 8.5,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.1-codex-max": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.1-codex-max",
-        "gpt-5.1-codex-max",
-        "gpt 5 1 codex max"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.1-codex-max",
+          "gpt-5.1-codex-max"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.25,
+        "cached_input_price_per_m": 0.125,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 10,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.1 Codex Max",
@@ -1826,7 +1822,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -1880,31 +1875,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 1.25,
-      "cached_input_price_per_m": 0.125,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 10,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.1-codex-mini": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.1-codex-mini",
-        "gpt-5.1-codex-mini",
-        "gpt 5 1 codex mini"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.1-codex-mini",
+          "gpt-5.1-codex-mini"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 0.25,
+        "cached_input_price_per_m": 0.025,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 2,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.1 Codex Mini",
@@ -1916,7 +1911,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -1963,31 +1957,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 0.25,
-      "cached_input_price_per_m": 0.025,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 2,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.2": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.2",
-        "gpt-5.2",
-        "gpt 5 2"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.2",
+          "gpt-5.2"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.75,
+        "cached_input_price_per_m": 0.175,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 14,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.2",
@@ -1999,7 +1993,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -2060,31 +2053,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 1.75,
-      "cached_input_price_per_m": 0.175,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 14,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.2-codex": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.2-codex",
-        "gpt-5.2-codex",
-        "gpt 5 2 codex"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.2-codex",
+          "gpt-5.2-codex"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.75,
+        "cached_input_price_per_m": 0.175,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 14,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.2 Codex",
@@ -2096,7 +2089,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -2150,31 +2142,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 1.75,
-      "cached_input_price_per_m": 0.175,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 14,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.3-codex": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.3-codex",
-        "gpt-5.3-codex",
-        "gpt 5 3 codex"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.3-codex",
+          "gpt-5.3-codex"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.75,
+        "cached_input_price_per_m": 0.175,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 14,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.3 Codex",
@@ -2186,7 +2178,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -2247,31 +2238,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 1.75,
-      "cached_input_price_per_m": 0.175,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 14,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.3-codex-spark": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.3-codex-spark",
-        "gpt-5.3-codex-spark",
-        "gpt 5 3 codex spark"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.3-codex-spark",
+          "gpt-5.3-codex-spark"
+        ],
+        "context_window_tokens": 128000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.75,
+        "cached_input_price_per_m": 0.175,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 14,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": false,
+        "max_input_tokens": 128000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.3 Codex Spark",
@@ -2283,7 +2274,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -2344,31 +2334,36 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 128000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 1.75,
-      "cached_input_price_per_m": 0.175,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 14,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": false,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 128000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.4": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.4",
-        "gpt-5.4",
-        "gpt 5 4"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.4",
+          "gpt-5.4"
+        ],
+        "context_window_tokens": 1050000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 2.5,
+        "cached_input_price_per_m": 0.25,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 15,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 922000,
+        "strip_temperature": true,
+        "long_context_threshold_tokens": 272000,
+        "long_input_price_per_m": 5,
+        "long_cached_input_price_per_m": 0.5,
+        "long_cached_write_price_per_m": 0,
+        "long_output_price_per_m": 22.5,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.4",
@@ -2380,7 +2375,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -2455,36 +2449,31 @@
             }
           }
         ]
-      },
-      "context_window_tokens": 1050000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 2.5,
-      "cached_input_price_per_m": 0.25,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 15,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 922000,
-      "strip_temperature": true,
-      "long_context_threshold_tokens": 272000,
-      "long_input_price_per_m": 5,
-      "long_cached_input_price_per_m": 0.5,
-      "long_cached_write_price_per_m": 0,
-      "long_output_price_per_m": 22.5
+      }
     },
     "gpt-5.4-mini": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.4-mini",
-        "gpt-5.4-mini",
-        "gpt 5 4 mini"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.4-mini",
+          "gpt-5.4-mini"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 0.75,
+        "cached_input_price_per_m": 0.075,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 4.5,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.4 Mini",
@@ -2496,7 +2485,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -2557,31 +2545,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 0.75,
-      "cached_input_price_per_m": 0.075,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 4.5,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.4-nano": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.4-nano",
-        "gpt-5.4-nano",
-        "gpt 5 4 nano"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.4-nano",
+          "gpt-5.4-nano"
+        ],
+        "context_window_tokens": 400000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 0.2,
+        "cached_input_price_per_m": 0.02,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 1.25,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 272000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.4 Nano",
@@ -2593,7 +2581,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -2654,31 +2641,31 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 400000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 0.2,
-      "cached_input_price_per_m": 0.02,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 1.25,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 272000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.4-pro": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.4-pro",
-        "gpt-5.4-pro",
-        "gpt 5 4 pro"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.4-pro",
+          "gpt-5.4-pro"
+        ],
+        "context_window_tokens": 1050000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 30,
+        "cached_input_price_per_m": 30,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 180,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 922000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.4 Pro",
@@ -2690,7 +2677,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -2737,31 +2723,36 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 1050000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 30,
-      "cached_input_price_per_m": 30,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 180,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 922000,
-      "strip_temperature": true
+      }
     },
     "gpt-5.5": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.5",
-        "gpt-5.5",
-        "gpt 5 5"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.5",
+          "gpt-5.5"
+        ],
+        "context_window_tokens": 1050000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5,
+        "cached_input_price_per_m": 0.5,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 30,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 922000,
+        "strip_temperature": true,
+        "long_context_threshold_tokens": 272000,
+        "long_input_price_per_m": 10,
+        "long_cached_input_price_per_m": 1,
+        "long_cached_write_price_per_m": 0,
+        "long_output_price_per_m": 45,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.5",
@@ -2773,7 +2764,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -2848,36 +2838,31 @@
             }
           }
         ]
-      },
-      "context_window_tokens": 1050000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 5,
-      "cached_input_price_per_m": 0.5,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 30,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 922000,
-      "strip_temperature": true,
-      "long_context_threshold_tokens": 272000,
-      "long_input_price_per_m": 10,
-      "long_cached_input_price_per_m": 1,
-      "long_cached_write_price_per_m": 0,
-      "long_output_price_per_m": 45
+      }
     },
     "gpt-5.5-pro": {
-      "client": "openai_responses_compatible",
-      "aliases": [
-        "opencode/gpt-5.5-pro",
-        "gpt-5.5-pro",
-        "gpt 5 5 pro"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.5-pro",
+          "gpt-5.5-pro"
+        ],
+        "context_window_tokens": 1050000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 30,
+        "cached_input_price_per_m": 30,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 180,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "max_input_tokens": 922000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "GPT-5.5 Pro",
@@ -2889,7 +2874,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai"
         },
-        "inference_endpoint": "/responses",
         "inference_url": "https://opencode.ai/zen/v1/responses",
         "options": {},
         "capabilities": {
@@ -2936,31 +2920,29 @@
             ]
           }
         }
-      },
-      "context_window_tokens": 1050000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 30,
-      "cached_input_price_per_m": 30,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 180,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "max_input_tokens": 922000,
-      "strip_temperature": true
+      }
     },
     "grok-build-0.1": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/grok-build-0.1",
-        "grok-build-0.1",
-        "grok build 0 1"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/grok-build-0.1",
+          "grok-build-0.1"
+        ],
+        "context_window_tokens": 256000,
+        "max_output_tokens": 256000,
+        "input_price_per_m": 1,
+        "cached_input_price_per_m": 0.2,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 2,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Grok Build 0.1",
@@ -2972,7 +2954,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -2997,29 +2978,29 @@
           "interleaved": false
         },
         "variants": {}
-      },
-      "context_window_tokens": 256000,
-      "max_output_tokens": 256000,
-      "input_price_per_m": 1,
-      "cached_input_price_per_m": 0.2,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 2,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "kimi-k2.5": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/kimi-k2.5",
-        "kimi-k2.5",
-        "kimi k2 5"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/kimi-k2.5",
+          "kimi-k2.5"
+        ],
+        "context_window_tokens": 262144,
+        "max_output_tokens": 65536,
+        "input_price_per_m": 0.6,
+        "cached_input_price_per_m": 0.08,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 3,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Kimi K2.5",
@@ -3031,7 +3012,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -3058,29 +3038,29 @@
           }
         },
         "variants": {}
-      },
-      "context_window_tokens": 262144,
-      "max_output_tokens": 65536,
-      "input_price_per_m": 0.6,
-      "cached_input_price_per_m": 0.08,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 3,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "kimi-k2.6": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/kimi-k2.6",
-        "kimi-k2.6",
-        "kimi k2 6"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/kimi-k2.6",
+          "kimi-k2.6"
+        ],
+        "context_window_tokens": 262144,
+        "max_output_tokens": 65536,
+        "input_price_per_m": 0.95,
+        "cached_input_price_per_m": 0.16,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 4,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Kimi K2.6",
@@ -3092,7 +3072,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -3119,29 +3098,29 @@
           }
         },
         "variants": {}
-      },
-      "context_window_tokens": 262144,
-      "max_output_tokens": 65536,
-      "input_price_per_m": 0.95,
-      "cached_input_price_per_m": 0.16,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 4,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "mimo-v2.5-free": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/mimo-v2.5-free",
-        "mimo-v2.5-free",
-        "mimo v2 5 free"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/mimo-v2.5-free",
+          "mimo-v2.5-free"
+        ],
+        "context_window_tokens": 200000,
+        "max_output_tokens": 32000,
+        "input_price_per_m": 0,
+        "cached_input_price_per_m": 0,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "MiMo V2.5 Free",
@@ -3153,7 +3132,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -3190,29 +3168,29 @@
             "reasoningEffort": "high"
           }
         }
-      },
-      "context_window_tokens": 200000,
-      "max_output_tokens": 32000,
-      "input_price_per_m": 0,
-      "cached_input_price_per_m": 0,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 0,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "minimax-m2.5": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/minimax-m2.5",
-        "minimax-m2.5",
-        "minimax m2 5"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/minimax-m2.5",
+          "minimax-m2.5"
+        ],
+        "context_window_tokens": 204800,
+        "max_output_tokens": 131072,
+        "input_price_per_m": 0.3,
+        "cached_input_price_per_m": 0.06,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 1.2,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": false,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "MiniMax M2.5",
@@ -3224,7 +3202,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -3251,29 +3228,29 @@
           }
         },
         "variants": {}
-      },
-      "context_window_tokens": 204800,
-      "max_output_tokens": 131072,
-      "input_price_per_m": 0.3,
-      "cached_input_price_per_m": 0.06,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 1.2,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
+      }
     },
     "minimax-m2.7": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/minimax-m2.7",
-        "minimax-m2.7",
-        "minimax m2 7"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/minimax-m2.7",
+          "minimax-m2.7"
+        ],
+        "context_window_tokens": 204800,
+        "max_output_tokens": 131072,
+        "input_price_per_m": 0.3,
+        "cached_input_price_per_m": 0.06,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 1.2,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": false,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "MiniMax M2.7",
@@ -3285,7 +3262,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -3312,29 +3288,29 @@
           }
         },
         "variants": {}
-      },
-      "context_window_tokens": 204800,
-      "max_output_tokens": 131072,
-      "input_price_per_m": 0.3,
-      "cached_input_price_per_m": 0.06,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 1.2,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
+      }
     },
     "nemotron-3-ultra-free": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/nemotron-3-ultra-free",
-        "nemotron-3-ultra-free",
-        "nemotron 3 ultra free"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/nemotron-3-ultra-free",
+          "nemotron-3-ultra-free"
+        ],
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 0,
+        "cached_input_price_per_m": 0,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": false,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Nemotron 3 Ultra Free",
@@ -3346,7 +3322,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -3383,29 +3358,29 @@
             "reasoningEffort": "high"
           }
         }
-      },
-      "context_window_tokens": 1000000,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 0,
-      "cached_input_price_per_m": 0,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 0,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
+      }
     },
     "north-mini-code-free": {
-      "client": "openai_compatible",
-      "aliases": [
-        "opencode/north-mini-code-free",
-        "north-mini-code-free",
-        "north mini code free"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "openai_compatible",
+        "aliases": [
+          "opencode/north-mini-code-free",
+          "north-mini-code-free"
+        ],
+        "context_window_tokens": 256000,
+        "max_output_tokens": 64000,
+        "input_price_per_m": 0,
+        "cached_input_price_per_m": 0,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": false,
+        "inference_endpoint": "/chat/completions"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "North Mini Code Free",
@@ -3417,7 +3392,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/openai-compatible"
         },
-        "inference_endpoint": "/chat/completions",
         "inference_url": "https://opencode.ai/zen/v1/chat/completions",
         "options": {},
         "capabilities": {
@@ -3451,29 +3425,29 @@
             "reasoningEffort": "high"
           }
         }
-      },
-      "context_window_tokens": 256000,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 0,
-      "cached_input_price_per_m": 0,
-      "cached_write_price_per_m": 0,
-      "output_price_per_m": 0,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
+      }
     },
     "qwen3.5-plus": {
-      "client": "anthropic_compatible",
-      "aliases": [
-        "opencode/qwen3.5-plus",
-        "qwen3.5-plus",
-        "qwen3 5 plus"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "anthropic_compatible",
+        "aliases": [
+          "opencode/qwen3.5-plus",
+          "qwen3.5-plus"
+        ],
+        "context_window_tokens": 262144,
+        "max_output_tokens": 65536,
+        "input_price_per_m": 0.2,
+        "cached_input_price_per_m": 0.02,
+        "cached_write_price_per_m": 0.25,
+        "output_price_per_m": 1.2,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/messages"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Qwen3.5 Plus",
@@ -3485,7 +3459,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/anthropic"
         },
-        "inference_endpoint": "/messages",
         "inference_url": "https://opencode.ai/zen/v1/messages",
         "options": {},
         "capabilities": {
@@ -3510,29 +3483,29 @@
           "interleaved": false
         },
         "variants": {}
-      },
-      "context_window_tokens": 262144,
-      "max_output_tokens": 65536,
-      "input_price_per_m": 0.2,
-      "cached_input_price_per_m": 0.02,
-      "cached_write_price_per_m": 0.25,
-      "output_price_per_m": 1.2,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     },
     "qwen3.6-plus": {
-      "client": "anthropic_compatible",
-      "aliases": [
-        "opencode/qwen3.6-plus",
-        "qwen3.6-plus",
-        "qwen3 6 plus"
-      ],
-      "provider_metadata": {
+      "runtime": {
+        "client": "anthropic_compatible",
+        "aliases": [
+          "opencode/qwen3.6-plus",
+          "qwen3.6-plus"
+        ],
+        "context_window_tokens": 262144,
+        "max_output_tokens": 65536,
+        "input_price_per_m": 0.5,
+        "cached_input_price_per_m": 0.05,
+        "cached_write_price_per_m": 0.625,
+        "output_price_per_m": 3,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": false,
+        "supports_vision": true,
+        "inference_endpoint": "/messages"
+      },
+      "metadata": {
         "source": "user_provided_opencode_internal_config",
         "provider_id": "opencode",
         "display_name": "Qwen3.6 Plus",
@@ -3544,7 +3517,6 @@
           "url": "https://opencode.ai/zen/v1",
           "npm": "@ai-sdk/anthropic"
         },
-        "inference_endpoint": "/messages",
         "inference_url": "https://opencode.ai/zen/v1/messages",
         "options": {},
         "capabilities": {
@@ -3569,20 +3541,7 @@
           "interleaved": false
         },
         "variants": {}
-      },
-      "context_window_tokens": 262144,
-      "max_output_tokens": 65536,
-      "input_price_per_m": 0.5,
-      "cached_input_price_per_m": 0.05,
-      "cached_write_price_per_m": 0.625,
-      "output_price_per_m": 3,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": false,
-      "supports_reasoning_effort": false,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      }
     }
   }
 }

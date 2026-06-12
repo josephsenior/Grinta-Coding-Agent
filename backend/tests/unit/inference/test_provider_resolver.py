@@ -598,7 +598,7 @@ class TestOpenCodeEndpointClassification(TestCase):
     def test_opencode_endpoint_for_gemini_family(self):
         self.assertEqual(
             opencode_required_endpoint('opencode/gemini-3.1-pro'),
-            '/models',
+            '/models/gemini-3.1-pro',
         )
 
     def test_opencode_endpoint_for_chat_completions_family(self):

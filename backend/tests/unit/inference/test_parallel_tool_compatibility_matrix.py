@@ -59,7 +59,7 @@ def _base_kwargs() -> dict[str, Any]:
             True,
             id='google_catalog_name_strip',
         ),
-        pytest.param('gpt-5', False, id='openai_catalog_keeps'),
+        pytest.param('openai/gpt-5', False, id='openai_catalog_keeps'),
         pytest.param('openai/gpt-5', False, id='openai_alias_keeps'),
         pytest.param('lightning/kimi-k2.5', False, id='lightning_openai_compat_keeps'),
         pytest.param(
@@ -106,7 +106,7 @@ def test_all_known_prefixes_openai_compat_keep_parallel_kwarg() -> None:
 def test_apply_overrides_sets_parallel_only_when_catalog_advertises() -> None:
     """Catalog ``supports_parallel_tool_calls`` drives apply_model_param_overrides."""
     gpt_kw = _base_kwargs()
-    apply_model_param_overrides('gpt-5', gpt_kw)
+    apply_model_param_overrides('openai/gpt-5', gpt_kw)
     assert gpt_kw.get('parallel_tool_calls') is True
 
     claude_kw = _base_kwargs()
@@ -121,8 +121,8 @@ def test_apply_overrides_sets_parallel_only_when_catalog_advertises() -> None:
 def test_apply_then_sanitize_openai_preserves_parallel_flag() -> None:
     """OpenAI catalog path: overrides add flag; sanitizer does not remove it."""
     kw = _base_kwargs()
-    apply_model_param_overrides('gpt-5', kw)
-    out = sanitize_call_kwargs_for_provider('gpt-5', kw)
+    apply_model_param_overrides('openai/gpt-5', kw)
+    out = sanitize_call_kwargs_for_provider('openai/gpt-5', kw)
     assert out.get('parallel_tool_calls') is True
 
 
@@ -139,10 +139,9 @@ def test_apply_then_sanitize_anthropic_drops_parallel_flag() -> None:
 @pytest.mark.parametrize(
     ('model_id', 'expected'),
     [
-        pytest.param('gpt-5', True, id='gpt5_catalog_parallel'),
-        pytest.param('openai/gpt-5', True, id='gpt5_alias_parallel'),
-        pytest.param('claude-4.5-sonnet', True, id='claude_catalog_parallel'),
-        pytest.param('kimi-k2.5', True, id='kimi_catalog_parallel'),
+        pytest.param('openai/gpt-5', True, id='gpt5_catalog_parallel'),
+        pytest.param('anthropic/claude-4.5-sonnet', True, id='claude_catalog_parallel'),
+        pytest.param('deepseek/deepseek-v4-pro', True, id='deepseek_catalog_parallel'),
         pytest.param('lightning/foo', False, id='prefixed_unknown_no_catalog'),
     ],
 )

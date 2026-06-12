@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from backend.context.pre_condensation_snapshot import load_snapshot
-from backend.context.prompt_window import estimate_events_tokens
+from backend.context.prompt_window import estimate_prompt_events_tokens
 from backend.context.tool_result_storage import extract_latest_pytest_summary
 from backend.core.constants import (
     DEFAULT_POST_COMPACT_FILE_PREVIEW_CHARS,
@@ -188,7 +188,7 @@ def inject_post_compact_restore(
     ):
         return events
     if (
-        estimate_events_tokens(events) + len(block) // 4
+        estimate_prompt_events_tokens(events) + len(block) // 4
         > DEFAULT_POST_COMPACT_TOKEN_BUDGET * 2
     ):
         logger.debug('Skipping post-compact restore: would exceed budget')

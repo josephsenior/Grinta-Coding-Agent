@@ -890,8 +890,10 @@ def _model_metadata_for_log(
 ) -> dict[str, Any]:
     """Return deterministic, non-secret model metadata for run logs."""
     from backend.inference.catalog_loader import (
+        compact_metadata_for_log,
         lookup_provider_model,
         runtime_model_id,
+        runtime_parameter_mode,
     )
     from backend.inference.context_limits import derive_usable_input_tokens
 
@@ -920,7 +922,7 @@ def _model_metadata_for_log(
         'provider': entry.provider,
         'client': entry.client,
         'catalog_file': entry.catalog_file,
-        'provider_metadata': entry.provider_metadata,
+        'metadata': compact_metadata_for_log(entry.metadata),
         'name': entry.name,
         'runtime_model_id': runtime_model_id(entry),
         'verified': entry.verified,
@@ -958,6 +960,7 @@ def _model_metadata_for_log(
             'use_max_completion_tokens': entry.use_max_completion_tokens,
             'default_temperature': entry.default_temperature,
         },
+        'runtime_parameter_mode': runtime_parameter_mode(entry),
     }
     return metadata
 

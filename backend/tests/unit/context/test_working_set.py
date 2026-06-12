@@ -64,6 +64,28 @@ def test_sync_snapshot_to_working_memory_updates_sections(tmp_path) -> None:
     assert memory_file.exists()
 
 
+def test_sync_snapshot_to_working_memory_uses_state_session(tmp_path, monkeypatch) -> None:
+    snapshot = {
+        'decisions': ['Preserve session scoped memory'],
+    }
+    from backend.engine.tools.working_memory import set_current_session_id
+
+    class _State:
+        session_id = 'state-session'
+
+    set_current_session_id(None)
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.workspace_agent_state_dir',
+        lambda: tmp_path,
+    )
+
+    updated = sync_snapshot_to_working_memory(snapshot, state=_State())
+
+    assert 'decisions' in updated
+    assert (tmp_path / 'working_memory_state-session.json').exists()
+    assert not (tmp_path / '.session_context_unbound' / 'working_memory.json').exists()
+
+
 def test_failed_approaches_are_deduped_outside_hypothesis(tmp_path) -> None:
     snapshot = {
         'attempted_approaches': [

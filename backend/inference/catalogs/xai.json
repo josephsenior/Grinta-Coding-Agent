@@ -3,19 +3,22 @@
   "client": "openai_compatible",
   "models": {
     "grok-build-0.1": {
-      "aliases": [
-        "xai/grok-build-0.1",
-        "grok-build-0.1",
-        "grok build 0.1"
-      ],
-      "context_window_tokens": 2000000,
-      "max_input_tokens": 1930368,
-      "max_output_tokens": 65536,
-      "verified": false,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_vision": true
+      "runtime": {
+        "aliases": [
+          "xai/grok-build-0.1",
+          "grok-build-0.1",
+          "grok build 0.1"
+        ],
+        "context_window_tokens": 2000000,
+        "max_input_tokens": 1930368,
+        "max_output_tokens": 65536,
+        "verified": false,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true
+      },
+      "metadata": {}
     }
   }
 }

@@ -12,7 +12,7 @@ from backend.context.canonical_state import (
     save_canonical_state,
     validate_canonical_state_for_compaction,
 )
-from backend.ledger.action import CmdRunAction, MessageAction
+from backend.ledger.action import CmdRunAction, MessageAction, TaskTrackingAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation import CmdOutputObservation, TerminalObservation
 
@@ -38,6 +38,12 @@ def _output(
     return event
 
 
+def _tasks(task_list: list[dict], event_id: int) -> TaskTrackingAction:
+    event = TaskTrackingAction(command='update', task_list=task_list)
+    event.id = event_id
+    return event
+
+
 def test_reducer_tracks_latest_directive_and_verification() -> None:
     events = [
         _user('Fix the failing parser tests', 1),
@@ -54,6 +60,33 @@ def test_reducer_tracks_latest_directive_and_verification() -> None:
     assert canonical.verification.command == 'pytest backend/tests/unit/test_parser.py'
     assert canonical.verification.status == 'passed'
     assert canonical.verification.exit_code == 0
+
+
+def test_reducer_preserves_task_tracker_as_next_action_and_checkpoint() -> None:
+    events = [
+        _user('Build the demo app', 1),
+        _tasks(
+            [
+                {'id': '1', 'description': 'Create foundation modules', 'status': 'done'},
+                {
+                    'id': '2',
+                    'description': 'Implement node.py',
+                    'status': 'in_progress',
+                },
+                {'id': '3', 'description': 'Add tests', 'status': 'todo'},
+            ],
+            2,
+        ),
+    ]
+
+    canonical = reduce_events_into_state(events, CanonicalTaskState(), persist=False)
+    rendered = render_canonical_state_for_prompt(canonical, char_budget=1600)
+
+    assert canonical.next_action == 'Implement node.py'
+    assert '[in_progress] Implement node.py' in canonical.active_plan
+    assert 'current: Implement node.py' in canonical.implementation_checkpoint
+    assert 'remaining: Add tests' in canonical.implementation_checkpoint
+    assert 'Task tracker' in rendered
 
 
 def test_background_task_persists_until_terminal_resolution() -> None:

@@ -36,6 +36,7 @@ _MAX_COMMANDS = 10
 _MAX_TEST_RESULTS = 8
 _MAX_INVALIDATED_ASSUMPTIONS = 12
 _MAX_CONTENT_LENGTH = 500
+_MAX_TASKS = 20
 
 
 def _agent_debug_log(
@@ -141,10 +142,12 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
         'test_results': [],
         'attempted_approaches': [],
         'background_tasks': [],
+        'task_plan': {},
     }
 
     for event in events:
         _extract_user_directive(event, snapshot)
+        _extract_task_plan(event, snapshot)
         _extract_file_info(event, snapshot)
         _extract_errors(event, snapshot)
         _extract_decisions(event, snapshot)
@@ -309,6 +312,85 @@ def _extract_user_directive(event: Event, snapshot: dict) -> None:
     snapshot['latest_directive'] = content[:_MAX_CONTENT_LENGTH]
 
 
+def _extract_task_plan(event: Event, snapshot: dict) -> None:
+    """Capture the latest structured task tracker state.
+
+    Task tracker entries are already machine-readable, so they are a better
+    compaction source of truth than prose thoughts about what to do next.
+    """
+    cls_name = type(event).__name__
+    if cls_name not in ('TaskTrackingAction', 'TaskTrackingObservation'):
+        return
+    task_list = getattr(event, 'task_list', None)
+    if not isinstance(task_list, list) or not task_list:
+        return
+
+    tasks: list[dict[str, Any]] = []
+    for raw in task_list[:_MAX_TASKS]:
+        if not isinstance(raw, dict):
+            continue
+        description = _task_description(raw)
+        if not description:
+            continue
+        status = _normalize_task_status(raw.get('status'))
+        tasks.append(
+            {
+                'id': str(raw.get('id', '') or '').strip()[:80],
+                'description': description[:240],
+                'status': status,
+                'result': str(raw.get('result', '') or '').strip()[:240],
+            }
+        )
+
+    if not tasks:
+        return
+    event_id = getattr(event, 'id', None)
+    snapshot['task_plan'] = {
+        'event_id': event_id if isinstance(event_id, int) else None,
+        'command': str(getattr(event, 'command', '') or '').strip()[:80],
+        'tasks': tasks,
+        'next_action': _next_action_from_tasks(tasks),
+    }
+
+
+def _task_description(task: dict[str, Any]) -> str:
+    for key in ('description', 'title', 'task', 'content', 'name'):
+        value = task.get(key)
+        if isinstance(value, str) and value.strip():
+            return ' '.join(value.strip().split())
+    return ''
+
+
+def _normalize_task_status(value: object) -> str:
+    try:
+        from backend.core.task_status import TASK_STATUS_TODO, normalize_task_status
+
+        return normalize_task_status(value, default=TASK_STATUS_TODO)
+    except Exception:
+        status = str(value or 'todo').strip().lower()
+        return status or 'todo'
+
+
+def _next_action_from_tasks(tasks: list[dict[str, Any]]) -> str:
+    current = next(
+        (task for task in tasks if task.get('status') == 'in_progress'),
+        None,
+    )
+    if current is None:
+        current = next((task for task in tasks if task.get('status') == 'todo'), None)
+    if current is None:
+        current = next(
+            (task for task in tasks if task.get('status') == 'blocked'),
+            None,
+        )
+    if not current:
+        return ''
+    description = str(current.get('description', '')).strip()
+    if current.get('status') == 'blocked':
+        return f'Unblock task: {description}'[:240]
+    return description[:240]
+
+
 def _extract_errors(event: Event, snapshot: dict) -> None:
     """Extract recent error messages from error-producing observations."""
     if len(snapshot['recent_errors']) >= _MAX_ERRORS:
@@ -374,8 +456,75 @@ def _extract_decisions(event: Event, snapshot: dict) -> None:
             and not _is_invalidated_assumption_text(thought)
             and not _is_control_noise_text(thought)
             and not _is_recoverable_tool_error_text(thought)
+            and is_durable_decision_text(
+                thought, source_tool=str(getattr(event, 'source_tool', '') or '')
+            )
         ):
             snapshot['decisions'].append(thought[:_MAX_CONTENT_LENGTH])
+
+
+def is_durable_decision_text(text: str, *, source_tool: str = '') -> bool:
+    """Return true for explicit durable decisions/checkpoints, not inner monologue."""
+    normalized = ' '.join(str(text).strip().split())
+    if not normalized:
+        return False
+    if source_tool == 'checkpoint':
+        return True
+    lower = normalized.casefold()
+    if len(normalized) > 700 and not any(
+        marker in lower
+        for marker in (
+            'decision:',
+            'decided',
+            'next action:',
+            'checkpoint:',
+            'implemented',
+            'created',
+            'changed',
+            'verified',
+            'remaining:',
+        )
+    ):
+        return False
+    if lower.startswith(('let me ', 'i need to ', 'i should ', 'actually ')):
+        return False
+    if any(
+        marker in lower
+        for marker in (
+            'decision:',
+            'decided',
+            'next action:',
+            'checkpoint:',
+            'current state:',
+            'implemented',
+            'created',
+            'changed',
+            'verified',
+            'remaining:',
+        )
+    ):
+        return True
+    return lower.startswith(
+        (
+            'fix ',
+            'use ',
+            'keep ',
+            'switch ',
+            'implement ',
+            'change ',
+            'remove ',
+            'add ',
+            'preserve ',
+            'avoid ',
+            'update ',
+            'choose ',
+            'continue ',
+            'create ',
+            'write ',
+            'run ',
+            'verify ',
+        )
+    )
 
 
 def _is_control_noise_text(text: str) -> bool:
@@ -751,6 +900,7 @@ def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
     parts.append(f'Events condensed: {snapshot.get("events_condensed", "?")}')
     parts.extend(_format_directive_section(snapshot))
     parts.extend(_format_runtime_section(snapshot.get('runtime', {})))
+    parts.extend(_format_task_plan_section(snapshot.get('task_plan', {})))
     parts.extend(_format_files_section(snapshot.get('files_touched', {})))
     parts.extend(_format_errors_section(snapshot.get('recent_errors', [])))
     parts.extend(_format_decisions_section(snapshot.get('decisions', [])))
@@ -796,6 +946,29 @@ def _format_runtime_section(runtime: dict) -> list[str]:
     session_id = runtime.get('session_id')
     if isinstance(session_id, str) and session_id:
         lines.append(f'  session_id: {session_id}')
+    return lines if len(lines) > 1 else []
+
+
+def _format_task_plan_section(task_plan: dict) -> list[str]:
+    if not isinstance(task_plan, dict) or not task_plan:
+        return []
+    tasks = task_plan.get('tasks')
+    if not isinstance(tasks, list) or not tasks:
+        return []
+    lines = ['\nActive task tracker state before condensation:']
+    next_action = str(task_plan.get('next_action', '') or '').strip()
+    if next_action:
+        lines.append(f'  next action: {next_action[:240]}')
+    for task in tasks[:12]:
+        if not isinstance(task, dict):
+            continue
+        status = str(task.get('status', '?') or '?')
+        desc = str(task.get('description', '') or '').strip()
+        if not desc:
+            continue
+        result = str(task.get('result', '') or '').strip()
+        suffix = f' -> {result[:120]}' if result else ''
+        lines.append(f'  - [{status}] {desc[:180]}{suffix}')
     return lines if len(lines) > 1 else []
 
 

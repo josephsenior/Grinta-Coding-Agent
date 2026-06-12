@@ -43,6 +43,16 @@ def _pending_action_for_observation_cause(
     return getattr(controller, '_pending_action', None)
 
 
+def _controller_llm_stream_active(controller: 'SessionOrchestrator') -> bool:
+    checker = getattr(controller, '_is_llm_stream_active', None)
+    if not callable(checker):
+        return False
+    try:
+        return bool(checker())
+    except Exception:
+        return False
+
+
 def _clear_agent_queued_actions(controller: 'SessionOrchestrator', reason: str) -> None:
     """Clear queued agent actions when recovery requires a hard strategy reset."""
     agent = getattr(controller, 'agent', None)
@@ -267,7 +277,10 @@ class StepGuardService:
             return None
 
         try:
-            result = watchdog_fn(agent_state=agent_state)
+            result = watchdog_fn(
+                agent_state=agent_state,
+                llm_stream_active=_controller_llm_stream_active(controller),
+            )
         except Exception as exc:
             logger.debug('No-step-progress watchdog raised: %s', exc, exc_info=True)
             return None

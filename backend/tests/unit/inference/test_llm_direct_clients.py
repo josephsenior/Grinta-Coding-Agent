@@ -292,7 +292,7 @@ class TestGetDirectClient:
         ):
             from backend.inference.direct_clients import OpenAIClient
 
-            client = get_direct_client('gpt-4o', api_key='sk-key')
+            client = get_direct_client('openai/gpt-5', api_key='sk-key')
             assert isinstance(client, OpenAIClient)
 
 

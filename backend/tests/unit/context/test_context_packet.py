@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+from backend.context.canonical_state import CanonicalTaskState, save_canonical_state
 from backend.context.context_packet import (
     CONTEXT_PACKET_MARKER,
     build_context_packet,
     build_context_packet_observation,
 )
-from backend.ledger.action import CmdRunAction, MessageAction
+from backend.ledger.action import CmdRunAction, MessageAction, TaskTrackingAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation import CmdOutputObservation
 from backend.ledger.observation.agent import AgentCondensationObservation
@@ -34,6 +37,12 @@ def _output(
     return event
 
 
+def _tasks(task_list: list[dict], event_id: int) -> TaskTrackingAction:
+    event = TaskTrackingAction(command='update', task_list=task_list)
+    event.id = event_id
+    return event
+
+
 def test_context_packet_contains_one_canonical_state_and_latest_verification(
     tmp_path, monkeypatch
 ) -> None:
@@ -55,6 +64,33 @@ def test_context_packet_contains_one_canonical_state_and_latest_verification(
     assert 'Fix memory compaction' in packet.content
     assert 'Latest verification: PASSED' in packet.content
     assert len(packet.content) <= 1800
+
+
+def test_context_packet_prioritizes_task_checkpoint_after_compaction(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        'backend.context.canonical_state.canonical_state_path',
+        lambda state=None: tmp_path / 'canonical_task_state.json',
+    )
+    events = [
+        _user('Build a small raft demo', 1),
+        _tasks(
+            [
+                {'description': 'Create message modules', 'status': 'done'},
+                {'description': 'Implement node.py', 'status': 'in_progress'},
+                {'description': 'Implement cluster.py', 'status': 'todo'},
+            ],
+            2,
+        ),
+    ]
+
+    packet = build_context_packet(events, events, just_compacted=True, char_budget=2200)
+
+    assert packet is not None
+    assert 'OPERATIONAL_CHECKPOINT' in packet.content
+    assert 'Next action: Implement node.py' in packet.content
+    assert 'remaining: Implement cluster.py' in packet.content
 
 
 def test_context_packet_ignores_old_packets_as_validated_summaries(
@@ -145,3 +181,30 @@ def test_repeated_compaction_replay_keeps_one_current_state(
     assert 'stale packet' not in packet.content
     assert 'old restore block' not in packet.content
     assert 'resuming task' not in packet.content
+
+
+def test_large_context_model_expands_context_packet_budget(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        'backend.context.canonical_state.canonical_state_path',
+        lambda state=None: tmp_path / 'canonical_task_state.json',
+    )
+    canonical = CanonicalTaskState(
+        objective='Keep long-session coding continuity stable',
+        latest_directive='Implement the context pipeline hardening',
+        next_action='Continue from canonical state without rereading old files',
+        narrative_summary='Detailed verified state. ' * 1200,
+    )
+    save_canonical_state(canonical)
+    llm_config = SimpleNamespace(
+        model='openai/gpt-5',
+        context_window_tokens=400_000,
+        max_output_tokens=128_000,
+        max_input_tokens=None,
+    )
+
+    packet = build_context_packet([], [], llm_config=llm_config, char_budget=6_000)
+
+    assert packet is not None
+    assert len(packet.content) > 6_000
+    assert len(packet.content) <= 32_000
+    assert 'Continue from canonical state' in packet.content

@@ -85,6 +85,7 @@ def _render_tool_reference(
             '- Creation: `create(type="file")` for new files; `create(type="symbol")` for new symbols anchored to existing code.\n'
             '- Code: `edit_symbols` for modifying/deleting existing symbols; prefer `path` + `qualified_name` + `symbol_kind` for write targets.\n'
             '- Text/config/docs: `replace_string`; add by anchor -> anchor + content, delete with `new_string=""`.\n'
+            '- Prefer surgical targeted edits for existing files; full-file overwrites are not recommended unless a full rewrite is genuinely necessary.\n'
             '- Refactor atomically across files: `multiedit`.\n'
             '- Undo: `undo_last_edit` reverts the last file-write on an existing file. File must still exist — for creation rollback, delete the file.\n'
             '- Never write source via shell. Use real newlines/quotes, not serialized JSON strings.\n\n'

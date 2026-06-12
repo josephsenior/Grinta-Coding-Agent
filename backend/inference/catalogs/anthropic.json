@@ -3,143 +3,164 @@
   "client": "anthropic_native",
   "models": {
     "claude-haiku-4-5": {
-      "aliases": [
-        "anthropic/claude-haiku-4-5",
-        "anthropic/claude-haiku-4-5-latest",
-        "claude-haiku-4-5",
-        "claude haiku 4.5"
-      ],
-      "context_window_tokens": 200000,
-      "max_input_tokens": 131904,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 1.0,
-      "output_price_per_m": 5.0,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_prompt_cache": true,
-      "supports_vision": true
+      "runtime": {
+        "aliases": [
+          "anthropic/claude-haiku-4-5",
+          "anthropic/claude-haiku-4-5-latest",
+          "claude-haiku-4-5",
+          "claude haiku 4.5"
+        ],
+        "context_window_tokens": 200000,
+        "max_input_tokens": 131904,
+        "max_output_tokens": 64000,
+        "input_price_per_m": 1.0,
+        "output_price_per_m": 5.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_prompt_cache": true,
+        "supports_vision": true
+      },
+      "metadata": {}
     },
     "claude-opus-4-5": {
-      "aliases": [
-        "anthropic/claude-opus-4-5",
-        "anthropic/claude-opus-4-5-latest",
-        "claude-opus-4-5",
-        "claude opus 4.5"
-      ],
-      "context_window_tokens": 200000,
-      "max_input_tokens": 131904,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 5.0,
-      "output_price_per_m": 25.0,
-      "verified": false,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_prompt_cache": true,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      "runtime": {
+        "aliases": [
+          "anthropic/claude-opus-4-5",
+          "anthropic/claude-opus-4-5-latest",
+          "claude-opus-4-5",
+          "claude opus 4.5"
+        ],
+        "context_window_tokens": 200000,
+        "max_input_tokens": 131904,
+        "max_output_tokens": 64000,
+        "input_price_per_m": 5.0,
+        "output_price_per_m": 25.0,
+        "verified": false,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_prompt_cache": true,
+        "supports_vision": true,
+        "strip_reasoning_effort": true
+      },
+      "metadata": {}
     },
     "claude-opus-4-6": {
-      "aliases": [
-        "anthropic/claude-opus-4-6",
-        "claude-opus-4-6",
-        "claude opus 4.6"
-      ],
-      "context_window_tokens": 1000000,
-      "max_input_tokens": 867904,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 5.0,
-      "output_price_per_m": 25.0,
-      "verified": false,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_prompt_cache": true,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      "runtime": {
+        "aliases": [
+          "anthropic/claude-opus-4-6",
+          "claude-opus-4-6",
+          "claude opus 4.6"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 867904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5.0,
+        "output_price_per_m": 25.0,
+        "verified": false,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_prompt_cache": true,
+        "supports_vision": true,
+        "strip_reasoning_effort": true
+      },
+      "metadata": {}
     },
     "claude-opus-4-7": {
-      "aliases": [
-        "anthropic/claude-opus-4-7",
-        "claude-opus-4-7",
-        "claude opus 4.7"
-      ],
-      "context_window_tokens": 1000000,
-      "max_input_tokens": 867904,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 5.0,
-      "output_price_per_m": 25.0,
-      "verified": false,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_prompt_cache": true,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      "runtime": {
+        "aliases": [
+          "anthropic/claude-opus-4-7",
+          "claude-opus-4-7",
+          "claude opus 4.7"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 867904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5.0,
+        "output_price_per_m": 25.0,
+        "verified": false,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_prompt_cache": true,
+        "supports_vision": true,
+        "strip_reasoning_effort": true
+      },
+      "metadata": {}
     },
     "claude-opus-4-8": {
-      "aliases": [
-        "anthropic/claude-opus-4-8",
-        "claude-opus-4-8",
-        "claude opus 4.8"
-      ],
-      "context_window_tokens": 1000000,
-      "max_input_tokens": 867904,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 5.0,
-      "output_price_per_m": 25.0,
-      "verified": false,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_prompt_cache": true,
-      "supports_vision": true,
-      "strip_reasoning_effort": true,
-      "strip_temperature": true,
-      "strip_top_p": true
+      "runtime": {
+        "aliases": [
+          "anthropic/claude-opus-4-8",
+          "claude-opus-4-8",
+          "claude opus 4.8"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 867904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5.0,
+        "output_price_per_m": 25.0,
+        "verified": false,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_prompt_cache": true,
+        "supports_vision": true,
+        "strip_reasoning_effort": true,
+        "strip_temperature": true,
+        "strip_top_p": true
+      },
+      "metadata": {}
     },
     "claude-sonnet-4-5": {
-      "aliases": [
-        "anthropic/claude-sonnet-4-5",
-        "anthropic/claude-sonnet-4-5-latest",
-        "anthropic/claude-4.5-sonnet",
-        "claude-sonnet-4-5",
-        "claude-4.5-sonnet",
-        "claude sonnet 4.5"
-      ],
-      "context_window_tokens": 256000,
-      "max_input_tokens": 187904,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 3.0,
-      "output_price_per_m": 15.0,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_prompt_cache": true,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      "runtime": {
+        "aliases": [
+          "anthropic/claude-sonnet-4-5",
+          "anthropic/claude-sonnet-4-5-latest",
+          "anthropic/claude-4.5-sonnet",
+          "claude-sonnet-4-5",
+          "claude-4.5-sonnet",
+          "claude sonnet 4.5"
+        ],
+        "context_window_tokens": 256000,
+        "max_input_tokens": 187904,
+        "max_output_tokens": 64000,
+        "input_price_per_m": 3.0,
+        "output_price_per_m": 15.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_prompt_cache": true,
+        "supports_vision": true,
+        "strip_reasoning_effort": true
+      },
+      "metadata": {}
     },
     "claude-sonnet-4-6": {
-      "aliases": [
-        "anthropic/claude-sonnet-4-6",
-        "claude-sonnet-4-6",
-        "claude sonnet 4.6"
-      ],
-      "context_window_tokens": 1000000,
-      "max_input_tokens": 931904,
-      "max_output_tokens": 64000,
-      "input_price_per_m": 3.0,
-      "output_price_per_m": 15.0,
-      "verified": false,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_prompt_cache": true,
-      "supports_vision": true,
-      "strip_reasoning_effort": true
+      "runtime": {
+        "aliases": [
+          "anthropic/claude-sonnet-4-6",
+          "claude-sonnet-4-6",
+          "claude sonnet 4.6"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 931904,
+        "max_output_tokens": 64000,
+        "input_price_per_m": 3.0,
+        "output_price_per_m": 15.0,
+        "verified": false,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_prompt_cache": true,
+        "supports_vision": true,
+        "strip_reasoning_effort": true
+      },
+      "metadata": {}
     }
   }
 }

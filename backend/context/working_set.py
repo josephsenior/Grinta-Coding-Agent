@@ -300,7 +300,11 @@ def _render_current_state(state: dict[str, Any]) -> str:
     return '\n'.join(lines)
 
 
-def sync_snapshot_to_working_memory(snapshot: dict[str, Any] | None) -> list[str]:
+def sync_snapshot_to_working_memory(
+    snapshot: dict[str, Any] | None,
+    *,
+    state: object | None = None,
+) -> list[str]:
     """Persist condensation snapshot facts into structured working memory."""
     if not snapshot:
         return []
@@ -312,14 +316,18 @@ def sync_snapshot_to_working_memory(snapshot: dict[str, Any] | None) -> list[str
         from backend.context.pre_condensation_snapshot import (
             format_snapshot_for_injection,  # noqa: F401
         )
+        from backend.context.session_context import bind_session_context
         from backend.engine.tools.working_memory import _load_memory, _save_memory
     except Exception:
         logger.debug('Working memory sync unavailable', exc_info=True)
         return []
 
+    bind_session_context(state=state)  # type: ignore[arg-type]
     try:
-        canonical = reduce_snapshot_into_state(snapshot, source='working_set_sync')
-        save_canonical_state(canonical)
+        canonical = reduce_snapshot_into_state(
+            snapshot, source='working_set_sync', persist_state=state  # type: ignore[arg-type]
+        )
+        save_canonical_state(canonical, state=state)  # type: ignore[arg-type]
     except Exception:
         logger.debug('Canonical state sync unavailable', exc_info=True)
 

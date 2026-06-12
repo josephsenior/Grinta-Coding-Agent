@@ -6,33 +6,16 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 _DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
-_ANTHROPIC_INCOMPATIBLE_REQUEST_KEYS = frozenset(
-    {
-        'tool_choice',
-        'response_format',
-        'frequency_penalty',
-        'presence_penalty',
-        'logit_bias',
-        'parallel_tool_calls',
-        'extra_body',
-        'extra_headers',
-        'stream',
-        'stream_options',
-        'reasoning_effort',
-    }
-)
 
 
 def _sanitize_anthropic_request_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
-    """Drop OpenAI-style kwargs that Anthropic's SDK does not accept.
+    from backend.inference.catalog_loader import (
+        TRANSPORT_CLIENT_ANTHROPIC,
+        pop_incompatible_kwargs,
+    )
 
-    This transport-level sanitization is required even when a non-Anthropic
-    provider prefix (for example ``opencode-go``) is routed through the native
-    Anthropic client. Provider-based sanitization alone cannot cover that case.
-    """
     request_kwargs = dict(kwargs)
-    for key in _ANTHROPIC_INCOMPATIBLE_REQUEST_KEYS:
-        request_kwargs.pop(key, None)
+    pop_incompatible_kwargs(request_kwargs, TRANSPORT_CLIENT_ANTHROPIC)
     return request_kwargs
 
 
@@ -44,9 +27,16 @@ def _resolve_anthropic_max_tokens(client: Any, kwargs: dict[str, Any]) -> int:
     if raw_max_tokens is not None:
         return max(int(raw_max_tokens), 1)
 
-    from backend.inference.catalog_loader import lookup
+    from backend.inference.catalog_loader import lookup, lookup_provider_model
 
     entry = lookup(client.model_name)
+    if entry is None:
+        provider_name = getattr(client, '_provider_name', None)
+        entry = lookup_provider_model(
+            provider_name,
+            client.model_name,
+            allow_aliases=True,
+        )
     if entry and entry.max_output_tokens is not None:
         return max(int(entry.max_output_tokens), 1)
 

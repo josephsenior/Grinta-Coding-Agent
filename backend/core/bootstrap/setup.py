@@ -495,6 +495,10 @@ def create_controller(
     # Store the runtime so downstream code (worker delegation, middleware)
     # can access it via controller.runtime.
     controller.runtime = runtime
+    # Snapshot post-init state once the rollback middleware can resolve the
+    # runtime workspace. Doing this in SessionOrchestrator.__init__ is too
+    # early because controller.runtime is assigned here.
+    controller._create_phase_boundary_checkpoint('init_to_active')
     try:
         from backend.execution.drivers.local.local_runtime_inprocess import (
             LocalRuntimeInProcess,
