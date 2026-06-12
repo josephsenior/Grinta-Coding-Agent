@@ -23,13 +23,14 @@ _CATALOG_DIR = Path(__file__).with_name('catalogs')
 
 @dataclass(frozen=True, slots=True)
 class ModelEntry:
-    """A single model's metadata from the catalog."""
+    """A single model entry from the provider catalog."""
 
     name: str
     provider: str
     client: str | None = None
     catalog_file: str | None = None
-    provider_metadata: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
+    inference_endpoint: str | None = None
     provider_model_id: str | None = None
     aliases: tuple[str, ...] = ()
     context_window_tokens: int | None = None
@@ -66,6 +67,288 @@ class ModelEntry:
     default_temperature: float | None = None  # Model-recommended temperature
 
 
+TRANSPORT_CLIENT_GOOGLE = 'google_native'
+TRANSPORT_CLIENT_ANTHROPIC = 'anthropic_native'
+TRANSPORT_CLIENT_OPENAI = 'openai_compatible'
+TRANSPORT_CLIENT_UNSUPPORTED = 'unsupported'
+
+_GOOGLE_INCOMPATIBLE_KWARGS: frozenset[str] = frozenset(
+    {
+        'tool_choice',
+        'extra_body',
+        'extra_headers',
+        'response_format',
+        'frequency_penalty',
+        'presence_penalty',
+        'logit_bias',
+        'seed',
+        'user',
+        'reasoning_effort',
+        'reasoning',
+        'parallel_tool_calls',
+        'metadata',
+    }
+)
+
+_ANTHROPIC_INCOMPATIBLE_KWARGS: frozenset[str] = frozenset(
+    {
+        'tool_choice',
+        'response_format',
+        'frequency_penalty',
+        'presence_penalty',
+        'logit_bias',
+        'parallel_tool_calls',
+        'extra_body',
+        'extra_headers',
+        'stream',
+        'stream_options',
+        'reasoning_effort',
+    }
+)
+
+GEMINI_SDK_EXTRA_INCOMPATIBLE_KWARGS: frozenset[str] = frozenset(
+    {
+        'stream',
+        'stream_options',
+        'logprobs',
+        'top_logprobs',
+        'n',
+        'timeout',
+    }
+)
+
+# Vendor extensions accepted by OpenAI-compatible HTTP APIs but not as direct
+# kwargs on ``chat.completions.create`` — tunneled via ``extra_body``.
+_OPENAI_PASSTHROUGH_KWARGS: frozenset[str] = frozenset(
+    {
+        'thinking',
+        'enable_thinking',
+        'output_config',
+    }
+)
+
+_INCOMPATIBLE_KWARGS_BY_TRANSPORT: dict[str, frozenset[str]] = {
+    TRANSPORT_CLIENT_GOOGLE: _GOOGLE_INCOMPATIBLE_KWARGS,
+    TRANSPORT_CLIENT_ANTHROPIC: _ANTHROPIC_INCOMPATIBLE_KWARGS,
+    TRANSPORT_CLIENT_OPENAI: frozenset(),
+}
+
+_SUPPORTED_INFERENCE_ENDPOINTS: frozenset[str] = frozenset(
+    {'/chat/completions', '/messages'}
+)
+
+
+def _parse_model_catalog_info(
+    info: dict[str, Any],
+    *,
+    source_file: str,
+    model_name: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return ``(runtime, metadata)`` from a catalog model record."""
+    runtime = info.get('runtime')
+    if not isinstance(runtime, dict):
+        raise ValueError(
+            f"Model {model_name!r} in {source_file} must define a 'runtime' object"
+        )
+    metadata = info.get('metadata')
+    if metadata is None:
+        metadata = {}
+    if not isinstance(metadata, dict):
+        raise ValueError(
+            f"Model {model_name!r} in {source_file} must define 'metadata' as an object"
+        )
+    return runtime, metadata
+
+
+def _strip_transport_prefix(model: str, provider: str) -> str:
+    if not provider or '/' not in model:
+        return model
+    prefix, stripped = model.split('/', 1)
+    if prefix.strip().lower() == provider.strip().lower():
+        return stripped
+    return model
+
+
+def _transport_client_for_entry(entry: ModelEntry) -> str:
+    if entry.provider == 'google':
+        return TRANSPORT_CLIENT_GOOGLE
+    if entry.provider == 'anthropic':
+        return TRANSPORT_CLIENT_ANTHROPIC
+    if entry.provider in {'opencode', 'opencode-go'}:
+        endpoint = entry.inference_endpoint
+        if endpoint == '/messages':
+            return TRANSPORT_CLIENT_ANTHROPIC
+        if endpoint in _SUPPORTED_INFERENCE_ENDPOINTS:
+            return TRANSPORT_CLIENT_OPENAI
+        return TRANSPORT_CLIENT_UNSUPPORTED
+    return TRANSPORT_CLIENT_OPENAI
+
+
+def _transport_client_for_provider_prefix(
+    provider: str,
+    model: str,
+    *,
+    config_provider: str | None = None,
+) -> str:
+    from backend.inference.provider_resolver import (
+        opencode_go_required_endpoint,
+        opencode_required_endpoint,
+    )
+
+    stripped = _strip_transport_prefix(model, provider)
+    if provider == 'google':
+        return TRANSPORT_CLIENT_GOOGLE
+    if provider == 'anthropic':
+        return TRANSPORT_CLIENT_ANTHROPIC
+    if provider == 'opencode':
+        endpoint = opencode_required_endpoint(stripped)
+        if endpoint == '/messages':
+            return TRANSPORT_CLIENT_ANTHROPIC
+        if endpoint in _SUPPORTED_INFERENCE_ENDPOINTS:
+            return TRANSPORT_CLIENT_OPENAI
+        return TRANSPORT_CLIENT_UNSUPPORTED
+    if provider == 'opencode-go':
+        endpoint = opencode_go_required_endpoint(stripped)
+        if endpoint == '/messages':
+            return TRANSPORT_CLIENT_ANTHROPIC
+        if endpoint in _SUPPORTED_INFERENCE_ENDPOINTS:
+            return TRANSPORT_CLIENT_OPENAI
+        return TRANSPORT_CLIENT_UNSUPPORTED
+    return TRANSPORT_CLIENT_OPENAI
+
+
+def resolve_transport_client(
+    model: str,
+    *,
+    config_provider: str | None = None,
+) -> str:
+    """Resolve the executable transport client for *model*."""
+    entry = lookup(model)
+    if entry is not None:
+        return _transport_client_for_entry(entry)
+
+    if config_provider:
+        bare = model.split('/', 1)[-1] if '/' in model else model
+        entry = lookup_provider_model(config_provider, bare, allow_aliases=True)
+        if entry is not None:
+            return _transport_client_for_entry(entry)
+
+    if '/' not in model.strip():
+        return TRANSPORT_CLIENT_OPENAI
+
+    from backend.inference.provider_resolver import get_resolver
+
+    try:
+        provider = get_resolver().resolve_provider(
+            model, config_provider=config_provider
+        )
+    except ValueError:
+        return TRANSPORT_CLIENT_OPENAI
+    return _transport_client_for_provider_prefix(
+        provider, model, config_provider=config_provider
+    )
+
+
+def incompatible_kwargs_for_transport(transport_client: str) -> frozenset[str]:
+    return _INCOMPATIBLE_KWARGS_BY_TRANSPORT.get(transport_client, frozenset())
+
+
+def pop_incompatible_kwargs(
+    kwargs: dict[str, Any],
+    transport_client: str,
+    *,
+    extra: frozenset[str] | None = None,
+) -> None:
+    """Remove transport-incompatible keys from *kwargs* in place."""
+    keys = incompatible_kwargs_for_transport(transport_client)
+    if extra:
+        keys = keys | extra
+    for key in keys:
+        kwargs.pop(key, None)
+
+
+def _tunnel_openai_passthrough_kwargs(sanitized: dict[str, Any]) -> None:
+    """Move vendor extension fields into ``extra_body`` for OpenAI SDK passthrough."""
+    passthrough: dict[str, Any] = {}
+    for key in _OPENAI_PASSTHROUGH_KWARGS:
+        if key in sanitized:
+            passthrough[key] = sanitized.pop(key)
+    if not passthrough:
+        return
+    existing = sanitized.get('extra_body')
+    if isinstance(existing, dict):
+        sanitized['extra_body'] = {**existing, **passthrough}
+    else:
+        sanitized['extra_body'] = passthrough
+
+
+def sanitize_call_kwargs_for_provider(model: str, call_kwargs: dict) -> dict:
+    """Remove transport-incompatible kwargs before SDK calls."""
+    transport = resolve_transport_client(model)
+    sanitized = dict(call_kwargs)
+    entry = lookup(model)
+    if entry is not None and (
+        not entry.supports_reasoning_effort or entry.strip_reasoning_effort
+    ):
+        sanitized.pop('reasoning_effort', None)
+    for key in incompatible_kwargs_for_transport(transport):
+        sanitized.pop(key, None)
+    if transport == TRANSPORT_CLIENT_OPENAI:
+        _tunnel_openai_passthrough_kwargs(sanitized)
+    return sanitized
+
+
+def validate_model_transport(
+    model: str,
+    *,
+    config_provider: str | None = None,
+) -> None:
+    """Fail fast when a catalog model uses an unsupported transport surface."""
+    from backend.inference.exceptions import BadRequestError
+
+    entry = lookup(model)
+    if entry is None and config_provider:
+        bare = model.split('/', 1)[-1] if '/' in model else model
+        entry = lookup_provider_model(config_provider, bare, allow_aliases=True)
+    if entry is None:
+        return
+
+    transport = _transport_client_for_entry(entry)
+    if transport != TRANSPORT_CLIENT_UNSUPPORTED:
+        return
+
+    endpoint = entry.inference_endpoint
+    provider = entry.provider
+    if endpoint == '/responses':
+        raise BadRequestError(
+            (
+                f"Model {model!r} is served via OpenCode '/responses', which Grinta "
+                'does not implement yet. Select a model on '
+                "'/chat/completions' or '/messages'."
+            ),
+            llm_provider=provider,
+            model=model,
+        )
+    if endpoint and endpoint.startswith('/models/'):
+        raise BadRequestError(
+            (
+                f"Model {model!r} is served via OpenCode native Gemini endpoint "
+                f"{endpoint!r}, which Grinta does not implement yet. Select a "
+                "model on '/chat/completions' or use provider 'google/'."
+            ),
+            llm_provider=provider,
+            model=model,
+        )
+    raise BadRequestError(
+        (
+            f"Model {model!r} requires unsupported transport endpoint "
+            f"{endpoint!r}."
+        ),
+        llm_provider=provider,
+        model=model,
+    )
+
+
 @functools.lru_cache(maxsize=1)
 def _load_raw() -> dict:
     """Load and cache provider catalog files."""
@@ -97,44 +380,51 @@ def _entry_from_catalog(
     provider_client: str | None,
     source_file: str | None,
     name: str,
-    info: dict[str, Any],
+    runtime: dict[str, Any],
+    metadata: dict[str, Any],
 ) -> ModelEntry:
+    endpoint = runtime.get('inference_endpoint')
+    if isinstance(endpoint, str) and endpoint.startswith('/'):
+        inference_endpoint = endpoint
+    else:
+        inference_endpoint = None
     return ModelEntry(
         name=name,
         provider=provider,
-        client=info.get('client', provider_client),
+        client=runtime.get('client', provider_client),
         catalog_file=source_file,
-        provider_metadata=info.get('provider_metadata'),
-        provider_model_id=info.get('provider_model_id'),
-        aliases=tuple(info.get('aliases', ())),
-        context_window_tokens=info.get('context_window_tokens'),
-        max_input_tokens=info.get('max_input_tokens'),
-        max_output_tokens=info.get('max_output_tokens'),
-        input_price_per_m=info.get('input_price_per_m'),
-        cached_input_price_per_m=info.get('cached_input_price_per_m'),
-        cached_write_price_per_m=info.get('cached_write_price_per_m'),
-        output_price_per_m=info.get('output_price_per_m'),
-        long_context_threshold_tokens=info.get('long_context_threshold_tokens'),
-        long_input_price_per_m=info.get('long_input_price_per_m'),
-        long_cached_input_price_per_m=info.get('long_cached_input_price_per_m'),
-        long_cached_write_price_per_m=info.get('long_cached_write_price_per_m'),
-        long_output_price_per_m=info.get('long_output_price_per_m'),
-        verified=info.get('verified', False),
-        featured=info.get('featured', False),
-        supports_function_calling=info.get('supports_function_calling', False),
-        supports_parallel_tool_calls=info.get('supports_parallel_tool_calls', False),
-        supports_reasoning_effort=info.get('supports_reasoning_effort', False),
-        supports_prompt_cache=info.get('supports_prompt_cache', False),
-        supports_stop_words=info.get('supports_stop_words', True),
-        supports_response_schema=info.get('supports_response_schema', False),
-        supports_vision=info.get('supports_vision', False),
-        strip_reasoning_effort=info.get('strip_reasoning_effort', False),
-        thinking_mode=info.get('thinking_mode'),
-        strip_temperature=info.get('strip_temperature', False),
-        strip_top_p=info.get('strip_top_p', False),
-        strip_penalties=info.get('strip_penalties', False),
-        use_max_completion_tokens=info.get('use_max_completion_tokens', False),
-        default_temperature=info.get('default_temperature'),
+        metadata=metadata or None,
+        inference_endpoint=inference_endpoint,
+        provider_model_id=runtime.get('provider_model_id'),
+        aliases=tuple(runtime.get('aliases', ())),
+        context_window_tokens=runtime.get('context_window_tokens'),
+        max_input_tokens=runtime.get('max_input_tokens'),
+        max_output_tokens=runtime.get('max_output_tokens'),
+        input_price_per_m=runtime.get('input_price_per_m'),
+        cached_input_price_per_m=runtime.get('cached_input_price_per_m'),
+        cached_write_price_per_m=runtime.get('cached_write_price_per_m'),
+        output_price_per_m=runtime.get('output_price_per_m'),
+        long_context_threshold_tokens=runtime.get('long_context_threshold_tokens'),
+        long_input_price_per_m=runtime.get('long_input_price_per_m'),
+        long_cached_input_price_per_m=runtime.get('long_cached_input_price_per_m'),
+        long_cached_write_price_per_m=runtime.get('long_cached_write_price_per_m'),
+        long_output_price_per_m=runtime.get('long_output_price_per_m'),
+        verified=runtime.get('verified', False),
+        featured=runtime.get('featured', False),
+        supports_function_calling=runtime.get('supports_function_calling', False),
+        supports_parallel_tool_calls=runtime.get('supports_parallel_tool_calls', False),
+        supports_reasoning_effort=runtime.get('supports_reasoning_effort', False),
+        supports_prompt_cache=runtime.get('supports_prompt_cache', False),
+        supports_stop_words=runtime.get('supports_stop_words', True),
+        supports_response_schema=runtime.get('supports_response_schema', False),
+        supports_vision=runtime.get('supports_vision', False),
+        strip_reasoning_effort=runtime.get('strip_reasoning_effort', False),
+        thinking_mode=runtime.get('thinking_mode'),
+        strip_temperature=runtime.get('strip_temperature', False),
+        strip_top_p=runtime.get('strip_top_p', False),
+        strip_penalties=runtime.get('strip_penalties', False),
+        use_max_completion_tokens=runtime.get('use_max_completion_tokens', False),
+        default_temperature=runtime.get('default_temperature'),
     )
 
 
@@ -147,7 +437,12 @@ def get_catalog() -> tuple[ModelEntry, ...]:
         provider_client = provider_data.get('client')
         source_file = provider_data.get('source_file', '<catalog>')
         for name, info in provider_data.get('models', {}).items():
-            declared_provider = str(info.get('provider') or provider).strip().lower()
+            runtime, metadata = _parse_model_catalog_info(
+                info,
+                source_file=source_file,
+                model_name=name,
+            )
+            declared_provider = str(runtime.get('provider') or provider).strip().lower()
             if declared_provider != provider:
                 raise ValueError(
                     f"Model {name!r} in {source_file} declares provider "
@@ -159,7 +454,8 @@ def get_catalog() -> tuple[ModelEntry, ...]:
                     provider_client=provider_client,
                     source_file=source_file,
                     name=name,
-                    info=info,
+                    runtime=runtime,
+                    metadata=metadata,
                 )
             )
     return tuple(entries)
@@ -183,6 +479,8 @@ def _name_index() -> dict[str, ModelEntry]:
 
     def add_bare_candidate(key: str | None, entry: ModelEntry) -> None:
         if not key:
+            return
+        if entry.provider in {'opencode', 'opencode-go'}:
             return
         bare_candidates.setdefault(key.lower(), []).append(entry)
 
@@ -211,6 +509,95 @@ def _name_index() -> dict[str, ModelEntry]:
 def runtime_model_id(entry: ModelEntry) -> str:
     """Return the exact model id that should be sent to the provider."""
     return entry.provider_model_id or entry.name
+
+
+def runtime_parameter_mode(entry: ModelEntry) -> dict[str, Any]:
+    """Return the executable runtime parameter mode for a catalog entry.
+
+    Provider metadata can contain raw docs or upstream SDK config. This helper
+    describes only what Grinta's Python transport will actually apply.
+    """
+    from backend.inference.reasoning import resolve_reasoning_plan, supports_reasoning
+
+    if entry.thinking_mode:
+        reasoning = f'catalog_thinking_mode:{entry.thinking_mode}'
+    elif supports_reasoning(entry):
+        plan = resolve_reasoning_plan(entry, reasoning_effort='medium')
+        reasoning = (
+            f'family_wire:{plan.wire}'
+            if plan.enabled
+            else f'family_wire:{plan.wire}:disabled'
+        )
+    else:
+        reasoning = 'not_configured'
+    return {
+        'reasoning': reasoning,
+        'temperature': 'stripped' if entry.strip_temperature else 'standard',
+        'top_p': 'stripped' if entry.strip_top_p else 'standard',
+        'penalties': 'stripped' if entry.strip_penalties else 'standard',
+        'token_param': (
+            'max_completion_tokens' if entry.use_max_completion_tokens else 'max_tokens'
+        ),
+        'parallel_tool_calls': (
+            'enabled' if entry.supports_parallel_tool_calls else 'not_configured'
+        ),
+        'inference_endpoint': entry.inference_endpoint,
+    }
+
+
+def compact_metadata_for_log(metadata: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Return compact docs-only metadata safe for per-call logs."""
+    if not isinstance(metadata, dict):
+        return metadata
+    keys = (
+        'source',
+        'provider_id',
+        'display_name',
+        'family',
+        'status',
+        'release_date',
+        'inference_url',
+    )
+    compact = {key: metadata[key] for key in keys if metadata.get(key) is not None}
+    api = metadata.get('api')
+    if isinstance(api, dict):
+        compact['api'] = {
+            key: api[key] for key in ('id', 'url', 'npm') if api.get(key) is not None
+        }
+    options = metadata.get('options') or metadata.get('runtime_options')
+    if isinstance(options, dict) and options:
+        compact['options'] = options
+    capabilities = metadata.get('capabilities')
+    if isinstance(capabilities, dict):
+        compact['capabilities'] = _compact_capabilities_for_log(capabilities)
+    variants = metadata.get(
+        'ai_sdk_variants_metadata_only',
+        metadata.get('variants'),
+    )
+    if isinstance(variants, dict) and variants:
+        compact['ai_sdk_variants_metadata_only'] = {
+            'names': sorted(variants.keys()),
+            'not_applied_as_python_kwargs': True,
+        }
+    runtime_reasoning = metadata.get('runtime_reasoning')
+    if isinstance(runtime_reasoning, dict):
+        compact['runtime_reasoning'] = runtime_reasoning
+    return compact
+
+
+def _compact_capabilities_for_log(capabilities: dict[str, Any]) -> dict[str, Any]:
+    compact = {
+        key: capabilities[key]
+        for key in ('temperature', 'reasoning', 'attachment', 'toolcall', 'interleaved')
+        if key in capabilities
+    }
+    for direction in ('input', 'output'):
+        modalities = capabilities.get(direction)
+        if isinstance(modalities, dict):
+            compact[f'{direction}_modalities'] = sorted(
+                key for key, enabled in modalities.items() if enabled
+            )
+    return compact
 
 
 def _normalize_provider(provider: str | None) -> str | None:
@@ -553,64 +940,6 @@ def get_provider_info(model: str) -> dict[str, Any]:
     }
 
 
-def _resolve_provider_for_sanitization(model: str) -> str:
-    """Resolve provider name for parameter sanitization."""
-    entry = lookup(model)
-    if entry:
-        return entry.provider
-
-    from backend.inference.provider_resolver import extract_provider_prefix
-
-    return extract_provider_prefix(model) or 'unknown'
-
-
-def sanitize_call_kwargs_for_provider(model: str, call_kwargs: dict) -> dict:
-    """Remove provider-incompatible kwargs from ``call_kwargs``.
-
-    This function is the canonical sanitization layer used before SDK calls.
-    It keeps planner/executor behavior stable while preventing provider-specific
-    transport errors from unsupported OpenAI-style parameters.
-    """
-    sanitized = dict(call_kwargs)
-    provider = _resolve_provider_for_sanitization(model)
-
-    # Google Gemini native SDK accepts a narrower send_message() surface.
-    if provider == 'google':
-        for key in (
-            'tool_choice',
-            'extra_body',
-            'extra_headers',
-            'response_format',
-            'frequency_penalty',
-            'presence_penalty',
-            'logit_bias',
-            'seed',
-            'user',
-            'reasoning_effort',
-            'reasoning',
-            'parallel_tool_calls',
-            'metadata',
-        ):
-            sanitized.pop(key, None)
-        return sanitized
-
-    # Anthropic SDK is not OpenAI-chat API compatible for several optional fields.
-    if provider == 'anthropic':
-        for key in (
-            'tool_choice',
-            'response_format',
-            'frequency_penalty',
-            'presence_penalty',
-            'logit_bias',
-            'parallel_tool_calls',
-            'extra_body',
-            'extra_headers',
-        ):
-            sanitized.pop(key, None)
-
-    return sanitized
-
-
 def _apply_catalog_token_and_penalty_strips(
     entry: ModelEntry, call_kwargs: dict
 ) -> None:
@@ -654,15 +983,13 @@ def apply_model_param_overrides(
         call_kwargs.pop('reasoning_effort', None)
         return call_kwargs
 
-    # Strip reasoning_effort if the model doesn't support it natively
-    if entry.strip_reasoning_effort:
-        call_kwargs.pop('reasoning_effort', None)
-
-    # Apply thinking mode configuration
     if entry.thinking_mode:
         _apply_thinking_mode(call_kwargs, entry, reasoning_effort, is_stream)
-    elif reasoning_effort is not None and not entry.strip_reasoning_effort:
-        call_kwargs['reasoning_effort'] = reasoning_effort
+    else:
+        from backend.inference.reasoning import apply_reasoning_plan, resolve_reasoning_plan
+
+        plan = resolve_reasoning_plan(entry, reasoning_effort)
+        apply_reasoning_plan(call_kwargs, plan)
 
     _apply_catalog_token_and_penalty_strips(entry, call_kwargs)
 

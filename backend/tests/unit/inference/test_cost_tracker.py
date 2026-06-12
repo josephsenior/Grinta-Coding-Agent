@@ -46,7 +46,12 @@ class TestGetCompletionCostConfig:
         # Should fall through to catalog lookup
         with patch(
             'backend.inference.cost_tracker.get_pricing',
-            return_value={'input': 10.0, 'output': 30.0},
+            return_value={
+                'input': 10.0,
+                'output': 30.0,
+                'cached_input': 10.0,
+                'cached_write': 10.0,
+            },
         ):
             cost = get_completion_cost('some-model', 1_000_000, 500_000, config=cfg)
         assert cost == pytest.approx(10.0 + 15.0)
@@ -54,7 +59,12 @@ class TestGetCompletionCostConfig:
     def test_no_config_uses_catalog(self):
         with patch(
             'backend.inference.cost_tracker.get_pricing',
-            return_value={'input': 3.0, 'output': 15.0},
+            return_value={
+                'input': 3.0,
+                'output': 15.0,
+                'cached_input': 3.0,
+                'cached_write': 3.0,
+            },
         ):
             cost = get_completion_cost('gpt-4o', 1_000_000, 1_000_000)
         assert cost == pytest.approx(3.0 + 15.0)
@@ -73,7 +83,12 @@ class TestGetCompletionCostCatalog:
     def test_catalog_pricing_per_million(self):
         with patch(
             'backend.inference.cost_tracker.get_pricing',
-            return_value={'input': 2.0, 'output': 8.0},
+            return_value={
+                'input': 2.0,
+                'output': 8.0,
+                'cached_input': 2.0,
+                'cached_write': 2.0,
+            },
         ):
             # 500k input tokens, 250k output tokens
             cost = get_completion_cost('m', 500_000, 250_000)

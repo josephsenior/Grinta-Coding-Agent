@@ -178,6 +178,22 @@ class TestLazyManagerInit:
             result = mw._get_manager(ctx)
         assert result is not None
 
+    def test_workspace_from_runtime_workspace_root(self, tmp_path):
+        """Falls back to ctx.controller.runtime.workspace_root."""
+        mw = RollbackMiddleware(workspace_path=None)
+        ctx = _make_ctx()
+        runtime = MagicMock()
+        runtime.workspace_dir = None
+        runtime.workspace_path = None
+        runtime.workspace_root = str(tmp_path)
+        ctx.controller.runtime = runtime
+        with patch('backend.core.rollback.rollback_manager.RollbackManager') as MockRM:
+            MockRM.return_value = MagicMock()
+            result = mw._get_manager(ctx)
+        assert result is not None
+        MockRM.assert_called_once()
+        assert MockRM.call_args.kwargs['workspace_path'] == str(tmp_path)
+
 
 # ---------------------------------------------------------------------------
 # observe stage

@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
 CONTEXT_PACKET_MARKER = '<CONTEXT_PACKET>'
 DEFAULT_CONTEXT_PACKET_CHAR_BUDGET = 6_000
+MIN_LARGE_CONTEXT_PACKET_CHAR_BUDGET = 8_000
+MAX_CONTEXT_PACKET_CHAR_BUDGET = 32_000
 
 
 @dataclass(frozen=True)
@@ -35,6 +37,7 @@ def build_context_packet_observation(
     history: list[Event],
     *,
     state: State | None = None,
+    llm_config: object | None = None,
     just_compacted: bool = False,
     char_budget: int = DEFAULT_CONTEXT_PACKET_CHAR_BUDGET,
 ) -> AgentCondensationObservation | None:
@@ -42,6 +45,7 @@ def build_context_packet_observation(
         events,
         history,
         state=state,
+        llm_config=llm_config,
         just_compacted=just_compacted,
         char_budget=char_budget,
     )
@@ -63,36 +67,65 @@ def build_context_packet(
     history: list[Event],
     *,
     state: State | None = None,
+    llm_config: object | None = None,
     just_compacted: bool = False,
     char_budget: int = DEFAULT_CONTEXT_PACKET_CHAR_BUDGET,
 ) -> ContextPacket | None:
+    char_budget = _resolve_packet_char_budget(llm_config, char_budget)
     canonical = _canonical_for_packet(history, state=state)
     sections: list[tuple[str, str]] = []
+    checkpoint = _operational_checkpoint(canonical)
+    if checkpoint:
+        sections.append(
+            (
+                'operational_checkpoint',
+                _bounded_section(
+                    'Operational checkpoint',
+                    checkpoint,
+                    max(1200, int(char_budget * 0.15)),
+                ),
+            )
+        )
     canonical_block = render_canonical_state_for_prompt(
         canonical,
-        char_budget=max(1800, char_budget // 2),
+        char_budget=max(4200, int(char_budget * 0.58)),
     )
     if canonical_block:
         sections.append(('canonical_state', canonical_block))
-    summary = _latest_summary(history)
-    if summary:
-        sections.append(
-            (
-                'latest_validated_summary',
-                _bounded_section('Latest validated summary', summary, 900),
-            )
-        )
-    tail = _recent_tail_summary(events)
-    if tail:
-        sections.append(
-            ('recent_causal_tail', _bounded_section('Recent causal tail', tail, 1200))
-        )
     active_status = _active_status(canonical)
     if active_status:
         sections.append(
             (
                 'active_status',
-                _bounded_section('Active tool/background status', active_status, 900),
+                _bounded_section(
+                    'Active tool/background status',
+                    active_status,
+                    max(900, int(char_budget * 0.10)),
+                ),
+            )
+        )
+    summary = _latest_summary(history)
+    if summary:
+        sections.append(
+            (
+                'latest_validated_summary',
+                _bounded_section(
+                    'Latest validated summary',
+                    summary,
+                    max(900, int(char_budget * 0.12)),
+                ),
+            )
+        )
+    tail = _recent_tail_summary(events)
+    if tail:
+        sections.append(
+            (
+                'recent_causal_tail',
+                _bounded_section(
+                    'Recent causal tail',
+                    tail,
+                    max(1200, int(char_budget * 0.20)),
+                ),
             )
         )
     restore_hints = _restore_hints(state=state) if just_compacted else ''
@@ -100,13 +133,33 @@ def build_context_packet(
         sections.append(
             (
                 'restore_hints',
-                _bounded_section('Compact restore hints', restore_hints, 900),
+                _bounded_section(
+                    'Compact restore hints',
+                    restore_hints,
+                    max(900, int(char_budget * 0.10)),
+                ),
             )
         )
     if not sections:
         return None
     content, lengths = _assemble_sections(sections, char_budget)
     return ContextPacket(content=content, section_lengths=lengths)
+
+
+def _resolve_packet_char_budget(llm_config: object | None, configured: int) -> int:
+    try:
+        from backend.inference.context_limits import limits_from_config
+
+        limits = limits_from_config(llm_config, unknown_default=False)
+        usable = limits.usable_input_tokens
+        if isinstance(usable, int) and usable >= 100_000:
+            return max(
+                MIN_LARGE_CONTEXT_PACKET_CHAR_BUDGET,
+                min(MAX_CONTEXT_PACKET_CHAR_BUDGET, int(usable * 0.04)),
+            )
+    except Exception:
+        logger.debug('Context packet budget resolution failed', exc_info=True)
+    return configured
 
 
 def _canonical_for_packet(
@@ -158,6 +211,24 @@ def _recent_tail_summary(events: list[Event]) -> str:
         detail = _event_detail(event)
         lines.append(f'- {label} id={event_id}: {detail}')
     return '\n'.join(line for line in lines if line.strip())
+
+
+def _operational_checkpoint(canonical: CanonicalTaskState) -> str:
+    lines: list[str] = []
+    if canonical.next_action:
+        lines.append(f'Next action: {canonical.next_action}')
+    if canonical.implementation_checkpoint:
+        lines.append(f'Checkpoint: {canonical.implementation_checkpoint}')
+    if canonical.active_files:
+        lines.append('Active files: ' + ', '.join(canonical.active_files[-10:]))
+    if canonical.task_plan:
+        lines.append('Current task tracker:')
+        for item in canonical.task_plan[-8:]:
+            detail = f'- [{item.status}] {item.description}'
+            if item.result:
+                detail += f' -> {item.result}'
+            lines.append(detail)
+    return '\n'.join(lines)
 
 
 def _event_detail(event: Event) -> str:

@@ -460,7 +460,12 @@ def _safe_call_kwargs_for_log(call_kwargs: dict[str, Any]) -> dict[str, Any]:
 
 def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
     """Return visible active model metadata for run logs."""
-    from backend.inference.catalog_loader import lookup, runtime_model_id
+    from backend.inference.catalog_loader import (
+        compact_metadata_for_log,
+        lookup,
+        runtime_model_id,
+        runtime_parameter_mode,
+    )
     from backend.inference.context_limits import limits_from_config
 
     model = str(getattr(config, 'model', '') or '').strip()
@@ -517,7 +522,7 @@ def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
             'provider': entry.provider,
             'client': entry.client,
             'catalog_file': entry.catalog_file,
-            'provider_metadata': entry.provider_metadata,
+            'metadata': compact_metadata_for_log(entry.metadata),
             'name': entry.name,
             'runtime_model_id': runtime_model_id(entry),
             'verified': entry.verified,
@@ -535,6 +540,7 @@ def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
             'strip_penalties': entry.strip_penalties,
             'use_max_completion_tokens': entry.use_max_completion_tokens,
             'default_temperature': entry.default_temperature,
+            'runtime_parameter_mode': runtime_parameter_mode(entry),
             'pricing_per_million': {
                 'input': entry.input_price_per_m,
                 'cached_input': entry.cached_input_price_per_m,
@@ -579,11 +585,12 @@ class LLM(RetryMixin, DebugMixin):
         resolver = _get_provider_resolver()
         config_provider = getattr(self.config, 'custom_llm_provider', None)
         if (
-            config_provider
+            isinstance(config_provider, str)
+            and config_provider.strip()
             and self.config.model
             and '/' not in str(self.config.model)
         ):
-            provider = str(config_provider).strip().lower()
+            provider = config_provider.strip().lower()
             model = str(self.config.model).strip()
             if provider and model:
                 self.config.model = f'{provider}/{model}'
@@ -614,6 +621,13 @@ class LLM(RetryMixin, DebugMixin):
         api_key_value = self._extract_api_key()
         _validate_api_key_or_local(api_key_value, self.config, resolver)
 
+        from backend.inference.catalog_loader import validate_model_transport
+
+        validate_model_transport(
+            self.config.model,
+            config_provider=getattr(self.config, 'custom_llm_provider', None),
+        )
+
         self.client = get_direct_client(
             model=self.config.model,
             api_key=api_key_value or 'not-needed',
@@ -631,6 +645,7 @@ class LLM(RetryMixin, DebugMixin):
             json.dumps(
                 _llm_model_metadata_for_log(self.config, resolver),
                 sort_keys=True,
+                default=str,
             ),
         )
         self._cached_features = _load_cached_features(self.config.model)
@@ -697,6 +712,7 @@ class LLM(RetryMixin, DebugMixin):
             'caching',
         ):
             kwargs.pop(param, None)
+        prompt_accounting = kwargs.pop('_prompt_accounting', None)
 
         call_kwargs = {
             'model': self.config.model,
@@ -744,13 +760,15 @@ class LLM(RetryMixin, DebugMixin):
         # Keep falsy values like 0/False.
         final_kwargs = {k: v for k, v in call_kwargs.items() if v is not None}
         log_payload = _safe_call_kwargs_for_log(final_kwargs)
+        if isinstance(prompt_accounting, dict):
+            log_payload['prompt_accounting'] = prompt_accounting
         log_payload['active_model_metadata'] = _llm_model_metadata_for_log(
             self.config,
             _get_provider_resolver(),
         )
         logger.info(
             'LLM applied call params: %s',
-            json.dumps(log_payload, sort_keys=True),
+            json.dumps(log_payload, sort_keys=True, default=str),
         )
         return final_kwargs
 

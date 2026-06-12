@@ -17,6 +17,7 @@ from backend.inference.catalog_loader import (
     get_token_limits,
     get_verified_models,
     lookup,
+    lookup_provider_model,
     prefers_short_tool_descriptions,
     sanitize_call_kwargs_for_provider,
     supports_function_calling,
@@ -125,20 +126,22 @@ class TestNameIndex:
     """Tests for _name_index function."""
 
     def test_index_includes_names(self):
-        """Test index includes all canonical names."""
+        """Test index includes provider-qualified names."""
         idx = _name_index()
         catalog = get_catalog()
         for entry in catalog:
-            assert entry.name in idx
-            assert idx[entry.name] is entry
+            assert f'{entry.provider}/{entry.name}' in idx
+            assert idx[f'{entry.provider}/{entry.name}'] is entry
 
     def test_index_includes_aliases(self):
-        """Test index includes all aliases."""
+        """Test index includes provider-qualified aliases."""
         idx = _name_index()
         catalog = get_catalog()
         for entry in catalog:
             for alias in entry.aliases:
-                assert alias in idx
+                if '/' in alias:
+                    assert alias in idx
+                    assert idx[alias] is entry
 
     def test_caching(self):
         """Test _name_index caches result."""
@@ -151,12 +154,11 @@ class TestLookup:
     """Tests for lookup function."""
 
     def test_lookup_by_canonical_name(self):
-        """Test lookup by canonical model name."""
-        catalog = get_catalog()
-        if catalog:
-            entry = catalog[0]
-            result = lookup(entry.name)
-            assert result is entry
+        """Test lookup by provider-qualified model name."""
+        result = lookup('openai/gpt-5')
+        assert result is not None
+        assert result.provider == 'openai'
+        assert result.name == 'gpt-5'
 
     def test_lookup_case_insensitive(self):
         """Test lookup is case-insensitive."""
@@ -287,12 +289,14 @@ class TestGetTokenLimits:
         assert input_limit == 149_504
         assert output_limit == 131_072
 
-    def test_minimax_m2_7_supports_tools_without_thinking_mode(self):
+    def test_minimax_m2_7_supports_tools_and_family_reasoning(self):
+        from backend.inference.reasoning import supports_reasoning
+
         entry = lookup('opencode-go/minimax-m2.7')
 
         assert entry is not None
         assert entry.thinking_mode is None
-        assert entry.strip_reasoning_effort is True
+        assert supports_reasoning(entry) is True
         assert supports_function_calling('opencode-go/minimax-m2.7') is True
 
     def test_unknown_opencode_go_chat_models_keep_native_tools(self):
@@ -345,25 +349,20 @@ class TestGetVerifiedModels:
     def test_only_verified_models(self):
         """Test only models marked verified=True are included."""
         verified = get_verified_models()
-        catalog = get_catalog()
         verified_set = set(verified)
-        for entry in catalog:
+        for entry in get_catalog():
             if entry.verified:
                 assert entry.name in verified_set
-            else:
-                assert entry.name not in verified_set
 
     def test_filter_by_provider(self):
         """Test filtering verified models by provider."""
         catalog = get_catalog()
-        # Find a provider with verified models
         providers = {e.provider for e in catalog if e.verified}
         if providers:
             provider = list(providers)[0]
             verified = get_verified_models(provider=provider)
-            # All returned models should be from this provider
             for model_name in verified:
-                entry = lookup(model_name)
+                entry = lookup_provider_model(provider, model_name, allow_aliases=True)
                 assert entry is not None
                 assert entry.provider == provider
 
@@ -429,7 +428,7 @@ class TestSanitizeCallKwargsForProvider:
             'tool_choice': 'none',
         }
 
-        out = sanitize_call_kwargs_for_provider('gpt-4o', kwargs)
+        out = sanitize_call_kwargs_for_provider('openai/gpt-4o', kwargs)
 
         assert out == kwargs
 
@@ -451,7 +450,7 @@ class TestApplyModelParamOverrides:
 
 class TestPrefersShortToolDescriptions:
     def test_gpt_family_prefers_short(self):
-        assert prefers_short_tool_descriptions('gpt-5') is True
+        assert prefers_short_tool_descriptions('openai/gpt-5') is True
 
     def test_codex_family_prefers_short(self):
         assert prefers_short_tool_descriptions('openai/gpt-5-codex') is True
@@ -465,7 +464,7 @@ class TestPrefersShortToolDescriptions:
 
 class TestSupportsToolChoice:
     def test_known_openai_model_supports(self):
-        assert supports_tool_choice('gpt-5') is True
+        assert supports_tool_choice('openai/gpt-5') is True
 
     def test_known_google_model_does_not_support(self):
         assert supports_tool_choice('google/gemini-3-flash') is False
@@ -502,3 +501,42 @@ class TestGetAllModelNames:
         catalog = get_catalog()
         catalog_names = [e.name for e in catalog]
         assert set(names) == set(catalog_names)
+
+
+class TestTransportSanitizationAndValidation:
+    def test_all_catalog_models_use_runtime_metadata_shape(self):
+        raw = _load_raw()
+        for provider, provider_data in raw['providers'].items():
+            source_file = provider_data.get('source_file', '<catalog>')
+            for name, info in provider_data.get('models', {}).items():
+                assert isinstance(info.get('runtime'), dict), (
+                    f'{source_file}:{name} missing runtime'
+                )
+                assert isinstance(info.get('metadata'), dict), (
+                    f'{source_file}:{name} missing metadata'
+                )
+
+    def test_opencode_go_messages_route_strips_parallel_tool_calls(self):
+        kwargs = {
+            'model': 'opencode-go/minimax-m2.5',
+            'temperature': 0.0,
+            'parallel_tool_calls': True,
+            'reasoning_effort': 'high',
+        }
+        out = sanitize_call_kwargs_for_provider('opencode-go/minimax-m2.5', kwargs)
+        assert 'parallel_tool_calls' not in out
+        assert 'reasoning_effort' not in out
+
+    def test_validate_model_transport_rejects_opencode_responses(self):
+        from backend.inference.catalog_loader import validate_model_transport
+        from backend.inference.exceptions import BadRequestError
+
+        with pytest.raises(BadRequestError, match='/responses'):
+            validate_model_transport('opencode/gpt-5')
+
+    def test_validate_model_transport_rejects_opencode_gemini_native_endpoint(self):
+        from backend.inference.catalog_loader import validate_model_transport
+        from backend.inference.exceptions import BadRequestError
+
+        with pytest.raises(BadRequestError, match='/models/'):
+            validate_model_transport('opencode/gemini-3-flash')

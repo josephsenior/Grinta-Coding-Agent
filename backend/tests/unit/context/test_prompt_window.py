@@ -6,7 +6,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.context.prompt_window import select_prompt_events
+from backend.context.prompt_window import (
+    estimate_events_tokens,
+    estimate_prompt_events_tokens,
+    select_prompt_events,
+)
+from backend.inference.metrics import Metrics
 from backend.ledger.action import CmdRunAction, MessageAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation import CmdOutputObservation
@@ -299,3 +304,26 @@ def test_orphan_action_without_observation_is_dropped_as_causal_unit() -> None:
 
     assert orphan_action not in result.events
     assert recent_chunk[0] in result.events
+
+
+def test_prompt_token_estimator_ignores_internal_llm_metrics() -> None:
+    event = _with_id(
+        AgentCondensationObservation(content='short model-visible summary'),
+        7,
+    )
+    metrics = Metrics(model_name='test-model')
+    metrics.add_token_usage(
+        prompt_tokens=100_000,
+        completion_tokens=2_000,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        context_window=200_000,
+        response_id='internal-response-id-' + ('x' * 20_000),
+    )
+    event.llm_metrics = metrics
+
+    full_serialized_tokens = estimate_events_tokens([event])
+    prompt_tokens = estimate_prompt_events_tokens([event])
+
+    assert full_serialized_tokens > prompt_tokens * 100
+    assert prompt_tokens < 50

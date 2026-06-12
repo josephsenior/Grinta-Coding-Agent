@@ -353,6 +353,7 @@ class CircuitBreaker:
         self,
         agent_state: 'AgentState | None' = None,
         now: float | None = None,
+        llm_stream_active: bool = False,
     ) -> CircuitBreakerResult | None:
         """Watchdog: detect RUNNING state with no recent step() call.
 
@@ -383,12 +384,20 @@ class CircuitBreaker:
         if not (hasattr(agent_state, 'name') and agent_state.name == 'RUNNING'):
             return None
 
-        if self._last_step_call_ts is None:
-            return None  # never had a step call — nothing to compare to
-
         import time as _time
 
         current = now if now is not None else _time.monotonic()
+
+        if llm_stream_active:
+            self.record_step_call(ts=current)
+            logger.debug(
+                'No-step-progress watchdog: suppressed while LLM stream is active'
+            )
+            return None
+
+        if self._last_step_call_ts is None:
+            return None  # never had a step call — nothing to compare to
+
         elapsed = current - self._last_step_call_ts
         if elapsed < timeout:
             return None

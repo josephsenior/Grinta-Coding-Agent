@@ -64,3 +64,29 @@ def test_post_compact_estimate_uses_post_boundary_events_not_api_tokens():
     )
     assert post_compact.estimated_tokens < pre_compact.estimated_tokens // 2
     assert post_compact.estimated_tokens < 500_000
+
+
+def test_budget_uses_dynamic_history_and_fixed_prompt_reserve() -> None:
+    llm_config = SimpleNamespace(max_input_tokens=20_000, model='test-model')
+    state = MagicMock()
+    state.extra_data = {
+        'prompt_token_accounting': {
+            'static_prompt_tokens': 2_000,
+            'tool_schema_tokens': 3_000,
+            'context_packet_tokens': 1_000,
+            'dynamic_history_tokens': 7_000,
+        }
+    }
+    state.metrics = SimpleNamespace(
+        token_usages=[SimpleNamespace(prompt_tokens=50_000, total_tokens=55_000)]
+    )
+    events = [_user_event('hello', 1)]
+
+    budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
+
+    assert budget.fixed_prompt_reserve_tokens == 6_000
+    assert (
+        budget.autocompact_threshold
+        == 20_000 - DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS - 6_000
+    )
+    assert budget.estimated_tokens < 8_000

@@ -107,6 +107,7 @@ class RollbackMiddleware(ToolInvocationMiddleware):
                 workspace = str(
                     getattr(runtime, 'workspace_dir', None)
                     or getattr(runtime, 'workspace_path', None)
+                    or getattr(runtime, 'workspace_root', None)
                     or ''
                 )
             except Exception:

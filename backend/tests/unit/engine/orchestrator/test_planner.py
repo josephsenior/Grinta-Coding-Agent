@@ -377,6 +377,40 @@ class TestBuildLlmParams:
         assert 'raw editor' not in joined
         assert 'XML file-edit' not in joined
 
+    def test_prompt_accounting_splits_static_tools_context_and_dynamic_history(self):
+        p = _make_planner()
+        p._llm.config.custom_tokenizer = None
+        p._llm.config.max_input_tokens = 120_000
+        p._llm.config.max_output_tokens = 4_000
+        p._llm.config.context_window_tokens = 124_000
+        params = {
+            'messages': [
+                {'role': 'system', 'content': 'system prompt'},
+                {'role': 'user', 'content': '<RUNTIME_INFORMATION>repo</RUNTIME_INFORMATION>'},
+                {'role': 'user', 'content': '<CONTEXT_PACKET>state</CONTEXT_PACKET>'},
+                {'role': 'user', 'content': 'latest user task'},
+            ],
+            'tools': [
+                {
+                    'type': 'function',
+                    'function': {
+                        'name': 'read',
+                        'description': 'Read files',
+                        'parameters': {'type': 'object'},
+                    },
+                }
+            ],
+        }
+
+        accounting = p._build_prompt_accounting(params)
+
+        assert accounting['static_prompt_tokens'] > 0
+        assert accounting['tool_schema_tokens'] > 0
+        assert accounting['context_packet_tokens'] > 0
+        assert accounting['dynamic_history_tokens'] > 0
+        assert 100_000 < accounting['usable_input_tokens'] <= 120_000
+        assert accounting['full_request_tokens'] > accounting['dynamic_history_tokens']
+
     def test_injects_control_message_before_last_user(self):
         p = _make_planner()
         state = _make_state()

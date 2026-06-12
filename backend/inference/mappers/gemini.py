@@ -240,6 +240,9 @@ def extract_generation_config(
     tools = map_tools_to_gemini(tools_raw) if tools_raw else None
 
     gen_cfg: dict[str, Any] = {}
+    thinking_config = kwargs.pop('thinking_config', None)
+    if isinstance(thinking_config, dict) and thinking_config:
+        gen_cfg['thinking_config'] = thinking_config
     for src, dst in [
         ('temperature', 'temperature'),
         ('top_p', 'top_p'),
@@ -251,28 +254,17 @@ def extract_generation_config(
             gen_cfg[dst] = kwargs.pop(src)
     # Native Gemini SDK (ChatSession.send_message) does not support tool_choice.
     kwargs.pop('tool_choice', None)
-    # Strip OpenAI/liteLLM-style passthrough fields unsupported by Gemini SDK.
-    for unsupported_key in (
-        'extra_body',
-        'extra_headers',
-        'response_format',
-        'frequency_penalty',
-        'presence_penalty',
-        'logit_bias',
-        'seed',
-        'user',
-        'reasoning_effort',
-        'reasoning',
-        'parallel_tool_calls',
-        'metadata',
-        'stream',
-        'stream_options',
-        'logprobs',
-        'top_logprobs',
-        'n',
-        'timeout',
-    ):
-        kwargs.pop(unsupported_key, None)
+    from backend.inference.catalog_loader import (
+        GEMINI_SDK_EXTRA_INCOMPATIBLE_KWARGS,
+        TRANSPORT_CLIENT_GOOGLE,
+        pop_incompatible_kwargs,
+    )
+
+    pop_incompatible_kwargs(
+        kwargs,
+        TRANSPORT_CLIENT_GOOGLE,
+        extra=GEMINI_SDK_EXTRA_INCOMPATIBLE_KWARGS,
+    )
     return model_name, gen_cfg, tools
 
 

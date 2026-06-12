@@ -3,56 +3,65 @@
   "client": "google_native",
   "models": {
     "gemini-3-flash": {
-      "aliases": [
-        "google/gemini-3-flash",
-        "google/gemini-3-flash-preview",
-        "gemini-3-flash",
-        "gemini-3-flash-preview",
-        "gemini 3 flash"
-      ],
-      "context_window_tokens": 1000000,
-      "max_input_tokens": 930368,
-      "max_output_tokens": 65536,
-      "input_price_per_m": 0.1,
-      "output_price_per_m": 0.4,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_vision": true
+      "runtime": {
+        "aliases": [
+          "google/gemini-3-flash",
+          "google/gemini-3-flash-preview",
+          "gemini-3-flash",
+          "gemini-3-flash-preview",
+          "gemini 3 flash"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 930368,
+        "max_output_tokens": 65536,
+        "input_price_per_m": 0.1,
+        "output_price_per_m": 0.4,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true
+      },
+      "metadata": {}
     },
     "gemini-3.1-pro-preview": {
-      "aliases": [
-        "google/gemini-3.1-pro-preview",
-        "gemini-3.1-pro-preview",
-        "gemini 3.1 pro preview"
-      ],
-      "context_window_tokens": 1000000,
-      "max_input_tokens": 930368,
-      "max_output_tokens": 65536,
-      "input_price_per_m": 2.0,
-      "output_price_per_m": 8.0,
-      "verified": true,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_reasoning_effort": true,
-      "supports_vision": true
+      "runtime": {
+        "aliases": [
+          "google/gemini-3.1-pro-preview",
+          "gemini-3.1-pro-preview",
+          "gemini 3.1 pro preview"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 930368,
+        "max_output_tokens": 65536,
+        "input_price_per_m": 2.0,
+        "output_price_per_m": 8.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "supports_vision": true
+      },
+      "metadata": {}
     },
     "gemini-3.5-flash": {
-      "aliases": [
-        "google/gemini-3.5-flash",
-        "gemini-3.5-flash",
-        "gemini 3.5 flash"
-      ],
-      "context_window_tokens": 1000000,
-      "max_input_tokens": 930368,
-      "max_output_tokens": 65536,
-      "verified": false,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_vision": true
+      "runtime": {
+        "aliases": [
+          "google/gemini-3.5-flash",
+          "gemini-3.5-flash",
+          "gemini 3.5 flash"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 930368,
+        "max_output_tokens": 65536,
+        "verified": false,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true
+      },
+      "metadata": {}
     }
   }
 }

@@ -109,10 +109,9 @@ async def test_six_hundred_event_pytest_session_commits_boundary_and_preserves_p
     )
 
     with (
-        patch('backend.context.context_pipeline.commit_snapshot'),
+        patch('backend.context.context_pipeline.finalize_compaction_artifacts'),
         patch('backend.context.context_pipeline.delete_staging_snapshot'),
         patch('backend.context.context_pipeline.maybe_update'),
-        patch('backend.context.context_pipeline.sync_snapshot_to_working_memory'),
         patch(
             'backend.context.context_pipeline.session_memory_exists',
             return_value=False,

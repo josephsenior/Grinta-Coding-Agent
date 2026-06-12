@@ -123,9 +123,9 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     def test_openai_default(self, _h, _ah, _oai, _aoai):
-        client = get_direct_client('gpt-4o', api_key='sk-test')
+        client = get_direct_client('openai/gpt-5', api_key='sk-test')
         assert type(client).__name__ == 'OpenAIClient'
-        assert client._model_name == 'gpt-4o'
+        assert client._model_name == 'gpt-5'
 
     @patch('backend.inference.direct_clients.Anthropic')
     @patch('backend.inference.direct_clients.AsyncAnthropic')
@@ -136,7 +136,7 @@ class TestGetDirectClientRouting:
     @patch('backend.inference.direct_clients.Anthropic')
     @patch('backend.inference.direct_clients.AsyncAnthropic')
     def test_claude_routing(self, _async, _sync):
-        client = get_direct_client('claude-sonnet-4-20250514', api_key='key')
+        client = get_direct_client('anthropic/claude-sonnet-4-5', api_key='key')
         assert type(client).__name__ == 'AnthropicClient'
 
     @patch('backend.inference.direct_clients_gemini_ops.genai')
@@ -192,7 +192,7 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     def test_grok_routing(self, _h, _ah, _oai, _aoai):
-        client = get_direct_client('grok-3-mini', api_key='key')
+        client = get_direct_client('xai/grok-build-0.1', api_key='key')
         assert type(client).__name__ == 'OpenAIClient'
 
     @patch('backend.inference.direct_clients.AsyncOpenAI')
@@ -329,9 +329,9 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     def test_opencode_go_qwen_routes_to_openai_compatible(self, _h, _ah, _oai, _aoai):
-        client = get_direct_client('opencode-go/qwen3.6-plus', api_key='key')
+        client = get_direct_client('opencode-go/deepseek-v4-flash', api_key='key')
         assert type(client).__name__ == 'OpenAIClient'
-        assert client._model_name == 'qwen3.6-plus'
+        assert client._model_name == 'deepseek-v4-flash'
 
 
 # ---------------------------------------------------------------------------
@@ -351,5 +351,5 @@ class TestDirectLLMClientModelName:
         return_value=MagicMock(),
     )
     def test_model_name_set(self, _h, _ah, _oai, _aoai):
-        client = get_direct_client('gpt-4o', api_key='k')
-        assert client.model_name == 'gpt-4o'
+        client = get_direct_client('openai/gpt-5', api_key='k')
+        assert client.model_name == 'gpt-5'

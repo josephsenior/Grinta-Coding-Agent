@@ -224,11 +224,6 @@ class SessionOrchestrator(
         self.services.autonomy.initialize(config.agent)
         self.services.retry.initialize()
 
-        # C-P1-1: snapshot post-init state so users can rewind to a "fresh
-        # session" baseline. Now that the pipeline is initialized, the
-        # rollback middleware will correctly capture the checkpoint.
-        self._create_phase_boundary_checkpoint('init_to_active')
-
     def step(self) -> None:
         """Trigger agent to take one step asynchronously.
 
@@ -615,6 +610,25 @@ class SessionOrchestrator(
             task.cancel()
         self._watchdog_task = None
 
+    def _is_llm_stream_active(self) -> bool:
+        """Return True while the active executor is consuming an LLM stream."""
+        executor = getattr(getattr(self, 'agent', None), 'executor', None)
+        if executor is None:
+            return False
+
+        stream_task = getattr(executor, '_active_stream_task', None)
+        if stream_task is not None:
+            done = getattr(stream_task, 'done', None)
+            if not callable(done):
+                return True
+            try:
+                if not done():
+                    return True
+            except Exception:
+                return True
+
+        return getattr(executor, '_active_stream_iter', None) is not None
+
     async def _watchdog_loop(self) -> None:
         """Background loop that checks for step() progress at regular intervals."""
         import time as _time
@@ -660,6 +674,15 @@ class SessionOrchestrator(
                 if state != AgentState.RUNNING:
                     self._watchdog_last_step_ts = _time.monotonic()
                     auto_recover_attempted = False
+                    continue
+
+                if self._is_llm_stream_active():
+                    self._watchdog_last_step_ts = _time.monotonic()
+                    auto_recover_attempted = False
+                    logger.debug(
+                        'INDEPENDENT WATCHDOG: suppressed no-step recovery; '
+                        'LLM stream is active'
+                    )
                     continue
 
                 elapsed = _time.monotonic() - self._watchdog_last_step_ts

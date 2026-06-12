@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from backend.context import pre_condensation_snapshot as snapshot_module
 from backend.context.pre_condensation_snapshot import extract_snapshot
-from backend.ledger.action.agent import AgentThinkAction
+from backend.ledger.action.agent import AgentThinkAction, TaskTrackingAction
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.files import FileEditAction, FileWriteAction
 from backend.ledger.action.message import MessageAction
@@ -182,6 +182,34 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         snapshot = extract_snapshot(events)
 
         assert snapshot['decisions'] == ['Fix config binding for the compactor.']
+
+    def test_extract_snapshot_records_task_tracker_state(self):
+        action = TaskTrackingAction(
+            command='update',
+            task_list=[
+                {'id': '1', 'description': 'Create skeleton files', 'status': 'done'},
+                {
+                    'id': '2',
+                    'description': 'Implement node.py',
+                    'status': 'in_progress',
+                },
+                {'id': '3', 'description': 'Write tests', 'status': 'todo'},
+            ],
+        )
+        action.id = 42
+
+        snapshot = extract_snapshot([action])
+
+        assert snapshot['task_plan']['event_id'] == 42
+        assert snapshot['task_plan']['next_action'] == 'Implement node.py'
+        assert snapshot['task_plan']['tasks'][0]['status'] == 'done'
+
+    def test_extract_snapshot_skips_unstructured_long_thought_as_decision(self):
+        thought = 'Let me think through the plan and strategy. ' * 40
+
+        snapshot = extract_snapshot([AgentThinkAction(thought=thought)])
+
+        assert snapshot['decisions'] == []
 
     def test_extract_snapshot_records_user_directives_and_background_task(self):
         first = MessageAction(content='Fix long-running compaction')

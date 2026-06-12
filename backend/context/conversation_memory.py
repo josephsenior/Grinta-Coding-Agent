@@ -27,6 +27,7 @@ from backend.context.message_formatting import (
     remove_duplicate_system_prompt_user,
 )
 from backend.context.observation_processors import convert_observation_to_message
+from backend.context.pre_condensation_snapshot import is_durable_decision_text
 from backend.context.prompt_assembly import process_recall_observation
 from backend.context.prompt_window import event_fingerprint
 from backend.context.tool_call_tracker import (
@@ -518,9 +519,9 @@ class ContextMemory:
         thought = (getattr(event, 'thought', '') or '').strip()
         if not thought:
             return
-        lower = thought.lower()
-        keywords = ('plan', 'strategy', 'approach', 'decide', 'next steps')
-        if any(kw in lower for kw in keywords):
+        if is_durable_decision_text(
+            thought, source_tool=str(getattr(event, 'source_tool', '') or '')
+        ):
             self._track_decision_if_new(thought)
 
     def _auto_track_event_context(self, event: Event) -> None:
@@ -576,6 +577,10 @@ class ContextMemory:
             return None
         thought = str(getattr(event, 'thought', '') or '').strip()
         if not thought:
+            return None
+        if not is_durable_decision_text(
+            thought, source_tool=str(getattr(event, 'source_tool', '') or '')
+        ):
             return None
         return (
             self._semantic_event_id(event, thought),

@@ -167,12 +167,9 @@ def _strip_known_transport_prefixes(model_name: str) -> str:
 def _catalog_inference_endpoint(provider: str, model_name: str) -> str | None:
     model = _strip_known_transport_prefixes(model_name)
     entry = lookup_provider_model(provider, model, allow_aliases=True)
-    if entry is None or not isinstance(entry.provider_metadata, dict):
+    if entry is None:
         return None
-    endpoint = entry.provider_metadata.get('inference_endpoint')
-    if isinstance(endpoint, str) and endpoint.startswith('/'):
-        return endpoint
-    return None
+    return entry.inference_endpoint
 
 
 def opencode_required_endpoint(model_name: str) -> str:

@@ -178,6 +178,7 @@ class _ExecutorLifecycleMixin:
                 'stream',
                 'max_tokens',
                 'max_completion_tokens',
+                '_prompt_accounting',
             }:
                 continue
             value = call_params.get(key)

@@ -10,7 +10,7 @@ from backend.context.pre_condensation_snapshot import (
     extract_snapshot,
     format_snapshot_for_injection,
 )
-from backend.context.prompt_window import estimate_events_tokens
+from backend.context.prompt_window import estimate_prompt_events_tokens
 from backend.core.constants import (
     DEFAULT_SESSION_MEMORY_INIT_TOKENS,
     DEFAULT_SESSION_MEMORY_UPDATE_TOKENS,
@@ -148,7 +148,7 @@ def maybe_update(
         return False
     if _should_skip_during_condensation_loop(state):
         return False
-    estimated = estimate_events_tokens(events)
+    estimated = estimate_prompt_events_tokens(events)
     pipe = _pipeline_state(state)
     last_event_id = pipe.get('last_session_memory_event_id')
     if not isinstance(last_event_id, int):
@@ -209,7 +209,7 @@ def maybe_update(
     try:
         from backend.context.working_set import sync_snapshot_to_working_memory
 
-        sync_snapshot_to_working_memory(snapshot)
+        sync_snapshot_to_working_memory(snapshot, state=state)
     except Exception:
         logger.debug('Session memory working-set sync failed', exc_info=True)
     logger.info(

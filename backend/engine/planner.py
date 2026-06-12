@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
+from backend.core import json_compat as json
 from backend.core.interaction_modes import (
     CHAT_MODE_ALLOWED_TOOLS,
     PLAN_MODE,
@@ -15,7 +16,7 @@ from backend.inference.catalog_loader import (
     supports_function_calling,
     supports_tool_choice,
 )
-from backend.inference.llm_utils import check_tools
+from backend.inference.llm_utils import check_tools, get_token_count
 
 ChatCompletionToolParam = Any
 
@@ -83,6 +84,35 @@ def _get_last_user_text_from_messages(messages: list) -> str:
                 if isinstance(item, dict) and item.get('type') == 'text'
             )
     return ''
+
+
+def _message_text(message: dict[str, Any]) -> str:
+    content = message.get('content', '')
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                parts.append(str(item.get('text') or item))
+            else:
+                parts.append(str(getattr(item, 'text', item)))
+        return '\n'.join(part for part in parts if part)
+    return str(content)
+
+
+def _message_contains(message: dict[str, Any], marker: str) -> bool:
+    return marker in _message_text(message)
+
+
+def _is_static_prompt_message(message: dict[str, Any]) -> bool:
+    role = message.get('role')
+    if role == 'system':
+        return True
+    if role != 'user':
+        return False
+    text = _message_text(message)
+    return any(marker in text for marker in _INJECTED_MSG_MARKERS)
 
 
 class OrchestratorPlanner:
@@ -377,7 +407,84 @@ class OrchestratorPlanner:
                 agent_name=getattr(state, 'agent_name', 'Orchestrator'),
             )
         }
+        self._attach_prompt_accounting(params, state)
         return params
+
+    def _attach_prompt_accounting(self, params: dict[str, Any], state: State) -> None:
+        accounting = self._build_prompt_accounting(params)
+        params['_prompt_accounting'] = accounting
+        try:
+            state.set_extra(
+                'prompt_token_accounting',
+                accounting,
+                source='OrchestratorPlanner',
+            )
+        except Exception:
+            logger.debug('Failed to persist prompt token accounting', exc_info=True)
+        logger.info(
+            'LLM prompt composition: %s',
+            json.dumps(accounting, sort_keys=True, default=str),
+        )
+
+    def _build_prompt_accounting(self, params: dict[str, Any]) -> dict[str, int]:
+        messages = params.get('messages')
+        if not isinstance(messages, list):
+            messages = []
+        tools = params.get('tools')
+        if not isinstance(tools, list):
+            tools = []
+
+        message_tokens = self._count_messages(messages)
+        static_prompt_tokens = self._count_messages(
+            [msg for msg in messages if _is_static_prompt_message(msg)]
+        )
+        context_packet_tokens = self._count_messages(
+            [msg for msg in messages if _message_contains(msg, '<CONTEXT_PACKET>')]
+        )
+        tool_schema_tokens = self._count_tool_schema_tokens(tools)
+        full_request_tokens = message_tokens + tool_schema_tokens
+        dynamic_history_tokens = max(
+            0, message_tokens - static_prompt_tokens - context_packet_tokens
+        )
+        usable_input = self._usable_input_tokens()
+        return {
+            'static_prompt_tokens': static_prompt_tokens,
+            'tool_schema_tokens': tool_schema_tokens,
+            'dynamic_history_tokens': dynamic_history_tokens,
+            'context_packet_tokens': context_packet_tokens,
+            'usable_input_tokens': usable_input,
+            'full_request_tokens': full_request_tokens,
+        }
+
+    def _count_messages(self, messages: list[dict[str, Any]]) -> int:
+        if not messages:
+            return 0
+        try:
+            return get_token_count(
+                messages,
+                model=(self._llm.config.model or '').strip() or 'gpt-4o',
+                custom_tokenizer=getattr(self._llm.config, 'custom_tokenizer', None),
+            )
+        except Exception:
+            return max(1, len(str(messages)) // 4)
+
+    def _count_tool_schema_tokens(self, tools: list[dict[str, Any]]) -> int:
+        if not tools:
+            return 0
+        try:
+            payload = json.dumps(tools, sort_keys=True, default=str)
+        except Exception:
+            payload = str(tools)
+        return self._count_messages([{'role': 'system', 'content': payload}])
+
+    def _usable_input_tokens(self) -> int:
+        try:
+            from backend.inference.context_limits import limits_from_config
+
+            limits = limits_from_config(self._llm.config, unknown_default=True)
+            return int(limits.usable_input_tokens or 0)
+        except Exception:
+            return 0
 
     def _log_debug_mode_info(self, messages: list, state: State, mode: str) -> None:
         if os.environ.get('APP_DEBUG_MODE', '').strip().lower() not in (

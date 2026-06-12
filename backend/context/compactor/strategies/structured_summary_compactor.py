@@ -280,6 +280,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         prompt = self._build_condensation_prompt(summary_event, pruned_events)
 
         self.last_state_patch: dict[str, Any] = {}
+        self.last_degraded = False
 
         # Get summary from LLM, with degraded fallback
         try:
@@ -287,6 +288,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             self.last_state_patch = summary.canonical_patch()
             summary_text = str(summary)
         except Exception as e:
+            self.last_degraded = True
             logger.warning(
                 'Condensation LLM call failed (%s: %s); falling back to '
                 'degraded summary so the agent can continue.',
