@@ -6,7 +6,6 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from backend.context import ContextMemory
 from backend.context.compact_boundary import (
     boundary_info,
     project_after_compact_boundary,
@@ -14,6 +13,7 @@ from backend.context.compact_boundary import (
 from backend.context.compaction_finalizer import finalize_compaction_artifacts
 from backend.context.compactor import Compactor
 from backend.context.condensed_history import CondensedHistory
+from backend.context.conversation_memory import ContextMemory
 from backend.context.pre_condensation_snapshot import (
     delete_staging_snapshot,
     extract_snapshot,

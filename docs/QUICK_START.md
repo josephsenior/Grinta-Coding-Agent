@@ -25,7 +25,7 @@ This script handles everything:
 ### 1) Sync dependencies and create local settings
 
 ```powershell
-uv sync
+python scripts/bootstrap_env.py base
 uv run python -m backend.cli.entry init
 ```
 

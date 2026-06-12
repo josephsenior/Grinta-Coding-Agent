@@ -743,8 +743,9 @@ class ActionExecutionService:
 
         ctx: ToolInvocationContext | None = None
         pipeline = _resolve_operation_pipeline(self._context)
-        if action.runnable and pipeline:
-            ctx = pipeline.create_context(action, self._context.state)
+        state = self._context.state
+        if action.runnable and pipeline and state is not None:
+            ctx = pipeline.create_context(action, state)
             if ctx is not None:
                 self._context.register_action_context(action, ctx)
                 iteration_service = self._context.iteration_service

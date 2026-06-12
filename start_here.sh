@@ -44,8 +44,8 @@ if [ ! -f "settings.json" ]; then
 fi
 
 # Step 2: Install dependencies
-echo -e "${YELLOW}📦 Step 2: Syncing dependencies...${NC}"
-uv sync
+echo -e "${YELLOW}📦 Step 2: Syncing dependencies with the shared base bootstrap profile...${NC}"
+python scripts/bootstrap_env.py base
 
 # Step 3: Auto-discover local models
 echo -e "${YELLOW}🤖 Step 3: Discovering local models (Ollama/LM Studio/vLLM)...${NC}"

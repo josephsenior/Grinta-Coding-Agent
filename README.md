@@ -132,10 +132,10 @@ Grinta is a single-author project, written and rewritten in public. The journey 
 1. Install dependencies **in this repo’s environment only** (creates/updates `.venv/`; do not rely on a global `pip install` mixed with unrelated tools):
 
 ```bash
-uv sync --group browser
+python scripts/bootstrap_env.py browser
 ```
 
-Optional dev/test tools: `uv sync --group dev --group test --group browser`.
+Optional dev/test tools: `python scripts/bootstrap_env.py dev-test-browser`.
 
 1. Create local settings:
 

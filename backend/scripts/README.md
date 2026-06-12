@@ -1,6 +1,6 @@
 # Backend scripts (`backend/scripts`)
 
-Small Python utilities used by maintainers and CI. Most day-to-day developer commands (`uv sync`, `pytest`, `make`) run from the repository root; larger automation lives in the top-level [`scripts/`](../../scripts/) directory.
+Small Python utilities used by maintainers and CI. Most day-to-day developer commands (`python scripts/bootstrap_env.py …`, `pytest`, `make`) run from the repository root; larger automation lives in the top-level [`scripts/`](../../scripts/) directory.
 
 ## Layout
 

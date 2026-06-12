@@ -1050,8 +1050,8 @@ class TestReset(unittest.TestCase):
         self.ctrl = _make_controller()
 
     def test_reset_clears_contexts(self):
-        self.ctrl._action_contexts_by_object[1] = 'a'
-        self.ctrl._action_contexts_by_event_id[2] = 'b'
+        self.ctrl._action_contexts_by_object[1] = MagicMock()
+        self.ctrl._action_contexts_by_event_id[2] = MagicMock()
 
         # Make pending_action return None
         self.ctrl.services.pending_action.get.return_value = None

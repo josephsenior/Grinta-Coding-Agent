@@ -39,7 +39,7 @@ grinta
 For source development:
 
 ```bash
-uv sync
+python scripts/bootstrap_env.py base
 ```
 
 ### Create local settings
@@ -228,7 +228,7 @@ See also [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md).
 Install + run:
 
 ```bash
-uv sync
+python scripts/bootstrap_env.py base
 uv run python -m backend.cli.entry
 ```
 

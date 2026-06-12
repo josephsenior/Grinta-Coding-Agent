@@ -18,7 +18,7 @@ git clone https://github.com/josephsenior/Grinta-Coding-Agent.git
 cd Grinta-Coding-Agent
 
 # Install dependencies
-uv sync
+python scripts/bootstrap_env.py base
 
 # Start the CLI
 uv run python -m backend.cli.entry
@@ -51,7 +51,7 @@ uv run python -m backend.cli.entry
 **Required** GitHub Actions jobs on Linux and Windows run the full **unit** corpus only. Match that locally before you open a PR:
 
 ```bash
-uv sync --group dev --group test
+python scripts/bootstrap_env.py dev-test
 PYTHONPATH=. uv run pytest backend/tests/unit
 ```
 
@@ -64,6 +64,8 @@ The scheduled **Heavy / Integration Tests** job runs a marker-filtered slice (`p
 If your change touches the CLI, REPL, or orchestration hot paths, also run the [CLI regression workflow](.github/workflows/e2e-tests.yml) locally when possible (it may also run on PRs when files under `backend/`, `launch/`, etc. change).
 
 For bugfix PRs, prefer adding a **regression test** next to the code you fixed (see [docs/REGRESSION_TESTS.md](docs/REGRESSION_TESTS.md)).
+
+Dependency profiles are centralized in `scripts/bootstrap_env.py` (for example: `base`, `browser`, `dev`, `dev-test`, `dev-test-browser`).
 
 For a one-command onboarding sanity check on Unix-like systems:
 

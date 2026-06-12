@@ -23,10 +23,13 @@ from typing import Any, Awaitable, Callable
 
 from backend.core.logger import app_logger as logger
 
+psutil: Any | None = None
+
 # Optional psutil — degrade gracefully on platforms where it is unavailable.
 try:
-    import psutil  # type: ignore[import-untyped]
+    import psutil as _psutil  # type: ignore[import-untyped]
 
+    psutil = _psutil
     _HAS_PSUTIL = True
 except ImportError:
     _HAS_PSUTIL = False
@@ -111,6 +114,7 @@ class MemoryPressureMonitor:
         self._process: Any = None
         self._baseline_rss_mb: float = 0.0
         if _HAS_PSUTIL:
+            assert psutil is not None
             self._process = psutil.Process(os.getpid())
             try:
                 info = self._process.memory_info()

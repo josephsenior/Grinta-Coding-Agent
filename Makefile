@@ -1,5 +1,7 @@
 ﻿PYTHON ?= uv run python
 
+BOOTSTRAP := python scripts/bootstrap_env.py
+
 .PHONY: pretest
 pretest:
 	@bash ./backend/scripts/dev/clean_pycache.sh
@@ -144,6 +146,26 @@ check-tmux:
 		echo "$(YELLOW)╚════════════════════════════════════════════════════════════════════════════╝$(RESET)"; \
 	fi
 
+.PHONY: bootstrap-base
+bootstrap-base:
+	@$(BOOTSTRAP) base
+
+.PHONY: bootstrap-browser
+bootstrap-browser:
+	@$(BOOTSTRAP) browser
+
+.PHONY: bootstrap-dev
+bootstrap-dev:
+	@$(BOOTSTRAP) dev
+
+.PHONY: bootstrap-dev-test
+bootstrap-dev-test:
+	@$(BOOTSTRAP) dev-test
+
+.PHONY: bootstrap-dev-test-browser
+bootstrap-dev-test-browser:
+	@$(BOOTSTRAP) dev-test-browser
+
 install-python-dependencies:
 	@echo "$(GREEN)Syncing Python dependencies...$(RESET)"
 	@if [ -z "${TZ}" ]; then \
@@ -155,7 +177,7 @@ install-python-dependencies:
 		export HNSWLIB_NO_NATIVE=1; \
 		uv pip install chroma-hnswlib; \
 	fi
-	uv sync
+	@$(MAKE) -s bootstrap-base
 	@echo "$(GREEN)Python dependencies synced successfully.$(RESET)"
 
 install-pre-commit-hooks: check-python check-uv install-python-dependencies

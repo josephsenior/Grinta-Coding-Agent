@@ -11,9 +11,10 @@ import asyncio
 import os
 import re
 import time
+from collections.abc import Callable, Coroutine
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 # Fail fast when invoked as a module script. Keeping this guard before heavy
 # imports prevents startup hangs/timeouts in retired-entrypoint checks.
@@ -561,13 +562,17 @@ async def lifespan(app: FastAPI):
 
     # Start initialization in background task
     initialize_background = globals().get('_initialize_background')
-    if not callable(initialize_background):
+    if callable(initialize_background):
+        initialize_background_fn = cast(
+            Callable[[FastAPI], Coroutine[Any, Any, None]], initialize_background
+        )
+    else:
 
         async def _noop_initialize(_: FastAPI) -> None:
             return
 
-        initialize_background = _noop_initialize
-    initialization_task = asyncio.create_task(initialize_background(app))
+        initialize_background_fn = _noop_initialize
+    initialization_task = asyncio.create_task(initialize_background_fn(app))
 
     # Yield after prewarm so server can start accepting requests
     yield

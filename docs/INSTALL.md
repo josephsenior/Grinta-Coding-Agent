@@ -17,7 +17,7 @@ Works on Windows, macOS, Linux. Requires Python 3.12+. Installed runs store sett
 ```bash
 git clone https://github.com/josephsenior/Grinta-Coding-Agent.git
 cd Grinta-Coding-Agent
-uv sync
+python scripts/bootstrap_env.py base
 uv run python -m backend.cli.entry init
 uv run python -m backend.cli.entry
 ```
