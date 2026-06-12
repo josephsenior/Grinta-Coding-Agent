@@ -472,6 +472,7 @@ def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
     except Exception:
         resolved_provider = config_provider or 'unknown'
     limits = limits_from_config(config, unknown_default=False)
+    fallback_limits = limits_from_config(config, unknown_default=True)
     metadata: dict[str, Any] = {
         'model': model,
         'custom_llm_provider': config_provider,
@@ -485,6 +486,12 @@ def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
             'usable_input_tokens': limits.usable_input_tokens,
             'max_output_tokens': limits.max_output_tokens,
             'source': limits.source,
+        },
+        'context_budget_limits': {
+            'context_window_tokens': fallback_limits.context_window_tokens,
+            'usable_input_tokens': fallback_limits.usable_input_tokens,
+            'max_output_tokens': fallback_limits.max_output_tokens,
+            'source': fallback_limits.source,
         },
         'config_params': {
             'temperature': getattr(config, 'temperature', None),
@@ -510,6 +517,7 @@ def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
             'provider': entry.provider,
             'client': entry.client,
             'catalog_file': entry.catalog_file,
+            'provider_metadata': entry.provider_metadata,
             'name': entry.name,
             'runtime_model_id': runtime_model_id(entry),
             'verified': entry.verified,
@@ -527,6 +535,17 @@ def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
             'strip_penalties': entry.strip_penalties,
             'use_max_completion_tokens': entry.use_max_completion_tokens,
             'default_temperature': entry.default_temperature,
+            'pricing_per_million': {
+                'input': entry.input_price_per_m,
+                'cached_input': entry.cached_input_price_per_m,
+                'cached_write': entry.cached_write_price_per_m,
+                'output': entry.output_price_per_m,
+                'long_context_threshold_tokens': entry.long_context_threshold_tokens,
+                'long_input': entry.long_input_price_per_m,
+                'long_cached_input': entry.long_cached_input_price_per_m,
+                'long_cached_write': entry.long_cached_write_price_per_m,
+                'long_output': entry.long_output_price_per_m,
+            },
         }
     return metadata
 
@@ -724,9 +743,14 @@ class LLM(RetryMixin, DebugMixin):
         # Drop explicit None values to avoid sending JSON nulls.
         # Keep falsy values like 0/False.
         final_kwargs = {k: v for k, v in call_kwargs.items() if v is not None}
+        log_payload = _safe_call_kwargs_for_log(final_kwargs)
+        log_payload['active_model_metadata'] = _llm_model_metadata_for_log(
+            self.config,
+            _get_provider_resolver(),
+        )
         logger.info(
             'LLM applied call params: %s',
-            json.dumps(_safe_call_kwargs_for_log(final_kwargs), sort_keys=True),
+            json.dumps(log_payload, sort_keys=True),
         )
         return final_kwargs
 
@@ -745,13 +769,6 @@ class LLM(RetryMixin, DebugMixin):
         completion_tokens = usage.get('completion_tokens', 0)
         usage_estimated = bool(usage.get('is_estimated', False))
 
-        cost = self.client.get_completion_cost(
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            config=self.config,
-        )
-        self.metrics.add_cost(cost)
-
         # Extract cache tokens from provider-specific nested structures
         cache_read = usage.get('cache_read_tokens', 0)
         cache_write = usage.get('cache_write_tokens', 0)
@@ -767,6 +784,15 @@ class LLM(RetryMixin, DebugMixin):
             extra: Any = usage['model_extra']
             if isinstance(extra, dict):
                 cache_write = extra.get('cache_creation_input_tokens', 0)
+
+        cost = self.client.get_completion_cost(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            config=self.config,
+            cache_read_tokens=cache_read,
+            cache_write_tokens=cache_write,
+        )
+        self.metrics.add_cost(cost)
 
         self.metrics.add_token_usage(
             prompt_tokens=prompt_tokens,

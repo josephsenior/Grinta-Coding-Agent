@@ -1,199 +1,943 @@
 {
   "provider": "opencode-go",
-  "client": "openai_compatible",
+  "client": "mixed_opencode_go_surfaces",
   "models": {
+    "deepseek-v4-flash": {
+      "client": "openai_compatible",
+      "aliases": [
+        "opencode-go/deepseek-v4-flash",
+        "deepseek-v4-flash",
+        "deepseek v4 flash"
+      ],
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "DeepSeek V4 Flash",
+        "family": "deepseek-flash",
+        "status": "active",
+        "release_date": "2026-04-24",
+        "api": {
+          "id": "deepseek-v4-flash",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/openai-compatible"
+        },
+        "inference_endpoint": "/chat/completions",
+        "inference_url": "https://opencode.ai/zen/go/v1/chat/completions",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": false,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": {
+            "field": "reasoning_content"
+          }
+        },
+        "variants": {
+          "low": {
+            "reasoningEffort": "low"
+          },
+          "medium": {
+            "reasoningEffort": "medium"
+          },
+          "high": {
+            "reasoningEffort": "high"
+          },
+          "max": {
+            "reasoningEffort": "max"
+          }
+        }
+      },
+      "context_window_tokens": 1000000,
+      "max_output_tokens": 384000,
+      "input_price_per_m": 0.14,
+      "cached_input_price_per_m": 0.0028,
+      "cached_write_price_per_m": 0,
+      "output_price_per_m": 0.28,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
+      "supports_vision": false,
+      "strip_reasoning_effort": true
+    },
+    "deepseek-v4-pro": {
+      "client": "openai_compatible",
+      "aliases": [
+        "opencode-go/deepseek-v4-pro",
+        "deepseek-v4-pro",
+        "deepseek v4 pro"
+      ],
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "DeepSeek V4 Pro",
+        "family": "deepseek-thinking",
+        "status": "active",
+        "release_date": "2026-04-24",
+        "api": {
+          "id": "deepseek-v4-pro",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/openai-compatible"
+        },
+        "inference_endpoint": "/chat/completions",
+        "inference_url": "https://opencode.ai/zen/go/v1/chat/completions",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": false,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": {
+            "field": "reasoning_content"
+          }
+        },
+        "variants": {
+          "low": {
+            "reasoningEffort": "low"
+          },
+          "medium": {
+            "reasoningEffort": "medium"
+          },
+          "high": {
+            "reasoningEffort": "high"
+          },
+          "max": {
+            "reasoningEffort": "max"
+          }
+        }
+      },
+      "context_window_tokens": 1000000,
+      "max_output_tokens": 384000,
+      "input_price_per_m": 1.74,
+      "cached_input_price_per_m": 0.0145,
+      "cached_write_price_per_m": 0,
+      "output_price_per_m": 3.48,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
+      "supports_vision": false,
+      "strip_reasoning_effort": true
+    },
     "glm-5": {
+      "client": "openai_compatible",
       "aliases": [
         "opencode-go/glm-5",
         "glm-5",
         "glm 5"
       ],
-      "context_window_tokens": 200000,
-      "max_input_tokens": 67904,
-      "max_output_tokens": 128000,
-      "input_price_per_m": 1.0,
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "GLM-5",
+        "family": "glm",
+        "status": "active",
+        "release_date": "2026-02-11",
+        "api": {
+          "id": "glm-5",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/openai-compatible"
+        },
+        "inference_endpoint": "/chat/completions",
+        "inference_url": "https://opencode.ai/zen/go/v1/chat/completions",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": false,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": {
+            "field": "reasoning_content"
+          }
+        },
+        "variants": {}
+      },
+      "context_window_tokens": 202752,
+      "max_output_tokens": 32768,
+      "input_price_per_m": 1,
       "cached_input_price_per_m": 0.2,
+      "cached_write_price_per_m": 0,
       "output_price_per_m": 3.2,
-      "verified": false,
+      "verified": true,
       "featured": true,
       "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
       "supports_vision": false,
-      "strip_reasoning_effort": true,
-      "default_temperature": 1.0
+      "strip_reasoning_effort": true
     },
-    "glm-5-1": {
+    "glm-5.1": {
+      "client": "openai_compatible",
       "aliases": [
         "opencode-go/glm-5.1",
-        "opencode-go/glm-5-1",
         "glm-5.1",
-        "glm-5-1",
-        "glm 5.1"
+        "glm 5 1"
       ],
-      "context_window_tokens": 200000,
-      "max_input_tokens": 67904,
-      "max_output_tokens": 128000,
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "GLM-5.1",
+        "family": "glm",
+        "status": "active",
+        "release_date": "2026-04-07",
+        "api": {
+          "id": "glm-5.1",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/openai-compatible"
+        },
+        "inference_endpoint": "/chat/completions",
+        "inference_url": "https://opencode.ai/zen/go/v1/chat/completions",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": false,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": {
+            "field": "reasoning_content"
+          }
+        },
+        "variants": {}
+      },
+      "context_window_tokens": 202752,
+      "max_output_tokens": 32768,
       "input_price_per_m": 1.4,
       "cached_input_price_per_m": 0.26,
+      "cached_write_price_per_m": 0,
       "output_price_per_m": 4.4,
-      "verified": false,
+      "verified": true,
       "featured": true,
       "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
       "supports_vision": false,
-      "strip_reasoning_effort": true,
-      "default_temperature": 1.0
+      "strip_reasoning_effort": true
     },
     "kimi-k2.5": {
+      "client": "openai_compatible",
       "aliases": [
         "opencode-go/kimi-k2.5",
-        "moonshotai/kimi-k2.5",
         "kimi-k2.5",
-        "kimi k2.5"
+        "kimi k2 5"
       ],
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "Kimi K2.5",
+        "family": "kimi-k2.5",
+        "status": "active",
+        "release_date": "2026-01-27",
+        "api": {
+          "id": "kimi-k2.5",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/openai-compatible"
+        },
+        "inference_endpoint": "/chat/completions",
+        "inference_url": "https://opencode.ai/zen/go/v1/chat/completions",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": true,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": true,
+            "video": true,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": {
+            "field": "reasoning_content"
+          }
+        },
+        "variants": {}
+      },
       "context_window_tokens": 262144,
-      "max_input_tokens": 163840,
-      "max_output_tokens": 98304,
-      "verified": false,
+      "max_output_tokens": 65536,
+      "input_price_per_m": 0.6,
+      "cached_input_price_per_m": 0.1,
+      "cached_write_price_per_m": 0,
+      "output_price_per_m": 3,
+      "verified": true,
       "featured": true,
       "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
       "supports_vision": true,
       "strip_reasoning_effort": true
     },
     "kimi-k2.6": {
+      "client": "openai_compatible",
       "aliases": [
         "opencode-go/kimi-k2.6",
-        "moonshotai/kimi-k2.6",
         "kimi-k2.6",
-        "kimi k2.6"
+        "kimi k2 6"
       ],
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "Kimi K2.6",
+        "family": "kimi-k2.6",
+        "status": "active",
+        "release_date": "2026-04-21",
+        "api": {
+          "id": "kimi-k2.6",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/openai-compatible"
+        },
+        "inference_endpoint": "/chat/completions",
+        "inference_url": "https://opencode.ai/zen/go/v1/chat/completions",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": true,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": true,
+            "video": true,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": {
+            "field": "reasoning_content"
+          }
+        },
+        "variants": {}
+      },
       "context_window_tokens": 262144,
-      "max_input_tokens": 163840,
-      "max_output_tokens": 98304,
-      "verified": false,
+      "max_output_tokens": 65536,
+      "input_price_per_m": 0.95,
+      "cached_input_price_per_m": 0.16,
+      "cached_write_price_per_m": 0,
+      "output_price_per_m": 4,
+      "verified": true,
       "featured": true,
       "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_response_schema": true,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
       "supports_vision": true,
-      "supports_reasoning_effort": true
+      "strip_reasoning_effort": true
+    },
+    "mimo-v2.5": {
+      "client": "openai_compatible",
+      "aliases": [
+        "opencode-go/mimo-v2.5",
+        "mimo-v2.5",
+        "mimo v2 5"
+      ],
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "MiMo V2.5",
+        "family": "mimo-v2.5",
+        "status": "active",
+        "release_date": "2026-04-22",
+        "api": {
+          "id": "mimo-v2.5",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/openai-compatible"
+        },
+        "inference_endpoint": "/chat/completions",
+        "inference_url": "https://opencode.ai/zen/go/v1/chat/completions",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": true,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": true,
+            "image": true,
+            "video": true,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": {
+            "field": "reasoning_content"
+          }
+        },
+        "variants": {
+          "low": {
+            "reasoningEffort": "low"
+          },
+          "medium": {
+            "reasoningEffort": "medium"
+          },
+          "high": {
+            "reasoningEffort": "high"
+          }
+        }
+      },
+      "context_window_tokens": 1000000,
+      "max_output_tokens": 128000,
+      "input_price_per_m": 0.14,
+      "cached_input_price_per_m": 0.0028,
+      "cached_write_price_per_m": 0,
+      "output_price_per_m": 0.28,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
+      "supports_vision": true,
+      "strip_reasoning_effort": true
+    },
+    "mimo-v2.5-pro": {
+      "client": "openai_compatible",
+      "aliases": [
+        "opencode-go/mimo-v2.5-pro",
+        "mimo-v2.5-pro",
+        "mimo v2 5 pro"
+      ],
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "MiMo V2.5 Pro",
+        "family": "mimo-v2.5-pro",
+        "status": "active",
+        "release_date": "2026-04-22",
+        "api": {
+          "id": "mimo-v2.5-pro",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/openai-compatible"
+        },
+        "inference_endpoint": "/chat/completions",
+        "inference_url": "https://opencode.ai/zen/go/v1/chat/completions",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": true,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": {
+            "field": "reasoning_content"
+          }
+        },
+        "variants": {
+          "low": {
+            "reasoningEffort": "low"
+          },
+          "medium": {
+            "reasoningEffort": "medium"
+          },
+          "high": {
+            "reasoningEffort": "high"
+          }
+        }
+      },
+      "context_window_tokens": 1048576,
+      "max_output_tokens": 128000,
+      "input_price_per_m": 1.74,
+      "cached_input_price_per_m": 0.0145,
+      "cached_write_price_per_m": 0,
+      "output_price_per_m": 3.48,
+      "verified": true,
+      "featured": true,
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
+      "supports_vision": false,
+      "strip_reasoning_effort": true
     },
     "minimax-m2.5": {
+      "client": "anthropic_compatible",
       "aliases": [
         "opencode-go/minimax-m2.5",
         "minimax-m2.5",
-        "minimax m2.5"
+        "minimax m2 5"
       ],
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "MiniMax M2.5",
+        "family": "minimax-m2.5",
+        "status": "active",
+        "release_date": "2026-02-12",
+        "api": {
+          "id": "minimax-m2.5",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/anthropic"
+        },
+        "inference_endpoint": "/messages",
+        "inference_url": "https://opencode.ai/zen/go/v1/messages",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": false,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": false
+        },
+        "variants": {}
+      },
       "context_window_tokens": 204800,
-      "max_input_tokens": 69632,
-      "max_output_tokens": 131072,
-      "verified": false,
+      "max_output_tokens": 65536,
+      "input_price_per_m": 0.3,
+      "cached_input_price_per_m": 0.03,
+      "cached_write_price_per_m": 0,
+      "output_price_per_m": 1.2,
+      "verified": true,
       "featured": true,
       "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
       "supports_vision": false,
       "strip_reasoning_effort": true
     },
     "minimax-m2.7": {
+      "client": "anthropic_compatible",
       "aliases": [
         "opencode-go/minimax-m2.7",
         "minimax-m2.7",
-        "minimax m2.7"
+        "minimax m2 7"
       ],
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "MiniMax M2.7",
+        "family": "minimax-m2.7",
+        "status": "active",
+        "release_date": "2026-03-18",
+        "api": {
+          "id": "minimax-m2.7",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/anthropic"
+        },
+        "inference_endpoint": "/messages",
+        "inference_url": "https://opencode.ai/zen/go/v1/messages",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": false,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": false
+        },
+        "variants": {}
+      },
       "context_window_tokens": 204800,
-      "max_input_tokens": 69632,
       "max_output_tokens": 131072,
-      "verified": false,
+      "input_price_per_m": 0.3,
+      "cached_input_price_per_m": 0.06,
+      "cached_write_price_per_m": 0,
+      "output_price_per_m": 1.2,
+      "verified": true,
       "featured": true,
       "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
       "supports_vision": false,
       "strip_reasoning_effort": true
     },
     "minimax-m3": {
+      "client": "anthropic_compatible",
       "aliases": [
         "opencode-go/minimax-m3",
         "minimax-m3",
         "minimax m3"
       ],
-      "context_window_tokens": 1000000,
-      "max_input_tokens": 930368,
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "MiniMax M3",
+        "family": "minimax-m3",
+        "status": "active",
+        "release_date": "2026-05-31",
+        "api": {
+          "id": "minimax-m3",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/anthropic"
+        },
+        "inference_endpoint": "/messages",
+        "inference_url": "https://opencode.ai/zen/go/v1/messages",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": false,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": true,
+            "video": true,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": false
+        },
+        "variants": {
+          "none": {
+            "thinking": {
+              "type": "disabled"
+            }
+          },
+          "thinking": {
+            "thinking": {
+              "type": "adaptive"
+            }
+          }
+        }
+      },
+      "context_window_tokens": 512000,
       "max_output_tokens": 131072,
-      "verified": false,
+      "input_price_per_m": 0.3,
+      "cached_input_price_per_m": 0.06,
+      "cached_write_price_per_m": 0,
+      "output_price_per_m": 1.2,
+      "verified": true,
       "featured": true,
       "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
-    },
-    "qwen3.5-plus": {
-      "aliases": [
-        "opencode-go/qwen3.5-plus",
-        "qwen/qwen3.5-plus",
-        "qwen3.5-plus",
-        "qwen3.5 plus"
-      ],
-      "context_window_tokens": 256000,
-      "max_input_tokens": 235520,
-      "max_output_tokens": 16384,
-      "verified": false,
-      "featured": true,
-      "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_vision": false,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
+      "supports_vision": true,
       "strip_reasoning_effort": true
     },
     "qwen3.6-plus": {
+      "client": "anthropic_compatible",
       "aliases": [
         "opencode-go/qwen3.6-plus",
-        "qwen/qwen3.6-plus",
         "qwen3.6-plus",
-        "qwen3.6 plus"
+        "qwen3 6 plus"
       ],
-      "context_window_tokens": 256000,
-      "max_input_tokens": 235520,
-      "max_output_tokens": 16384,
-      "verified": false,
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "Qwen3.6 Plus",
+        "family": "qwen3.6",
+        "status": "active",
+        "release_date": "2026-04-02",
+        "api": {
+          "id": "qwen3.6-plus",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/anthropic"
+        },
+        "inference_endpoint": "/messages",
+        "inference_url": "https://opencode.ai/zen/go/v1/messages",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": true,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": true,
+            "video": true,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": false
+        },
+        "variants": {},
+        "pricing_tiers": [
+          {
+            "input": 2,
+            "output": 6,
+            "cache": {
+              "read": 0.2,
+              "write": 2.5
+            },
+            "tier": {
+              "type": "context",
+              "size": 256000
+            }
+          }
+        ]
+      },
+      "context_window_tokens": 1000000,
+      "max_output_tokens": 65536,
+      "input_price_per_m": 0.5,
+      "cached_input_price_per_m": 0.05,
+      "cached_write_price_per_m": 0.625,
+      "output_price_per_m": 3,
+      "verified": true,
       "featured": true,
       "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
+      "supports_vision": true,
+      "strip_reasoning_effort": true,
+      "long_context_threshold_tokens": 256000,
+      "long_input_price_per_m": 2,
+      "long_cached_input_price_per_m": 0.2,
+      "long_cached_write_price_per_m": 2.5,
+      "long_output_price_per_m": 6
     },
     "qwen3.7-max": {
+      "client": "anthropic_compatible",
       "aliases": [
         "opencode-go/qwen3.7-max",
-        "qwen/qwen3.7-max",
         "qwen3.7-max",
-        "qwen3.7 max"
+        "qwen3 7 max"
       ],
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "Qwen3.7 Max",
+        "family": "qwen3.7-max",
+        "status": "active",
+        "release_date": "2026-05-21",
+        "api": {
+          "id": "qwen3.7-max",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/anthropic"
+        },
+        "inference_endpoint": "/messages",
+        "inference_url": "https://opencode.ai/zen/go/v1/messages",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": false,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": false
+        },
+        "variants": {}
+      },
       "context_window_tokens": 1000000,
-      "max_input_tokens": 930368,
       "max_output_tokens": 65536,
-      "verified": false,
+      "input_price_per_m": 2.5,
+      "cached_input_price_per_m": 0.5,
+      "cached_write_price_per_m": 3.125,
+      "output_price_per_m": 7.5,
+      "verified": true,
       "featured": true,
       "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
       "supports_vision": false,
       "strip_reasoning_effort": true
     },
     "qwen3.7-plus": {
+      "client": "anthropic_compatible",
       "aliases": [
         "opencode-go/qwen3.7-plus",
-        "qwen/qwen3.7-plus",
         "qwen3.7-plus",
-        "qwen3.7 plus"
+        "qwen3 7 plus"
       ],
+      "provider_metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode-go",
+        "display_name": "Qwen3.7 Plus",
+        "family": "qwen3.7-plus",
+        "status": "active",
+        "release_date": "2026-06-02",
+        "api": {
+          "id": "qwen3.7-plus",
+          "url": "https://opencode.ai/zen/go/v1",
+          "npm": "@ai-sdk/anthropic"
+        },
+        "inference_endpoint": "/messages",
+        "inference_url": "https://opencode.ai/zen/go/v1/messages",
+        "options": {},
+        "capabilities": {
+          "temperature": true,
+          "reasoning": true,
+          "attachment": true,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": true,
+            "video": true,
+            "pdf": false
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": false
+        },
+        "variants": {},
+        "pricing_tiers": [
+          {
+            "input": 1.2,
+            "output": 4.8,
+            "cache": {
+              "read": 0.12,
+              "write": 1.5
+            },
+            "tier": {
+              "type": "context",
+              "size": 256000
+            }
+          }
+        ]
+      },
       "context_window_tokens": 1000000,
-      "max_input_tokens": 930368,
       "max_output_tokens": 65536,
-      "verified": false,
+      "input_price_per_m": 0.4,
+      "cached_input_price_per_m": 0.04,
+      "cached_write_price_per_m": 0.5,
+      "output_price_per_m": 1.6,
+      "verified": true,
       "featured": true,
       "supports_function_calling": true,
-      "supports_parallel_tool_calls": true,
-      "supports_vision": false,
-      "strip_reasoning_effort": true
+      "supports_parallel_tool_calls": false,
+      "supports_reasoning_effort": false,
+      "supports_vision": true,
+      "strip_reasoning_effort": true,
+      "long_context_threshold_tokens": 256000,
+      "long_input_price_per_m": 1.2,
+      "long_cached_input_price_per_m": 0.12,
+      "long_cached_write_price_per_m": 1.5,
+      "long_output_price_per_m": 4.8
     }
   }
 }
