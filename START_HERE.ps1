@@ -33,8 +33,8 @@ if (-not (Test-Path 'settings.json')) {
     Write-Host 'No settings.json found. Run uv run python -m backend.cli.entry init after dependencies sync if configuration is needed.' -ForegroundColor Cyan
 }
 
-Write-Host 'Step 1: Syncing dependencies with uv (project .venv + browser group)...' -ForegroundColor Yellow
-& uv sync --group browser
+Write-Host 'Step 1: Syncing dependencies with the shared browser bootstrap profile...' -ForegroundColor Yellow
+& uv run python scripts/bootstrap_env.py browser
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host '[ERROR] Failed to sync dependencies' -ForegroundColor Red

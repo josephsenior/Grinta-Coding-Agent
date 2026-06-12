@@ -119,11 +119,14 @@ def _find_type_checking_ranges(tree: ast.AST) -> list[tuple[int, int]]:
         if not is_tc:
             continue
         start = node.lineno
-        end = max(
-            getattr(n, 'end_lineno', n.lineno)
-            for n in ast.walk(node)
-            if hasattr(n, 'lineno')
-        )
+        line_numbers: list[int] = []
+        for n in ast.walk(node):
+            lineno = getattr(n, 'lineno', None)
+            if not isinstance(lineno, int):
+                continue
+            end_lineno = getattr(n, 'end_lineno', lineno)
+            line_numbers.append(end_lineno if isinstance(end_lineno, int) else lineno)
+        end = max(line_numbers, default=start)
         ranges.append((start, end))
     return ranges
 

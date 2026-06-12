@@ -62,7 +62,7 @@ class UnifiedShellSession(ABC):
         """Get current working directory."""
 
     @abstractmethod
-    def get_detected_server(self):
+    def get_detected_server(self) -> DetectedServer | None:
         """Get and clear the last detected server."""
 
     @abstractmethod
@@ -478,14 +478,23 @@ def _kill_on_hard_timeout(
 
 
 def _try_create_interactive_session(
-    session_kwargs: dict[str, Any],
+    **session_kwargs: Any,
 ) -> UnifiedShellSession | None:
     try:
         from backend.execution.utils.pty_session import PtyUnavailableError
         from backend.execution.utils.pty_shell_session import (
             PtyInteractiveShellSession,
         )
+    except Exception as exc:
+        logger.warning(
+            'Failed to import interactive PTY shell (%s); falling back to '
+            'default shell session. Interactive read_output / write_input '
+            'may be limited.',
+            exc,
+        )
+        return None
 
+    try:
         logger.info('Using PtyInteractiveShellSession (OS-agnostic PTY)')
         return PtyInteractiveShellSession(**session_kwargs)
     except PtyUnavailableError as exc:
@@ -498,7 +507,8 @@ def _try_create_interactive_session(
     except Exception as exc:
         logger.warning(
             'Failed to start interactive PTY shell (%s); falling back to '
-            'default shell session.',
+            'default shell session. Interactive read_output / write_input '
+            'may be limited.',
             exc,
         )
     return None
@@ -638,7 +648,7 @@ def create_shell_session(
     sandboxed_local = is_sandboxed_local_profile(security_config)
 
     if interactive:
-        result = _try_create_interactive_session(session_kwargs)
+        result = _try_create_interactive_session(**session_kwargs)
         if result is not None:
             return result
 

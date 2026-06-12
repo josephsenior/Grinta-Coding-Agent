@@ -38,7 +38,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --group dev --group test
+        run: python scripts/bootstrap_env.py dev-test
 
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend

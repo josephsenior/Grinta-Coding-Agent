@@ -165,11 +165,11 @@ class GrintaNativeBrowser:
         if self._session is not None:
             return self._session
         try:
-            from browser_use import Browser as BrowserCls
+            from browser_use import Browser as BrowserCls  # pyright: ignore[reportMissingImports]  # noqa: I001
         except ImportError as e:
             raise RuntimeError(
                 'browser-use is not installed. Install the optional dependency group '
-                '(`uv sync --group browser`) and run `uvx browser-use install` to '
+                '(`python scripts/bootstrap_env.py browser`) and run `uvx browser-use install` to '
                 'download Chromium.'
             ) from e
         browser = BrowserCls()

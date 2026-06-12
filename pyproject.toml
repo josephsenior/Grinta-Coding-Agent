@@ -267,7 +267,8 @@ skips = [
 ]
 exclude_dirs = [ "backend/tests", "tests" ]
 
-# Use a project-local environment only: run `uv sync` in this repo, then `uv run …`.
+# Use a project-local environment only: prefer `python scripts/bootstrap_env.py base`
+# (or another named profile) in this repo, then `uv run …`.
 # Avoid `pip install` into the global Python alongside unrelated agent stacks; that causes resolver conflicts.
 
 [tool.vulture]

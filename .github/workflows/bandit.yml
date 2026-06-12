@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: 3.12
       - name: Install dependencies
-        run: uv sync --group dev
+        run: python scripts/bootstrap_env.py dev
       - name: Run Bandit
         run: uv run bandit -c pyproject.toml -r backend --exclude backend/tests -ll -f json -o bandit-report.json || true
       - name: Check Bandit report

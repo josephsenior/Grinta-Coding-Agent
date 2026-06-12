@@ -216,8 +216,13 @@ class OrchestratorPromptManager(PromptManager):
                 )
                 if callable(llm_cfg):
                     resolved = llm_cfg(self._config)  # pylint: disable=not-callable
-                    if resolved and hasattr(resolved, 'model') and resolved.model:
-                        return str(resolved.model).strip()
+                    model = (
+                        getattr(resolved, 'model', None)
+                        if resolved is not None
+                        else None
+                    )
+                    if model:
+                        return str(model).strip()
             except Exception:
                 pass
         return ''

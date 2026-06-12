@@ -31,7 +31,7 @@ still exist for compatibility or export workflows, but the supported interactive
 
 ## General Setup:
 
-To set up the entire repo, run `make build` (or `uv sync` on Windows).
+To set up the entire repo, run `make build` (or `python scripts/bootstrap_env.py base` on Windows).
 You don't need to do this unless the user asks you to, or if you're trying to run the entire application.
 
 Before pushing any changes, you should ensure that any lint errors or simple test errors have been fixed.
