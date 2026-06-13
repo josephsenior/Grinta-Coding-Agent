@@ -385,6 +385,30 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         self._config = config
         self._entries_by_provider = self._load_catalog_entries()
 
+    def _resolve_listing_api_key(self, provider: str | None = None) -> str | None:
+        from backend.inference.registry import resolve_api_key_for_provider
+
+        selected = provider or self._current_provider()
+        typed = ''
+        try:
+            typed = self.query_one('#settings-api-key', Input).value.strip()
+        except Exception:
+            typed = ''
+        if typed:
+            return typed
+        return resolve_api_key_for_provider(self._config, selected)
+
+    def _reload_model_entries(self, provider: str | None = None) -> None:
+        from backend.inference.registry import build_model_entries_by_provider
+
+        selected = provider or self._current_provider()
+        api_key = self._resolve_listing_api_key(selected)
+        merged = build_model_entries_by_provider(
+            api_key=api_key,
+            provider=selected,
+        )
+        self._entries_by_provider.update(merged)
+
     def compose(self) -> ComposeResult:
         from backend.cli.config_manager import get_masked_api_key
 
@@ -454,6 +478,11 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
 
     def on_mount(self) -> None:
         self.query_one('#settings-provider', Select).focus()
+        self._reload_model_entries()
+        provider = self._current_provider()
+        model_select = self.query_one('#settings-model', Select)
+        model_select.set_options(self._model_options(provider))
+        model_select.value = self._current_model_for_provider(provider)
         self._sync_custom_model_visibility()
         self._sync_model_metadata()
 
@@ -476,6 +505,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             return
         if event.select.id == 'settings-provider':
             provider = event.value
+            self._reload_model_entries(provider)
             model_select = self.query_one('#settings-model', Select)
             model = self._current_model_for_provider(provider)
             model_select.set_options(self._model_options(provider))
@@ -496,50 +526,15 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
 
     @staticmethod
     def _load_catalog_entries() -> dict[str, list[Any]]:
-        from backend.core.providers import PROVIDER_CONFIGURATIONS
-        from backend.inference.catalog_loader import get_catalog
+        from backend.inference.registry import build_model_entries_by_provider
 
-        entries_by_provider: dict[str, list[Any]] = {}
-        for entry in get_catalog():
-            entries_by_provider.setdefault(entry.provider, []).append(entry)
-        for provider, entries in entries_by_provider.items():
-            entries.sort(
-                key=lambda item: (
-                    not bool(getattr(item, 'featured', False)),
-                    not bool(getattr(item, 'verified', False)),
-                    GrintaSettingsDialog._entry_label(item),
-                )
-            )
-        for provider in PROVIDER_CONFIGURATIONS:
-            entries_by_provider.setdefault(provider, [])
-        return dict(sorted(entries_by_provider.items()))
+        return build_model_entries_by_provider(include_remote=False)
 
     @staticmethod
     def _provider_label(provider: str | None) -> str:
-        labels = {
-            'anthropic': 'Anthropic',
-            'cerebras': 'Cerebras',
-            'deepinfra': 'DeepInfra',
-            'deepseek': 'DeepSeek',
-            'digitalocean': 'DigitalOcean',
-            'fireworks': 'Fireworks',
-            'google': 'Google Gemini',
-            'groq': 'Groq',
-            'lightning': 'Lightning AI',
-            'mistral': 'Mistral AI',
-            'nvidia': 'NVIDIA',
-            'openai': 'OpenAI',
-            'opencode': 'OpenCode Zen',
-            'opencode-go': 'OpenCode Go',
-            'openrouter': 'OpenRouter',
-            'vercel': 'Vercel AI Gateway',
-            'perplexity': 'Perplexity',
-            'together': 'Together AI',
-            'xai': 'xAI',
-        }
-        if not provider:
-            return 'selected provider'
-        return labels.get(provider, provider.replace('-', ' ').title())
+        from backend.inference.registry import provider_label
+
+        return provider_label(provider)
 
     @staticmethod
     def _entry_label(entry: Any) -> str:
@@ -564,7 +559,10 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         if options:
             options.append(('Custom model id', '__custom__'))
             return options
-        return [('Custom model id', '__custom__')]
+        from backend.inference.registry import empty_model_picker_hint
+
+        hint = empty_model_picker_hint(provider)
+        return [(hint, '__custom__')]
 
     def _current_provider(self) -> str:
         from backend.cli.config_manager import get_current_provider
@@ -701,8 +699,10 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         entry = self._selected_entry(provider, model)
         if entry is None:
             if self._custom_model_enabled():
+                from backend.inference.registry import empty_model_picker_hint
+
                 self.query_one('#settings-model-meta', Label).update(
-                    f'[{NAVY_TEXT_MUTED}]custom model: provider defaults, no catalog metadata[/]'
+                    f'[{NAVY_TEXT_MUTED}]{empty_model_picker_hint(provider)}[/]'
                 )
             else:
                 self.query_one('#settings-model-meta', Label).update('')

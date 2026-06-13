@@ -2,6 +2,17 @@
 
 This page provides lightweight examples of MCP usage patterns in Grinta.
 
+For how MCP fits alongside native tools and LLM providers, see [INFERENCE_AND_INTEGRATIONS.md](INFERENCE_AND_INTEGRATIONS.md).
+
+## Integration tiers
+
+| Tier | Examples | How the model sees them |
+|------|----------|-------------------------|
+| Native core tools | read, edit, bash, grep | Always in the tool schema |
+| Native facades | web_search, web_fetch | One stable tool name; MCP backends hidden |
+| MCP extensions | GitHub, Context7, Exa, Rigour | `call_mcp_tool` gateway + prompt catalog |
+| Runtime protocols | browser, LSP, debugger | Native tools; not under `integrations/` |
+
 ## Example: read-only docs lookup
 
 - Use an MCP docs server to resolve current API signatures.

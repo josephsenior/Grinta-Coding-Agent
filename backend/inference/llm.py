@@ -655,6 +655,24 @@ class LLM(RetryMixin, DebugMixin):
         self._cached_features = _load_cached_features(self.config.model)
         _apply_custom_tokenizer(self.config)
 
+        from backend.inference.runtime_profile import (
+            attach_runtime_profile,
+            resolve_runtime_profile,
+        )
+
+        self.runtime_profile = resolve_runtime_profile(
+            self.config,
+            provider=getattr(self.config, 'custom_llm_provider', None),
+        )
+        attach_runtime_profile(self.config, self.runtime_profile)
+        logger.info(
+            'LLM runtime profile: model=%s profile=%s source=%s window=%s',
+            self.runtime_profile.model,
+            self.runtime_profile.param_profile_id,
+            self.runtime_profile.source,
+            self.runtime_profile.context_limits.usable_input_tokens,
+        )
+
     @property
     def features(self) -> ModelFeatures:
         """Get model features/capabilities."""
@@ -753,6 +771,7 @@ class LLM(RetryMixin, DebugMixin):
             call_kwargs,
             reasoning_effort=self.config.reasoning_effort,
             is_stream=is_stream,
+            provider=getattr(self.config, 'custom_llm_provider', None),
         )
 
         if self.config.seed is not None:

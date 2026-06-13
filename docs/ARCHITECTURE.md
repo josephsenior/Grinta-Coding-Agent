@@ -46,7 +46,7 @@ backend/
   evaluation/     Agent eval pack and related evaluation helpers
   execution/      Local runtime, shell/session plumbing, and executor internals
   inference/      Provider routing and direct LLM clients
-  integrations/   External integration adapters
+  integrations/   External integration adapters (MCP; see docs/INFERENCE_AND_INTEGRATIONS.md)
   knowledge/      Optional retrieval and knowledge features
   ledger/         Event types, serialization, stream infrastructure
   orchestration/  Session orchestrator and focused services

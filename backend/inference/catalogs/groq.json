@@ -1,0 +1,54 @@
+{
+  "provider": "groq",
+  "client": "openai_compatible",
+  "metadata": {
+    "dynamic_listing": true
+  },
+  "models": {
+    "llama-3.3-70b-versatile": {
+      "runtime": {
+        "aliases": ["groq/llama-3.3-70b-versatile", "llama-3.3-70b-versatile"],
+        "context_window_tokens": 128000,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "Llama 3.3 70B Versatile"
+      }
+    },
+    "llama-3.1-8b-instant": {
+      "runtime": {
+        "aliases": ["groq/llama-3.1-8b-instant", "llama-3.1-8b-instant"],
+        "context_window_tokens": 128000,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "Llama 3.1 8B Instant"
+      }
+    },
+    "mixtral-8x7b-32768": {
+      "runtime": {
+        "aliases": ["groq/mixtral-8x7b-32768", "mixtral-8x7b-32768"],
+        "context_window_tokens": 32768,
+        "max_input_tokens": 28000,
+        "max_output_tokens": 4096,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "Mixtral 8x7B"
+      }
+    }
+  }
+}

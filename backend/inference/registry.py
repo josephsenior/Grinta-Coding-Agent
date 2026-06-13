@@ -1,0 +1,448 @@
+"""Unified provider and model registry — single read API for inference metadata.
+
+Consolidates provider URLs, prefixes, model listing (static + remote + local),
+and capability lookup. Prefer importing from this module for new code.
+"""
+
+from __future__ import annotations
+
+import time
+from typing import TYPE_CHECKING, Any
+
+from backend.core.logger import app_logger as logger
+from backend.inference.catalog_loader import ModelEntry, get_catalog, get_models_for_provider
+
+
+def normalize_provider_name(provider: str | None) -> str | None:
+    """Normalize provider names for stable comparisons."""
+    if provider is None:
+        return None
+    normalized = str(provider).strip().lower()
+    if not normalized:
+        return None
+    return normalized
+
+if TYPE_CHECKING:
+    from backend.inference.model_features import ModelFeatures
+    from backend.inference.provider_capabilities import ProviderCapabilities
+
+PROVIDER_DEFAULT_URLS: dict[str, str] = {
+    'groq': 'https://api.groq.com/openai/v1',
+    'xai': 'https://api.x.ai/v1',
+    'deepseek': 'https://api.deepseek.com/v1',
+    'openrouter': 'https://openrouter.ai/api/v1',
+    'vercel': 'https://ai-gateway.vercel.sh/v1',
+    'nvidia': 'https://integrate.api.nvidia.com/v1',
+    'lightning': 'https://lightning.ai/api/v1',
+    'digitalocean': 'https://inference.do-ai.run/v1',
+    'deepinfra': 'https://api.deepinfra.com/v1/openai',
+    'fireworks': 'https://api.fireworks.ai/inference/v1',
+    'together': 'https://api.together.xyz/v1',
+    'perplexity': 'https://api.perplexity.ai',
+    'cerebras': 'https://api.cerebras.ai/v1',
+    'mistral': 'https://api.mistral.ai/v1',
+    'opencode': 'https://opencode.ai/zen/v1',
+    'opencode-go': 'https://opencode.ai/zen/go/v1',
+}
+
+KNOWN_PROVIDER_PREFIXES: frozenset[str] = frozenset(
+    {
+        'anthropic',
+        'cerebras',
+        'deepinfra',
+        'deepseek',
+        'digitalocean',
+        'fireworks',
+        'google',
+        'groq',
+        'lightning',
+        'lm_studio',
+        'mistral',
+        'nvidia',
+        'ollama',
+        'openai',
+        'opencode',
+        'opencode-go',
+        'openrouter',
+        'perplexity',
+        'replicate',
+        'together',
+        'vercel',
+        'vllm',
+        'xai',
+    }
+)
+
+LOCAL_PROVIDERS: frozenset[str] = frozenset({'ollama', 'lm_studio', 'vllm'})
+
+OPENAI_COMPATIBLE_REMOTE_PROVIDERS: frozenset[str] = frozenset(
+    {
+        'openai',
+        'groq',
+        'xai',
+        'deepseek',
+        'vercel',
+        'openrouter',
+        'nvidia',
+        'lightning',
+        'cerebras',
+        'mistral',
+        'digitalocean',
+        'deepinfra',
+        'fireworks',
+        'together',
+        'perplexity',
+        'opencode',
+        'opencode-go',
+    }
+)
+
+DYNAMIC_LISTING_PROVIDERS: frozenset[str] = frozenset(
+    {
+        'openrouter',
+        'vercel',
+        'nvidia',
+        'deepinfra',
+        'fireworks',
+        'together',
+        'groq',
+        'mistral',
+        'cerebras',
+    }
+)
+
+_REMOTE_MODEL_CACHE_TTL_SECONDS = 600.0
+_remote_model_cache: dict[tuple[str, str, str], tuple[float, list[str]]] = {}
+
+
+def get_provider_ids() -> list[str]:
+    """Return configured hosted provider ids (from core provider config)."""
+    from backend.core.providers import PROVIDER_CONFIGURATIONS
+
+    return sorted(PROVIDER_CONFIGURATIONS.keys())
+
+
+TIER_1_PROVIDERS: frozenset[str] = frozenset(
+    {'anthropic', 'openai', 'google', 'groq', 'ollama'}
+)
+
+TIER_2_PROVIDERS: frozenset[str] = frozenset(
+    {'openrouter', 'vercel', 'mistral', 'deepseek', 'xai'}
+)
+
+
+def get_provider_tier(provider: str | None) -> int:
+    normalized = normalize_provider_name(provider)
+    if normalized in TIER_1_PROVIDERS or normalized in LOCAL_PROVIDERS:
+        return 1
+    if normalized in TIER_2_PROVIDERS:
+        return 2
+    return 3
+
+
+def get_listable_providers() -> list[str]:
+    """Providers shown in settings / onboarding pickers (Tier 1 + Tier 2 + local)."""
+    hosted = get_provider_ids()
+    tier12 = [provider for provider in hosted if get_provider_tier(provider) <= 2]
+    extras = [provider for provider in sorted(LOCAL_PROVIDERS) if provider not in tier12]
+    return tier12 + extras
+
+
+def get_default_base_url(provider: str | None) -> str | None:
+    normalized = normalize_provider_name(provider)
+    if normalized is None:
+        return None
+    return PROVIDER_DEFAULT_URLS.get(normalized)
+
+
+def get_provider_configuration(provider: str | None) -> dict[str, Any]:
+    from backend.core.providers import PROVIDER_CONFIGURATIONS, UNKNOWN_PROVIDER_CONFIG
+
+    normalized = normalize_provider_name(provider)
+    if normalized is None:
+        return UNKNOWN_PROVIDER_CONFIG
+    return PROVIDER_CONFIGURATIONS.get(normalized, UNKNOWN_PROVIDER_CONFIG)
+
+
+def supports_remote_model_listing(provider: str | None) -> bool:
+    """Return True when dynamic listing is available for *provider*."""
+    normalized = normalize_provider_name(provider)
+    if normalized is None:
+        return False
+    if normalized in LOCAL_PROVIDERS:
+        return True
+    return True
+
+
+def fetch_remote_models(
+    provider: str | None,
+    api_key: str | None,
+    *,
+    base_url: str | None = None,
+    use_cache: bool = True,
+) -> list[str]:
+    """Fetch model ids via the unified listing backend."""
+    from backend.inference.model_list_backends import list_models_for_provider
+
+    normalized = normalize_provider_name(provider)
+    if normalized is None:
+        return []
+
+    key = (api_key or '').strip()
+    if normalized not in LOCAL_PROVIDERS and not key:
+        return []
+
+    resolved_base = (base_url or get_default_base_url(normalized) or '').rstrip('/')
+    cache_key = (normalized, resolved_base, key[:12])
+    if use_cache and normalized not in LOCAL_PROVIDERS:
+        cached = _remote_model_cache.get(cache_key)
+        if cached is not None:
+            expires_at, models = cached
+            if time.monotonic() < expires_at:
+                return list(models)
+
+    models = list_models_for_provider(
+        normalized,
+        api_key=key or None,
+        base_url=base_url,
+    )
+    if use_cache and normalized not in LOCAL_PROVIDERS:
+        _remote_model_cache[cache_key] = (
+            time.monotonic() + _REMOTE_MODEL_CACHE_TTL_SECONDS,
+            list(models),
+        )
+    return models
+
+
+def include_remote_listing_for_provider(
+    provider: str | None, api_key: str | None
+) -> bool:
+    normalized = normalize_provider_name(provider)
+    if normalized is None:
+        return False
+    if normalized in LOCAL_PROVIDERS:
+        return True
+    return bool((api_key or '').strip())
+
+
+def get_static_model_names(provider: str | None, *, featured_only: bool = False) -> list[str]:
+    normalized = normalize_provider_name(provider)
+    if normalized is None:
+        return []
+    return get_models_for_provider(normalized, featured_only=featured_only)
+
+
+def get_local_model_names(provider: str | None) -> list[str]:
+    normalized = normalize_provider_name(provider)
+    if normalized is None or normalized not in LOCAL_PROVIDERS:
+        return []
+    from backend.inference.provider_resolver import get_resolver
+
+    return get_resolver().get_available_local_models(normalized)
+
+
+def list_model_names(
+    provider: str | None,
+    *,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    include_remote: bool = True,
+    include_local: bool = True,
+) -> list[str]:
+    """Merge static catalog, remote, and local model ids for *provider*."""
+    normalized = normalize_provider_name(provider)
+    if normalized is None:
+        return []
+
+    names: list[str] = list(get_static_model_names(normalized, featured_only=True))
+
+    if include_local and normalized in LOCAL_PROVIDERS:
+        names.extend(get_local_model_names(normalized))
+
+    if include_remote and include_remote_listing_for_provider(normalized, api_key):
+        names.extend(fetch_remote_models(normalized, api_key, base_url=base_url))
+
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for name in names:
+        if name not in seen:
+            seen.add(name)
+            ordered.append(name)
+    return ordered
+
+
+def _synthetic_model_entry(
+    provider: str,
+    name: str,
+    *,
+    source: str,
+    display_name: str | None = None,
+) -> ModelEntry:
+    label = display_name or name
+    return ModelEntry(
+        name=name,
+        provider=provider,
+        metadata={'display_name': label, 'source': source},
+    )
+
+
+def build_model_entries_by_provider(
+    *,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    provider: str | None = None,
+    include_remote: bool = True,
+    include_local: bool = True,
+) -> dict[str, list[ModelEntry]]:
+    """Build picker entries grouped by provider (catalog + dynamic + local)."""
+    providers = [provider] if provider else get_listable_providers()
+    by_provider: dict[str, list[ModelEntry]] = {}
+
+    catalog_by_provider: dict[str, list[ModelEntry]] = {}
+    for entry in get_catalog():
+        catalog_by_provider.setdefault(entry.provider, []).append(entry)
+
+    for prov in providers:
+        normalized = normalize_provider_name(prov)
+        if normalized is None:
+            continue
+
+        entries = list(catalog_by_provider.get(normalized, []))
+        known_names = {entry.name for entry in entries}
+
+        if include_local and normalized in LOCAL_PROVIDERS:
+            for model_id in get_local_model_names(normalized):
+                if model_id not in known_names:
+                    entries.append(
+                        _synthetic_model_entry(
+                            normalized,
+                            model_id,
+                            source='local',
+                        )
+                    )
+                    known_names.add(model_id)
+
+        if include_remote and include_remote_listing_for_provider(normalized, api_key):
+            for model_id in fetch_remote_models(
+                normalized, api_key, base_url=base_url
+            ):
+                bare = model_id.split('/')[-1] if '/' in model_id else model_id
+                if bare not in known_names and model_id not in known_names:
+                    entries.append(
+                        _synthetic_model_entry(
+                            normalized,
+                            bare,
+                            source='remote',
+                            display_name=model_id if model_id != bare else None,
+                        )
+                    )
+                    known_names.add(bare)
+
+        entries.sort(
+            key=lambda item: (
+                not bool(getattr(item, 'featured', False)),
+                not bool(getattr(item, 'verified', False)),
+                str((item.metadata or {}).get('display_name') or item.name),
+            )
+        )
+        by_provider[normalized] = entries
+
+    if provider is None:
+        for prov in get_provider_ids():
+            by_provider.setdefault(prov, [])
+        for prov in LOCAL_PROVIDERS:
+            by_provider.setdefault(prov, [])
+
+    return dict(sorted(by_provider.items()))
+
+
+def resolve_api_key_for_provider(config: Any, provider: str | None) -> str | None:
+    """Best-effort API key for *provider* from config (for remote model listing)."""
+    normalized = normalize_provider_name(provider)
+    if normalized is None:
+        return None
+    try:
+        llm_cfg = config.get_llm_config()
+        current_provider = normalize_provider_name(getattr(llm_cfg, 'provider', None))
+        key = getattr(llm_cfg, 'api_key', None)
+        if key is not None and (current_provider is None or current_provider == normalized):
+            raw = key.get_secret_value() if hasattr(key, 'get_secret_value') else str(key)
+            if raw.strip():
+                return raw.strip()
+    except Exception:
+        logger.debug('Could not read LLM api_key from config', exc_info=True)
+
+    cfg = get_provider_configuration(normalized)
+    env_var = cfg.get('env_var')
+    if env_var:
+        import os
+
+        env_key = (os.environ.get(env_var) or '').strip()
+        if env_key:
+            return env_key
+    return None
+
+
+def get_model_capabilities(model: str) -> ModelFeatures:
+    """Per-model capabilities (catalog first, glob fallbacks)."""
+    from backend.inference.model_features import get_features
+
+    return get_features(model)
+
+
+def get_provider_capability_profile(provider: str | None) -> ProviderCapabilities:
+    """Per-provider behavioural flags (native tools, cache, replay, etc.)."""
+    from backend.inference.provider_capabilities import get_provider_capabilities
+
+    return get_provider_capabilities(provider)
+
+
+def get_combined_capabilities(
+    model: str, provider: str | None = None
+) -> tuple[ModelFeatures, ProviderCapabilities]:
+    """Return model-level and provider-level capability objects."""
+    return get_model_capabilities(model), get_provider_capability_profile(provider)
+
+
+def provider_label(provider: str | None) -> str:
+    labels = {
+        'anthropic': 'Anthropic',
+        'cerebras': 'Cerebras',
+        'deepinfra': 'DeepInfra',
+        'deepseek': 'DeepSeek',
+        'digitalocean': 'DigitalOcean',
+        'fireworks': 'Fireworks',
+        'google': 'Google Gemini',
+        'groq': 'Groq',
+        'lightning': 'Lightning AI',
+        'lm_studio': 'LM Studio',
+        'mistral': 'Mistral AI',
+        'nvidia': 'NVIDIA',
+        'ollama': 'Ollama',
+        'openai': 'OpenAI',
+        'opencode': 'OpenCode Zen',
+        'opencode-go': 'OpenCode Go',
+        'openrouter': 'OpenRouter',
+        'vercel': 'Vercel AI Gateway',
+        'perplexity': 'Perplexity',
+        'together': 'Together AI',
+        'vllm': 'vLLM',
+        'xai': 'xAI',
+    }
+    if not provider:
+        return 'selected provider'
+    normalized = normalize_provider_name(provider) or provider
+    return labels.get(normalized, normalized.replace('_', ' ').replace('-', ' ').title())
+
+
+def empty_model_picker_hint(provider: str | None) -> str:
+    label = provider_label(provider)
+    if normalize_provider_name(provider) in LOCAL_PROVIDERS:
+        return (
+            f'No local models found for {label}. Start the server '
+            f'(e.g. ollama serve) or enter a custom model id.'
+        )
+    return (
+        f'No predefined models for {label}. Enter a model id or configure an API key '
+        f'to refresh from the provider.'
+    )

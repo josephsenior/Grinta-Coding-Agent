@@ -20,13 +20,16 @@ from backend.cli._tool_display.summarize import (
 from backend.cli.theme import NAVY_BG, get_grinta_pygments_style
 
 
+from backend.inference.tool_history import flatten_tool_call_for_history as _flatten_tool_call_plain
+
+
 def flatten_tool_call_for_history(name: str, arguments: str) -> str:
     """Single line for cross-family assistant history (no raw JSON)."""
     parsed = parse_tool_arguments_json(arguments)
     if parsed is not None:
         icon, label = format_tool_invocation_line(name, parsed)
         return f'{_TOOL_CALL_PREFIX} {icon} {label}'
-    return f'{_TOOL_CALL_PREFIX} {name}'
+    return _flatten_tool_call_plain(name, arguments)
 
 
 def looks_like_streaming_tool_arguments(text: str) -> bool:

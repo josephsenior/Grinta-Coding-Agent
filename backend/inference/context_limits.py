@@ -84,6 +84,16 @@ def limits_from_config(
     unknown_default: bool = False,
 ) -> ModelContextLimits:
     """Resolve context limits from config first, then catalog, then fallback."""
+    from backend.inference.runtime_profile import get_attached_runtime_profile
+
+    attached = get_attached_runtime_profile(llm_config)
+    if attached is not None:
+        configured_context = _positive_int(
+            getattr(llm_config, 'context_window_tokens', None)
+        )
+        if configured_context is None:
+            return attached.context_limits
+
     model = str(getattr(llm_config, 'model', '') or '')
     configured_context = _positive_int(
         getattr(llm_config, 'context_window_tokens', None)
@@ -131,6 +141,11 @@ def limits_from_config(
         )
 
     if unknown_default:
+        from backend.inference.runtime_profile import resolve_runtime_profile
+
+        profile = resolve_runtime_profile(llm_config)
+        if profile.context_limits.usable_input_tokens is not None:
+            return profile.context_limits
         usable = derive_usable_input_tokens(
             context_window_tokens=DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,
             max_output_tokens=configured_output,

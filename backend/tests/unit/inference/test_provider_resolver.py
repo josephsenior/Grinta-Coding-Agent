@@ -594,9 +594,9 @@ class TestCanonicalizeModelSelection(TestCase):
         self.assertEqual(model, 'opencode/deepseek-v4-flash-free')
         self.assertEqual(provider, 'opencode')
 
-    def test_lightning_still_uses_openai_transport_prefix(self):
+    def test_lightning_keeps_provider_prefix(self):
         model, provider = canonicalize_model_selection('kimi-k2.5', 'lightning')
-        self.assertEqual(model, 'openai/kimi-k2.5')
+        self.assertEqual(model, 'lightning/kimi-k2.5')
         self.assertEqual(provider, 'lightning')
 
     def test_opencode_go_keeps_provider_prefix(self):

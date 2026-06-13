@@ -763,20 +763,24 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 | File | Purpose |
 |------|---------|
-| `llm.py` | Main LLM class, completion wrapper |
-| `async_llm.py` | Async LLM wrapper |
-| `streaming_llm.py` | Streaming support |
+| `llm.py` | Main LLM class (sync, async, streaming) |
+| `registry.py` | Unified provider/model listing and capability facade |
+| `provider_resolver.py` | Provider prefix resolution and local endpoint discovery |
+| `catalog_loader.py` | JSON model catalogs (`catalogs/*.json`) |
+| `discover_models.py` | CLI for local model discovery |
+| `direct_clients.py` | SDK client factory and shared transport |
+| `direct_clients_*_ops.py` | Provider-specific completion/stream implementations |
 | `retry_mixin.py` | Retry logic |
 | `debug_mixin.py` | Debug logging |
 | `metrics.py` | Cost and latency tracking |
-| `model_features.py` | Feature detection |
-| `fn_call_converter.py` | Mock function calling fallback (split into `fn_call/` package; the entry point is `backend.inference.fn_call`) |
-| `bedrock.py` | AWS Bedrock support |
-| `llm_utils.py` | Utility functions |
-| `llm_registry.py` | Model registry |
-| **`provider_resolver.py`** | **Provider detection & local discovery (NEW)** |
-| **`catalog_loader.py`** | **Model catalog & metadata (NEW)** |
-| **`discover_models.py`** | **CLI tool for local model discovery (NEW)** |
+| `model_features.py` | Per-model capability detection (catalog + glob fallbacks) |
+| `provider_capabilities.py` | Per-provider behavioural flags |
+| `fn_call/` | Mock function-calling fallback for non-native models |
+| `tool_history.py` | Provider-neutral tool-call flattening for message history |
+| `llm_utils.py` | Tool schema cleanup, token counting |
+| `llm_registry.py` | Per-service LLM instance registry |
+
+Configuration modules live under `backend/core/config/` (`llm_config.py`, `provider_config.py`, `api_key_manager.py`).
 
 ## Examples
 
@@ -784,5 +788,6 @@ See `docs/examples/02_custom_provider.py` for complete example of adding a new p
 
 ## References
 
+- [Inference and Integrations](../../docs/INFERENCE_AND_INTEGRATIONS.md) - Layer map
 - [Architecture](../../docs/ARCHITECTURE.md) - System overview
 - [API Reference](../../docs/API_REFERENCE.md) - API documentation
