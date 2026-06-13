@@ -431,10 +431,6 @@ class PromptTextArea(TextArea):
                 return
 
 
-class HudReasoningSelect(Select):
-    """Reasoning effort picker styled like other HUD selectors."""
-
-
 class HudModeSelect(Select):
     """Mode picker that propagates programmatic value changes to the screen."""
 
@@ -475,17 +471,19 @@ class HUD(Vertical):
                 id='hud-autonomy',
                 allow_blank=False,
             )
-            yield Label('[#8f9fc1]Model:[/]', id='hud-label-model')
-            yield Static('(not set)', id='hud-model-display')
-            yield Label('[#8f9fc1]Reasoning:[/]', id='hud-label-reasoning')
-            yield HudReasoningSelect(
+            yield Label(id='hud-line-2')
+        with Horizontal(id='hud-line-1-row'):
+            yield Label(id='hud-line-1')
+            yield Label('[#969aad]Model:[/]', id='hud-label-model')
+            yield Label(id='hud-model-name')
+            yield Label('[#969aad]Reasoning:[/]', id='hud-label-reasoning')
+            yield Select(
                 [('Default', '')],
                 value='',
                 id='hud-reasoning',
                 allow_blank=False,
             )
-            yield Label(id='hud-line-2')
-        yield Label(id='hud-line-1')
+            yield Label(id='hud-line-1-ws')
 
 
 class RendererDrainRequested(Message):

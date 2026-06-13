@@ -90,6 +90,20 @@ from backend.ledger.observation.task_tracking import TaskTrackingObservation
 from backend.ledger.observation.terminal import TerminalObservation
 
 
+@pytest.fixture(autouse=True)
+def isolate_repo_settings(tmp_path, monkeypatch):
+    """Never let headless TUI tests read or write repo-root settings.json."""
+    settings_file = tmp_path / 'settings.json'
+    settings_file.write_text(
+        '{"llm_provider":"openai","llm_model":"openai/gpt-4o","llm_api_key":"${LLM_API_KEY}"}\n',
+        encoding='utf-8',
+    )
+    monkeypatch.setattr(
+        'backend.cli.config_manager._settings_path',
+        lambda: settings_file,
+    )
+
+
 @pytest.fixture
 def mock_config():
     config = MagicMock()
@@ -98,6 +112,8 @@ def mock_config():
     llm_config = MagicMock()
     llm_config.model = 'openai/gpt-4o'
     llm_config.base_url = None
+    llm_config.custom_llm_provider = 'openai'
+    llm_config.reasoning_effort = None
     config.get_llm_config.return_value = llm_config
     config.get_llm_config_from_agent.return_value = llm_config
     return config
@@ -936,10 +952,11 @@ async def test_tui_hud_bar_shows_workspace_path(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
+        s._config = mock_config
         s._render_hud_bar()
         await pilot.pause()
 
-        stats = s.query_one('#hud-line-1', Label)
+        stats = s.query_one('#hud-line-1-ws', Label)
         rendered = str(stats.renderable)
         assert 'Ws:' in rendered
         assert any(sep in rendered for sep in ('/', '\\', '~'))
@@ -1299,6 +1316,59 @@ async def test_tui_hud_bar_shows_accumulated_and_context_tokens(mock_config):
         rendered = str(stats.renderable)
         assert 'Ctx: 430/8.2K' in rendered
         assert '%' in rendered
+
+
+@pytest.mark.asyncio
+async def test_tui_hud_reasoning_select_syncs_from_config(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    mock_config.get_llm_config.return_value.reasoning_effort = 'high'
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+    monkeypatch.setattr(
+        GrintaScreen,
+        '_hud_reasoning_select_options',
+        lambda self: [
+            ('Default', ''),
+            ('Low', 'low'),
+            ('Medium', 'medium'),
+            ('High', 'high'),
+        ],
+    )
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._config = mock_config
+        s._render_hud_bar()
+        await pilot.pause()
+
+        reasoning = s.query_one('#hud-reasoning', Select)
+        assert reasoning.value == 'high'
+
+
+@pytest.mark.asyncio
+async def test_tui_hud_reasoning_effort_persists(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+    monkeypatch.setattr(
+        GrintaScreen,
+        '_hud_reasoning_select_options',
+        lambda self: [('Default', ''), ('Low', 'low'), ('High', 'high')],
+    )
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._config = mock_config
+        s._apply_hud_reasoning_effort('low')
+        await pilot.pause()
+
+        from backend.cli.config_manager import get_persisted_reasoning_effort
+
+        assert get_persisted_reasoning_effort() == 'low'
 
 
 @pytest.mark.asyncio

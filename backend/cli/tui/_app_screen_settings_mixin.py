@@ -65,16 +65,28 @@ class _AppScreenSettingsMixin:
 
     def _apply_hud_reasoning_effort(self, effort_value: str) -> None:
         effort = str(effort_value or '').strip()
-        from backend.cli.config_manager import get_current_model, update_model
+        from backend.cli.config_manager import (
+            get_current_model,
+            get_current_provider,
+            update_model,
+        )
         from backend.core.config import load_app_config
 
-        current = self._current_reasoning_effort()
+        current = ''
+        try:
+            current = (
+                (getattr(self._config.get_llm_config(), 'reasoning_effort', None) or '')
+                .strip()
+                .lower()
+            )
+        except Exception:
+            current = ''
         if effort == current:
             return
         try:
             update_model(
                 get_current_model(self._config),
-                provider=self._current_llm_provider() or None,
+                provider=get_current_provider(self._config),
                 reasoning_effort=effort or None,
             )
         except Exception as exc:
