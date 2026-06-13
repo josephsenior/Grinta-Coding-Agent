@@ -64,13 +64,18 @@ class SidebarRow(Static):
         deletable: bool = False,
         status: str | None = None,
         meta: str | None = None,
+        interactive: bool = True,
     ) -> None:
         self._label = label
         self._status = status or 'neutral'
         self._meta = meta
+        self.interactive = interactive
         super().__init__(self._build_markup())
         self.item_id = item_id
         self.deletable = deletable
+        self.can_focus = interactive
+        if not interactive:
+            self.add_class('-read-only')
 
     def _build_markup(self) -> str:
         color = STATUS_COLORS.get(self._status, '#969aad')
@@ -88,6 +93,8 @@ class SidebarRow(Static):
         self.update(self._build_markup())
 
     def on_click(self, event: events.Click) -> None:
+        if not self.interactive:
+            return
         if self.deletable:
             size = self.size.width or 0
             if size > 6 and event.x >= max(0, size - 4):
@@ -100,6 +107,8 @@ class SidebarRow(Static):
         event.stop()
 
     def on_key(self, event: events.Key) -> None:
+        if not self.interactive:
+            return
         if event.key in ('enter', 'space'):
             self.post_message(self.Selected(self.item_id))
             event.prevent_default()
@@ -214,7 +223,7 @@ class CollapsibleSection(Container):
         self._collapsed = collapsed
         self._accent_color = accent_color
         self._action_label = action_label
-        self._items: list[tuple[Any, str, bool, str | None, str | None]] = []
+        self._items: list[tuple[Any, str, bool, str | None, str | None, bool]] = []
         self._is_thinking = is_thinking
 
     @property
@@ -239,13 +248,14 @@ class CollapsibleSection(Container):
         )
         with Vertical(classes=body_classes, id='body'):
             if self._items:
-                for label, item_id, deletable, status, meta in self._items:
+                for label, item_id, deletable, status, meta, interactive in self._items:
                     yield SidebarRow(
                         label,
                         item_id,
                         deletable=deletable,
                         status=status,
                         meta=meta,
+                        interactive=interactive,
                     )
             else:
                 content_classes = 'empty-text'
@@ -323,26 +333,30 @@ class CollapsibleSection(Container):
         """Update the list of interactive items in the body.
 
         Each item is a tuple of (label, item_id) or (label, item_id, deletable)
-        or (label, item_id, deletable, status, meta).
+        or (label, item_id, deletable, status, meta)
+        or (label, item_id, deletable, status, meta, interactive).
         """
-        normalized: list[tuple[str, str, bool, str | None, str | None]] = []
+        normalized: list[tuple[str, str, bool, str | None, str | None, bool]] = []
         for item in items:
             if len(item) >= 4:
                 label, item_id, deletable, status = item[:4]
                 meta = item[4] if len(item) >= 5 else None
-                normalized.append((label, item_id, bool(deletable), status, meta))
+                interactive = bool(item[5]) if len(item) >= 6 else True
+                normalized.append(
+                    (label, item_id, bool(deletable), status, meta, interactive)
+                )
             elif len(item) == 3:
                 label, item_id, deletable = item
-                normalized.append((label, item_id, bool(deletable), None, None))
+                normalized.append((label, item_id, bool(deletable), None, None, True))
             else:
                 label, item_id = item
-                normalized.append((label, item_id, False, None, None))
+                normalized.append((label, item_id, False, None, None, True))
         self._items = normalized
         body = self.query_one('#body', Vertical)
         body.remove_children()
 
         if normalized:
-            for label, item_id, deletable, status, meta in normalized:
+            for label, item_id, deletable, status, meta, interactive in normalized:
                 body.mount(
                     SidebarRow(
                         label,
@@ -350,6 +364,7 @@ class CollapsibleSection(Container):
                         deletable=deletable,
                         status=status,
                         meta=meta,
+                        interactive=interactive,
                     )
                 )
         else:

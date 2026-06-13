@@ -127,6 +127,8 @@ _OPENAI_PASSTHROUGH_KWARGS: frozenset[str] = frozenset(
         'thinking',
         'enable_thinking',
         'output_config',
+        'reasoning',
+        'reasoning_effort',
     }
 )
 

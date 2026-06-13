@@ -17,10 +17,7 @@ from backend.cli.tui._app_constants import (
     _WELCOME_FIGLET_CACHE,
     _WELCOME_FIGLET_FALLBACK,
 )
-from backend.cli.tui.widgets.activity_card import (
-    encode_diff_line,
-    encode_split_diff_line,
-)
+from backend.cli.tui.widgets.unified_diff_view import encode_diff_view_payload
 
 
 def _rich_text(text: str) -> Text:
@@ -82,30 +79,34 @@ def _count_unified_diff_changes(diff_text: str | None) -> tuple[int, int]:
     return added, removed
 
 
-def _encode_unified_diff_text(diff_text: str, *, max_lines: int = 200) -> str | None:
-    """Encode a unified diff into full-width TUI diff rows."""
+def _encode_unified_diff_text(
+    diff_text: str,
+    *,
+    path: str = '',
+    max_lines: int = 200,
+) -> str | None:
+    """Encode a unified diff into a rich diff-view payload for the TUI."""
     if not diff_text:
         return None
+    return encode_diff_view_payload(patch=diff_text, path=path, max_lines=max_lines)
 
-    lines = diff_text.splitlines()
-    encoded: list[str] = []
-    visible_lines = lines[:max_lines]
-    for line in visible_lines:
-        if line.startswith(('---', '+++', '@@')):
-            kind = 'ctx'
-        elif line.startswith('+'):
-            kind = 'add'
-        elif line.startswith('-'):
-            kind = 'rem'
-        else:
-            kind = 'ctx'
-        encoded.append(encode_diff_line(line or ' ', kind))
 
-    remaining = len(lines) - len(visible_lines)
-    if remaining > 0:
-        encoded.append(encode_diff_line(f'... {remaining} more diff lines', 'ctx'))
-
-    return '\n'.join(encoded) if encoded else None
+def _encode_diff_view_from_contents(
+    old_content: str,
+    new_content: str,
+    *,
+    path: str = '',
+    max_lines: int = 200,
+) -> str | None:
+    """Encode before/after file contents for the unified diff widget."""
+    if old_content == new_content:
+        return None
+    return encode_diff_view_payload(
+        path=path,
+        old_content=old_content,
+        new_content=new_content,
+        max_lines=max_lines,
+    )
 
 
 def _split_combined_diff(diff_text: str) -> list[tuple[str, str]]:
@@ -149,50 +150,18 @@ def _encode_split_diff_contents(
     old_content: str,
     new_content: str,
     *,
+    path: str = '',
     max_lines: int = 200,
     n_context_lines: int = 3,
 ) -> str | None:
-    """Encode before/after text into aligned two-pane TUI diff rows."""
-    old_lines = old_content.split('\n')
-    new_lines = new_content.split('\n')
-    matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
-    encoded: list[str] = []
-    for group_idx, group in enumerate(matcher.get_grouped_opcodes(n_context_lines)):
-        if group_idx > 0:
-            encoded.append(encode_split_diff_line('...', '...', 'ctx', 'ctx'))
-        max_line_no = max((op[2] for op in group), default=0)
-        max_line_no = max(max_line_no, max((op[4] for op in group), default=0))
-        pad = max(1, len(str(max_line_no)))
-        for tag, i1, i2, j1, j2 in group:
-            for row in _split_diff_opcode_rows(
-                tag,
-                old_lines,
-                new_lines,
-                i1,
-                i2,
-                j1,
-                j2,
-                pad,
-            ):
-                if len(encoded) >= max_lines:
-                    encoded.append(
-                        encode_split_diff_line(
-                            '... more diff rows',
-                            '... more diff rows',
-                            'ctx',
-                            'ctx',
-                        )
-                    )
-                    return '\n'.join(encoded)
-                encoded.append(
-                    encode_split_diff_line(
-                        row[0],
-                        row[1],
-                        row[2],
-                        row[3],
-                    )
-                )
-    return '\n'.join(encoded) if encoded else None
+    """Encode before/after text for the unified diff widget."""
+    del n_context_lines
+    return _encode_diff_view_from_contents(
+        old_content,
+        new_content,
+        path=path,
+        max_lines=max_lines,
+    )
 
 
 def _split_diff_opcode_rows(

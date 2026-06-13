@@ -24,7 +24,6 @@ from textual.containers import Container, Horizontal
 from textual.widgets import Static
 
 from backend.cli.syntax_theme import get_grinta_rich_syntax_theme
-from backend.cli.syntax_theme import get_grinta_rich_syntax_theme
 from backend.cli.theme import (
     NAVY_BG,
     NAVY_BRAND,
@@ -506,6 +505,12 @@ class ActivityCard(Container):
         content = self._extra_content or ''
 
         if self._diff_encoded:
+            from backend.cli.tui.widgets.unified_diff_view import diff_view_from_encoded
+
+            diff_view = diff_view_from_encoded(content)
+            if diff_view is not None:
+                return [diff_view]
+
             renderables: list[Any] = []
             for line in content.splitlines():
                 split_decoded = _decode_split_diff_line(line)
@@ -898,10 +903,15 @@ class ThinkingIndicator(Container):
         margin: 0 0 1 0;
         border: transparent;
         background: #090d18;
-        padding: 0 1;
+        border-left: solid #3d5a80;
+        padding: 0 1 0 2;
     }
     ThinkingIndicator.-hidden {
         display: none;
+    }
+    ThinkingIndicator.-streaming {
+        background: #0a101c;
+        border-left: solid #5eead4;
     }
     ThinkingIndicator > #thinking-content {
         width: 100%;
@@ -1048,10 +1058,24 @@ class ThinkingIndicator(Container):
         return parts
 
     def _update_display_streaming(self, content: Static) -> None:
+        from rich.console import Group
+
+        from backend.cli.tui._render_prep import prep_streaming_renderable
+
         content.remove_class('-hidden')
         if self._code_block_container is not None:
             self._code_block_container.remove()
             self._code_block_container = None
+
+        full_text = '\n'.join(self._thoughts)
+        prefix_color = '#42a394'
+        prefix = Text.assemble((f'{self._current_action}: ', f'bold {prefix_color}'))
+
+        if '```' in full_text or '`' in full_text:
+            body = prep_streaming_renderable(full_text)
+            content.update(Group(prefix, body))
+            return
+
         parts = self._build_thoughts_text_parts()
         content.update(Text.assemble(*parts))
 
@@ -1088,8 +1112,11 @@ class ThinkingIndicator(Container):
             return
 
         if streaming:
+            self.add_class('-streaming')
             self._update_display_streaming(content)
             return
+
+        self.remove_class('-streaming')
 
         if self._has_code_blocks(full_text):
             self._update_display_with_code_blocks(content, full_text)

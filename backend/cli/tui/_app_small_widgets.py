@@ -99,6 +99,8 @@ class Transcript(VerticalScroll):
         self._tail_unread_count = 0
         self._suppress_mount_animation = False
         self._suppress_scroll_sync = False
+        self._last_scroll_y = 0.0
+        self._last_max_scroll_y = 0.0
         self._load_earlier_button: Static | None = None
 
     def compose(self) -> ComposeResult:
@@ -147,21 +149,39 @@ class Transcript(VerticalScroll):
         self.force_scroll_end()
 
     def _sync_scroll_state_from_position(self) -> None:
-        self._set_user_scrolled_away(not self._was_at_bottom())
+        """Update follow-tail state from scroll position.
+
+        Content growth increases max_scroll_y while scroll_y stays put; that
+        must not be treated as the user leaving the tail. Only upward movement
+        (or already being away from the bottom without fresh content) counts.
+        """
+        max_y = self.max_scroll_y
+        scroll_y = self.scroll_y
+        last_max_y = self._last_max_scroll_y
+        last_scroll_y = self._last_scroll_y
+        self._last_max_scroll_y = max_y
+        self._last_scroll_y = scroll_y
+
+        if self._user_scrolled_away:
+            if self._was_at_bottom():
+                self._set_user_scrolled_away(False)
+            return
+
+        content_grew_in_place = max_y > last_max_y and abs(scroll_y - last_scroll_y) <= 0.5
+        if content_grew_in_place:
+            return
+
+        if not self._was_at_bottom():
+            self._set_user_scrolled_away(True)
 
     def should_follow_tail(self) -> bool:
         """Return True when live updates should keep the transcript pinned.
 
-        Only the user's explicit scroll actions set _user_scrolled_away.
-        During agentic activity the renderer streams new widgets rapidly and
-        the scroll position briefly lags behind max_scroll_y, so we must not
-        treat that transient lag as "user scrolled away".
+        Only explicit user scroll-away actions set _user_scrolled_away.
+        During agentic activity the scroll position briefly lags behind
+        max_scroll_y while new content mounts; that lag must not disable follow.
         """
-        if self._user_scrolled_away:
-            return False
-        if self.max_scroll_y <= 0:
-            return True
-        return self._was_at_bottom()
+        return not self._user_scrolled_away
 
     def pause_auto_scroll(self) -> None:
         """Stop live updates from pulling the transcript back to the bottom."""

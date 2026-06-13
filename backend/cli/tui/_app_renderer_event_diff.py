@@ -77,7 +77,11 @@ def _extract_file_edit_group_rows(
     new_content = getattr(event, 'new_content', None)
     if old_content is None or new_content is None:
         return None
-    return _encode_split_diff_contents(old_content, new_content)
+    return _encode_split_diff_contents(
+        old_content,
+        new_content,
+        path=str(getattr(event, 'path', '') or ''),
+    )
 
 
 def _extract_embedded_diff_from_content(content: str) -> str | None:

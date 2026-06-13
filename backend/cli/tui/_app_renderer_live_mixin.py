@@ -24,6 +24,12 @@ _LIVE_SCROLL_PAINT_INTERVAL = 0.1
 _LIVE_STREAMING_RENDER_INTERVAL = 0.2
 
 
+def _streaming_render_interval(text: str) -> float:
+    from backend.cli.tui._render_prep import streaming_render_interval
+
+    return streaming_render_interval(text)
+
+
 class _AppRendererLiveMixin:
     """subscribe + live thinking/response streaming."""
 
@@ -131,6 +137,26 @@ class _AppRendererLiveMixin:
         except Exception:
             widget.set_streaming_text(text)
 
+    def _follow_transcript_tail_after_reflow(self, display: Any) -> None:
+        """Scroll to tail after in-place widget reflow updates max_scroll_y."""
+        if display._user_scrolled_away:
+            return
+
+        def _follow_after_reflow() -> None:
+            force_scroll_end = getattr(display, 'force_scroll_end', None)
+            if callable(force_scroll_end):
+                force_scroll_end(animate=False)
+                try:
+                    self._loop.call_soon(lambda: force_scroll_end(animate=False))
+                except RuntimeError:
+                    pass
+                return
+            follow_tail = getattr(display, 'follow_tail', None)
+            if callable(follow_tail):
+                follow_tail()
+
+        display.call_after_refresh(_follow_after_reflow)
+
     def _flush_deferred_streaming_render(self) -> None:
         self._streaming_render_timer_armed = False
         text = getattr(self, '_live_response_pending_text', '')
@@ -138,6 +164,12 @@ class _AppRendererLiveMixin:
             return
         self._last_streaming_render_at = time.monotonic()
         self._apply_live_response_render(text)
+        try:
+            display = self._tui._get_display()
+        except (AttributeError, Exception):
+            return
+        if type(display).__name__ != 'MagicMock':
+            self._follow_transcript_tail_after_reflow(display)
 
     def update_live_response(self, text: str) -> None:
         """Update the in-flight assistant response in-place."""
@@ -171,13 +203,14 @@ class _AppRendererLiveMixin:
         self._live_response_pending_text = text
         now = time.monotonic()
         last_render = getattr(self, '_last_streaming_render_at', 0.0)
-        if last_render <= 0.0 or (now - last_render) >= _LIVE_STREAMING_RENDER_INTERVAL:
+        render_interval = _streaming_render_interval(text)
+        if last_render <= 0.0 or (now - last_render) >= render_interval:
             self._last_streaming_render_at = now
             self._streaming_render_timer_armed = False
             self._apply_live_response_render(text)
         elif not getattr(self, '_streaming_render_timer_armed', False):
             self._streaming_render_timer_armed = True
-            delay = max(_LIVE_STREAMING_RENDER_INTERVAL - (now - last_render), 0.01)
+            delay = max(render_interval - (now - last_render), 0.01)
             try:
                 self._loop.call_later(delay, self._flush_deferred_streaming_render)
             except RuntimeError:
@@ -188,22 +221,7 @@ class _AppRendererLiveMixin:
             follow_tail = getattr(display, 'follow_tail', None)
             if callable(follow_tail):
                 if in_place_update:
-                    # Static.update() reflows on the next refresh; defer tail
-                    # follow so scroll_end sees the updated max_scroll_y.
-                    def _follow_after_reflow() -> None:
-                        force_scroll_end = getattr(display, 'force_scroll_end', None)
-                        if callable(force_scroll_end):
-                            force_scroll_end(animate=False)
-                            try:
-                                self._loop.call_soon(
-                                    lambda: force_scroll_end(animate=False)
-                                )
-                            except RuntimeError:
-                                pass
-                        else:
-                            follow_tail()
-
-                    display.call_after_refresh(_follow_after_reflow)
+                    self._follow_transcript_tail_after_reflow(display)
                 else:
                     follow_tail()
             else:

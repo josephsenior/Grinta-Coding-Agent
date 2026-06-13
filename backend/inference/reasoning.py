@@ -26,6 +26,7 @@ from backend.inference.reasoning_profiles import (
 
 # Wire schema identifiers (family registry — not per-model).
 WIRE_OPENAI_REASONING_EFFORT = 'openai_reasoning_effort'
+WIRE_VERCEL_GATEWAY_REASONING = 'vercel_gateway_reasoning'
 WIRE_OPENAI_THINKING_AND_EFFORT = 'openai_thinking_and_effort'
 WIRE_OPENAI_THINKING_ENABLED = 'openai_thinking_enabled'
 WIRE_ANTHROPIC_ADAPTIVE = 'anthropic_adaptive'
@@ -34,6 +35,11 @@ WIRE_GEMINI_NATIVE = 'gemini_native'
 WIRE_GEMINI_OPENAI_COMPAT = 'gemini_openai_compat'
 WIRE_GLM_THINKING = 'glm_thinking'
 WIRE_NONE = 'none'
+
+# Vercel AI Gateway chat-completions ``reasoning.effort`` values (official docs).
+VERCEL_GATEWAY_EFFORTS: frozenset[str] = frozenset(
+    {'none', 'minimal', 'low', 'medium', 'high', 'xhigh'}
+)
 
 _EFFORT_TO_GEMINI_LEVEL: dict[str, str] = {
     'minimal': 'minimal',
@@ -219,6 +225,14 @@ def supports_reasoning(entry: ModelEntry) -> bool:
 
 
 def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
+    if entry.reasoning_wire == WIRE_VERCEL_GATEWAY_REASONING:
+        return WIRE_VERCEL_GATEWAY_REASONING
+    if (
+        entry.provider == 'vercel'
+        and entry.reasoning_wire == WIRE_OPENAI_REASONING_EFFORT
+    ):
+        return WIRE_VERCEL_GATEWAY_REASONING
+
     if entry.reasoning_wire:
         return entry.reasoning_wire
 
@@ -413,8 +427,26 @@ def _anthropic_thinking_for_effort(effort: str, entry: ModelEntry) -> dict[str, 
     return {'type': 'enabled', 'budget_tokens': budget}
 
 
+def _map_vercel_gateway_effort(effort: str) -> str:
+    """Map catalog/config tiers onto Vercel gateway ``reasoning.effort`` values."""
+    normalized = str(effort or '').strip().lower()
+    if normalized in ('', 'none'):
+        return 'none'
+    if normalized == 'max':
+        return 'xhigh'
+    if normalized in VERCEL_GATEWAY_EFFORTS:
+        return normalized
+    return 'high'
+
+
 def _build_wire_kwargs(wire: str, effort: str, entry: ModelEntry) -> dict[str, Any]:
     family = infer_family(entry)
+    if wire == WIRE_VERCEL_GATEWAY_REASONING:
+        api_effort = _map_vercel_gateway_effort(effort)
+        if api_effort == 'none':
+            return {}
+        return {'reasoning': {'effort': api_effort}}
+
     if wire == WIRE_OPENAI_REASONING_EFFORT:
         patch: dict[str, Any] = {'reasoning_effort': effort}
         if effort == 'none':
@@ -491,6 +523,8 @@ def resolve_reasoning_plan(
     family = infer_family(entry)
     allowed = _allowed_efforts(entry, wire, family)
     resolved = _normalize_effort(reasoning_effort, allowed)
+    if wire == WIRE_VERCEL_GATEWAY_REASONING and resolved == 'max':
+        resolved = 'xhigh' if 'xhigh' in allowed else resolved
     if resolved is None:
         return ReasoningPlan(
             enabled=False,
@@ -526,6 +560,7 @@ def apply_reasoning_plan(call_kwargs: dict[str, Any], plan: ReasoningPlan) -> No
     """Merge *plan* into *call_kwargs* in place."""
     for key in (
         'reasoning_effort',
+        'reasoning',
         'thinking',
         'output_config',
         'enable_thinking',
@@ -535,6 +570,7 @@ def apply_reasoning_plan(call_kwargs: dict[str, Any], plan: ReasoningPlan) -> No
 
     if not plan.enabled:
         call_kwargs.pop('reasoning_effort', None)
+        call_kwargs.pop('reasoning', None)
         call_kwargs.pop('thinking', None)
         call_kwargs.pop('output_config', None)
         call_kwargs.pop('enable_thinking', None)

@@ -185,16 +185,26 @@ class _AppScreenStateMixin:
         return [('Default', '')]
 
     def _current_reasoning_effort(self) -> str:
-        configured = ''
-        try:
-            configured = (
-                (getattr(self._config.get_llm_config(), 'reasoning_effort', None) or '')
-                .strip()
-                .lower()
-            )
-        except Exception:
-            configured = ''
+        from backend.cli.config_manager import get_persisted_reasoning_effort
+
+        configured = get_persisted_reasoning_effort().strip().lower()
+        if not configured:
+            try:
+                configured = (
+                    (
+                        getattr(
+                            self._config.get_llm_config(), 'reasoning_effort', None
+                        )
+                        or ''
+                    )
+                    .strip()
+                    .lower()
+                )
+            except Exception:
+                configured = ''
         allowed = {value for _label, value in self._hud_reasoning_select_options()}
+        if configured == 'max' and 'max' not in allowed and 'xhigh' in allowed:
+            configured = 'xhigh'
         return configured if configured in allowed else ''
 
     def _sync_hud_reasoning_select(self, hud_bar) -> None:
@@ -205,12 +215,16 @@ class _AppScreenStateMixin:
             values = {value for _label, value in options}
             if current not in values:
                 current = options[0][1]
-            if tuple(reasoning_select._options) != tuple(options):
-                reasoning_select.set_options(options)
-            if reasoning_select.value != current:
-                reasoning_select.value = current
+            self._hud_reasoning_syncing = True
+            try:
+                if tuple(reasoning_select._options) != tuple(options):
+                    reasoning_select.set_options(options)
+                if reasoning_select.value != current:
+                    reasoning_select.value = current
+            finally:
+                self._hud_reasoning_syncing = False
         except Exception:
-            pass
+            self._hud_reasoning_syncing = False
 
     def _sync_hud_reasoning_visibility(self, hud_bar) -> None:
         try:
