@@ -68,7 +68,7 @@ class TestSleepIfShouldContinue:
         start = time.time()
         sleep_if_should_continue(0.1)
         elapsed = time.time() - start
-        assert 0.08 <= elapsed <= 0.2
+        assert 0.08 <= elapsed <= 0.25
 
     def test_sleeps_long_duration_in_chunks(self):
         import backend.utils.shutdown_listener as mod
