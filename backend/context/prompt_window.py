@@ -246,7 +246,32 @@ def _apply_windowing_constraints(
                 min_tail_tokens=min_tail_tokens,
             )
         selected = _enforce_token_ceiling(selected, ctx.budget, protected)
+    if ctx.max_events is not None:
+        selected = _enforce_max_event_count(
+            selected,
+            protected,
+            max_events=ctx.max_events,
+        )
     return selected
+
+
+def _enforce_max_event_count(
+    selected: list[Event],
+    protected: list[Event],
+    *,
+    max_events: int,
+) -> list[Event]:
+    """Drop oldest removable events until the selection fits *max_events*."""
+    if len(selected) <= max_events:
+        return selected
+    protected_ids = _event_id_set(protected)
+    protected_events, removable = _split_protected_and_removable(
+        selected, protected_ids
+    )
+    slots = max(0, max_events - len(protected_events))
+    if slots <= 0:
+        return protected_events[:max_events]
+    return _dedupe_events_preserve_order(protected_events + removable[-slots:])
 
 
 def _build_windowed_result(ctx, protected, selected_chunks, llm_config):

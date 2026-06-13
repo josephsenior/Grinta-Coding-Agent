@@ -1,3 +1,11 @@
+"""_SessionOrchestratorLifecycleMixin mixin for SessionOrchestrator.
+
+Pure code motion: extracted from
+``backend/orchestration/session_orchestrator.py`` to break the file past the
+40 KB cap. Methods here are bound to ``_SessionOrchestratorLifecycleMixin`` and mixed into
+``SessionOrchestrator`` via its MRO.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -50,24 +58,19 @@ if TYPE_CHECKING:
     from backend.ledger.observation import ErrorObservation
     from backend.orchestration.tool_pipeline import ToolInvocationContext
 
-"""_SessionOrchestratorLifecycleMixin mixin for SessionOrchestrator.
-
-Pure code motion: extracted from
-``backend/orchestration/session_orchestrator.py`` to break the file past the
-40 KB cap. Methods here are bound to ``_SessionOrchestratorLifecycleMixin`` and mixed into
-``SessionOrchestrator`` via its MRO.
-"""
-
 
 if TYPE_CHECKING:
-    from backend.orchestration.session_orchestrator_accessors import SessionOrchestratorAccessorsMixin
+    from backend.orchestration.session_orchestrator_accessors import (
+        SessionOrchestratorAccessorsMixin,
+    )
 else:
-    class SessionOrchestratorAccessorsMixin: pass
+
+    class SessionOrchestratorAccessorsMixin:
+        pass
 
 
 class _SessionOrchestratorLifecycleMixin(SessionOrchestratorAccessorsMixin):
     """Mixin: pipeline init, phase boundary checkpoint, blocked invocation, stop."""
-
 
     def _initialize_operation_pipeline(self) -> None:
         """Build the default tool pipeline directly on the controller.

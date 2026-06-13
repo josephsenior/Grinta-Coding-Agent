@@ -1,3 +1,11 @@
+"""_SessionOrchestratorParallelMixin mixin for SessionOrchestrator.
+
+Pure code motion: extracted from
+``backend/orchestration/session_orchestrator.py`` to break the file past the
+40 KB cap. Methods here are bound to ``_SessionOrchestratorParallelMixin`` and mixed into
+``SessionOrchestrator`` via its MRO.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -86,28 +94,19 @@ if TYPE_CHECKING:
         Observation,
     )
 
-"""_SessionOrchestratorParallelMixin mixin for SessionOrchestrator.
-
-Pure code motion: extracted from
-``backend/orchestration/session_orchestrator.py`` to break the file past the
-40 KB cap. Methods here are bound to ``_SessionOrchestratorParallelMixin`` and mixed into
-``SessionOrchestrator`` via its MRO.
-"""
-
 
 if TYPE_CHECKING:
-    from backend.orchestration.session_orchestrator_accessors import SessionOrchestratorAccessorsMixin
+    from backend.orchestration.session_orchestrator_accessors import (
+        SessionOrchestratorAccessorsMixin,
+    )
 else:
-    class SessionOrchestratorAccessorsMixin: pass
+
+    class SessionOrchestratorAccessorsMixin:
+        pass
 
 
 class _SessionOrchestratorParallelMixin(SessionOrchestratorAccessorsMixin):
     """Mixin: parallel read batch, post-execution, pending action drain."""
-
-
-
-
-
 
     async def _try_parallel_read_batch(self) -> bool:
         """Attempt to drain pending actions in parallel when scheduler allows.

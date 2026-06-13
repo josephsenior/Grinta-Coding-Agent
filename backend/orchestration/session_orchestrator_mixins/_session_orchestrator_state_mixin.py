@@ -1,3 +1,11 @@
+"""_SessionOrchestratorStateMixin mixin for SessionOrchestrator.
+
+Pure code motion: extracted from
+``backend/orchestration/session_orchestrator.py`` to break the file past the
+40 KB cap. Methods here are bound to ``_SessionOrchestratorStateMixin`` and mixed into
+``SessionOrchestrator`` via its MRO.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -51,14 +59,6 @@ if TYPE_CHECKING:
     from backend.ledger.observation import AgentStateChangedObservation
     from backend.orchestration.conversation_stats import ConversationStats
     from backend.orchestration.state.state import State
-
-"""_SessionOrchestratorStateMixin mixin for SessionOrchestrator.
-
-Pure code motion: extracted from
-``backend/orchestration/session_orchestrator.py`` to break the file past the
-40 KB cap. Methods here are bound to ``_SessionOrchestratorStateMixin`` and mixed into
-``SessionOrchestrator`` via its MRO.
-"""
 
 
 class _SessionOrchestratorStateMixin:

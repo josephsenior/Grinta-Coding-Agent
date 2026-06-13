@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber
@@ -33,7 +33,7 @@ from backend.ledger.observation.agent import (
 from backend.ledger.observation_cause import attach_observation_cause
 
 if TYPE_CHECKING:
-    from backend.orchestration.services.event_router_service import EventRouterService
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,6 @@ class _EventRouterDelegateMixin:
 
     if TYPE_CHECKING:
         _ctrl: Any  # Actually EventRouterService control interface
-
 
     async def _handle_delegate_task_action(self, action: DelegateTaskAction) -> None:
         """Handle delegating a subtask to a worker agent."""
