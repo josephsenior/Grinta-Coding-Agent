@@ -25,7 +25,7 @@ Install path for end users: `pipx install grinta-ai`. Contributors should use
 | Middleware (safety, cost, rollback) | `backend/orchestration/session_orchestrator.py` (pipeline list), files under `backend/orchestration/middleware/` | `backend/tests/unit/orchestration/test_*middleware*` |
 | Tool execution (bash, edit, grep, browser) | `backend/execution/action_execution_server.py`, `backend/engine/tools/` | `backend/tests/unit/execution/`, `backend/tests/unit/engine/` |
 | LLM provider routing and API calls | `backend/inference/registry.py`, `backend/inference/llm.py`, `backend/inference/direct_clients.py` | `backend/tests/unit/inference/` |
-| Model catalogs and param profiles | `backend/inference/catalogs/*.json`, `backend/inference/param_profiles.json` | `backend/tests/unit/inference/test_registry.py`, `test_catalog_integrity.py`, `backend/tests/integration/test_inference_model_listing_integration.py` |
+| Model catalogs | `backend/inference/catalogs/*.json` | `backend/tests/unit/inference/test_registry.py`, `test_catalog_integrity.py`, `backend/tests/integration/test_inference_model_listing_integration.py` |
 | Context window and compaction | `backend/context/context_pipeline.py`, `backend/context/prompt_window.py` | `backend/tests/unit/context/` |
 | Event stream and durability | `backend/ledger/stream.py`, `backend/ledger/durable_writer.py` | `backend/tests/unit/ledger/` |
 | MCP external tools | `backend/integrations/mcp/`, bootstrap in `backend/execution/mcp/` | `backend/tests/unit/integrations/mcp/` |

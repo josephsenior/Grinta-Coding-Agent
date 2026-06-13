@@ -4,11 +4,24 @@
   "models": {
     "anthropic/claude-sonnet-4": {
       "runtime": {
-        "aliases": ["openrouter/anthropic/claude-sonnet-4"],
+        "aliases": [
+          "openrouter/anthropic/claude-sonnet-4"
+        ],
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": true
+        "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "supports_prompt_cache": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {
         "display_name": "Claude Sonnet 4 (via OpenRouter)"
@@ -16,11 +29,14 @@
     },
     "openai/gpt-4.1": {
       "runtime": {
-        "aliases": ["openrouter/openai/gpt-4.1"],
+        "aliases": [
+          "openrouter/openai/gpt-4.1"
+        ],
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": true
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true
       },
       "metadata": {
         "display_name": "GPT-4.1 (via OpenRouter)"
@@ -28,11 +44,22 @@
     },
     "google/gemini-2.5-pro": {
       "runtime": {
-        "aliases": ["openrouter/google/gemini-2.5-pro"],
+        "aliases": [
+          "openrouter/google/gemini-2.5-pro"
+        ],
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": true
+        "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "gemini_openai_compat"
       },
       "metadata": {
         "display_name": "Gemini 2.5 Pro (via OpenRouter)"

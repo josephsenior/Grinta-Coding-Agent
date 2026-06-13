@@ -1,32 +1,15 @@
-"""Family-level reasoning effort profiles.
-
-Resolution order (deterministic, highest priority first):
-
-1. Catalog ``metadata.variants`` keys — per-model override with optional API payloads
-2. Catalog ``metadata.reasoning_efforts`` — lightweight per-model tier list
-3. Family profile from :data:`reasoning_profiles.json` (prefix inheritance)
-4. Gateway vendor profile when the entry is a prefixed upstream id
-5. Wire default from :data:`reasoning_profiles.json`
-6. Conservative fallback ``('low', 'medium', 'high')``
-
-Add a new model family once in ``reasoning_profiles.json``; individual catalog entries
-only need overrides when a specific model diverges from its family.
-"""
+"""Per-model reasoning effort resolution from catalog entries."""
 
 from __future__ import annotations
 
-import functools
-import json
-from pathlib import Path
 from typing import Any
 
 from backend.inference.catalog_loader import ModelEntry
 
-_PROFILES_PATH = Path(__file__).with_name('reasoning_profiles.json')
+TIER_ORDER: tuple[str, ...] = ('minimal', 'low', 'medium', 'high', 'xhigh', 'max')
+TIER_ALIASES: dict[str, str] = {'off': 'none', 'disabled': 'none'}
 
-_GATEWAY_PROVIDERS: frozenset[str] = frozenset(
-    {'openrouter', 'vercel', 'opencode', 'opencode-go'}
-)
+_CONSERVATIVE_EFFORTS: tuple[str, ...] = ('low', 'medium', 'high')
 
 _UPSTREAM_VENDOR_PREFIXES: frozenset[str] = frozenset(
     {
@@ -44,69 +27,12 @@ _UPSTREAM_VENDOR_PREFIXES: frozenset[str] = frozenset(
 )
 
 
-@functools.lru_cache(maxsize=1)
-def _load_profile_data() -> dict[str, Any]:
-    with _PROFILES_PATH.open(encoding='utf-8') as handle:
-        return json.load(handle)
-
-
-def _as_effort_tuple(raw: Any) -> tuple[str, ...] | None:
-    if not isinstance(raw, list):
-        return None
-    efforts: list[str] = []
-    for item in raw:
-        if isinstance(item, str) and item.strip():
-            efforts.append(item.strip().lower())
-    return tuple(efforts) if efforts else None
-
-
 def tier_order() -> tuple[str, ...]:
-    order = _as_effort_tuple(_load_profile_data().get('tier_order'))
-    return order or ('minimal', 'low', 'medium', 'high', 'xhigh', 'max')
+    return TIER_ORDER
 
 
 def tier_aliases() -> dict[str, str]:
-    raw = _load_profile_data().get('tier_aliases', {})
-    if not isinstance(raw, dict):
-        return {}
-    return {
-        str(key).strip().lower(): str(value).strip().lower()
-        for key, value in raw.items()
-        if str(key).strip() and str(value).strip()
-    }
-
-
-def wire_default_efforts(wire: str) -> tuple[str, ...]:
-    wires = _load_profile_data().get('wires', {})
-    if isinstance(wires, dict):
-        efforts = _as_effort_tuple(wires.get(wire))
-        if efforts is not None:
-            return efforts
-    return ('low', 'medium', 'high')
-
-
-def family_profile_efforts(family: str) -> tuple[str, ...] | None:
-    """Return efforts for *family*, walking prefix segments for inheritance."""
-    families = _load_profile_data().get('families', {})
-    if not isinstance(families, dict):
-        return None
-    normalized = family.strip().lower()
-    if not normalized:
-        return None
-    parts = normalized.split('-')
-    for end in range(len(parts), 0, -1):
-        key = '-'.join(parts[:end])
-        efforts = _as_effort_tuple(families.get(key))
-        if efforts is not None:
-            return efforts
-    return None
-
-
-def vendor_gateway_efforts(vendor: str) -> tuple[str, ...] | None:
-    gateways = _load_profile_data().get('vendor_gateways', {})
-    if not isinstance(gateways, dict):
-        return None
-    return _as_effort_tuple(gateways.get(vendor.strip().lower()))
+    return dict(TIER_ALIASES)
 
 
 def split_upstream_model_id(model_id: str) -> tuple[str | None, str]:
@@ -129,36 +55,38 @@ def _variants(entry: ModelEntry) -> dict[str, Any]:
 
 
 def _catalog_effort_override(entry: ModelEntry) -> tuple[str, ...] | None:
-    metadata = _metadata_dict(entry)
     variants = _variants(entry)
     if variants:
         return tuple(str(key).lower() for key in variants.keys())
-    return _as_effort_tuple(metadata.get('reasoning_efforts'))
+
+    if entry.reasoning_efforts:
+        return entry.reasoning_efforts
+
+    metadata = _metadata_dict(entry)
+    raw = metadata.get('reasoning_efforts')
+    if isinstance(raw, list):
+        efforts = tuple(
+            str(item).strip().lower()
+            for item in raw
+            if isinstance(item, str) and str(item).strip()
+        )
+        if efforts:
+            return efforts
+    return None
 
 
 def resolve_allowed_efforts(
     entry: ModelEntry,
     *,
-    wire: str,
-    family: str,
+    wire: str | None = None,
+    family: str | None = None,
 ) -> tuple[str, ...]:
-    """Resolve executable reasoning tiers for *entry*."""
+    """Resolve executable reasoning tiers for *entry* from catalog data."""
+    _ = wire, family
     catalog = _catalog_effort_override(entry)
     if catalog is not None:
         return catalog
-
-    family_efforts = family_profile_efforts(family)
-    if family_efforts is not None:
-        return family_efforts
-
-    if entry.provider in _GATEWAY_PROVIDERS:
-        vendor, _logical = split_upstream_model_id(entry.name)
-        if vendor is not None:
-            vendor_efforts = vendor_gateway_efforts(vendor)
-            if vendor_efforts is not None:
-                return vendor_efforts
-
-    return wire_default_efforts(wire)
+    return _CONSERVATIVE_EFFORTS
 
 
 def normalize_effort_value(
@@ -178,7 +106,6 @@ def normalize_effort_value(
     if effort in allowed:
         return effort
 
-    # Cross-family aliases only when the target tier exists in *allowed*.
     cross_family = {'minimal': 'low'}
     mapped = cross_family.get(effort, effort)
     if mapped in allowed:

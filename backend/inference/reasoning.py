@@ -1,14 +1,10 @@
-"""Family-driven reasoning wire mapping for LLM call kwargs.
+"""Catalog-driven reasoning wire mapping for LLM call kwargs.
 
 User config exposes a single ``reasoning_effort`` knob. Resolution is deterministic:
 
-1. Catalog ``metadata.variants`` or ``metadata.reasoning_efforts`` (per-model override)
-2. Family profile from ``reasoning_profiles.json`` (prefix inheritance — add once per family)
-3. Gateway vendor profile from ``reasoning_profiles.json``
-4. Wire default from ``reasoning_profiles.json``
-
-``_resolve_wire_schema`` still selects the provider-specific request wire; profiles only
-choose which effort tiers are legal for UI + runtime normalization.
+1. Catalog ``runtime.reasoning_efforts`` or ``metadata.variants`` (per-model tiers)
+2. Catalog ``runtime.reasoning_wire`` selects the provider-specific request wire
+3. Conservative fallback tiers when a model omits explicit efforts
 """
 
 from __future__ import annotations
@@ -223,6 +219,9 @@ def supports_reasoning(entry: ModelEntry) -> bool:
 
 
 def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
+    if entry.reasoning_wire:
+        return entry.reasoning_wire
+
     runtime_reasoning = _metadata_dict(entry).get('runtime_reasoning')
     if isinstance(runtime_reasoning, dict):
         wire = runtime_reasoning.get('wire')

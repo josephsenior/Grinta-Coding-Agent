@@ -1,0 +1,81 @@
+{
+  "provider": "lightning",
+  "client": "openai_compatible",
+  "models": {
+    "meta-llama/Meta-Llama-3.1-8B-Instruct": {
+      "runtime": {
+        "aliases": [
+          "lightning/meta-llama/Meta-Llama-3.1-8B-Instruct",
+          "meta-llama/Meta-Llama-3.1-8B-Instruct"
+        ],
+        "context_window_tokens": 128000,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true
+      },
+      "metadata": {
+        "display_name": "Llama 3.1 8B Instruct"
+      }
+    },
+    "claude-sonnet-4-6": {
+      "runtime": {
+        "aliases": [
+          "lightning/claude-sonnet-4-6",
+          "claude-sonnet-4-6"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 930368,
+        "max_output_tokens": 64000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_prompt_cache": true,
+        "supports_vision": true,
+        "supports_stop_words": true,
+        "supports_reasoning_effort": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {
+        "display_name": "Claude Sonnet 4.6 (Lightning)"
+      }
+    },
+    "kimi-k2.5": {
+      "runtime": {
+        "aliases": [
+          "lightning/kimi-k2.5",
+          "kimi-k2.5"
+        ],
+        "context_window_tokens": 128000,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true,
+        "supports_reasoning_effort": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "openai_thinking_enabled"
+      },
+      "metadata": {
+        "display_name": "Kimi K2.5"
+      }
+    }
+  }
+}

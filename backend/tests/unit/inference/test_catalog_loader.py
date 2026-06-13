@@ -302,6 +302,10 @@ class TestGetTokenLimits:
     def test_unknown_opencode_go_chat_models_keep_native_tools(self):
         assert supports_function_calling('opencode-go/deepseek-v4-flash') is True
 
+    def test_perplexity_sonar_is_search_only_not_agent_tools(self):
+        assert supports_function_calling('perplexity/sonar-pro') is False
+        assert supports_function_calling('perplexity/sonar-reasoning-pro') is False
+
     def test_digitalocean_provider_supports_native_tools(self):
         assert supports_function_calling('digitalocean/deepseek-v4-pro') is True
 
@@ -527,16 +531,12 @@ class TestTransportSanitizationAndValidation:
         assert 'parallel_tool_calls' not in out
         assert 'reasoning_effort' not in out
 
-    def test_validate_model_transport_rejects_opencode_responses(self):
+    def test_validate_model_transport_allows_opencode_responses(self):
         from backend.inference.catalog_loader import validate_model_transport
-        from backend.inference.exceptions import BadRequestError
 
-        with pytest.raises(BadRequestError, match='/responses'):
-            validate_model_transport('opencode/gpt-5')
+        validate_model_transport('opencode/gpt-5')
 
-    def test_validate_model_transport_rejects_opencode_gemini_native_endpoint(self):
+    def test_validate_model_transport_allows_opencode_gemini_native_endpoint(self):
         from backend.inference.catalog_loader import validate_model_transport
-        from backend.inference.exceptions import BadRequestError
 
-        with pytest.raises(BadRequestError, match='/models/'):
-            validate_model_transport('opencode/gemini-3-flash')
+        validate_model_transport('opencode/gemini-3-flash')

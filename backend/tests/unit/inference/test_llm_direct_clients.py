@@ -660,18 +660,30 @@ class TestOpenAIClientHelpers:
         assert metadata['tags'] == 'model:gpt-4,agent:orchestrator'
         assert metadata['extra'] == '{"a":1}'
 
-    def test_opencode_non_chat_model_fails_fast(self):
+    def test_opencode_responses_model_uses_responses_api(self):
+        from backend.inference.direct_clients_opencode_responses_ops import (
+            completion as responses_completion,
+        )
+
+        response = MagicMock()
+        response.output_text = 'ok'
+        response.output = []
+        response.model = 'gpt-5.5'
+        response.usage = None
+        response.id = 'resp-1'
+        response.status = 'completed'
+
         client = MagicMock()
         client._provider_name = 'opencode'
         client.model_name = 'gpt-5.5'
         client._clean_messages.return_value = [{'role': 'user', 'content': 'hi'}]
         client._strip_unsupported_params.side_effect = lambda kwargs: kwargs
-        client._extract_openai_tool_calls.return_value = None
+        client._map_openai_error.side_effect = lambda exc: exc
+        client.client.responses.create.return_value = response
 
-        with pytest.raises(BadRequestError, match='/responses'):
-            openai_completion(client, [{'role': 'user', 'content': 'hi'}])
-
-        client.client.chat.completions.create.assert_not_called()
+        result = responses_completion(client, [{'role': 'user', 'content': 'hi'}])
+        assert result.content == 'ok'
+        client.client.responses.create.assert_called_once()
 
     def test_opencode_chat_model_calls_chat_completions(self):
         response = MagicMock()

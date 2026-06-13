@@ -18,10 +18,20 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "strip_temperature": true,
-        "inference_endpoint": "/messages"
+        "inference_endpoint": "/messages",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "max",
+          "medium",
+          "xhigh"
+        ],
+        "reasoning_wire": "anthropic_extended",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -113,9 +123,17 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/messages"
+        "inference_endpoint": "/messages",
+        "supports_reasoning_effort": true,
+        "supports_prompt_cache": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "max"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -184,9 +202,17 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/messages"
+        "inference_endpoint": "/messages",
+        "supports_reasoning_effort": true,
+        "supports_prompt_cache": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "max"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -255,9 +281,18 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/messages"
+        "inference_endpoint": "/messages",
+        "supports_reasoning_effort": true,
+        "supports_prompt_cache": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -323,9 +358,19 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/messages"
+        "inference_endpoint": "/messages",
+        "supports_reasoning_effort": true,
+        "supports_prompt_cache": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "max",
+          "medium"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -406,10 +451,20 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "strip_temperature": true,
-        "inference_endpoint": "/messages"
+        "inference_endpoint": "/messages",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "max",
+          "medium",
+          "xhigh"
+        ],
+        "reasoning_wire": "anthropic_extended",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -501,10 +556,20 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "strip_temperature": true,
-        "inference_endpoint": "/messages"
+        "inference_endpoint": "/messages",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "max",
+          "medium",
+          "xhigh"
+        ],
+        "reasoning_wire": "anthropic_extended",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -596,14 +661,22 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "long_context_threshold_tokens": 200000,
         "long_input_price_per_m": 6,
         "long_cached_input_price_per_m": 0.6,
         "long_cached_write_price_per_m": 7.5,
         "long_output_price_per_m": 22.5,
-        "inference_endpoint": "/messages"
+        "inference_endpoint": "/messages",
+        "supports_reasoning_effort": true,
+        "supports_prompt_cache": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "max"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -686,9 +759,19 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/messages"
+        "inference_endpoint": "/messages",
+        "supports_reasoning_effort": true,
+        "supports_prompt_cache": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "max",
+          "medium"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -769,10 +852,18 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_reasoning_effort": true,
         "supports_vision": false,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "max",
+          "medium"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -843,10 +934,18 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_reasoning_effort": true,
         "supports_vision": false,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "max",
+          "medium"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -917,10 +1016,18 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_reasoning_effort": true,
         "supports_vision": false,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "max",
+          "medium"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -991,9 +1098,18 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/models/gemini-3-flash"
+        "inference_endpoint": "/models/gemini-3-flash",
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "minimal"
+        ],
+        "reasoning_wire": "gemini_openai_compat"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1074,14 +1190,22 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "long_context_threshold_tokens": 200000,
         "long_input_price_per_m": 4,
         "long_cached_input_price_per_m": 0.4,
         "long_cached_write_price_per_m": 0,
         "long_output_price_per_m": 18,
-        "inference_endpoint": "/models/gemini-3.1-pro"
+        "inference_endpoint": "/models/gemini-3.1-pro",
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium"
+        ],
+        "reasoning_wire": "gemini_openai_compat"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1170,9 +1294,18 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/models/gemini-3.5-flash"
+        "inference_endpoint": "/models/gemini-3.5-flash",
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "minimal"
+        ],
+        "reasoning_wire": "gemini_openai_compat"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1253,9 +1386,10 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": false,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1313,9 +1447,10 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": false,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1373,11 +1508,20 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "minimal"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1462,11 +1606,19 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1544,11 +1696,20 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "minimal"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1633,11 +1794,20 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1722,11 +1892,19 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1804,11 +1982,20 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1893,11 +2080,19 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1975,11 +2170,21 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2071,11 +2276,20 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2160,11 +2374,21 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2247,7 +2471,7 @@
           "opencode/gpt-5.3-codex-spark",
           "gpt-5.3-codex-spark"
         ],
-        "context_window_tokens": 128000,
+        "context_window_tokens": 256000,
         "max_output_tokens": 128000,
         "input_price_per_m": 1.75,
         "cached_input_price_per_m": 0.175,
@@ -2256,11 +2480,21 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": false,
         "max_input_tokens": 128000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2352,7 +2586,7 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 922000,
         "strip_temperature": true,
@@ -2361,7 +2595,17 @@
         "long_cached_input_price_per_m": 0.5,
         "long_cached_write_price_per_m": 0,
         "long_output_price_per_m": 22.5,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2467,11 +2711,21 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2563,11 +2817,21 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 272000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2659,11 +2923,19 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 922000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "medium",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2741,7 +3013,7 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 922000,
         "strip_temperature": true,
@@ -2750,7 +3022,17 @@
         "long_cached_input_price_per_m": 1,
         "long_cached_write_price_per_m": 0,
         "long_output_price_per_m": 45,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2856,11 +3138,19 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "max_input_tokens": 922000,
         "strip_temperature": true,
-        "inference_endpoint": "/responses"
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "medium",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2938,9 +3228,10 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2996,9 +3287,10 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3056,9 +3348,10 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3116,9 +3409,17 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium"
+        ],
+        "reasoning_wire": "none",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3186,9 +3487,10 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": false,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3246,9 +3548,10 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": false,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3306,9 +3609,17 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": false,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium"
+        ],
+        "reasoning_wire": "none",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3376,9 +3687,16 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": false,
-        "inference_endpoint": "/chat/completions"
+        "inference_endpoint": "/chat/completions",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "none"
+        ],
+        "reasoning_wire": "none",
+        "supports_reasoning_effort": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3443,9 +3761,10 @@
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": false,
+        "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "inference_endpoint": "/messages"
+        "inference_endpoint": "/messages",
+        "supports_stop_words": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",

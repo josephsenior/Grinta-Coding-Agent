@@ -24,7 +24,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -50,7 +59,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -76,7 +94,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -102,7 +129,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -125,7 +161,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -151,7 +196,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -177,7 +231,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -203,7 +266,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -229,7 +301,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -253,7 +334,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -282,7 +372,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -308,7 +407,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -335,7 +443,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -364,7 +481,16 @@
         "supports_reasoning_effort": true,
         "strip_temperature": true,
         "strip_top_p": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -389,7 +515,16 @@
         "supports_response_schema": true,
         "supports_vision": true,
         "supports_reasoning_effort": true,
-        "use_max_completion_tokens": true
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     }

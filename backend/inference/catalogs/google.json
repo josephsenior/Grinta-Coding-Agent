@@ -20,7 +20,16 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_vision": true
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "gemini_native"
       },
       "metadata": {}
     },
@@ -41,7 +50,15 @@
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
         "supports_reasoning_effort": true,
-        "supports_vision": true
+        "supports_vision": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "gemini_native"
       },
       "metadata": {}
     },
@@ -59,7 +76,16 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_vision": true
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "gemini_native"
       },
       "metadata": {}
     }

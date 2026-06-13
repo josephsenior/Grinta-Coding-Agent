@@ -1,0 +1,53 @@
+{
+  "provider": "perplexity",
+  "client": "openai_compatible",
+  "models": {
+    "sonar-pro": {
+      "runtime": {
+        "aliases": [
+          "perplexity/sonar-pro",
+          "sonar-pro"
+        ],
+        "context_window_tokens": 200000,
+        "max_input_tokens": 180000,
+        "max_output_tokens": 8000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": false,
+        "supports_parallel_tool_calls": false,
+        "supports_stop_words": true
+      },
+      "metadata": {
+        "display_name": "Sonar Pro",
+        "search_only": true
+      }
+    },
+    "sonar-reasoning-pro": {
+      "runtime": {
+        "aliases": [
+          "perplexity/sonar-reasoning-pro",
+          "sonar-reasoning-pro"
+        ],
+        "context_window_tokens": 128000,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": false,
+        "supports_parallel_tool_calls": false,
+        "supports_stop_words": true,
+        "supports_reasoning_effort": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {
+        "display_name": "Sonar Reasoning Pro",
+        "search_only": true
+      }
+    }
+  }
+}

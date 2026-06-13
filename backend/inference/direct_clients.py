@@ -758,6 +758,36 @@ class OpenAIClient(DirectLLMClient):
             yield chunk
 
 
+class OpenCodeResponsesClient(OpenAIClient):
+    """OpenCode Zen models served via OpenAI Responses API (/responses)."""
+
+    def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
+        from backend.inference.direct_clients_opencode_responses_ops import (
+            completion as responses_completion,
+        )
+
+        return responses_completion(self, messages, **kwargs)
+
+    async def acompletion(
+        self, messages: list[dict[str, Any]], **kwargs
+    ) -> LLMResponse:
+        from backend.inference.direct_clients_opencode_responses_ops import (
+            acompletion as responses_acompletion,
+        )
+
+        return await responses_acompletion(self, messages, **kwargs)
+
+    async def astream(
+        self, messages: list[dict[str, Any]], **kwargs
+    ) -> AsyncIterator[dict[str, Any]]:
+        from backend.inference.direct_clients_opencode_responses_ops import (
+            astream as responses_astream,
+        )
+
+        async for chunk in responses_astream(self, messages, **kwargs):
+            yield chunk
+
+
 class AnthropicClient(DirectLLMClient):
     """Client for Anthropic Claude."""
 
@@ -848,6 +878,18 @@ def get_direct_client(
     )
 
     client = _try_opencode_messages_client(
+        provider, stripped_model, api_key, timeout, resolved_base_url
+    )
+    if client is not None:
+        return client
+
+    client = _try_opencode_responses_client(
+        provider, stripped_model, api_key, timeout, resolved_base_url
+    )
+    if client is not None:
+        return client
+
+    client = _try_opencode_gemini_client(
         provider, stripped_model, api_key, timeout, resolved_base_url
     )
     if client is not None:
@@ -965,6 +1007,55 @@ def _model_metadata_for_log(
         'runtime_parameter_mode': runtime_parameter_mode(entry),
     }
     return metadata
+
+
+def _try_opencode_responses_client(
+    provider: str,
+    stripped_model: str,
+    api_key: str,
+    timeout: float | int | None,
+    resolved_base_url: str | None,
+) -> OpenCodeResponsesClient | None:
+    if provider != 'opencode':
+        return None
+    from backend.inference.provider_resolver import opencode_required_endpoint
+
+    if opencode_required_endpoint(stripped_model) != '/responses':
+        return None
+    profile = _resolve_transport_profile('opencode', resolved_base_url)
+    return OpenCodeResponsesClient(
+        model_name=stripped_model,
+        api_key=api_key,
+        base_url=resolved_base_url,
+        profile=profile,
+        timeout=timeout,
+        provider_name='opencode',
+    )
+
+
+def _try_opencode_gemini_client(
+    provider: str,
+    stripped_model: str,
+    api_key: str,
+    timeout: float | int | None,
+    resolved_base_url: str | None,
+) -> DirectLLMClient | None:
+    if provider != 'opencode':
+        return None
+    from backend.inference.direct_clients_opencode_gemini_ops import OpenCodeGeminiClient
+    from backend.inference.provider_resolver import opencode_required_endpoint
+
+    endpoint = opencode_required_endpoint(stripped_model)
+    if not endpoint.startswith('/models/'):
+        return None
+    return OpenCodeGeminiClient(
+        model_name=stripped_model,
+        api_key=api_key,
+        endpoint_path=endpoint,
+        base_url=resolved_base_url,
+        timeout=timeout,
+        provider_name='opencode',
+    )
 
 
 def _try_opencode_messages_client(

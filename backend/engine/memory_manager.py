@@ -25,7 +25,7 @@ from backend.context.prompt_window import event_fingerprint, select_prompt_event
 from backend.context.view import View
 from backend.core.logger import app_logger as logger
 from backend.core.message import Message, TextContent
-from backend.inference.prompt_caching import model_supports_prompt_cache_hints
+from backend.inference.prompt_caching import should_mark_messages_for_prompt_cache
 from backend.ledger.action import MessageAction
 from backend.ledger.action.agent import CondensationAction
 
@@ -756,8 +756,12 @@ class ContextMemoryManager:
     @staticmethod
     def _apply_prompt_cache_hints(messages: list[Message], llm_config: object) -> None:
         model = getattr(llm_config, 'model', None) or ''
+        provider = getattr(llm_config, 'custom_llm_provider', None)
         caching_on = bool(getattr(llm_config, 'caching_prompt', True))
-        if not caching_on or not model_supports_prompt_cache_hints(str(model)):
+        if not caching_on or not should_mark_messages_for_prompt_cache(
+            str(model),
+            provider=str(provider) if provider else None,
+        ):
             return
 
         first_message = messages[0]

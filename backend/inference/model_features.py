@@ -136,12 +136,8 @@ def get_model_token_limits(model: str) -> tuple[int | None, int | None]:
 def get_features(model: str) -> ModelFeatures:
     """Get feature capabilities for a specific model.
 
-    Args:
-        model: Model identifier
-
-    Returns:
-        ModelFeatures object with capability flags
-
+    Catalog entries are the source of truth. Uncataloged models receive
+    conservative defaults suitable for local/manual ids.
     """
     from backend.inference.catalog_loader import lookup
     from backend.inference.context_limits import derive_usable_input_tokens
@@ -168,11 +164,9 @@ def get_features(model: str) -> ModelFeatures:
         context_window_tokens=None,
         max_input_tokens=max_input,
         max_output_tokens=max_output,
-        supports_function_calling=model_matches(model, FUNCTION_CALLING_PATTERNS),
-        supports_reasoning_effort=model_matches(model, REASONING_EFFORT_PATTERNS),
-        supports_prompt_cache=model_matches(model, PROMPT_CACHE_PATTERNS),
-        supports_stop_words=not model_matches(
-            model, SUPPORTS_STOP_WORDS_FALSE_PATTERNS
-        ),
-        supports_response_schema=model_matches(model, RESPONSE_SCHEMA_PATTERNS),
+        supports_function_calling=True,
+        supports_reasoning_effort=False,
+        supports_prompt_cache=False,
+        supports_stop_words=True,
+        supports_response_schema=False,
     )

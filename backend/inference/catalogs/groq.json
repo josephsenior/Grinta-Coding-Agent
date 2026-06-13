@@ -4,14 +4,18 @@
   "models": {
     "llama-3.3-70b-versatile": {
       "runtime": {
-        "aliases": ["groq/llama-3.3-70b-versatile", "llama-3.3-70b-versatile"],
+        "aliases": [
+          "groq/llama-3.3-70b-versatile",
+          "llama-3.3-70b-versatile"
+        ],
         "context_window_tokens": 128000,
         "max_input_tokens": 120000,
         "max_output_tokens": 8000,
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": true
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true
       },
       "metadata": {
         "display_name": "Llama 3.3 70B Versatile"
@@ -19,14 +23,18 @@
     },
     "llama-3.1-8b-instant": {
       "runtime": {
-        "aliases": ["groq/llama-3.1-8b-instant", "llama-3.1-8b-instant"],
+        "aliases": [
+          "groq/llama-3.1-8b-instant",
+          "llama-3.1-8b-instant"
+        ],
         "context_window_tokens": 128000,
         "max_input_tokens": 120000,
         "max_output_tokens": 8000,
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": true
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true
       },
       "metadata": {
         "display_name": "Llama 3.1 8B Instant"
@@ -34,17 +42,84 @@
     },
     "mixtral-8x7b-32768": {
       "runtime": {
-        "aliases": ["groq/mixtral-8x7b-32768", "mixtral-8x7b-32768"],
+        "aliases": [
+          "groq/mixtral-8x7b-32768",
+          "mixtral-8x7b-32768"
+        ],
         "context_window_tokens": 32768,
         "max_input_tokens": 28000,
         "max_output_tokens": 4096,
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": true
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true
       },
       "metadata": {
         "display_name": "Mixtral 8x7B"
+      }
+    },
+    "meta-llama/llama-4-scout-17b-16e-instruct": {
+      "runtime": {
+        "aliases": [
+          "groq/meta-llama/llama-4-scout-17b-16e-instruct",
+          "meta-llama/llama-4-scout-17b-16e-instruct",
+          "groq/meta-llama/llama-4-scout",
+          "meta-llama/llama-4-scout",
+          "llama-4-scout"
+        ],
+        "context_window_tokens": 131072,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8192,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_stop_words": true
+      },
+      "metadata": {
+        "display_name": "Llama 4 Scout 17B"
+      }
+    },
+    "meta-llama/llama-4-maverick-17b-128e-instruct": {
+      "runtime": {
+        "aliases": [
+          "groq/meta-llama/llama-4-maverick-17b-128e-instruct",
+          "meta-llama/llama-4-maverick-17b-128e-instruct",
+          "llama-4-maverick"
+        ],
+        "context_window_tokens": 131072,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8192,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_stop_words": true
+      },
+      "metadata": {
+        "display_name": "Llama 4 Maverick 17B"
+      }
+    },
+    "qwen/qwen3-32b": {
+      "runtime": {
+        "aliases": [
+          "groq/qwen/qwen3-32b",
+          "qwen/qwen3-32b"
+        ],
+        "context_window_tokens": 131072,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8192,
+        "verified": false,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true
+      },
+      "metadata": {
+        "display_name": "Qwen3 32B"
       }
     }
   }

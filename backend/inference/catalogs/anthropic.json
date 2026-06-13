@@ -20,7 +20,14 @@
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
         "supports_prompt_cache": true,
-        "supports_vision": true
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "max"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {}
     },
@@ -43,7 +50,17 @@
         "supports_parallel_tool_calls": true,
         "supports_prompt_cache": true,
         "supports_vision": true,
-        "strip_reasoning_effort": true
+        "strip_reasoning_effort": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {}
     },
@@ -65,7 +82,17 @@
         "supports_parallel_tool_calls": true,
         "supports_prompt_cache": true,
         "supports_vision": true,
-        "strip_reasoning_effort": true
+        "strip_reasoning_effort": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {}
     },
@@ -87,7 +114,17 @@
         "supports_parallel_tool_calls": true,
         "supports_prompt_cache": true,
         "supports_vision": true,
-        "strip_reasoning_effort": true
+        "strip_reasoning_effort": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {}
     },
@@ -111,7 +148,17 @@
         "supports_vision": true,
         "strip_reasoning_effort": true,
         "strip_temperature": true,
-        "strip_top_p": true
+        "strip_top_p": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoning_wire": "anthropic_extended",
+        "supports_reasoning_effort": true
       },
       "metadata": {}
     },
@@ -136,7 +183,17 @@
         "supports_parallel_tool_calls": true,
         "supports_prompt_cache": true,
         "supports_vision": true,
-        "strip_reasoning_effort": true
+        "strip_reasoning_effort": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {}
     },
@@ -158,7 +215,17 @@
         "supports_parallel_tool_calls": true,
         "supports_prompt_cache": true,
         "supports_vision": true,
-        "strip_reasoning_effort": true
+        "strip_reasoning_effort": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoning_wire": "anthropic_extended"
       },
       "metadata": {}
     }

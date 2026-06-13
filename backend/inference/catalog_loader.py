@@ -51,6 +51,7 @@ class ModelEntry:
     supports_parallel_tool_calls: bool = False
     supports_reasoning_effort: bool = False
     supports_prompt_cache: bool = False
+    prompt_cache_mode: str = 'none'
     supports_stop_words: bool = True
     supports_response_schema: bool = False
     supports_vision: bool = False
@@ -65,6 +66,8 @@ class ModelEntry:
         False  # Use max_completion_tokens instead of max_tokens
     )
     default_temperature: float | None = None  # Model-recommended temperature
+    reasoning_efforts: tuple[str, ...] = ()
+    reasoning_wire: str | None = None
 
 
 TRANSPORT_CLIENT_GOOGLE = 'google_native'
@@ -127,6 +130,28 @@ _OPENAI_PASSTHROUGH_KWARGS: frozenset[str] = frozenset(
     }
 )
 
+_OPENAI_COMPATIBLE_PROVIDERS: frozenset[str] = frozenset(
+    {
+        'openai',
+        'cerebras',
+        'deepinfra',
+        'deepseek',
+        'digitalocean',
+        'fireworks',
+        'groq',
+        'lightning',
+        'mistral',
+        'nvidia',
+        'opencode',
+        'opencode-go',
+        'openrouter',
+        'perplexity',
+        'together',
+        'vercel',
+        'xai',
+    }
+)
+
 _INCOMPATIBLE_KWARGS_BY_TRANSPORT: dict[str, frozenset[str]] = {
     TRANSPORT_CLIENT_GOOGLE: _GOOGLE_INCOMPATIBLE_KWARGS,
     TRANSPORT_CLIENT_ANTHROPIC: _ANTHROPIC_INCOMPATIBLE_KWARGS,
@@ -178,6 +203,10 @@ def _transport_client_for_entry(entry: ModelEntry) -> str:
         endpoint = entry.inference_endpoint
         if endpoint == '/messages':
             return TRANSPORT_CLIENT_ANTHROPIC
+        if endpoint == '/responses':
+            return TRANSPORT_CLIENT_OPENAI
+        if endpoint and endpoint.startswith('/models/'):
+            return TRANSPORT_CLIENT_GOOGLE
         if endpoint in _SUPPORTED_INFERENCE_ENDPOINTS:
             return TRANSPORT_CLIENT_OPENAI
         return TRANSPORT_CLIENT_UNSUPPORTED
@@ -319,6 +348,10 @@ def validate_model_transport(
 
     endpoint = entry.inference_endpoint
     provider = entry.provider
+    if endpoint == '/responses' and provider == 'opencode':
+        return
+    if endpoint and endpoint.startswith('/models/') and provider == 'opencode':
+        return
     if endpoint == '/responses':
         raise BadRequestError(
             (
@@ -371,6 +404,23 @@ def _load_raw() -> dict:
     return {'providers': providers}
 
 
+def _resolve_prompt_cache_mode(
+    *,
+    provider: str,
+    name: str,
+    runtime: dict[str, Any],
+    client: str | None,
+) -> str:
+    from backend.inference.prompt_caching import resolve_prompt_cache_mode_from_runtime
+
+    return resolve_prompt_cache_mode_from_runtime(
+        provider=provider,
+        name=name,
+        runtime=runtime,
+        client=client,
+    )
+
+
 def _entry_from_catalog(
     *,
     provider: str,
@@ -385,6 +435,13 @@ def _entry_from_catalog(
         inference_endpoint = endpoint
     else:
         inference_endpoint = None
+    prompt_cache_mode = _resolve_prompt_cache_mode(
+        provider=provider,
+        name=name,
+        runtime=runtime,
+        client=runtime.get('client', provider_client),
+    )
+    supports_prompt_cache = prompt_cache_mode != 'none'
     return ModelEntry(
         name=name,
         provider=provider,
@@ -411,7 +468,8 @@ def _entry_from_catalog(
         supports_function_calling=runtime.get('supports_function_calling', False),
         supports_parallel_tool_calls=runtime.get('supports_parallel_tool_calls', False),
         supports_reasoning_effort=runtime.get('supports_reasoning_effort', False),
-        supports_prompt_cache=runtime.get('supports_prompt_cache', False),
+        supports_prompt_cache=supports_prompt_cache,
+        prompt_cache_mode=prompt_cache_mode,
         supports_stop_words=runtime.get('supports_stop_words', True),
         supports_response_schema=runtime.get('supports_response_schema', False),
         supports_vision=runtime.get('supports_vision', False),
@@ -422,6 +480,17 @@ def _entry_from_catalog(
         strip_penalties=runtime.get('strip_penalties', False),
         use_max_completion_tokens=runtime.get('use_max_completion_tokens', False),
         default_temperature=runtime.get('default_temperature'),
+        reasoning_efforts=tuple(
+            str(item).strip().lower()
+            for item in runtime.get('reasoning_efforts', ())
+            if isinstance(item, str) and str(item).strip()
+        ),
+        reasoning_wire=(
+            str(runtime['reasoning_wire']).strip()
+            if isinstance(runtime.get('reasoning_wire'), str)
+            and str(runtime['reasoning_wire']).strip()
+            else None
+        ),
     )
 
 
@@ -478,6 +547,10 @@ def _name_index() -> dict[str, ModelEntry]:
         if not key:
             return
         if entry.provider in {'opencode', 'opencode-go'}:
+            return
+        # Vendor-qualified ids (e.g. openai/gpt-5 on gateway catalogs) are not
+        # global bare names — they resolve via provider-scoped or alias keys only.
+        if '/' in key:
             return
         bare_candidates.setdefault(key.lower(), []).append(entry)
 
@@ -822,39 +895,12 @@ def is_openai_compatible(model: str) -> bool:
     """
     entry = lookup(model)
     if entry:
-        # These providers are OpenAI-compatible
-        return entry.provider in [
-            'openai',
-            'cerebras',
-            'deepseek',
-            'groq',
-            'lightning',
-            'mistral',
-            'nvidia',
-            'opencode',
-            'opencode-go',
-            'openrouter',
-            'vercel',
-            'xai',
-        ]
+        return entry.provider in _OPENAI_COMPATIBLE_PROVIDERS
 
     from backend.inference.provider_resolver import extract_provider_prefix
 
     provider = extract_provider_prefix(model)
-    return provider in {
-        'openai',
-        'cerebras',
-        'deepseek',
-        'groq',
-        'lightning',
-        'mistral',
-        'nvidia',
-        'opencode',
-        'opencode-go',
-        'openrouter',
-        'vercel',
-        'xai',
-    }
+    return provider in _OPENAI_COMPATIBLE_PROVIDERS
 
 
 def supports_tool_choice(model: str) -> bool:
@@ -966,15 +1012,15 @@ def apply_model_param_overrides(
     is_stream: bool = False,
     *,
     provider: str | None = None,
+    caching_prompt: bool = True,
 ) -> dict:
-    """Apply data-driven model-specific parameter overrides from the catalog.
+    """Apply data-driven model-specific parameter overrides from the catalog."""
+    from backend.inference.catalog_loader import lookup, lookup_provider_model
 
-    Falls back to family/provider param profiles when the catalog entry is
-    missing or has no runtime overrides.
-    """
-    from backend.inference.param_profiles import resolve_effective_model_entry
-
-    entry, _profile_id, _source = resolve_effective_model_entry(model, provider)
+    entry = lookup(model)
+    if entry is None and provider:
+        bare = model.split('/')[-1] if '/' in model else model
+        entry = lookup_provider_model(provider, bare, allow_aliases=True)
     if entry is None:
         call_kwargs.pop('reasoning_effort', None)
         return call_kwargs
@@ -1009,7 +1055,24 @@ def apply_model_param_overrides(
     if entry.supports_parallel_tool_calls and 'parallel_tool_calls' not in call_kwargs:
         call_kwargs['parallel_tool_calls'] = True
 
+    _apply_prompt_cache_call_kwargs(entry, call_kwargs, caching_prompt=caching_prompt)
+
     return call_kwargs
+
+
+def _apply_prompt_cache_call_kwargs(
+    entry: ModelEntry,
+    call_kwargs: dict,
+    *,
+    caching_prompt: bool,
+) -> None:
+    if not caching_prompt or entry.prompt_cache_mode != 'implicit':
+        return
+    if 'prompt_cache_key' in call_kwargs:
+        return
+    from backend.inference.prompt_caching import implicit_prompt_cache_key
+
+    call_kwargs['prompt_cache_key'] = implicit_prompt_cache_key(entry)
 
 
 def _apply_thinking_disabled(call_kwargs: dict) -> None:

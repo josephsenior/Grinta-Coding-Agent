@@ -13,10 +13,10 @@ from backend.inference.reasoning import reasoning_effort_options
 from backend.inference.runtime_profile import resolve_runtime_profile
 
 
-def test_unknown_groq_model_uses_provider_default_profile() -> None:
+def test_unknown_groq_model_uses_conservative_profile() -> None:
     profile_id, source = resolve_param_profile_id('some-new-groq-model', 'groq')
-    assert profile_id == 'provider_default'
-    assert source == 'provider_default'
+    assert profile_id == 'conservative'
+    assert source == 'conservative'
 
 
 def test_conservative_profile_strips_reasoning() -> None:
@@ -31,7 +31,8 @@ def test_openai_gpt5_catalog_entry_keeps_runtime_overrides() -> None:
     entry, profile_id, source = resolve_effective_model_entry('openai/gpt-5', 'openai')
     assert entry is not None
     assert entry.use_max_completion_tokens is True
-    assert source in {'catalog', 'catalog_family', 'family'}
+    assert profile_id == 'gpt-5'
+    assert source == 'catalog'
 
 
 def test_opencode_claude_fable_keeps_catalog_variants() -> None:
@@ -39,7 +40,6 @@ def test_opencode_claude_fable_keeps_catalog_variants() -> None:
     assert raw is not None
     entry = resolve_model_entry_for_capabilities('claude-fable-5', 'opencode', fallback=raw)
     assert entry is not None
-    assert (entry.metadata or {}).get('family') == 'claude-fable'
     assert reasoning_effort_options(entry, include_disabled=True) == (
         'none',
         'low',
@@ -72,7 +72,6 @@ def test_opencode_deepseek_flash_free_not_mapped_to_gemini_profile() -> None:
         'deepseek-v4-flash-free', 'opencode', fallback=raw
     )
     assert entry is not None
-    assert (entry.metadata or {}).get('family') == 'deepseek-flash-free'
     assert reasoning_effort_options(entry, include_disabled=True) == (
         'none',
         'low',
@@ -90,7 +89,8 @@ class _Cfg:
     max_input_tokens = None
 
 
-def test_runtime_profile_resolves_for_compat_model() -> None:
+def test_runtime_profile_resolves_for_catalog_model() -> None:
     profile = resolve_runtime_profile(_Cfg())
-    assert profile.param_profile_id == 'provider_default'
+    assert profile.param_profile_id == 'llama-3.3-70b-versatile'
+    assert profile.source == 'catalog'
     assert profile.context_limits.usable_input_tokens is not None

@@ -772,6 +772,7 @@ class LLM(RetryMixin, DebugMixin):
             reasoning_effort=self.config.reasoning_effort,
             is_stream=is_stream,
             provider=getattr(self.config, 'custom_llm_provider', None),
+            caching_prompt=bool(getattr(self.config, 'caching_prompt', True)),
         )
 
         if self.config.seed is not None:

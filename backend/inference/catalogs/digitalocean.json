@@ -1,0 +1,110 @@
+{
+  "provider": "digitalocean",
+  "client": "openai_compatible",
+  "models": {
+    "anthropic-claude-4.6-sonnet": {
+      "runtime": {
+        "aliases": [
+          "digitalocean/anthropic-claude-4.6-sonnet",
+          "anthropic-claude-4.6-sonnet"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 930368,
+        "max_output_tokens": 64000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_prompt_cache": true,
+        "supports_vision": true,
+        "supports_stop_words": true,
+        "supports_reasoning_effort": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {
+        "display_name": "Claude Sonnet 4.6 (Gradient AI)"
+      }
+    },
+    "anthropic-claude-haiku-4.5": {
+      "runtime": {
+        "aliases": [
+          "digitalocean/anthropic-claude-haiku-4.5",
+          "anthropic-claude-haiku-4.5"
+        ],
+        "context_window_tokens": 200000,
+        "max_input_tokens": 131904,
+        "max_output_tokens": 64000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_prompt_cache": true,
+        "supports_vision": true,
+        "supports_stop_words": true,
+        "supports_reasoning_effort": true,
+        "reasoning_efforts": [
+          "high",
+          "max"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {
+        "display_name": "Claude Haiku 4.5 (Gradient AI)"
+      }
+    },
+    "deepseek-v4-pro": {
+      "runtime": {
+        "aliases": [
+          "digitalocean/deepseek-v4-pro",
+          "deepseek-v4-pro"
+        ],
+        "context_window_tokens": 1048576,
+        "max_input_tokens": 611904,
+        "max_output_tokens": 384000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true,
+        "supports_reasoning_effort": true,
+        "default_temperature": 1.0,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "max"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {
+        "display_name": "DeepSeek V4 Pro (Gradient AI)"
+      }
+    },
+    "deepseek-3.2": {
+      "runtime": {
+        "aliases": [
+          "digitalocean/deepseek-3.2",
+          "deepseek-3.2"
+        ],
+        "context_window_tokens": 200000,
+        "max_input_tokens": 131904,
+        "max_output_tokens": 64000,
+        "verified": false,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true
+      },
+      "metadata": {
+        "display_name": "DeepSeek V3.2 (Gradient AI)"
+      }
+    }
+  }
+}

@@ -463,17 +463,9 @@ def _provider_model_options(
     if custom_name:
         return []
     try:
-        from backend.inference.registry import (
-            get_provider_configuration,
-            list_model_names,
-        )
+        from backend.inference.registry import list_model_names
 
-        cfg = get_provider_configuration(provider_key)
-        env_var = cfg.get('env_var')
-        api_key = None
-        if env_var:
-            api_key = (os.environ.get(env_var) or '').strip() or None
-        return list_model_names(provider_key, api_key=api_key)
+        return list_model_names(provider_key)
     except Exception:
         logger.debug('Could not load provider model options', exc_info=True)
         return []

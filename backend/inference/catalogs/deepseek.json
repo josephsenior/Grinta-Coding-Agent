@@ -21,7 +21,15 @@
         "supports_parallel_tool_calls": true,
         "supports_reasoning_effort": true,
         "supports_vision": false,
-        "default_temperature": 1.0
+        "default_temperature": 1.0,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "max"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     },
@@ -43,7 +51,15 @@
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
         "supports_reasoning_effort": true,
-        "supports_vision": false
+        "supports_vision": false,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "max"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
     }
