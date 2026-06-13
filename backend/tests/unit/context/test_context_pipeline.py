@@ -143,8 +143,14 @@ async def test_prepare_step_uses_prewarmed_compaction(pipeline):
     with (
         patch('backend.context.context_pipeline.finalize_compaction_artifacts'),
         patch('backend.context.context_pipeline.maybe_update'),
-        patch('backend.context.context_pipeline.ContextPipeline._passes_effectiveness_gate', return_value=True),
-        patch('backend.context.context_pipeline.ContextPipeline._resolve_continuity_or_fallback', return_value=action),
+        patch(
+            'backend.context.context_pipeline.ContextPipeline._passes_effectiveness_gate',
+            return_value=True,
+        ),
+        patch(
+            'backend.context.context_pipeline.ContextPipeline._resolve_continuity_or_fallback',
+            return_value=action,
+        ),
     ):
         result = await pipeline.prepare_step(state)
     assert result.pending_action is action

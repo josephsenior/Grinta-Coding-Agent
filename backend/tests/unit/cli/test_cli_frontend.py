@@ -2148,7 +2148,8 @@ def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
     with patch('backend.cli.config_manager._settings_path', return_value=settings_file):
         with patch(
             'backend.cli.config_manager.Prompt.ask',
-            side_effect=lambda *args, **kwargs: next(entered) or str(kwargs.get('default', '')),
+            side_effect=lambda *args, **kwargs: next(entered)
+            or str(kwargs.get('default', '')),
         ):
             with patch(
                 'backend.cli.config_manager.load_app_config', return_value=loaded_config

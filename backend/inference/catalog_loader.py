@@ -332,18 +332,15 @@ def validate_model_transport(
     if endpoint and endpoint.startswith('/models/'):
         raise BadRequestError(
             (
-                f"Model {model!r} is served via OpenCode native Gemini endpoint "
-                f"{endpoint!r}, which Grinta does not implement yet. Select a "
+                f'Model {model!r} is served via OpenCode native Gemini endpoint '
+                f'{endpoint!r}, which Grinta does not implement yet. Select a '
                 "model on '/chat/completions' or use provider 'google/'."
             ),
             llm_provider=provider,
             model=model,
         )
     raise BadRequestError(
-        (
-            f'Model {model!r} requires unsupported transport endpoint '
-            f'{endpoint!r}.'
-        ),
+        (f'Model {model!r} requires unsupported transport endpoint {endpoint!r}.'),
         llm_provider=provider,
         model=model,
     )

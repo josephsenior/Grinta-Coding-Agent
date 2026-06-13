@@ -52,8 +52,15 @@ Pure code motion: extracted from
 """
 
 
-class _SessionOrchestratorActionMixin:
+if TYPE_CHECKING:
+    from backend.orchestration.session_orchestrator_accessors import SessionOrchestratorAccessorsMixin
+else:
+    class SessionOrchestratorAccessorsMixin: pass
+
+
+class _SessionOrchestratorActionMixin(SessionOrchestratorAccessorsMixin):
     """Mixin: action context registration/binding/cleanup, system messages, log."""
+
 
     def _sync_budget_flag_with_metrics(self) -> None:
         """Keep the budget control flag aligned with accumulated metrics."""

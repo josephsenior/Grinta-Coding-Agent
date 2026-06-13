@@ -83,7 +83,11 @@ def resolve_param_profile_id(model: str, provider: str | None) -> tuple[str, str
     normalized_provider = normalize_provider_name(provider)
     entry = lookup(model)
     if entry is None and normalized_provider:
-        bare = model.split('/')[-1] if model.startswith(f'{normalized_provider}/') else model
+        bare = (
+            model.split('/')[-1]
+            if model.startswith(f'{normalized_provider}/')
+            else model
+        )
         entry = lookup_provider_model(normalized_provider, bare, allow_aliases=True)
 
     if entry is not None and _entry_has_runtime_overrides(entry):

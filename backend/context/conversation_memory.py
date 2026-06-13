@@ -408,7 +408,9 @@ class ContextMemory:
                 f'som={int(bool(self.agent_config.enable_som_visual_browsing))}',
             )
         )
-        return hashlib.sha1(payload.encode('utf-8', 'ignore'), usedforsecurity=False).hexdigest()
+        return hashlib.sha1(
+            payload.encode('utf-8', 'ignore'), usedforsecurity=False
+        ).hexdigest()
 
     def _is_render_cacheable_event(self, event: Event) -> bool:
         """Keep cache use away from events whose rendering mutates tool state."""

@@ -64,7 +64,9 @@ def test_sync_snapshot_to_working_memory_updates_sections(tmp_path) -> None:
     assert memory_file.exists()
 
 
-def test_sync_snapshot_to_working_memory_uses_state_session(tmp_path, monkeypatch) -> None:
+def test_sync_snapshot_to_working_memory_uses_state_session(
+    tmp_path, monkeypatch
+) -> None:
     snapshot = {
         'decisions': ['Preserve session scoped memory'],
     }

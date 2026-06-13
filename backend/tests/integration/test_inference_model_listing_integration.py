@@ -184,7 +184,9 @@ class TestRegistryRemoteListingIntegration:
 
         assert client.get.call_count == 2
 
-    def test_list_model_names_merges_catalog_and_remote_without_duplicates(self) -> None:
+    def test_list_model_names_merges_catalog_and_remote_without_duplicates(
+        self,
+    ) -> None:
         catalog_model = 'llama-3.3-70b-versatile'
         with _mock_httpx_get(
             json_payload={'data': [{'id': catalog_model}, {'id': 'remote-extra'}]}

@@ -123,7 +123,9 @@ def _anthropic_list(api_key: str | None) -> list[str]:
                 },
             )
             if response.status_code != 200:
-                logger.debug('Anthropic model list returned HTTP %s', response.status_code)
+                logger.debug(
+                    'Anthropic model list returned HTTP %s', response.status_code
+                )
                 return []
             payload = response.json()
             raw = payload.get('data', []) if isinstance(payload, dict) else []

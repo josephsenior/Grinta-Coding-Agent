@@ -290,7 +290,9 @@ class TestBuildLlmParams:
         p = _make_planner()
         state = _make_state()
         messages = [{'role': 'user', 'content': 'create it'}]
-        tools = [{'type': 'function', 'function': {'name': 'test', 'description': 'desc'}}]
+        tools = [
+            {'type': 'function', 'function': {'name': 'test', 'description': 'desc'}}
+        ]
         checked = [MagicMock(name='checked')]
 
         with patch(
@@ -309,7 +311,9 @@ class TestBuildLlmParams:
         p = _make_planner()
         state = _make_state()
         messages = [{'role': 'user', 'content': 'create it'}]
-        tools = [{'type': 'function', 'function': {'name': 'test', 'description': 'desc'}}]
+        tools = [
+            {'type': 'function', 'function': {'name': 'test', 'description': 'desc'}}
+        ]
         checked = [MagicMock(name='checked')]
 
         with patch(
@@ -325,7 +329,9 @@ class TestBuildLlmParams:
         p = _make_planner()
         state = _make_state()
         messages = [{'role': 'user', 'content': 'go'}]
-        tools = [{'type': 'function', 'function': {'name': 'test', 'description': 'desc'}}]
+        tools = [
+            {'type': 'function', 'function': {'name': 'test', 'description': 'desc'}}
+        ]
         checked = [MagicMock(name='checked')]
 
         with patch(
@@ -386,7 +392,10 @@ class TestBuildLlmParams:
         params = {
             'messages': [
                 {'role': 'system', 'content': 'system prompt'},
-                {'role': 'user', 'content': '<RUNTIME_INFORMATION>repo</RUNTIME_INFORMATION>'},
+                {
+                    'role': 'user',
+                    'content': '<RUNTIME_INFORMATION>repo</RUNTIME_INFORMATION>',
+                },
                 {'role': 'user', 'content': '<CONTEXT_PACKET>state</CONTEXT_PACKET>'},
                 {'role': 'user', 'content': 'latest user task'},
             ],
