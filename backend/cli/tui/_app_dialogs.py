@@ -12,10 +12,10 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual import work
 from textual.widget import Widget
 from textual.widgets import (
     Button,
@@ -596,11 +596,11 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
 
     @staticmethod
     def _load_catalog_entries(config: AppConfig) -> dict[str, list[Any]]:
+        from backend.cli.config_manager import get_current_provider
         from backend.inference.registry import (
             build_model_entries_by_provider,
             get_listable_providers,
         )
-        from backend.cli.config_manager import get_current_provider
 
         by_provider: dict[str, list[Any]] = {
             provider: [] for provider in get_listable_providers()
@@ -713,7 +713,9 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         return self._current_model_for_provider(self._selected_provider())
 
     def _selected_entry(self, provider: str | None, model: str | None):
-        from backend.inference.param_profiles import resolve_model_entry_for_capabilities
+        from backend.inference.param_profiles import (
+            resolve_model_entry_for_capabilities,
+        )
 
         if model == '__custom__' or not model:
             return None

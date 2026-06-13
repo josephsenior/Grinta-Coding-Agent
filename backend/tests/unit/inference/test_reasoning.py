@@ -63,7 +63,9 @@ class TestSupportsReasoning:
 
 class TestGatewayReasoningOptions:
     def test_openrouter_claude_via_effective_entry(self):
-        from backend.inference.param_profiles import resolve_model_entry_for_capabilities
+        from backend.inference.param_profiles import (
+            resolve_model_entry_for_capabilities,
+        )
         from backend.inference.reasoning import reasoning_effort_options
 
         entry = resolve_model_entry_for_capabilities(
@@ -76,7 +78,9 @@ class TestGatewayReasoningOptions:
         assert 'none' in options
 
     def test_vercel_gemini_via_effective_entry(self):
-        from backend.inference.param_profiles import resolve_model_entry_for_capabilities
+        from backend.inference.param_profiles import (
+            resolve_model_entry_for_capabilities,
+        )
         from backend.inference.reasoning import reasoning_effort_options
 
         entry = resolve_model_entry_for_capabilities(

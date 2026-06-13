@@ -21,7 +21,11 @@ from backend.inference.catalog_loader import (
 )
 from backend.inference.registry import (
     KNOWN_PROVIDER_PREFIXES as _KNOWN_PREFIXES,
+)
+from backend.inference.registry import (
     PROVIDER_DEFAULT_URLS as _PROVIDER_DEFAULT_URLS,
+)
+from backend.inference.registry import (
     normalize_provider_name,
 )
 

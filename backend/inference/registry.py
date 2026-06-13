@@ -10,7 +10,11 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
-from backend.inference.catalog_loader import ModelEntry, get_catalog, get_models_for_provider
+from backend.inference.catalog_loader import (
+    ModelEntry,
+    get_catalog,
+    get_models_for_provider,
+)
 
 
 def normalize_provider_name(provider: str | None) -> str | None:

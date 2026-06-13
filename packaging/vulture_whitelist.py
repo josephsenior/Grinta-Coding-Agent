@@ -20,3 +20,4 @@ original_file
 LanguageType
 stream_max_lines
 fragments
+ParserType
