@@ -52,6 +52,41 @@ class TestSupportsReasoning:
         assert supports_reasoning(entry) is True
         assert infer_family(entry) == 'claude-sonnet'
 
+    def test_gateway_prefixed_claude_on_openrouter(self):
+        entry = lookup('openrouter/anthropic/claude-sonnet-4')
+        assert entry is not None
+        assert supports_reasoning(entry) is True
+        from backend.inference.reasoning import reasoning_effort_options
+
+        assert reasoning_effort_options(entry, include_disabled=True)
+
+
+class TestGatewayReasoningOptions:
+    def test_openrouter_claude_via_effective_entry(self):
+        from backend.inference.param_profiles import resolve_model_entry_for_capabilities
+        from backend.inference.reasoning import reasoning_effort_options
+
+        entry = resolve_model_entry_for_capabilities(
+            'anthropic/claude-sonnet-4',
+            'openrouter',
+        )
+        assert entry is not None
+        options = reasoning_effort_options(entry, include_disabled=True)
+        assert 'medium' in options
+        assert 'none' in options
+
+    def test_vercel_gemini_via_effective_entry(self):
+        from backend.inference.param_profiles import resolve_model_entry_for_capabilities
+        from backend.inference.reasoning import reasoning_effort_options
+
+        entry = resolve_model_entry_for_capabilities(
+            'google/gemini-2.5-pro',
+            'vercel',
+        )
+        assert entry is not None
+        options = reasoning_effort_options(entry, include_disabled=True)
+        assert 'medium' in options
+
 
 class TestResolveReasoningPlan:
     def test_opencode_deepseek_flash_free_reasoning_effort(self):

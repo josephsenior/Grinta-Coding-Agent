@@ -383,7 +383,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
     def __init__(self, config: AppConfig) -> None:
         super().__init__()
         self._config = config
-        self._entries_by_provider = self._load_catalog_entries()
+        self._entries_by_provider = self._load_catalog_entries(config)
 
     def _resolve_listing_api_key(self, provider: str | None = None) -> str | None:
         from backend.inference.registry import resolve_api_key_for_provider
@@ -525,10 +525,21 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             self._sync_model_metadata()
 
     @staticmethod
-    def _load_catalog_entries() -> dict[str, list[Any]]:
-        from backend.inference.registry import build_model_entries_by_provider
+    def _load_catalog_entries(config: AppConfig) -> dict[str, list[Any]]:
+        from backend.inference.registry import (
+            build_model_entries_by_provider,
+            resolve_api_key_for_provider,
+        )
 
-        return build_model_entries_by_provider(include_remote=False)
+        try:
+            provider = config.get_llm_config().provider
+        except Exception:
+            provider = None
+        api_key = resolve_api_key_for_provider(config, provider)
+        return build_model_entries_by_provider(
+            api_key=api_key,
+            include_remote=bool((api_key or '').strip()),
+        )
 
     @staticmethod
     def _provider_label(provider: str | None) -> str:
@@ -618,11 +629,22 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         return value if isinstance(value, str) else ''
 
     def _selected_entry(self, provider: str | None, model: str | None):
-        from backend.inference.catalog_loader import lookup_provider_model
+        from backend.inference.param_profiles import resolve_model_entry_for_capabilities
 
-        if model == '__custom__':
+        if model == '__custom__' or not model:
             return None
-        return lookup_provider_model(provider, model, allow_aliases=False)
+
+        fallback = None
+        for candidate in self._entries_by_provider.get(provider or '', []):
+            if candidate.name == model:
+                fallback = candidate
+                break
+
+        return resolve_model_entry_for_capabilities(
+            model,
+            provider,
+            fallback=fallback,
+        )
 
     def _custom_model_enabled(self) -> bool:
         return self._selected_model() == '__custom__'
