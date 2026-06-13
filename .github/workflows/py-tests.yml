@@ -25,7 +25,8 @@ concurrency:
 jobs:
   gates-on-linux:
     name: Python Gates on Linux
-    runs-on: ubuntu-latest
+    # ubuntu-latest (24.04) can cancel long steps when needrestart restarts runner-provisioner.
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:

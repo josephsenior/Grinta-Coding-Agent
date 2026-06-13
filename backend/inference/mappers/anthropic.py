@@ -252,9 +252,7 @@ def model_requires_anthropic_tool_schema(model: str) -> bool:
 
     lowered = model.lower()
     return (
-        'anthropic/' in lowered
-        or '/claude' in lowered
-        or lowered.startswith('claude')
+        'anthropic/' in lowered or '/claude' in lowered or lowered.startswith('claude')
     )
 
 
