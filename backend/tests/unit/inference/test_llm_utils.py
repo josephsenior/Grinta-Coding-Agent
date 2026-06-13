@@ -118,7 +118,9 @@ class TestCheckTools:
                     'parameters': {
                         'type': 'object',
                         'properties': {'x': {'type': 'string'}},
-                        'anyOf': [{'type': 'object', 'properties': {'y': {'type': 'string'}}}],
+                        'anyOf': [
+                            {'type': 'object', 'properties': {'y': {'type': 'string'}}}
+                        ],
                     }
                 }
             }
