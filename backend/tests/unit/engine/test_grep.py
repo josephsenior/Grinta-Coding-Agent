@@ -79,9 +79,10 @@ class TestExecuteGrep:
         )
         obs = execute_grep(action)
 
-        assert 'file0.py' in obs.content
-        assert 'file1.py' in obs.content
-        assert 'file4.py' not in obs.content
+        # The Python fallback iterates files in filesystem order, which varies
+        # by platform.  Assert only that exactly head_limit (2) files appear.
+        matched_files = [f'file{i}.py' for i in range(5) if f'file{i}.py' in obs.content]
+        assert len(matched_files) == 2
 
     def test_invalid_regex_returns_friendly_error(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)

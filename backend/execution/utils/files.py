@@ -178,7 +178,10 @@ async def write_file(
             os.makedirs(os.path.dirname(whole_path))
         mode = 'r+' if os.path.exists(whole_path) else 'w'
         try:
-            with open(whole_path, mode, encoding='utf-8') as file:  # noqa: ASYNC230
+            # newline='' suppresses universal-newline translation so that
+            # detect_line_ending can observe the file's actual \r\n endings
+            # on every platform (default text mode converts \r\n → \n on read).
+            with open(whole_path, mode, encoding='utf-8', newline='') as file:  # noqa: ASYNC230
                 if mode != 'w':
                     all_lines = file.readlines()
                     new_file = insert_lines(
