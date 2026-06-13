@@ -1,12 +1,12 @@
 {
-  "provider": "mistral",
+  "provider": "deepinfra",
   "client": "openai_compatible",
   "models": {
-    "mistral-large-latest": {
+    "meta-llama/Meta-Llama-3.3-70B-Instruct": {
       "runtime": {
         "aliases": [
-          "mistral/mistral-large-latest",
-          "mistral-large-latest"
+          "deepinfra/meta-llama/Meta-Llama-3.3-70B-Instruct",
+          "meta-llama/Meta-Llama-3.3-70B-Instruct"
         ],
         "context_window_tokens": 128000,
         "max_input_tokens": 120000,
@@ -18,33 +18,14 @@
         "supports_stop_words": true
       },
       "metadata": {
-        "display_name": "Mistral Large"
+        "display_name": "Llama 3.3 70B Instruct"
       }
     },
-    "codestral-latest": {
+    "Qwen/Qwen2.5-72B-Instruct": {
       "runtime": {
         "aliases": [
-          "mistral/codestral-latest",
-          "codestral-latest"
-        ],
-        "context_window_tokens": 256000,
-        "max_input_tokens": 240000,
-        "max_output_tokens": 16000,
-        "verified": true,
-        "featured": true,
-        "supports_function_calling": true,
-        "supports_parallel_tool_calls": true,
-        "supports_stop_words": true
-      },
-      "metadata": {
-        "display_name": "Codestral"
-      }
-    },
-    "devstral-small-latest": {
-      "runtime": {
-        "aliases": [
-          "mistral/devstral-small-latest",
-          "devstral-small-latest"
+          "deepinfra/Qwen/Qwen2.5-72B-Instruct",
+          "Qwen/Qwen2.5-72B-Instruct"
         ],
         "context_window_tokens": 128000,
         "max_input_tokens": 120000,
@@ -56,7 +37,26 @@
         "supports_stop_words": true
       },
       "metadata": {
-        "display_name": "Devstral Small"
+        "display_name": "Qwen 2.5 72B Instruct"
+      }
+    },
+    "deepseek-ai/DeepSeek-V3": {
+      "runtime": {
+        "aliases": [
+          "deepinfra/deepseek-ai/DeepSeek-V3",
+          "deepseek-ai/DeepSeek-V3"
+        ],
+        "context_window_tokens": 128000,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true
+      },
+      "metadata": {
+        "display_name": "DeepSeek V3"
       }
     }
   }

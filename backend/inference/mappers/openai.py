@@ -67,9 +67,22 @@ def _strip_cache_control_recursive(obj: Any) -> None:
 
 def strip_prompt_cache_hints_from_messages(
     messages: list[dict[str, Any]],
+    *,
+    model: str | None = None,
+    provider: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Remove Anthropic-style cache markers; OpenAI-compatible APIs do not accept them."""
+    """Remove cache markers unless the catalog entry supports prompt-cache hints.
+
+    Gateways (Vercel, OpenRouter, OpenCode Anthropic routes, etc.) forward
+    Anthropic-style ``cache_control`` blocks when the upstream model supports
+    prompt caching. Pure OpenAI models use implicit server-side caching instead
+    and keep hints stripped.
+    """
+    from backend.inference.prompt_caching import model_supports_prompt_cache_hints
+
     cleaned = copy.deepcopy(messages)
+    if model_supports_prompt_cache_hints(model or '', provider=provider):
+        return cleaned
     for m in cleaned:
         _strip_cache_control_recursive(m)
     return cleaned

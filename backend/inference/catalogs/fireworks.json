@@ -1,12 +1,12 @@
 {
-  "provider": "mistral",
+  "provider": "fireworks",
   "client": "openai_compatible",
   "models": {
-    "mistral-large-latest": {
+    "accounts/fireworks/models/llama-v3p3-70b-instruct": {
       "runtime": {
         "aliases": [
-          "mistral/mistral-large-latest",
-          "mistral-large-latest"
+          "fireworks/accounts/fireworks/models/llama-v3p3-70b-instruct",
+          "accounts/fireworks/models/llama-v3p3-70b-instruct"
         ],
         "context_window_tokens": 128000,
         "max_input_tokens": 120000,
@@ -18,33 +18,14 @@
         "supports_stop_words": true
       },
       "metadata": {
-        "display_name": "Mistral Large"
+        "display_name": "Llama 3.3 70B Instruct"
       }
     },
-    "codestral-latest": {
+    "accounts/fireworks/models/deepseek-v3": {
       "runtime": {
         "aliases": [
-          "mistral/codestral-latest",
-          "codestral-latest"
-        ],
-        "context_window_tokens": 256000,
-        "max_input_tokens": 240000,
-        "max_output_tokens": 16000,
-        "verified": true,
-        "featured": true,
-        "supports_function_calling": true,
-        "supports_parallel_tool_calls": true,
-        "supports_stop_words": true
-      },
-      "metadata": {
-        "display_name": "Codestral"
-      }
-    },
-    "devstral-small-latest": {
-      "runtime": {
-        "aliases": [
-          "mistral/devstral-small-latest",
-          "devstral-small-latest"
+          "fireworks/accounts/fireworks/models/deepseek-v3",
+          "accounts/fireworks/models/deepseek-v3"
         ],
         "context_window_tokens": 128000,
         "max_input_tokens": 120000,
@@ -56,7 +37,27 @@
         "supports_stop_words": true
       },
       "metadata": {
-        "display_name": "Devstral Small"
+        "display_name": "DeepSeek V3"
+      }
+    },
+    "accounts/fireworks/models/llama4-scout-instruct-basic": {
+      "runtime": {
+        "aliases": [
+          "fireworks/accounts/fireworks/models/llama4-scout-instruct-basic",
+          "accounts/fireworks/models/llama4-scout-instruct-basic"
+        ],
+        "context_window_tokens": 131072,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8192,
+        "verified": false,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_stop_words": true
+      },
+      "metadata": {
+        "display_name": "Llama 4 Scout Instruct"
       }
     }
   }

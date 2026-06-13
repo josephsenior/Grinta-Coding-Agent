@@ -95,14 +95,14 @@ class TestGatewayReasoningOptions:
         assert reasoning_effort_options(entry, include_disabled=True) == ()
         assert reasoning_effort_display_options(entry, include_disabled=True) == []
 
-    def test_vercel_gemini_via_effective_entry(self):
+    def test_vercel_claude_via_effective_entry(self):
         from backend.inference.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
         from backend.inference.reasoning import reasoning_effort_options
 
         entry = resolve_model_entry_for_capabilities(
-            'google/gemini-2.5-pro',
+            'anthropic/claude-sonnet-4',
             'vercel',
         )
         assert entry is not None
@@ -130,7 +130,7 @@ class TestReasoningDisplayOptions:
     def test_gemini_control_label(self):
         from backend.inference.reasoning import reasoning_control_label
 
-        entry = lookup('google/gemini-2.5-pro')
+        entry = lookup('google/gemini-3-flash')
         assert entry is not None
         assert reasoning_control_label(entry) == 'Thinking level'
 

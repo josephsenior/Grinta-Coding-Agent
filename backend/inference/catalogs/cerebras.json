@@ -4,11 +4,15 @@
   "models": {
     "llama-3.3-70b": {
       "runtime": {
-        "aliases": ["cerebras/llama-3.3-70b", "llama-3.3-70b"],
+        "aliases": [
+          "cerebras/llama-3.3-70b",
+          "llama-3.3-70b"
+        ],
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": true
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true
       },
       "metadata": {
         "display_name": "Llama 3.3 70B"
@@ -16,11 +20,15 @@
     },
     "llama3.1-8b": {
       "runtime": {
-        "aliases": ["cerebras/llama3.1-8b", "llama3.1-8b"],
+        "aliases": [
+          "cerebras/llama3.1-8b",
+          "llama3.1-8b"
+        ],
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
-        "supports_parallel_tool_calls": true
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true
       },
       "metadata": {
         "display_name": "Llama 3.1 8B"

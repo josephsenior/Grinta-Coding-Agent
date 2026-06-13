@@ -1,12 +1,12 @@
 {
-  "provider": "mistral",
+  "provider": "together",
   "client": "openai_compatible",
   "models": {
-    "mistral-large-latest": {
+    "meta-llama/Llama-3.3-70B-Instruct-Turbo": {
       "runtime": {
         "aliases": [
-          "mistral/mistral-large-latest",
-          "mistral-large-latest"
+          "together/meta-llama/Llama-3.3-70B-Instruct-Turbo",
+          "meta-llama/Llama-3.3-70B-Instruct-Turbo"
         ],
         "context_window_tokens": 128000,
         "max_input_tokens": 120000,
@@ -18,33 +18,34 @@
         "supports_stop_words": true
       },
       "metadata": {
-        "display_name": "Mistral Large"
+        "display_name": "Llama 3.3 70B Instruct Turbo"
       }
     },
-    "codestral-latest": {
+    "meta-llama/Llama-4-Scout-17B-16E-Instruct": {
       "runtime": {
         "aliases": [
-          "mistral/codestral-latest",
-          "codestral-latest"
+          "together/meta-llama/Llama-4-Scout-17B-16E-Instruct",
+          "meta-llama/Llama-4-Scout-17B-16E-Instruct"
         ],
-        "context_window_tokens": 256000,
-        "max_input_tokens": 240000,
-        "max_output_tokens": 16000,
+        "context_window_tokens": 131072,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8192,
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
+        "supports_vision": true,
         "supports_stop_words": true
       },
       "metadata": {
-        "display_name": "Codestral"
+        "display_name": "Llama 4 Scout 17B Instruct"
       }
     },
-    "devstral-small-latest": {
+    "Qwen/Qwen2.5-Coder-32B-Instruct": {
       "runtime": {
         "aliases": [
-          "mistral/devstral-small-latest",
-          "devstral-small-latest"
+          "together/Qwen/Qwen2.5-Coder-32B-Instruct",
+          "Qwen/Qwen2.5-Coder-32B-Instruct"
         ],
         "context_window_tokens": 128000,
         "max_input_tokens": 120000,
@@ -56,7 +57,7 @@
         "supports_stop_words": true
       },
       "metadata": {
-        "display_name": "Devstral Small"
+        "display_name": "Qwen 2.5 Coder 32B Instruct"
       }
     }
   }

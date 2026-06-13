@@ -1,13 +1,11 @@
 """Unified provider and model registry — single read API for inference metadata.
 
-Consolidates provider URLs, prefixes, model listing (static + remote + local),
+Consolidates provider URLs, prefixes, static catalog model listing, local probes,
 and capability lookup. Prefer importing from this module for new code.
 """
 
 from __future__ import annotations
 
-import os
-import time
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
@@ -103,23 +101,6 @@ OPENAI_COMPATIBLE_REMOTE_PROVIDERS: frozenset[str] = frozenset(
     }
 )
 
-DYNAMIC_LISTING_PROVIDERS: frozenset[str] = frozenset(
-    {
-        'openrouter',
-        'vercel',
-        'nvidia',
-        'deepinfra',
-        'fireworks',
-        'together',
-        'groq',
-        'mistral',
-        'cerebras',
-    }
-)
-
-_REMOTE_MODEL_CACHE_TTL_SECONDS = 600.0
-_remote_model_cache: dict[tuple[str, str, str], tuple[float, list[str]]] = {}
-
 
 def get_provider_ids() -> list[str]:
     """Return configured hosted provider ids (from core provider config)."""
@@ -172,82 +153,6 @@ def get_provider_configuration(provider: str | None) -> dict[str, Any]:
     return PROVIDER_CONFIGURATIONS.get(normalized, UNKNOWN_PROVIDER_CONFIG)
 
 
-def supports_remote_model_listing(provider: str | None) -> bool:
-    """Return True when dynamic listing is available for *provider*."""
-    normalized = normalize_provider_name(provider)
-    if normalized is None:
-        return False
-    if normalized in LOCAL_PROVIDERS:
-        return True
-    return True
-
-
-def fetch_remote_models(
-    provider: str | None,
-    api_key: str | None,
-    *,
-    base_url: str | None = None,
-    use_cache: bool = True,
-) -> list[str]:
-    """Fetch model ids via the unified listing backend."""
-    from backend.inference.model_list_backends import (
-        list_models_for_provider,
-        resolve_listing_base_url,
-    )
-
-    normalized = normalize_provider_name(provider)
-    if normalized is None:
-        return []
-
-    key = (api_key or '').strip()
-    if normalized not in LOCAL_PROVIDERS and not key:
-        return []
-
-    resolved_base = resolve_listing_base_url(normalized, base_url)
-    cache_key = (normalized, resolved_base or '', key[:12])
-    if use_cache and normalized not in LOCAL_PROVIDERS:
-        cached = _remote_model_cache.get(cache_key)
-        if cached is not None:
-            expires_at, models = cached
-            if time.monotonic() < expires_at:
-                return list(models)
-
-    models = list_models_for_provider(
-        normalized,
-        api_key=key or None,
-        base_url=resolved_base,
-    )
-    if use_cache and normalized not in LOCAL_PROVIDERS:
-        _remote_model_cache[cache_key] = (
-            time.monotonic() + _REMOTE_MODEL_CACHE_TTL_SECONDS,
-            list(models),
-        )
-    return models
-
-
-def include_remote_listing_for_provider(
-    provider: str | None, api_key: str | None
-) -> bool:
-    normalized = normalize_provider_name(provider)
-    if normalized is None:
-        return False
-    if normalized in LOCAL_PROVIDERS:
-        return True
-    return bool((api_key or '').strip())
-
-
-def resolve_include_remote_model_listing(explicit: bool | None = None) -> bool:
-    """Return whether hosted providers should merge remote ``/v1/models`` listings.
-
-    Default is catalog-only pickers. Set ``GRINTA_INCLUDE_REMOTE_MODEL_LISTING=1``
-    or pass ``include_remote=True`` explicitly to opt in.
-    """
-    if explicit is not None:
-        return explicit
-    raw = (os.environ.get('GRINTA_INCLUDE_REMOTE_MODEL_LISTING') or '').strip().lower()
-    return raw in {'1', 'true', 'yes', 'on'}
-
-
 def get_static_model_names(
     provider: str | None, *, featured_only: bool = False
 ) -> list[str]:
@@ -269,17 +174,13 @@ def get_local_model_names(provider: str | None) -> list[str]:
 def list_model_names(
     provider: str | None,
     *,
-    api_key: str | None = None,
-    base_url: str | None = None,
-    include_remote: bool | None = None,
     include_local: bool = True,
 ) -> list[str]:
-    """Return model ids for *provider* (catalog-first for hosted; probe for local)."""
+    """Return model ids for *provider* (catalog for hosted; live probe for local)."""
     normalized = normalize_provider_name(provider)
     if normalized is None:
         return []
 
-    include_remote_api = resolve_include_remote_model_listing(include_remote)
     names: list[str] = []
 
     if include_local and normalized in LOCAL_PROVIDERS:
@@ -290,14 +191,6 @@ def list_model_names(
             names.extend(get_static_model_names(normalized, featured_only=True))
     else:
         names.extend(get_static_model_names(normalized, featured_only=False))
-        if include_remote_api and include_remote_listing_for_provider(
-            normalized, api_key
-        ):
-            for model_id in fetch_remote_models(
-                normalized, api_key, base_url=base_url
-            ):
-                if model_id not in names:
-                    names.append(model_id)
 
     seen: set[str] = set()
     ordered: list[str] = []
@@ -355,7 +248,7 @@ def _picker_entry_for_model_id(
     )
 
 
-def _catalog_fallback_entries(
+def _catalog_picker_entries(
     provider: str,
     catalog_entries: list[ModelEntry],
 ) -> list[ModelEntry]:
@@ -381,14 +274,10 @@ def _sort_picker_entries(entries: list[ModelEntry]) -> None:
 
 def build_model_entries_by_provider(
     *,
-    api_key: str | None = None,
-    base_url: str | None = None,
     provider: str | None = None,
-    include_remote: bool | None = None,
     include_local: bool = True,
 ) -> dict[str, list[ModelEntry]]:
-    """Build picker entries grouped by provider (catalog-first for hosted providers)."""
-    include_remote_api = resolve_include_remote_model_listing(include_remote)
+    """Build picker entries grouped by provider (catalog or local probe only)."""
     providers = [provider] if provider else get_listable_providers()
     by_provider: dict[str, list[ModelEntry]] = {}
 
@@ -423,31 +312,9 @@ def build_model_entries_by_provider(
                     if model_id != bare:
                         known_names.add(model_id)
             if not entries and catalog_entries:
-                entries = _catalog_fallback_entries(normalized, catalog_entries)
-        else:
-            if catalog_entries:
-                entries = _catalog_fallback_entries(normalized, catalog_entries)
-                known_names = {entry.name for entry in entries}
-            if include_remote_api and include_remote_listing_for_provider(
-                normalized, api_key
-            ):
-                for model_id in fetch_remote_models(
-                    normalized, api_key, base_url=base_url
-                ):
-                    bare = model_id.split('/')[-1] if '/' in model_id else model_id
-                    if bare in known_names or model_id in known_names:
-                        continue
-                    entries.append(
-                        _picker_entry_for_model_id(
-                            normalized,
-                            model_id,
-                            source='remote',
-                            display_name=model_id if model_id != bare else None,
-                        )
-                    )
-                    known_names.add(bare)
-                    if model_id != bare:
-                        known_names.add(model_id)
+                entries = _catalog_picker_entries(normalized, catalog_entries)
+        elif catalog_entries:
+            entries = _catalog_picker_entries(normalized, catalog_entries)
 
         _sort_picker_entries(entries)
         by_provider[normalized] = entries
@@ -462,7 +329,7 @@ def build_model_entries_by_provider(
 
 
 def resolve_api_key_for_provider(config: Any, provider: str | None) -> str | None:
-    """Best-effort API key for *provider* from config (for remote model listing)."""
+    """Best-effort API key for *provider* from config or environment."""
     normalized = normalize_provider_name(provider)
     if normalized is None:
         return None

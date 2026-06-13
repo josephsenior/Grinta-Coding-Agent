@@ -16,9 +16,90 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_vision": true
+        "supports_vision": true,
+        "supports_stop_words": true
       },
       "metadata": {}
+    },
+    "grok-4-fast": {
+      "runtime": {
+        "aliases": [
+          "xai/grok-4-fast",
+          "grok-4-fast",
+          "grok 4 fast"
+        ],
+        "context_window_tokens": 2000000,
+        "max_input_tokens": 1930368,
+        "max_output_tokens": 65536,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_stop_words": true,
+        "supports_reasoning_effort": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {
+        "display_name": "Grok 4 Fast"
+      }
+    },
+    "grok-4-0709": {
+      "runtime": {
+        "aliases": [
+          "xai/grok-4-0709",
+          "grok-4-0709",
+          "grok-4"
+        ],
+        "context_window_tokens": 256000,
+        "max_input_tokens": 240000,
+        "max_output_tokens": 16000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_stop_words": true,
+        "supports_reasoning_effort": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {
+        "display_name": "Grok 4"
+      }
+    },
+    "grok-3-mini": {
+      "runtime": {
+        "aliases": [
+          "xai/grok-3-mini",
+          "grok-3-mini",
+          "grok 3 mini"
+        ],
+        "context_window_tokens": 131072,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8192,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_stop_words": true
+      },
+      "metadata": {
+        "display_name": "Grok 3 Mini"
+      }
     }
   }
 }

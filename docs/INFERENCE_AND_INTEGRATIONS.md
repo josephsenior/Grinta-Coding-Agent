@@ -18,29 +18,30 @@ Responsibilities:
 
 - Provider IDs, default base URLs, and model listing (static catalog + optional remote `/v1/models` + local discovery)
 - LLM transport via [`llm.py`](../backend/inference/llm.py) and [`direct_clients.py`](../backend/inference/direct_clients.py)
-- Capability lookup (catalog → model glob patterns → provider defaults)
+- Capability lookup (catalog → conservative defaults for uncataloged ids)
 
 Configuration keys and param validation live in [`backend/core/config/`](../backend/core/config/). Prompt assembly lives in [`backend/engine/prompts/`](../backend/engine/prompts/) and [`backend/context/`](../backend/context/) — those consume inference; they do not call providers directly.
 
 ### Model listing sources
 
-Grinta uses **catalog-first listing** with optional remote merge and live local probes:
+Grinta uses **catalog-only listing** for hosted providers and **live probes** for local runtimes:
 
-1. **Static catalog (default for hosted providers)** — [`catalogs/*.json`](backend/inference/catalogs/) define curated models with pricing, limits, param overrides, and aliases. Pickers load these by default.
-2. **Optional remote merge** — set `GRINTA_INCLUDE_REMOTE_MODEL_LISTING=1` or pass `include_remote=True` to [`registry.build_model_entries_by_provider()`](backend/inference/registry.py) / [`list_model_names()`](backend/inference/registry.py) to append ids from provider `/v1/models` APIs via [`model_list_backends.py`](backend/inference/model_list_backends.py).
-3. **Local probe (always for Ollama / LM Studio / vLLM)** — live discovery when the local server is running; catalog rows are optional fallback.
-4. **Param profiles** — family-level call-surface rules in [`param_profiles.json`](backend/inference/param_profiles.json); applied when a catalog row is missing (manual model ids, local models).
-5. **Session pinning** — [`runtime_profile.py`](backend/inference/runtime_profile.py) pins limits on the LLM instance; `settings.json` overrides still win.
+1. **Static catalog (hosted providers)** — [`catalogs/*.json`](backend/inference/catalogs/) are the single source of truth for picker models, pricing, limits, capability flags, reasoning tiers/wires, param overrides, and aliases.
+2. **Local probe (Ollama / LM Studio / vLLM)** — [`registry.get_local_model_names()`](backend/inference/registry.py) discovers installed models when the local server is running.
+3. **Conservative fallback** — uncataloged manual/local model ids use safe defaults (tools on, reasoning off) via [`param_profiles.py`](backend/inference/param_profiles.py).
+4. **Session pinning** — [`runtime_profile.py`](backend/inference/runtime_profile.py) pins limits on the LLM instance; `settings.json` overrides still win.
 
 ### Catalog maintenance
 
 When a hosted provider ships a model you want in pickers or docs:
 
-1. Add a row under the provider file in [`catalogs/*.json`](backend/inference/catalogs/) with a full `runtime` block (limits, tool flags, thinking/reasoning overrides).
+1. Add a row under the provider file in [`catalogs/*.json`](backend/inference/catalogs/) with a full `runtime` block:
+   - limits, pricing, tool flags (`supports_*`)
+   - param overrides (`strip_temperature`, `use_max_completion_tokens`, …)
+   - reasoning config (`reasoning_efforts`, `reasoning_wire`) when the model supports thinking/reasoning
+   - optional `metadata.variants` for rich per-tier API payloads (OpenCode routes)
 2. Set `verified: true` / `featured: true` for demo-ready models.
-3. Extend [`reasoning_profiles.json`](backend/inference/reasoning_profiles.json) only when the model introduces a **new family** of reasoning tiers.
-4. Extend [`param_profiles.json`](backend/inference/param_profiles.json) only for models without a catalog row (local ids, manual entry).
-5. Run `pytest backend/tests/unit/inference/test_catalog_integrity.py`.
+3. Run `pytest backend/tests/unit/inference/test_catalog_integrity.py` — validates JSON schema, alias resolution, picker listing, and transport invariants for every catalog row.
 
 Batch updates on flagship releases; do not mirror every provider API rename automatically.
 

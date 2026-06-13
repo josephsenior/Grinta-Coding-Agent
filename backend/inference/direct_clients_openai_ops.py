@@ -411,12 +411,25 @@ def _recover_deepseek_thinking_history(
     return recovered
 
 
-def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
-    from backend.inference import direct_clients as dc
+def _prepare_openai_compatible_messages(
+    client: Any,
+    messages: list[dict[str, Any]],
+    kwargs: dict[str, Any],
+) -> list[dict[str, Any]]:
     from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
 
+    return strip_prompt_cache_hints_from_messages(
+        messages,
+        model=kwargs.get('model', client.model_name),
+        provider=getattr(client, '_provider_name', None),
+    )
+
+
+def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
+    from backend.inference import direct_clients as dc
+
     _ensure_opencode_chat_completions_model_supported(client)
-    messages = strip_prompt_cache_hints_from_messages(messages)
+    messages = _prepare_openai_compatible_messages(client, messages, kwargs)
     messages = _recover_deepseek_thinking_history(client, messages)
     messages = client._clean_messages(messages)
     kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)
@@ -489,10 +502,9 @@ def _build_llm_response(response, client):
 async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
     from backend.inference import direct_clients as dc
     from backend.inference.exceptions import BadRequestError
-    from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
 
     _ensure_opencode_chat_completions_model_supported(client)
-    messages = strip_prompt_cache_hints_from_messages(messages)
+    messages = _prepare_openai_compatible_messages(client, messages, kwargs)
     messages = _recover_deepseek_thinking_history(client, messages)
     messages = client._clean_messages(messages)
     kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)
@@ -535,10 +547,9 @@ async def astream(
     client: Any, messages: list[dict[str, Any]], **kwargs
 ) -> AsyncIterator[dict[str, Any]]:
     from backend.inference import direct_clients as dc
-    from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
 
     _ensure_opencode_chat_completions_model_supported(client)
-    messages = strip_prompt_cache_hints_from_messages(messages)
+    messages = _prepare_openai_compatible_messages(client, messages, kwargs)
     messages = _recover_deepseek_thinking_history(client, messages)
     messages = client._clean_messages(messages)
     kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)

@@ -426,27 +426,10 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         self._selected_provider_value: str | None = None
         self._model_list_request_id = 0
 
-    def _resolve_listing_api_key(self, provider: str | None = None) -> str | None:
-        from backend.inference.registry import resolve_api_key_for_provider
-
-        selected = provider or self._current_provider()
-        typed = ''
-        try:
-            typed = self.query_one('#settings-api-key', Input).value.strip()
-        except Exception:
-            typed = ''
-        if typed:
-            return typed
-        return resolve_api_key_for_provider(self._config, selected)
-
     def _fetch_model_entries_for_provider(self, provider: str) -> dict[str, list[Any]]:
         from backend.inference.registry import build_model_entries_by_provider
 
-        api_key = self._resolve_listing_api_key(provider)
-        return build_model_entries_by_provider(
-            api_key=api_key,
-            provider=provider,
-        )
+        return build_model_entries_by_provider(provider=provider)
 
     def _apply_model_list_to_ui(self, provider: str) -> None:
         model_select = self.query_one('#settings-model', Select)
@@ -493,7 +476,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         from backend.inference.registry import build_model_entries_by_provider
 
         self._entries_by_provider.update(
-            build_model_entries_by_provider(provider=provider, include_remote=False)
+            build_model_entries_by_provider(provider=provider)
         )
 
     def _schedule_model_refresh(self, provider: str | None = None) -> None:
@@ -607,10 +590,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         current = get_current_provider(config)
         if current:
             by_provider.update(
-                build_model_entries_by_provider(
-                    provider=current,
-                    include_remote=False,
-                )
+                build_model_entries_by_provider(provider=current)
             )
         return by_provider
 

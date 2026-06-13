@@ -200,7 +200,7 @@ class TestGetFeatures:
         assert features.supports_stop_words is False
         assert features.supports_response_schema is False
 
-    def test_falls_back_to_patterns_when_model_unknown(self, monkeypatch):
+    def test_falls_back_to_conservative_defaults_when_model_unknown(self, monkeypatch):
         import backend.inference.catalog_loader as catalog_loader
 
         monkeypatch.setattr(catalog_loader, 'lookup', lambda _model: None)
@@ -214,7 +214,7 @@ class TestGetFeatures:
         assert features.context_window_tokens is None
         assert features.max_output_tokens == 444
         assert features.supports_function_calling is True
-        assert features.supports_reasoning_effort is True
+        assert features.supports_reasoning_effort is False
         assert features.supports_prompt_cache is False
-        assert features.supports_stop_words is False
-        assert features.supports_response_schema is True
+        assert features.supports_stop_words is True
+        assert features.supports_response_schema is False
