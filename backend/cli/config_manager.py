@@ -86,7 +86,11 @@ def _load_raw_settings() -> dict[str, Any]:
     if not path.exists():
         return {}
     with path.open('r', encoding='utf-8') as f:
-        return json.load(f)
+        settings = json.load(f)
+    legacy_reasoning = settings.pop('reasoningEffort', None)
+    if legacy_reasoning is not None and 'llm_reasoning_effort' not in settings:
+        settings['llm_reasoning_effort'] = legacy_reasoning
+    return settings
 
 
 def _save_raw_settings(data: dict[str, Any]) -> None:
@@ -824,9 +828,12 @@ def update_api_key(key: str, provider: str | None = None) -> None:
     persist_llm_api_key_to_dotenv(key, settings_json_path=_settings_path())
 
 
-def update_budget(budget: float) -> None:
+def update_budget(budget: float | None) -> None:
     settings = _load_raw_settings()
-    settings['max_budget_per_task'] = budget
+    if budget is None or budget <= 0:
+        settings.pop('max_budget_per_task', None)
+    else:
+        settings['max_budget_per_task'] = budget
     _save_raw_settings(settings)
 
 

@@ -30,7 +30,7 @@ def generate_quickstart_config(
     *,
     model: str = 'gemini-2.5-flash',
     base_url: str = '',
-    max_budget: float = 5.0,
+    max_budget: float | None = None,
 ) -> str:
     """Return a minimal quick-start ``settings.json`` as a string.
 
@@ -40,18 +40,19 @@ def generate_quickstart_config(
     Args:
         model: Default model identifier.
         base_url: Optional base URL for the LLM endpoint.
-        max_budget: Maximum spend per task in USD.
+        max_budget: Maximum spend per task in USD. None omits the key (unlimited).
 
     Returns:
         A JSON-formatted configuration string.
     """
-    config = {
+    config: dict[str, object] = {
         'project_root': './workspace',
-        'max_budget_per_task': max_budget,
         'llm_model': model,
         'llm_api_key': LLM_API_KEY_SETTINGS_PLACEHOLDER,
         'llm_base_url': base_url or '',
     }
+    if max_budget is not None and max_budget > 0:
+        config['max_budget_per_task'] = max_budget
     return json.dumps(config, indent=2)
 
 
@@ -93,8 +94,8 @@ def _interactive_init(dest: Path) -> None:
     if '/' not in model:
         api_key = input('   LLM API key (optional): ').strip()
 
-    budget_str = input('   Max budget per task (USD) [5.0]: ').strip()
-    max_budget = float(budget_str) if budget_str else 5.0
+    budget_str = input('   Max budget per task (USD, blank = unlimited) []: ').strip()
+    max_budget = float(budget_str) if budget_str else None
 
     content = generate_quickstart_config(model=model, max_budget=max_budget)
 

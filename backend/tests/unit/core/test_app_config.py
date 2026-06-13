@@ -70,7 +70,7 @@ class TestAppConfigDefaults:
 
     def test_default_max_budget(self):
         cfg = AppConfig()
-        assert cfg.max_budget_per_task == 5.0
+        assert cfg.max_budget_per_task is None
 
     def test_default_debug(self):
         cfg = AppConfig()

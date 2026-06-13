@@ -493,7 +493,7 @@ def test_hud_falls_back_to_response_latencies_for_call_count() -> None:
     metrics = Metrics()
     metrics.accumulated_cost = 0.5
     metrics.response_latencies = [
-        ResponseLatency(model='openai/gpt-4.1', latency=0.2, response_id='resp-1')
+        ResponseLatency(model='openai/gpt-5.1', latency=0.2, response_id='resp-1')
     ]
 
     hud.update_from_llm_metrics(metrics)
@@ -1313,13 +1313,13 @@ def test_entry_point_parses_model_flag() -> None:
     """--model flag should be forwarded to repl main."""
     import sys
 
-    with patch.object(sys, 'argv', ['app', '--model', 'openai/gpt-4.1']):
+    with patch.object(sys, 'argv', ['app', '--model', 'openai/gpt-5.1']):
         with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
 
             main()
             mock_repl.assert_called_once_with(
-                model='openai/gpt-4.1',
+                model='openai/gpt-5.1',
                 project=None,
                 cleanup_storage=False,
                 no_splash=False,
@@ -1491,7 +1491,7 @@ async def test_async_main_defaults_workspace_to_cwd(
     tmp_path: Path, monkeypatch
 ) -> None:
     config = AppConfig()
-    config.get_llm_config().model = 'openai/gpt-4.1'
+    config.get_llm_config().model = 'openai/gpt-5.1'
 
     sim_home = tmp_path / 'SIM_HOME'
     sim_home.mkdir()
@@ -1511,7 +1511,7 @@ async def test_async_main_defaults_workspace_to_cwd(
                     ):
                         with patch(
                             'backend.cli.config_manager.ensure_default_model',
-                            return_value='openai/gpt-4.1',
+                            return_value='openai/gpt-5.1',
                         ):
                             with patch('backend.cli.main._setup_logging'):
                                 with patch('pathlib.Path.cwd', return_value=tmp_path):
@@ -1530,7 +1530,7 @@ async def test_async_main_defaults_workspace_to_cwd(
 @pytest.mark.asyncio
 async def test_async_main_queues_piped_input(tmp_path: Path) -> None:
     config = AppConfig()
-    config.get_llm_config().model = 'openai/gpt-4.1'
+    config.get_llm_config().model = 'openai/gpt-5.1'
 
     stdin = MagicMock()
     stdin.isatty.return_value = False
@@ -1549,7 +1549,7 @@ async def test_async_main_queues_piped_input(tmp_path: Path) -> None:
                     ):
                         with patch(
                             'backend.cli.config_manager.ensure_default_model',
-                            return_value='openai/gpt-4.1',
+                            return_value='openai/gpt-5.1',
                         ):
                             with patch('backend.cli.main._setup_logging'):
                                 with patch('pathlib.Path.cwd', return_value=tmp_path):
@@ -1563,7 +1563,7 @@ async def test_async_main_keeps_explicit_project_override(
     tmp_path: Path, monkeypatch
 ) -> None:
     config = AppConfig()
-    config.get_llm_config().model = 'openai/gpt-4.1'
+    config.get_llm_config().model = 'openai/gpt-5.1'
     sim_home = tmp_path / 'SIM_HOME'
     sim_home.mkdir()
     monkeypatch.setenv('HOME', str(sim_home))
@@ -1582,7 +1582,7 @@ async def test_async_main_keeps_explicit_project_override(
                     ):
                         with patch(
                             'backend.cli.config_manager.ensure_default_model',
-                            return_value='openai/gpt-4.1',
+                            return_value='openai/gpt-5.1',
                         ):
                             with patch('backend.cli.main._setup_logging'):
                                 import backend.cli.tui.main  # noqa: F401
@@ -2059,7 +2059,7 @@ def test_get_masked_api_key_returns_not_set_when_missing() -> None:
 
     llm_cfg = MagicMock()
     llm_cfg.api_key = None
-    llm_cfg.model = 'openai/gpt-4.1'
+    llm_cfg.model = 'openai/gpt-5.1'
     config = MagicMock()
     config.get_llm_config.return_value = llm_cfg
 
@@ -2133,8 +2133,8 @@ def test_ensure_default_model_uses_provider_specific_env_var() -> None:
     ):
         selected = ensure_default_model(config)
 
-    assert selected == 'openai/gpt-4.1'
-    assert llm_cfg.model == 'openai/gpt-4.1'
+    assert selected == 'openai/gpt-5.1'
+    assert llm_cfg.model == 'openai/gpt-5.1'
 
 
 def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
@@ -2148,7 +2148,7 @@ def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
     with patch('backend.cli.config_manager._settings_path', return_value=settings_file):
         with patch(
             'backend.cli.config_manager.Prompt.ask',
-            side_effect=lambda *args, **kwargs: next(entered),
+            side_effect=lambda *args, **kwargs: next(entered) or str(kwargs.get('default', '')),
         ):
             with patch(
                 'backend.cli.config_manager.load_app_config', return_value=loaded_config
@@ -2158,7 +2158,7 @@ def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
 
     saved = json.loads(settings_file.read_text(encoding='utf-8'))
     assert saved['llm_api_key'] == LLM_API_KEY_SETTINGS_PLACEHOLDER
-    assert saved['llm_model'] == 'anthropic/claude-sonnet-4.6'
+    assert saved['llm_model'] == 'anthropic/claude-haiku-4-5'
     assert saved['llm_provider'] == 'anthropic'
     env_file = settings_file.parent / '.env'
     assert env_file.is_file()
@@ -3823,7 +3823,7 @@ async def test_fake_prompt_single_path_narrow_and_wide_match() -> None:
 def test_hud_single_bar_format_all_widths() -> None:
     """HUD uses one dense bar (no wide/narrow mode split)."""
     hud = HUDBar()
-    hud.state.model = 'openai/gpt-4.1'
+    hud.state.model = 'openai/gpt-5.1'
     hud.state.context_tokens = 5000
     hud.state.context_limit = 128000
     hud.state.cost_usd = 0.1234

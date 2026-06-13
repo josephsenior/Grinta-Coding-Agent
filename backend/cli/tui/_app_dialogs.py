@@ -18,7 +18,6 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import (
     Button,
-    Checkbox,
     DataTable,
     Input,
     Label,
@@ -375,6 +374,44 @@ class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
 class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
     """Native settings modal for full-screen TUI."""
 
+    DEFAULT_CSS = """
+    GrintaSettingsDialog > #dialog-container {
+        padding: 1 3;
+        height: auto;
+        max-height: 92%;
+    }
+    GrintaSettingsDialog #dialog-title {
+        margin-bottom: 0;
+    }
+    GrintaSettingsDialog .field-label {
+        margin-top: 0;
+    }
+    GrintaSettingsDialog #settings-current-key {
+        margin-top: 0;
+        margin-bottom: 1;
+    }
+    GrintaSettingsDialog #settings-provider,
+    GrintaSettingsDialog #settings-model,
+    GrintaSettingsDialog #settings-reasoning,
+    GrintaSettingsDialog #settings-custom-model,
+    GrintaSettingsDialog #settings-api-key {
+        height: 3;
+        margin-bottom: 0;
+    }
+    GrintaSettingsDialog #settings-model-meta {
+        height: auto;
+        max-height: 2;
+        margin-bottom: 0;
+    }
+    GrintaSettingsDialog #dialog-feedback {
+        margin-top: 0;
+        height: 1;
+    }
+    GrintaSettingsDialog #dialog-buttons {
+        margin-top: 1;
+    }
+    """
+
     BINDINGS = [
         *ModalDialog.BINDINGS,
         Binding('ctrl+s', 'save', 'Save', show=False),
@@ -384,6 +421,8 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         super().__init__()
         self._config = config
         self._entries_by_provider = self._load_catalog_entries(config)
+        self._selected_model_value: str | None = None
+        self._selected_provider_value: str | None = None
 
     def _resolve_listing_api_key(self, provider: str | None = None) -> str | None:
         from backend.inference.registry import resolve_api_key_for_provider
@@ -419,9 +458,6 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             current_provider, current_model
         )
         masked_key = get_masked_api_key(self._config, current_provider)
-        raw_budget = getattr(self._config, 'max_budget_per_task', None)
-        budget_value = '' if raw_budget is None else f'{float(raw_budget):g}'
-        icons_enabled = bool(getattr(self._config, 'cli_tool_icons', True))
 
         with Vertical(id='dialog-container'):
             yield Label('[bold]Settings[/]', id='dialog-title')
@@ -457,20 +493,8 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
                 allow_blank=False,
                 id='settings-reasoning',
             )
-            yield Label(
-                'API key (leave blank to keep current key)', classes='field-label'
-            )
+            yield Label('API key (blank = keep current)', classes='field-label')
             yield Input(password=True, id='settings-api-key')
-            yield Label(
-                'Budget per task (blank/unlimited to keep unlimited)',
-                classes='field-label',
-            )
-            yield Input(value=budget_value, id='settings-budget')
-            yield Checkbox(
-                'Show tool icons in activity cards',
-                value=icons_enabled,
-                id='settings-icons',
-            )
             yield Label('', id='dialog-feedback')
             with Horizontal(id='dialog-buttons'):
                 yield Button('Save', id='settings-save', variant='primary')
@@ -481,8 +505,14 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         self._reload_model_entries()
         provider = self._current_provider()
         model_select = self.query_one('#settings-model', Select)
+        model = self._current_model_for_provider(provider)
         model_select.set_options(self._model_options(provider))
-        model_select.value = self._current_model_for_provider(provider)
+        model_select.value = model
+        self._selected_provider_value = provider
+        self._selected_model_value = model
+        self.query_one('#settings-custom-model', Input).value = (
+            self._current_custom_model_for_provider(provider)
+        )
         self._sync_custom_model_visibility()
         self._sync_model_metadata()
 
@@ -505,11 +535,13 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             return
         if event.select.id == 'settings-provider':
             provider = event.value
+            self._selected_provider_value = provider
             self._reload_model_entries(provider)
             model_select = self.query_one('#settings-model', Select)
             model = self._current_model_for_provider(provider)
             model_select.set_options(self._model_options(provider))
             model_select.value = model
+            self._selected_model_value = model
             self.query_one('#settings-custom-model', Input).value = (
                 self._current_custom_model_for_provider(provider)
             )
@@ -519,7 +551,10 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             self._sync_model_metadata()
             return
         if event.select.id == 'settings-model':
+            self._selected_model_value = event.value
             provider = self._selected_provider()
+            if event.value != '__custom__':
+                self.query_one('#settings-custom-model', Input).value = ''
             self._sync_custom_model_visibility()
             self._sync_reasoning_options(provider, event.value)
             self._sync_model_metadata()
@@ -601,9 +636,11 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             for candidate in entries:
                 if bare in {candidate.name, runtime_model_id(candidate)}:
                     return candidate.name
+            if bare:
+                return '__custom__'
         except Exception:
             pass
-        return entries[0].name if entries else '__custom__'
+        return '__custom__' if not entries else entries[0].name
 
     def _current_custom_model_for_provider(self, provider: str | None) -> str:
         try:
@@ -622,11 +659,19 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
 
     def _selected_provider(self) -> str:
         value = self.query_one('#settings-provider', Select).value
-        return value if isinstance(value, str) else self._current_provider()
+        if isinstance(value, str) and value:
+            return value
+        if self._selected_provider_value:
+            return self._selected_provider_value
+        return self._current_provider()
 
     def _selected_model(self) -> str:
         value = self.query_one('#settings-model', Select).value
-        return value if isinstance(value, str) else ''
+        if isinstance(value, str) and value:
+            return value
+        if self._selected_model_value:
+            return self._selected_model_value
+        return self._current_model_for_provider(self._selected_provider())
 
     def _selected_entry(self, provider: str | None, model: str | None):
         from backend.inference.param_profiles import resolve_model_entry_for_capabilities
@@ -750,19 +795,35 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             f'[{NAVY_TEXT_MUTED}]{" | ".join(details)}[/]'
         )
 
+    def _resolve_submit_model(self) -> str:
+        """Read the model id the user chose, including Textual Select edge cases."""
+        model_select = self.query_one('#settings-model', Select)
+        selected = ''
+        for candidate in (
+            model_select.value,
+            getattr(model_select, 'selection', None),
+            self._selected_model_value,
+        ):
+            if isinstance(candidate, str) and candidate:
+                selected = candidate
+                break
+        if not selected:
+            selected = self._current_model_for_provider(self._selected_provider())
+
+        custom_model = self.query_one('#settings-custom-model', Input).value.strip()
+        if selected == '__custom__':
+            return custom_model
+        return selected
+
     def _submit(self) -> None:
         from backend.inference.catalog_loader import runtime_model_id
 
         provider = self._selected_provider()
-        selected_model = self._selected_model()
-        custom_model = self.query_one('#settings-custom-model', Input).value.strip()
-        model = custom_model if selected_model == '__custom__' else selected_model
+        model = self._resolve_submit_model()
         entry = self._selected_entry(provider, model)
         reasoning_value = self.query_one('#settings-reasoning', Select).value
         reasoning = reasoning_value if isinstance(reasoning_value, str) else ''
         api_key = self.query_one('#settings-api-key', Input).value.strip()
-        budget_raw = self.query_one('#settings-budget', Input).value.strip()
-        icons_enabled = self.query_one('#settings-icons', Checkbox).value
 
         if not provider:
             self._set_feedback('Provider is required.', error=True)
@@ -771,19 +832,6 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             self._set_feedback('Model is required.', error=True)
             return
 
-        budget_value: float | None = None
-        if budget_raw and budget_raw.lower() not in {'unlimited', 'none'}:
-            try:
-                budget_value = float(budget_raw)
-            except ValueError:
-                self._set_feedback(
-                    'Budget must be numeric, unlimited, or empty.', error=True
-                )
-                return
-            if budget_value < 0:
-                self._set_feedback('Budget cannot be negative.', error=True)
-                return
-
         runtime_model = runtime_model_id(entry) if entry is not None else model
         self.dismiss(
             {
@@ -791,8 +839,6 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
                 'model': runtime_model,
                 'reasoning_effort': reasoning,
                 'api_key': api_key,
-                'budget': budget_value,
-                'icons': bool(icons_enabled),
             }
         )
 

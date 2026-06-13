@@ -29,7 +29,7 @@ def _make_config(**kwargs):
     return cfg
 
 
-def _make_llm(model: str = 'gpt-4-turbo') -> MagicMock:
+def _make_llm(model: str = 'openai/gpt-4-turbo') -> MagicMock:
     llm = MagicMock()
     llm.config.model = model
     return llm
@@ -116,12 +116,12 @@ class TestLlmSupportsToolChoice:
     @pytest.mark.parametrize(
         'model',
         [
-            'gpt-4o',
-            'gpt-4-turbo',
-            'claude-opus-4-7',
-            'claude-sonnet-4-6',
-            'gpt-5.2',
-            'gpt-4.1-mini',
+            'openai/gpt-4o',
+            'openai/gpt-4-turbo',
+            'anthropic/claude-opus-4-7',
+            'anthropic/claude-sonnet-4-6',
+            'openai/gpt-5.2',
+            'openai/gpt-4.1-mini',
         ],
     )
     def test_supported_models(self, model):
@@ -290,7 +290,7 @@ class TestBuildLlmParams:
         p = _make_planner()
         state = _make_state()
         messages = [{'role': 'user', 'content': 'create it'}]
-        tools = [MagicMock()]
+        tools = [{'type': 'function', 'function': {'name': 'test', 'description': 'desc'}}]
         checked = [MagicMock(name='checked')]
 
         with patch(
@@ -309,7 +309,7 @@ class TestBuildLlmParams:
         p = _make_planner()
         state = _make_state()
         messages = [{'role': 'user', 'content': 'create it'}]
-        tools = [MagicMock()]
+        tools = [{'type': 'function', 'function': {'name': 'test', 'description': 'desc'}}]
         checked = [MagicMock(name='checked')]
 
         with patch(
@@ -325,7 +325,7 @@ class TestBuildLlmParams:
         p = _make_planner()
         state = _make_state()
         messages = [{'role': 'user', 'content': 'go'}]
-        tools = [MagicMock()]
+        tools = [{'type': 'function', 'function': {'name': 'test', 'description': 'desc'}}]
         checked = [MagicMock(name='checked')]
 
         with patch(
@@ -333,7 +333,7 @@ class TestBuildLlmParams:
         ) as mock_ct:
             p.build_llm_params(messages, state, tools)
             # Simulate model change
-            p._llm.config.model = 'gpt-4o'
+            p._llm.config.model = 'openai/gpt-4o'
             p.build_llm_params(messages, state, tools)
 
         assert mock_ct.call_count == 2
@@ -473,7 +473,7 @@ class TestBuildLlmParams:
         assert 'tool_choice' not in params
 
     def test_tool_choice_set_for_supported_model(self):
-        p = _make_planner(llm=_make_llm('gpt-4-turbo'))
+        p = _make_planner(llm=_make_llm('openai/gpt-4-turbo'))
         state = _make_state()
         messages = [{'role': 'user', 'content': 'create a file'}]
         with patch('backend.engine.planner.check_tools', return_value=[]):

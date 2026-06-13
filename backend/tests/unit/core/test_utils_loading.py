@@ -518,7 +518,7 @@ class TestLoadFromJson:
         json_file.write_text(
             json.dumps(
                 {
-                    'llm_model': 'meta-llama/llama-4-scout',
+                    'llm_model': 'gpt-4o',
                     'llm_provider': 'lightning',
                 }
             )
@@ -528,7 +528,7 @@ class TestLoadFromJson:
         load_from_json(cfg, str(json_file))
 
         llm_cfg = cfg.get_llm_config()
-        assert llm_cfg.model == 'openai/meta-llama/llama-4-scout'
+        assert llm_cfg.model == 'openai/gpt-4o'
         assert llm_cfg.base_url == _PROVIDER_DEFAULT_URLS['lightning']
 
     def test_load_from_json_sets_provider_default_base_url_for_opencode(

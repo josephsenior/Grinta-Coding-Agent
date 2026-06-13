@@ -129,7 +129,7 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     max_budget_per_task: float | None = Field(
         default=DEFAULT_MAX_BUDGET_PER_TASK,
         description=(
-            'Maximum LLM cost (USD) allowed per task. Set to 0 or None for no limit (not recommended).'
+            'Maximum LLM cost (USD) allowed per task. None or 0 = unlimited (default).'
         ),
     )
     max_budget_per_session: float | None = Field(
