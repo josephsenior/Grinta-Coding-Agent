@@ -967,27 +967,18 @@ def apply_model_param_overrides(
     call_kwargs: dict,
     reasoning_effort: str | None = None,
     is_stream: bool = False,
+    *,
+    provider: str | None = None,
 ) -> dict:
     """Apply data-driven model-specific parameter overrides from the catalog.
 
-    This replaces hand-coded if-elif chains in ``_get_call_kwargs``.
-    If the model is not in the catalog or has no overrides, the kwargs
-    are returned unchanged.
-
-    Args:
-        model: Model name/alias.
-        call_kwargs: The kwargs dict being built for the LLM call.
-        reasoning_effort: The configured reasoning effort level.
-        is_stream: Whether this is a streaming call.
-
-    Returns:
-        The (potentially modified) call_kwargs dict.
+    Falls back to family/provider param profiles when the catalog entry is
+    missing or has no runtime overrides.
     """
-    entry = lookup(model)
+    from backend.inference.param_profiles import resolve_effective_model_entry
+
+    entry, _profile_id, _source = resolve_effective_model_entry(model, provider)
     if entry is None:
-        # Unknown model - keep the call surface conservative.
-        # Optional provider/model-specific knobs like reasoning_effort should
-        # only be sent when the catalog explicitly says the target supports them.
         call_kwargs.pop('reasoning_effort', None)
         return call_kwargs
 
@@ -1003,6 +994,8 @@ def apply_model_param_overrides(
         apply_reasoning_plan(call_kwargs, plan)
 
     _apply_catalog_token_and_penalty_strips(entry, call_kwargs)
+    if entry.strip_reasoning_effort:
+        call_kwargs.pop('reasoning_effort', None)
 
     # Apply model-recommended default temperature when user hasn't explicitly
     # overridden (i.e. it's still the global default).

@@ -1,6 +1,9 @@
 """Tool detection and registry for cross-platform runtime.
 
-Detects available tools at startup and provides fallback strategies.
+Detects available **host OS binaries** (git, bash, ripgrep, tmux) at startup.
+This is the **OsToolDetector** — not the LLM tool registry in
+``backend.engine.tool_registry``.
+
 Inspired by VS Code's approach to cross-platform compatibility.
 """
 

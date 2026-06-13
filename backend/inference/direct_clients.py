@@ -18,7 +18,7 @@ import httpx
 from anthropic import Anthropic, AsyncAnthropic
 from openai import AsyncOpenAI, OpenAI
 
-from backend.cli.tool_call_display import flatten_tool_call_for_history
+from backend.inference.tool_history import flatten_tool_call_for_history
 from backend.core import json_compat as json
 from backend.core.logger import app_logger as logger
 from backend.inference.direct_clients_anthropic_ops import (

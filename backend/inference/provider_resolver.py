@@ -19,74 +19,14 @@ from backend.inference.catalog_loader import (
     lookup_provider_model,
     runtime_model_id,
 )
+from backend.inference.registry import (
+    KNOWN_PROVIDER_PREFIXES as _KNOWN_PREFIXES,
+    PROVIDER_DEFAULT_URLS as _PROVIDER_DEFAULT_URLS,
+    normalize_provider_name,
+)
 
-_PROVIDER_DEFAULT_URLS: dict[str, str] = {
-    'groq': 'https://api.groq.com/openai/v1',
-    'xai': 'https://api.x.ai/v1',
-    'deepseek': 'https://api.deepseek.com/v1',
-    'openrouter': 'https://openrouter.ai/api/v1',
-    # Vercel AI Gateway: OpenAI-compatible unified endpoint for 200+ models.
-    'vercel': 'https://ai-gateway.vercel.sh/v1',
-    'nvidia': 'https://integrate.api.nvidia.com/v1',
-    # Lightning AI: Grinta routes `llm_provider=lightning` through OpenAIClient
-    # (see get_direct_client) with this OpenAI-compatible root. If the key or
-    # path is wrong, the host may return HTML — see format_html_api_error_response.
-    'lightning': 'https://lightning.ai/api/v1',
-    # DigitalOcean AI Platform (Serverless Inference endpoint)
-    'digitalocean': 'https://inference.do-ai.run/v1',
-    # DeepInfra OpenAI-compatible inference endpoint.
-    'deepinfra': 'https://api.deepinfra.com/v1/openai',
-    # Fireworks OpenAI-compatible inference endpoint.
-    'fireworks': 'https://api.fireworks.ai/inference/v1',
-    # Together AI OpenAI-compatible inference endpoint.
-    'together': 'https://api.together.xyz/v1',
-    # Perplexity OpenAI-compatible chat endpoint.
-    'perplexity': 'https://api.perplexity.ai',
-    # Cerebras AI: OpenAI-compatible endpoint for fast inference on CS-3 systems.
-    'cerebras': 'https://api.cerebras.ai/v1',
-    # Mistral AI: official API for Mistral models.
-    'mistral': 'https://api.mistral.ai/v1',
-    # OpenCode Zen: OpenAI-compatible API for OpenCode's curated model catalog.
-    'opencode': 'https://opencode.ai/zen/v1',
-    # OpenCode Go subscription models.
-    'opencode-go': 'https://opencode.ai/zen/go/v1',
-}
-
-KNOWN_PROVIDER_PREFIXES: set[str] = {
-    'anthropic',
-    'cerebras',
-    'deepinfra',
-    'deepseek',
-    'digitalocean',
-    'fireworks',
-    'google',
-    'groq',
-    'lightning',
-    'lm_studio',
-    'mistral',
-    'nvidia',
-    'ollama',
-    'openai',
-    'opencode',
-    'opencode-go',
-    'openrouter',
-    'perplexity',
-    'replicate',
-    'together',
-    'vercel',
-    'vllm',
-    'xai',
-}
-
-
-def normalize_provider_name(provider: str | None) -> str | None:
-    """Normalize provider names for stable comparisons."""
-    if provider is None:
-        return None
-    normalized = str(provider).strip().lower()
-    if not normalized:
-        return None
-    return normalized
+_PROVIDER_DEFAULT_URLS = _PROVIDER_DEFAULT_URLS
+KNOWN_PROVIDER_PREFIXES: set[str] = set(_KNOWN_PREFIXES)
 
 
 def extract_provider_prefix(model_name: str | None) -> str | None:
@@ -116,9 +56,9 @@ def canonicalize_model_selection(
     routing and provider is normalized.
 
     Proxy/aggregator providers (Lightning AI, OpenRouter, etc.) expose
-    OpenAI-compatible APIs.  litellm doesn't recognise all of them natively,
-    so we prepend ``openai/`` to ensure litellm routes through the
-    OpenAI-compatible path with the configured ``base_url``.
+    OpenAI-compatible APIs. Grinta keeps the configured provider prefix
+    (e.g. ``lightning/kimi-k2.5``) and routes through the OpenAI-compatible
+    client using ``llm_provider`` plus the provider default ``base_url``.
     """
     if model_name is None:
         return None, normalize_provider_name(provider)

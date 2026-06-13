@@ -1,5 +1,9 @@
 """LLM API request batching and failover utilities.
 
+Experimental — not wired into the orchestration loop today. Kept for
+future multi-endpoint failover / bulk offline workloads. See
+docs/INFERENCE_AND_INTEGRATIONS.md (inference layer).
+
 Provides:
 - Request batching for multiple LLM calls
 - Automatic failover to backup providers

@@ -1,0 +1,33 @@
+{
+  "provider": "nvidia",
+  "client": "openai_compatible",
+  "metadata": {
+    "dynamic_listing": true
+  },
+  "models": {
+    "meta/llama-3.1-70b-instruct": {
+      "runtime": {
+        "aliases": ["nvidia/meta/llama-3.1-70b-instruct", "meta/llama-3.1-70b-instruct"],
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "Llama 3.1 70B Instruct"
+      }
+    },
+    "moonshotai/kimi-k2-instruct": {
+      "runtime": {
+        "aliases": ["nvidia/moonshotai/kimi-k2-instruct", "moonshotai/kimi-k2-instruct"],
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "Kimi K2 Instruct"
+      }
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "provider": "openrouter",
+  "client": "openai_compatible",
+  "metadata": {
+    "dynamic_listing": true
+  },
+  "models": {
+    "anthropic/claude-sonnet-4": {
+      "runtime": {
+        "aliases": ["openrouter/anthropic/claude-sonnet-4"],
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "Claude Sonnet 4 (via OpenRouter)"
+      }
+    },
+    "openai/gpt-4.1": {
+      "runtime": {
+        "aliases": ["openrouter/openai/gpt-4.1"],
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "GPT-4.1 (via OpenRouter)"
+      }
+    },
+    "google/gemini-2.5-pro": {
+      "runtime": {
+        "aliases": ["openrouter/google/gemini-2.5-pro"],
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "Gemini 2.5 Pro (via OpenRouter)"
+      }
+    }
+  }
+}

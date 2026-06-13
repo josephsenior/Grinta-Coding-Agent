@@ -1,0 +1,33 @@
+{
+  "provider": "vercel",
+  "client": "openai_compatible",
+  "metadata": {
+    "dynamic_listing": true
+  },
+  "models": {
+    "openai/gpt-4.1": {
+      "runtime": {
+        "aliases": ["vercel/openai/gpt-4.1"],
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "GPT-4.1 (Vercel Gateway)"
+      }
+    },
+    "anthropic/claude-sonnet-4": {
+      "runtime": {
+        "aliases": ["vercel/anthropic/claude-sonnet-4"],
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "Claude Sonnet 4 (Vercel Gateway)"
+      }
+    }
+  }
+}

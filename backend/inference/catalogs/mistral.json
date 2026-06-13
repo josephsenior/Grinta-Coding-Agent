@@ -1,0 +1,54 @@
+{
+  "provider": "mistral",
+  "client": "openai_compatible",
+  "metadata": {
+    "dynamic_listing": true
+  },
+  "models": {
+    "mistral-large-latest": {
+      "runtime": {
+        "aliases": ["mistral/mistral-large-latest", "mistral-large-latest"],
+        "context_window_tokens": 128000,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "Mistral Large"
+      }
+    },
+    "codestral-latest": {
+      "runtime": {
+        "aliases": ["mistral/codestral-latest", "codestral-latest"],
+        "context_window_tokens": 256000,
+        "max_input_tokens": 240000,
+        "max_output_tokens": 16000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "Codestral"
+      }
+    },
+    "devstral-small-latest": {
+      "runtime": {
+        "aliases": ["mistral/devstral-small-latest", "devstral-small-latest"],
+        "context_window_tokens": 128000,
+        "max_input_tokens": 120000,
+        "max_output_tokens": 8000,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true
+      },
+      "metadata": {
+        "display_name": "Devstral Small"
+      }
+    }
+  }
+}
