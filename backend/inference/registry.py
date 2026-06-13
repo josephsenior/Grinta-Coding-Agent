@@ -6,6 +6,7 @@ and capability lookup. Prefer importing from this module for new code.
 
 from __future__ import annotations
 
+import os
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -235,6 +236,18 @@ def include_remote_listing_for_provider(
     return bool((api_key or '').strip())
 
 
+def resolve_include_remote_model_listing(explicit: bool | None = None) -> bool:
+    """Return whether hosted providers should merge remote ``/v1/models`` listings.
+
+    Default is catalog-only pickers. Set ``GRINTA_INCLUDE_REMOTE_MODEL_LISTING=1``
+    or pass ``include_remote=True`` explicitly to opt in.
+    """
+    if explicit is not None:
+        return explicit
+    raw = (os.environ.get('GRINTA_INCLUDE_REMOTE_MODEL_LISTING') or '').strip().lower()
+    return raw in {'1', 'true', 'yes', 'on'}
+
+
 def get_static_model_names(
     provider: str | None, *, featured_only: bool = False
 ) -> list[str]:
@@ -258,24 +271,33 @@ def list_model_names(
     *,
     api_key: str | None = None,
     base_url: str | None = None,
-    include_remote: bool = True,
+    include_remote: bool | None = None,
     include_local: bool = True,
 ) -> list[str]:
-    """Merge dynamic and catalog model ids for *provider* (API-first when available)."""
+    """Return model ids for *provider* (catalog-first for hosted; probe for local)."""
     normalized = normalize_provider_name(provider)
     if normalized is None:
         return []
 
+    include_remote_api = resolve_include_remote_model_listing(include_remote)
     names: list[str] = []
 
     if include_local and normalized in LOCAL_PROVIDERS:
         names.extend(get_local_model_names(normalized))
 
-    if include_remote and include_remote_listing_for_provider(normalized, api_key):
-        names.extend(fetch_remote_models(normalized, api_key, base_url=base_url))
-
-    if not names:
-        names.extend(get_static_model_names(normalized, featured_only=True))
+    if normalized in LOCAL_PROVIDERS:
+        if not names:
+            names.extend(get_static_model_names(normalized, featured_only=True))
+    else:
+        names.extend(get_static_model_names(normalized, featured_only=False))
+        if include_remote_api and include_remote_listing_for_provider(
+            normalized, api_key
+        ):
+            for model_id in fetch_remote_models(
+                normalized, api_key, base_url=base_url
+            ):
+                if model_id not in names:
+                    names.append(model_id)
 
     seen: set[str] = set()
     ordered: list[str] = []
@@ -337,7 +359,7 @@ def _catalog_fallback_entries(
     provider: str,
     catalog_entries: list[ModelEntry],
 ) -> list[ModelEntry]:
-    """Offline picker fallback when dynamic listing is unavailable."""
+    """Build picker rows from static catalog entries."""
     from backend.inference.param_profiles import resolve_effective_model_entry
 
     enriched: list[ModelEntry] = []
@@ -362,10 +384,11 @@ def build_model_entries_by_provider(
     api_key: str | None = None,
     base_url: str | None = None,
     provider: str | None = None,
-    include_remote: bool = True,
+    include_remote: bool | None = None,
     include_local: bool = True,
 ) -> dict[str, list[ModelEntry]]:
-    """Build picker entries grouped by provider (API-first listing, catalog overlay)."""
+    """Build picker entries grouped by provider (catalog-first for hosted providers)."""
+    include_remote_api = resolve_include_remote_model_listing(include_remote)
     providers = [provider] if provider else get_listable_providers()
     by_provider: dict[str, list[ModelEntry]] = {}
 
@@ -382,36 +405,49 @@ def build_model_entries_by_provider(
         entries: list[ModelEntry] = []
         known_names: set[str] = set()
 
-        dynamic_ids: list[str] = []
-        if include_local and normalized in LOCAL_PROVIDERS:
-            dynamic_ids.extend(get_local_model_names(normalized))
-        elif include_remote and include_remote_listing_for_provider(
-            normalized, api_key
-        ):
-            dynamic_ids.extend(
-                fetch_remote_models(normalized, api_key, base_url=base_url)
-            )
-
-        if dynamic_ids:
-            for model_id in dynamic_ids:
-                bare = model_id.split('/')[-1] if '/' in model_id else model_id
-                if bare in known_names or model_id in known_names:
-                    continue
-                source = 'local' if normalized in LOCAL_PROVIDERS else 'remote'
-                entries.append(
-                    _picker_entry_for_model_id(
-                        normalized,
-                        model_id,
-                        source=source,
-                        display_name=model_id if model_id != bare else None,
+        if normalized in LOCAL_PROVIDERS:
+            if include_local:
+                for model_id in get_local_model_names(normalized):
+                    bare = model_id.split('/')[-1] if '/' in model_id else model_id
+                    if bare in known_names or model_id in known_names:
+                        continue
+                    entries.append(
+                        _picker_entry_for_model_id(
+                            normalized,
+                            model_id,
+                            source='local',
+                            display_name=model_id if model_id != bare else None,
+                        )
                     )
-                )
-                known_names.add(bare)
-                if model_id != bare:
-                    known_names.add(model_id)
-        elif catalog_entries:
-            entries = _catalog_fallback_entries(normalized, catalog_entries)
-            known_names = {entry.name for entry in entries}
+                    known_names.add(bare)
+                    if model_id != bare:
+                        known_names.add(model_id)
+            if not entries and catalog_entries:
+                entries = _catalog_fallback_entries(normalized, catalog_entries)
+        else:
+            if catalog_entries:
+                entries = _catalog_fallback_entries(normalized, catalog_entries)
+                known_names = {entry.name for entry in entries}
+            if include_remote_api and include_remote_listing_for_provider(
+                normalized, api_key
+            ):
+                for model_id in fetch_remote_models(
+                    normalized, api_key, base_url=base_url
+                ):
+                    bare = model_id.split('/')[-1] if '/' in model_id else model_id
+                    if bare in known_names or model_id in known_names:
+                        continue
+                    entries.append(
+                        _picker_entry_for_model_id(
+                            normalized,
+                            model_id,
+                            source='remote',
+                            display_name=model_id if model_id != bare else None,
+                        )
+                    )
+                    known_names.add(bare)
+                    if model_id != bare:
+                        known_names.add(model_id)
 
         _sort_picker_entries(entries)
         by_provider[normalized] = entries
@@ -518,6 +554,6 @@ def empty_model_picker_hint(provider: str | None) -> str:
             f'(e.g. ollama serve) or enter a custom model id.'
         )
     return (
-        f'No predefined models for {label}. Enter a model id or configure an API key '
-        f'to refresh from the provider.'
+        f'No catalog models for {label}. Enter a model id manually or add a row to '
+        f'the provider catalog.'
     )

@@ -24,12 +24,25 @@ Configuration keys and param validation live in [`backend/core/config/`](../back
 
 ### Model listing sources
 
-Grinta uses **API-first listing** with **catalog overlay**:
+Grinta uses **catalog-first listing** with optional remote merge and live local probes:
 
-1. **Dynamic listing (primary)** — [`registry.build_model_entries_by_provider()`](backend/inference/registry.py) calls transport adapters in [`model_list_backends.py`](backend/inference/model_list_backends.py) (OpenAI `/v1/models`, Anthropic models API, Google `genai`, local probes) when an API key is available (local providers probe without a key).
-2. **Catalog overlay** — [`catalogs/*.json`](backend/inference/catalogs/) enrich matches with pricing, limits, param overrides, and aliases; used alone only when dynamic listing is unavailable (offline / no key / empty API response).
-3. **Param profiles** — family-level call-surface rules in [`param_profiles.json`](backend/inference/param_profiles.json); applied to API ids without a catalog row via [`resolve_effective_model_entry()`](backend/inference/param_profiles.py).
-4. **Session pinning** — [`runtime_profile.py`](backend/inference/runtime_profile.py) pins limits on the LLM instance; `settings.json` overrides still win.
+1. **Static catalog (default for hosted providers)** — [`catalogs/*.json`](backend/inference/catalogs/) define curated models with pricing, limits, param overrides, and aliases. Pickers load these by default.
+2. **Optional remote merge** — set `GRINTA_INCLUDE_REMOTE_MODEL_LISTING=1` or pass `include_remote=True` to [`registry.build_model_entries_by_provider()`](backend/inference/registry.py) / [`list_model_names()`](backend/inference/registry.py) to append ids from provider `/v1/models` APIs via [`model_list_backends.py`](backend/inference/model_list_backends.py).
+3. **Local probe (always for Ollama / LM Studio / vLLM)** — live discovery when the local server is running; catalog rows are optional fallback.
+4. **Param profiles** — family-level call-surface rules in [`param_profiles.json`](backend/inference/param_profiles.json); applied when a catalog row is missing (manual model ids, local models).
+5. **Session pinning** — [`runtime_profile.py`](backend/inference/runtime_profile.py) pins limits on the LLM instance; `settings.json` overrides still win.
+
+### Catalog maintenance
+
+When a hosted provider ships a model you want in pickers or docs:
+
+1. Add a row under the provider file in [`catalogs/*.json`](backend/inference/catalogs/) with a full `runtime` block (limits, tool flags, thinking/reasoning overrides).
+2. Set `verified: true` / `featured: true` for demo-ready models.
+3. Extend [`reasoning_profiles.json`](backend/inference/reasoning_profiles.json) only when the model introduces a **new family** of reasoning tiers.
+4. Extend [`param_profiles.json`](backend/inference/param_profiles.json) only for models without a catalog row (local ids, manual entry).
+5. Run `pytest backend/tests/unit/inference/test_catalog_integrity.py`.
+
+Batch updates on flagship releases; do not mirror every provider API rename automatically.
 
 ## Integrations layer
 

@@ -47,7 +47,8 @@ def _render_critical(
         '   - **Bugfix:** reproduce or capture the failing test, fix, then re-run the narrowest test/reproducer.\n'
         '   - **Implementation:** run lint/typecheck when the project uses them; smoke-test the changed path.\n'
         '   - **Refactor:** run affected tests or a narrow smoke check on touched modules.\n'
-        '   - **Blocked verification:** state exactly what was not verified and why before the final summary.'
+        '   - **Blocked verification:** state the concrete blocker (no harness, missing dependency/credential, '
+        'environment cannot install/build/run, unsafe/destructive check, or no meaningful runnable check) before the final summary.'
     )
     return render_partial(
         'system_partial_04_critical.md',

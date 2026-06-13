@@ -191,7 +191,9 @@ class TestRegistryRemoteListingIntegration:
         with _mock_httpx_get(
             json_payload={'data': [{'id': catalog_model}, {'id': 'remote-extra'}]}
         ):
-            names = list_model_names('groq', api_key='gsk_merge_test')
+            names = list_model_names(
+                'groq', api_key='gsk_merge_test', include_remote=True
+            )
 
         assert catalog_model in names
         assert 'remote-extra' in names
@@ -203,6 +205,7 @@ class TestRegistryRemoteListingIntegration:
             by_provider = build_model_entries_by_provider(
                 provider='groq',
                 api_key='gsk_entries_test',
+                include_remote=True,
             )
 
         names = {entry.name for entry in by_provider['groq']}

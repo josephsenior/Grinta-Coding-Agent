@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from backend.inference.catalog_loader import lookup
 from backend.inference.param_profiles import (
     resolve_effective_model_entry,
+    resolve_model_entry_for_capabilities,
     resolve_param_profile_id,
     synthetic_entry_from_profile,
 )
+from backend.inference.reasoning import reasoning_effort_options
 from backend.inference.runtime_profile import resolve_runtime_profile
 
 
@@ -29,6 +32,54 @@ def test_openai_gpt5_catalog_entry_keeps_runtime_overrides() -> None:
     assert entry is not None
     assert entry.use_max_completion_tokens is True
     assert source in {'catalog', 'catalog_family', 'family'}
+
+
+def test_opencode_claude_fable_keeps_catalog_variants() -> None:
+    raw = lookup('opencode/claude-fable-5')
+    assert raw is not None
+    entry = resolve_model_entry_for_capabilities('claude-fable-5', 'opencode', fallback=raw)
+    assert entry is not None
+    assert (entry.metadata or {}).get('family') == 'claude-fable'
+    assert reasoning_effort_options(entry, include_disabled=True) == (
+        'none',
+        'low',
+        'medium',
+        'high',
+        'xhigh',
+        'max',
+    )
+
+
+def test_opencode_claude_haiku_uses_provider_scoped_catalog() -> None:
+    raw = lookup('opencode/claude-haiku-4-5')
+    assert raw is not None
+    entry = resolve_model_entry_for_capabilities(
+        'claude-haiku-4-5', 'opencode', fallback=raw
+    )
+    assert entry is not None
+    assert entry.provider == 'opencode'
+    assert reasoning_effort_options(entry, include_disabled=True) == (
+        'none',
+        'high',
+        'max',
+    )
+
+
+def test_opencode_deepseek_flash_free_not_mapped_to_gemini_profile() -> None:
+    raw = lookup('opencode/deepseek-v4-flash-free')
+    assert raw is not None
+    entry = resolve_model_entry_for_capabilities(
+        'deepseek-v4-flash-free', 'opencode', fallback=raw
+    )
+    assert entry is not None
+    assert (entry.metadata or {}).get('family') == 'deepseek-flash-free'
+    assert reasoning_effort_options(entry, include_disabled=True) == (
+        'none',
+        'low',
+        'medium',
+        'high',
+        'max',
+    )
 
 
 class _Cfg:

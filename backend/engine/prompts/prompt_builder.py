@@ -434,6 +434,7 @@ def _collect_system_prompt_sections(
                 'When your work is complete, write a comprehensive final summary covering:\n'
                 '- What you did\n'
                 '- What changed\n'
+                '- Verification run and result, or the concrete blocker if verification could not run\n'
                 '- Any important notes or caveats for the user\n'
                 '- Any follow-up recommendations if relevant\n\n'
                 'Writing that summary ends the run. You do not need to call any special tool to signal completion. Your final response IS the completion.',

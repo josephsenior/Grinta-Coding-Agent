@@ -1,9 +1,6 @@
 {
   "provider": "openrouter",
   "client": "openai_compatible",
-  "metadata": {
-    "dynamic_listing": true
-  },
   "models": {
     "anthropic/claude-sonnet-4": {
       "runtime": {

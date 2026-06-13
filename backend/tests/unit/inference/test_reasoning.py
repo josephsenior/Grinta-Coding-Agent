@@ -76,6 +76,24 @@ class TestGatewayReasoningOptions:
         options = reasoning_effort_options(entry, include_disabled=True)
         assert 'medium' in options
         assert 'none' in options
+        assert 'minimal' not in options
+
+    def test_openrouter_gpt41_has_no_reasoning_options(self):
+        from backend.inference.param_profiles import (
+            resolve_model_entry_for_capabilities,
+        )
+        from backend.inference.reasoning import (
+            reasoning_effort_display_options,
+            reasoning_effort_options,
+        )
+
+        entry = resolve_model_entry_for_capabilities(
+            'openai/gpt-4.1',
+            'openrouter',
+        )
+        assert entry is not None
+        assert reasoning_effort_options(entry, include_disabled=True) == ()
+        assert reasoning_effort_display_options(entry, include_disabled=True) == []
 
     def test_vercel_gemini_via_effective_entry(self):
         from backend.inference.param_profiles import (
@@ -90,6 +108,31 @@ class TestGatewayReasoningOptions:
         assert entry is not None
         options = reasoning_effort_options(entry, include_disabled=True)
         assert 'medium' in options
+
+
+class TestReasoningDisplayOptions:
+    def test_opencode_claude_fable_display_labels_match_variants(self):
+        from backend.inference.reasoning import reasoning_effort_display_options
+
+        entry = lookup('opencode/claude-fable-5')
+        assert entry is not None
+        labels_by_value = {
+            value: label
+            for label, value in reasoning_effort_display_options(
+                entry, include_disabled=True
+            )
+        }
+        assert labels_by_value[''] == 'Default'
+        assert labels_by_value['xhigh'] == 'Xhigh'
+        assert labels_by_value['max'] == 'Max'
+        assert 'minimal' not in labels_by_value
+
+    def test_gemini_control_label(self):
+        from backend.inference.reasoning import reasoning_control_label
+
+        entry = lookup('google/gemini-2.5-pro')
+        assert entry is not None
+        assert reasoning_control_label(entry) == 'Thinking level'
 
 
 class TestResolveReasoningPlan:

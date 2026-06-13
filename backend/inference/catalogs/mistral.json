@@ -1,9 +1,6 @@
 {
   "provider": "mistral",
   "client": "openai_compatible",
-  "metadata": {
-    "dynamic_listing": true
-  },
   "models": {
     "mistral-large-latest": {
       "runtime": {
