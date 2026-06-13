@@ -18,9 +18,9 @@ from backend.cli._tool_display.summarize import (
     parse_tool_arguments_json,
 )
 from backend.cli.theme import NAVY_BG, get_grinta_pygments_style
-
-
-from backend.inference.tool_history import flatten_tool_call_for_history as _flatten_tool_call_plain
+from backend.inference.tool_history import (
+    flatten_tool_call_for_history as _flatten_tool_call_plain,
+)
 
 
 def flatten_tool_call_for_history(name: str, arguments: str) -> str:

@@ -18,7 +18,6 @@ import httpx
 from anthropic import Anthropic, AsyncAnthropic
 from openai import AsyncOpenAI, OpenAI
 
-from backend.inference.tool_history import flatten_tool_call_for_history
 from backend.core import json_compat as json
 from backend.core.logger import app_logger as logger
 from backend.inference.direct_clients_anthropic_ops import (
@@ -54,6 +53,7 @@ from backend.inference.direct_clients_openai_ops import (
 from backend.inference.direct_clients_openai_ops import (
     strip_unsupported_params as _strip_unsupported_params_impl,
 )
+from backend.inference.tool_history import flatten_tool_call_for_history
 from backend.inference.tool_types import is_valid_tool_call_name
 
 # Shared httpx pool: reuse provider/base_url transports across sessions so the

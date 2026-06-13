@@ -17,8 +17,8 @@ import pytest
 from backend.inference import registry
 from backend.inference.model_list_backends import (
     OPENAI_COMPAT_PROVIDERS,
-    resolve_listing_base_url,
     list_models_for_provider,
+    resolve_listing_base_url,
 )
 from backend.inference.registry import (
     build_model_entries_by_provider,

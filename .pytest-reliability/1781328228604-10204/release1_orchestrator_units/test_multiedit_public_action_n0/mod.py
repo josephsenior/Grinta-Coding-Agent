@@ -1,0 +1,2 @@
+def login():
+    return True
