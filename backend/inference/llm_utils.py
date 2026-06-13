@@ -20,16 +20,36 @@ def check_tools(tools: list[dict], llm_config: LLMConfig) -> list[dict]:
         Modified tools compatible with the LLM
 
     """
-    if not llm_config.model or 'gemini' not in llm_config.model.lower():
-        return tools
+    model = llm_config.model or ''
+    if 'gemini' in model.lower():
+        logger.info(
+            'Removing default fields and unsupported formats from tools for Gemini model %s '
+            "since Gemini models have limited format support (only 'enum' and 'date-time' for STRING types).",
+            model,
+        )
+        return _clean_tools_for_gemini(tools)
 
-    logger.info(
-        'Removing default fields and unsupported formats from tools for Gemini model %s '
-        "since Gemini models have limited format support (only 'enum' and 'date-time' for STRING types).",
-        llm_config.model,
-    )
+    from backend.inference.mappers.anthropic import model_requires_anthropic_tool_schema
 
-    return _clean_tools_for_gemini(tools)
+    if model_requires_anthropic_tool_schema(model):
+        return _clean_tools_for_anthropic(tools)
+
+    return tools
+
+
+def _clean_tools_for_anthropic(tools: list[dict]) -> list[dict]:
+    """Strip Anthropic-incompatible JSON Schema combinators from tool parameters."""
+    from backend.inference.mappers.anthropic import _normalize_input_schema
+
+    checked_tools = copy.deepcopy(tools)
+    for tool in checked_tools:
+        function = tool.get('function')
+        if not isinstance(function, dict):
+            continue
+        parameters = function.get('parameters')
+        if isinstance(parameters, dict):
+            function['parameters'] = _normalize_input_schema(parameters)
+    return checked_tools
 
 
 def _clean_tools_for_gemini(

@@ -82,12 +82,50 @@ class TestCheckTools:
         result = check_tools(tools, config)
         assert result is tools
 
-    def test_anthropic_model_unchanged(self):
-        """Test Anthropic models don't trigger cleaning."""
-        tools = [{'function': {'parameters': {'properties': {'x': {'default': 'y'}}}}}]
-        config = LLMConfig(model='claude-sonnet-4-6', api_key='test')
+    def test_anthropic_model_strips_top_level_schema_combinators(self):
+        """Claude models should drop unsupported top-level JSON Schema combinators."""
+        tools = [
+            {
+                'type': 'function',
+                'function': {
+                    'name': 'terminal_manager',
+                    'parameters': {
+                        'type': 'object',
+                        'properties': {'action': {'type': 'string'}},
+                        'required': ['action'],
+                        'allOf': [
+                            {
+                                'if': {'properties': {'action': {'const': 'open'}}},
+                                'then': {'required': ['command', 'security_risk']},
+                            }
+                        ],
+                    },
+                },
+            }
+        ]
+        config = LLMConfig(model='claude-opus-4.8', api_key='test')
         result = check_tools(tools, config)
-        assert result is tools
+        params = result[0]['function']['parameters']
+        assert 'allOf' not in params
+        assert params['required'] == ['action']
+        assert 'action' in params['properties']
+
+    def test_vercel_routed_claude_model_strips_schema_combinators(self):
+        """Gateway-routed Claude models still need Anthropic-compatible schemas."""
+        tools = [
+            {
+                'function': {
+                    'parameters': {
+                        'type': 'object',
+                        'properties': {'x': {'type': 'string'}},
+                        'anyOf': [{'type': 'object', 'properties': {'y': {'type': 'string'}}}],
+                    }
+                }
+            }
+        ]
+        config = LLMConfig(model='anthropic/claude-opus-4-8', api_key='test')
+        result = check_tools(tools, config)
+        assert 'anyOf' not in result[0]['function']['parameters']
 
 
 class TestGeminiToolCleaning:
