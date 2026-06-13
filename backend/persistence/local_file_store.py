@@ -45,9 +45,17 @@ class LocalFileStore(FileStore):
         try:
             from backend.core.type_safety.path_validation import SafePath
 
+            # Strip a bare leading slash so that paths like '/file.txt' are
+            # treated as workspace-relative on every platform (matching Windows
+            # behaviour where Path('/file.txt').is_absolute() is False).
+            # The SafePath workspace-boundary check still applies afterwards.
+            stripped_path = path.lstrip('/') if path.startswith('/') else path
+            if not stripped_path:
+                stripped_path = '.'
+
             # Use SafePath for security validation
             safe_path = SafePath.validate(
-                path,
+                stripped_path,
                 workspace_root=self.root,
                 must_be_relative=True,  # Enforce storage root boundaries
             )

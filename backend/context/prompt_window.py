@@ -377,7 +377,7 @@ def estimate_prompt_events_tokens(events: Iterable[Event]) -> int:
 def event_fingerprint(event: Event) -> str:
     """Stable fingerprint for prompt-window/cache diagnostics."""
     payload = _event_payload_text(event)
-    digest = hashlib.sha1(payload.encode('utf-8', 'ignore')).hexdigest()[:16]
+    digest = hashlib.sha1(payload.encode('utf-8', 'ignore'), usedforsecurity=False).hexdigest()[:16]
     event_id = getattr(event, 'id', None)
     return f'{type(event).__name__}:{event_id}:{digest}'
 
@@ -997,7 +997,8 @@ def _result(
 ) -> PromptWindowResult:
     fingerprint_payload = '|'.join(event_fingerprint(event) for event in events)
     cache_fingerprint = hashlib.sha1(
-        fingerprint_payload.encode('utf-8', 'ignore')
+        fingerprint_payload.encode('utf-8', 'ignore'),
+        usedforsecurity=False,
     ).hexdigest()[:16]
     return PromptWindowResult(
         events=events,

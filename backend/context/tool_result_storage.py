@@ -46,7 +46,7 @@ def _stable_filename(event: Event, content: str) -> str:
     event_id = getattr(event, 'id', None)
     if isinstance(event_id, int):
         return f'event_{event_id}.txt'
-    digest = hashlib.sha1(content[:4000].encode('utf-8', 'ignore')).hexdigest()[:12]
+    digest = hashlib.sha1(content[:4000].encode('utf-8', 'ignore'), usedforsecurity=False).hexdigest()[:12]
     return f'hash_{digest}.txt'
 
 

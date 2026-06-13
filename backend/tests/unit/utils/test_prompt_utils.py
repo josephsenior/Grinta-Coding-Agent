@@ -1121,7 +1121,7 @@ class TestBuildSystemPromptRenders:
         assert 'command=callers' in result
         assert 'command=semantic_search' in result
         assert 'read(type="symbols", symbols=[...])' in result
-        assert 'read(type="file", path=..., start_line=..., end_line=...)' in result
+        assert 'read(type="file", path=...)' in result
         assert 'test_coverage' not in result
         assert 'glob' in result and 'grep' in result
         assert 'Test files for a module' in result

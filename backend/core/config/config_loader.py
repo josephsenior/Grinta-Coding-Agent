@@ -216,10 +216,10 @@ def _maybe_set_provider_default_base_url(
     )
 
     model_prefix = extract_provider_prefix(model_value or '')
-    if model_prefix == provider_value and provider_value not in {
-        'opencode',
-        'opencode-go',
-    }:
+    # Skip URL injection only when the provider is a native litellm provider
+    # (i.e., NOT in _PROVIDER_DEFAULT_URLS) and the model is already prefixed.
+    # Proxy providers (lightning, opencode, groq, etc.) always need the URL.
+    if model_prefix == provider_value and provider_value not in _PROVIDER_DEFAULT_URLS:
         return
     provider_url = _PROVIDER_DEFAULT_URLS.get(provider_value)
     if provider_url:
