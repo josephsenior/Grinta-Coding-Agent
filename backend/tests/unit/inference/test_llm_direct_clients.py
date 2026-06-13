@@ -390,6 +390,42 @@ class TestAnthropicClientHelpers:
             }
         ]
 
+    def test_prepare_kwargs_strips_top_level_schema_combinators(self):
+        from backend.inference.mappers.anthropic import prepare_kwargs
+
+        messages = [{'role': 'user', 'content': 'Hi'}]
+        tools = [
+            {
+                'type': 'function',
+                'function': {
+                    'name': 'terminal_manager',
+                    'description': 'Manage terminals',
+                    'parameters': {
+                        'type': 'object',
+                        'properties': {'action': {'type': 'string'}},
+                        'required': ['action'],
+                        'allOf': [
+                            {
+                                'if': {'properties': {'action': {'const': 'open'}}},
+                                'then': {'required': ['command']},
+                            }
+                        ],
+                    },
+                },
+            }
+        ]
+
+        _, kwargs = prepare_kwargs(
+            messages,
+            {'tools': tools},
+            default_model='claude-opus-4-8',
+        )
+
+        schema = kwargs['tools'][0]['input_schema']
+        assert 'allOf' not in schema
+        assert schema['type'] == 'object'
+        assert schema['required'] == ['action']
+
     def test_prepare_kwargs_defaults_empty_tool_parameters(self):
         from backend.inference.mappers.anthropic import prepare_kwargs
 

@@ -233,17 +233,112 @@ def _default_input_schema() -> dict[str, Any]:
     return {'type': 'object', 'properties': {}}
 
 
-def _normalize_input_schema(schema: Any) -> dict[str, Any]:
+_SCHEMA_COMBINATORS = ('oneOf', 'allOf', 'anyOf')
+_CONDITIONAL_KEYS = ('if', 'then', 'else')
+
+
+def model_requires_anthropic_tool_schema(model: str) -> bool:
+    """Return True when tool schemas must satisfy Anthropic JSON Schema rules."""
+    if not model:
+        return False
+
+    from backend.inference.catalog_loader import (
+        TRANSPORT_CLIENT_ANTHROPIC,
+        resolve_transport_client,
+    )
+
+    if resolve_transport_client(model) == TRANSPORT_CLIENT_ANTHROPIC:
+        return True
+
+    lowered = model.lower()
+    return (
+        'anthropic/' in lowered
+        or '/claude' in lowered
+        or lowered.startswith('claude')
+    )
+
+
+def _merge_combinator_branches(branches: Any) -> dict[str, Any]:
+    if not isinstance(branches, list):
+        return {}
+
+    merged_props: dict[str, Any] = {}
+    merged_required: list[str] = []
+    for branch in branches:
+        if not isinstance(branch, dict):
+            continue
+        candidate = branch
+        then_branch = branch.get('then')
+        if 'if' in branch and isinstance(then_branch, dict):
+            candidate = then_branch
+        props = candidate.get('properties')
+        if isinstance(props, dict):
+            merged_props.update(props)
+        required = candidate.get('required')
+        if isinstance(required, list):
+            merged_required.extend(str(item) for item in required)
+
+    merged: dict[str, Any] = {}
+    if merged_props:
+        merged['properties'] = merged_props
+    if merged_required:
+        merged['required'] = list(dict.fromkeys(merged_required))
+    return merged
+
+
+def _sanitize_json_schema_node(schema: Any, *, at_root: bool) -> dict[str, Any]:
     if not isinstance(schema, dict) or not schema:
-        return _default_input_schema()
-    normalized = dict(schema)
-    if not isinstance(normalized.get('type'), str) or not normalized.get('type'):
-        normalized['type'] = 'object'
-    if normalized.get('type') == 'object' and not isinstance(
-        normalized.get('properties'), dict
-    ):
-        normalized['properties'] = {}
+        return _default_input_schema() if at_root else {}
+
+    normalized: dict[str, Any] = dict(schema)
+
+    if at_root:
+        for combinator in _SCHEMA_COMBINATORS:
+            if combinator not in normalized:
+                continue
+            branches = normalized.pop(combinator)
+            # Conditional allOf blocks (if/then) encode optional required fields
+            # Anthropic cannot represent. oneOf/anyOf may define the base shape.
+            if combinator in ('oneOf', 'anyOf') and not normalized.get('properties'):
+                merged = _merge_combinator_branches(branches)
+                for key, value in merged.items():
+                    if key not in normalized:
+                        normalized[key] = value
+
+    for key in _CONDITIONAL_KEYS:
+        normalized.pop(key, None)
+
+    props = normalized.get('properties')
+    if isinstance(props, dict):
+        normalized['properties'] = {
+            name: _sanitize_json_schema_node(prop, at_root=False)
+            for name, prop in props.items()
+        }
+
+    items = normalized.get('items')
+    if isinstance(items, dict):
+        normalized['items'] = _sanitize_json_schema_node(items, at_root=False)
+    elif isinstance(items, list):
+        normalized['items'] = [
+            _sanitize_json_schema_node(item, at_root=False)
+            if isinstance(item, dict)
+            else item
+            for item in items
+        ]
+
+    if at_root:
+        if not isinstance(normalized.get('type'), str) or not normalized.get('type'):
+            normalized['type'] = 'object'
+        if normalized.get('type') == 'object' and not isinstance(
+            normalized.get('properties'), dict
+        ):
+            normalized['properties'] = {}
+
     return normalized
+
+
+def _normalize_input_schema(schema: Any) -> dict[str, Any]:
+    return _sanitize_json_schema_node(schema, at_root=True)
 
 
 def _openai_tool_to_anthropic(tool: dict[str, Any]) -> dict[str, Any] | None:
