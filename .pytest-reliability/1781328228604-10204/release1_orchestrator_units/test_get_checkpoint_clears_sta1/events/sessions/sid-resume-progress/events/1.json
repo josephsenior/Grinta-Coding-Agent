@@ -1,1 +1,0 @@
-{"id": 1, "timestamp": "2026-06-13T07:24:06.293888", "source": "agent", "message": "", "observation": "agent_state_changed", "content": "", "extras": {"_timestamp": null, "_source": "agent", "truncation_strategy": null, "agent_state": "finished", "reason": ""}, "_grinta_checksum": "1bc06bc11528ef5010eb9d8f92a4a74c3b8259cb02c8d3f97a9ae3a309111d56"}
