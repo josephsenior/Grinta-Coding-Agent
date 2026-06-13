@@ -5,7 +5,11 @@ from __future__ import annotations
 from backend.core.logger import app_logger as logger
 
 
-def persist_finish_lessons(*, summary: str) -> None:
+def persist_finish_lessons(
+    *,
+    summary: str,
+    session_id: str | None = None,
+) -> None:
     """Write finish-summary lessons into workspace memory and lessons.md."""
     summary = (summary or '').strip()
     if not summary:
@@ -13,8 +17,10 @@ def persist_finish_lessons(*, summary: str) -> None:
 
     lesson_body = summary[:800]
     try:
+        from backend.context.session_context import bind_session_context
         from backend.engine.tools.working_memory import _load_memory
 
+        bind_session_context(session_id=session_id)
         wm = _load_memory()
         extras: list[str] = []
         for section in ('decisions', 'findings'):

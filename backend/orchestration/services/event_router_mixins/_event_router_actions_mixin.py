@@ -201,7 +201,10 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                         persist_finish_lessons,
                     )
 
-                    persist_finish_lessons(summary=content)
+                    persist_finish_lessons(
+                        summary=content,
+                        session_id=self._ctrl.id,
+                    )
                 except Exception:
                     pass
                 await self._ctrl.set_agent_state_to(AgentState.FINISHED)

@@ -574,10 +574,107 @@ class TestMultiEditCommand:
         assert isinstance(action, MessageAction)
         assert 'return 42' in py.read_text(encoding='utf-8')
 
+    def test_multi_edit_resolves_edit_symbols_after_replace_string(self, tmp_path):
+        from backend.engine.function_calling import _handle_multi_edit_command
 
-# ---------------------------------------------------------------------------
-# health_check
-# ---------------------------------------------------------------------------
+        py = tmp_path / 'src' / 'mix.py'
+        py.parent.mkdir(parents=True, exist_ok=True)
+        py.write_text('HEADER = 0\n\ndef foo():\n    return 1\n', encoding='utf-8')
+
+        action = _handle_multi_edit_command(
+            '',
+            {
+                'file_edits': [
+                    {
+                        'path': 'src/mix.py',
+                        'operation': 'replace_string',
+                        'old_string': 'HEADER = 0\n',
+                        'new_string': 'HEADER = 1\n',
+                    },
+                    {
+                        'path': 'src/mix.py',
+                        'operation': 'edit_symbols_deferred',
+                        'edits': [
+                            {
+                                'symbol_name': 'foo',
+                                'new_content': 'def foo():\n    return 99\n',
+                            }
+                        ],
+                    },
+                ]
+            },
+        )
+
+        assert isinstance(action, MessageAction)
+        assert (tmp_path / 'src' / 'mix.py').read_text(encoding='utf-8') == (
+            'HEADER = 1\n\ndef foo():\n    return 99\n'
+        )
+
+    def test_multi_edit_resolves_edit_symbols_before_replace_string(self, tmp_path):
+        from backend.engine.function_calling import _handle_multi_edit_command
+
+        py = tmp_path / 'src' / 'mix.py'
+        py.parent.mkdir(parents=True, exist_ok=True)
+        py.write_text('def foo():\n    return 1\n\nHEADER = 0\n', encoding='utf-8')
+
+        action = _handle_multi_edit_command(
+            '',
+            {
+                'file_edits': [
+                    {
+                        'path': 'src/mix.py',
+                        'operation': 'edit_symbols_deferred',
+                        'edits': [
+                            {
+                                'symbol_name': 'foo',
+                                'new_content': 'def foo():\n    return 99\n',
+                            }
+                        ],
+                    },
+                    {
+                        'path': 'src/mix.py',
+                        'operation': 'replace_string',
+                        'old_string': 'HEADER = 0\n',
+                        'new_string': 'HEADER = 1\n',
+                    },
+                ]
+            },
+        )
+
+        assert isinstance(action, MessageAction)
+        assert (tmp_path / 'src' / 'mix.py').read_text(encoding='utf-8') == (
+            'def foo():\n    return 99\n\nHEADER = 1\n'
+        )
+
+    def test_multi_edit_replace_string_order_is_preserved(self, tmp_path):
+        from backend.engine.function_calling import _handle_multi_edit_command
+
+        py = tmp_path / 'src' / 'chain.py'
+        py.parent.mkdir(parents=True, exist_ok=True)
+        py.write_text('STEP = 0\n', encoding='utf-8')
+
+        action = _handle_multi_edit_command(
+            '',
+            {
+                'file_edits': [
+                    {
+                        'path': 'src/chain.py',
+                        'operation': 'replace_string',
+                        'old_string': 'STEP = 0\n',
+                        'new_string': 'STEP = 1\n',
+                    },
+                    {
+                        'path': 'src/chain.py',
+                        'operation': 'replace_string',
+                        'old_string': 'STEP = 1\n',
+                        'new_string': 'STEP = 2\n',
+                    },
+                ]
+            },
+        )
+
+        assert isinstance(action, MessageAction)
+        assert (tmp_path / 'src' / 'chain.py').read_text(encoding='utf-8') == 'STEP = 2\n'
 
 
 class TestHealthCheck:

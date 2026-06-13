@@ -15,6 +15,7 @@ from typing import Any
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual import work
 from textual.widget import Widget
 from textual.widgets import (
     Button,
@@ -423,6 +424,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         self._entries_by_provider = self._load_catalog_entries(config)
         self._selected_model_value: str | None = None
         self._selected_provider_value: str | None = None
+        self._model_list_request_id = 0
 
     def _resolve_listing_api_key(self, provider: str | None = None) -> str | None:
         from backend.inference.registry import resolve_api_key_for_provider
@@ -437,16 +439,67 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             return typed
         return resolve_api_key_for_provider(self._config, selected)
 
-    def _reload_model_entries(self, provider: str | None = None) -> None:
+    def _fetch_model_entries_for_provider(self, provider: str) -> dict[str, list[Any]]:
         from backend.inference.registry import build_model_entries_by_provider
 
-        selected = provider or self._current_provider()
-        api_key = self._resolve_listing_api_key(selected)
-        merged = build_model_entries_by_provider(
+        api_key = self._resolve_listing_api_key(provider)
+        return build_model_entries_by_provider(
             api_key=api_key,
-            provider=selected,
+            provider=provider,
+            include_remote=bool((api_key or '').strip()),
         )
+
+    def _apply_model_list_to_ui(self, provider: str) -> None:
+        model_select = self.query_one('#settings-model', Select)
+        options = self._model_options(provider)
+        values = {value for _label, value in options}
+        model = self._current_model_for_provider(provider)
+        if model not in values:
+            model = options[0][1] if options else '__custom__'
+        model_select.set_options(options)
+        model_select.value = model
+        self._selected_model_value = model
+        self.query_one('#settings-custom-model', Input).value = (
+            self._current_custom_model_for_provider(provider)
+        )
+        self._sync_custom_model_visibility()
+        self._sync_reasoning_options(provider, model)
+        self._sync_model_metadata()
+
+    @work(exclusive=True)
+    async def _refresh_model_entries_async(self, provider: str | None = None) -> None:
+        selected = provider or self._current_provider()
+        request_id = self._model_list_request_id
+        if not self.is_mounted:
+            return
+        self._set_feedback(f'Loading {self._provider_label(selected)} models...')
+        try:
+            merged = await asyncio.to_thread(
+                self._fetch_model_entries_for_provider, selected
+            )
+        except Exception:
+            if request_id == self._model_list_request_id and self.is_mounted:
+                self._set_feedback(
+                    'Could not refresh models; catalog/custom still available.',
+                    error=True,
+                )
+            return
+        if request_id != self._model_list_request_id or not self.is_mounted:
+            return
         self._entries_by_provider.update(merged)
+        self._apply_model_list_to_ui(selected)
+        self._set_feedback('')
+
+    def _load_catalog_entries_for_provider(self, provider: str) -> None:
+        from backend.inference.registry import build_model_entries_by_provider
+
+        self._entries_by_provider.update(
+            build_model_entries_by_provider(provider=provider, include_remote=False)
+        )
+
+    def _schedule_model_refresh(self, provider: str | None = None) -> None:
+        self._model_list_request_id += 1
+        self._refresh_model_entries_async(provider)
 
     def compose(self) -> ComposeResult:
         from backend.cli.config_manager import get_masked_api_key
@@ -502,19 +555,10 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
 
     def on_mount(self) -> None:
         self.query_one('#settings-provider', Select).focus()
-        self._reload_model_entries()
         provider = self._current_provider()
-        model_select = self.query_one('#settings-model', Select)
-        model = self._current_model_for_provider(provider)
-        model_select.set_options(self._model_options(provider))
-        model_select.value = model
         self._selected_provider_value = provider
-        self._selected_model_value = model
-        self.query_one('#settings-custom-model', Input).value = (
-            self._current_custom_model_for_provider(provider)
-        )
-        self._sync_custom_model_visibility()
-        self._sync_model_metadata()
+        self._apply_model_list_to_ui(provider)
+        self._schedule_model_refresh(provider)
 
     def action_save(self) -> None:
         self._submit()
@@ -536,19 +580,10 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         if event.select.id == 'settings-provider':
             provider = event.value
             self._selected_provider_value = provider
-            self._reload_model_entries(provider)
-            model_select = self.query_one('#settings-model', Select)
-            model = self._current_model_for_provider(provider)
-            model_select.set_options(self._model_options(provider))
-            model_select.value = model
-            self._selected_model_value = model
-            self.query_one('#settings-custom-model', Input).value = (
-                self._current_custom_model_for_provider(provider)
-            )
+            self._load_catalog_entries_for_provider(provider)
+            self._apply_model_list_to_ui(provider)
             self._sync_api_key_label(provider)
-            self._sync_custom_model_visibility()
-            self._sync_reasoning_options(provider, model)
-            self._sync_model_metadata()
+            self._schedule_model_refresh(provider)
             return
         if event.select.id == 'settings-model':
             self._selected_model_value = event.value
@@ -563,18 +598,22 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
     def _load_catalog_entries(config: AppConfig) -> dict[str, list[Any]]:
         from backend.inference.registry import (
             build_model_entries_by_provider,
-            resolve_api_key_for_provider,
+            get_listable_providers,
         )
+        from backend.cli.config_manager import get_current_provider
 
-        try:
-            provider = config.get_llm_config().provider
-        except Exception:
-            provider = None
-        api_key = resolve_api_key_for_provider(config, provider)
-        return build_model_entries_by_provider(
-            api_key=api_key,
-            include_remote=bool((api_key or '').strip()),
-        )
+        by_provider: dict[str, list[Any]] = {
+            provider: [] for provider in get_listable_providers()
+        }
+        current = get_current_provider(config)
+        if current:
+            by_provider.update(
+                build_model_entries_by_provider(
+                    provider=current,
+                    include_remote=False,
+                )
+            )
+        return by_provider
 
     @staticmethod
     def _provider_label(provider: str | None) -> str:

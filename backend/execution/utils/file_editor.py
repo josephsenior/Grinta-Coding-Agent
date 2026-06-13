@@ -103,6 +103,8 @@ class FileEditor(
         # previously-read content. Bounded to avoid unbounded growth in long
         # sessions.
         self._recent_writes: dict[str, float] = {}
+        # When True, skip per-edit syntax validation (multi_edit validates once per file).
+        self._defer_syntax_validation: bool = False
 
     def _io_meta_key(self, file_path: Path) -> str:
         return self._undo_key(file_path)
