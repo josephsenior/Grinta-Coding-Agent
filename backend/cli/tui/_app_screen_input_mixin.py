@@ -469,11 +469,11 @@ class _AppScreenInputMixin:
             self._agent_running = False
             self.app.exit()
         elif cmd == '/settings':
-            await self._open_settings_tui()
+            self.run_worker(self._open_settings_tui(), exclusive=True)
         elif cmd == '/sessions':
-            await self._run_sessions_tui(args)
+            self.run_worker(self._run_sessions_tui(args), exclusive=True)
         elif cmd == '/resume':
-            await self._run_resume_tui(args)
+            self.run_worker(self._run_resume_tui(args), exclusive=True)
         else:
             self.add_error(f'Unknown command: {text}')
 
@@ -481,13 +481,17 @@ class _AppScreenInputMixin:
         from backend.cli.config_manager import (
             get_current_model,
             update_api_key,
-            update_budget,
-            update_cli_tool_icons,
             update_model,
         )
         from backend.core.config import load_app_config
 
-        result = await self.app.push_screen_wait(GrintaSettingsDialog(self._config))
+        self._config = load_app_config(set_logging_levels=False)
+        try:
+            result = await self.app.push_screen_wait(GrintaSettingsDialog(self._config))
+        except Exception as exc:
+            logger.exception('[TUI] /settings dialog failed')
+            self.add_error(f'/settings failed: {type(exc).__name__}: {exc}')
+            return
         if not result:
             return
         try:
@@ -502,10 +506,6 @@ class _AppScreenInputMixin:
             api_key = str(result.get('api_key', '')).strip()
             if api_key:
                 update_api_key(api_key, provider=provider or None)
-            budget = result.get('budget')
-            if budget is not None:
-                update_budget(float(budget))
-            update_cli_tool_icons(bool(result.get('icons', True)))
         except Exception as exc:
             logger.exception('[TUI] /settings failed to persist')
             self.add_error(f'/settings failed: {type(exc).__name__}: {exc}')

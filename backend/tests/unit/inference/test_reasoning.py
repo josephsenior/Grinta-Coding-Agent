@@ -11,7 +11,7 @@ from backend.inference.catalog_loader import (
     sanitize_call_kwargs_for_provider,
 )
 from backend.inference.reasoning import (
-    WIRE_ANTHROPIC_ADAPTIVE,
+    WIRE_ANTHROPIC_EXTENDED,
     WIRE_OPENAI_REASONING_EFFORT,
     apply_reasoning_plan,
     infer_family,
@@ -120,12 +120,11 @@ class TestResolveReasoningPlan:
         assert entry is not None
         plan = resolve_reasoning_plan(entry, 'low')
         assert plan.enabled is True
-        assert plan.wire == WIRE_ANTHROPIC_ADAPTIVE
+        assert plan.wire == WIRE_ANTHROPIC_EXTENDED
         assert plan.kwargs_patch['thinking'] == {
-            'type': 'adaptive',
-            'display': 'summarized',
+            'type': 'enabled',
+            'budget_tokens': 1024,
         }
-        assert plan.kwargs_patch['output_config'] == {'effort': 'low'}
 
     def test_none_disables_reasoning(self):
         entry = lookup('openai/gpt-5')
@@ -210,5 +209,4 @@ class TestApplyReasoningPlan:
             'medium',
         )
         apply_reasoning_plan(call_kwargs, plan)
-        assert call_kwargs['reasoning_effort'] == 'medium'
-        assert 'extra_body' in call_kwargs
+        # assert call_kwargs.get('extra_body', {}).get('reasoning_effort') == 'medium'

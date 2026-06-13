@@ -91,6 +91,10 @@ async def test_prepare_step_skips_compaction_under_threshold(pipeline):
         mock_budget.from_events.return_value = SimpleNamespace(
             should_autocompact=False,
             estimated_tokens=100,
+            autocompact_threshold=1000,
+            effective_window=2000,
+            fixed_prompt_reserve_tokens=500,
+            reserved_summary_tokens=100,
         )
         result = await pipeline.prepare_step(state)
     assert result.pending_action is None
@@ -139,6 +143,8 @@ async def test_prepare_step_uses_prewarmed_compaction(pipeline):
     with (
         patch('backend.context.context_pipeline.finalize_compaction_artifacts'),
         patch('backend.context.context_pipeline.maybe_update'),
+        patch('backend.context.context_pipeline.ContextPipeline._passes_effectiveness_gate', return_value=True),
+        patch('backend.context.context_pipeline.ContextPipeline._resolve_continuity_or_fallback', return_value=action),
     ):
         result = await pipeline.prepare_step(state)
     assert result.pending_action is action
@@ -211,6 +217,8 @@ async def test_prepare_step_rejects_micro_prune_and_respects_cooldown(pipeline):
                     estimated_tokens=190_000,
                     autocompact_threshold=180_000,
                     effective_window=200_000,
+                    fixed_prompt_reserve_tokens=500,
+                    reserved_summary_tokens=100,
                 ),
             ):
                 first = await pipeline.prepare_step(state)
@@ -228,6 +236,8 @@ async def test_prepare_step_rejects_micro_prune_and_respects_cooldown(pipeline):
                     estimated_tokens=190_000,
                     autocompact_threshold=180_000,
                     effective_window=200_000,
+                    fixed_prompt_reserve_tokens=500,
+                    reserved_summary_tokens=100,
                 ),
             ):
                 second = await pipeline.prepare_step(state)

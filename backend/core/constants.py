@@ -270,7 +270,7 @@ DEFAULT_VCS_USER_EMAIL = 'grinta@localhost'
 DEFAULT_LOG_FORMAT = 'text'
 DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_ENABLE_BROWSER = True
-DEFAULT_MAX_BUDGET_PER_TASK = 5.0
+DEFAULT_MAX_BUDGET_PER_TASK = None
 
 # ── Runtime Defaults ────────────────────────────────────────────────
 DEFAULT_RUNTIME_TIMEOUT = 900

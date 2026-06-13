@@ -266,10 +266,9 @@ def _build_json_llm_config(
                 llm_dict['context_window_tokens'] = int(str(raw))
             except (ValueError, TypeError):
                 pass
-    if 'llm_reasoning_effort' in data:
-        raw = data['llm_reasoning_effort']
-        if raw is not None and str(raw).strip():
-            llm_dict['reasoning_effort'] = str(raw).strip()
+    reasoning_raw = data.get('llm_reasoning_effort', data.get('reasoningEffort'))
+    if reasoning_raw is not None and str(reasoning_raw).strip():
+        llm_dict['reasoning_effort'] = str(reasoning_raw).strip()
     return llm_dict
 
 
@@ -305,6 +304,16 @@ def _apply_json_top_level_fields(cfg: AppConfig, data: dict[str, object]) -> Non
         cfg.mcp_host = cast(str, data['mcp_host'])
     if data.get('project_root'):
         cfg.project_root = cast(str, data['project_root'])
+    if 'max_budget_per_task' in data:
+        raw = data['max_budget_per_task']
+        if raw is None:
+            cfg.max_budget_per_task = None
+        else:
+            try:
+                value = float(str(raw))
+                cfg.max_budget_per_task = value if value > 0 else None
+            except (ValueError, TypeError):
+                pass
 
 
 def _parse_mcp_server_entry(entry: object):

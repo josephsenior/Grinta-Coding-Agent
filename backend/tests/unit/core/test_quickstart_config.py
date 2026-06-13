@@ -15,7 +15,7 @@ class TestGenerateQuickstartConfig:
         data = json.loads(result)
         assert data['llm_api_key'] == LLM_API_KEY_SETTINGS_PLACEHOLDER
         assert data['llm_model'] == 'gemini-2.5-flash'
-        assert data['max_budget_per_task'] == 5.0
+        assert 'max_budget_per_task' not in data
         assert data['llm_base_url'] == ''
         assert data['project_root'] == './workspace'
 
