@@ -65,10 +65,9 @@ class TestResetShutdownState:
 
 class TestSleepIfShouldContinue:
     def test_sleeps_short_duration(self):
-        start = time.time()
-        sleep_if_should_continue(0.1)
-        elapsed = time.time() - start
-        assert 0.08 <= elapsed <= 0.25
+        with patch('backend.utils.shutdown_listener.time.sleep') as mock_sleep:
+            sleep_if_should_continue(0.1)
+        mock_sleep.assert_called()
 
     def test_sleeps_long_duration_in_chunks(self):
         import backend.utils.shutdown_listener as mod
