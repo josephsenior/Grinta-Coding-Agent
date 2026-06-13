@@ -140,9 +140,11 @@ def infer_family(entry: ModelEntry) -> str:
             return 'claude-opus'
         return 'claude'
     if 'deepseek' in name:
-        return 'deepseek-thinking' if any(
-            token in name for token in ('pro', 'reasoner', 'r1')
-        ) else 'deepseek-flash'
+        return (
+            'deepseek-thinking'
+            if any(token in name for token in ('pro', 'reasoner', 'r1'))
+            else 'deepseek-flash'
+        )
     if 'gemini' in name:
         return 'gemini-flash' if 'flash' in name else 'gemini-pro'
     if 'kimi' in name:
@@ -189,7 +191,9 @@ def supports_reasoning(entry: ModelEntry) -> bool:
     logical_lower = logical.lower()
     if vendor == 'anthropic' and logical_lower.startswith('claude'):
         return True
-    if vendor == 'openai' and logical_lower.startswith(('gpt-', 'o1', 'o3', 'o4', 'codex')):
+    if vendor == 'openai' and logical_lower.startswith(
+        ('gpt-', 'o1', 'o3', 'o4', 'codex')
+    ):
         return True
     if vendor == 'google' and 'gemini' in logical_lower:
         return True
@@ -414,9 +418,7 @@ def _build_wire_kwargs(wire: str, effort: str, entry: ModelEntry) -> dict[str, A
         level = _EFFORT_TO_GEMINI_LEVEL.get(effort, 'medium')
         return {
             'reasoning_effort': effort,
-            'extra_body': {
-                'google': {'thinking_config': {'thinking_level': level}}
-            },
+            'extra_body': {'google': {'thinking_config': {'thinking_level': level}}},
         }
 
     if wire == WIRE_GLM_THINKING:

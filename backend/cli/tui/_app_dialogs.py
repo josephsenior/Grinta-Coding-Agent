@@ -459,9 +459,9 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         model_select.set_options(options)
         model_select.value = model
         self._selected_model_value = model
-        self.query_one('#settings-custom-model', Input).value = (
-            self._current_custom_model_for_provider(provider)
-        )
+        self.query_one(
+            '#settings-custom-model', Input
+        ).value = self._current_custom_model_for_provider(provider)
         self._sync_custom_model_visibility()
         self._sync_reasoning_options(provider, model)
         self._sync_model_metadata()
@@ -694,7 +694,9 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         prefixed = extract_provider_prefix(model)
         if prefixed == provider:
             return model.split('/', 1)[1]
-        return model if self._current_model_for_provider(provider) == '__custom__' else ''
+        return (
+            model if self._current_model_for_provider(provider) == '__custom__' else ''
+        )
 
     def _selected_provider(self) -> str:
         value = self.query_one('#settings-provider', Select).value
@@ -755,10 +757,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         if not values:
             return [('Not supported by selected model', '')]
         labels = [('Default', '')]
-        labels.extend(
-            (self._reasoning_label(value), value)
-            for value in values
-        )
+        labels.extend((self._reasoning_label(value), value) for value in values)
         return labels
 
     @staticmethod
@@ -778,8 +777,10 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         configured = ''
         try:
             configured = (
-                getattr(self._config.get_llm_config(), 'reasoning_effort', None) or ''
-            ).strip().lower()
+                (getattr(self._config.get_llm_config(), 'reasoning_effort', None) or '')
+                .strip()
+                .lower()
+            )
         except Exception:
             configured = ''
         allowed = {value for _label, value in self._reasoning_options(provider, model)}

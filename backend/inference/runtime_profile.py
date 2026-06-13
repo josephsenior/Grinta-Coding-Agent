@@ -65,7 +65,9 @@ def _resolve_context_limits(
     llm_config: object | None,
     model: str,
 ) -> ModelContextLimits:
-    configured_context = _positive_int(getattr(llm_config, 'context_window_tokens', None))
+    configured_context = _positive_int(
+        getattr(llm_config, 'context_window_tokens', None)
+    )
     configured_output = _positive_int(getattr(llm_config, 'max_output_tokens', None))
     configured_input = _positive_int(getattr(llm_config, 'max_input_tokens', None))
 
@@ -142,7 +144,9 @@ def attach_runtime_profile(llm_config: object, profile: RuntimeModelProfile) -> 
         setattr(llm_config, _RUNTIME_PROFILE_KEY, profile)
 
 
-def get_attached_runtime_profile(llm_config: object | None) -> RuntimeModelProfile | None:
+def get_attached_runtime_profile(
+    llm_config: object | None,
+) -> RuntimeModelProfile | None:
     if llm_config is None:
         return None
     profile = getattr(llm_config, _RUNTIME_PROFILE_KEY, None)

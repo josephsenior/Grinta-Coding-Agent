@@ -1046,7 +1046,9 @@ def _validate_multi_edit_file_final(
             path=rel_path,
         )
 
-    is_valid, msg = temp_editor._maybe_validate_syntax_for_file(temp_path, final_content)
+    is_valid, msg = temp_editor._maybe_validate_syntax_for_file(
+        temp_path, final_content
+    )
     if not is_valid:
         _multi_edit_raise(
             f'❌ multi_edit syntax validation failed for {rel_path}: {msg}',

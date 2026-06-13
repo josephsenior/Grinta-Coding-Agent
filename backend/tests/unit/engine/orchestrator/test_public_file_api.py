@@ -525,7 +525,9 @@ def test_multiedit_public_action_normalizes_supported_operations_and_guards_cont
         == 'edit_symbol_deferred'
     )
     assert action.structured_payload['file_edits'][1]['path'] == 'mod.py'
-    assert action.structured_payload['file_edits'][1]['edits'][0]['symbol_name'] == 'login'
+    assert (
+        action.structured_payload['file_edits'][1]['edits'][0]['symbol_name'] == 'login'
+    )
 
     with pytest.raises(FunctionCallValidationError, match='CONTENT_APPEARS_SERIALIZED'):
         _handle_multiedit_tool(

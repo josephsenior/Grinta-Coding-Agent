@@ -373,7 +373,9 @@ def render_canonical_state_for_prompt(
     if canonical.latest_directive and canonical.latest_directive != canonical.objective:
         _append(lines, f'- Latest directive: {canonical.latest_directive}')
     _append(lines, f'- Next action: {canonical.next_action}')
-    _append(lines, f'- Implementation checkpoint: {canonical.implementation_checkpoint}')
+    _append(
+        lines, f'- Implementation checkpoint: {canonical.implementation_checkpoint}'
+    )
     if canonical.verification.command:
         status = canonical.verification.status.upper() or '?'
         _append(

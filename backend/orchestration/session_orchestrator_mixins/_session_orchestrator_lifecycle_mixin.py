@@ -59,8 +59,15 @@ Pure code motion: extracted from
 """
 
 
-class _SessionOrchestratorLifecycleMixin:
+if TYPE_CHECKING:
+    from backend.orchestration.session_orchestrator_accessors import SessionOrchestratorAccessorsMixin
+else:
+    class SessionOrchestratorAccessorsMixin: pass
+
+
+class _SessionOrchestratorLifecycleMixin(SessionOrchestratorAccessorsMixin):
     """Mixin: pipeline init, phase boundary checkpoint, blocked invocation, stop."""
+
 
     def _initialize_operation_pipeline(self) -> None:
         """Build the default tool pipeline directly on the controller.

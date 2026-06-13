@@ -34,7 +34,10 @@ class TestExtractProvider:
         assert self.mgr._extract_provider('anthropic/claude-3.5-sonnet') == 'anthropic'
 
     def test_exact_catalog_entry(self):
-        assert self.mgr._extract_provider('anthropic/claude-sonnet-4-20250514') == 'anthropic'
+        assert (
+            self.mgr._extract_provider('anthropic/claude-sonnet-4-20250514')
+            == 'anthropic'
+        )
 
     def test_google_prefix(self):
         assert self.mgr._extract_provider('google/gemini-pro') == 'google'

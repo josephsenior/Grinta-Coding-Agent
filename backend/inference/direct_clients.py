@@ -142,9 +142,7 @@ def _coerce_bounded_request_timeout(
 ) -> httpx.Timeout:
     """Normalize SDK timeout kwargs to a bounded ``httpx.Timeout``."""
     if isinstance(value, httpx.Timeout):
-        timeout_total = getattr(value, 'timeout', None) or getattr(
-            value, 'read', None
-        )
+        timeout_total = getattr(value, 'timeout', None) or getattr(value, 'read', None)
         return bounded_llm_http_timeout(
             timeout_total if timeout_total else default_total,
             streaming=streaming,

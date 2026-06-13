@@ -67,7 +67,11 @@ def test_reducer_preserves_task_tracker_as_next_action_and_checkpoint() -> None:
         _user('Build the demo app', 1),
         _tasks(
             [
-                {'id': '1', 'description': 'Create foundation modules', 'status': 'done'},
+                {
+                    'id': '1',
+                    'description': 'Create foundation modules',
+                    'status': 'done',
+                },
                 {
                     'id': '2',
                     'description': 'Implement node.py',

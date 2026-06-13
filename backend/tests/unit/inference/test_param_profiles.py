@@ -17,7 +17,9 @@ def test_unknown_groq_model_uses_provider_default_profile() -> None:
 
 
 def test_conservative_profile_strips_reasoning() -> None:
-    entry = synthetic_entry_from_profile('custom/model', 'custom', profile_id='conservative')
+    entry = synthetic_entry_from_profile(
+        'custom/model', 'custom', profile_id='conservative'
+    )
     assert entry.strip_reasoning_effort is True
     assert entry.supports_reasoning_effort is False
 

@@ -236,7 +236,10 @@ class _AesIoTerminalMixin:
         return str(self._resolve_effective_cwd(action_cwd, cwd))
 
     async def _poll_terminal_output(
-        self, session: Any, offset: int, timeout: float  # noqa: ASYNC109
+        self,
+        session: Any,
+        offset: int,
+        timeout: float,  # noqa: ASYNC109
     ) -> None:
         """Poll for terminal output with early exit on first byte."""
         poll_interval = PTY_READ_POLL_INTERVAL_SECONDS

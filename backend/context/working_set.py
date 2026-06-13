@@ -325,7 +325,9 @@ def sync_snapshot_to_working_memory(
     bind_session_context(state=state)  # type: ignore[arg-type]
     try:
         canonical = reduce_snapshot_into_state(
-            snapshot, source='working_set_sync', persist_state=state  # type: ignore[arg-type]
+            snapshot,
+            source='working_set_sync',
+            persist_state=state,  # type: ignore[arg-type]
         )
         save_canonical_state(canonical, state=state)  # type: ignore[arg-type]
     except Exception:

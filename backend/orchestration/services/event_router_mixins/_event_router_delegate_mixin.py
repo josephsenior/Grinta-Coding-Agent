@@ -62,8 +62,12 @@ from backend.orchestration.services.event_router_mixins._event_router_delegate_h
 )
 
 
-class _EventRouterDelegateMixin(EventRouterService if TYPE_CHECKING else object):
+class _EventRouterDelegateMixin:
     """Mixin class — see module docstring."""
+
+    if TYPE_CHECKING:
+        _ctrl: Any  # Actually EventRouterService control interface
+
 
     async def _handle_delegate_task_action(self, action: DelegateTaskAction) -> None:
         """Handle delegating a subtask to a worker agent."""

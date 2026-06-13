@@ -26,6 +26,7 @@ def normalize_provider_name(provider: str | None) -> str | None:
         return None
     return normalized
 
+
 if TYPE_CHECKING:
     from backend.inference.model_features import ModelFeatures
     from backend.inference.provider_capabilities import ProviderCapabilities
@@ -148,7 +149,9 @@ def get_listable_providers() -> list[str]:
     """Providers shown in settings / onboarding pickers (Tier 1 + Tier 2 + local)."""
     hosted = get_provider_ids()
     tier12 = [provider for provider in hosted if get_provider_tier(provider) <= 2]
-    extras = [provider for provider in sorted(LOCAL_PROVIDERS) if provider not in tier12]
+    extras = [
+        provider for provider in sorted(LOCAL_PROVIDERS) if provider not in tier12
+    ]
     return tier12 + extras
 
 
@@ -232,7 +235,9 @@ def include_remote_listing_for_provider(
     return bool((api_key or '').strip())
 
 
-def get_static_model_names(provider: str | None, *, featured_only: bool = False) -> list[str]:
+def get_static_model_names(
+    provider: str | None, *, featured_only: bool = False
+) -> list[str]:
     normalized = normalize_provider_name(provider)
     if normalized is None:
         return []
@@ -380,7 +385,9 @@ def build_model_entries_by_provider(
         dynamic_ids: list[str] = []
         if include_local and normalized in LOCAL_PROVIDERS:
             dynamic_ids.extend(get_local_model_names(normalized))
-        elif include_remote and include_remote_listing_for_provider(normalized, api_key):
+        elif include_remote and include_remote_listing_for_provider(
+            normalized, api_key
+        ):
             dynamic_ids.extend(
                 fetch_remote_models(normalized, api_key, base_url=base_url)
             )
@@ -427,8 +434,12 @@ def resolve_api_key_for_provider(config: Any, provider: str | None) -> str | Non
         llm_cfg = config.get_llm_config()
         current_provider = normalize_provider_name(getattr(llm_cfg, 'provider', None))
         key = getattr(llm_cfg, 'api_key', None)
-        if key is not None and (current_provider is None or current_provider == normalized):
-            raw = key.get_secret_value() if hasattr(key, 'get_secret_value') else str(key)
+        if key is not None and (
+            current_provider is None or current_provider == normalized
+        ):
+            raw = (
+                key.get_secret_value() if hasattr(key, 'get_secret_value') else str(key)
+            )
             if raw.strip():
                 return raw.strip()
     except Exception:
@@ -494,7 +505,9 @@ def provider_label(provider: str | None) -> str:
     if not provider:
         return 'selected provider'
     normalized = normalize_provider_name(provider) or provider
-    return labels.get(normalized, normalized.replace('_', ' ').replace('-', ' ').title())
+    return labels.get(
+        normalized, normalized.replace('_', ' ').replace('-', ' ').title()
+    )
 
 
 def empty_model_picker_hint(provider: str | None) -> str:

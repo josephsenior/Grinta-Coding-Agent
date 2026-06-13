@@ -674,7 +674,9 @@ class TestMultiEditCommand:
         )
 
         assert isinstance(action, MessageAction)
-        assert (tmp_path / 'src' / 'chain.py').read_text(encoding='utf-8') == 'STEP = 2\n'
+        assert (tmp_path / 'src' / 'chain.py').read_text(
+            encoding='utf-8'
+        ) == 'STEP = 2\n'
 
 
 class TestHealthCheck:

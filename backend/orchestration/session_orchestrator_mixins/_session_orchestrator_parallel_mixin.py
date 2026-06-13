@@ -95,8 +95,19 @@ Pure code motion: extracted from
 """
 
 
-class _SessionOrchestratorParallelMixin:
+if TYPE_CHECKING:
+    from backend.orchestration.session_orchestrator_accessors import SessionOrchestratorAccessorsMixin
+else:
+    class SessionOrchestratorAccessorsMixin: pass
+
+
+class _SessionOrchestratorParallelMixin(SessionOrchestratorAccessorsMixin):
     """Mixin: parallel read batch, post-execution, pending action drain."""
+
+
+
+
+
 
     async def _try_parallel_read_batch(self) -> bool:
         """Attempt to drain pending actions in parallel when scheduler allows.
@@ -338,6 +349,8 @@ class _SessionOrchestratorParallelMixin:
                 background_result = background_compact(state_copy)
                 if inspect.isawaitable(background_result):
                     return await background_result
+            if compactor is None:
+                return None
             return await compactor.compacted_history(state_copy)
 
         self.memory_pressure.start_prewarm(_run_bg)

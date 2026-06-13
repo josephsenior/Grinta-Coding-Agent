@@ -81,7 +81,9 @@ class TestExecuteGrep:
 
         # The Python fallback iterates files in filesystem order, which varies
         # by platform.  Assert only that exactly head_limit (2) files appear.
-        matched_files = [f'file{i}.py' for i in range(5) if f'file{i}.py' in obs.content]
+        matched_files = [
+            f'file{i}.py' for i in range(5) if f'file{i}.py' in obs.content
+        ]
         assert len(matched_files) == 2
 
     def test_invalid_regex_returns_friendly_error(self, tmp_path, monkeypatch) -> None:
