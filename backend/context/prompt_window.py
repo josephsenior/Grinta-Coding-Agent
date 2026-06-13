@@ -250,7 +250,9 @@ def _apply_windowing_constraints(
         selected = _enforce_max_event_count(
             selected,
             protected,
+            all_events,
             max_events=ctx.max_events,
+            min_tool_loops=min_tool_loops,
         )
     return selected
 
@@ -258,19 +260,26 @@ def _apply_windowing_constraints(
 def _enforce_max_event_count(
     selected: list[Event],
     protected: list[Event],
+    all_events: list[Event],
     *,
     max_events: int,
+    min_tool_loops: int = 0,
 ) -> list[Event]:
     """Drop oldest removable events until the selection fits *max_events*."""
     if len(selected) <= max_events:
         return selected
     protected_ids = _event_id_set(protected)
-    protected_events, removable = _split_protected_and_removable(
-        selected, protected_ids
-    )
-    slots = max(0, max_events - len(protected_events))
-    if slots <= 0:
-        return protected_events[:max_events]
+    required_ids: set[int] = set()
+    if min_tool_loops > 0:
+        chunks = _non_protected_chunks(all_events, protected_ids)
+        if len(chunks) >= min_tool_loops:
+            required_ids = _required_tail_ids(chunks, min_tool_loops)
+    keep_ids = protected_ids | required_ids
+    protected_events = [event for event in selected if id(event) in keep_ids]
+    removable = [event for event in selected if id(event) not in keep_ids]
+    if len(protected_events) >= max_events:
+        return selected
+    slots = max_events - len(protected_events)
     return _dedupe_events_preserve_order(protected_events + removable[-slots:])
 
 
