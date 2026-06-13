@@ -77,3 +77,6 @@ logs/
 tsc_errors*.txt
 
 backend/MagicMock/
+.pytest-reliability/
+bandit-out.json
+
