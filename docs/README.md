@@ -6,7 +6,7 @@ Choose a path:
 | --- | --- |
 | Install and run the CLI, configure models | [Quick Start](QUICK_START.md), [Install](INSTALL.md), [User Guide](USER_GUIDE.md) |
 | Debug failures and platform issues | [Troubleshooting](TROUBLESHOOTING.md), [Support Matrix](SUPPORT_MATRIX.md) |
-| Understand the system or contribute code | [Architecture](ARCHITECTURE.md), [Developer Guide](DEVELOPER.md), [Vocabulary](VOCABULARY.md), [CI](CI.md), [Contributing](../CONTRIBUTING.md) |
+| Understand the system or contribute code | [Contributor Map](CONTRIBUTOR_MAP.md), [Architecture](ARCHITECTURE.md), [Developer Guide](DEVELOPER.md), [Vocabulary](VOCABULARY.md), [CI](CI.md), [Contributing](../CONTRIBUTING.md) |
 
 ## The Book of Grinta (narrative)
 

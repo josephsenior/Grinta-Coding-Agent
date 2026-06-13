@@ -178,6 +178,27 @@ def resolve_effective_model_entry(
     return synthetic, profile_id, source
 
 
+def resolve_model_entry_for_capabilities(
+    model: str | None,
+    provider: str | None = None,
+    *,
+    fallback: ModelEntry | None = None,
+) -> ModelEntry | None:
+    """Resolve a catalog/profile entry for capability UI (reasoning, tools, etc.)."""
+    if not model or model == '__custom__':
+        return None
+
+    from backend.inference.catalog_loader import lookup_provider_model
+
+    scoped = lookup_provider_model(provider, model, allow_aliases=True)
+    if scoped is None and fallback is not None and fallback.name == model:
+        scoped = fallback
+
+    model_key = scoped.name if scoped is not None else model
+    entry, _, _ = resolve_effective_model_entry(model_key, provider)
+    return entry
+
+
 def _merge_entry(catalog: ModelEntry, profile: ModelEntry) -> ModelEntry:
     """Catalog listing fields win; profile fills unset runtime flags."""
     return ModelEntry(

@@ -24,10 +24,12 @@ Configuration keys and param validation live in [`backend/core/config/`](../back
 
 ### Model listing sources
 
-1. **Unified dynamic listing** — [`registry.list_models()`](backend/inference/registry.py) via transport adapters in [`model_list_backends.py`](backend/inference/model_list_backends.py) (OpenAI `/v1/models`, Anthropic models API, Google `genai`, local probes)
-2. **Featured catalog stubs** — offline defaults and pricing only ([`catalogs/*.json`](backend/inference/catalogs/))
-3. **Param profiles** — family-level call-surface rules in [`param_profiles.json`](backend/inference/param_profiles.json); provider defaults for Tier 2/3
-4. **Session pinning** — [`runtime_profile.py`](backend/inference/runtime_profile.py) pins limits on the LLM instance; `settings.json` overrides still win
+Grinta uses **API-first listing** with **catalog overlay**:
+
+1. **Dynamic listing (primary)** — [`registry.build_model_entries_by_provider()`](backend/inference/registry.py) calls transport adapters in [`model_list_backends.py`](backend/inference/model_list_backends.py) (OpenAI `/v1/models`, Anthropic models API, Google `genai`, local probes) when an API key is available (local providers probe without a key).
+2. **Catalog overlay** — [`catalogs/*.json`](backend/inference/catalogs/) enrich matches with pricing, limits, param overrides, and aliases; used alone only when dynamic listing is unavailable (offline / no key / empty API response).
+3. **Param profiles** — family-level call-surface rules in [`param_profiles.json`](backend/inference/param_profiles.json); applied to API ids without a catalog row via [`resolve_effective_model_entry()`](backend/inference/param_profiles.py).
+4. **Session pinning** — [`runtime_profile.py`](backend/inference/runtime_profile.py) pins limits on the LLM instance; `settings.json` overrides still win.
 
 ## Integrations layer
 

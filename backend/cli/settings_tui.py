@@ -72,9 +72,23 @@ def _prompt_provider_model(console: Console, provider_key: str | None) -> str:
     options: list[str] = []
     if provider_key:
         try:
-            from backend.inference.catalog_loader import get_models_for_provider
+            from backend.inference.registry import (
+                LOCAL_PROVIDERS,
+                build_model_entries_by_provider,
+                resolve_api_key_for_provider,
+            )
 
-            options = get_models_for_provider(provider_key)
+            config = load_app_config()
+            api_key = resolve_api_key_for_provider(config, provider_key)
+            include_remote = bool((api_key or '').strip()) or (
+                provider_key in LOCAL_PROVIDERS
+            )
+            entries = build_model_entries_by_provider(
+                provider=provider_key,
+                api_key=api_key,
+                include_remote=include_remote,
+            ).get(provider_key, [])
+            options = [entry.name for entry in entries]
         except Exception:
             options = []
     if not options:

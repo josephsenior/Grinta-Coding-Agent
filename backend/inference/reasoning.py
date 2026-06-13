@@ -75,6 +75,39 @@ def _camel_to_snake(name: str) -> str:
     return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
+_UPSTREAM_VENDOR_PREFIXES: frozenset[str] = frozenset(
+    {
+        'anthropic',
+        'openai',
+        'google',
+        'xai',
+        'deepseek',
+        'meta-llama',
+        'qwen',
+        'mistral',
+        'cohere',
+        'moonshotai',
+    }
+)
+
+
+def _split_upstream_model_id(model_id: str) -> tuple[str | None, str]:
+    """Split gateway ids like ``anthropic/claude-sonnet-4`` into vendor + bare id."""
+    if '/' not in model_id:
+        return None, model_id
+    prefix, rest = model_id.split('/', 1)
+    normalized = prefix.strip().lower()
+    if normalized in _UPSTREAM_VENDOR_PREFIXES and rest.strip():
+        return normalized, rest.strip()
+    return None, model_id
+
+
+def _logical_model_name(entry: ModelEntry) -> str:
+    """Bare model id used for family and capability heuristics."""
+    _vendor, bare = _split_upstream_model_id(entry.name)
+    return bare
+
+
 def _metadata_dict(entry: ModelEntry) -> dict[str, Any]:
     return entry.metadata if isinstance(entry.metadata, dict) else {}
 
@@ -95,7 +128,7 @@ def infer_family(entry: ModelEntry) -> str:
     if isinstance(family, str) and family.strip():
         return family.strip().lower()
 
-    name = entry.name.lower()
+    name = _logical_model_name(entry).lower()
     if name.startswith('gpt-') or 'codex' in name:
         return 'gpt'
     if name.startswith('claude-'):
@@ -151,7 +184,25 @@ def supports_reasoning(entry: ModelEntry) -> bool:
         return True
     if entry.provider == 'xai' and normalized.startswith('grok-4'):
         return True
-    return normalized.startswith(('o1', 'o3', 'o4', 'gpt-'))
+
+    vendor, logical = _split_upstream_model_id(entry.name)
+    logical_lower = logical.lower()
+    if vendor == 'anthropic' and logical_lower.startswith('claude'):
+        return True
+    if vendor == 'openai' and logical_lower.startswith(('gpt-', 'o1', 'o3', 'o4', 'codex')):
+        return True
+    if vendor == 'google' and 'gemini' in logical_lower:
+        return True
+    if vendor == 'xai' and logical_lower.startswith('grok-'):
+        return True
+    if vendor == 'deepseek' and any(
+        token in logical_lower for token in ('reasoner', 'r1', 'thinking')
+    ):
+        return True
+    if any(token in logical_lower for token in ('qwq', 'reasoner', '-r1', 'thinking')):
+        return True
+
+    return logical_lower.startswith(('o1', 'o3', 'o4', 'gpt-'))
 
 
 def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
@@ -190,6 +241,8 @@ def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
     if family == 'glm':
         return WIRE_GLM_THINKING
     if family == 'grok':
+        return WIRE_OPENAI_REASONING_EFFORT
+    if family.startswith('claude') and transport == TRANSPORT_CLIENT_OPENAI:
         return WIRE_OPENAI_REASONING_EFFORT
     if entry.supports_reasoning_effort:
         return WIRE_OPENAI_REASONING_EFFORT

@@ -91,16 +91,23 @@ type: short description
 types: feat, fix, refactor, docs, test, chore, perf
 ```
 
+## Where to start in the codebase
+
+New contributors: read **[docs/CONTRIBUTOR_MAP.md](docs/CONTRIBUTOR_MAP.md)** first.
+It lists task-oriented entry points (CLI, orchestration, inference, MCP, tests)
+without reading the whole tree. Day-to-day reference: [docs/DEVELOPER.md](docs/DEVELOPER.md).
+
 ## Architecture Quick Reference
 
 | Directory | Purpose |
 | --- | --- |
-| `backend/orchestration/` | Session orchestration (21 decomposed services) |
+| `backend/orchestration/` | Session orchestration (decomposed services) |
 | `backend/orchestration/services/` | Service classes composing the orchestrator |
 | `backend/cli/` | CLI entrypoint, REPL, init wizard, and session commands |
 | `backend/ledger/` | Event sourcing, backpressure-aware stream, durable writer |
 | `backend/persistence/` | File & DB storage implementations |
-| `backend/gateway/` | Internal transport and integration boundaries; not a supported public product surface |
+| `backend/inference/` | Provider registry, LLM clients, model catalogs |
+| `backend/integrations/` | MCP adapters (external tools) |
 | `backend/engine/` | Production agent engine package |
 | `backend/context/` | Context memory, compactors, RAG, vector store |
 | `backend/core/` | Config (Pydantic), exceptions, schemas, logging |
@@ -108,7 +115,8 @@ types: feat, fix, refactor, docs, test, chore, perf
 
 ### Orchestration Service Map
 
-The `SessionOrchestrator` (1267 LOC) delegates work to these services:
+The `SessionOrchestrator` delegates work to these services (implementation split
+across mixins under `backend/orchestration/session_orchestrator_mixins/`):
 
 | Service | Responsibility |
 | --- | --- |

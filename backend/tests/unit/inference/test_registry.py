@@ -49,8 +49,33 @@ def test_build_model_entries_merges_catalog() -> None:
     assert 'mistral-large-latest' in {e.name for e in entries['mistral']}
 
 
-@patch('backend.inference.registry.fetch_remote_models', return_value=['remote-model'])
-def test_list_model_names_includes_remote_when_requested(mock_fetch) -> None:
+@patch('backend.inference.registry.fetch_remote_models', return_value=['gpt-4o', 'new-api-model'])
+def test_build_model_entries_api_first_with_catalog_overlay(mock_fetch) -> None:
+    entries = build_model_entries_by_provider(provider='openai', api_key='sk-test')
+    names = {entry.name for entry in entries['openai']}
+    assert 'new-api-model' in names
+    assert 'gpt-4o' in names
+    assert 'gpt-5' not in names  # featured catalog stub omitted when API listing succeeds
+    mock_fetch.assert_called_once()
+
+
+@patch('backend.inference.registry.fetch_remote_models', return_value=[])
+def test_build_model_entries_catalog_fallback_when_api_empty(mock_fetch) -> None:
+    entries = build_model_entries_by_provider(provider='openai', api_key='sk-test')
+    names = {entry.name for entry in entries['openai']}
+    assert 'gpt-5' in names
+    mock_fetch.assert_called_once()
+
+
+@patch('backend.inference.registry.fetch_remote_models', return_value=['remote-only'])
+def test_list_model_names_api_first_skips_static_when_remote_returns(mock_fetch) -> None:
     names = list_model_names('groq', api_key='gsk_test')
-    assert 'remote-model' in names
+    assert names == ['remote-only']
+    mock_fetch.assert_called_once()
+
+
+@patch('backend.inference.registry.fetch_remote_models', return_value=[])
+def test_list_model_names_falls_back_to_catalog_when_remote_empty(mock_fetch) -> None:
+    names = list_model_names('groq', api_key='gsk_test')
+    assert 'llama-3.3-70b-versatile' in names
     mock_fetch.assert_called_once()

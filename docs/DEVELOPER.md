@@ -4,6 +4,7 @@ Contributor reference for current internals.
 
 Related docs:
 
+- **Contributor map (start here):** `docs/CONTRIBUTOR_MAP.md`
 - User documentation: `docs/USER_GUIDE.md`
 - Architecture overview: `docs/ARCHITECTURE.md`
 - CI tiers (what PRs gate): `docs/CI.md`

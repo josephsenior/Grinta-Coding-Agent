@@ -42,6 +42,25 @@ def normalize_provider_name(provider: str | None) -> str | None:
     return normalized or None
 
 
+def resolve_listing_base_url(
+    provider: str | None,
+    base_url: str | None = None,
+) -> str | None:
+    """Return the base URL used for remote model listing and registry cache keys."""
+    normalized = normalize_provider_name(provider)
+    if normalized is None:
+        return None
+    explicit = (base_url or '').strip().rstrip('/')
+    if explicit:
+        return explicit
+    if normalized in LOCAL_PROVIDERS:
+        return None
+    default = _default_base_url(normalized)
+    if not default:
+        return None
+    return default.rstrip('/')
+
+
 class ModelListBackend(Protocol):
     def list_models(
         self,
@@ -176,4 +195,9 @@ def list_models_for_provider(
 def _default_base_url(provider: str) -> str | None:
     from backend.inference.registry import get_default_base_url
 
-    return get_default_base_url(provider)
+    url = get_default_base_url(provider)
+    if url:
+        return url
+    if normalize_provider_name(provider) == 'openai':
+        return 'https://api.openai.com/v1'
+    return None
