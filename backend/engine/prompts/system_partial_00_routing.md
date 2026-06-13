@@ -14,7 +14,7 @@
 - **Search & Explore:** Follow `<DISCOVERY_ROUTING>`. Use native `grep`/`glob`/`find_symbols`/`read`/`analyze_project_structure` — never shell `grep`/`find`/`rg` for repo intelligence.
 - **`grep`:** default `output_mode=files_with_matches`; switch to `content` only for files that matter; paginate with `head_limit`/`offset` (default 200).
 - **`glob`:** paginate file lists with `head_limit`/`offset` (default 200).
-- **`read`:** use `start_line`/`end_line` on large files; prefer `read(type="symbols")` over whole-file reads when symbols are known; widen ranges only after a bounded first pass.
+- **`read`:** always pass required `type` (`"file"` or `"symbols"` — never `read` with only `path`). For line ranges: pass both `start_line` and `end_line` (`start_line>=1`; `end_line>=start_line` or `-1` for EOF); omit both for a whole file. Prefer `read(type="symbols")` over whole-file reads when symbols are known; widen ranges only after a bounded first pass.
 {lsp_routing}
 {discovery_decision_table}
 {read_and_edit_ladder}

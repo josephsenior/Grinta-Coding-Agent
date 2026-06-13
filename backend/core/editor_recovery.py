@@ -70,10 +70,10 @@ def _check_full_file_overwrite_blocked(lower: str) -> EditorRecoveryAdvice | Non
     if 'large existing code file overwrite blocked' in lower:
         return EditorRecoveryAdvice(
             kind='full_file_overwrite_blocked',
-            preferred_tool='edit_symbols',
-            next_action='edit_symbols',
+            preferred_tool='edit_symbol',
+            next_action='edit_symbol',
             detail=(
-                'Full-file overwrite was blocked on a large existing source file. Prefer edit_symbols '
+                'Full-file overwrite was blocked on a large existing source file. Prefer edit_symbol '
                 'for code or replace_string for exact text changes.'
             ),
         )
@@ -92,7 +92,7 @@ def _check_syntax_validation_failure(lower: str) -> EditorRecoveryAdvice | None:
             next_action='read',
             detail=(
                 'The edit produced invalid syntax. Re-read the affected region, then do one surgical repair '
-                'with edit_symbols or replace_string instead of repeating the same full write.'
+                'with edit_symbol or replace_string instead of repeating the same full write.'
             ),
         )
     return None
@@ -106,7 +106,7 @@ def _check_range_context_mismatch(lower: str) -> EditorRecoveryAdvice | None:
             next_action='read',
             detail=(
                 'The edit context is stale or malformed. Re-read the file and retry once with '
-                'edit_symbols or exact replace_string content.'
+                'edit_symbol or exact replace_string content.'
             ),
         )
     return None
@@ -124,7 +124,7 @@ def _check_range_edit_failed(lower: str) -> EditorRecoveryAdvice | None:
             next_action='read',
             detail=(
                 'The range edit inputs are invalid or stale. Re-read the file to confirm line numbers, '
-                'then retry one smaller edit through edit_symbols or replace_string.'
+                'then retry one smaller edit through edit_symbol or replace_string.'
             ),
         )
     return None

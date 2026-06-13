@@ -29,7 +29,7 @@ Each of these fills a specific gap that the native tool set does not cover. Web 
 
 The boundary between native and plugin is intentional.
 
-Native core tools — `read`, `write`, `edit_symbols`, `replace_string`, `multiedit`, `cmd_run`, `terminal_manager`, `grep`, `glob`, `analyze_project_structure` — are always available. They are taught in the system prompt as native truths. The model knows they exist, knows their interfaces, and relies on them for the central work of coding.
+Native core tools — `read`, `write`, `edit_symbol`, `replace_string`, `multiedit`, `cmd_run`, `terminal_manager`, `grep`, `glob`, `analyze_project_structure` — are always available. They are taught in the system prompt as native truths. The model knows they exist, knows their interfaces, and relies on them for the central work of coding.
 
 MCP tools are taught differently. They are declared in the tool schema rather than the prompt, discovered at runtime, and presented as capability extensions. The model can use them when relevant but does not depend on them for core behavior.
 
@@ -49,7 +49,7 @@ One area that still needs consolidation: duplicate fetch tools. Grinta has a nat
 
 Some capabilities should never be MCP tools. They should be taught in the prompt as native truths.
 
-The editing facade — `read`, `write`, `edit_symbols`, `replace_string`, `multiedit` — is the clearest example. If these were MCP tools, the model would not have them in its initial context. It would have to discover them, learn their interfaces at runtime, and rely on the MCP host to make them available. That introduces latency, uncertainty, and a dependency on the MCP transport layer for core operations.
+The editing facade — `read`, `write`, `edit_symbol`, `replace_string`, `multiedit` — is the clearest example. If these were MCP tools, the model would not have them in its initial context. It would have to discover them, learn their interfaces at runtime, and rely on the MCP host to make them available. That introduces latency, uncertainty, and a dependency on the MCP transport layer for core operations.
 
 The same applies to `cmd_run` and `terminal_manager`. If the model cannot run commands because the MCP server is down, it is not a coding agent anymore.
 

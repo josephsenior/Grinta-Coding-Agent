@@ -31,7 +31,7 @@ def _discovery_decision_table(*, lsp_available: bool, web_on: bool = True) -> st
         '- File paths by name/pattern → `glob`',
         '- Symbol name, file unknown → `find_symbols`',
         '- Symbol bodies after candidates → `read(type="symbols", symbols=[...])`',
-        '- File body or line range (one file) → `read(type="file", path=..., start_line=..., end_line=...)`',
+        '- File body or line range (one file) → `read(type="file", path=...)`; add `start_line`+`end_line` together (`end_line=-1` for EOF) or omit both for whole file',
         '- File signatures only (one file) → `analyze_project_structure` command=file_outline',
         '- File symbol list (one file) → `analyze_project_structure` command=symbols',
         '- Project tree / recent changes → `analyze_project_structure` command=tree or recent',

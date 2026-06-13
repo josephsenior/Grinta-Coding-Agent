@@ -574,7 +574,7 @@ class TestMultiEditCommand:
         assert isinstance(action, MessageAction)
         assert 'return 42' in py.read_text(encoding='utf-8')
 
-    def test_multi_edit_resolves_edit_symbols_after_replace_string(self, tmp_path):
+    def test_multi_edit_resolves_edit_symbol_after_replace_string(self, tmp_path):
         from backend.engine.function_calling import _handle_multi_edit_command
 
         py = tmp_path / 'src' / 'mix.py'
@@ -593,7 +593,7 @@ class TestMultiEditCommand:
                     },
                     {
                         'path': 'src/mix.py',
-                        'operation': 'edit_symbols_deferred',
+                        'operation': 'edit_symbol_deferred',
                         'edits': [
                             {
                                 'symbol_name': 'foo',
@@ -610,7 +610,7 @@ class TestMultiEditCommand:
             'HEADER = 1\n\ndef foo():\n    return 99\n'
         )
 
-    def test_multi_edit_resolves_edit_symbols_before_replace_string(self, tmp_path):
+    def test_multi_edit_resolves_edit_symbol_before_replace_string(self, tmp_path):
         from backend.engine.function_calling import _handle_multi_edit_command
 
         py = tmp_path / 'src' / 'mix.py'
@@ -623,7 +623,7 @@ class TestMultiEditCommand:
                 'file_edits': [
                     {
                         'path': 'src/mix.py',
-                        'operation': 'edit_symbols_deferred',
+                        'operation': 'edit_symbol_deferred',
                         'edits': [
                             {
                                 'symbol_name': 'foo',

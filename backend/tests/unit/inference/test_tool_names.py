@@ -17,7 +17,7 @@ EXPECTED_EXPORTS = [
     'CREATE_TOOL_NAME',
     'DEBUGGER_TOOL_NAME',
     'DELEGATE_TASK_TOOL_NAME',
-    'EDIT_SYMBOLS_TOOL_NAME',
+    'EDIT_SYMBOL_TOOL_NAME',
     'EXECUTE_BASH_TOOL_NAME',
     'EXECUTE_MCP_TOOL_TOOL_NAME',
     'EXECUTE_POWERSHELL_TOOL_NAME',
@@ -92,7 +92,7 @@ class TestToolNames(TestCase):
         """Canonical file/memory tool names are defined in tool_names."""
         for name in (
             'CREATE_TOOL_NAME',
-            'EDIT_SYMBOLS_TOOL_NAME',
+            'EDIT_SYMBOL_TOOL_NAME',
             'FIND_SYMBOLS_TOOL_NAME',
             'MULTIEDIT_TOOL_NAME',
             'NOTE_TOOL_NAME',

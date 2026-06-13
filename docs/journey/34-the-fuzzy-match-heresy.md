@@ -104,14 +104,14 @@ Fuzzy matching improved edit reliability significantly, but it was not the final
 
 The real improvement came from a different direction: reducing the model-facing API. The raw editing block — any format where the model produces a structured payload that the backend must parse — was replaced by an intent-oriented tool facade. The model no longer constructs diffs, escapes strings, or manages open/close tags. It declares what it wants to do:
 
-- `edit_symbols` for code, backed by tree-sitter and AST parsing.
+- `edit_symbol` for code, backed by tree-sitter and AST parsing.
 - `replace_string` for grounded textual changes, with the three match modes as a fallback layer.
 - `create` for new files and symbols.
 - `multiedit` for atomic cross-file refactors.
 
 The backend still uses normalization, AST parsing, rollback, and validation internally. The model no longer needs to think in editor protocols.
 
-This layered design means the fuzzy-match modes are not the primary editing path anymore. They are the safety net. The primary path is `edit_symbols` — named symbol replacement with tree-sitter verification. When that does not apply (non-code files, generated code, templated languages), `replace_string` with its match modes takes over. And when the change crosses file boundaries, `multiedit` wraps everything in a transaction.
+This layered design means the fuzzy-match modes are not the primary editing path anymore. They are the safety net. The primary path is `edit_symbol` — named symbol replacement with tree-sitter verification. When that does not apply (non-code files, generated code, templated languages), `replace_string` with its match modes takes over. And when the change crosses file boundaries, `multiedit` wraps everything in a transaction.
 
 The match modes survived because they serve a real need. But the architecture stopped asking the model to think about them. The model just says "replace this symbol" or "find this string and change it." The backend handles the mode selection, the tolerance, and the validation.
 

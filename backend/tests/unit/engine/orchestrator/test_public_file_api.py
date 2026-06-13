@@ -9,7 +9,7 @@ import pytest
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
 from backend.engine.function_calling import (
     _handle_create_tool,
-    _handle_edit_symbols_tool,
+    _handle_edit_symbol_tool,
     _handle_find_symbols_tool,
     _handle_multi_edit_command,
     _handle_multiedit_tool,
@@ -348,20 +348,15 @@ def test_replace_string_public_action_supports_replace_add_and_delete(
     assert replace.replace_all is False
 
 
-def test_edit_symbols_replaces_one_or_more_symbols(monkeypatch, tmp_path):
+def test_edit_symbol_normalizes_to_deferred_multi_edit(monkeypatch, tmp_path):
     _use_tmp_workspace(monkeypatch, tmp_path)
-    (tmp_path / 'mod.py').write_text(
-        'def a():\n    return 1\n\ndef b():\n    return 2\n',
-        encoding='utf-8',
-    )
+    (tmp_path / 'mod.py').write_text('def a():\n    return 1\n', encoding='utf-8')
 
-    action = _handle_edit_symbols_tool(
+    action = _handle_edit_symbol_tool(
         {
             'path': 'mod.py',
-            'edits': [
-                {'symbol_name': 'a', 'new_content': 'def a():\n    return 10\n'},
-                {'symbol_name': 'b', 'new_content': 'def b():\n    return 20\n'},
-            ],
+            'symbol_name': 'a',
+            'new_content': 'def a():\n    return 10\n',
             'security_risk': 'LOW',
         }
     )
@@ -372,23 +367,35 @@ def test_edit_symbols_replaces_one_or_more_symbols(monkeypatch, tmp_path):
         'file_edits': [
             {
                 'path': 'mod.py',
-                'operation': 'symbol_body_replacement',
-                'start_line': 4,
-                'end_line': 5,
-                'content': 'def b():\n    return 20\n',
-            },
-            {
-                'path': 'mod.py',
-                'operation': 'symbol_body_replacement',
-                'start_line': 1,
-                'end_line': 2,
-                'content': 'def a():\n    return 10\n',
-            },
+                'operation': 'edit_symbol_deferred',
+                'edits': [
+                    {
+                        'symbol_name': 'a',
+                        'new_content': 'def a():\n    return 10\n',
+                    }
+                ],
+            }
         ]
     }
 
 
-def test_edit_symbols_rejects_ambiguous_write_target(monkeypatch, tmp_path):
+def test_edit_symbol_rejects_legacy_edits_array(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+    (tmp_path / 'mod.py').write_text('def a():\n    return 1\n', encoding='utf-8')
+
+    with pytest.raises(FunctionCallValidationError, match='use multiedit'):
+        _handle_edit_symbol_tool(
+            {
+                'path': 'mod.py',
+                'edits': [
+                    {'symbol_name': 'a', 'new_content': 'def a():\n    return 10\n'},
+                ],
+                'security_risk': 'LOW',
+            }
+        )
+
+
+def test_edit_symbol_rejects_ambiguous_write_target(monkeypatch, tmp_path):
     _use_tmp_workspace(monkeypatch, tmp_path)
     (tmp_path / 'mod.py').write_text(
         'class A:\n    def run(self):\n        return 1\n\n'
@@ -397,21 +404,26 @@ def test_edit_symbols_rejects_ambiguous_write_target(monkeypatch, tmp_path):
     )
 
     with pytest.raises(FunctionCallValidationError, match='ambiguous'):
-        _handle_edit_symbols_tool(
+        _handle_multi_edit_command(
+            '.',
             {
-                'path': 'mod.py',
-                'edits': [
+                'file_edits': [
                     {
-                        'symbol_name': 'run',
-                        'new_content': 'def run(self):\n    return 3\n',
+                        'path': 'mod.py',
+                        'operation': 'edit_symbol_deferred',
+                        'edits': [
+                            {
+                                'symbol_name': 'run',
+                                'new_content': 'def run(self):\n    return 3\n',
+                            }
+                        ],
                     }
-                ],
-                'security_risk': 'LOW',
-            }
+                ]
+            },
         )
 
 
-def test_edit_symbols_accepts_path_qualified_name_and_kind(monkeypatch, tmp_path):
+def test_edit_symbol_accepts_path_qualified_name_and_kind(monkeypatch, tmp_path):
     _use_tmp_workspace(monkeypatch, tmp_path)
     (tmp_path / 'auth.py').write_text(
         'class UserService:\n'
@@ -423,16 +435,12 @@ def test_edit_symbols_accepts_path_qualified_name_and_kind(monkeypatch, tmp_path
         encoding='utf-8',
     )
 
-    action = _handle_edit_symbols_tool(
+    action = _handle_edit_symbol_tool(
         {
-            'edits': [
-                {
-                    'path': 'auth.py',
-                    'qualified_name': 'AdminService.login',
-                    'symbol_kind': 'method',
-                    'new_content': '    def login(self):\n        return "root"\n',
-                }
-            ],
+            'path': 'auth.py',
+            'qualified_name': 'AdminService.login',
+            'symbol_kind': 'method',
+            'new_content': '    def login(self):\n        return "root"\n',
             'security_risk': 'LOW',
         }
     )
@@ -442,26 +450,29 @@ def test_edit_symbols_accepts_path_qualified_name_and_kind(monkeypatch, tmp_path
         'file_edits': [
             {
                 'path': 'auth.py',
-                'operation': 'symbol_body_replacement',
-                'start_line': 6,
-                'end_line': 7,
-                'content': '    def login(self):\n        return "root"\n',
+                'operation': 'edit_symbol_deferred',
+                'edits': [
+                    {
+                        'qualified_name': 'AdminService.login',
+                        'symbol_kind': 'method',
+                        'new_content': '    def login(self):\n        return "root"\n',
+                    }
+                ],
             }
         ]
     }
 
 
-def test_edit_symbols_rejects_serialized_payload(monkeypatch, tmp_path):
+def test_edit_symbol_rejects_serialized_payload(monkeypatch, tmp_path):
     _use_tmp_workspace(monkeypatch, tmp_path)
     (tmp_path / 'mod.py').write_text('def a():\n    return 1\n', encoding='utf-8')
 
     with pytest.raises(FunctionCallValidationError, match='CONTENT_APPEARS_SERIALIZED'):
-        _handle_edit_symbols_tool(
+        _handle_edit_symbol_tool(
             {
                 'path': 'mod.py',
-                'edits': [
-                    {'symbol_name': 'a', 'new_content': '"def a():\\n    return 2\\n"'}
-                ],
+                'symbol_name': 'a',
+                'new_content': '"def a():\\n    return 2\\n"',
                 'security_risk': 'LOW',
             }
         )
@@ -486,7 +497,7 @@ def test_multiedit_public_action_normalizes_supported_operations_and_guards_cont
                     'new_string': 'new',
                 },
                 {
-                    'command': 'edit_symbols',
+                    'command': 'edit_symbol',
                     'path': 'mod.py',
                     'edits': [
                         {
@@ -511,7 +522,7 @@ def test_multiedit_public_action_normalizes_supported_operations_and_guards_cont
     }
     assert (
         action.structured_payload['file_edits'][1]['operation']
-        == 'edit_symbols_deferred'
+        == 'edit_symbol_deferred'
     )
     assert action.structured_payload['file_edits'][1]['path'] == 'mod.py'
     assert action.structured_payload['file_edits'][1]['edits'][0]['symbol_name'] == 'login'
@@ -536,7 +547,7 @@ def test_multiedit_rejects_old_public_aliases(monkeypatch, tmp_path):
     _use_tmp_workspace(monkeypatch, tmp_path)
 
     with pytest.raises(
-        FunctionCallValidationError, match='Use replace_string or edit_symbols'
+        FunctionCallValidationError, match='Use replace_string or edit_symbol'
     ):
         _handle_multiedit_tool(
             {

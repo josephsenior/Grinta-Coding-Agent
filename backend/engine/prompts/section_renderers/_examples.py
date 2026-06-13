@@ -9,7 +9,7 @@ from backend.inference.tool_names import (
     ASK_USER_TOOL_NAME,
     CODE_INTELLIGENCE_TOOL_NAME,
     CREATE_TOOL_NAME,
-    EDIT_SYMBOLS_TOOL_NAME,
+    EDIT_SYMBOL_TOOL_NAME,
     FIND_SYMBOLS_TOOL_NAME,
     GLOB_TOOL_NAME,
     GREP_TOOL_NAME,
@@ -42,7 +42,7 @@ def _build_search_tools(*, lsp_available: bool) -> str:
 def _build_edit_tools() -> str:
     return (
         f'{_tool_ref(CREATE_TOOL_NAME)} / {_tool_ref(REPLACE_STRING_TOOL_NAME)} / '
-        f'{_tool_ref(EDIT_SYMBOLS_TOOL_NAME)} / {_tool_ref(MULTIEDIT_TOOL_NAME)}'
+        f'{_tool_ref(EDIT_SYMBOL_TOOL_NAME)} / {_tool_ref(MULTIEDIT_TOOL_NAME)}'
     )
 
 
@@ -62,7 +62,7 @@ def _build_available_tools_summary(
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
         CREATE_TOOL_NAME,
         REPLACE_STRING_TOOL_NAME,
-        EDIT_SYMBOLS_TOOL_NAME,
+        EDIT_SYMBOL_TOOL_NAME,
         MULTIEDIT_TOOL_NAME,
         UNDO_LAST_EDIT_TOOL_NAME,
         terminal_command_tool,
@@ -130,7 +130,7 @@ def _render_examples(
         edit_tools=edit_tools,
         read_tool=_tool_ref(READ_TOOL_NAME),
         analyze_tool=_tool_ref(ANALYZE_PROJECT_STRUCTURE_TOOL_NAME),
-        edit_symbols_tool=_tool_ref(EDIT_SYMBOLS_TOOL_NAME),
+        edit_symbol_tool=_tool_ref(EDIT_SYMBOL_TOOL_NAME),
         multiedit_tool=_tool_ref(MULTIEDIT_TOOL_NAME),
         replace_string_tool=_tool_ref(REPLACE_STRING_TOOL_NAME),
         terminal_tool=_tool_ref(terminal_command_tool),

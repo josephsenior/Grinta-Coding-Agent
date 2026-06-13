@@ -237,7 +237,7 @@ class StructureEditor:
         if os.path.exists(path):
             return EditResult(
                 success=False,
-                message=f'File already exists: {path}. Use edit_symbols or replace_string to modify it.',
+                message=f'File already exists: {path}. Use edit_symbol or replace_string to modify it.',
             )
 
         try:

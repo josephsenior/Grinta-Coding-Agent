@@ -47,7 +47,7 @@ def _tool_name_for_action(action: object) -> str:
     return getattr(tcm, 'function_name', '') or ''
 
 
-_FILE_EDIT_TOOL_NAMES = {'create', 'replace_string', 'edit_symbols', 'multiedit'}
+_FILE_EDIT_TOOL_NAMES = {'create', 'replace_string', 'edit_symbol', 'multiedit'}
 
 
 def _effective_error_tool_name(tool_name: str, content: str) -> str:
@@ -80,7 +80,7 @@ def _record_success_progress(
     record_success = getattr(service, 'record_success')
     # Map edit tool names to the file-edit bucket so successes decay the same
     # per-tool counter that errors increment. Otherwise edit errors never
-    # decay within a turn (key mismatch: error → 'file_edit', success → 'edit_symbols').
+    # decay within a turn (key mismatch: error → 'file_edit', success → 'edit_symbol').
     if tool_name in _FILE_EDIT_TOOL_NAMES:
         tool_name = FILE_EDIT_BUCKET
     record_success(tool_name=tool_name)

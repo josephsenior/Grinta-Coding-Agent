@@ -42,7 +42,7 @@ def create_lsp_query_tool() -> dict[str, Any]:
                 'the chosen fix yourself via a file edit and '
                 're-run `get_diagnostics` to verify.\n'
                 'Tool boundaries (do not duplicate effort):\n'
-                '  • Edit by symbol name → use `edit_symbols`. `lsp` '
+                '  • Edit by symbol name → use `edit_symbol`. `lsp` '
                 'is read-only and intentionally does not expose rename.\n'
                 '  • Workspace-wide text/symbol search → use `grep` or `glob` '
                 '(ripgrep). `list_symbols` only enumerates symbols in a single file.\n'
